@@ -9,6 +9,7 @@ from snpdb.models import GenomeBuild, VariantCoordinate
 class HGVSConverterType(Enum):
     PYHGVS = 1
     BIOCOMMONS_HGVS = 2
+    COMBO = 3
 
 
 class HgvsMatchRefAllele:

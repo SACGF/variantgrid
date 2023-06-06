@@ -58,17 +58,21 @@ class HGVSConverterFactory:
 
     @staticmethod
     def factory(genome_build: GenomeBuild, hgvs_converter_type: HGVSConverterType = None):
-        if False and settings.DEBUG:
-            converters = [BioCommonsHGVSConverter(genome_build), PyHGVSConverter(genome_build)]
-            return ComboCheckerHGVSConverter(genome_build, converters, die_on_error=False)
-
         if hgvs_converter_type is None:
-            hgvs_converter_type = HGVSConverterType[settings.HGVS_DEFAULT_METHOD.upper()]
+            if False and settings.DEBUG:  # TODO: Disabled
+                hgvs_converter_type = HGVSConverterType.COMBO
+            else:
+                hgvs_converter_type = HGVSConverterType[settings.HGVS_DEFAULT_METHOD.upper()]
+
+        logging.debug("Using HGVSConverter = %s", hgvs_converter_type.name)
 
         if hgvs_converter_type == HGVSConverterType.BIOCOMMONS_HGVS:
             return BioCommonsHGVSConverter(genome_build)
         elif hgvs_converter_type == HGVSConverterType.PYHGVS:
             return PyHGVSConverter(genome_build)
+        elif hgvs_converter_type == HGVSConverterType.COMBO:
+            converters = [BioCommonsHGVSConverter(genome_build), PyHGVSConverter(genome_build)]
+            return ComboCheckerHGVSConverter(genome_build, converters, die_on_error=False)
 
 
 class HGVSMatcher:

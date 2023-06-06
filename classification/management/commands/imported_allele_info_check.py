@@ -5,9 +5,9 @@ import pandas as pd
 from django.core.management import BaseCommand
 from django.db.models import Max
 
-from classification.models import Classification
-from genes.hgvs import HGVSMatcher
-from snpdb.models import Variant
+from classification.models import Classification, ImportedAlleleInfo
+from genes.hgvs import HGVSMatcher, HGVSConverterType
+from snpdb.models import Variant, GenomeBuild
 
 
 class Command(BaseCommand):
@@ -20,64 +20,59 @@ class Command(BaseCommand):
     """
 
     def _get_last_modified(self):
-        qs = Classification.objects.all()
+        qs = ImportedAlleleInfo.objects.all()
         data = qs.aggregate(Max("modified"))
         return data["modified__max"]
 
     def handle(self, *args, **options):
-        # FIXME base this off AlleleInfo instead of Classification
         start_last_modified = self._get_last_modified()
 
         variant_diff_count = Counter()
         transcript_diff_count = Counter()
         diff_rows = []
-        c: Classification
-        for c in Classification.objects.all().iterator(chunk_size=100):
+        iai: ImportedAlleleInfo
+        hgvs_matchers_by_build = {}
+        for genome_build in GenomeBuild.builds_with_annotation():
+            matcher = HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.COMBO)
+            hgvs_matchers_by_build[genome_build] = matcher
+
+        for iai in ImportedAlleleInfo.objects.all().iterator(chunk_size=100):
             try:
-                if v := c.variant:
-                    existing_tuple = v.as_tuple()
+                genome_build = iai.imported_genome_build
+                matcher = hgvs_matchers_by_build[genome_build]
+                provided_transcript_accession = matcher.get_transcript_accession(iai.imported_c_hgvs)
+                vcd = matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(iai.imported_c_hgvs)
+                current_variant_coordinate, current_transcript_accession, _kind, _method, _matches_ref = vcd
+
+                rvi = iai[iai.imported_genome_build]
+                if rvi.variant:
+                    existing_variant_coordinate = rvi.variant.coordinate
                 else:
-                    existing_tuple = None
+                    existing_variant_coordinate = None
 
-                genome_build = c.get_genome_build()
-                if genome_build.name == "GRCh37":
-                    c_hgvs_name = c.chgvs_grch37_full
-                elif genome_build.name == "GRCh38":
-                    c_hgvs_name = c.chgvs_grch38_full
-                else:
-                    raise ValueError(f"Don't know how to get out cached chgvs from {c} ({genome_build=}) ")
+                resolved_transcript_accession = rvi.transcript_version.accession
+                resolved_c_hgvs_name = rvi.c_hgvs_full
 
-                hgvs_matcher = HGVSMatcher(genome_build)
-                if c_hgvs_name:
-                    existing_resolved_transcript = hgvs_matcher.get_transcript_accession(c_hgvs_name)
-                else:
-                    existing_resolved_transcript = None
-
-                vcfe = c._get_variant_coordinates_from_evidence()
-                provided_transcript = c.transcript
-                variant_tuple = vcfe.variant_coordinate
-                transcript_accession = vcfe.transcript_accession
-
-                if variant_tuple == existing_tuple:
+                if current_variant_coordinate == existing_variant_coordinate:
                     variant_diff = ""
-                elif not existing_tuple:
+                elif not existing_variant_coordinate:
                     variant_diff = "gained variant match"
-                elif not variant_tuple:
+                elif not current_variant_coordinate:
                     variant_diff = "lost variant match"
                 else:
                     variant_diff = "variant matched changed"
 
-                if transcript_accession == existing_resolved_transcript:
+                if provided_transcript_accession == resolved_transcript_accession:
                     transcript_diff = ""
-                elif not existing_resolved_transcript:
+                elif not resolved_transcript_accession:
                     transcript_diff = "gained transcript"
-                elif not transcript_accession:
+                elif not provided_transcript_accession:
                     transcript_diff = "lost transcript"
                 else:
                     transcript_diff = "transcript changed"
-                    if provided_transcript == transcript_accession:
+                    if provided_transcript_accession == current_transcript_accession:
                         transcript_diff += ": matched exact"
-                    elif provided_transcript == existing_resolved_transcript:
+                    elif provided_transcript_accession == resolved_transcript_accession:
                         transcript_diff += ": LOST EXACT MATCH!"
 
                 if variant_diff or transcript_diff:
@@ -89,13 +84,13 @@ class Command(BaseCommand):
 
                     #print(f"{existing_tuple=}")
                     diff_rows.append({
-                        "classification": c.get_absolute_url(),
-                        "provided_transcript": provided_transcript,
-                        "old_resolved_transcript": existing_resolved_transcript,
-                        "new_resolved_transcript": transcript_accession,
+                        "imported_allele_info": iai.get_absolute_url(),
+                        "provided_transcript_accession": provided_transcript_accession,
+                        "old_resolved_transcript": resolved_transcript_accession,
+                        "new_resolved_transcript": current_transcript_accession,
                         "transcript_diff": transcript_diff,
-                        "old_variant": _format_tuple(existing_tuple),
-                        "new_variant": _format_tuple(variant_tuple),
+                        "old_variant": _format_tuple(existing_variant_coordinate),
+                        "new_variant": _format_tuple(current_variant_coordinate),
                         "variant_diff": variant_diff,
                     })
 
