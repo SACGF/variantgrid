@@ -26,7 +26,7 @@ from library.cache import timed_cache
 from library.constants import DAY_SECS, WEEK_SECS
 from library.log_utils import report_exc_info
 from library.preview_request import PreviewData, PreviewModelMixin
-from library.utils import Constant, pretty_label
+from library.utils import Constant, first
 
 
 class OntologyImportSource:
@@ -702,7 +702,7 @@ class OntologyVersion(TimeStampedModel):
 
     @staticmethod
     @timed_cache(ttl=60, quick_key_access=True)
-    def get_latest_and_live_ontology_qs():
+    def get_latest_and_live_ontology_qs() -> QuerySet[OntologyTermRelation]:
         latest = OntologyVersion.latest()
         # live relationships of panelappau aren't versioned
         # TODO could restrict only if we have live enabled in settings
@@ -1003,6 +1003,7 @@ class OntologySnake:
 
         return OntologySnakes(valid_snakes)
 
+
     @staticmethod
     def gencc_quality_filter(quality: GeneDiseaseClassification = GeneDiseaseClassification.STRONG) -> Q:
         gencc_classifications = GeneDiseaseClassification.get_above_min(quality)
@@ -1075,6 +1076,16 @@ class OntologySnake:
             report_exc_info()
             return False
 
+    @staticmethod
+    def get_children(term: OntologyTerm):
+        relationships = OntologyVersion.get_latest_and_live_ontology_qs().filter(dest_term=term, relation=OntologyRelation.IS_A).select_related("source_term")
+        return set(relationship.source_term for relationship in relationships)
+
+    @staticmethod
+    def get_parents(term: OntologyTerm):
+        relationships = OntologyVersion.get_latest_and_live_ontology_qs().filter(source_term=term, relation=OntologyRelation.IS_A).select_related("dest_term")
+        return set(relationship.dest_term for relationship in relationships)
+
 
 class OntologySnakes:
 
@@ -1101,3 +1112,101 @@ class OntologySnakes:
         if ontology_relation:
             relations = {otr for otr in relations if otr.relation == ontology_relation}
         return list(sorted(relations))
+
+
+class SingleTermH:
+
+    def __init__(self, term: OntologyTerm):
+        self.term = term
+        self.children: Set[SingleTermH] = set()
+        self.depth = 99
+        self.resolved = False
+
+    @cached_property
+    def all_relevant_children(self):
+        all_relevant_children = set([self.term])
+        for child in self.children:
+            all_relevant_children.update(child.all_relevant_children)
+        return all_relevant_children
+
+    def __repr__(self):
+        return f"{self.term} depth: {self.depth}"
+
+class AncestorCalculator:
+
+    def __init__(self, terms: Iterable[OntologyTerm]):
+        terms = set(terms)
+        if not terms:
+            raise ValueError("Terms must have at least one entry")
+        else:
+            ontology_services = set()
+            for term in terms:
+                ontology_services.add(term.ontology_service)
+            if len(ontology_services) > 1:
+                raise ValueError(f"Can't find ancestors between different ontologies {ontology_services}")
+            ontology_service = first(ontology_services)
+            if ontology_service not in {OntologyService.MONDO, OntologyService.HPO}:
+                raise ValueError(f"Can only find common ancestor of MONDO & HPO, not {ontology_service}")
+
+        self.base_terms = terms
+        self.term_hs: Dict[OntologyTerm, SingleTermH] = dict()
+        for term in terms:
+            self.get_term(term)
+        self.processed = False
+
+    def get_term(self, term: OntologyTerm) -> SingleTermH:
+        if term_h := self.term_hs.get(term):
+            return term_h
+        else:
+            term_h = SingleTermH(term=term)
+            self.term_hs[term] = term_h
+            return term_h
+
+    def get_unresolved(self):
+        return [sh for sh in self.term_hs.values() if not sh.resolved]
+
+    def set_depth(self, single_h: SingleTermH, depth: int):
+        if single_h.depth > depth:
+            single_h.depth = depth
+
+            for child in single_h.children:
+                self.set_depth(child, depth+1)
+
+    def process(self) -> OntologyTerm:
+        if self.processed:
+            raise ValueError("Can only call process once")
+        self.processed = True
+
+        if len(self.base_terms) == 1:
+            return first(self.base_terms)
+
+        root_term: Optional[SingleTermH] = None
+
+        unprocessed = self.get_unresolved()
+        while unprocessed:
+            for sh in unprocessed:
+                parents = OntologySnake.get_parents(sh.term)
+                if parents:
+                    for parent in parents:
+                        self.get_term(parent).children.add(sh)
+                else:
+                    root_term = sh
+                sh.resolved = True
+
+            unprocessed = self.get_unresolved()
+
+        if not root_term:
+            raise ValueError("Did not find root term going up IS_A relationships")
+
+        self.set_depth(root_term, 0)
+
+        best_contender = root_term
+        for sh in self.term_hs.values():
+            if sh.depth > best_contender.depth and sh.all_relevant_children.issuperset(self.base_terms):
+                best_contender = sh
+
+        return best_contender.term
+
+    @staticmethod
+    def common_ancestor(terms: Iterable[OntologyTerm]) -> OntologyTerm:
+        return AncestorCalculator(terms).process()

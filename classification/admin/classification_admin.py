@@ -23,9 +23,11 @@ from classification.models.clinical_context_models import ClinicalContextRecalcT
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from classification.signals import send_discordance_notification
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
+from library.cache import timed_cache
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import admin_bot
-from library.utils import ExportRow, export_column, ExportDataType
+from library.utils import ExportRow, export_column, ExportDataType, first
+from ontology.models import OntologyTerm, AncestorCalculator
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter, \
     admin_model_action
 from snpdb.lab_picker import LabPickerData
@@ -567,6 +569,47 @@ class DiscordanceReportClassificationAdmin(admin.TabularInline):
 
 class DiscordanceReportAdminExport(ExportRow):
 
+    @staticmethod
+    @timed_cache(ttl=60)
+    def cs_to_index():
+        return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("vg")
+
+    @staticmethod
+    def _less_more_certain(summary: DiscordanceLabSummary):
+        cs_to_index = DiscordanceReportAdminExport.cs_to_index()
+        from_value = int(cs_to_index.get(summary.clinical_significance_from, "0"))
+        to_value = int(cs_to_index.get(summary.clinical_significance_to, "0"))
+
+        if summary.clinical_significance_to == 'withdrawn':
+            return "withdrawn"
+        elif from_value == to_value:
+            return "same"
+        elif from_value == 0 or to_value == 0:
+            return "?"
+        else:
+            if abs(to_value - 3) > abs(from_value - 3):
+                return "more"
+            else:
+                return "less"
+
+    @staticmethod
+    def _up_down_for(summary: DiscordanceLabSummary):
+        cs_to_index = DiscordanceReportAdminExport.cs_to_index()
+        from_value = int(cs_to_index.get(summary.clinical_significance_from, "0"))
+        to_value = int(cs_to_index.get(summary.clinical_significance_to, "0"))
+
+        if summary.clinical_significance_to == 'withdrawn':
+            return "withdrawn"
+        elif from_value == to_value:
+            return "same"
+        elif from_value == 0 or to_value == 0:
+            return "?"
+        else:
+            if to_value > from_value:
+                return "upgrade"
+            else:
+                return "downgrade"
+
     def __init__(self, discordance_report: DiscordanceReport, perspective: LabPickerData):
         self.discordance_report = discordance_report
         self.summaries = DiscordanceLabSummary.for_discordance_report(discordance_report, perspective)
@@ -626,6 +669,61 @@ class DiscordanceReportAdminExport(ExportRow):
     def _admin_notes(self):
         return self.discordance_report.admin_note
 
+    @export_column("Umbrella Condition")
+    def _umbrella_condition(self):
+        conditions: Set[OntologyTerm] = set()
+        for summary in self.summaries:
+            for drc in summary.drcs:
+                if condition_obj := drc.classification_original.classification.condition_resolution_obj:
+                    if mondo := condition_obj.as_mondo_if_possible():
+                        conditions.update(mondo.terms)
+        if conditions:
+            ancestor = AncestorCalculator.common_ancestor(conditions)
+            return str(ancestor)
+        else:
+            return ""
+
+    @export_column("Clinically Significant")
+    def _clinically_significant(self):
+        for summary in self.summaries:
+            if "P" in summary.clinical_significance_from:
+                return True
+        return False
+
+    @export_column("Overall Upgrade/Downgrade")
+    def _overall_upgrade_downgrade(self):
+        ups_and_downs = set([DiscordanceReportAdminExport._up_down_for(summary) for summary in self.summaries])
+        ups_and_downs.discard("same")
+        if not ups_and_downs:
+            return "same"
+        elif len(ups_and_downs) == 1:
+            return first(ups_and_downs)
+        if "upgrade" in ups_and_downs and "downgrade" in ups_and_downs:
+            return "mixed"
+        elif "upgrade" in ups_and_downs:
+            return "upgrade"
+        elif "downgrade" in ups_and_downs:
+            return "downgrade"
+        else:
+            return first(ups_and_downs)
+
+    @export_column("Overall Certainty")
+    def _overall_certainty(self):
+        certainties = set([DiscordanceReportAdminExport._less_more_certain(summary) for summary in self.summaries])
+        certainties.discard("same")
+        if not certainties:
+            return "same"
+        elif len(certainties) == 1:
+            return first(certainties)
+        if "more" in certainties and "less" in certainties:
+            return "mixed"
+        elif "more" in certainties:
+            return "more"
+        elif "less" in certainties:
+            return "less"
+        else:
+            return first(certainties)
+
     @export_column("Labs")
     def _labs(self):
         return "\n".join(str(summary.lab) for summary in self.summaries)
@@ -648,45 +746,11 @@ class DiscordanceReportAdminExport(ExportRow):
 
     @export_column("Upgrade/Downgrade")
     def _upgrade_downgrade(self):
-        cs_to_index = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("vg")
-        def up_down_for(summary: DiscordanceLabSummary):
-
-            from_value = int(cs_to_index.get(summary.clinical_significance_from, "0"))
-            to_value = int(cs_to_index.get(summary.clinical_significance_to, "0"))
-
-            if summary.clinical_significance_to == 'withdrawn':
-                return "withdrawn"
-            elif from_value == to_value:
-                return "same"
-            elif from_value == 0 or to_value == 0:
-                return "?"
-            else:
-                if to_value > from_value:
-                    return "upgrade"
-                else:
-                    return "downgrade"
-        return "\n".join((up_down_for(summary) for summary in self.summaries))
+        return "\n".join((DiscordanceReportAdminExport._up_down_for(summary) for summary in self.summaries))
 
     @export_column("Certainty")
     def _certainty(self):
-        cs_to_index = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("vg")
-
-        def up_down_for(summary: DiscordanceLabSummary):
-            from_value = int(cs_to_index.get(summary.clinical_significance_from, "0"))
-            to_value = int(cs_to_index.get(summary.clinical_significance_to, "0"))
-
-            if summary.clinical_significance_to == 'withdrawn':
-                return "withdrawn"
-            elif from_value == to_value:
-                return "same"
-            elif from_value == 0 or to_value == 0:
-                return "?"
-            else:
-                if abs(to_value - 3) > abs(from_value - 3):
-                    return "more"
-                else:
-                    return "less"
-        return "\n".join((up_down_for(summary) for summary in self.summaries))
+        return "\n".join((DiscordanceReportAdminExport._less_more_certain(summary) for summary in self.summaries))
 
 
 @admin.register(DiscordanceReport)
