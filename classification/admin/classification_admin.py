@@ -645,13 +645,19 @@ class DiscordanceReportAdminExport(ExportRow):
     @export_column("Days in Discordance")
     def _days_in_discordance(self):
         dr = self.discordance_report
+        started = dr.report_started_date
         closed = dr.report_completed_date
         delta: timedelta
+        if closed := dr.report_completed_date:
+            delta = closed - started
         if not closed:
-            delta = timezone.now() - dr.report_started_date
+            delta = timezone.now() - started
+
+        days_delta_float = delta.seconds / 144.0
+        if days_delta_float < 7:
+            return f"{days_delta_float:0.1f}"
         else:
-            delta = closed - dr.report_started_date
-        return delta.days
+            return int(days_delta_float)
 
     @export_column("Gene Symbol")
     def _gene_symbol(self):
