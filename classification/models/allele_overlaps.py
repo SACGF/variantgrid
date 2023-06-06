@@ -8,9 +8,9 @@ from typing import List, Optional, Dict, Set, Iterator
 from django.db.models import Count, QuerySet, Subquery
 
 from classification.criteria_strengths import AcmgPointScore, CriteriaStrengths, CriteriaSummarizer
-from classification.enums import SpecialEKeys
+from classification.enums import SpecialEKeys, ShareLevel
 from classification.models import ClassificationModification, ClinicalContext, ClassificationLabSummaryEntry, \
-    ClassificationLabSummary, classification_flag_types, ClassificationFlagTypes, DiscordanceReport
+    ClassificationLabSummary, classification_flag_types, ClassificationFlagTypes, DiscordanceReport, Classification
 from classification.models.clinical_context_models import DiscordanceStatus, DiscordanceLevel
 from flags.models import Flag, FlagStatus
 from genes.hgvs import CHGVS
@@ -314,13 +314,14 @@ class OverlapSet:
 
 class OverlapsCalculator:
 
-    def __init__(self, perspective: LabPickerData):
+    def __init__(self, perspective: LabPickerData, shared_only=False):
         """
         Calculates classification overlaps (when more than 1 classification is provided from the same allele.)
         Is the generally split up between
         :param perspective: User must be present in this perspective
         """
         self.calculator_state = OverlapsCalculatorState(perspective=perspective)
+        self.shared_only = shared_only
 
     @cached_property
     def overlaps(self) -> List[AlleleOverlap]:
@@ -328,27 +329,37 @@ class OverlapsCalculator:
         lab_ids = perspective.lab_ids
         # find all overlaps, then see if user is allowed to see them and if user wants to see them (lab restriction)
 
-        allele_qs = Allele.objects.annotate(classification__count=Count('classification')).filter(
-            classification__count__gte=2)
+        # overlaps
+        overlapping_alleles_qs = Allele.objects.annotate(classification__count=Count('classification')).filter(classification__count__gte=2)
+        # your lab
+        your_lab_alleles_qs = Classification.objects.filter(lab_id__in=lab_ids)
+        if self.shared_only and not perspective.is_admin_mode:
+            your_lab_alleles_qs = your_lab_alleles_qs.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)
+        your_lab_alleles_qs = your_lab_alleles_qs.values_list("allele_info__allele", flat=True)
 
         cm_qs: QuerySet[ClassificationModification]
         cm_qs = ClassificationModification.latest_for_user(user=perspective.user, published=True).filter(
-            classification__allele_id__in=Subquery(allele_qs.values("pk"))) \
-            .select_related('classification',
+                classification__allele_id__in=Subquery(overlapping_alleles_qs.values("pk"))
+            ).filter(
+                classification__allele_id__in=Subquery(your_lab_alleles_qs)
+            ).select_related('classification',
                             'classification__allele_info__grch37',
                             'classification__allele_info__grch38',
+                            'classification__allele_info__allele',
                             'classification__clinical_context',
                             'classification__lab',
                             'classification__lab__organization') \
-            .order_by('classification__allele_info__allele')
+            .order_by('classification__allele_info__allele').iterator()
 
         all_overlaps = []
         for allele, cms in group_by_key(cm_qs, lambda x: x.classification.allele_object):
             if len(cms) >= 2 and any((cm.classification.lab_id in lab_ids for cm in cms)):
                 overlap = AlleleOverlap(calculator_state=self.calculator_state, allele=allele)
                 all_overlaps.append(overlap)
+                cm: Classification
                 for cm in cms:
-                    overlap.add_classification(cm)
+                    if (not self.shared_only) or cm.share_level_enum.is_discordant_level:
+                        overlap.add_classification(cm)
 
         all_overlaps.sort(reverse=True)
         return all_overlaps

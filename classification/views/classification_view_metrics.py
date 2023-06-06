@@ -89,7 +89,6 @@ class ViewEventCounts:
                 .annotate(total=Count('pk'))\
                 .order_by():
             if non_blank := values.get(field_name):
-                print(f"{field_name} \"{non_blank}\"")
                 id_to_count[non_blank] += 1  # just want to count once per unique user
             # TODO limit the number of results we look at? (though wont work if we want unique users)
 
@@ -98,7 +97,7 @@ class ViewEventCounts:
     @staticmethod
     def resolver_for_model(model: Type[Model]):
         def resolver(pk: Any):
-            if pk:
+            if pk and pk != "undefined":
                 if first := model.objects.filter(pk=pk).first():
                     return first
                 else:
@@ -180,19 +179,23 @@ class ViewEventCounts:
             .order_by('-created') \
             .select_related('user')
 
-        if view_name := request.GET.get('view_name'):
-            views = views.filter(view_name=view_name)
-        elif classification_id := request.GET.get('classification_id'):
-            views = views.filter(args__classification_id=int(classification_id))
-        elif allele_id := request.GET.get('allele_id'):
-            views = views.filter(args__allele_id=int(allele_id))
-        elif discordance_report_id := request.GET.get('discordance_report_id'):
-            views = views.filter(args__discordance_report_id=int(discordance_report_id))
-        elif gene_symbol_id := request.GET.get('gene_symbol'):
-            views = views.filter(args__gene_symbol=gene_symbol_id)
-        elif user_id := request.GET.get('user_id'):
-            views = views.filter(user=user_id)
-        else:
+        try:
+            if view_name := request.GET.get('view_name'):
+                views = views.filter(view_name=view_name)
+            elif classification_id := request.GET.get('classification_id'):
+                views = views.filter(args__classification_id=int(classification_id))
+            elif allele_id := request.GET.get('allele_id'):
+                views = views.filter(args__allele_id=int(allele_id))
+            elif discordance_report_id := request.GET.get('discordance_report_id'):
+                views = views.filter(args__discordance_report_id=int(discordance_report_id))
+            elif gene_symbol_id := request.GET.get('gene_symbol'):
+                views = views.filter(args__gene_symbol=gene_symbol_id)
+            elif user_id := request.GET.get('user_id'):
+                views = views.filter(user=user_id)
+            else:
+                views = ViewEvent.objects.none()
+        except ValueError:
+            # conversion of "undefined" to an int or similar
             views = ViewEvent.objects.none()
 
         return views
