@@ -18,5 +18,5 @@ def view_overlaps_vus(request: HttpRequest, lab_id=None) -> HttpResponseBase:
 
 def view_overlaps_vus_detail(request: HttpRequest, lab_id: Optional[Union[str, int]] = None) -> HttpResponseBase:
     return render(request, "classification/vus_detail.html", {
-        "overlaps": OverlapsCalculator(perspective=LabPickerData.from_request(request, lab_id))
+        "overlaps": OverlapsCalculator(perspective=LabPickerData.from_request(request, lab_id), shared_only=True)
     })
