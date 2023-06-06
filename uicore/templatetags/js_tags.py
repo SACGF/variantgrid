@@ -145,6 +145,7 @@ def code_regex(data: str):
         error = f"Invalid pattern: {data}"
 
     if match := re.compile(r"\.\*\\\.(?P<extension>.+)").match(data):
+        # detect if the regex looks like it's just trying to match a file extnesion
         extension = match.group('extension')
     return {"error": error, "extension": extension, "pattern": pattern}
 
