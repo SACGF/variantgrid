@@ -333,8 +333,8 @@ class OverlapsCalculator:
         overlapping_alleles_qs = Allele.objects.annotate(classification__count=Count('classification')).filter(classification__count__gte=2)
         # your lab
         your_lab_alleles_qs = Classification.objects.filter(lab_id__in=lab_ids)
-        if self.shared_only:
-            your_lab_alleles_qs.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)
+        if self.shared_only and not perspective.is_admin_mode:
+            your_lab_alleles_qs = your_lab_alleles_qs.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)
         your_lab_alleles_qs = your_lab_alleles_qs.values_list("allele_info__allele", flat=True)
 
         cm_qs: QuerySet[ClassificationModification]
@@ -356,8 +356,10 @@ class OverlapsCalculator:
             if len(cms) >= 2 and any((cm.classification.lab_id in lab_ids for cm in cms)):
                 overlap = AlleleOverlap(calculator_state=self.calculator_state, allele=allele)
                 all_overlaps.append(overlap)
+                cm: Classification
                 for cm in cms:
-                    overlap.add_classification(cm)
+                    if (not self.shared_only) or cm.share_level_enum.is_discordant_level:
+                        overlap.add_classification(cm)
 
         all_overlaps.sort(reverse=True)
         return all_overlaps
