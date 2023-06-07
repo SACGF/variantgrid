@@ -15,10 +15,11 @@ def _get_gene_and_terms(hgvs_matcher, vta, c_hgvs=True, extra_terms: Optional[Li
     if extra_terms:
         terms.extend(extra_terms)
     hgvs_variant = None
-    try:
-        hgvs_variant = hgvs_matcher.create_hgvs_variant(vta.hgvs_c)
-    except (NotImplementedError, HGVSException):
-        pass
+    if vta.hgvs_c:
+        try:
+            hgvs_variant = hgvs_matcher.create_hgvs_variant(vta.hgvs_c)
+        except (NotImplementedError, HGVSException):
+            pass
 
     if c_hgvs and hgvs_variant:
         # "7051G>A" | "7051G->A" | "7051G-->A" | "7051G/A"
