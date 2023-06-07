@@ -8,7 +8,7 @@ from django.core.cache import cache
 from django.db.models import Max, Min
 from hgvs.exceptions import HGVSError
 
-from genes.hgvs import HGVSVariant, CHGVS
+from genes.hgvs import HGVSVariant, CHGVS, HGVSException
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
 from genes.hgvs.hgvs_converter import HGVSConverterType
 from genes.hgvs.hgvs_converter_combo import ComboCheckerHGVSConverter
@@ -555,46 +555,57 @@ class HGVSMatcher:
             # WARNING, THIS GETS IGNORED IN SEARCH, calling code just checks itself if there's been any difference
             search_messages.append(f'Cleaned "{hgvs_string}" =>"{cleaned_hgvs}"')
 
-        try:
-            fixed_hgvs, fixed_messages = self.fix_gene_transcript(cleaned_hgvs)
-            if fixed_hgvs != cleaned_hgvs:
-                search_messages.extend(fixed_messages)
-                cleaned_hgvs = fixed_hgvs
-
-        except ValueError:
-            pass
-
+        fixed_hgvs, fixed_messages = self.fix_gene_transcript(cleaned_hgvs)
+        if fixed_hgvs != cleaned_hgvs:
+            search_messages.extend(fixed_messages)
+            cleaned_hgvs = fixed_hgvs
         return cleaned_hgvs, search_messages
 
-    def fix_gene_transcript(self, hgvs_string: str) -> Tuple[str, List[str]]:
+    @staticmethod
+    def fix_gene_transcript(hgvs_string: str) -> Tuple[str, List[str]]:
         """ Fix common case of 'GATA2(NM_032638.5):c.1082G>C' and lower case transcript IDs """
 
-        # lower case transcripts w/o genes will be assigned as gene by pyHGVS
         fixed_messages = []
-        hgvs_variant = self.create_hgvs_variant(hgvs_string)
-        transcript_ok = HGVSMatcher._looks_like_transcript(hgvs_variant.transcript)
-        if not transcript_ok and hgvs_variant.gene:
+
+        try:
+            prefix, allele = hgvs_string.split(":")
+        except ValueError:
+            return hgvs_string, []  # Can't do anything here
+
+        if m := re.match(r"(.+)\((.*)\)", prefix):  # Both provided
+            transcript_accession, gene_symbol = m.groups()
+        else:
+            transcript_accession = prefix
+            gene_symbol = None
+
+        transcript_ok = HGVSMatcher._looks_like_transcript(transcript_accession)
+        if not transcript_ok and gene_symbol:
             # fix gene/transcript swap and lower case separately to get separate warnings.
-            uc_gene = hgvs_variant.gene.upper()
+            uc_gene = gene_symbol.upper()
             if HGVSMatcher._looks_like_transcript(uc_gene):  # Need to upper here
-                old_transcript = hgvs_variant.transcript
-                hgvs_variant.transcript = hgvs_variant.gene
-                hgvs_variant.gene = old_transcript
-                if hgvs_variant.gene:
+                old_transcript = transcript_accession
+                transcript_accession = gene_symbol
+                gene_symbol = old_transcript
+                if gene_symbol:
                     fixed_messages.append(f"Swapped gene/transcript")
-                transcript_ok = HGVSMatcher._looks_like_transcript(hgvs_variant.transcript)
+                transcript_ok = HGVSMatcher._looks_like_transcript(transcript_accession)
             elif HGVSMatcher._looks_like_hgvs_prefix(uc_gene):
-                hgvs_variant.gene = uc_gene
+                gene_symbol = uc_gene
                 fixed_messages.append(f"Upper cased HGVS prefix")
 
         if not transcript_ok:
-            if hgvs_variant.transcript:
-                uc_transcript = hgvs_variant.transcript.upper()
+            if transcript_accession:
+                uc_transcript = transcript_accession.upper()
                 if HGVSMatcher._looks_like_transcript(uc_transcript):
-                    hgvs_variant.transcript = uc_transcript
+                    transcript_accession = uc_transcript
                     fixed_messages.append(f"Upper cased transcript")
 
-        return hgvs_variant.format(), fixed_messages
+        if gene_symbol:
+            prefix = f"{transcript_accession}({gene_symbol})"
+        else:
+            prefix = transcript_accession
+        fixed_hgvs_string = f"{prefix}:{allele}"
+        return fixed_hgvs_string, fixed_messages
 
     @staticmethod
     def _looks_like_transcript(prefix: str) -> bool:
