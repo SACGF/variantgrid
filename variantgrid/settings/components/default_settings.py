@@ -526,7 +526,8 @@ SEARCH_SUMMARY_VARIANT_SHOW_CLINVAR = True
 SEARCH_HGVS_GENE_SYMBOL_USE_MANE = True
 SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS = False
 
-SILENCED_SYSTEM_CHECKS = ['models.E006']  # 'captcha.recaptcha_test_key_error']
+SILENCED_SYSTEM_CHECKS = ['models.E006',  # 'captcha.recaptcha_test_key_error'
+                          'fields.W907']  # CITextField deprecated. Waiting for Django 4.2.3 see issue #831
 SITE_ID = 2
 SITE_MESSAGE = None  # displayed at the top of all logged-in pages
 
