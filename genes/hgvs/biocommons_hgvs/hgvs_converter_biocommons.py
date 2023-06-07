@@ -107,11 +107,12 @@ class BioCommonsHGVSConverter(HGVSConverter):
 
     def get_transcript_accession(self, hgvs_string: str) -> str:
         """ Only returns anything if c. HGVS """
-        parser = ParserSingleton.parser()
-        sequence_variant = parser.parse_hgvs_variant(hgvs_string)
         transcript_accession = ''
-        if sequence_variant.type != 'g' and sequence_variant.ac:
-            transcript_accession = sequence_variant.ac
+        if hgvs_string is not None:
+            parser = ParserSingleton.parser()
+            sequence_variant = parser.parse_hgvs_variant(hgvs_string)
+            if sequence_variant.type != 'g' and sequence_variant.ac:
+                transcript_accession = sequence_variant.ac
         return transcript_accession
 
     @staticmethod

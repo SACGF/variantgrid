@@ -159,8 +159,12 @@ class PyHGVSConverter(HGVSConverter):
 
     def get_transcript_accession(self, hgvs_string: str) -> str:
         """ Only returns anything for c.HGVS """
-        hgvs_name = HGVSName(hgvs_string)
-        return hgvs_name.transcript
+        if hgvs_string is not None:
+            hgvs_name = HGVSName(hgvs_string)
+            transcript_accession = hgvs_name.transcript
+        else:
+            transcript_accession = ''
+        return transcript_accession
 
     def description(self) -> str:
         return f"pyhgvs v{metadata.version('pyhgvs')}"
