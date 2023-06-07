@@ -135,11 +135,14 @@ let EKey = (function() {
                 if (!EKey.HTML_WHITE_LIST.has(tag.tagName)) {
                     throw Error(`unsafe HTML tag ${tag.tagName}`);
                 }
+                // never allow attributes
                 if (tag.attributes.length) {
+                    let attributeNames = [];
                     for (let attribute of tag.attributes) {
-                        if (!EKey.ATTRIBUTE_WHITE_LIST.has(attribute.name)) {
-                            throw Error(`tag ${tag.tagName} contains non-white list attribute \"${attribute.name}\"`);
-                        }
+                        attributeNames.push(attribute.name);
+                    }
+                    for (let attributeName of attributeNames) {
+                        tag.removeAttribute(attributeName);
                     }
                 }
             }
@@ -219,7 +222,6 @@ let EKey = (function() {
 })();
 
 EKey.HTML_WHITE_LIST = new Set(['BR','B','I','OL','UL','LI','U','SUP','SUB', 'SPAN', 'DIV']);
-EKey.ATTRIBUTE_WHITE_LIST = new Set(['style']);
 
 // UNSPECIFIED STRENGTH HANDLING
 EKey.critValues = {
