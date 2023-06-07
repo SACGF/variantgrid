@@ -58,7 +58,7 @@ class VariantExtra:
         parts = [str(variant)]
         return PreviewData(
             category="Variant",
-            identifier=f" ".join(parts),
+            identifier=" ".join(parts),
             icon="fa-solid fa-circle-plus",
             title="Click to classify variant",
             internal_url=internal_url,
@@ -347,7 +347,7 @@ def _search_hgvs_using_gene_symbol(
                         results_by_record[result.preview.obj].append(result)
                         tv_message = str(transcript_version.accession)
                         if transcript_version.accession in mane_transcripts:
-                            tv_message += f" (MANE)"
+                            tv_message += " (MANE)"
                         transcript_accessions_by_record[result.preview.obj].append(tv_message)
                     else:
                         # result is a ClassifyVariantHgvs or similar, yield it and only care about real variants for the rest
@@ -528,8 +528,9 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                     genome_build=genome_build
                 ), search_messages + reference_message
             else:
-                # if kind == 'g' then doesn't matter what the preferred genome build is
-                yield SearchResult(preview=variant.preview, messages=search_messages + reference_message, ignore_genome_build_mismatch=(kind == 'g'))
+                is_genomic = kind == 'g'  # doesn't matter what the preferred genome build is (explicit contig version)
+                yield SearchResult(preview=variant.preview, messages=search_messages + reference_message,
+                                   ignore_genome_build_mismatch=is_genomic)
 
         except Variant.DoesNotExist:
             # variant_string = Variant.format_tuple(*variant_tuple)

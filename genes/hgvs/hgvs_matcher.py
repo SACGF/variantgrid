@@ -587,18 +587,18 @@ class HGVSMatcher:
                 transcript_accession = gene_symbol
                 gene_symbol = old_transcript
                 if gene_symbol:
-                    fixed_messages.append(f"Swapped gene/transcript")
+                    fixed_messages.append("Swapped gene/transcript")
                 transcript_ok = HGVSMatcher._looks_like_transcript(transcript_accession)
             elif HGVSMatcher._looks_like_hgvs_prefix(uc_gene):
                 gene_symbol = uc_gene
-                fixed_messages.append(f"Upper cased HGVS prefix")
+                fixed_messages.append("Upper cased HGVS prefix")
 
         if not transcript_ok:
             if transcript_accession:
                 uc_transcript = transcript_accession.upper()
                 if HGVSMatcher._looks_like_transcript(uc_transcript):
                     transcript_accession = uc_transcript
-                    fixed_messages.append(f"Upper cased transcript")
+                    fixed_messages.append("Upper cased transcript")
 
         if gene_symbol:
             prefix = f"{transcript_accession}({gene_symbol})"

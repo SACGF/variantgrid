@@ -18,7 +18,7 @@ def _one_off_user_tag_colors_to_collection(apps, _schema_editor):
 
     # The 1 mandatory tag
     tag = Tag.objects.get_or_create(pk=settings.TAG_REQUIRES_CLASSIFICATION)[0]
-    collection = TagColorsCollection(name=f"Default public tag colors")
+    collection = TagColorsCollection(name="Default public tag colors")
     collection.save(assign_permissions=False)
     UserTagColors.objects.create(collection=collection, tag=tag, rgb="#ff0000")
     global_settings.tag_colors = collection

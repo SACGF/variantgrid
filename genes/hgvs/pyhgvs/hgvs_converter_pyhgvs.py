@@ -188,4 +188,5 @@ class PyHGVSConverter(HGVSConverter):
             genomic_coord = pyhgvs_transcript.cdna_to_genomic_coord(cdna_coord)
             within_transcript = pyhgvs_transcript.tx_position.chrom_start <= genomic_coord <= pyhgvs_transcript.tx_position.chrom_stop
             if not within_transcript:
-                raise pyhgvs.InvalidHGVSName(f"'{hgvs_name.format()}' {description} {cdna_coord} resolves outside of transcript")
+                reason = f"{description} {cdna_coord} resolves outside of transcript"
+                raise pyhgvs.InvalidHGVSName(name=hgvs_name, reason=reason)

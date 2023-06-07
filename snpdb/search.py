@@ -242,7 +242,7 @@ class SearchMessage:
 
     @staticmethod
     def highest_severity(iterable: Iterable['SearchMessage']) -> LogLevel:
-        return max((m.severity for m in iterable), key=lambda sm: log_level_to_int(sm), default=LogLevel.INFO)
+        return max((m.severity for m in iterable), key=log_level_to_int, default=LogLevel.INFO)
 
 
 @dataclass(frozen=True)

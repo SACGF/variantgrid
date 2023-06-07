@@ -1469,7 +1469,7 @@ def _import_contigs(apps, _schema_editor):
         if alias:
             kwargs["alias"] = alias
         genome_build = GenomeBuild.objects.create(**kwargs)
-        logging.info(f"Created build %s", genome_build)
+        logging.info("Created build %s", genome_build)
         role_lookup = invert_dict(dict(SequenceRole.CHOICES))
         molecule_type_lookup = invert_dict(dict(AssemblyMoleculeType.CHOICES))
         molecule_type_lookup["na"] = None
