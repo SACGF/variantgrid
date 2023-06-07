@@ -36,7 +36,7 @@ class Command(BaseCommand):
             matcher = HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.COMBO)
             hgvs_matchers_by_build[genome_build] = matcher
 
-        for iai in ImportedAlleleInfo.objects.all().iterator(chunk_size=100):
+        for iai in ImportedAlleleInfo.objects.filter(imported_c_hgvs__isnull=False).iterator(chunk_size=100):
             try:
                 genome_build = iai.imported_genome_build
                 matcher = hgvs_matchers_by_build[genome_build]
