@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 
+from annotation.fake_annotation import get_fake_annotation_version
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from snpdb.models import GenomeBuild, ClinGenAllele
 from snpdb.search import search_data
@@ -13,6 +14,10 @@ class TestSearch(TestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.user = User.objects.get_or_create(username='testuser')[0]
+
+        get_fake_annotation_version(GenomeBuild.grch37())
+        get_fake_annotation_version(GenomeBuild.grch38())
+
         create_fake_transcript_version(GenomeBuild.grch38())
 
     def _verify_all_of_type(self, search_results, search_type):
@@ -27,7 +32,7 @@ class TestSearch(TestCase):
         ]
         for hgvs_name in HGVS_NAMES:
             search_results = search_data(self.user, hgvs_name, False)
-            self._verify_all_of_type(search_results, SearchTypes.HGVS)
+            self._verify_all_of_type(search_results, SearchTypes.VARIANT)
 
     def test_search_gene_hgvs(self):
         HGVS_NAMES = [
