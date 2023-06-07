@@ -1,5 +1,5 @@
 import json
-from typing import Optional
+from typing import Type, Any, Optional
 
 from django.core.exceptions import PermissionDenied
 from django.http.response import JsonResponse, HttpResponse
@@ -24,15 +24,16 @@ class JQGridView(View):
         perm_path('analyses/grid/<slug:op>/', JQGridView.as_view(grid=AnalysesGrid, delete=True), name='analyses_grid'),
     """
 
-    grid: Optional[type] = None  # JqGridUserRowConfig (or grid initialised w/user, has delete_row method)
+    grid: Optional[Type[Any]] = None  # JqGridUserRowConfig (or grid initialised w/user, has delete_row method)
     delete_row = False
     csv_download = False  # via request - can also do via JSON
 
     def _load_grid(self, request, *args, **kwargs):
-        grid_klass = self.grid
-        if grid_klass is None:
+        if self.grid is None:
             msg = f"{nice_class_name(self)}.grid not set"
             raise ValueError(msg)
+        else:
+            grid_klass: Type[Any] = self.grid
 
         kwargs["user"] = request.user
         # extra_filters are commonly used to filter by something custom via JS

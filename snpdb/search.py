@@ -262,7 +262,7 @@ class SearchResultGenomeBuildMessages:
     @cached_property
     def severity_bs(self):
         if self.messages:
-            max_log = max(*(m.severity for m in self.messages), key=lambda s: log_level_to_int(s) )
+            max_log = max(*(m.severity for m in self.messages), key=log_level_to_int)
             return log_level_to_bootstrap(max_log)
         return ""
 

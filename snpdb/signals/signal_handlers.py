@@ -66,4 +66,4 @@ def trio_post_save_handler(sender, instance, **kwargs):
     created = kwargs.get("created")
     if created:
         celery_task = create_genome_karyomapping_for_trio.si(instance.pk)  # @UndefinedVariable
-        transaction.on_commit(lambda: celery_task.apply_async())
+        transaction.on_commit(celery_task.apply_async)

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Type, Any
 
 from django.db import connections
 from django.db.models.query import QuerySet
@@ -27,7 +27,7 @@ def get_queryset_with_transformer_hook(klass):
         pass
 
     class QueryTransformerCompilerMixin:
-        compiler_klass: Optional[type] = None
+        compiler_klass: Type[Any]
 
         def get_compiler(self, using=None, connection=None, elide_empty=True):
             if using is None and connection is None:
