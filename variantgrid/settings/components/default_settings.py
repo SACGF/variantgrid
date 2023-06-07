@@ -830,6 +830,9 @@ LOGGING = {
             'propagate': False,
             'level': 'INFO',
         },
+        'hgvs': {
+            'level': 'WARNING',
+        },
         #        'django.request': {
         #            'handlers': ['mail_admins'],
         #            'level': 'ERROR',
