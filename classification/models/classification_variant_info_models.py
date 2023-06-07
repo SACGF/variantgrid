@@ -123,11 +123,11 @@ class ResolvedVariantInfo(TimeStampedModel):
 
         hgvs_matcher = HGVSMatcher(genome_build=genome_build)
         try:
-            c_hgvs_name = hgvs_matcher.variant_to_c_hgvs_variant(variant, imported_transcript)
-            c_hgvs = c_hgvs_name.format()
+            c_hgvs_variant = hgvs_matcher.variant_to_c_hgvs_variant(variant, imported_transcript)
+            c_hgvs = c_hgvs_variant.format()
             c_hgvs_obj = CHGVS(c_hgvs)
             self.c_hgvs = c_hgvs
-            self.c_hgvs_full = c_hgvs_name.format(max_ref_length=settings.VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH)
+            self.c_hgvs_full = c_hgvs_variant.format(max_ref_length=settings.VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH)
             self.transcript_version = c_hgvs_obj.transcript_version_model(genome_build=genome_build)
             self.gene_symbol = GeneSymbol.objects.filter(symbol=c_hgvs_obj.gene_symbol).first()
         except Exception as exception:

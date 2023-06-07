@@ -160,7 +160,7 @@
         "status": "R",
         "genomic_intervals_collection": null,
         "genomic_interval": null,
-        "hgvs_name": null,
+        "hgvs_string": null,
         "hgvs_variant": null,
         "left": 0,
         "right": 0,

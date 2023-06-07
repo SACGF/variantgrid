@@ -31,7 +31,7 @@ from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from genes.custom_text_gene_list import create_custom_text_gene_list
-from genes.hgvs import get_hgvs_variant_tuple, get_hgvs_variant
+from genes.hgvs import get_hgvs_variant_tuple, get_hgvs_variant, HGVSException
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAppPanel
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
 from library.forms import NumberInput
@@ -433,11 +433,11 @@ class IntersectionNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
 
     class Meta:
         model = IntersectionNode
-        fields = ("genomic_intervals_collection", "hgvs_name", "accordion_panel")
+        fields = ("genomic_intervals_collection", "hgvs_string", "accordion_panel")
         widgets = {
             "genomic_intervals_collection": ModelSelect2(url='genomic_intervals_collection_autocomplete',
                                                          attrs={'data-placeholder': 'Genomic Intervals...'}),
-            "hgvs_name": TextInput(attrs={'placeholder': 'HGVS...'}),
+            "hgvs_string": TextInput(attrs={'placeholder': 'HGVS...'}),
             'accordion_panel': HiddenInput(),
         }
 
@@ -470,11 +470,11 @@ class IntersectionNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
                     for f in ["start", "end"]:
                         self.add_error(f, "start > end")
         # HGVS:
-        if hgvs_name := cleaned_data.get("hgvs_name"):
+        if hgvs_string := cleaned_data.get("hgvs_string"):
             try:
-                get_hgvs_variant_tuple(hgvs_name, self.instance.analysis.genome_build)
-            except (ValueError, NotImplementedError) as e:
-                self.add_error("hgvs_name", str(e))
+                get_hgvs_variant_tuple(hgvs_string, self.instance.analysis.genome_build)
+            except HGVSException as e:
+                self.add_error("hgvs_string", str(e))
 
     def save(self, commit=True):
         node = super().save(commit=False)
@@ -491,9 +491,9 @@ class IntersectionNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
             except:
                 pass
 
-        if "hgvs_name" in self.changed_data:
-            hgvs_name = self.cleaned_data.get("hgvs_name")
-            node.hgvs_variant = get_hgvs_variant(hgvs_name, self.instance.analysis.genome_build)
+        if "hgvs_string" in self.changed_data:
+            hgvs_string = self.cleaned_data.get("hgvs_string")
+            node.hgvs_variant = get_hgvs_variant(hgvs_string, self.instance.analysis.genome_build)
 
         if commit:
             node.save()

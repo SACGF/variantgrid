@@ -51,7 +51,7 @@ class Command(BaseCommand):
                     existing_variant_coordinate = None
 
                 resolved_transcript_accession = rvi.transcript_version.accession
-                resolved_c_hgvs_name = rvi.c_hgvs_full
+                # resolved_c_hgvs_name = rvi.c_hgvs_full
 
                 if current_variant_coordinate == existing_variant_coordinate:
                     variant_diff = ""

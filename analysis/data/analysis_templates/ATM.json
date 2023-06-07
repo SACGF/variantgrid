@@ -34,7 +34,7 @@
         "status": "R",
         "genomic_intervals_collection": null,
         "genomic_interval": null,
-        "hgvs_name": "NM_000051.3(ATM):c.7271T>G",
+        "hgvs_string": "NM_000051.3(ATM):c.7271T>G",
         "hgvs_variant": null,
         "left": 0,
         "right": 0,

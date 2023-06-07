@@ -27,7 +27,7 @@ class IntersectionNode(AnalysisNode):
     genomic_intervals_collection = models.ForeignKey(GenomicIntervalsCollection, null=True, blank=True, on_delete=SET_NULL)
     genomic_interval = models.OneToOneField(GenomicInterval, null=True, on_delete=SET_NULL)
     # HGVS linking done in both form and save() method below
-    hgvs_name = models.TextField(null=True, blank=True)
+    hgvs_string = models.TextField(null=True, blank=True)
     hgvs_variant = models.ForeignKey(Variant, null=True, blank=True, on_delete=SET_NULL)
     left = models.IntegerField(default=0)
     right = models.IntegerField(default=0)
@@ -40,7 +40,7 @@ class IntersectionNode(AnalysisNode):
         return self.accordion_panel == self.SELECTED_INTERVALS and self.genomic_intervals_collection
 
     def valid_hgvs(self):
-        return self.accordion_panel == self.HGVS and self.hgvs_name
+        return self.accordion_panel == self.HGVS and self.hgvs_string
 
     def valid_backend_enrichment_kit(self):
         pbi, _ = self.get_vcf_bed_intersection_and_enrichment_kit()
@@ -152,11 +152,11 @@ class IntersectionNode(AnalysisNode):
     def save(self, **kwargs):
         # HGVS name is validated in IntersectionNodeForm, and linked to a variant if one is found
         # But it's possible a variant isn't there at form save time, but will appear later
-        # Thus if hgvs_name is set, but hgvs_variant isn't - recheck in save (eg re-connected to diff source node)
-        if self.hgvs_name:
+        # Thus if hgvs_string is set, but hgvs_variant isn't - recheck in save (eg re-connected to diff source node)
+        if self.hgvs_string:
             # May need to re-match if analysis template was different genome build
             if self.hgvs_variant is None or (self.analysis.genome_build not in self.hgvs_variant.genome_builds):
-                self.hgvs_variant = get_hgvs_variant(self.hgvs_name, self.analysis.genome_build)
+                self.hgvs_variant = get_hgvs_variant(self.hgvs_string, self.analysis.genome_build)
         return super().save(**kwargs)
 
     def save_clone(self):

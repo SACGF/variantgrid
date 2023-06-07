@@ -1,16 +1,16 @@
 import logging
 import re
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Max, Min
 from hgvs.exceptions import HGVSError
 
-from genes.hgvs import HGVSVariant, CHGVS, HGVSException
+from genes.hgvs import HGVSVariant, CHGVS
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
-from genes.hgvs.hgvs_converter import HGVSConverterType
+from genes.hgvs.hgvs_converter import HGVSConverterType, HgvsMatchRefAllele
 from genes.hgvs.hgvs_converter_combo import ComboCheckerHGVSConverter
 from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSConverter
 from genes.models import TranscriptVersion, Transcript, GeneSymbol, LRGRefSeqGene, BadTranscript, \
@@ -105,7 +105,7 @@ class HGVSMatcher:
         self.attempt_clingen = True  # Stop on any non-recoverable error - keep going if unknown reference
         self.hgvs_converter = HGVSConverterFactory.factory(genome_build, hgvs_converter_type)
 
-    def _clingen_get_variant_tuple(self, hgvs_string: str):
+    def _clingen_get_variant_tuple(self, hgvs_string: str) -> VariantCoordinate:
         cleaned_hgvs = self.hgvs_converter.c_hgvs_remove_gene_symbol(hgvs_string)
 
         try:
@@ -139,10 +139,10 @@ class HGVSMatcher:
                 return hgvs_variant, transcript_version
         return None, None
 
-    def _lrg_get_variant_tuple(self, hgvs_variant: HGVSVariant) -> Tuple[Tuple, str, bool]:
-        new_hgvs_name, transcript_version = self._get_renamed_lrg_transcript_hgvs_variant_and_transcript_version(self.genome_build, hgvs_variant)
-        if new_hgvs_name:
-            new_hgvs_string = new_hgvs_name.format()
+    def _lrg_get_variant_tuple(self, hgvs_variant: HGVSVariant) -> Tuple[VariantCoordinate, str, Union[bool, HgvsMatchRefAllele]]:
+        new_hgvs_variant, transcript_version = self._get_renamed_lrg_transcript_hgvs_variant_and_transcript_version(self.genome_build, hgvs_variant)
+        if new_hgvs_variant:
+            new_hgvs_string = new_hgvs_variant.format()
             method = f"{self.hgvs_converter.description()} as '{new_hgvs_string}' (from LRG_RefSeqGene)"
             variant_tuple, matches_reference = self.hgvs_converter.hgvs_to_variant_coords_and_reference_match(new_hgvs_string, transcript_version)
             return variant_tuple, method, matches_reference
@@ -274,24 +274,24 @@ class HGVSMatcher:
         used_transcript_accession = None
         method = None
         matches_reference = None
-        hgvs_name = self.create_hgvs_variant(hgvs_string)
-        kind = hgvs_name.kind
+        hgvs_variant = self.create_hgvs_variant(hgvs_string)
+        kind = hgvs_variant.kind
 
         if transcript_is_lrg(transcript_accession):
-            variant_tuple, method, matches_reference = self._lrg_get_variant_tuple(hgvs_string)
-        elif hgvs_name.kind in ('c', 'n'):
+            variant_tuple, method, matches_reference = self._lrg_get_variant_tuple(hgvs_variant)
+        elif hgvs_variant.kind in ('c', 'n'):
             if not transcript_accession:
                 msg = f"Could not parse \"{hgvs_string}\" c.HGVS requires a transcript or LRG."
-                if hgvs_name.gene:
-                    msg += f"\nGene appears to be \"{hgvs_name.gene}\""
+                if hgvs_variant.gene:
+                    msg += f"\nGene appears to be \"{hgvs_variant.gene}\""
                 raise ValueError(msg)
 
             variant_tuple = None
             hgvs_methods = []
             for tv, method in self.filter_best_transcripts_and_method_by_accession(transcript_accession):
                 used_transcript_accession = tv.accession
-                hgvs_name.transcript = tv.accession
-                hgvs_string_for_version = hgvs_name.format()
+                hgvs_variant.transcript = tv.accession
+                hgvs_string_for_version = hgvs_variant.format()
                 if method == self.HGVS_METHOD_INTERNAL_LIBRARY:
                     variant_tuple, matches_reference = self.hgvs_converter.hgvs_to_variant_coords_and_reference_match(hgvs_string_for_version, tv)
                 elif method == self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY:
@@ -363,22 +363,22 @@ class HGVSMatcher:
     def _lrg_variant_to_hgvs(self, variant: Variant, lrg_identifier: str = None) -> Tuple[HGVSVariant, str]:
         if transcript_version := LRGRefSeqGene.get_transcript_version(self.genome_build, lrg_identifier):
             if transcript_version.hgvs_ok:
-                hgvs_name, hgvs_method = self._variant_to_hgvs(variant, transcript_version.accession)
-                if hgvs_name.transcript != transcript_version.accession:
+                hgvs_variant, hgvs_method = self._variant_to_hgvs(variant, transcript_version.accession)
+                if hgvs_variant.transcript != transcript_version.accession:
                     msg = f"Error creating HGVS for {variant}, LRG '{lrg_identifier}' asked for HGVS " \
-                          f"'{transcript_version.accession}' but got '{hgvs_name.transcript}'"
+                          f"'{transcript_version.accession}' but got '{hgvs_variant.transcript}'"
                     raise ValueError(msg)
                 # Replace with our LRG
-                hgvs_name.transcript = lrg_identifier
-                hgvs_name.gene = str(transcript_version.gene_symbol)
-                return hgvs_name, hgvs_method
+                hgvs_variant.transcript = lrg_identifier
+                hgvs_variant.gene = str(transcript_version.gene_symbol)
+                return hgvs_variant, hgvs_method
 
         problems = ["No transcript via LRGRefSeqGene"]
 
         # Use ClinGen - will raise exception if it can't get it
         if ca := get_clingen_allele_for_variant(self.genome_build, variant):
-            if hgvs_name := ca.get_c_hgvs_name(self.hgvs_converter, lrg_identifier):
-                return hgvs_name, self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
+            if hgvs_variant := ca.get_c_hgvs_variant(self.hgvs_converter, lrg_identifier):
+                return hgvs_variant, self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
             else:
                 problems.append(f"{ca} didn't contain HGVS for '{lrg_identifier}'")
 
@@ -415,7 +415,7 @@ class HGVSMatcher:
                         # TODO: We could also use VEP then add reference bases on our HGVSs
                         try:
                             if ca := get_clingen_allele_for_variant(self.genome_build, variant):
-                                if hgvs_variant := ca.get_c_hgvs_name(self.hgvs_converter, transcript_version.accession):
+                                if hgvs_variant := ca.get_c_hgvs_variant(self.hgvs_converter, transcript_version.accession):
                                     # Use our latest symbol as ClinGen can be out of date, and this keeps it consistent
                                     # regardless of whether we use PyHGVS or ClinGen to resolve
                                     if gene_symbol := transcript_version.gene_symbol:
@@ -633,10 +633,10 @@ class HGVSMatcher:
         return GeneSymbol.objects.filter(pk=symbol).first()
 
 
-def get_hgvs_variant_tuple(hgvs_name: str, genome_build: GenomeBuild) -> VariantCoordinate:
+def get_hgvs_variant_tuple(hgvs_string: str, genome_build: GenomeBuild) -> VariantCoordinate:
     """ Convenience method for 1 off HGVS - for batches use HGVSMatcher """
     matcher = HGVSMatcher(genome_build)
-    return matcher.get_variant_tuple(hgvs_name)
+    return matcher.get_variant_tuple(hgvs_string)
 
 
 def get_hgvs_variant(hgvs_name: str, genome_build: GenomeBuild) -> Optional[Variant]:

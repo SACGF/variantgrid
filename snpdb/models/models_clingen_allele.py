@@ -95,23 +95,23 @@ class ClinGenAllele(TimeStampedModel):
                     return p_hgvs
         return None
 
-    def get_c_hgvs_name(self, hgvs_converter, transcript_accession):
+    def get_c_hgvs_variant(self, hgvs_converter, transcript_accession):
         """ c.HGVS has reference bases on it """
         from genes.models import TranscriptVersionSequenceInfo
 
-        hgvs_name = None
+        hgvs_variant = None
         raw_hgvs_string, t_data = self._get_raw_hgvs_and_data(transcript_accession)
         if raw_hgvs_string:  # Has for this transcript version
-            hgvs_name = hgvs_converter.create_hgvs_variant(raw_hgvs_string)
+            hgvs_variant = hgvs_converter.create_hgvs_variant(raw_hgvs_string)
             # Sometimes ClinGen return "n." on NM transcripts - reported as a bug 22/9/21
-            if hgvs_name.kind == "n":
+            if hgvs_variant.kind == "n":
                 if transcript_accession.startswith("NM_") or "proteinEffect" in t_data:
-                    hgvs_name.kind = 'c'
+                    hgvs_variant.kind = 'c'
 
-            if not hgvs_name.gene:  # Ref/Ens HGVSs have transcript no gene, LRG is set as gene
-                hgvs_name.gene = t_data.get("geneSymbol")
+            if not hgvs_variant.gene:  # Ref/Ens HGVSs have transcript no gene, LRG is set as gene
+                hgvs_variant.gene = t_data.get("geneSymbol")
 
-            if hgvs_name.mutation_type in {"dup", "del", "delins"}:
+            if hgvs_variant.mutation_type in {"dup", "del", "delins"}:
                 # We want to add reference bases onto HGVS but ClinGen reference sequence is wrong (see issue #493)
                 coord = t_data["coordinates"][0]
                 if "startIntronOffset" in coord:
@@ -131,19 +131,19 @@ class ClinGenAllele(TimeStampedModel):
 
                     try:
                         tvsi = TranscriptVersionSequenceInfo.get(transcript_accession)
-                        if hgvs_name.mutation_type == "dup":
+                        if hgvs_variant.mutation_type == "dup":
                             ref_end = coord["end"]
                             ref_start = ref_end - len(coord["allele"])
                         else:
                             ref_start = coord["start"]
                             ref_end = coord["end"]
-                        hgvs_name.ref_allele = tvsi.sequence[ref_start:ref_end]
+                        hgvs_variant.ref_allele = tvsi.sequence[ref_start:ref_end]
                     except NoTranscript as e_no_transcript:
                         if settings.CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE:
                             raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError() from e_no_transcript
                         else:
                             logging.warning(e_no_transcript)
-        return hgvs_name
+        return hgvs_variant
 
     def _get_raw_hgvs_and_data(self, transcript_accession, match_version=True) -> Tuple[Optional[str],
                                                                                         Optional[Dict]]:
