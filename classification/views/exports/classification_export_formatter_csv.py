@@ -196,7 +196,7 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
         )
         # apparently this is signficantly quicker than the attempt to use an aggregate
         for evidence in self.classification_filter.cms_qs.values_list('published_evidence', flat=True).iterator(chunk_size=1000):
-           used_keys.check_evidence(evidence)
+            used_keys.check_evidence(evidence)
         # below took up to 3 minutes in Shariant test, vs 7 seconds of just iterating through the evidence twice
         # used_keys.check_evidence_qs(self.classification_filter.cms_qs)
 

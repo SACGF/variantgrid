@@ -97,7 +97,7 @@ class UsedKeyTracker:
         self.ordered_keys = None
         self.include_explains = include_explains
         self.ignore_evidence_keys = ignore_evidence_keys
-        self.process()
+        self.processed = False
 
     @property
     def keys_ignore_exclude(self) -> Iterable[EvidenceKey]:
@@ -132,6 +132,9 @@ class UsedKeyTracker:
         self.check_evidence(vcm.evidence)
 
     def check_evidence(self, evidence: Dict[str, Any]):
+        if self.processed:
+            raise ValueError("Can't check evidence after process() has been called")
+
         has_value = False
         has_note = False
         has_explain = False
@@ -152,6 +155,9 @@ class UsedKeyTracker:
                 used_key.has_explain = used_key.has_explain or has_explain
 
     def process(self):
+        if self.processed:
+            return
+        self.processed = True
         self.ordered_keys = []
         for ekey in self.ekeys.all_keys:
             used_key = self.calc_dict.get(ekey.key)
@@ -160,6 +166,7 @@ class UsedKeyTracker:
                 self.ordered_keys.append(used_key)
 
     def header(self) -> List[str]:
+        self.process()
         cols: List[str] = []
         for used_key in self.ordered_keys:
             if used_key.has_value:
@@ -171,6 +178,7 @@ class UsedKeyTracker:
         return cols
 
     def row(self, classification_modification: ClassificationModification) -> List[Optional[str]]:
+        self.process()
         cols: List[Optional[str]] = []
         evidence = classification_modification.get_visible_evidence(self.user)
         for used_key in self.ordered_keys:
