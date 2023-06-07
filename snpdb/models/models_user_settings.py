@@ -2,7 +2,6 @@ import dataclasses
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from html import escape
 from typing import Optional, List, Tuple, Dict, Set
 
 from avatar.templatetags.avatar_tags import avatar_url
@@ -13,7 +12,6 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.urls import reverse
-from django.utils.safestring import SafeString
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 

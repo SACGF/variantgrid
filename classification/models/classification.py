@@ -25,6 +25,7 @@ from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
+
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
 from annotation.regexes import db_ref_regexes, DbRegexes
 from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
@@ -41,7 +42,7 @@ from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagPermissionLevel, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
-from genes.hgvs import HGVSMatcher, CHGVS, HGVSVariant
+from genes.hgvs import HGVSMatcher, CHGVS
 from genes.models import Gene
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions

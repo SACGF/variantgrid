@@ -30,7 +30,6 @@ from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant
 from snpdb.models.models_vcf import VCF, Sample
-from variantgrid.perm_path import get_visible_url_names
 
 
 class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):

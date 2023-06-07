@@ -1,6 +1,6 @@
 from django.dispatch import receiver
 
-from library.preview_request import preview_request_signal, PreviewRequest, PreviewData
+from library.preview_request import preview_request_signal, PreviewRequest
 from ontology.models import OntologyTerm
 
 

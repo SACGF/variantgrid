@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from django.db.models import Q, Value, CharField, Count
+from django.db.models import Value, CharField, Count
 from django.db.models.functions import Concat, Lower
 from django.dispatch import receiver
 

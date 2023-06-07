@@ -18,6 +18,7 @@ from guardian.admin import GuardedModelAdminMixin
 from library.log_utils import log_admin_change
 from library.utils import delimited_row, WrappablePartial
 
+
 class AllValuesChoicesFieldListFilter(admin.AllValuesFieldListFilter):
     """
     Used to provide filter for choice fields (will display the choice label and not just the code)

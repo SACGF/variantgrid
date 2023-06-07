@@ -1,6 +1,6 @@
+import json
 from datetime import datetime
 from enum import Enum
-from json import JSONDecodeError
 from typing import Optional
 
 from classification.enums import ShareLevel
@@ -13,7 +13,6 @@ from library.guardian_utils import admin_bot
 from library.log_utils import AdminNotificationBuilder, report_exc_info
 from snpdb.models import Lab, GenomeBuild, Organization
 from sync.sync_runner import SyncRunner, register_sync_runner, SyncRunInstance
-import json
 
 
 class AlissaImportOption(str, Enum):

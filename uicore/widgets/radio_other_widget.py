@@ -1,10 +1,9 @@
+import copy
 from dataclasses import dataclass
 from typing import List, Tuple
 
 from django.db.models import Model
 from django.forms import ChoiceField
-import copy
-
 from django.forms.widgets import ChoiceWidget
 from more_itertools import first
 

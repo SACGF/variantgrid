@@ -18,6 +18,7 @@ from library.utils import group_by_key, segment, first
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab
 
+
 @dataclass(frozen=True)
 class _PatientIdLab:
     lab: Lab

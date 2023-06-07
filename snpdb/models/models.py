@@ -30,7 +30,7 @@ from model_utils.managers import InheritanceManager
 
 from classification.enums.classification_enums import ShareLevel
 from library.enums.log_level import LogLevel
-from library.preview_request import PreviewData, PreviewModelMixin
+from library.preview_request import PreviewModelMixin
 from library.utils import import_class, JsonObjType
 
 

@@ -6,10 +6,9 @@
 """translate between HGVS and other formats"""
 import os
 
-from bioutils.assemblies import make_ac_name_map, make_name_ac_map
-
 import hgvs
 import hgvs.normalizer
+from bioutils.assemblies import make_ac_name_map, make_name_ac_map
 from hgvs.assemblymapper import AssemblyMapper
 from hgvs.edit import NARefAlt
 from hgvs.exceptions import HGVSInvalidVariantError

@@ -2,7 +2,6 @@ import csv
 import logging
 import os
 
-from django import db
 from django.db import connection
 
 from library.utils import single_quote

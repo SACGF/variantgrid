@@ -1,8 +1,8 @@
 import itertools
+import logging
 import re
 from collections import defaultdict
 from itertools import zip_longest
-import logging
 from typing import Optional, List, Iterable, Union, Dict
 
 from django.conf import settings

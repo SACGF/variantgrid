@@ -1,5 +1,4 @@
 import time
-from typing import Dict
 
 from django.core.management import BaseCommand
 from django.db.models import Q
@@ -7,10 +6,8 @@ from django.db.models import Q
 from classification.management.commands.fix_migrate_flags_to_imported_allele_info import FlagDatabase
 from classification.models import Classification, ImportedAlleleInfo
 from classification.models.classification_variant_info_models import ResolvedVariantInfo
-from flags.models import FlagComment, FlagType
 from library.guardian_utils import admin_bot
-from library.utils import first
-from snpdb.models import GenomeBuild, Allele
+from snpdb.models import GenomeBuild
 
 
 class Command(BaseCommand):

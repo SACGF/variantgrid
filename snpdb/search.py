@@ -1,6 +1,7 @@
+import itertools
+import logging
 import operator
 import re
-import itertools
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
@@ -16,11 +17,9 @@ from more_itertools import take
 
 from library.enums.log_level import LogLevel
 from library.log_utils import report_exc_info, report_message, log_level_to_int, log_level_to_bootstrap
-from library.preview_request import PreviewCoordinator, PreviewData, PreviewModelMixin
+from library.preview_request import PreviewCoordinator, PreviewData
 from library.utils import clean_string, first
 from snpdb.models import UserSettings, GenomeBuild, Variant, Allele
-import logging
-
 
 search_signal = Signal()
 HAS_ALPHA_PATTERN = re.compile(r"[a-zA-Z]")

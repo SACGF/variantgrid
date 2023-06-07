@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
-from django.db.models import Q, Value, CharField
+from django.db.models import Value, CharField
 from django.db.models.functions import Lower, Concat
+
 from snpdb.models import UserPreview
 from snpdb.search import search_receiver, SearchInputInstance, \
     HAS_ALPHA_PATTERN, SearchExample

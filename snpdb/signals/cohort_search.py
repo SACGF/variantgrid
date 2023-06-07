@@ -1,4 +1,3 @@
-from re import Match
 from snpdb.models import Cohort
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 

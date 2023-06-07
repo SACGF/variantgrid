@@ -12,7 +12,6 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsA
 from library.preview_request import PreviewModelMixin
 from patients.models_enums import Sex
 from snpdb.models import ImportStatus, Cohort, CohortSample, Sample, SomalierRelate
-from variantgrid.perm_path import get_visible_url_names
 
 
 class PedFile(GuardianPermissionsMixin, models.Model):

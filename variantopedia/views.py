@@ -31,7 +31,6 @@ from library.enums.log_level import LogLevel
 from library.git import Git
 from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback, report_message, slack_bot_username
-from library.utils import http_header_date_now, parse_http_header_date
 from pathtests.models import cases_for_user
 from patients.models import Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
@@ -44,6 +43,7 @@ from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMerge
     AlleleConversionTool, ImportSource, AlleleOrigin, VariantAlleleSource, VariantGridColumn, Tag
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
+from snpdb.search import search_data
 from snpdb.serializers import VariantAlleleSerializer
 from snpdb.variant_sample_information import VariantSampleInformation
 from sync.models import SyncDestination
@@ -53,7 +53,6 @@ from variantgrid.celery import app
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
 from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries, get_nearby_summaries
-from snpdb.search import search_data
 from variantopedia.server_status import get_dashboard_notices
 from variantopedia.tasks.server_status_tasks import notify_server_status_now
 

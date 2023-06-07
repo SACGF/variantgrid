@@ -2,9 +2,8 @@ from dataclasses import dataclass
 from typing import Optional, Dict
 
 from django.core.exceptions import ValidationError
-from django.forms import Field, Widget
-
 from django.db.models import TextChoices
+from django.forms import Field, Widget
 
 
 class DifferenceResolution(TextChoices):

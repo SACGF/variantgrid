@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional
 
 from django.db import models
 from django.db.models import Q, CASCADE

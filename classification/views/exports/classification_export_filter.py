@@ -5,13 +5,10 @@ from functools import cached_property, reduce
 from operator import __or__
 from typing import List, Type, Union, Set, Optional, Dict, Iterator, Any, Callable
 
-from dateutil.tz import tz
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
-from django.utils import timezone
-from django.utils.timezone import now
 from guardian.shortcuts import get_objects_for_user
 from threadlocals.threadlocals import get_current_request
 

@@ -6,10 +6,8 @@ from django.conf import settings
 from django.db.models import TextField, Value, QuerySet, Q, Count, Max
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
-from django.urls import reverse
 
 from analysis.models import VariantTag, Analysis
-from analysis.serializers import VariantTagSerializer
 from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version, \
     get_variant_queryset_for_annotation_version
 from annotation.models import AnnotationVersion

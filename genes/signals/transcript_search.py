@@ -1,4 +1,5 @@
 import re
+
 from genes.models import Transcript, TranscriptVersion
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 

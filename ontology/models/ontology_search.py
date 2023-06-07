@@ -1,11 +1,13 @@
+import re
 from functools import partial
 from typing import Optional, List
+
 from django.db.models.functions import Lower
+
 from library.preview_request import PreviewProxyModel
 from ontology.models import OntologyTerm, OntologyService, OntologyTermStatus
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample, HAS_3_ALPHA_MIN, SearchResult, \
     SearchResultMatchStrength, SearchMessage
-import re
 
 
 def validate_ontology(term: OntologyTerm, preview_proxy: Optional[PreviewProxyModel] = None) -> SearchResult:

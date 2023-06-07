@@ -1,4 +1,5 @@
 import re
+
 from seqauto.models import SequencingRun
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 

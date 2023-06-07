@@ -1,4 +1,3 @@
-import re
 from snpdb.models import Organization
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample, HAS_3_ALPHA_MIN
 

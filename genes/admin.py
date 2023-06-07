@@ -5,7 +5,7 @@ from django.utils.safestring import SafeString
 from guardian.admin import GuardedModelAdmin
 
 from genes import models
-from genes.models import GeneSymbol, Gene
+from genes.models import GeneSymbol
 from snpdb.admin_utils import ModelAdminBasics, admin_list_column
 
 

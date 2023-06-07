@@ -1,7 +1,9 @@
+import re
+
 from annotation.models import CitationFetchRequest, Citation
 from annotation.models.models_citations import CitationSource, CitationIdNormalized
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample
-import re
+
 
 @search_receiver(
     search_type=Citation,

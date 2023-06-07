@@ -23,7 +23,7 @@ from flags.models.models import FlagsMixin, FlagTypeContext
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
-from library.utils import md5sum_str, FormerTuple, first
+from library.utils import md5sum_str, FormerTuple
 from snpdb.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus

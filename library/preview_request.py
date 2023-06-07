@@ -1,8 +1,7 @@
-from abc import ABC
-from dataclasses import field
 from datetime import datetime
 from functools import cached_property
 from typing import Optional, Union, Any, Set, List, Callable, Type
+
 from attr import dataclass
 from django.db.models import Model
 from django.dispatch import Signal
@@ -10,6 +9,7 @@ from django.http import JsonResponse
 from django.urls import NoReverseMatch
 from django.utils.safestring import SafeString
 from threadlocals.threadlocals import get_current_user
+
 from library.log_utils import report_message
 from library.utils import pretty_label
 from variantgrid.perm_path import get_visible_url_names

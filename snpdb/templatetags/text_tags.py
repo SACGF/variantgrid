@@ -1,5 +1,3 @@
-from typing import Any
-
 import markdown
 from django import template
 

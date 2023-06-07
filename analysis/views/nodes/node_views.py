@@ -36,7 +36,6 @@ from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk
 from library.jqgrid.jqgrid import JqGrid
-from snpdb.models import Lab
 from snpdb.models.models_variant import Variant
 
 

@@ -4,7 +4,7 @@ from re import RegexFlag
 from typing import List, Union, Match, Dict, Optional, Set
 
 from annotation.models.models_citations import CitationIdNormalized
-from ontology.models import OntologyService, OntologyTerm
+from ontology.models import OntologyService
 
 
 class MatchType(Enum):

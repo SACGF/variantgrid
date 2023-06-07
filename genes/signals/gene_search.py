@@ -1,4 +1,5 @@
 import re
+
 from genes.models import Gene
 from genes.models_enums import AnnotationConsortium
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample

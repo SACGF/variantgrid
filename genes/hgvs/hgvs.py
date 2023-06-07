@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import List, Optional
 
-import pyhgvs
 from Bio.Data.IUPACData import protein_letters_1to3_extended
 from django.conf import settings
 

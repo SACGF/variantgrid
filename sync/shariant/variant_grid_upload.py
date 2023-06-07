@@ -1,6 +1,8 @@
 import socket
 from typing import Dict, Iterable, List, TypeVar, Union
+
 from django.db.models import QuerySet
+
 from classification.enums.classification_enums import ShareLevel
 from classification.models import EvidenceKeyMap
 from classification.models.classification import ClassificationModification

@@ -1,10 +1,8 @@
-from typing import List
-
 from django.dispatch import receiver
 
 from annotation.models import CitationFetchRequest
 from annotation.models.models_citations import CitationIdNormalized
-from library.preview_request import preview_request_signal, PreviewRequest, PreviewData
+from library.preview_request import preview_request_signal, PreviewRequest
 
 
 @receiver(signal=preview_request_signal)

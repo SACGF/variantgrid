@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Dict
@@ -10,7 +11,7 @@ from classification.enums import SpecialEKeys
 from classification.models import DiscordanceReport, EvidenceKeyMap
 from review.models import review_detail_signal, Review
 from snpdb.models import Lab
-import json
+
 
 @dataclass(frozen=True)
 class PendingChange:

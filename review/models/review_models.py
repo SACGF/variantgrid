@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Union, List, Set, Type, Dict
@@ -5,15 +6,14 @@ from typing import Union, List, Set, Type, Dict
 import django.dispatch
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
+from django.db import models
 from django.db.models import TextField, ForeignKey, JSONField, IntegerField, CASCADE, TextChoices, \
     PROTECT, DateField, ManyToManyField, QuerySet, BooleanField
 from django.urls import reverse
-from django.db import models
-import logging
 from model_utils.models import TimeStampedModel
+
 from snpdb.models import Lab
 from uicore.widgets.describe_difference_widget import DifferenceResolution
-
 
 """
 The review module allows users to perform a Review on any ReviewModelMixin. The only VG specific functionality comes from

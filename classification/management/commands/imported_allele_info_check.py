@@ -5,7 +5,7 @@ import pandas as pd
 from django.core.management import BaseCommand
 from django.db.models import Max
 
-from classification.models import Classification, ImportedAlleleInfo
+from classification.models import ImportedAlleleInfo
 from genes.hgvs import HGVSMatcher, HGVSConverterType
 from snpdb.models import Variant, GenomeBuild
 
