@@ -8,7 +8,7 @@ from django.utils.timesince import timesince
 from annotation.models import VEPSkippedReason, AnnotationStatus
 from annotation.models.models import VariantAnnotation, AnnotationVersion, \
     InvalidAnnotationVersionError, VariantTranscriptAnnotation, AnnotationRun
-from genes.hgvs import HGVSMatcher
+from genes.hgvs import HGVSMatcher, HGVSException
 from genes.models import TranscriptVersion, GnomADGeneConstraint
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import Variant
@@ -237,12 +237,12 @@ class VariantTranscriptSelections:
                 try:
                     # Transcript data may not be well formed
                     t_data["protein_length"] = transcript_version.protein_length
-                except (ValueError, KeyError):
+                except (HGVSException, KeyError):
                     pass
 
                 try:
                     t_data["hgvs_c"] = hgvs_matcher.variant_to_c_hgvs(variant, transcript_version.accession)
-                except (ValueError, KeyError):
+                except (HGVSException, KeyError):
                     pass
                 self.transcript_data.append(t_data)
                 has_other_annotation_consortium_transcripts = True

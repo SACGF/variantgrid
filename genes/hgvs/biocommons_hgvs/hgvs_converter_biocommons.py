@@ -38,6 +38,23 @@ class BioCommonsHGVSVariant(HGVSVariant):
     def _set_kind(self, value):
         self._sequence_variant.type = value
 
+    def _get_mutation_type(self):
+        biocommons_type = self._sequence_variant.posedit.edit.type
+        if biocommons_type == "sub":
+            mutation_type = ">"
+        else:
+            mutation_type = biocommons_type
+        return mutation_type
+
+    def get_ref_alt(self):
+        edit = self._sequence_variant.posedit.edit
+        ref = edit.ref or ''
+        alt = edit.alt or ''
+        return ref, alt
+
+    def get_cdna_coords(self) -> str:
+        return str(self._sequence_variant.posedit.pos)
+
     def format(self, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH):
         conf = {"max_ref_length": max_ref_length}
         return self._sequence_variant.format(conf)
@@ -64,7 +81,11 @@ class BioCommonsHGVSConverter(HGVSConverter):
         return BioCommonsHGVSVariant(var_g)
 
     def variant_coords_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
-        var_c = self.babelfish.vcf_to_c_hgvs(*vc, transcript_accession=transcript_version.accession)
+        try:
+            var_c = self.babelfish.vcf_to_c_hgvs(*vc, transcript_accession=transcript_version.accession)
+        except HGVSError as e:  # Can be out of bounds etc
+            raise HGVSException from e
+
         if gene_symbol := transcript_version.gene_symbol:
             var_c.gene = gene_symbol.symbol
         return BioCommonsHGVSVariant(var_c)

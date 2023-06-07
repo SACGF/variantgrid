@@ -48,12 +48,12 @@ from classification.views.exports.classification_export_formatter_csv import For
 from flags.models import Flag, FlagComment
 from flags.models.models import FlagType
 from genes.forms import GeneSymbolForm
-from genes.hgvs import get_kind_and_transcript_accession_from_invalid_hgvs
+from genes.hgvs import HGVSMatcher
 from library.django_utils import require_superuser, get_url_from_view_path
 from library.log_utils import log_traceback
 from library.utils import delimited_row
 from library.utils.file_utils import rm_if_exists
-from snpdb.forms import SampleChoiceForm, UserSelectForm, LabMultiSelectForm, LabSelectForm
+from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Variant, UserSettings, Sample, Lab, Allele
 from snpdb.models.models_genome import GenomeBuild
@@ -600,19 +600,19 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
     lab, lab_error = UserSettings.get_lab_and_error(request.user)
     refseq_transcript_accession = ""
     ensembl_transcript_accession = ""
-    kind, transcript_accession = get_kind_and_transcript_accession_from_invalid_hgvs(hgvs_string)
+    matcher = HGVSMatcher(genome_build)
+    hgvs_variant = matcher.create_hgvs_variant(hgvs_string)
     evidence = {}
-    if transcript_accession:
-        if transcript_accession.startswith("ENST"):
-            ensembl_transcript_accession = transcript_accession
+    if hgvs_variant.transcript:
+        if hgvs_variant.transcript.startswith("ENST"):
+            ensembl_transcript_accession = hgvs_variant.transcript
         else:
-            refseq_transcript_accession = transcript_accession
+            refseq_transcript_accession = hgvs_variant.transcript
 
         EKEYS_BY_KIND = {"c": SpecialEKeys.C_HGVS,
                          "p": SpecialEKeys.P_HGVS,
                          "g": SpecialEKeys.G_HGVS}
-        ekey = EKEYS_BY_KIND.get(kind)
-        if ekey:
+        if ekey := EKEYS_BY_KIND.get(hgvs_variant.kind):
             evidence[ekey] = hgvs_string
 
     warnings = [f"We could not understand HGVS '{hgvs_string}' - it may be invalid.",

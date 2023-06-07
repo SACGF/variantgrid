@@ -51,18 +51,11 @@ class VariantExtra:
         )
 
     @staticmethod
-    def classify_variant(for_user: User, variant: Variant, transcript_id: str = None) -> Optional[PreviewData]:
-        kwargs = {"variant_id": variant.pk}
-        if transcript_id:
-            name = "create_classification_for_variant_and_transcript"
-            kwargs["transcript_id"] = transcript_id
-        else:
-            name = "create_classification_for_variant"
+    def classify_variant(variant: Variant, genome_build) -> Optional[PreviewData]:
+        kwargs = {"variant_id": variant.pk, "genome_build_name": genome_build.name}
+        name = "create_classification_for_variant"
         internal_url = reverse(name, kwargs=kwargs)
-        parts = []
-        if transcript_id:
-            parts.append(transcript_id)
-        parts.append(str(variant))
+        parts = [str(variant)]
         return PreviewData(
             category="Variant",
             identifier=f" ".join(parts),
@@ -530,10 +523,9 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
             results = get_results_from_variant_tuples(variant_qs, variant_tuple)
             variant = results.get()
             if classify:
-                transcript_id = hgvs_matcher.get_transcript_id(hgvs_string)
                 yield VariantExtra.classify_variant(
-                    for_user=user,
-                    transcript_id=transcript_id,
+                    variant=variant,
+                    genome_build=genome_build
                 ), search_messages + reference_message
             else:
                 # if kind == 'g' then doesn't matter what the preferred genome build is

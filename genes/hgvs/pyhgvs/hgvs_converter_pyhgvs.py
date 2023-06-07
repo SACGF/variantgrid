@@ -38,11 +38,21 @@ class PyHGVSVariant(HGVSVariant):
     def _set_kind(self, value):
         self._hgvs_name.kind = value
 
+    def _get_mutation_type(self):
+        return self._hgvs_name.mutation_type
+
     def _safe(self) -> HGVSName:
         params = vars(self._hgvs_name)
         params.pop('name', None)  # don't provide name a second time as parsing of name redundantly recalculates values
         copy = HGVSName(**params)
         return copy
+
+    def get_ref_alt(self):
+        # We don't ever use the kwargs so don't implement it
+        return self._hgvs_name.get_ref_alt()
+
+    def get_cdna_coords(self) -> str:
+        return self._hgvs_name.format_cdna_coords()
 
     def format(self, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH) -> Optional[str]:
         # would be better practise to throw an error if we couldn't generate

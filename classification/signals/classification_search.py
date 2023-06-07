@@ -2,15 +2,11 @@ import operator
 from functools import reduce
 from typing import Optional, List
 
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.dispatch import receiver
-from pyhgvs import HGVSName
 
-from annotation.models import VariantAnnotationVersion
 from classification.models import Classification, ClassificationModification
-from genes.hgvs import HGVSException
 from library.preview_request import preview_extra_signal, PreviewKeyValue
 from ontology.models import OntologyTerm
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -55,30 +51,6 @@ def classification_search(search_input: SearchInputInstance):
 
             if lab_qs:
                 filters.append(Q(classification__lab_record_id=lab_record_id) & Q(classification__lab__in=lab_qs))
-
-    # FIXME put this in its own search, or just remove it and the setting
-    # maybe have variants report how many classifcations they have
-    # We can also filter for c.HGVS in classifications
-    if settings.SEARCH_CLASSIFICATION_HGVS_SUFFIX:
-        if search_string.startswith("c.") or search_string.startswith("n."):
-            cdna = search_string[2:]
-            try:
-                hgvs_name = HGVSName()
-                hgvs_name.parse_cdna(cdna)  # Valid HGVS cdna section
-
-                # Look for direct string in evidence
-                filters.append(Q(classification__evidence__c_hgvs__icontains=search_string))
-
-                # Look for HGVS in transcript annotation pointing to classified allele
-                vav = VariantAnnotationVersion.latest(search_input.genome_build_preferred)
-                va_path = "classification__allele__variantallele"
-                vta_path = f"{va_path}__variant__varianttranscriptannotation"
-                filters.append(Q(**{f"{va_path}__genome_build": search_input.genome_build_preferred,
-                                    f"{vta_path}__version": vav,
-                                    f"{vta_path}__hgvs_c__endswith": search_string}))
-
-            except HGVSException:
-                pass
 
     q_cm = reduce(operator.or_, filters)
     cm_qs = ClassificationModification.filter_for_user(search_input.user).filter(is_last_published=True)

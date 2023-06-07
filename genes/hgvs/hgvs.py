@@ -446,6 +446,22 @@ class HGVSVariant(abc.ABC):
     def _set_kind(self, value):
         pass
 
+    @property
+    def mutation_type(self) -> str:
+        return self._get_mutation_type()
+
+    @abc.abstractmethod
+    def _get_mutation_type(self):
+        pass
+
+    @abc.abstractmethod
+    def get_ref_alt(self):
+        pass
+
+    @abc.abstractmethod
+    def get_cdna_coords(self) -> str:
+        pass
+
     @abc.abstractmethod
     def format(self, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH):
         pass
@@ -455,16 +471,3 @@ class HGVSVariant(abc.ABC):
 
     def __eq__(self, other):
         return self.format() == other.format()
-
-
-def get_kind_and_transcript_accession_from_invalid_hgvs(hgvs_string: str):
-    """ If HGVS is valid, use HGVSMatcher.get_transcript_id """
-
-    name = pyhgvs.HGVSName()
-    prefix, allele = hgvs_string.split(':', 1)
-    try:
-        name.parse_allele(allele)
-    except (pyhgvs.InvalidHGVSName, NotImplementedError):
-        pass
-    name.parse_prefix(prefix, name.kind)
-    return name.kind, name.transcript

@@ -487,11 +487,11 @@ class HGVSMatcher:
         transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_accession)
         return self.hgvs_converter.variant_coords_to_c_hgvs(variant.coordinate, transcript_version)
 
-    def variant_to_c_hgvs(self, variant: Variant, transcript_name: str) -> Optional[str]:
-        if hgvs_variant := self.variant_to_c_hgvs_variant(variant=variant, transcript_name=transcript_name):
+    def variant_to_c_hgvs(self, variant: Variant, transcript_accession: str) -> Optional[str]:
+        if hgvs_variant := self.variant_to_c_hgvs_variant(variant, transcript_accession):
             return hgvs_variant.format()
-        if transcript_name:
-            return self.variant_to_hgvs(variant, transcript_name)
+        if transcript_accession:
+            return self.variant_to_hgvs(variant, transcript_accession)
         return None
 
     def variant_to_c_hgvs_parts(self, variant: Variant, transcript: Optional[str], throw_on_issue: bool = False) -> Optional[CHGVS]:

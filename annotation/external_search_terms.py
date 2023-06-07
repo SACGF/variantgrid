@@ -2,11 +2,9 @@
 from collections import defaultdict
 from typing import Tuple, List, Optional
 
-from pyhgvs import HGVSName, InvalidHGVSName
 
-
-def _get_gene_and_terms(vta, c_hgvs=True, extra_terms: Optional[List[str]] = None) -> Tuple[str, List]:
-    from annotation.models import VariantTranscriptAnnotation
+def _get_gene_and_terms(hgvs_matcher, vta, c_hgvs=True, extra_terms: Optional[List[str]] = None) -> Tuple[str, List]:
+    from genes.hgvs import HGVSException
 
     gene_symbol = None
     if vta.gene:
@@ -16,17 +14,17 @@ def _get_gene_and_terms(vta, c_hgvs=True, extra_terms: Optional[List[str]] = Non
     terms = []
     if extra_terms:
         terms.extend(extra_terms)
-    hgvs_name = None
+    hgvs_variant = None
     try:
-        hgvs_name = HGVSName(vta.hgvs_c)
-    except (NotImplementedError, InvalidHGVSName):
+        hgvs_variant = hgvs_matcher.create_hgvs_variant(vta.hgvs_c)
+    except (NotImplementedError, HGVSException):
         pass
 
-    if c_hgvs and hgvs_name:
+    if c_hgvs and hgvs_variant:
         # "7051G>A" | "7051G->A" | "7051G-->A" | "7051G/A"
-        if hgvs_name.mutation_type == ">":
-            cdna_coords = hgvs_name.format_cdna_coords()
-            ref, alt = hgvs_name.get_ref_alt()
+        if hgvs_variant.mutation_type == ">":
+            cdna_coords = hgvs_variant.get_cdna_coords()
+            ref, alt = hgvs_variant.get_ref_alt()
             for change_symbol in [">", "->", "-->", "/"]:
                 terms.append(f"{cdna_coords}{ref}{change_symbol}{alt}")
 
@@ -34,10 +32,10 @@ def _get_gene_and_terms(vta, c_hgvs=True, extra_terms: Optional[List[str]] = Non
         # pyHGVS doesn't handle p.HGVS very well, so can't use HGVSName.format_protein() etc
         protein_aa3 = vta.hgvs_p.split(":p.")[1]
         terms.append(protein_aa3)
-        protein_aa1 = VariantTranscriptAnnotation.amino_acid_3_to_1(protein_aa3)
+        protein_aa1 = vta.amino_acid_3_to_1(protein_aa3)
         terms.append(protein_aa1)
 
-    if hgvs_name and hgvs_name.mutation_type in ('ins', 'del', 'dup'):
+    if hgvs_variant and hgvs_variant.mutation_type in ('ins', 'del', 'dup'):
         # "del ex 20" and "del exon 20"
         ex_in_terms = [(vta.intron, ["intron", "in"]),
                        (vta.exon, ["exon", "ex"])]
@@ -45,15 +43,20 @@ def _get_gene_and_terms(vta, c_hgvs=True, extra_terms: Optional[List[str]] = Non
             if val:
                 num = val.split("/")[0]  # looks like: "20/24"
                 for t in in_terms:
-                    terms.append(f"{hgvs_name.mutation_type} {t} {num}")
+                    terms.append(f"{hgvs_variant.mutation_type} {t} {num}")
 
     return gene_symbol, terms
 
 
 def _get_search_terms(variant_transcripts_list: List, formatter: str = None, **kwargs):
+    from genes.hgvs import HGVSMatcher
+
+    hgvs_matcher = None
     gene_terms = defaultdict(set)
     for vta in variant_transcripts_list:
-        gene_symbol, terms = _get_gene_and_terms(vta, **kwargs)
+        if hgvs_matcher is None:
+            hgvs_matcher = HGVSMatcher(vta.version.genome_build)
+        gene_symbol, terms = _get_gene_and_terms(hgvs_matcher, vta, **kwargs)
         if gene_symbol:
             gene_terms[gene_symbol].update(terms)
 
