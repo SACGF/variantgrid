@@ -923,7 +923,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
                 # Only cache if we don't have it (DB will have it if we do)
                 cache.set(no_transcript_key, str(nt), timeout=WEEK_SECS)
                 raise
-            except (RequestException, URLError) as e:
+            except (RequestException, URLError):
                 cache.set(transcript_connection_error_key, True, timeout=HOUR_SECS)
 
         raise NoTranscript(f"Transcript '{transcript_accession}' missing from our DB - validity with {annotation_consortium} unknown")
@@ -1736,7 +1736,7 @@ class GeneList(TimeStampedModel):
         num_deleted = qs.delete()
 
         if num_added or num_deleted:
-            self.update_modified()
+            self.set_modified_to_now()
 
         return num_added, num_deleted
 
@@ -1777,7 +1777,7 @@ class GeneList(TimeStampedModel):
         gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
         return qs.filter(genelistgenesymbol__gene_symbol=gene_symbol)
 
-    def update_modified(self):
+    def set_modified_to_now(self):
         GeneList.objects.filter(pk=self.pk).update(modified=timezone.now())
 
     def __str__(self):
