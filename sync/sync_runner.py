@@ -103,4 +103,3 @@ def sync_runner_for_destination(sync_destination: SyncDestination) -> SyncRunner
             return factory_requirements.factory()
 
     raise ValueError(f"No SyncRunner is configured for the config of {sync_destination}")
-

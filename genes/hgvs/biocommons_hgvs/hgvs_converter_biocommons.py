@@ -146,7 +146,6 @@ class BioCommonsHGVSConverter(HGVSConverter):
             else:
                 raise ValueError(f"Couldn't obtain ref/genome_ref from '{msg}'")
 
-
         return HgvsMatchRefAllele(provided_ref=provided_ref, calculated_ref=calculated_ref)
 
     def description(self) -> str:

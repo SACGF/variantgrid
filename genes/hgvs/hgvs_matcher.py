@@ -385,7 +385,7 @@ class HGVSMatcher:
         problem_str = ", ".join(problems)
         raise ValueError(f"Could not convert {variant} to HGVS using '{lrg_identifier}': {problem_str}")
 
-    def _variant_to_hgvs(self, variant: Variant, transcript_accession: str=None) -> Tuple[HGVSVariant, str]:
+    def _variant_to_hgvs(self, variant: Variant, transcript_accession: str = None) -> Tuple[HGVSVariant, str]:
         """ returns (hgvs, method) - hgvs is c.HGVS is transcript provided, g.HGVS if not
             We always generate the HGVS with full-length reference bases etc, as we adjust that in HGVSExtra.format()
         """
@@ -541,7 +541,6 @@ class HGVSMatcher:
             parts.append(m.group('op'))
             parts.append(m.group('ins').upper())
             return "".join(parts)
-
 
         cleaned_hgvs = self.C_DOT_REF_ALT_NUC.sub(fix_ref_alt, cleaned_hgvs)
         cleaned_hgvs = self.C_DOT_REF_DEL_INS_DUP_NUC.sub(fix_del_ins, cleaned_hgvs)

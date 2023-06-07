@@ -165,7 +165,7 @@ class PyHGVSConverter(HGVSConverter):
     def description(self) -> str:
         return f"pyhgvs v{metadata.version('pyhgvs')}"
 
-    def get_hgvs_match_ref_allele(self, hgvs_name, pyhgvs_transcript = None) -> HgvsMatchRefAllele:
+    def get_hgvs_match_ref_allele(self, hgvs_name, pyhgvs_transcript=None) -> HgvsMatchRefAllele:
         """Return True if reference allele matches genomic sequence."""
         is_forward_strand = pyhgvs_transcript.tx_position.is_forward_strand if pyhgvs_transcript else True
         ref, _ = hgvs_name.get_ref_alt(is_forward_strand,

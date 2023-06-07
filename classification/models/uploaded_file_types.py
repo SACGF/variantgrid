@@ -16,7 +16,6 @@ class FileHandle(ABC):
     ol file in the local filesystem
     """
 
-
     @abstractmethod
     def _data_handle(self):
         """ Return handle to an open file or storage, anything that you can call .read() on """

@@ -34,7 +34,6 @@ class GeneSymbolAdmin(ModelAdminBasics):
         return ", ".join(str(g) for g in obj.genes)
 
 
-
 admin.site.register(models.ActiveSampleGeneList)
 admin.site.register(models.GeneAnnotationRelease)
 admin.site.register(models.GeneInfo)

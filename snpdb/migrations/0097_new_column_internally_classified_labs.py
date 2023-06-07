@@ -35,7 +35,6 @@ def _custom_columns_for_new_internally_classified_labs(apps, _schema_editor):
     # This was forgotten for some reason
 
 
-
 class Migration(migrations.Migration):
 
     dependencies = [

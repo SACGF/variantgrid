@@ -22,4 +22,3 @@ def gene_symbol_alias_search(search_input: SearchInputInstance):
     aliases = GeneSymbolAlias.objects.filter(alias=search_input.search_string).exclude(gene_symbol__in=gene_symbols)
     for alias in aliases:
         yield alias.gene_symbol, f"{alias.alias} is an alias for {alias.gene_symbol}"
-

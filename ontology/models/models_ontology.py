@@ -1003,7 +1003,6 @@ class OntologySnake:
 
         return OntologySnakes(valid_snakes)
 
-
     @staticmethod
     def gencc_quality_filter(quality: GeneDiseaseClassification = GeneDiseaseClassification.STRONG) -> Q:
         gencc_classifications = GeneDiseaseClassification.get_above_min(quality)

@@ -54,4 +54,3 @@ class ComboCheckerHGVSConverter(HGVSConverter):
     def description(self) -> str:
         # This will be different so just return the 1st one
         return self._converters[0].description()
-

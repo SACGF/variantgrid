@@ -431,7 +431,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         yield SearchMessageOverall(f'Cleaned hgvs from \n"{hgvs_string}" to\n"{clean_hgvs_string}"', severity=LogLevel.INFO)
         hgvs_string = clean_hgvs_string
 
-    search_messages: List[SearchMessage] = [] #[SearchMessage(m) for m in hgvs_search_messages]
+    search_messages: List[SearchMessage] = []  # [SearchMessage(m) for m in hgvs_search_messages]
     reference_message: List[SearchMessage] = []
 
     try:

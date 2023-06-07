@@ -74,4 +74,3 @@ class ClassificationsNode(AnalysisNode):
 class ClassificationsNodeLab(models.Model):
     node = models.ForeignKey(ClassificationsNode, on_delete=CASCADE)
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
-

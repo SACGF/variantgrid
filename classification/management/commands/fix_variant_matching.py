@@ -181,7 +181,6 @@ class Command(BaseCommand):
             after = c_hgvs_validation(c)
             print(f"{c.id} from {before} to {after}")
 
-
     def handle_validation(self):
         FlagDatabase.run()
         # def get_flag_comments(flag_type: FlagType, resolution_id: str) -> Dict[int, FlagComment]:

@@ -7,7 +7,7 @@ from snpdb.search import search_receiver, HAS_ALPHA_PATTERN, \
 
 
 @search_receiver(
-    search_type=ExternalPK, # FIXME, not really appropriate to call this ExternalPK
+    search_type=ExternalPK,  # FIXME, not really appropriate to call this ExternalPK
     pattern=HAS_ALPHA_PATTERN,
     example=SearchExample(
         note="Search on HelixID or SAPOrderNumber"

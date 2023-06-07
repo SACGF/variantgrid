@@ -45,7 +45,6 @@ def _test_old_pyhgvs(apps):
     return needs_upgrade
 
 
-
 class Migration(migrations.Migration):
 
     dependencies = [

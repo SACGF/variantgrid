@@ -19,7 +19,6 @@ class ClassificationChange:
     For showing on Classifiaction Activity Page
     """
 
-
     def __init__(self, key: str, attribute: str, before: Any, after: Any, resolution: Optional[FlagResolution] = None):
         self.key = key
         self.attribute = attribute

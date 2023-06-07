@@ -92,4 +92,3 @@ def process_vcf_file(vcf_filename, name, user, import_source, run_async=True, fi
     if not run_async:  # Should be done by now...
         ufpj = UploadPipeline.objects.get(pk=ufpj.pk)
     return ufpj, result
-

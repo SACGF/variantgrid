@@ -189,7 +189,6 @@ if __name__ == "__main__":
     def _v22(*v):
         return babelfish38.vcf_to_hgvs(*v)
 
-
     def _vp(h):
         v = hgvs.easy.parser.parse(h)
         vl = hnl.normalize(v)

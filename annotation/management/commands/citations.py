@@ -11,14 +11,12 @@ for batch in batch_iterator(error_citations):
     CitationFetchRequest.fetch_all_now(batch, cache_age=timedelta(seconds=0))
 
 
-
 class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--load', action='store_true', default=False, help='Pre-emptively load all citations not yet loaded')
         parser.add_argument('--fix', action='store_true', default=False, help='Force re-load citations that appear to have an incorrect id')
         parser.add_argument('--reload', action='store_true', default=False, help='Attempts to reload all citations currently marked as in error')
-
 
     def handle(self, *args, **options):
         if options["reload"]:

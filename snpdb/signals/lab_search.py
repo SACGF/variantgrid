@@ -13,4 +13,3 @@ from snpdb.search import search_receiver, SearchInputInstance, SearchExample, HA
 )
 def lab_search(search_input: SearchInputInstance):
     yield Lab.objects.filter(organization__active=True).filter(search_input.q_words())
-

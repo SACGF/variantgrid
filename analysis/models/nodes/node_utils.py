@@ -146,4 +146,3 @@ def get_rendering_dict(node):
         "name": node.name,
         "args": node_args
     }
-
