@@ -39,7 +39,7 @@ class Command(BaseCommand):
                 print(f"Loaded {loaded} citations")
 
         if options["fix"]:
-            bad_citations = list()
+            bad_citations = []
             for citation in Citation.objects.filter(old_id__isnull=False, data_json__isnull=False):
                 if citation.source == CitationSource.NCBI_BOOKSHELF:
                     nbk_id = citation.data_json.get("RID")

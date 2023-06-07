@@ -10,9 +10,9 @@ def _migrate_citations(apps, _schema_editor):
     Citation = apps.get_model("annotation", "Citation")
     Citation2 = apps.get_model("annotation", "Citation2")
     CachedCitation = apps.get_model("annotation", "CachedCitation")
-    all_citation_2s = list()
+    all_citation_2s = []
 
-    citation_map = dict()
+    citation_map = {}
 
     for citation in Citation.objects.all():
         if len(all_citation_2s) % 1000 == 0:
@@ -56,7 +56,7 @@ def _migrate_citations(apps, _schema_editor):
     Citation2.objects.bulk_create(objs=all_citation_2s, ignore_conflicts=True, batch_size=1000)
     print(f"Completed {len(all_citation_2s)} migrations")
 
-    all_gene_symbol_citations = list()
+    all_gene_symbol_citations = []
     GeneSymbolCitation = apps.get_model("annotation", "GeneSymbolCitation")
     for gene_symbol_citation in GeneSymbolCitation.objects.all():
         if len(all_gene_symbol_citations) % 1000 == 0:
@@ -68,7 +68,7 @@ def _migrate_citations(apps, _schema_editor):
     GeneSymbolCitation.objects.bulk_update(objs=all_gene_symbol_citations, fields=['citation2'], batch_size=1000)
     print(f"Completed {len(all_gene_symbol_citations)} migrations")
 
-    all_clinvar_citations = list()
+    all_clinvar_citations = []
     ClinVarCitation = apps.get_model("annotation", "ClinVarCitation")
     for clinvar_citation in ClinVarCitation.objects.filter(citation__isnull=False):
         old_id = clinvar_citation.citation_id

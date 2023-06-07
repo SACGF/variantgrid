@@ -307,7 +307,7 @@ class ClinVarExportConverter:
 
     @property
     def citations(self) -> List[ValidatedJson]:
-        request_ids = list()
+        request_ids = []
         if self.clinvar_key.citations_mode == ClinVarCitationsModes.interpretation_summary_only:
             if text := self.classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY):
                 request_ids = db_citation_regexes.search(text)
@@ -315,7 +315,7 @@ class ClinVarExportConverter:
             # non citation refs will be ignored
             request_ids = self.classification_based_on.db_refs
 
-        citation_list = list()
+        citation_list = []
         for citation in CitationFetchRequest.fetch_all_now(request_ids).all_citations:
             if clinvar_db := ClinVarExportConverter.CITATION_SOURCE_TO_CLINVAR.get(citation.source):
                 # NEED to test for NBCI

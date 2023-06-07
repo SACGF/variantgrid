@@ -469,7 +469,7 @@ class CitationFetchRequest:
         Keeps a dict of all normalized IDs to FetchEntries but only for records
         """
 
-        self.error_fetches: List[CitationFetchEntry] = list()
+        self.error_fetches: List[CitationFetchEntry] = []
         """
         FetchEntries that are too invalid to request from Entrez
         """

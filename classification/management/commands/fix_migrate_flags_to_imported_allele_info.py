@@ -74,7 +74,7 @@ class CHGVSFlagData:
 class AlleleData:
 
     def __init__(self):
-        self.flag_datas = list()
+        self.flag_datas = []
 
     def flag_data_for_identifier(self, identifier: CHGVSIdentifier) -> CHGVSFlagData:
         for flag_data in self.flag_datas:
