@@ -164,7 +164,17 @@ class Babelfish:
         try:
             self.ev.validate(var_x, strict=True)  # Validate in transcript range
         except HGVSInvalidVariantError as hgvs_e:
-            if 'Cannot validate sequence of an intronic variant' not in str(hgvs_e):
+            ACCEPTABLE_VALIDATION_MESSAGES = [
+                'Cannot validate sequence of an intronic variant',
+                'does not agree with reference sequence'
+            ]
+            ok = False
+            exception_str = str(hgvs_e)
+            for msg in ACCEPTABLE_VALIDATION_MESSAGES:
+                if msg in exception_str:
+                    ok = True
+                    break
+            if not ok:
                 raise
 
         if converter := CONVERT_TO_G.get(var_x.type):

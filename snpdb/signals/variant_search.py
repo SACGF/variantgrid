@@ -540,7 +540,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
 
             # manual variants
             if cmv := VariantExtra.create_manual_variant(for_user=user, genome_build=genome_build, variant_string=hgvs_string):
-                yield cmv, search_messages
+                yield cmv, search_messages + reference_message
 
             # search for alt alts
             alts = get_results_from_variant_tuples(variant_qs, variant_tuple, any_alt=True)

@@ -5,6 +5,7 @@ from importlib import metadata
 from typing import Tuple
 
 from django.conf import settings
+from hgvs.enums import ValidationLevel
 from hgvs.exceptions import HGVSDataNotAvailableError, HGVSError
 from hgvs.sequencevariant import SequenceVariant
 from hgvs.validator import ExtrinsicValidator
@@ -62,7 +63,7 @@ class BioCommonsHGVSVariant(HGVSVariant):
 
 
 class BioCommonsHGVSConverter(HGVSConverter):
-    pattern = re.compile(".*?: Variant reference \('(.*)'\) does not agree with reference sequence \('(.*)'\)")
+    pattern = re.compile(r".*: Variant reference \((.*)\) does not agree with reference sequence \((.*)\)")
 
     def __init__(self, genome_build: GenomeBuild):
         super().__init__(genome_build)
@@ -135,8 +136,8 @@ class BioCommonsHGVSConverter(HGVSConverter):
             provided_ref = var_g.posedit.edit.ref
 
         ev = ExtrinsicValidator(self.hdp)
-        valid, msg = ev._ref_is_valid(var_g)
-        if valid:
+        validation_level, msg = ev._ref_is_valid(var_g)
+        if validation_level == ValidationLevel.VALID:
             ref, _ = self._strip_common_prefix(vcf_ref, vcf_alt)
             if provided_ref:
                 if provided_ref != ref:
