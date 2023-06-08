@@ -4,13 +4,12 @@ from typing import Tuple, Optional
 
 import pyhgvs
 from django.conf import settings
-from hgvs.exceptions import HGVSError
 from pyhgvs import get_genomic_sequence, HGVSName
 from pyhgvs.utils import make_transcript
 
-from genes.hgvs import HGVSVariant
+from genes.hgvs import HGVSVariant, HGVSException
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele
-from genes.refseq_transcripts import transcript_is_lrg
+from genes.transcripts_utils import transcript_is_lrg
 from snpdb.models import GenomeBuild, VariantCoordinate
 
 
@@ -108,11 +107,17 @@ class PyHGVSConverter(HGVSConverter):
     def __int__(self, genome_build: GenomeBuild):
         super().__init__(genome_build)
 
-    def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
+    @staticmethod
+    def _hgvs_name(hgvs_string):
+        """ Catches PyHGVS specific exceptions and converts to HGVSException """
         try:
-            return PyHGVSVariant(HGVSName(hgvs_string))
+            return HGVSName(hgvs_string)
         except pyhgvs.InvalidHGVSName as e:
-            raise HGVSError from e
+            raise HGVSException from e
+
+
+    def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
+        return PyHGVSVariant(self._hgvs_name(hgvs_string))
 
     def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
         chrom, offset, ref, alt = vc
@@ -131,7 +136,7 @@ class PyHGVSConverter(HGVSConverter):
 
     def hgvs_to_variant_coords_and_reference_match(self, hgvs_string: str, transcript_version) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
         pyhgvs_transcript = None
-        hgvs_name = HGVSName(hgvs_string)
+        hgvs_name = self._hgvs_name(hgvs_string)
 
         # Check transcript bounds
         if transcript_version:
@@ -151,7 +156,7 @@ class PyHGVSConverter(HGVSConverter):
 
     def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
         # ClinGen Allele Registry doesn't like gene names - so strip (unless LRG_)
-        hgvs_name = HGVSName(hgvs_string)
+        hgvs_name = self._hgvs_name(hgvs_string)
         transcript_accession = self.get_transcript_accession(hgvs_string)
         if not transcript_is_lrg(transcript_accession):
             hgvs_name.gene = None
@@ -160,7 +165,7 @@ class PyHGVSConverter(HGVSConverter):
     def get_transcript_accession(self, hgvs_string: str) -> str:
         """ Only returns anything for c.HGVS """
         if hgvs_string is not None:
-            hgvs_name = HGVSName(hgvs_string)
+            hgvs_name = self._hgvs_name(hgvs_string)
             transcript_accession = hgvs_name.transcript
         else:
             transcript_accession = ''
@@ -192,5 +197,4 @@ class PyHGVSConverter(HGVSConverter):
             genomic_coord = pyhgvs_transcript.cdna_to_genomic_coord(cdna_coord)
             within_transcript = pyhgvs_transcript.tx_position.chrom_start <= genomic_coord <= pyhgvs_transcript.tx_position.chrom_stop
             if not within_transcript:
-                reason = f"{description} {cdna_coord} resolves outside of transcript"
-                raise pyhgvs.InvalidHGVSName(name=hgvs_name, reason=reason)
+                raise HGVSException(f"{hgvs_name}: {description} {cdna_coord} resolves outside of transcript")

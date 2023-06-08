@@ -3,7 +3,7 @@ from typing import Tuple
 
 from more_itertools import all_equal
 
-from genes.hgvs import HGVSVariant
+from genes.hgvs import HGVSVariant, HGVSException
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele
 from library.utils import all_equal
 from snpdb.models import VariantCoordinate, GenomeBuild
@@ -19,7 +19,11 @@ class ComboCheckerHGVSConverter(HGVSConverter):
         results_and_methods = []
         for converter in self._converters:
             method = getattr(converter, method_str)
-            results_and_methods.append((method(*args, **kwargs), converter.description()))
+            try:
+                result = method(*args, **kwargs)
+            except HGVSException as e:
+                result = e
+            results_and_methods.append((result, converter.description()))
 
         results = [rm[0] for rm in results_and_methods]
         if not all_equal(results):

@@ -469,4 +469,6 @@ class HGVSVariant(abc.ABC):
         return self.format()
 
     def __eq__(self, other):
-        return self.format() == other.format()
+        if isinstance(other, HGVSVariant):
+            return self.format() == other.format()
+        return False

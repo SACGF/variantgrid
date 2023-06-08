@@ -4,11 +4,10 @@
 from unittest import skip
 
 from django.test.testcases import TestCase
-from hgvs.exceptions import HGVSError
 from pyhgvs import HGVSName  # This is used for pyhgvs specific test
 
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
-from genes.hgvs import HGVSMatcher
+from genes.hgvs import HGVSMatcher, HGVSException
 from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
 from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSVariant
 from snpdb.models import GenomeBuild
@@ -95,7 +94,7 @@ class TestHGVS(TestCase):
         matcher = HGVSMatcher(genome_build)
         matcher.get_variant_tuple("ENST00000300305.3:c.1440A>T")
 
-        with self.assertRaises(HGVSError):
+        with self.assertRaises(HGVSException):
             matcher.get_variant_tuple("ENST00000300305.3:c.9999A>T")
 
     def test_sort_transcript_versions(self):

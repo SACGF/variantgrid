@@ -6,16 +6,15 @@ from typing import List, Optional, Tuple, Union
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Max, Min
-from hgvs.exceptions import HGVSError
 
-from genes.hgvs import HGVSVariant, CHGVS
+from genes.hgvs import HGVSVariant, CHGVS, HGVSException
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
 from genes.hgvs.hgvs_converter import HGVSConverterType, HgvsMatchRefAllele
 from genes.hgvs.hgvs_converter_combo import ComboCheckerHGVSConverter
 from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSConverter
 from genes.models import TranscriptVersion, Transcript, GeneSymbol, LRGRefSeqGene, BadTranscript, \
     NoTranscript
-from genes.refseq_transcripts import get_refseq_type, transcript_is_lrg
+from genes.transcripts_utils import transcript_is_lrg, looks_like_transcript, looks_like_hgvs_prefix
 from library.constants import WEEK_SECS
 from library.log_utils import report_exc_info
 from library.utils import clean_string, FormerTuple
@@ -59,7 +58,7 @@ class HGVSConverterFactory:
     @staticmethod
     def factory(genome_build: GenomeBuild, hgvs_converter_type: HGVSConverterType = None):
         if hgvs_converter_type is None:
-            if False and settings.DEBUG:  # TODO: Disabled
+            if settings.DEBUG:  # TODO: Disabled
                 hgvs_converter_type = HGVSConverterType.COMBO
             else:
                 hgvs_converter_type = HGVSConverterType[settings.HGVS_DEFAULT_METHOD.upper()]
@@ -341,7 +340,7 @@ class HGVSMatcher:
                     non_standard_bases = non_standard_bases.replace(n, "")
                 if non_standard_bases:
                     msg = f"'{hgvs_string}': {k}={v} contains non-standard (A,C,G,T) bases: {non_standard_bases}"
-                    raise HGVSError(msg)
+                    raise HGVSException(msg)
 
         if Variant.is_ref_alt_reference(ref, alt):
             alt = Variant.REFERENCE_ALT
@@ -578,25 +577,25 @@ class HGVSMatcher:
             transcript_accession = prefix
             gene_symbol = None
 
-        transcript_ok = HGVSMatcher._looks_like_transcript(transcript_accession)
+        transcript_ok = looks_like_transcript(transcript_accession)
         if not transcript_ok and gene_symbol:
             # fix gene/transcript swap and lower case separately to get separate warnings.
             uc_gene = gene_symbol.upper()
-            if HGVSMatcher._looks_like_transcript(uc_gene):  # Need to upper here
+            if looks_like_transcript(uc_gene):  # Need to upper here
                 old_transcript = transcript_accession
                 transcript_accession = gene_symbol
                 gene_symbol = old_transcript
                 if gene_symbol:
                     fixed_messages.append("Swapped gene/transcript")
-                transcript_ok = HGVSMatcher._looks_like_transcript(transcript_accession)
-            elif HGVSMatcher._looks_like_hgvs_prefix(uc_gene):
+                transcript_ok = looks_like_transcript(transcript_accession)
+            elif looks_like_hgvs_prefix(uc_gene):
                 gene_symbol = uc_gene
                 fixed_messages.append("Upper cased HGVS prefix")
 
         if not transcript_ok:
             if transcript_accession:
                 uc_transcript = transcript_accession.upper()
-                if HGVSMatcher._looks_like_transcript(uc_transcript):
+                if looks_like_transcript(uc_transcript):
                     transcript_accession = uc_transcript
                     fixed_messages.append("Upper cased transcript")
 
@@ -606,22 +605,6 @@ class HGVSMatcher:
             prefix = transcript_accession
         fixed_hgvs_string = f"{prefix}:{allele}"
         return fixed_hgvs_string, fixed_messages
-
-    @staticmethod
-    def _looks_like_transcript(prefix: str) -> bool:
-        return HGVSMatcher._looks_like_hgvs_prefix(prefix, refseq_types=('mRNA', 'RNA'))
-
-    @staticmethod
-    def _looks_like_hgvs_prefix(prefix: str, refseq_types=None) -> bool:
-        """ copied from pyhgvs.models.hgvs_name.HGVSName.parse_prefix """
-        if prefix.startswith('ENST') or prefix.startswith('LRG_'):
-            return True
-
-        if refseq_type := get_refseq_type(prefix):
-            if refseq_types is not None:
-                return refseq_type in refseq_types
-            return True
-        return False
 
     def get_gene_symbol_if_no_transcript(self, hgvs_string: str) -> Optional[GeneSymbol]:
         """ If HGVS uses gene symbol instead of transcript, return symbol """

@@ -13,6 +13,7 @@ from genes.hgvs import HGVSVariant, HGVSException
 from genes.hgvs.biocommons_hgvs.babelfish import Babelfish, ParserSingleton
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele
+from genes.transcripts_utils import looks_like_transcript
 from snpdb.models import GenomeBuild, VariantCoordinate, Contig
 
 
@@ -111,8 +112,9 @@ class BioCommonsHGVSConverter(HGVSConverter):
         if hgvs_string is not None:
             parser = ParserSingleton.parser()
             sequence_variant = parser.parse_hgvs_variant(hgvs_string)
-            if sequence_variant.type != 'g' and sequence_variant.ac:
-                transcript_accession = sequence_variant.ac
+            if sequence_variant.type != 'g':
+                if looks_like_transcript(sequence_variant.ac):
+                    transcript_accession = sequence_variant.ac
         return transcript_accession
 
     @staticmethod

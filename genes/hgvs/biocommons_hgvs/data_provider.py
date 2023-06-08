@@ -1,7 +1,7 @@
 from cdot.hgvs.dataproviders import LocalDataProvider, FastaSeqFetcher
 
 from genes.models import TranscriptVersion
-from genes.refseq_transcripts import get_refseq_type
+from genes.transcripts_utils import get_refseq_type
 from snpdb.models import Contig
 
 
