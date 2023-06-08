@@ -292,6 +292,7 @@ class HGVSMatcher:
                 hgvs_variant.transcript = tv.accession
                 hgvs_string_for_version = hgvs_variant.format()
                 if method == self.HGVS_METHOD_INTERNAL_LIBRARY:
+                    method = self.hgvs_converter.description()
                     variant_tuple, matches_reference = self.hgvs_converter.hgvs_to_variant_coords_and_reference_match(hgvs_string_for_version, tv)
                 elif method == self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY:
                     if self._clingen_allele_registry_ok(tv.accession):
