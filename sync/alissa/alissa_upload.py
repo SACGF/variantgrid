@@ -138,7 +138,7 @@ class AlissaUploadSyncer(SyncRunner):
                                 notify.add_field("Failures", numberFailed)
 
                                 failure: str
-                                for failure in response.json.get("failures"):
+                                for failure in response_json.get("failures"):
                                     if "\t" in failure:
                                         parts = failure.split("\t")
                                         message = parts[0]
