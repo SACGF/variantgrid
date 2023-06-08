@@ -144,7 +144,7 @@ class AlissaUploadSyncer(SyncRunner):
                                         message = parts[0]
                                         json_data_str = parts[1]
                                         try:
-                                            json_data = json.loads(json_data)
+                                            json_data = json.loads(json_data_str)
                                             transcript = json_data.get("transcript")
                                             c_nomen = json_data.get("cNomen")
                                             notify.add_markdown(f"{transcript}:{c_nomen} - \"{message}\"")
