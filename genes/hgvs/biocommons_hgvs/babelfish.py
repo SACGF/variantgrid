@@ -128,12 +128,7 @@ class Babelfish:
                 alt = alt[lp:]
                 position += lp
 
-        if ref == '':
-            ref = None
-        if alt == '':
-            alt = None
-
-        if ref is None:  # Insert
+        if ref == '':  # Insert
             # Insert uses coordinates around the insert point.
             start = position - 1
             end = position
@@ -146,8 +141,8 @@ class Babelfish:
                                 posedit=PosEdit(Interval(start=SimplePosition(start),
                                                          end=SimplePosition(end),
                                                          uncertain=False),
-                                                NARefAlt(ref=ref,
-                                                         alt=alt,
+                                                NARefAlt(ref=ref or '',
+                                                         alt=alt or '',
                                                          uncertain=False)))
 
         n = Normalizer(self.hdp)
