@@ -9,6 +9,7 @@ import os
 import hgvs
 import hgvs.normalizer
 from bioutils.assemblies import make_ac_name_map, make_name_ac_map
+from bioutils.sequences import reverse_complement
 from hgvs.assemblymapper import AssemblyMapper
 from hgvs.edit import NARefAlt
 from hgvs.exceptions import HGVSInvalidVariantError
@@ -87,19 +88,22 @@ class Babelfish:
             ref = alt[0]
             end_i = start_i
             return (chr, start_i + 1, ref, alt, typ)
-
-        if vleft.posedit.edit.ref == vleft.posedit.edit.alt:
-            return None
-
-        alt = vleft.posedit.edit.alt or ""
-
-        if typ in ('del', 'ins'):
-            # left-anchored
-            start_i -= 1
-            ref = self.hdp.seqfetcher.fetch_seq(vleft.ac, start_i, end_i)
-            alt = ref[0] + alt
-        else:
+        elif typ == 'inv':
             ref = vleft.posedit.edit.ref
+            alt = reverse_complement(ref)
+        else:
+            if vleft.posedit.edit.ref == vleft.posedit.edit.alt:
+                return None
+
+            alt = vleft.posedit.edit.alt or ""
+
+            if typ in ('del', 'ins'):
+                # left-anchored
+                start_i -= 1
+                ref = self.hdp.seqfetcher.fetch_seq(vleft.ac, start_i, end_i)
+                alt = ref[0] + alt
+            else:
+                ref = vleft.posedit.edit.ref
 
         return chr, start_i + 1, ref, alt, typ
 
