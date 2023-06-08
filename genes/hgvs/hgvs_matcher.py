@@ -1,5 +1,6 @@
 import logging
 import re
+import sys
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union
 
@@ -290,7 +291,8 @@ class HGVSMatcher:
             for tv, method in self.filter_best_transcripts_and_method_by_accession(transcript_accession):
                 used_transcript_accession = tv.accession
                 hgvs_variant.transcript = tv.accession
-                hgvs_string_for_version = hgvs_variant.format()
+                # Ensure that ref is always present so we can give warning about provided reference
+                hgvs_string_for_version = hgvs_variant.format(max_ref_length=sys.maxsize)
                 if method == self.HGVS_METHOD_INTERNAL_LIBRARY:
                     method = self.hgvs_converter.description()
                     variant_tuple, matches_reference = self.hgvs_converter.hgvs_to_variant_coords_and_reference_match(hgvs_string_for_version, tv)
