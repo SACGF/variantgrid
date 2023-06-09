@@ -33,6 +33,11 @@ class ComboCheckerHGVSConverter(HGVSConverter):
             else:
                 logging.error(msg)
 
+        # Always die if any die
+        for r in results:
+            if isinstance(r, Exception):
+                raise r
+
         result = results[0]  # All same so any is fine
         # logging.debug("HGVS Combo: %s", result)
         return result

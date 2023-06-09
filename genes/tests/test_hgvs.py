@@ -6,8 +6,8 @@ from unittest import skip
 from django.test.testcases import TestCase
 from pyhgvs import HGVSName  # This is used for pyhgvs specific test
 
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version
-from genes.hgvs import HGVSMatcher, HGVSException
+from annotation.tests.test_data_fake_genes import create_fake_transcript_version, create_gata2_transcript_version
+from genes.hgvs import HGVSMatcher, HGVSException, HGVSConverterType
 from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
 from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSVariant
 from snpdb.models import GenomeBuild
@@ -149,3 +149,57 @@ class TestHGVS(TestCase):
         key_closest = HGVSMatcher._get_sort_key_transcript_version_and_methods(version, closest=True)
         sorted_closest = list(sorted(transcript_version_and_methods, key=key_closest))
         self.assertEqual(sorted_closest, expected_closest, "Sorted closest")
+
+    def test_hgvs_pyhgvs(self):
+        self._test_hgvs_conversion(HGVSConverterType.PYHGVS)
+
+    def test_hgvs_biocommons(self):
+        pass
+        #        self._test_hgvs_conversion(HGVSConverterType.BIOCOMMONS_HGVS)
+
+    def _test_hgvs_conversion(self, hgvs_converter_type: HGVSConverterType):
+        # GATA2 ClinVar
+        HGVS_EXAMPLES = [
+            "NM_001145661.2(GATA2):c.1121G>A",
+            "NM_001145661.2(GATA2):c.1114G>A",
+            "NM_001145661.2(GATA2):c.1017+572C>T",
+            "NM_001145661.2(GATA2):c.1144-1G>C",
+            # Single base del
+            "NM_001145661.2(GATA2):c.1142del",
+            "NM_001145661.2(GATA2):c.1124del",
+            "NM_001145661.2(GATA2):c.1113del",
+            # Multi-base del
+            "NM_001145661.2(GATA2):c.1143+200_1198del",
+            "NM_001145661.2(GATA2):c.1117_1131del",
+            "NM_001145661.2(GATA2):c.1084_1095del",
+            "NM_001145661.2(GATA2):c.1066_1095del",
+            "NM_001145661.2(GATA2):c.1031_1049del",
+            "NM_001145661.2(GATA2):c.1172_1175del",
+            # clingen allele registry agrees with 'NM_001145661.2:c.1017+513_1017+540del'
+            "NM_001145661.2(GATA2):c.1017+513_1017+540del",
+            # Ins
+            "NM_001145661.2(GATA2):c.1035_1036insTCTGGCC",
+            "NM_001145661.2(GATA2):c.1034_1035insTCTTCTTGTGGCGGCTCTTCTGGCGGC",
+            "NM_001145661.2(GATA2):c.1019_1020insCGACTGGGAGGGCAAGGCAG",
+            # Delins
+            "NM_001145661.2(GATA2):c.554_628delinsTAGCACCACGGGGGCT",
+            "NM_001145661.2(GATA2):c.932_937delinsG",
+            "NM_001145661.2(GATA2):c.405_409delinsGTA",
+            "NM_001145661.2(GATA2):c.243delinsGC",
+            # Dup
+            "NM_001145661.2(GATA2):c.890_903dup",
+            "NM_001145661.2(GATA2):c.1200_1216dup",
+            "NM_001145661.2(GATA2):c.1126_1133dup",
+            "NM_001145661.2(GATA2):c.1023_1038dup",
+        ]
+
+        genome_build = GenomeBuild.grch37()
+        create_gata2_transcript_version(genome_build)
+        matcher = HGVSMatcher(genome_build, hgvs_converter_type=hgvs_converter_type)
+        for hgvs_string in HGVS_EXAMPLES:
+            transcript_accession = matcher.get_transcript_accession(hgvs_string)
+            vc = matcher.get_variant_tuple(hgvs_string)
+            hgvs_variant = matcher.variant_coordinate_to_c_hgvs_variant(vc, transcript_accession)
+            hgvs_out = hgvs_variant.format()
+            self.assertEqual(hgvs_string, hgvs_out, f"{hgvs_converter_type} Converting to and back to VariantCoordinate")
+

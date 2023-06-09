@@ -188,8 +188,9 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
     def reference_fasta(self):
         return self.get_settings_file("reference_fasta")
 
-    @cached_property
+    @property
     def genome_fasta(self):
+        """ This can't be cached as need to be there for unit tests """
         return GenomeFasta.get_for_genome_build(self)
 
     @property
