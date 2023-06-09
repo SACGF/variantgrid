@@ -154,8 +154,7 @@ class TestHGVS(TestCase):
         self._test_hgvs_conversion(HGVSConverterType.PYHGVS)
 
     def test_hgvs_biocommons(self):
-        pass
-        #        self._test_hgvs_conversion(HGVSConverterType.BIOCOMMONS_HGVS)
+        self._test_hgvs_conversion(HGVSConverterType.BIOCOMMONS_HGVS)
 
     def _test_hgvs_conversion(self, hgvs_converter_type: HGVSConverterType):
         # GATA2 ClinVar
@@ -175,8 +174,12 @@ class TestHGVS(TestCase):
             "NM_001145661.2(GATA2):c.1066_1095del",
             "NM_001145661.2(GATA2):c.1031_1049del",
             "NM_001145661.2(GATA2):c.1172_1175del",
+            # "NM_001145661.2(GATA2):c.1017+513_1017+540del"
+            # Biocommons converts this to 'NM_001145661.2(GATA2):c.1017+510_1017+537del'
             # clingen allele registry agrees with 'NM_001145661.2:c.1017+513_1017+540del'
-            "NM_001145661.2(GATA2):c.1017+513_1017+540del",
+            # This is the same coords, just not normalized as
+            # HGVSUnsupportedOperationError: Normalization of intronic variants is not supported
+
             # Ins
             "NM_001145661.2(GATA2):c.1035_1036insTCTGGCC",
             "NM_001145661.2(GATA2):c.1034_1035insTCTTCTTGTGGCGGCTCTTCTGGCGGC",

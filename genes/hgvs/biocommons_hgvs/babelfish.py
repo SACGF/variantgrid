@@ -36,7 +36,6 @@ class ParserSingleton:
     __instance = None
 
     def __init__(self):
-        print("ParserSingleton.__init__")
         self._parser = Parser()
 
     @classmethod
@@ -141,10 +140,9 @@ class Babelfish:
                                 posedit=PosEdit(Interval(start=SimplePosition(start),
                                                          end=SimplePosition(end),
                                                          uncertain=False),
-                                                NARefAlt(ref=ref or '',
-                                                         alt=alt or '',
+                                                NARefAlt(ref=ref or None,
+                                                         alt=alt or None,
                                                          uncertain=False)))
-
         n = Normalizer(self.hdp)
         return n.normalize(var_g)
 
