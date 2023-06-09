@@ -96,8 +96,14 @@ class Babelfish:
 
             alt = vleft.posedit.edit.alt or ""
 
-            if typ in ('del', 'ins'):
-                # left-anchored
+            if typ in ('del', 'ins'):  # Left anchored
+                # When making biocommons pull request, add comment:
+                # The original test here was: end_i - start_i == 1 and vleft.posedit.length_change() == 0
+                # The only difference is the old way caught delins and gave them a common prefix
+                # example NC_000003.12:g.128483940_128483945delinsC
+                # old way: 3:128202782 TGGCCGG>TC
+                # new way: 3:128202783 GGCCGG>C (this is what VT normalizes the above to)
+
                 start_i -= 1
                 ref = self.hdp.seqfetcher.fetch_seq(vleft.ac, start_i, end_i)
                 alt = ref[0] + alt

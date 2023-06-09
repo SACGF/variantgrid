@@ -154,9 +154,16 @@ class TestHGVS(TestCase):
         self._test_hgvs_conversion(HGVSConverterType.PYHGVS)
 
     def test_hgvs_biocommons(self):
-        self._test_hgvs_conversion(HGVSConverterType.BIOCOMMONS_HGVS)
+        # PyHGVS doesn't support INV but biocommons does
+        extra_hgvs = [
+            "NM_001145661.2(GATA2):c.1117_1131inv",
+        ]
+        self._test_hgvs_conversion(HGVSConverterType.BIOCOMMONS_HGVS, extra_hgvs)
 
-    def _test_hgvs_conversion(self, hgvs_converter_type: HGVSConverterType):
+    def _test_hgvs_conversion(self, hgvs_converter_type: HGVSConverterType, extra_hgvs=None):
+        if extra_hgvs is None:
+            extra_hgvs = []
+
         # GATA2 ClinVar
         HGVS_EXAMPLES = [
             "NM_001145661.2(GATA2):c.1121G>A",
@@ -199,7 +206,7 @@ class TestHGVS(TestCase):
         genome_build = GenomeBuild.grch37()
         create_gata2_transcript_version(genome_build)
         matcher = HGVSMatcher(genome_build, hgvs_converter_type=hgvs_converter_type)
-        for hgvs_string in HGVS_EXAMPLES:
+        for hgvs_string in HGVS_EXAMPLES + extra_hgvs:
             transcript_accession = matcher.get_transcript_accession(hgvs_string)
             vc = matcher.get_variant_tuple(hgvs_string)
             hgvs_variant = matcher.variant_coordinate_to_c_hgvs_variant(vc, transcript_accession)
