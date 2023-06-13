@@ -37,7 +37,7 @@ easy_thumbnails==2.8.1
 fontawesomefree==6.4.0
 git+https://github.com/davmlaw/django-json-widget@34924b99a2c9390dcacb5fa923f84ceda5b7bc4a#egg=django_json_widget
 git+https://github.com/davmlaw/django-jfu@692c6b209c9db04031b0947005b3ff2878dfdfa2#egg=django-jfu
-git+https://github.com/davmlaw/django-messages@36920f188536d60b263320325577aa0ef87de4f4/#egg=django-messages
+git+https://github.com/davmlaw/django-messages@36920f188536d60b263320325577aa0ef87de4f4#egg=django-messages
 git+https://github.com/davmlaw/django-starfield@a7bb433bb645a989cc0f01b4543bde5e5ce210a7#egg=django_starfield
 git+https://github.com/davmlaw/django-js-reverse@1477ba44b62c419d12ebec86e56973f1ae56f712#egg=django-js-reverse
 git+https://github.com/SACGF/hgvs@116217d18876b0882555e621e4fa9122b316f016#egg=pyhgvs
