@@ -1039,7 +1039,7 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
         #"created"
     )
     list_filter = ('imported_genome_build_patch_version', 'status', 'latest_validation__confirmed', ValidationFilter, MatchingOnFilter)
-    search_fields = ('id', 'imported_c_hgvs', 'imported_g_hgvs')
+    search_fields = ('id', 'imported_c_hgvs', 'imported_g_hgvs', 'message')
     inlines = (ImportedAlleleInfoValidationInline,)
 
     @admin_list_column("grch37", "grch37")
