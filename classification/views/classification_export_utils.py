@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
-from typing import List, Iterable, Optional, Dict, Set, Any, Mapping
+from typing import List, Iterable, Optional, Dict, Set, Any, Mapping, Callable
 
 from django.contrib.auth.models import User
 from django.db.models import Count
@@ -10,6 +10,7 @@ from django.db.models.query import QuerySet
 from classification.models.classification import ClassificationModification
 from classification.models.evidence_key import EvidenceKeyMap, EvidenceKey
 from genes.hgvs import CHGVS
+from library.utils import html_to_text
 
 
 class KeyValueFormatter:
@@ -26,16 +27,20 @@ class KeyValueFormatter:
                 label += '.note'
         return label
 
-    def value_for(self, ekey: EvidenceKey, value, pretty: bool = False):
+    def value_for(self, ekey: EvidenceKey, value, pretty: bool = False, cell_formatter: Optional[Callable[[Any], Any]] = False):
         if pretty:
-            return ekey.pretty_value(value)
+            value = ekey.pretty_value(value)
+        else:
+            if isinstance(value, list):
+                value = ', '.join((str(item) for item in value))
+            elif value is True:
+                return 'TRUE'
+            elif value is False:
+                return 'FALSE'
 
-        if isinstance(value, list):
-            value = ', '.join((str(item) for item in value))
-        elif value is True:
-            return 'TRUE'
-        elif value is False:
-            return 'FALSE'
+        if cell_formatter:
+            value = cell_formatter(value)
+
         return value
 
 
@@ -87,6 +92,7 @@ class UsedKeyTracker:
                  ekeys: EvidenceKeyMap,
                  key_value_formatter: KeyValueFormatter,
                  pretty: bool = False,
+                 cell_formatter: Optional[Callable[[Any], Any]] = None,
                  include_explains: bool = False,
                  ignore_evidence_keys: Optional[Set[str]] = None):
         self.user = user
@@ -94,6 +100,7 @@ class UsedKeyTracker:
         self.key_value_formatter = key_value_formatter
         self.calc_dict: Dict[str, UsedKey] = {}
         self.pretty = pretty
+        self.cell_formatter = cell_formatter
         self.ordered_keys = None
         self.include_explains = include_explains
         self.ignore_evidence_keys = ignore_evidence_keys
@@ -177,7 +184,7 @@ class UsedKeyTracker:
                 cols.append(self.key_value_formatter.header_for(used_key.ekey, pretty=self.pretty) + '.explain')
         return cols
 
-    def row(self, classification_modification: ClassificationModification) -> List[Optional[str]]:
+    def row(self, classification_modification: ClassificationModification, formatter: Callable[[Any], Any]) -> List[Optional[str]]:
         self.process()
         cols: List[Optional[str]] = []
         evidence = classification_modification.get_visible_evidence(self.user)
@@ -188,7 +195,7 @@ class UsedKeyTracker:
                     cols.append(None)
                 else:
                     value = value_obj.get('value')
-                    cols.append(self.key_value_formatter.value_for(used_key.ekey, value, pretty=self.pretty))
+                    cols.append(self.key_value_formatter.value_for(used_key.ekey, value, pretty=self.pretty, cell_formatter=self.cell_formatter))
             if used_key.has_note:
                 if not value_obj:
                     cols.append(None)
