@@ -467,7 +467,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         if variant_tuple is None:
             if classify:
                 search_message = SearchMessage(f"Error reading HGVS \"{hgvs_error}\"")
-                if classify_no_variant := VariantExtra.classify_no_variant_hgvs(for_user=user, hgvs_string=original_hgvs_string):
+                if classify_no_variant := VariantExtra.classify_no_variant_hgvs(for_user=user, hgvs_string=original_hgvs_string, genome_build=genome_build):
                     yield SearchResult(classify_no_variant, messages=[search_message])
 
         # yield SearchMessageOverall(str(hgvs_error))
@@ -523,6 +523,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 yield VariantExtra.classify_variant(
                     for_user=user,
                     transcript_id=transcript_id,
+                    variant=variant
                 ), search_messages + reference_message
             else:
                 # if kind == 'g' then doesn't matter what the preferred genome build is
