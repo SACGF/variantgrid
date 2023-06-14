@@ -37,13 +37,13 @@
         params.type = format;
 
         let rowsPerFile = $("#rows_per_file").val();
-        if (rowsPerFile.length) {
+        if (rowsPerFile && rowsPerFile.length) {
             params.rows_per_file = rowsPerFile;
         }
 
-        let row_limit = $("#row_limit").val();
-        if (row_limit.length) {
-            params.row_limit = row_limit;
+        let rowLimit = $("#row_limit").val();
+        if (rowLimit && rowLimit.length) {
+            params.row_limit = rowLimit;
         }
 
         if (format === 'mvl') {
@@ -73,16 +73,24 @@
             let encoding = $("input[name='encoding']:checked").val();
             params.encoding = encoding;
         } else if (format === 'csv') {
-            params.value_format = $("input[name='value_format']:checked").val();
-            params.html_handling = $("input[name='html_handling']:checked").val();
 
-            let include_explains = $("input[name='include_explains']:checked");
-            if (include_explains.length) {
+            let valueFormat = $("input[name='value_format']:checked").val();
+            if (valueFormat) {
+                params.value_format = valueFormat;
+            }
+
+            let htmlHandling = $("input[name='html_handling']:checked").val();
+            if (htmlHandling) {
+                params.html_handling = htmlHandling;
+            }
+
+            let includeExplains = $("input[name='include_explains']:checked");
+            if (includeExplains && includeExplains.length) {
                 params.include_explains = 'true';
             }
 
-            let exclude_transient = $("input[name='exclude_transient']:checked");
-            if (exclude_transient.length) {
+            let excludeTransient = $("input[name='exclude_transient']:checked");
+            if (excludeTransient && excludeTransient.length) {
                 params.exclude_transient = 'true';
             }
         }
