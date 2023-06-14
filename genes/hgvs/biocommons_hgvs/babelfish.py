@@ -10,15 +10,12 @@ import hgvs
 import hgvs.normalizer
 from bioutils.assemblies import make_ac_name_map, make_name_ac_map
 from bioutils.sequences import reverse_complement
-from hgvs.assemblymapper import AssemblyMapper
 from hgvs.edit import NARefAlt
-from hgvs.exceptions import HGVSInvalidVariantError
 from hgvs.location import Interval, SimplePosition
 from hgvs.normalizer import Normalizer
 from hgvs.parser import Parser
 from hgvs.posedit import PosEdit
 from hgvs.sequencevariant import SequenceVariant
-from hgvs.validator import ExtrinsicValidator
 
 
 def _as_interbase(posedit):
@@ -52,10 +49,6 @@ class Babelfish:
         self.assembly_name = assembly_name
         self.hdp = hdp
         self.hn = hgvs.normalizer.Normalizer(hdp, cross_boundaries=False, shuffle_direction=5, validate=False)
-        self.am = AssemblyMapper(self.hdp,
-                                 assembly_name=assembly_name,
-                                 alt_aln_method='splign', replace_reference=True)
-        self.ev = ExtrinsicValidator(self.hdp)
         self.ac_to_name_map = make_ac_name_map(assembly_name)
         self.name_to_ac_map = make_name_ac_map(assembly_name)
 
@@ -112,15 +105,6 @@ class Babelfish:
 
         return chr, start_i + 1, ref, alt, typ
 
-    def vcf_to_hgvs(self, chrom, position, ref, alt, transcript_accession=None):
-        if transcript_accession:
-            return self.vcf_to_c_hgvs(chrom, position, ref, alt, transcript_accession)
-        return self.vcf_to_g_hgvs(chrom, position, ref, alt)
-
-    def vcf_to_c_hgvs(self, chrom, position, ref, alt, transcript_accession):
-        var_g = self.vcf_to_g_hgvs(chrom, position, ref, alt)
-        return self.am.g_to_c(var_g, transcript_accession)
-
     def vcf_to_g_hgvs(self, chrom, position, ref, alt):
         ac = self.name_to_ac_map[chrom]
 
@@ -151,34 +135,6 @@ class Babelfish:
                                                          uncertain=False)))
         n = Normalizer(self.hdp)
         return n.normalize(var_g)
-
-    def hgvs_to_g_hgvs(self, hgvs_string: str):
-        CONVERT_TO_G = {
-            'c': self.am.c_to_g,
-            'n': self.am.n_to_g,
-        }
-
-        parser = ParserSingleton.parser()
-        var_x = parser.parse_hgvs_variant(hgvs_string)
-        try:
-            self.ev.validate(var_x, strict=True)  # Validate in transcript range
-        except HGVSInvalidVariantError as hgvs_e:
-            ACCEPTABLE_VALIDATION_MESSAGES = [
-                'Cannot validate sequence of an intronic variant',
-                'does not agree with reference sequence'
-            ]
-            ok = False
-            exception_str = str(hgvs_e)
-            for msg in ACCEPTABLE_VALIDATION_MESSAGES:
-                if msg in exception_str:
-                    ok = True
-                    break
-            if not ok:
-                raise
-
-        if converter := CONVERT_TO_G.get(var_x.type):
-            var_x = converter(var_x)
-        return var_x
 
 
 if __name__ == "__main__":

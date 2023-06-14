@@ -5,8 +5,9 @@ from importlib import metadata
 from typing import Tuple
 
 from django.conf import settings
+from hgvs.assemblymapper import AssemblyMapper
 from hgvs.enums import ValidationLevel
-from hgvs.exceptions import HGVSDataNotAvailableError, HGVSError
+from hgvs.exceptions import HGVSDataNotAvailableError, HGVSError, HGVSInvalidVariantError
 from hgvs.sequencevariant import SequenceVariant
 from hgvs.validator import ExtrinsicValidator
 
@@ -69,6 +70,13 @@ class BioCommonsHGVSConverter(HGVSConverter):
         super().__init__(genome_build)
         self.hdp = DjangoTranscriptDataProvider(genome_build)
         self.babelfish = Babelfish(self.hdp, genome_build.name)
+        self.am = AssemblyMapper(self.hdp,
+                                 assembly_name=genome_build.name,
+                                 alt_aln_method='splign',
+                                 replace_reference=False,
+                                 prevalidation_level="INTRINSIC")
+        self.ev = ExtrinsicValidator(self.hdp)
+
 
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
         try:
@@ -84,7 +92,8 @@ class BioCommonsHGVSConverter(HGVSConverter):
 
     def variant_coords_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
         try:
-            var_c = self.babelfish.vcf_to_c_hgvs(*vc, transcript_accession=transcript_version.accession)
+            var_g = self.babelfish.vcf_to_g_hgvs(*vc)
+            var_c = self.am.g_to_c(var_g, transcript_version.accession)
         except HGVSError as e:  # Can be out of bounds etc
             raise HGVSException from e
 
@@ -93,7 +102,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
         return BioCommonsHGVSVariant(var_c)
 
     def hgvs_to_variant_coords_and_reference_match(self, hgvs_string: str, transcript_version=None) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
-        var_g = self.babelfish.hgvs_to_g_hgvs(hgvs_string)
+        var_g = self._hgvs_to_g_hgvs(hgvs_string)
         try:
             (chrom, position, ref, alt, typ) = self.babelfish.hgvs_to_vcf(var_g)
         except HGVSDataNotAvailableError:
@@ -154,3 +163,33 @@ class BioCommonsHGVSConverter(HGVSConverter):
 
     def description(self) -> str:
         return f"BioCommons hgvs v{metadata.version('hgvs')}"
+
+    def _hgvs_to_g_hgvs(self, hgvs_string: str):
+        CONVERT_TO_G = {
+            'c': self.am.c_to_g,
+            'n': self.am.n_to_g,
+        }
+
+        parser = ParserSingleton.parser()
+        var_x = parser.parse_hgvs_variant(hgvs_string)
+        var_cleaned = parser.parse_hgvs_variant(var_x.format())
+        try:
+            self.ev.validate(var_x, strict=True)  # Validate in transcript range
+        except HGVSInvalidVariantError as hgvs_e:
+            ACCEPTABLE_VALIDATION_MESSAGES = [
+                'Cannot validate sequence of an intronic variant',
+                'does not agree with reference sequence'
+            ]
+            ok = False
+            exception_str = str(hgvs_e)
+            for msg in ACCEPTABLE_VALIDATION_MESSAGES:
+                if msg in exception_str:
+                    ok = True
+                    break
+            if not ok:
+                raise
+
+        if converter := CONVERT_TO_G.get(var_x.type):
+            var_x = converter(var_cleaned)
+        return var_x
+

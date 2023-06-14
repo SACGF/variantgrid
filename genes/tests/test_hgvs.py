@@ -7,10 +7,10 @@ from django.test import TestCase, override_settings
 from pyhgvs import HGVSName  # This is used for pyhgvs specific test
 
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version, create_gata2_transcript_version
-from genes.hgvs import HGVSMatcher, HGVSException, HGVSConverterType
+from genes.hgvs import HGVSMatcher, HGVSException, HGVSConverterType, HgvsMatchRefAllele
 from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
 from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSVariant
-from snpdb.models import GenomeBuild
+from snpdb.models import GenomeBuild, VariantCoordinate
 
 
 @override_settings(HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH=False)
@@ -44,7 +44,8 @@ class TestHGVS(TestCase):
             "NM_000350.2(ABCA4):c-52delC",  # Missing "." with "-"
         ]
 
-        hgvs_matcher = HGVSMatcher(genome_build=GenomeBuild.grch38())
+        hgvs_matcher = HGVSMatcher(genome_build=GenomeBuild.grch38(),
+                                   hgvs_converter_type=HGVSConverterType.PYHGVS)
         for bad_hgvs in BAD_HGVS:
             try:
                 hgvs_matcher.create_hgvs_variant(bad_hgvs)
@@ -214,3 +215,29 @@ class TestHGVS(TestCase):
             hgvs_out = hgvs_variant.format(max_ref_length=0)
             self.assertEqual(hgvs_string, hgvs_out, f"{hgvs_converter_type} Converting to and back to VariantCoordinate")
 
+    def test_pyhgvs_reference_diff(self):
+        self._test_reference_diff(HGVSConverterType.PYHGVS)
+
+    def test_biocommons_reference_diff(self):
+        self._test_reference_diff(HGVSConverterType.BIOCOMMONS_HGVS)
+
+    def _test_reference_diff(self, hgvs_converter_type: HGVSConverterType):
+        TEST_HGVS = [
+            # No provided ref
+            ('NM_001145661.2(GATA2):c.1113dup', VariantCoordinate(chrom='3', pos=128200691, ref='C', alt='CG'), True),
+            # provided ref = genomic ref
+            ('NM_001145661.2(GATA2):c.1113dupC', VariantCoordinate(chrom='3', pos=128200691, ref='C', alt='CG'), True),
+            # GATA2 is '-' strand, so provided ref C = genomic ref = G
+            # This is normalized left
+            #('NM_001145661.2(GATA2):c.1113dupG', VariantCoordinate(chrom='3', pos=128200690, ref='G', alt='GC'),
+            # HgvsMatchRefAllele(provided_ref='C', calculated_ref='G')),
+        ]
+        genome_build = GenomeBuild.grch37()
+        create_gata2_transcript_version(genome_build)
+        matcher = HGVSMatcher(genome_build, hgvs_converter_type=hgvs_converter_type)
+        for hgvs_string, expected_vc, expected_matches_ref in TEST_HGVS:
+            vcd = matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(hgvs_string)
+            #print(f"{vcd=}")
+            #print(f"{type(vcd.matches_reference)=}")
+            self.assertEqual(vcd.variant_coordinate, expected_vc)
+            self.assertEqual(vcd.matches_reference, expected_matches_ref)

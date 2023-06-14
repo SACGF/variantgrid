@@ -18,12 +18,17 @@ class HgvsMatchRefAllele:
         self.calculated_ref = calculated_ref
 
     def __bool__(self):
-        return self.provided_ref == self.calculated_ref
+        if self.provided_ref:
+            return self.provided_ref == self.calculated_ref
+        return True
 
     def __repr__(self):
         return f"{self.provided_ref=},{self.calculated_ref=}"
 
     def __eq__(self, other):
+        if isinstance(other, bool):
+            return bool(self) == other
+
         # We only ever care about this if it's false and has provided_ref
         if bool(self) and bool(other):
             return True

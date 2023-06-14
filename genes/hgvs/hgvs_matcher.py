@@ -44,7 +44,7 @@ class VariantCoordinateAndDetails(FormerTuple):
     transcript_accession: str
     kind: str
     method: str
-    matches_reference: bool
+    matches_reference: Union[bool, HgvsMatchRefAllele]
 
     @property
     def as_tuple(self) -> Tuple:
