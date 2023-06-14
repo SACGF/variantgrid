@@ -46,6 +46,8 @@ class ComboCheckerHGVSConverter(HGVSConverter):
             else:
                 logging.error(msg)
 
+        if has_exception:
+            raise result
         return result
 
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
