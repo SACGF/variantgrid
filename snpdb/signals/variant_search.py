@@ -103,12 +103,13 @@ class VariantExtra:
     )
 )
 def variant_cosmic_search(search_input: SearchInputInstance):
+    search_string = search_input.search_string.upper()
     for genome_build in search_input.genome_builds:
         variant_qs = search_input.get_visible_variants(genome_build)
-        if search_input.match.group(1) == "COSV":
-            yield variant_qs.filter(variantannotation__cosmic_id=search_input.search_string)
-        elif search_input.match.group(1) == "COSM":
-            yield variant_qs.filter(variantannotation__cosmic_legacy_id=search_input.search_string)
+        if search_input.match.group(1).upper() == "COSV":
+            yield variant_qs.filter(variantannotation__cosmic_id=search_string)
+        elif search_input.match.group(1).upper() == "COSM":
+            yield variant_qs.filter(variantannotation__cosmic_legacy_id=search_string)
 
 
 @search_receiver(
