@@ -772,6 +772,11 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         return TranscriptVersion.get_accession(self.transcript_id, self.version)
 
     @property
+    def annotation_consortium(self):
+        """ This is used in search results """
+        return self.transcript.annotation_consortium
+
+    @property
     def gene(self):
         return self.gene_version.gene
 

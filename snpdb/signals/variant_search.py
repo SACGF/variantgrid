@@ -339,8 +339,7 @@ def _search_hgvs_using_gene_symbol(
         try:
             for result in _search_hgvs(transcript_hgvs, user, genome_build, variant_qs):
                 if isinstance(result, SearchResult):
-                    # TODO: do we need to set the annotation_consortia on the result?
-                    # result.preview.annotation_consortia = [transcript_version.transcript.annotation_consortium]
+                    result.preview.annotation_consortia = [AnnotationConsortium(transcript_version.annotation_consortium)]
                     if result.preview.category == "Variant":
                         variant_identifier = result.preview.identifier
                         results_by_variant_identifier[variant_identifier].append(result)
@@ -357,34 +356,30 @@ def _search_hgvs_using_gene_symbol(
 
     have_results = False
     for variant_identifier, results_for_record in results_by_variant_identifier.items():
-        unique_messages = {m: True for m in search_messages}  # Use dict for uniqueness
         result_message = f"Results for: {', '.join(transcript_accessions_by_variant_identifier[variant_identifier])}"
-        unique_messages[result_message] = True
+        # Use a dict for uniqueness while preserving order
+        unique_messages = {
+            SearchMessage(result_message): True
+        }
         if other_transcripts_message:
-            unique_messages[other_transcripts_message] = True
+            unique_messages[SearchMessage(other_transcripts_message)] = True
         # Go through messages for each result together, so they stay in same order
         for messages in zip_longest(*[r.messages for r in results_for_record]):
             for m in messages:
                 if m:
                     unique_messages[m] = True
 
+        search_messages.extend(unique_messages.keys())
+
         unique_annotation_consortia = set()
         for r in results_for_record:
-            if r.annotation_consortia is not None:
-                unique_annotation_consortia.update(r.annotation_consortia)
+            unique_annotation_consortia.update(r.annotation_consortia)
 
         # All weights should be the same, just take 1st
         have_results = True
-        search_messages = []
-        # This was throwing exception as we initialised SearchMessage(SearchMessage)
-        for m in list(unique_messages.keys()):
-            if isinstance(m, str):
-                search_messages.append(SearchMessage(m))
-            elif isinstance(m, SearchMessage):
-                search_messages.append(m)
-            else:
-                raise ValueError(f"Search Messages must be string or SearchMessage, was: {type(m)} = {m}")
         preview = results_for_record[0].preview  # These will all be the same
+        if unique_annotation_consortia:
+            preview.annotation_consortia = unique_annotation_consortia
         yield SearchResult(preview=preview, messages=search_messages)
 
     if not have_results:
