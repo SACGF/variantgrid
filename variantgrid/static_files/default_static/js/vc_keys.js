@@ -135,8 +135,15 @@ let EKey = (function() {
                 if (!EKey.HTML_WHITE_LIST.has(tag.tagName)) {
                     throw Error(`unsafe HTML tag ${tag.tagName}`);
                 }
+                // never allow attributes
                 if (tag.attributes.length) {
-                    throw Error(`tag ${tag.tagName} contains attributes`);
+                    let attributeNames = [];
+                    for (let attribute of tag.attributes) {
+                        attributeNames.push(attribute.name);
+                    }
+                    for (let attributeName of attributeNames) {
+                        tag.removeAttribute(attributeName);
+                    }
                 }
             }
             return html;

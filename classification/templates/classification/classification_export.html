@@ -37,13 +37,13 @@
         params.type = format;
 
         let rowsPerFile = $("#rows_per_file").val();
-        if (rowsPerFile.length) {
+        if (rowsPerFile && rowsPerFile.length) {
             params.rows_per_file = rowsPerFile;
         }
 
-        let row_limit = $("#row_limit").val();
-        if (row_limit.length) {
-            params.row_limit = row_limit;
+        let rowLimit = $("#row_limit").val();
+        if (rowLimit && rowLimit.length) {
+            params.row_limit = rowLimit;
         }
 
         if (format === 'mvl') {
@@ -73,16 +73,24 @@
             let encoding = $("input[name='encoding']:checked").val();
             params.encoding = encoding;
         } else if (format === 'csv') {
-            let value_format = $("input[name='value_format']:checked").val();
-            params.value_format = value_format;
 
-            let include_explains = $("input[name='include_explains']:checked");
-            if (include_explains.length) {
+            let valueFormat = $("input[name='value_format']:checked").val();
+            if (valueFormat) {
+                params.value_format = valueFormat;
+            }
+
+            let htmlHandling = $("input[name='html_handling']:checked").val();
+            if (htmlHandling) {
+                params.html_handling = htmlHandling;
+            }
+
+            let includeExplains = $("input[name='include_explains']:checked");
+            if (includeExplains && includeExplains.length) {
                 params.include_explains = 'true';
             }
 
-            let exclude_transient = $("input[name='exclude_transient']:checked");
-            if (exclude_transient.length) {
+            let excludeTransient = $("input[name='exclude_transient']:checked");
+            if (excludeTransient && excludeTransient.length) {
                 params.exclude_transient = 'true';
             }
         }
@@ -332,6 +340,20 @@
                 <label class="form-check-label">
                     <input id="value_format_labels" type="radio" name="value_format" value="labels" class="form-check-input" />
                     Use labels for headings and values (e.g. "Strand bias" instead of "strand_bias")
+                </label>
+            </div>
+        {% endlabelled %}
+        {% labelled label="HTML Processing" admin_only=True %}
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input checked="checked" id="html_handling_text" type="radio" name="html_handling" value="text" class="form-check-input" />
+                    Strip HTML tags out of fields
+                </label>
+            </div>
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input id="html_handling_html" type="radio" name="html_handling" value="html" class="form-check-input" />
+                    Leave HTML tags as is
                 </label>
             </div>
         {% endlabelled %}

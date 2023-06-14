@@ -82,8 +82,9 @@ class HGVSMatcher:
     TRANSCRIPT_NO_UNDERSCORE = re.compile(r"^(NM|NC)(\d+)")
     TRANSCRIPT_UNDERSCORE_REPLACE = r"\g<1>_\g<2>"
     # noinspection RegExpSingleCharAlternation
-    HGVS_SLOPPY_PATTERN = re.compile(r"(\d|\)):?(c|g|n|p)\.?(-?\d+)")
-    HGVS_SLOPPY_REPLACE = r"\g<1>:\g<2>.\g<3>"
+    HGVS_SLOPPY_PATTERN = re.compile(r"(\d|\)):?(c|g|n|p)\.?(-?\d+)", re.IGNORECASE)
+    # Replace is now done with lambda instead of regex so we can lowercase c,g,n,p
+    # HGVS_SLOPPY_REPLACE = r"\g<1>:\g<2>.\g<3>"
     HGVS_TRANSCRIPT_NO_CDOT = re.compile(r"^(NM_|ENST)\d+.*:\d+")
     HGVS_CONTIG_NO_GDOT = re.compile(r"^NC_\d+.*:\d+")
 
@@ -534,7 +535,9 @@ class HGVSMatcher:
                 cleaned_hgvs = self.TRANSCRIPT_PREFIX.sub(transcript_prefix.upper(), cleaned_hgvs)
 
         cleaned_hgvs = self.TRANSCRIPT_NO_UNDERSCORE.sub(self.TRANSCRIPT_UNDERSCORE_REPLACE, cleaned_hgvs)
-        cleaned_hgvs = self.HGVS_SLOPPY_PATTERN.sub(self.HGVS_SLOPPY_REPLACE, cleaned_hgvs)
+        # r"\g<1>:\g<2>.\g<3>"
+        cleaned_hgvs = self.HGVS_SLOPPY_PATTERN.sub(lambda m: m.group(1) + ":" + m.group(2).lower() + "." + m.group(3),
+                                                   cleaned_hgvs)
 
         def fix_ref_alt(m):
             return m.group('ref').upper() + '>' + m.group('alt').upper()

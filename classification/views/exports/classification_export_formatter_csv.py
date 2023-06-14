@@ -1,6 +1,7 @@
 from dataclasses import dataclass
+from enum import Enum
 from functools import cached_property
-from typing import List, Optional, Dict, Set
+from typing import List, Optional, Dict, Set, Any
 
 from django.http import HttpRequest
 
@@ -13,8 +14,20 @@ from classification.views.exports.classification_export_filter import AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter, \
     ClassificationExportExtraData
 from classification.views.exports.classification_export_utils import CitationCounter
-from library.utils import delimited_row, export_column, ExportRow, ExportDataType
+from library.utils import delimited_row, export_column, ExportRow, ExportDataType, html_to_text
 from snpdb.models import GenomeBuild
+
+
+class CSVCellFormatting(str, Enum):
+    INCLUDE_HTML = "HTML"
+    PURE_TEXT = "TEXT"
+
+    def format(self, value: Any):
+        if self == CSVCellFormatting.PURE_TEXT:
+            if isinstance(value, str):
+                if "<" in value:
+                    return html_to_text(value)
+        return value
 
 
 @dataclass(frozen=True)
@@ -28,12 +41,23 @@ class FormatDetailsCSV:
     # exclude fields that change between environments, makes it easier to compare changes if the same data is in both environments
     exclude_transient: bool = False
 
+    html_handling: CSVCellFormatting = CSVCellFormatting.PURE_TEXT
+
     @staticmethod
     def from_request(request: HttpRequest) -> 'FormatDetailsCSV':
         pretty = request.query_params.get('value_format') == 'labels'
         include_explains = request.query_params.get('include_explains') == 'true'
         exclude_transient = request.query_params.get('exclude_transient') == 'true'
-        return FormatDetailsCSV(pretty=pretty, include_explains=include_explains, exclude_transient=exclude_transient)
+        html_handling = CSVCellFormatting.PURE_TEXT
+        if html_handling_str := request.query_params.get('html_handling'):
+            html_handling = CSVCellFormatting(html_handling_str.upper())
+
+        return FormatDetailsCSV(
+            pretty=pretty,
+            include_explains=include_explains,
+            exclude_transient=exclude_transient,
+            html_handling=html_handling
+        )
 
     @property
     def ignore_evidence_keys(self) -> Set[str]:
@@ -191,12 +215,13 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
             self.classification_filter.user,
             self.e_keys, KeyValueFormatter(),
             pretty=self.format_details.pretty,
+            cell_formatter=self.format_details.html_handling.format,
             include_explains=self.format_details.include_explains,
             ignore_evidence_keys=self.format_details.ignore_evidence_keys
         )
         # apparently this is signficantly quicker than the attempt to use an aggregate
         for evidence in self.classification_filter.cms_qs.values_list('published_evidence', flat=True).iterator(chunk_size=1000):
-           used_keys.check_evidence(evidence)
+            used_keys.check_evidence(evidence)
         # below took up to 3 minutes in Shariant test, vs 7 seconds of just iterating through the evidence twice
         # used_keys.check_evidence_qs(self.classification_filter.cms_qs)
 
@@ -254,6 +279,6 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
                 pending_clin_sig=self.grouping_utils.pending_changes_for(vcm),
                 e_keys=self.e_keys
             ).to_csv(categories=self._categories) + \
-            self.used_keys.row(classification_modification=vcm)
+            self.used_keys.row(classification_modification=vcm, formatter=self.format_details.html_handling.format)
 
         return delimited_row(row_data, delimiter=',')

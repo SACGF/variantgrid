@@ -1,6 +1,6 @@
 import json
 from datetime import timedelta
-from typing import Set, Union, Dict
+from typing import Set, Union, Dict, Optional
 
 from django.contrib import admin, messages
 from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter
@@ -36,7 +36,7 @@ from snpdb.models import GenomeBuild, Lab
 
 class VariantMatchedFilter(admin.SimpleListFilter):
     list_per_page = 200
-    title = 'Variant Match Status Filter'
+    title = 'variant match status'
     parameter_name = 'matched'
     default_value = None
 
@@ -53,7 +53,7 @@ class VariantMatchedFilter(admin.SimpleListFilter):
 
 class ClassificationShareLevelFilter(admin.SimpleListFilter):
     list_per_page = 200
-    title = 'Share Level Filter'
+    title = 'share level'
     parameter_name = 'share_level'
     default_value = None
 
@@ -67,7 +67,7 @@ class ClassificationShareLevelFilter(admin.SimpleListFilter):
 
 
 class ClinicalContextFilter(admin.SimpleListFilter):
-    title = 'Clinical Context Filter'
+    title = 'clinical context'
     parameter_name = 'clinical_context'
     default_value = 'default'
 
@@ -86,7 +86,7 @@ class ClinicalContextFilter(admin.SimpleListFilter):
 
 
 class ClassificationImportedGenomeBuildFilter(admin.SimpleListFilter):
-    title = 'Imported Genome Build Filter'
+    title = 'imported genome build'
     parameter_name = 'genome_build'
     default_value = None
 
@@ -99,6 +99,28 @@ class ClassificationImportedGenomeBuildFilter(admin.SimpleListFilter):
             substring = GenomeBuild.objects.get(pk=value).name
             return queryset.filter(evidence__genome_build__value__istartswith=substring)
         return queryset
+
+
+class ClassificationLatestImportFilter(admin.SimpleListFilter):
+    title = "import (choose a lab first)"
+    parameter_name = "latest_import"
+    default_value = None
+
+    def lookups(self, request, model_admin):
+        return [("latest", "latest"), ("not-latest", "not-latest")]
+
+    def queryset(self, request, queryset: QuerySet[Classification]):
+        if value := self.value():
+            most_up_to_date_run: Optional[ClassificationImportRun] = None
+            if most_up_to_date_class_run := queryset.filter(last_import_run__isnull=False).order_by('-last_import_run__created').first():
+                most_up_to_date_run = most_up_to_date_class_run.last_import_run
+            if most_up_to_date_run:
+                if value == "latest":
+                    return queryset.filter(last_import_run=most_up_to_date_run)
+                if value == "not-latest":
+                    return queryset.exclude(last_import_run=most_up_to_date_run)
+        return queryset
+
 
 
 class ClassificationModificationAdmin(admin.TabularInline):
@@ -181,12 +203,13 @@ class ClassificationAdmin(ModelAdminBasics):
     list_filter = (
         ('lab__organization', RelatedFieldListFilter),
         ('lab', RelatedFieldListFilter),
+        ClassificationLatestImportFilter,
         ('withdrawn', BooleanFieldListFilter),
         ClassificationShareLevelFilter,
         VariantMatchedFilter,
         ClinicalContextFilter,
         ClassificationImportedGenomeBuildFilter,
-        ('user', RelatedFieldListFilter),
+        # ('user', RelatedFieldListFilter),
     )
     search_fields = ('id', 'lab_record_id')
     list_per_page = 50
@@ -465,7 +488,7 @@ class EvidenceKeySectionFilter(admin.SimpleListFilter):
 
 
 class MaxShareLevelFilter(admin.SimpleListFilter):
-    title = 'Max Share Level Filter'
+    title = 'max share level'
     parameter_name = 'max_share_level'
     default_value = None
 
@@ -645,13 +668,19 @@ class DiscordanceReportAdminExport(ExportRow):
     @export_column("Days in Discordance")
     def _days_in_discordance(self):
         dr = self.discordance_report
+        started = dr.report_started_date
         closed = dr.report_completed_date
         delta: timedelta
+        if closed := dr.report_completed_date:
+            delta = closed - started
         if not closed:
-            delta = timezone.now() - dr.report_started_date
+            delta = timezone.now() - started
+
+        days_delta_float = delta.seconds / 144.0
+        if days_delta_float < 7:
+            return f"{days_delta_float:0.1f}"
         else:
-            delta = closed - dr.report_started_date
-        return delta.days
+            return int(days_delta_float)
 
     @export_column("Gene Symbol")
     def _gene_symbol(self):
@@ -671,17 +700,32 @@ class DiscordanceReportAdminExport(ExportRow):
 
     @export_column("Umbrella Condition")
     def _umbrella_condition(self):
+        umbrellas = ""
         conditions: Set[OntologyTerm] = set()
+        unresolved_conditions: Set[str] = set()
         for summary in self.summaries:
             for drc in summary.drcs:
+                has_resolved_conditions = False
                 if condition_obj := drc.classification_original.classification.condition_resolution_obj:
                     if mondo := condition_obj.as_mondo_if_possible():
                         conditions.update(mondo.terms)
+                        has_resolved_conditions = True
+                if not has_resolved_conditions:
+                    if raw_condition := drc.classification_effective.get(SpecialEKeys.CONDITION):
+                        unresolved_conditions.add(raw_condition)
+
         if conditions:
             ancestor = AncestorCalculator.common_ancestor(conditions)
-            return str(ancestor)
-        else:
-            return ""
+            umbrellas = str(ancestor)
+
+        if unresolved_conditions:
+            unresolved_str = ", ".join(sorted(unresolved_conditions))
+            if umbrellas:
+                umbrellas += f", **({unresolved_str})"
+            else:
+                umbrellas = unresolved_str
+
+        return umbrellas.strip()
 
     @export_column("Clinically Significant")
     def _clinically_significant(self):
@@ -995,7 +1039,7 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
         #"created"
     )
     list_filter = ('imported_genome_build_patch_version', 'status', 'latest_validation__confirmed', ValidationFilter, MatchingOnFilter)
-    search_fields = ('id', 'imported_c_hgvs', 'imported_g_hgvs')
+    search_fields = ('id', 'imported_c_hgvs', 'imported_g_hgvs', 'message')
     inlines = (ImportedAlleleInfoValidationInline,)
 
     @admin_list_column("grch37", "grch37")

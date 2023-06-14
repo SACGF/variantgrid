@@ -97,13 +97,18 @@ def report_message(message: str, level: str = 'warning', request=None, extra_dat
     @param request the web request (if available)
     @param extra_data a JSON-isable dictionary of extra information
     """
-    print_message = message
-    if extra_data and (target := extra_data.get('target')):
-        print_message = message + " : " + str(target)
-    print(print_message)
+    if not extra_data:
+        extra_data = {}
+    target = extra_data.get("target")
+    exception_message = message
+    if target:
+        exception_message += f": {target}"
+    print(exception_message)
+    extra_data["exception_message"] = exception_message
 
     if not request:
         request = get_current_request()
+
     rollbar.report_message(message=message,
                            level=level,
                            request=request,
@@ -113,9 +118,14 @@ def report_message(message: str, level: str = 'warning', request=None, extra_dat
 def report_exc_info(extra_data=None, request=None, report_externally=True):
     if not request:
         request = get_current_request()
-    if report_externally:
-        rollbar.report_exc_info(extra_data=extra_data, request=request)
+
     exc_info = sys.exc_info()
+    if report_externally:
+        if not extra_data:
+            extra_data = {}
+        extra_data["exception_message"] = str(exc_info[1])
+        rollbar.report_exc_info(exc_info=exc_info, extra_data=extra_data, request=request)
+
     if exc_info:
         traceback.print_exc()
 

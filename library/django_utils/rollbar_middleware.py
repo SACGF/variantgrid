@@ -9,11 +9,18 @@ class RollbarIgnoreException(Exception):
 
 
 class CustomRollbarNotifierMiddleware(RollbarNotifierMiddleware):
+
+    def get_extra_data(self, request, exc):
+        if isinstance(exc, Exception):
+            return {"exception_message": str(exc)}
+        return
+
+    def get_payload_data(self, request, exc):
+        return
+
     """ Copied from rollbar.contrib.django.middleware.RollbarNotifierMiddlewareExcluding404 """
     def process_exception(self, request, exc):
-        if isinstance(exc, Http404):
-            request._rollbar_notifier_original_http404_exc_info = sys.exc_info()
-        elif isinstance(exc, RollbarIgnoreException):
+        if isinstance(exc, RollbarIgnoreException):
             return
         else:
             super().process_exception(request, exc)
