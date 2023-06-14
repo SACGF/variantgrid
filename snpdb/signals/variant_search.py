@@ -164,8 +164,8 @@ def allele_search(search_input: SearchInputInstance):
                 pass
             # if there was no variant for that allele
             variant_string = clingen_allele.get_variant_string(genome_build)
-            variant_string_abbreviated = clingen_allele.get_variant_string(genome_build, abbreviate=True)
             if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build, variant_string=variant_string):
+                variant_string_abbreviated = clingen_allele.get_variant_string(genome_build, abbreviate=True)
                 yield create_manual, SearchMessage(f'"{clingen_allele}" resolved to "{variant_string_abbreviated}"', severity=LogLevel.INFO)
 
 
@@ -206,8 +206,8 @@ def yield_search_variant_match(search_input: SearchInputInstance):
             yield SearchMessageOverall(", ".join(errors), genome_builds=[genome_build])
         else:
             variant_string = Variant.format_tuple(chrom, position, ref, alt)
-            search_message = f"The variant {variant_string} does not exist in our database"
             if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build, variant_string=variant_string):
+                search_message = f"The variant {variant_string} does not exist in our database"
                 yield create_manual, search_message
 
 
@@ -301,9 +301,9 @@ def _search_hgvs_using_gene_symbol(
         variant_qs: QuerySet) -> Iterable[Union[SearchResult, SearchMessageOverall]]:
 
     search_messages.append(SearchMessage(f'HGVS requires transcript, given symbol "{gene_symbol}"'))
-    # Group results + hgvs by result.record hashcode
-    results_by_record: Dict[Variant, List[SearchResult]] = defaultdict(list)
-    transcript_accessions_by_record: Dict[Variant, List] = defaultdict(list)
+    # Group results + hgvs by result.identifier
+    results_by_variant_identifier: Dict[str, List[SearchResult]] = defaultdict(list)
+    transcript_accessions_by_variant_identifier: Dict[str, List] = defaultdict(list)
     hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_string)
     hgvs_variant.gene = None
 
@@ -326,27 +326,28 @@ def _search_hgvs_using_gene_symbol(
                 transcript_versions.add(tv)
     else:
         tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build, gene_version__gene__in=gene_symbol.genes)
-        if num_other := tv_qs.exclude(transcript__in=[tv.transcript for tv in transcript_versions]).distinct("transcript_id").count():
-            gene_page_link = f"<a href='{gene_symbol.get_absolute_url()}'>{gene_symbol} gene page</a>"
-            other_transcripts_message = f"Warning: there are {num_other} other transcripts for this genome build " \
-                                        f"which may give different results. You may wish to view the " \
-                                        f"{gene_page_link} for all results"
+        transcripts = [tv.transcript for tv in transcript_versions]
+        if num_other := tv_qs.exclude(transcript__in=transcripts).distinct("transcript_id").count():
+            other_transcripts_message = f"Warning: {gene_symbol} has {num_other} other transcripts in " \
+                                        f"{genome_build.name} that may resolve to different coordinates. " \
+                                        f"You may wish to search for the gene symbol to view all results"
 
     # TODO: Sort transcript_versions somehow
     for transcript_version in transcript_versions:
         hgvs_variant.transcript = transcript_version.accession
         transcript_hgvs = hgvs_variant.format()
         try:
-            for result in _search_hgvs_variants_results_only(transcript_hgvs, user, genome_build, variant_qs):
+            for result in _search_hgvs(transcript_hgvs, user, genome_build, variant_qs):
                 if isinstance(result, SearchResult):
                     # TODO: do we need to set the annotation_consortia on the result?
                     # result.preview.annotation_consortia = [transcript_version.transcript.annotation_consortium]
-                    if isinstance(result.preview.obj, Variant):
-                        results_by_record[result.preview.obj].append(result)
+                    if result.preview.category == "Variant":
+                        variant_identifier = result.preview.identifier
+                        results_by_variant_identifier[variant_identifier].append(result)
                         tv_message = str(transcript_version.accession)
                         if transcript_version.accession in mane_transcripts:
                             tv_message += " (MANE)"
-                        transcript_accessions_by_record[result.preview.obj].append(tv_message)
+                        transcript_accessions_by_variant_identifier[variant_identifier].append(tv_message)
                     else:
                         # result is a ClassifyVariantHgvs or similar, yield it and only care about real variants for the rest
                         yield result
@@ -355,9 +356,9 @@ def _search_hgvs_using_gene_symbol(
             logging.warning(e)
 
     have_results = False
-    for record, results_for_record in results_by_record.items():
+    for variant_identifier, results_for_record in results_by_variant_identifier.items():
         unique_messages = {m: True for m in search_messages}  # Use dict for uniqueness
-        result_message = f"Results for: {', '.join(transcript_accessions_by_record[record])}"
+        result_message = f"Results for: {', '.join(transcript_accessions_by_variant_identifier[variant_identifier])}"
         unique_messages[result_message] = True
         if other_transcripts_message:
             unique_messages[other_transcripts_message] = True
@@ -383,7 +384,8 @@ def _search_hgvs_using_gene_symbol(
                 search_messages.append(m)
             else:
                 raise ValueError(f"Search Messages must be string or SearchMessage, was: {type(m)} = {m}")
-        yield SearchResult(preview=record.preview, messages=search_messages)
+        preview = results_for_record[0].preview  # These will all be the same
+        yield SearchResult(preview=preview, messages=search_messages)
 
     if not have_results:
         # In some special cases, add in special messages for no result
@@ -531,14 +533,14 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                                    ignore_genome_build_mismatch=is_genomic)
 
         except Variant.DoesNotExist:
-            # variant_string = Variant.format_tuple(*variant_tuple)
+            variant_string = Variant.format_tuple(*variant_tuple)
             variant_string_abbreviated = Variant.format_tuple(*variant_tuple, abbreviate=True)
-            search_messages.append(SearchMessage(f'"{hgvs_string}" resolved to "{variant_string_abbreviated}" in our build', LogLevel.INFO))
+            search_messages.append(SearchMessage(f'"{hgvs_string}" resolved to genomic coordinates "{variant_string_abbreviated}"', LogLevel.INFO, genome_build=genome_build))
             # if we're saying what we're resolving to, no need to complain about reference_message
 
             # manual variants
-            if cmv := VariantExtra.create_manual_variant(for_user=user, genome_build=genome_build, variant_string=hgvs_string):
-                yield cmv, search_messages + reference_message
+            if cmv := VariantExtra.create_manual_variant(for_user=user, genome_build=genome_build, variant_string=variant_string):
+                yield SearchResult(cmv, messages=search_messages + reference_message)
 
             # search for alt alts
             alts = get_results_from_variant_tuples(variant_qs, variant_tuple, any_alt=True)
