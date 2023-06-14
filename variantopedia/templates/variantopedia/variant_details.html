@@ -844,9 +844,11 @@ function applyVariantValues() {
                                 {% labelled id="mastermind_count_1_cdna" label="MM variant article count" hint="tiny" %}{{ variant_annotation.mastermind_count_1_cdna }}{% endlabelled %}
                                 {% labelled id="mastermind_count_2_cdna_prot" label="MM variant/protein article count" hint="tiny" %}{{ variant_annotation.mastermind_count_2_cdna_prot }}{% endlabelled %}
                                 {% labelled id="mastermind_count_3_aa_change" label="MM AA article count" hint="tiny" %}{{ variant_annotation.mastermind_count_3_aa_change }}{% endlabelled %}
-                                {% labelled label="View in Mastermind" hint="tiny" %}
-                                    <a target='_blank' class="hover-link" href='{{ variant_annotation.mastermind_url }}'>{{ variant_annotation.mastermind_mmid3 }}</a>
-                                {% endlabelled %}
+	                            {% labelled label="View in Mastermind" hint="tiny" %}
+	                                {% for mmid3, mastermind_url in variant_annotation.mmid3_mastermind_urls.items %}
+	                                    <a target='_blank' class="hover-link" href='{{ mastermind_url }}'>{{ mmid3 }}</a>
+	                                {% endfor %}
+	                            {% endlabelled %}
                             {% else %}
                                 {% labelled label="Mastermind" hint="tiny" %}No local Mastermind entry<br><i>may be others on site</i>{% endlabelled %}
                             {% endif %}
