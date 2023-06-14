@@ -902,14 +902,16 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return url
 
     @property
-    def mastermind_url(self):
-        return self.get_mastermind_url(self.mastermind_mmid3)
+    def mmid3_mastermind_urls(self) -> dict:
+        return self.get_mmid3_mastermind_urls(self.mastermind_mmid3)
 
     @staticmethod
-    def get_mastermind_url(mastermind_mmid3):
+    def get_mmid3_mastermind_urls(mastermind_mmid3) -> dict:
+        mmid3_mastermind_urls = {}
         if mastermind_mmid3:
-            return f"https://mastermind.genomenon.com/detail?mutation={mastermind_mmid3}"
-        return None
+            for mmid3 in mastermind_mmid3.split("&"):
+                mmid3_mastermind_urls[mmid3] = f"https://mastermind.genomenon.com/detail?mutation={mmid3}"
+        return mmid3_mastermind_urls
 
     def has_spliceai(self):
         return any((self.spliceai_pred_ds_ag, self.spliceai_pred_ds_al,

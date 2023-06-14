@@ -419,7 +419,8 @@ def _get_mastermind_summary(variant_values: dict) -> Optional[str]:
             value = variant_values.get(f"variantannotation__{field}")
             mastermind_fields.append(f"{label}: {value}")
         count_summary = ", ".join(mastermind_fields[:-1])
-        mastermind_summary = f"Mastermind: {VariantAnnotation.get_mastermind_url(mastermind_mmid3)}\n"
+        mmid3_mastermind_urls = VariantAnnotation.get_mmid3_mastermind_urls(mastermind_mmid3)
+        mastermind_summary = f"Mastermind: {' '.join(mmid3_mastermind_urls.values())}\n"
         mastermind_summary += f"Search results: {count_summary}\n"
         mastermind_summary += mastermind_fields[-1]  # MMID3
     return mastermind_summary
