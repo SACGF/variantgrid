@@ -1,8 +1,3 @@
-# This is from BioCommons, with a few fixes applied:
-# https://github.com/biocommons/hgvs/blob/main/src/hgvs/extras/babelfish.py
-# Will remove this once this issue / pull request is closed
-# https://github.com/biocommons/hgvs/issues/653
-
 """translate between HGVS and other formats"""
 import os
 
@@ -13,7 +8,6 @@ from bioutils.sequences import reverse_complement
 from hgvs.edit import NARefAlt
 from hgvs.location import Interval, SimplePosition
 from hgvs.normalizer import Normalizer
-from hgvs.parser import Parser
 from hgvs.posedit import PosEdit
 from hgvs.sequencevariant import SequenceVariant
 
@@ -29,22 +23,7 @@ def _as_interbase(posedit):
     return (start_i, end_i)
 
 
-class ParserSingleton:
-    __instance = None
-
-    def __init__(self):
-        self._parser = Parser()
-
-    @classmethod
-    def parser(cls):
-        if not cls.__instance:
-            cls.__instance = ParserSingleton()
-        return cls.__instance._parser
-
-
 class Babelfish:
-    """ The plan here is to get this into biocommons HGVS via pull request
-        Once this is done, we can delete this file and use the biocommons library """
     def __init__(self, hdp, assembly_name):
         self.assembly_name = assembly_name
         self.hdp = hdp
@@ -58,9 +37,6 @@ class Babelfish:
         converts a single hgvs allele to (chr, pos, ref, alt) using
         the given assembly_name. The chr name uses official chromosome
         name (i.e., without a "chr" prefix).
-
-        Returns None for non-variation (e.g., NC_000006.12:g.49949407=)
-
         """
 
         if var_g.type != "g":
@@ -70,7 +46,7 @@ class Babelfish:
 
         (start_i, end_i) = _as_interbase(vleft.posedit)
 
-        chr = self.ac_to_name_map[vleft.ac]
+        chrom = self.ac_to_name_map[vleft.ac]
 
         typ = vleft.posedit.edit.type
 
@@ -78,32 +54,21 @@ class Babelfish:
             start_i -= 1
             alt = self.hdp.seqfetcher.fetch_seq(vleft.ac, start_i, end_i)
             ref = alt[0]
-            end_i = start_i
-            return (chr, start_i + 1, ref, alt, typ)
         elif typ == 'inv':
             ref = vleft.posedit.edit.ref
             alt = reverse_complement(ref)
         else:
-            if vleft.posedit.edit.ref == vleft.posedit.edit.alt:
-                return None
-
             alt = vleft.posedit.edit.alt or ""
 
             if typ in ('del', 'ins'):  # Left anchored
-                # When making biocommons pull request, add comment:
-                # The original test here was: end_i - start_i == 1 and vleft.posedit.length_change() == 0
-                # The only difference is the old way caught delins and gave them a common prefix
-                # example NC_000003.12:g.128483940_128483945delinsC
-                # old way: 3:128202782 TGGCCGG>TC
-                # new way: 3:128202783 GGCCGG>C (this is what VT normalizes the above to)
-
                 start_i -= 1
                 ref = self.hdp.seqfetcher.fetch_seq(vleft.ac, start_i, end_i)
                 alt = ref[0] + alt
             else:
                 ref = vleft.posedit.edit.ref
-
-        return chr, start_i + 1, ref, alt, typ
+                if ref == alt:
+                    alt = '.'
+        return chrom, start_i + 1, ref, alt, typ
 
     def vcf_to_g_hgvs(self, chrom, position, ref, alt):
         ac = self.name_to_ac_map[chrom]
@@ -124,6 +89,9 @@ class Babelfish:
         else:
             start = position
             end = position + len(ref) - 1
+
+        if alt == '.':
+            alt = ref
 
         var_g = SequenceVariant(ac=ac,
                                 type='g',
@@ -155,9 +123,6 @@ if __name__ == "__main__":
     def _h2v(h):
         return babelfish38.hgvs_to_vcf(hgvs.easy.parser.parse(h))
 
-    def _v22(*v):
-        return babelfish38.vcf_to_hgvs(*v)
-
     def _vp(h):
         v = hgvs.easy.parser.parse(h)
         vl = hnl.normalize(v)
@@ -184,6 +149,4 @@ if __name__ == "__main__":
         "NC_000006.12:g.49949414_49949415insA",
         "NC_000006.12:g.49949414_49949415insAA",
     ):
-        v = _h2v(h)
-        _v22(*v)  # Try converting it back
-        print('assert _h2v("{h}") == {res}'.format(res=str(v), h=h))
+        print('assert _h2v("{h}") == {res}'.format(res=str(_h2v(h)), h=h))

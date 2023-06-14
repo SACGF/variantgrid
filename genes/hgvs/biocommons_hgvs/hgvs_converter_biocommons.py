@@ -8,15 +8,31 @@ from django.conf import settings
 from hgvs.assemblymapper import AssemblyMapper
 from hgvs.enums import ValidationLevel
 from hgvs.exceptions import HGVSDataNotAvailableError, HGVSError, HGVSInvalidVariantError
+from hgvs.parser import Parser
 from hgvs.sequencevariant import SequenceVariant
 from hgvs.validator import ExtrinsicValidator
 
 from genes.hgvs import HGVSVariant, HGVSException
-from genes.hgvs.biocommons_hgvs.babelfish import Babelfish, ParserSingleton
+from genes.hgvs.biocommons_hgvs.babelfish import Babelfish
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele
 from genes.transcripts_utils import looks_like_transcript
 from snpdb.models import GenomeBuild, VariantCoordinate, Contig
+
+
+class ParserSingleton:
+    """ This takes 1.5 secs to startup so we use a lazy singleton """
+    __instance = None
+
+    def __init__(self):
+        self._parser = Parser()
+
+    @classmethod
+    def parser(cls):
+        if not cls.__instance:
+            cls.__instance = ParserSingleton()
+        return cls.__instance._parser
+
 
 
 class BioCommonsHGVSVariant(HGVSVariant):
@@ -72,9 +88,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
         self.babelfish = Babelfish(self.hdp, genome_build.name)
         self.am = AssemblyMapper(self.hdp,
                                  assembly_name=genome_build.name,
-                                 alt_aln_method='splign',
-                                 replace_reference=False,
-                                 prevalidation_level="INTRINSIC")
+                                 alt_aln_method='splign')
         self.ev = ExtrinsicValidator(self.hdp)
 
 
