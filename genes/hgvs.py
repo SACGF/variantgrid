@@ -517,6 +517,16 @@ class HgvsMatchRefAllele:
         return self.provided_ref == self.calculated_ref
 
 
+class InvalidRefError(KeyError):
+    # make this extend KeyError in case there's code that already checks for KeyErrors
+    def __init__(self, ref: str):
+        self.ref = ref
+        super().__init__(self, ref)
+
+    def __str__(self):
+        return f"Invalid ref \"{self.ref}\""
+
+
 class HGVSMatcher:
     # "NR", "NM", "NC", "ENST", "LRG_", "XR"}
 
@@ -581,9 +591,12 @@ class HGVSMatcher:
             pyhgvs_transcript = self._create_pyhgvs_transcript(transcript_version)
             self._validate_in_transcript_range(pyhgvs_transcript, hgvs_name)
 
-        variant_tuple = pyhgvs.parse_hgvs_name(hgvs_string, self.genome_build.genome_fasta.fasta,
-                                               transcript=pyhgvs_transcript,
-                                               indels_start_with_same_base=False)
+        try:
+            variant_tuple = pyhgvs.parse_hgvs_name(hgvs_string, self.genome_build.genome_fasta.fasta,
+                                                   transcript=pyhgvs_transcript,
+                                                   indels_start_with_same_base=False)
+        except KeyError as ke:
+            raise InvalidRefError(ref=str(ke)[1:-1])
 
         chrom, position, ref, alt = variant_tuple
         contig = self.genome_build.chrom_contig_mappings[chrom]
