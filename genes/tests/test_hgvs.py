@@ -3,7 +3,7 @@
 """
 from unittest import skip
 
-from django.test.testcases import TestCase
+from django.test import TestCase, override_settings
 from pyhgvs import HGVSName  # This is used for pyhgvs specific test
 
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version, create_gata2_transcript_version
@@ -13,6 +13,7 @@ from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSVariant
 from snpdb.models import GenomeBuild
 
 
+@override_settings(HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH=False)
 class TestHGVS(TestCase):
 
     def test_clean_hgvs(self):
@@ -210,6 +211,6 @@ class TestHGVS(TestCase):
             transcript_accession = matcher.get_transcript_accession(hgvs_string)
             vc = matcher.get_variant_tuple(hgvs_string)
             hgvs_variant = matcher.variant_coordinate_to_c_hgvs_variant(vc, transcript_accession)
-            hgvs_out = hgvs_variant.format()
+            hgvs_out = hgvs_variant.format(max_ref_length=0)
             self.assertEqual(hgvs_string, hgvs_out, f"{hgvs_converter_type} Converting to and back to VariantCoordinate")
 

@@ -26,6 +26,19 @@ class ComboCheckerHGVSConverter(HGVSConverter):
             results_and_methods.append((result, converter.description()))
 
         results = [rm[0] for rm in results_and_methods]
+        # If all exceptions, they won't be equal (as they are raised from different ones)
+        has_exception = False
+        has_non_exception = False
+        for r in results:
+            if isinstance(r, Exception):
+                has_exception = True
+            else:
+                has_non_exception = True
+
+        result = results[0]  # First result
+        if has_exception and not has_non_exception:
+            raise result
+
         if not all_equal(results):
             msg = f"HGVS converters calling {method_str}({args}) returned different results! {results_and_methods})"
             if self.die_on_error:
@@ -33,13 +46,6 @@ class ComboCheckerHGVSConverter(HGVSConverter):
             else:
                 logging.error(msg)
 
-        # Always die if any die
-        for r in results:
-            if isinstance(r, Exception):
-                raise r
-
-        result = results[0]  # All same so any is fine
-        # logging.debug("HGVS Combo: %s", result)
         return result
 
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:

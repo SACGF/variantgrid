@@ -785,11 +785,10 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     def hgvs_ok(self) -> bool:
         """ """
         if self.has_valid_data:
-            if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
-                return bool(self.sequence_length_matches_exon_length_ignoring_poly_a_tail)
-            elif self.transcript.annotation_consortium == AnnotationConsortium.ENSEMBL:
-                return True
-
+            if settings.HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH:
+                if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
+                    return bool(self.sequence_length_matches_exon_length_ignoring_poly_a_tail)
+            return True
         return False
 
     @property
