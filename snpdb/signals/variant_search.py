@@ -470,7 +470,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         if variant_tuple is None:
             if classify:
                 search_message = SearchMessage(f"Error reading HGVS \"{hgvs_error}\"")
-                if classify_no_variant := VariantExtra.classify_no_variant_hgvs(for_user=user, hgvs_string=original_hgvs_string, genome_build=genome_build):
+                if classify_no_variant := VariantExtra.classify_no_varigant_hgvs(for_user=user, genome_build=genome_build, hgvs_string=original_hgvs_string):
                     yield SearchResult(classify_no_variant, messages=[search_message])
 
         # yield SearchMessageOverall(str(hgvs_error))
