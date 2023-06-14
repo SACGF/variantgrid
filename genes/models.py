@@ -709,6 +709,10 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         else:
             return right_utr, cds, left_utr
 
+    @property
+    def is_coding(self) -> bool:
+        return bool(self.data.get("start_codon"))
+
     @cached_property
     def fivep_utr(self):
         return self._transcript_regions[0]

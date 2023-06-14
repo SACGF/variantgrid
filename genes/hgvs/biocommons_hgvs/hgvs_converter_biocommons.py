@@ -105,9 +105,13 @@ class BioCommonsHGVSConverter(HGVSConverter):
         return BioCommonsHGVSVariant(var_g)
 
     def variant_coords_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
+        """ In VG we call non-coding "c.HGVS" as well - so hanve to handle that """
         try:
             var_g = self.babelfish.vcf_to_g_hgvs(*vc)
-            var_c = self.am.g_to_c(var_g, transcript_version.accession)
+            if transcript_version.is_coding:
+                var_c = self.am.g_to_c(var_g, transcript_version.accession)
+            else:
+                var_c = self.am.g_to_n(var_g, transcript_version.accession)
         except HGVSError as e:  # Can be out of bounds etc
             raise HGVSException from e
 
