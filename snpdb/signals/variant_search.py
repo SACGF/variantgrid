@@ -199,22 +199,22 @@ def get_results_from_variant_tuples(qs: QuerySet, data: VariantCoordinate, any_a
     return results
 
 
-def search_variant_match(search_input: SearchInputInstance):
+def yield_search_variant_match(search_input: SearchInputInstance):
     for genome_build in search_input.genome_builds:
         chrom, position, ref, alt = search_input.match.groups()
         chrom, position, ref, alt = Variant.clean_variant_fields(chrom, position, ref, alt,
                                                                  want_chr=genome_build.reference_fasta_has_chr)
         results = get_results_from_variant_tuples(search_input.get_visible_variants(genome_build), VariantCoordinate(chrom, position, ref, alt))
         if results.exists():
-            return results
+            yield results
 
         if errors := Variant.validate(genome_build, chrom, position):
-            return SearchMessageOverall(", ".join(errors))
+            yield SearchMessageOverall(", ".join(errors), genome_builds=[genome_build])
         else:
             variant_string = Variant.format_tuple(chrom, position, ref, alt)
             search_message = f"The variant {variant_string} does not exist in our database"
             if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build, variant_string=variant_string):
-                return create_manual, search_message
+                yield create_manual, search_message
 
 
 VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)", re.IGNORECASE)
@@ -229,11 +229,10 @@ VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([G
     )
 )
 def variant_search_vcf(search_input: SearchInputInstance):
-    if results := search_variant_match(search_input):
-        yield results
+    return yield_search_variant_match(search_input)
 
 
-VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)", re.IGNORECASE)
+VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)\s*-\s*(\d+)\s*-\s*([GATC]+)\s*-\s*([GATC]+)", re.IGNORECASE)
 
 
 @search_receiver(
@@ -246,11 +245,10 @@ VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)", 
     )
 )
 def search_variant_gnomad(search_input: SearchInputInstance):
-    if results := search_variant_match(search_input):
-        yield results
+    return yield_search_variant_match(search_input)
 
 
-VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+)):(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$", re.IGNORECASE)
+VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+))\s*:\s*(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$", re.IGNORECASE)
 
 
 @search_receiver(
@@ -263,8 +261,7 @@ VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+)):(\d+)[,\s]*([GATC]+)>
     )
 )
 def search_variant_variant(search_input: SearchInputInstance):
-    if results := search_variant_match(search_input):
-        yield results
+    return yield_search_variant_match(search_input)
 
 
 @search_receiver(

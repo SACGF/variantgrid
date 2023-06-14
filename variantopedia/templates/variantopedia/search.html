@@ -162,6 +162,14 @@
                                         {{ message.severity | severity_icon }}{% if message.search_info.preview_icon %}<i class="{{ message.search_info.preview_icon }} text-info mr-2" style="opacity:0.75"></i>{% endif %}
                                         <label>{{ message.search_info.preview_category }}</label>
                                         {% if message.search_info.sub_name %}<div class="text-info text-small">via {{ message.search_info.sub_name }} Search</div>{% endif %}
+                                        {% if message.genome_builds %}
+                                            <nomin class="d-block text-small">
+                                                <span class="text-secondary">{% if search_result.genome_build_mismatch %}{{ 'W' | severity_icon:'This is not your preferred genome build' }}{% endif %}
+                                                Issue in </span> {% for gb in message.genome_builds %}
+                                                <label>{{ gb }}</label>
+                                                {% if not forloop.last %} and {% endif %}{% endfor %}
+                                            </nomin>
+                                        {% endif %}
                                     </div>
                                     <div class="col-9">
                                         {{ message.message|enrich }}
@@ -175,7 +183,8 @@
                                 {% comment %}The below anchor is used to jump to results of a certain kind{% endcomment %}
                                 <a {% ifchanged preview.category %}id="results-{{ preview.category|id_safe }}"{% endifchanged %}
                                         class="list-group-item list-group-item-action list-group-item-okay result-{{ preview.category|id_safe }}" href="{{ preview.internal_url }}"
-                                        style="{% if search_result.genome_build_mismatch %}opacity:0.5{% endif %}"
+                                        {% comment %}used to lower opacity of mismatched search results, but got confusing when they weren't duplicates of the correct search{% endcomment %}
+                                        {% comment %}style="{% if search_result.genome_build_mismatch %}opacity:0.5{% endif %}"{% endcomment %}
                                         >
                                     <div class="row d-flex align-items-center" style="color:#444">
 

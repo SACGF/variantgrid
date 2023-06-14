@@ -29,9 +29,9 @@ from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
 from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 
-LOCUS_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)$", re.IGNORECASE)
-LOCUS_NO_REF_PATTERN = re.compile(r"^([^:]+):(\d+)$")
-VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+)):(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$", re.IGNORECASE)
+LOCUS_PATTERN = re.compile(r"^([^:]+)\s*:\s*(\d+)[,\s]*([GATC]+)$", re.IGNORECASE)
+LOCUS_NO_REF_PATTERN = re.compile(r"^([^:]+)\s*:\s*(\d+)$")
+VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+))\s*:\s*(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$", re.IGNORECASE)
 # matches anything hgvs-like before any fixes
 HGVS_UNCLEANED_PATTERN = re.compile(r"(^(N[MC]_|ENST)\d+.*:|[cnmg]\.|[^:]:[cnmg]).*\d+")
 
@@ -374,7 +374,7 @@ class Variant(PreviewModelMixin, models.Model):
             contig = genome_build.chrom_contig_mappings[chrom]
             position = int(position)
             if not (0 < position < contig.length):
-                errors.append(f"position '{position}' is outside contig '{contig}' length={contig.length}")
+                errors.append(f'position "{position}" is outside contig "{contig}" length={contig.length}')
         except KeyError:
             errors.append(f"Chromsome/contig '{chrom}' not a valid in genome build {genome_build}")
         return errors

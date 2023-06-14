@@ -188,6 +188,7 @@ class SearchMessageOverall:
     message: str
     severity: LogLevel = LogLevel.ERROR
     search_info: Optional['SearchResponse'] = None
+    genome_builds: Optional[List[GenomeBuild]] = None
 
     @property
     def _sort_order(self):
@@ -201,7 +202,14 @@ class SearchMessageOverall:
             raise ValueError(f"Created a Search Message with something other than string {self.message}")
 
     def with_response(self, search_response: 'SearchResponse'):
-        return SearchMessageOverall(message=self.message, severity=self.severity, search_info=search_response)
+        return SearchMessageOverall(message=self.message, severity=self.severity, search_info=search_response, genome_builds=self.genome_builds)
+
+    def __hash__(self):
+        value = hash(self.message)
+        if self.genome_builds:
+            for gb in self.genome_builds:
+                value += hash(gb)
+        return value
 
 
 class SearchResultMatchStrength(int, Enum):
