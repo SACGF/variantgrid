@@ -538,6 +538,16 @@ function unitAsPercentFormatter(unitValue) {
 }
 
 
+function formatMasterMindMMID3(value) {
+    console.log("formatMasterMindMMID3: " + value);
+
+    function buildMasterMindLink(mmid3) {
+        return "<a title='View MasterMind in new window' target='_blank' href='https://mastermind.genomenon.com/detail?mutation=" + mmid3 + "'>" + mmid3 + "</a>"
+    }
+    return splitAndLink(value, "&", buildMasterMindLink);
+}
+
+
 jQuery.extend($.fn.fmatter , {
     'detailsLink' : detailsLink,
     'tagsFormatter' : tagsFormatter,
@@ -550,6 +560,7 @@ jQuery.extend($.fn.fmatter , {
     'geneSymbolNewWindowLink' : geneSymbolNewWindowLink,
     'gnomadFilteredFormatter' : gnomadFilteredFormatter,
     'unitAsPercentFormatter' : unitAsPercentFormatter,
+    'formatMasterMindMMID3': formatMasterMindMMID3,
 });
 
 
