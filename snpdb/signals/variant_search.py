@@ -544,12 +544,6 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 yield SearchResult(alt.preview, messages=alt_messages)
 
 
-def _search_hgvs_variants_results_only(hgvs_string: str, user: User, genome_build: GenomeBuild, visible_variants: QuerySet, classify: bool = False) -> Iterable[SearchResult]:
-    for result in _search_hgvs(hgvs_string=hgvs_string, user=user, genome_build=genome_build, visible_variants=visible_variants, classify=classify):
-        if isinstance(result, SearchResult) and isinstance(result.preview.obj, Variant):
-            yield result
-
-
 DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
 
 
