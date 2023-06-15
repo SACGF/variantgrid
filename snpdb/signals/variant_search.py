@@ -198,17 +198,20 @@ def yield_search_variant_match(search_input: SearchInputInstance):
         chrom, position, ref, alt = search_input.match.groups()
         chrom, position, ref, alt = Variant.clean_variant_fields(chrom, position, ref, alt,
                                                                  want_chr=genome_build.reference_fasta_has_chr)
+        has_results = False
         results = get_results_from_variant_tuples(search_input.get_visible_variants(genome_build), VariantCoordinate(chrom, position, ref, alt))
         if results.exists():
+            has_results = True
             yield results
 
         if errors := Variant.validate(genome_build, chrom, position):
             yield SearchMessageOverall(", ".join(errors), genome_builds=[genome_build])
         else:
-            variant_string = Variant.format_tuple(chrom, position, ref, alt)
-            if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build, variant_string=variant_string):
-                search_message = f"The variant {variant_string} does not exist in our database"
-                yield create_manual, search_message
+            if not has_results:
+                variant_string = Variant.format_tuple(chrom, position, ref, alt)
+                if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build, variant_string=variant_string):
+                    search_message = f"The variant {variant_string} does not exist in our database"
+                    yield create_manual, search_message
 
 
 VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)", re.IGNORECASE)
