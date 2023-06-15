@@ -3,6 +3,7 @@ from django.core.management.base import BaseCommand
 
 from annotation.models import AnnotationRangeLock, VariantAnnotation, VariantTranscriptAnnotation
 from snpdb.models import Variant, VariantZygosityCount, VariantCollectionRecord
+from upload.models import ModifiedImportedVariant
 
 
 class Command(BaseCommand):
@@ -63,7 +64,9 @@ class Command(BaseCommand):
                     check_ref = False
 
                 # If there is a VariantCollectionRecord, but no sample, the analysis won't work anyway
-                for klass in [VariantCollectionRecord, VariantZygosityCount, VariantAnnotation, VariantTranscriptAnnotation]:
+                for klass in [VariantCollectionRecord, VariantZygosityCount,
+                              VariantAnnotation, VariantTranscriptAnnotation,
+                              ModifiedImportedVariant]:
                     qs = klass.objects.filter(variant_id__gt=start, variant_id__lt=end, variant_id__in=unused_variant_ids)
                     num_deleted = qs._raw_delete(qs.db)
                     print(f"{klass}: deleted {num_deleted} records")
