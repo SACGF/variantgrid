@@ -2167,7 +2167,7 @@ VCTable.format_hgvs = (parts) => {
             cDom.append($('<span>', {class: 'c-hgvs-gene-symbol-b', html:[
                 $('<span>', {text: "(", class: 'bracket'}),
                 $('<span>', {class: 'c-hgvs-gene-symbol', text: geneSymbol}),
-                $('<span>', {text: ")", class: 'bracket', style: 'letter-spacing: 2px'})
+                $('<span>', {text: ")", class: 'bracket bracket-close'})
             ]}));
         }
         cDom.append($('<span>', {text: ":", class: 'colon'}));
