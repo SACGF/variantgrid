@@ -10,9 +10,11 @@
         <input type="radio" name="diff-mode" value="after" onclick="diffToggle(this)"> After
       </label>
     </div>
+{% spaceless %}
     <div style="white-space: pre-line">
-    <nomin class="diff-text" data-diff-mode="diff">{% for diff_segment in diffs %}<span class="diff-text-{{ diff_segment.operation_name }}">{{ diff_segment.effective_text }}</span>{% endfor %}</nomin>
-    <nomin class="collapse" data-diff-mode="before" style="color:#888;">{{ before }}</nomin>
-    <nomin class="collapse" data-diff-mode="after">{{ after }}</nomin>
+    <div class="diff-text" data-diff-mode="diff">{% for diff_segment in diffs %}<span class="diff-text-{{ diff_segment.operation_name }}">{{ diff_segment.effective_text }}</span>{% endfor %}</div>
+    <div class="collapse" data-diff-mode="before" style="color:#888;">{{ before }}</div>
+    <div class="collapse" data-diff-mode="after">{{ after }}</div>
     </div>
+{% endspaceless %}
 </span>

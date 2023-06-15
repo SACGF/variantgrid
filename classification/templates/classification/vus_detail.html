@@ -108,10 +108,9 @@
                     <td>{{ grouping.allele.pk }}</td>
                     {% with strengths=lab_summary.latest.criteria_strengths %}
                         <td data-search="{% for hgvs in grouping.c_hgvses %}{{ hgvs }} {% endfor %}">
-                            <nomin>
                             {{ lab_summary.lab }}
                             {% if lab_summary.count > 1 %} x {{ lab_summary.count }}{% endif %}
-                            {% clinical_significance_inline lab_summary.clinical_significance_to %} </nomin>
+                            {% clinical_significance_inline lab_summary.clinical_significance_to %}
                             {% if strengths.has_criteria %}
                             <span class="mono text-muted">({{ strengths.summary_string_short }})</span>
                             {% else %}

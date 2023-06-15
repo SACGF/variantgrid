@@ -152,7 +152,6 @@
 
                 {% comment %}Overall Messages{% endcomment %}
                 {% if search_results.results or search_results.messages_overall %}
-                    <nomin>
                     <ul class="list-group search-results">
                         {% comment %}TOP LEVEL SEARCH INFO/WARNINGS/ERRORS{% endcomment %}
                         {% for message in search_results.messages_overall %}
@@ -163,12 +162,12 @@
                                         <label>{{ message.search_info.preview_category }}</label>
                                         {% if message.search_info.sub_name %}<div class="text-info text-small">via {{ message.search_info.sub_name }} Search</div>{% endif %}
                                         {% if message.genome_builds %}
-                                            <nomin class="d-block text-small">
+                                            <div class="text-small">
                                                 <span class="text-secondary">{% if search_result.genome_build_mismatch %}{{ 'W' | severity_icon:'This is not your preferred genome build' }}{% endif %}
                                                 Issue in </span> {% for gb in message.genome_builds %}
                                                 <label>{{ gb }}</label>
                                                 {% if not forloop.last %} and {% endif %}{% endfor %}
-                                            </nomin>
+                                            </div>
                                         {% endif %}
                                     </div>
                                     <div class="col-9">
@@ -202,14 +201,14 @@
                                                 </div>
                                             {% endif %}
                                             {% if search_result.genome_builds %}
-                                                <nomin class="d-block text-small">
+                                                <div class="text-small">
                                                     <span class="text-secondary">{% if search_result.genome_build_mismatch %}{{ 'W' | severity_icon:'This is not your preferred genome build' }}{% endif %}
                                                     Matched on </span> {% for gb_messages in search_result.genome_builds_with_messages %}
                                                     <label
                                                         {% if gb_messages.message_summary %}title="{{ gb_messages.message_summary }}" class="text-{{ gb_messages.severity_bs }} hover-detail"{% endif %}
                                                     >{{ gb_messages.genome_build }}</label>
                                                     {% if not forloop.last %} and {% endif %}{% endfor %}
-                                                </nomin>
+                                                </div>
                                             {% endif %}
                                         </div>
 
@@ -239,7 +238,6 @@
                             {% endwith %}
                         {% endfor %}
                     </ul>
-                    </nomin>
                 {% endif %}
             </div>
         {% endif %}
@@ -268,8 +266,7 @@
                                 {% endif %}
                                 {% if search_response.example.examples %}
                                     {% for example in search_response.example.examples %}
-                                        <span class="example ml-1">{{ example }}</span>
-                                        <nomin> </nomin>
+                                        <span class="example ml-1">{{ example }} </span>
                                     {% endfor %}
                                 {% endif %}
                             {% else %}
