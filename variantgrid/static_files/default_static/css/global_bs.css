@@ -1137,6 +1137,9 @@ a .c-hgvs-body .c-hgvs-transcript, a .c-hgvs-body .c-hgvs-nomen {
   margin-right: 2pt;
   color: #555;
 }
+.c-hgvs-body .bracket.bracket-close {
+  letter-spacing: 2px;
+}
 .c-hgvs-body .colon {
   margin-left: -1pt;
   margin-right: 1pt;

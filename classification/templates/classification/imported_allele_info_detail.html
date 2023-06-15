@@ -34,14 +34,14 @@
     {% labelled label="Resolution Differences" %}
         {% if validation_tags %}
             {% for tag in validation_tags %}
-                <div><nomin>
+                <div>
                     {% if tag.severity == 'E' %}
                     {{ 'W' | severity_icon:'Requires Confirmation' }}
                     {% else %}
                     {{ 'I' | severity_icon:'Variant Matching Info' }}
                     {% endif %}
                     <label>{{ tag.category_pretty }}</label> {{ tag.field_pretty }}
-                </nomin></div>
+                </div>
             {% endfor %}
         {% else %}<span class="no-value">None</span>{% endif %}
     {% endlabelled %}

@@ -203,8 +203,9 @@
                 <div class="card-body card-body-list">
                     <ul class="list-group">
                         <li class="list-group-item list-group-item-light text-monospace">
+                            {% spaceless %}
                             {% for alias_summary in gene_symbol.alias_meta.aliases_in %}
-                                {% if not forloop.first %}<span>,&nbsp;</span>{% endif %}
+                                {% if not forloop.first %}<span>, </span>{% endif %}
                                 {% if alias_summary.other_symbol_in_database %}
                                     {% if alias_summary.different_genes %}
                                         <span data-toggle="popover" title="Different Gene IDs" data-placement="bottom"
@@ -219,6 +220,7 @@
                                     <span class="hover-detail" data-toggle="tooltip" title="{{ alias_summary.source }}">{{ alias_summary.other_symbol }}</span>
                                 {% endif %}
                             {% endfor %}
+                            {% endspaceless %}
                         </li>
                     </ul>
                 </div>

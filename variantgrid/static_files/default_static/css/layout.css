@@ -126,7 +126,7 @@ nav .nav-link:hover {
   height: 27px;
 }
 
-i.fas, .svg-inline--fa {
+i.fas, i.fa-solid, .svg-inline--fa {
   margin-right: 4px;
 }
 

@@ -1165,6 +1165,9 @@ a .c-hgvs-body {
     margin-left: 2pt;
     margin-right: 2pt;
     color: #555;
+    &.bracket-close {
+      letter-spacing: 2px;
+    }
   }
   .colon {
     margin-left: -1pt;
