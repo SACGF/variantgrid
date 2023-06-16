@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Tuple, Any
 
+from django.core.exceptions import ValidationError
 from django.db.models import Model
 from django.forms import ChoiceField
 import copy
@@ -10,12 +11,23 @@ from more_itertools import first
 
 
 @dataclass(frozen=True)
+class ValuesMissingOther:
+    """
+    This class exists soley to provide a warning if someone ticked "other" but didn't fill in a value
+    """
+    wrapped: Any
+
+
+@dataclass(frozen=True)
 class OptionData:
     name: str
     label: str
     value: str
     selected: bool
     index: int
+
+    def as_selected(self):
+        return OptionData(name=self.name, label=self.label, value=self.value, selected=True, index=self.index)
 
 
 class RadioOtherWidget(ChoiceWidget):
@@ -27,12 +39,19 @@ class RadioOtherWidget(ChoiceWidget):
         self.choices = list(choices)
 
     def get_context(self, name, value, attrs):
+        missing_other = False
+        if isinstance(value, ValuesMissingOther):
+            value = value.wrapped
+            missing_other = True
+
         context = super().get_context(name, value, attrs)
 
         value = self.format_value(value)
         if value is None:
             value = []
         options, other_option = self.other_options(name=name, value=value, attrs=attrs)
+        if missing_other:
+            other_option = other_option.as_selected()
 
         context["widget"]["options"] = options
         context["widget"]["other"] = other_option
@@ -81,6 +100,7 @@ class RadioOtherWidget(ChoiceWidget):
         return obj
 
     def value_from_datadict(self, data, files, name):
+        missing_other = False
         if self.allow_multiple_selected:
             values = set()
             for choice in self.choices:
@@ -90,16 +110,24 @@ class RadioOtherWidget(ChoiceWidget):
             if data.get(f"{name}-other") == "on":
                 if other_value := data.get(f"{name}-other-value"):
                     values.add(other_value)
-            return list(sorted(values))
+                else:
+                    missing_other = True
+
+            values=list(sorted(values))
+            if missing_other:
+                values = ValuesMissingOther(values)
+            return values
         else:
             selected_value = super().value_from_datadict(data, files, name)
             if selected_value == "other":
                 selected_value = data.get(f"{name}-other")
-            if not selected_value:
-                return None
+                if not selected_value:
+                    return ValuesMissingOther(None)
             return selected_value
 
     def format_value(self, value):
+        if isinstance(value, ValuesMissingOther):
+            return value
         """Return selected values as a list."""
         if value is None and self.allow_multiple_selected:
             return []
@@ -134,6 +162,11 @@ class ChoiceFieldWithOther(ChoiceField):
         # don't want to turn an array into a string representation of an array
         return value
 
+    def validate(self, value):
+        if isinstance(value, ValuesMissingOther):
+            raise ValidationError("Other must have a description provided.")
+        super().validate(value)
+
 
 class MultiChoiceFieldWithOther(ChoiceField):
     widget = CheckboxOtherWidget
@@ -144,6 +177,11 @@ class MultiChoiceFieldWithOther(ChoiceField):
 
     def valid_value(self, value):
         return True
+
+    def validate(self, value):
+        if isinstance(value, ValuesMissingOther):
+            raise ValidationError("Other must have a description provided.")
+        super().validate(value)
 
     def to_python(self, value):
         # don't want to turn an array into a string representation of an array
