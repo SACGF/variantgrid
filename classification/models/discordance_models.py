@@ -91,22 +91,31 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
             lab: Lab
             strengths: CriteriaStrengths
             withdrawn: bool
-            clinical_significance: str
+            clinical_significance_from: str
+            clinical_significance_to: str
 
             @staticmethod
             def from_modification(cm: ClassificationModification):
                 strengths_string = cm.criteria_strengths().summary_string(acmg_only=False) or "No criteria provided"
+
+                # should we indicate that this is a pending change anywhere?
+                clinical_significance_from = cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+                clinical_significance_to = clinical_significance_from
+                if flag := cm.classification.flag_collection.get_open_flag_of_type(classification_flag_types.classification_pending_changes):
+                    clinical_significance_to = flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) or "unknown"
+
                 return SummaryData(
                     lab=cm.lab,
                     strengths=strengths_string,
                     withdrawn=cm.classification.withdrawn,
-                    clinical_significance=cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+                    clinical_significance_from=clinical_significance_from,
+                    clinical_significance_to=clinical_significance_to
                 )
 
             @cached_property
             def _sort_value(self):
                 from classification.models import EvidenceKeyMap
-                return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter_value(self.clinical_significance), self.lab
+                return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter_value(self.clinical_significance_to), self.lab
 
             def __lt__(self, other):
                 self._sort_value < other._sort_value
@@ -114,11 +123,16 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
             def as_preview_key(self) -> PreviewKeyValue:
                 from classification.models import EvidenceKeyMap
                 withdrawn_message = " withdrawn" if self.withdrawn else ""
+                e_key =  EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+
                 parts = [
                     str(self.strengths),
-                    "-",
-                    EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(self.clinical_significance)
+                    ":",
                 ]
+                parts += [e_key.pretty_value(self.clinical_significance_from)]
+                if self.clinical_significance_from != self.clinical_significance_to:
+                    parts += ["->", e_key.pretty_value(self.clinical_significance_to)]
+
                 if self.withdrawn:
                     parts += ["withdrawn"]
 
