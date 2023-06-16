@@ -18,6 +18,7 @@ from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from more_itertools import first
 
+from classification.criteria_strengths import CriteriaStrengths
 from classification.enums.classification_enums import SpecialEKeys, ClinicalSignificance
 from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
 from classification.models.classification import ClassificationModification, Classification
@@ -85,12 +86,56 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
                 PreviewKeyValue(key=f"{c_hgvs.genome_build} c.HGVS", value=str(c_hgvs))
             )
 
+        @dataclass(frozen=True)
+        class SummaryData:
+            lab: Lab
+            strengths: CriteriaStrengths
+            withdrawn: bool
+            clinical_significance: str
+
+            @staticmethod
+            def from_modification(cm: ClassificationModification):
+                strengths_string = cm.criteria_strengths().summary_string(acmg_only=False) or "No criteria provided"
+                return SummaryData(
+                    lab=cm.lab,
+                    strengths=strengths_string,
+                    withdrawn=cm.classification.withdrawn,
+                    clinical_significance=cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+                )
+
+            @cached_property
+            def _sort_value(self):
+                from classification.models import EvidenceKeyMap
+                return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter_value(self.clinical_significance), self.lab
+
+            def __lt__(self, other):
+                self._sort_value < other._sort_value
+
+            def as_preview_key(self) -> PreviewKeyValue:
+                from classification.models import EvidenceKeyMap
+                withdrawn_message = " withdrawn" if self.withdrawn else ""
+                parts = [
+                    str(self.strengths),
+                    "-",
+                    EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(self.clinical_significance)
+                ]
+                if self.withdrawn:
+                    parts += ["withdrawn"]
+
+                return PreviewKeyValue(key=str(self.lab), value=" ".join(parts))
+
+        counts = defaultdict(int)
+        for effective in self.all_classification_modifications:
+            counts[SummaryData.from_modification(effective)] += 1
+
         return self.preview_with(
             identifier=f"DR_{self.pk}",
             summary_extra=
                 [PreviewKeyValue(key="Allele", value=f"{self.clinical_context.allele:CA}")] +
                 c_hgvs_key_values +
-                [PreviewKeyValue(key="Status", value=f"{self.get_resolution_display() or 'Discordant'}")]
+                [PreviewKeyValue(key="Status", value=f"{self.get_resolution_display() or 'Discordant'}")] +
+                [PreviewKeyValue(key="---", value="")] +
+                [summary.as_preview_key() for summary in sorted(counts.keys())]
         )
 
     class LabInvolvement(int, Enum):
