@@ -6,6 +6,7 @@ from typing import List, Dict, Optional, Tuple
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db.models import QuerySet
+from django.dispatch import receiver
 from django.http import HttpRequest
 from django.http.response import HttpResponse, HttpResponseBase
 from django.shortcuts import render, redirect
@@ -16,7 +17,7 @@ from classification.enums.discordance_enums import ContinuedDiscordanceReason, D
 from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext, \
     EvidenceKeyMap, classification_flag_types, discordance_change_signal, \
     DiscordanceReportRowData, ClassificationFlagTypes
-from classification.models.classification_groups import ClassificationGroupUtils
+from classification.models.classification_groups import ClassificationGroupUtils, ClassificationGroups
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.evidence_key import EvidenceKeyOption
 from classification.views.classification_dashboard_view import ClassificationDashboard
@@ -25,6 +26,7 @@ from classification.views.exports.classification_export_filter import Classifica
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
 from genes.hgvs import CHGVS
 from library.log_utils import log_admin_change
+from library.preview_request import preview_extra_signal, PreviewKeyValue
 from review.models import Review
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
@@ -201,7 +203,7 @@ class DiscordanceReportTemplateData:
         return self._effectives_and_not_considered[0]
 
     @property
-    def group_utils(self) -> List[ClassificationModification]:
+    def group_utils(self) -> ClassificationGroupUtils:
         # TODO, rather than no longer considered, shove that value into clinical significance somehow e.g. "withdrawn"
         no_longer_considered_mods = []
         if no_longer_considered := self.no_longer_considered:
@@ -459,3 +461,30 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
     }
 
     return render(request, "classification/discordance_report_action.html", context)
+
+
+@receiver(preview_extra_signal, sender=DiscordanceReport)
+def discordance_preview_extra(sender, user: User, obj: DiscordanceReport, **kwargs) -> Optional[List[PreviewKeyValue]]:
+    template_data = DiscordanceReportTemplateData(obj.pk, user=user)
+    groups = ClassificationGroups(
+        classification_modifications=template_data.effective_classifications,
+        group_utils=template_data.group_utils
+    )
+    extras: List[PreviewKeyValue] = []
+    cids = ",".join([str(g.most_recent.classification.pk) for g in groups.groups])
+    diff_url = reverse("classification_diff") + f"?cids={cids}&discordance_report_id={obj.pk}"
+
+    extras += [PreviewKeyValue(key="", value="Show Evidence Differences", link=diff_url)]
+
+    e_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+    for group in groups.groups:
+        old_cs = group.clinical_significance_old or group.clinical_significance
+        new_cs = group.clinical_significance_pending or group.clinical_significance
+
+        parts = [group.most_recent.criteria_strength_summary(only_acmg=False), ":"]
+        if old_cs != new_cs:
+            parts += [e_key.pretty_value(old_cs, dash_for_none=True), " -> "]
+        parts += [e_key.pretty_value(new_cs, dash_for_none=True)]
+        extras += [PreviewKeyValue(key=str(group.lab), value=" ".join(parts))]
+
+    return extras

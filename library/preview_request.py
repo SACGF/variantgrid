@@ -33,6 +33,7 @@ class PreviewKeyValue:
     value: Optional[Any] = None  # really we always want a value, but key is optional and want to order it first
     dedicated_row: bool = False
     icon: Optional[str] = None
+    link: Optional[str] = None
     """
     Highlights this bit of data as being linked to another data set (as opposed to a KeyValue that every record
     of this type would hve. Worth highlighting)

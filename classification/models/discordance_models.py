@@ -17,12 +17,10 @@ from django.urls.base import reverse
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from more_itertools import first
-
-from classification.criteria_strengths import CriteriaStrengths
 from classification.enums.classification_enums import SpecialEKeys, ClinicalSignificance
 from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
 from classification.models.classification import ClassificationModification, Classification
-from classification.models.classification_lab_summaries import ClassificationLabSummaryEntry, ClassificationLabSummary
+from classification.models.classification_lab_summaries import ClassificationLabSummary, ClassificationLabSummaryEntry
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types, ClassificationFlagTypes
 from review.models import ReviewableModelMixin, Review
@@ -86,70 +84,12 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
                 PreviewKeyValue(key=f"{c_hgvs.genome_build} c.HGVS", value=str(c_hgvs))
             )
 
-        @dataclass(frozen=True)
-        class SummaryData:
-            lab: Lab
-            strengths: CriteriaStrengths
-            withdrawn: bool
-            clinical_significance_from: str
-            clinical_significance_to: str
-
-            @staticmethod
-            def from_modification(cm: ClassificationModification):
-                strengths_string = cm.criteria_strengths().summary_string(acmg_only=False) or "No criteria provided"
-
-                # should we indicate that this is a pending change anywhere?
-                clinical_significance_from = cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-                clinical_significance_to = clinical_significance_from
-                if flag := cm.classification.flag_collection.get_open_flag_of_type(classification_flag_types.classification_pending_changes):
-                    clinical_significance_to = flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) or "unknown"
-
-                return SummaryData(
-                    lab=cm.lab,
-                    strengths=strengths_string,
-                    withdrawn=cm.classification.withdrawn,
-                    clinical_significance_from=clinical_significance_from,
-                    clinical_significance_to=clinical_significance_to
-                )
-
-            @cached_property
-            def _sort_value(self):
-                from classification.models import EvidenceKeyMap
-                return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter_value(self.clinical_significance_to), self.lab
-
-            def __lt__(self, other):
-                self._sort_value < other._sort_value
-
-            def as_preview_key(self) -> PreviewKeyValue:
-                from classification.models import EvidenceKeyMap
-                withdrawn_message = " withdrawn" if self.withdrawn else ""
-                e_key =  EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-
-                parts = [
-                    str(self.strengths),
-                    ":",
-                ]
-                parts += [e_key.pretty_value(self.clinical_significance_from)]
-                if self.clinical_significance_from != self.clinical_significance_to:
-                    parts += ["->", e_key.pretty_value(self.clinical_significance_to)]
-
-                if self.withdrawn:
-                    parts += ["withdrawn"]
-
-                return PreviewKeyValue(key=str(self.lab), value=" ".join(parts))
-
-        counts = defaultdict(int)
-        for effective in self.all_classification_modifications:
-            counts[SummaryData.from_modification(effective)] += 1
-
         return self.preview_with(
             identifier=f"DR_{self.pk}",
             summary_extra=
                 [PreviewKeyValue(key="Allele", value=f"{self.clinical_context.allele:CA}")] +
                 c_hgvs_key_values +
-                [PreviewKeyValue(key="Status", value=f"{self.get_resolution_display() or 'Discordant'}")] +
-                [PreviewKeyValue(key="---", value="")] +
-                [summary.as_preview_key() for summary in sorted(counts.keys())]
+                [PreviewKeyValue(key="Status", value=f"{self.get_resolution_display() or 'Discordant'}")]
         )
 
     class LabInvolvement(int, Enum):

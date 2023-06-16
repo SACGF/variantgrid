@@ -260,7 +260,7 @@
                         <div class="col-9">
                             {% if search_response.admin_only %}<i class="fa-solid fa-key mr-2"></i>{% endif %}
                             {% if search_response.sub_name %}
-                                <label {% if search_response.matched_pattern %}class="searched"{% endif %}>{{ search_response.sub_name }}</label><span class="d-inline mx-1">-</span>
+                                <label {% if search_response.matched_pattern %}class="searched"{% endif %}>{{ search_response.sub_name }}</label><span class="d-inline"> - </span>
                             {% endif %}
                             {% if search_response.example %}
                                 {% if search_response.example.note %}
