@@ -42,7 +42,12 @@ class SyncRunInstance:
 
     @cached_property
     def sync_run(self) -> SyncRun:
-        return SyncRun.objects.create(destination=self.sync_destination, status=SyncStatus.IN_PROGRESS)
+        return SyncRun.objects.create(
+            destination=self.sync_destination,
+            full_sync=self.full_sync,
+            max_rows=self.max_rows,
+            status=SyncStatus.IN_PROGRESS
+        )
 
     def run_start(self):
         _ = self.sync_run
