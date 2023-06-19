@@ -66,7 +66,7 @@ class SyncDestinationAdmin(ModelAdminBasics):
 @admin.register(SyncRun)
 class SyncRunAdmin(ModelAdminBasics):
     list_display = ('id', 'destination', 'created', 'status', 'meta_short')
-    list_filter = (('destination', RelatedFieldListFilter),)
+    list_filter = (('destination', RelatedFieldListFilter), 'status')
 
     def has_add_permission(self, request):
         return False
