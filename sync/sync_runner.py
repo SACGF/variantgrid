@@ -7,6 +7,7 @@ from library.oauth import ServerAuth
 from library.utils import parse_http_header_date
 from sync.models import SyncStatus
 from sync.models.models import SyncDestination, SyncRun
+import json
 
 
 class SyncRunInstance:
@@ -68,6 +69,9 @@ class SyncRunner(ABC):
     def sync(self, sync_run_instance: SyncRunInstance):
         pass
 
+    def report_on(self, sync_run: SyncRun):
+        pass
+
 
 SyncRunnerFactory = Callable[[], SyncRunner]
 
@@ -106,5 +110,5 @@ def sync_runner_for_destination(sync_destination: SyncDestination) -> SyncRunner
         if factory_requirements.matches(sync_destination):
             return factory_requirements.factory()
 
-    raise ValueError(f"No SyncRunner is configured for the config of {sync_destination}")
+    raise ValueError(f"None of the {len(_sync_runner_registry)} SyncRunners is configured for the config of {sync_destination}: ({json.dumps(sync_destination.config)})")
 

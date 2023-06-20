@@ -1,7 +1,7 @@
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from json import JSONDecodeError
-from typing import Optional
+from typing import Optional, Set
 
 from classification.enums import ShareLevel
 from classification.views.exports import ClassificationExportFormatterMVL
@@ -11,7 +11,9 @@ from classification.views.exports.classification_export_formatter_mvl import For
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
 from library.log_utils import AdminNotificationBuilder, report_exc_info
+from library.utils import ExportRow, export_column
 from snpdb.models import Lab, GenomeBuild, Organization
+from sync.models import SyncRun
 from sync.sync_runner import SyncRunner, register_sync_runner, SyncRunInstance
 import json
 
@@ -173,3 +175,48 @@ class AlissaUploadSyncer(SyncRunner):
                 "responses": response_jsons
             }
         )
+
+    def report_on(self, sync_run: SyncRun):
+
+        @dataclass(frozen=True)
+        class AlissaRowInfoExport(ExportRow):
+            c_hgvs: str
+            severity: str
+            message: str
+
+            @export_column("c.HGVS")
+            def _c_hgvs(self):
+                return self.c_hgvs
+
+            @export_column("severity")
+            def _severity(self):
+                return self.severity
+
+            @export_column("message")
+            def _message(self):
+                return self.message
+
+        all_issues: Set[AlissaRowInfoExport] = set()
+
+        for response_dict in sync_run.meta.get("responses", {}):
+            for info_line in response_dict.get("infos", []):
+                info_parts = [p.strip().replace(" ", ":") for p in info_line.split("\t")]
+                all_issues.add(AlissaRowInfoExport(c_hgvs=info_parts[0], severity="info", message=info_parts[1]))
+
+            for failure in response_dict.get("failures"):
+                parts = failure.split("\t")
+                message = parts[0]
+                json_data = json.loads(parts[1])
+
+                transcript = json_data.get("transcript")
+                c_nomen = json_data.get("cNomen")
+                all_issues.add(
+                    AlissaRowInfoExport(
+                        c_hgvs=f"{transcript}:{c_nomen}",
+                        severity="failure",
+                        message=message
+                    )
+                )
+
+        sorted_data = list(sorted(all_issues, key=lambda x: (x.severity, x.c_hgvs)))
+        return AlissaRowInfoExport.streaming_csv(data=sorted_data, filename=f"sync_run_{sync_run.pk}")
