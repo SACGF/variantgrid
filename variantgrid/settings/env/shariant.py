@@ -12,6 +12,7 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 import re
 
 # for nginx providing HTTPS
+USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTOCOL', 'https')
 
 SYNC_DETAILS = get_shariant_sync_secrets()
