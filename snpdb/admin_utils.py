@@ -323,7 +323,6 @@ class ModelAdminBasics(admin.ModelAdmin):
         widgets = {}
         widgets.update(kwarg_widgets)
         widgets.update(overrides)
-        print(widgets)
 
         return super().get_form(request, obj, widgets=widgets, **kwargs)
 
