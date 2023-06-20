@@ -11,6 +11,9 @@ from variantgrid.settings.components.default_settings import *  # pylint: disabl
 from variantgrid.settings.components.seqauto_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 import re
 
+# for nginx providing HTTPS
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTOCOL', 'https')
+
 SYNC_DETAILS = get_shariant_sync_secrets()
 
 ALLELE_VALIDATION = True
