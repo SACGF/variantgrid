@@ -106,6 +106,9 @@ def variant_cosmic_search(search_input: SearchInputInstance):
     search_string = search_input.search_string.upper()
     for genome_build in search_input.genome_builds:
         variant_qs = search_input.get_visible_variants(genome_build)
+        # COSMIC IDs are in a text field and separated by "&"
+        # commonly there's 0 or 1 COSMIC ID, but if there's multiple we have to check for it starting with
+        # the start of the field or an &, and ending with the end of the line or an &
         if search_input.match.group(1).upper() == "COSV":
             yield variant_qs.filter(variantannotation__cosmic_id__regex=f"(?:^|&){search_string}(?:$|&)")
         elif search_input.match.group(1).upper() == "COSM":
