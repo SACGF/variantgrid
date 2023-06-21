@@ -49,7 +49,7 @@ def discordance_report_changes_summary(sender, instance: Review, **kwargs):
             return SafeString("".join(rows))
         elif outcome := data.get("outcome"):
             if outcome == "postpone":
-                return "Outcome has been delayed for a future discussion"
+                return "Outcome awaiting further discussion"
     else:
         return "Outcome was not decided"
     return json.dumps(instance.post_review_data)

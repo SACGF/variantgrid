@@ -17,20 +17,19 @@ from django.urls.base import reverse
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from more_itertools import first
-
 from classification.enums.classification_enums import SpecialEKeys, ClinicalSignificance
 from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
 from classification.models.classification import ClassificationModification, Classification
-from classification.models.classification_lab_summaries import ClassificationLabSummary
+from classification.models.classification_lab_summaries import ClassificationLabSummary, ClassificationLabSummaryEntry
 from classification.models.clinical_context_models import ClinicalContext
-from classification.models.flag_types import classification_flag_types
+from classification.models.flag_types import classification_flag_types, ClassificationFlagTypes
+from review.models import ReviewableModelMixin, Review
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
-from library.django_utils import get_url_from_view_path
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
+from library.django_utils import get_url_from_view_path
 from library.utils import invalidate_cached_property, ExportRow, export_column, ExportDataType
-from review.models import ReviewableModelMixin, Review
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, GenomeBuild

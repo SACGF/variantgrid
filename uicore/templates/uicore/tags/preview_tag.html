@@ -3,18 +3,20 @@
     <i class="{{ preview.icon }} preview-icon"></i>
     <span class="preview-category">{{ preview.category }}</span>&nbsp;<a class="preview-identifier" href="{{ preview.internal_url }}" target="_blank" class="hover-link">{{ preview.identifier }}</a>
     {% if preview.title %}<span class="preview-title">{{ preview.title }}</span>{% endif %}
-    {% if preview.summary_extra %}
+    {% if preview.summary_all %}
         <div class="preview-key-values">
-            {% for kv in preview.summary_extra %}
+            {% for kv in preview.summary_all %}
                 <div class="preview-key-value">
-                    <span class="preview-key">{{ kv.key }}</span>&nbsp;
-                    <span class="preview-value">
-                        {% if "c.HGVS" in kv.key %}
-                            {% c_hgvs kv.value %}
-                        {% else %}
-                            {{ kv.value }}
-                        {% endif %}
-                    </span>
+                    {% if kv.key %}<span class="preview-key">{{ kv.key }}</span>{% endif %}
+                    {% if kv.link %}<a href="{{ kv.link }}" class="hover-link" target="_blank">{% endif %}
+                        <span class="preview-value">
+                            {% if "c.HGVS" in kv.key %}
+                                {% c_hgvs kv.value %}
+                            {% else %}
+                                {{ kv.value }}
+                            {% endif %}
+                        </span>
+                    {% if kv.link %}</a>{% endif %}
                 </div>
             {% endfor %}
         </div>

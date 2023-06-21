@@ -3,11 +3,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
 from typing import Optional, Callable, Dict, List
-
 from library.oauth import ServerAuth
 from library.utils import parse_http_header_date
 from sync.models import SyncStatus
 from sync.models.models import SyncDestination, SyncRun
+import json
 
 
 class SyncRunInstance:
@@ -43,7 +43,12 @@ class SyncRunInstance:
 
     @cached_property
     def sync_run(self) -> SyncRun:
-        return SyncRun.objects.create(destination=self.sync_destination, status=SyncStatus.IN_PROGRESS)
+        return SyncRun.objects.create(
+            destination=self.sync_destination,
+            full_sync=self.full_sync,
+            max_rows=self.max_rows,
+            status=SyncStatus.IN_PROGRESS
+        )
 
     def run_start(self):
         _ = self.sync_run
@@ -62,6 +67,9 @@ class SyncRunner(ABC):
 
     @abstractmethod
     def sync(self, sync_run_instance: SyncRunInstance):
+        pass
+
+    def report_on(self, sync_run: SyncRun):
         pass
 
 
@@ -102,4 +110,5 @@ def sync_runner_for_destination(sync_destination: SyncDestination) -> SyncRunner
         if factory_requirements.matches(sync_destination):
             return factory_requirements.factory()
 
-    raise ValueError(f"No SyncRunner is configured for the config of {sync_destination}")
+    raise ValueError(f"None of the {len(_sync_runner_registry)} SyncRunners is configured for the config of {sync_destination}: ({json.dumps(sync_destination.config)})")
+

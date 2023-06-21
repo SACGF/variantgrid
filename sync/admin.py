@@ -9,6 +9,8 @@ from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column
 from sync.models import SyncRun, ClassificationModificationSyncRecord
 from sync.models.models import SyncDestination
 
+from sync.sync_runner import sync_runner_for_destination
+
 
 @admin.register(SyncDestination)
 class SyncDestinationAdmin(ModelAdminBasics):
@@ -65,8 +67,8 @@ class SyncDestinationAdmin(ModelAdminBasics):
 
 @admin.register(SyncRun)
 class SyncRunAdmin(ModelAdminBasics):
-    list_display = ('id', 'destination', 'created', 'status', 'meta_short')
-    list_filter = (('destination', RelatedFieldListFilter),)
+    list_display = ('id', 'destination', 'created', 'status', 'full_sync', 'meta_short')
+    list_filter = (('destination', RelatedFieldListFilter), 'status', 'full_sync')
 
     def has_add_permission(self, request):
         return False
@@ -76,6 +78,15 @@ class SyncRunAdmin(ModelAdminBasics):
         if meta := obj.meta:
             return json.dumps(meta)
         return ""
+
+    @admin_action(short_description="Download report")
+    def download_report(self, request, queryset: QuerySet[SyncRun]):
+        if queryset.count() != 1:
+            self.message_user(request, message="Can only run report on a single SyncRun at a time")
+        else:
+            sync_run: SyncRun = queryset.first()
+            sync_runner = sync_runner_for_destination(sync_run.destination)
+            return sync_runner.report_on(sync_run)
 
 
 @admin.register(ClassificationModificationSyncRecord)

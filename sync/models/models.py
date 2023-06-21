@@ -77,6 +77,8 @@ class SyncRun(TimeStampedModel):
     """
     destination = models.ForeignKey(SyncDestination, on_delete=CASCADE)
     status = models.CharField(max_length=1, choices=SyncStatus.choices, null=False)
+    full_sync = models.BooleanField(null=True, blank=True, default=None)
+    max_rows = models.IntegerField(null=True, blank=True, default=None)
     meta = models.JSONField(null=True, blank=True, default=None)
 
     def __str__(self):
