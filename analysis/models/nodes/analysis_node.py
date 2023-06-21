@@ -1186,10 +1186,21 @@ class NodeVCFFilter(models.Model):
     vcf_filter = models.ForeignKey(VCFFilter, on_delete=CASCADE, null=True)  # null = 'PASS'
 
     @staticmethod
-    def filter_for_node(node, vcf):
-        """ returns vfc but also where vcf_filter is NULL (for pass) """
-        q_vcf_filter = Q(vcf_filter__isnull=True) | Q(vcf_filter__vcf=vcf)
-        return NodeVCFFilter.objects.filter(q_vcf_filter, node=node)
+    def get_filter_ids(node):
+        """ Returns PASS as None """
+        all_nvf_qs = NodeVCFFilter.objects.filter(node=node)
+        return set(all_nvf_qs.values_list("vcf_filter__filter_id", flat=True))
+
+    @staticmethod
+    def get_filter_codes(node, vcf):
+        filter_ids = NodeVCFFilter.get_filter_ids(node)
+
+        # Translate them into codes from our VCF
+        vf_qs = VCFFilter.objects.filter(vcf=vcf, filter_id__in=filter_ids).values("filter_code")
+        filter_codes = set(vf_qs.values_list("filter_code", flat=True).distinct())
+        if None in filter_ids:  # PASS
+            filter_codes.add(None)
+        return filter_codes
 
 
 class NodeAlleleFrequencyFilter(models.Model):

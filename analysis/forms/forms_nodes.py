@@ -83,7 +83,7 @@ class VCFLocusFiltersMixin(forms.Form):
     def save_vcf_locus_filters(self, node):
         if vcf := node._get_vcf():
             vcf_locus_filters = self.cleaned_data["vcf_locus_filters"]
-            NodeVCFFilter.filter_for_node(node, vcf).delete()
+            NodeVCFFilter.objects.filter(node=node).delete()
 
             if vcf_locus_filters:
                 for filter_id in vcf_locus_filters:
