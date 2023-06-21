@@ -15,33 +15,59 @@
     {%  if analysis_template_versions.exists %}
         <h4>Historical versions:</h4>
 
-        <table class="table">
-            <tr>
-                <th>Version</th>
-                <th>Created</th>
-                <th>Active</th>
-                <th>Autocomplete</th>
-                <th>Links</th>
-                <th>Requires Somatic</th>
-                <th>Requires Sample Gene List</th>
-            </tr>
-        {% for atv in analysis_template_versions %}
-            <tr>
-                <td>
-                    <a href="{% url 'analysis' atv.analysis_snapshot.pk %}">v.{{ atv.version }}</a>
-                </td>
-                <td>
-                    {{ atv.created | localtime }}
-                </td>
-                <td>{{ atv.active }}</td>
-                <td>{{ atv.appears_in_autocomplete }}</td>
-                <td>{{ atv.appears_in_links }}</td>
-                <td>{{ atv.requires_sample_somatic }}</td>
-                <td>{{ atv.requires_sample_gene_list }}</td>
-            </tr>
-        {% endfor %}
+        <form id="active-template-version-form" method="post" action="{{ request.path }}" novalidate>
+            {% csrf_token %}
+            {{ atv_form.non_field_errors }}
+            {% for hidden_field in atv_form.hidden_fields %}
+                {{ hidden_field.errors }}
+                {{ hidden_field }}
+            {% endfor %}
 
-        </table>
+
+            <table class="table">
+                <tr>
+                    <th>Version</th>
+                    <th>Created</th>
+                    <th>Active</th>
+                    <th>Name template</th>
+                    <th>Autocomplete</th>
+                    <th>Links</th>
+                    <th>Requires Somatic</th>
+                    <th>Requires Sample Gene List</th>
+                </tr>
+            {% for atv in analysis_template_versions %}
+                <tr>
+                    <td>
+                        <a href="{% url 'analysis' atv.analysis_snapshot.pk %}">v.{{ atv.version }}</a>
+                    </td>
+                    <td>
+                        {{ atv.created | localtime }}
+                    </td>
+                    <td>{{ atv.active }}</td>
+                {% if atv.active and atv_form and has_write_permission %}
+                        <td>{{ atv_form.analysis_name_template }}{{ atv_form.analysis_name_template.errors }}</td>
+                        <td>{{ atv_form.appears_in_autocomplete }}{{ atv_form.appears_in_autocomplete.errors }}</td>
+                        <td>{{ atv_form.appears_in_links }}{{ atv_form.appears_in_links.errors }}</td>
+                        <td>{{ atv_form.requires_sample_somatic }}{{ atv_form.requires_sample_somatic.errors }}</td>
+                        <td>{{ atv_form.requires_sample_gene_list }}{{ atv_form.requires_sample_gene_list.errors }}</td>
+                        <td>
+                            {{ atv_form.errors }}
+                            <button type="submit" class="btn btn-primary">save</button>
+                        </td>
+                {% else %}
+                    <td>{{ atv.analysis_name_template }}</td>
+                    <td>{{ atv.appears_in_autocomplete }}</td>
+                    <td>{{ atv.appears_in_links }}</td>
+                    <td>{{ atv.requires_sample_somatic }}</td>
+                    <td>{{ atv.requires_sample_gene_list }}</td>
+                    <td><!-- Empty to make space for button on atv_form --></td>
+                {% endif %}
+                </tr>
+            {% endfor %}
+
+            </table>
+            {{ atv_form.media }}
+        </form>
     {% else %}
        This analysis has no saved template versions.
     {% endif %}

@@ -8,7 +8,7 @@ from dal import forward
 from django import forms
 from django.forms.widgets import TextInput
 
-from analysis.models import Analysis, NodeGraphType, FilterNodeItem, AnalysisTemplate
+from analysis.models import Analysis, NodeGraphType, FilterNodeItem, AnalysisTemplate, AnalysisTemplateVersion
 from analysis.models.enums import SNPMatrix, AnalysisTemplateType, TrioSample
 from analysis.models.models_karyomapping import KaryomappingGene
 from analysis.models.nodes.node_types import get_nodes_by_classification
@@ -141,6 +141,23 @@ class CreateAnalysisTemplateForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
+
+class AnalysisTemplateVersionForm(forms.ModelForm):
+    class Meta:
+        model = AnalysisTemplateVersion
+        fields = ("analysis_name_template",
+                  "appears_in_autocomplete",
+                  "appears_in_links",
+                  "requires_sample_somatic",
+                  "requires_sample_gene_list")
+        widgets = {'analysis_name_template': TextInput()}
+
+    def __init__(self, *args, **kwargs):
+        super(AnalysisTemplateVersionForm, self).__init__(*args, **kwargs)
+        for boolean_field in ["appears_in_autocomplete", "appears_in_links",
+                              "requires_sample_somatic", "requires_sample_gene_list"]:
+            self.fields[boolean_field].required = False
 
 
 class AnalysisForm(forms.ModelForm, ROFormMixin):
