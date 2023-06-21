@@ -2,6 +2,7 @@ import operator
 import uuid
 from collections import defaultdict
 from functools import reduce
+from typing import Dict
 
 from django.db.models import Q, Model
 from django.template import Library
@@ -19,7 +20,7 @@ register = Library()
 
 
 def get_all_analyses_for_user(user, samples, cohorts=None, trios=None, pedigrees=None):
-    analysis_details = defaultdict(list)
+    analysis_details: Dict[Analysis, list] = defaultdict(list)
     if pedigrees:
         for analysis, details in get_related_analysis_details_for_pedigree(user, pedigrees):
             analysis_details[analysis].append(f'Pedigree: {details}')
