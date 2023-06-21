@@ -585,8 +585,6 @@ function unitAsPercentFormatter(unitValue) {
 
 
 function formatMasterMindMMID3(value) {
-    console.log("formatMasterMindMMID3: " + value);
-
     function buildMasterMindLink(mmid3) {
         return "<a title='View MasterMind in new window' target='_blank' href='https://mastermind.genomenon.com/detail?mutation=" + mmid3 + "'>" + mmid3 + "</a>"
     }
