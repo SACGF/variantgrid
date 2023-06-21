@@ -1,6 +1,7 @@
 {% extends menu_analysis_base %}
 {% load static %}
 {% load tz %}
+{% load ui_help %}
 {% block title %}Analysis Template: {{ analysis_template  }}{% endblock title %}
 
 {% block submenu_page_content %}
@@ -10,6 +11,8 @@
     <div>
         <a href="{% url 'analysis' analysis_template.analysis.pk %}">Edit Analysis Template</a>
     </div>
+
+    {% page_help page_id='analysis/analysis_templates_list_help' title='Analysis Template Versions' %}
 
     <p>
     {%  if analysis_template_versions.exists %}
