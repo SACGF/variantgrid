@@ -583,9 +583,9 @@ def vcf_locus_filters(request, node_id, vcf_id):
     if vcf:
         vcf_filter_descriptions = {"PASS": "All filters passed"}
         set_filters = {}
-        for npf in NodeVCFFilter.filter_for_node(node, vcf):
-            if npf.vcf_filter:
-                filter_id = npf.vcf_filter.filter_id
+        for raw_filter_id in NodeVCFFilter.get_filter_ids(node):
+            if raw_filter_id:
+                filter_id = raw_filter_id
             else:
                 filter_id = "PASS"
             set_filters[filter_id] = True

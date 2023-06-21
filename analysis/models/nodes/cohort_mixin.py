@@ -151,8 +151,7 @@ class CohortMixin:
             vcf = self._get_vcf()
             alias = self.cohort_genotype_collection.cohortgenotype_alias
 
-            node_vcf_filters_qs = NodeVCFFilter.filter_for_node(self, vcf)
-            filter_codes = set(node_vcf_filters_qs.values_list("vcf_filter__filter_code", flat=True).distinct())
+            filter_codes = NodeVCFFilter.get_filter_codes(self, vcf)
             if filter_codes:
                 q_or = []
                 if None in filter_codes:  # Pass
@@ -180,9 +179,7 @@ class CohortMixin:
 
         vcf = self._get_vcf()
         if vcf:
-            node_vcf_filters_qs = NodeVCFFilter.filter_for_node(self, vcf)
-            filter_codes = list(node_vcf_filters_qs.values_list("vcf_filter__filter_code", flat=True).distinct())
-            if filter_codes:
+            if filter_codes := NodeVCFFilter.get_filter_codes(self, vcf):
                 if filter_codes == [None]:  # PASS only
                     return 1
                 return 2
