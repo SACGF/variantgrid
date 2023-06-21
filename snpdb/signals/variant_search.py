@@ -26,7 +26,7 @@ from snpdb.search import search_receiver, SearchInputInstance, SearchExample, Se
     SearchMessage
 from upload.models import ModifiedImportedVariant
 
-COSMIC_PATTERN = re.compile(r"^(COS[VM])[0-9]+$", re.IGNORECASE)
+COSMIC_PATTERN = re.compile(r"^(COS[VM])[0-9]{3,}$", re.IGNORECASE)
 
 
 class VariantExtra:
@@ -107,9 +107,9 @@ def variant_cosmic_search(search_input: SearchInputInstance):
     for genome_build in search_input.genome_builds:
         variant_qs = search_input.get_visible_variants(genome_build)
         if search_input.match.group(1).upper() == "COSV":
-            yield variant_qs.filter(variantannotation__cosmic_id=search_string).first()
+            yield variant_qs.filter(variantannotation__cosmic_id__regex=f"(?:^|&){search_string}(?:$|&)")
         elif search_input.match.group(1).upper() == "COSM":
-            yield variant_qs.filter(variantannotation__cosmic_legacy_id=search_string).first()
+            yield variant_qs.filter(variantannotation__cosmic_legacy_id__regex=f"(?:^|&){search_string}(?:$|&)")
 
 
 @search_receiver(
