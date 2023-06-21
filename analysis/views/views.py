@@ -28,7 +28,7 @@ from analysis import forms
 from analysis.analysis_templates import populate_analysis_from_template_run
 from analysis.exceptions import NonFatalNodeError, NodeOutOfDateException
 from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, VCFLocusFilterForm, InputSamplesForm, \
-    AnalysisChoiceForm, AnalysisTemplateTypeChoiceForm
+    AnalysisChoiceForm, AnalysisTemplateTypeChoiceForm, AnalysisTemplateVersionForm
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, AnalysisVariable, AnalysisTemplate, \
@@ -246,8 +246,26 @@ def stand_alone_analysis_editor_and_grid(request, analysis_id):
 
 def analysis_templates_list(request, pk):
     analysis_template = AnalysisTemplate.get_for_user(request.user, pk)
-    context = {"analysis_template": analysis_template,
-               "analysis_template_versions": analysis_template.analysistemplateversion_set.order_by("-pk")}
+    has_write_permission = analysis_template.can_write(request.user)
+
+    atv_form = None
+    if atv := analysis_template.active:
+        atv_form = AnalysisTemplateVersionForm(request.POST or None, instance=atv)
+        if request.method == 'POST':
+            if not has_write_permission:
+                raise PermissionDenied(f"Don't have permission to modify {analysis_template}")
+
+            valid = atv_form.is_valid()
+            if valid:
+                atv_form.save()
+            add_save_message(request, valid, "Active Template Version")
+
+    context = {
+        "analysis_template": analysis_template,
+        "analysis_template_versions": analysis_template.analysistemplateversion_set.order_by("-pk"),
+        "atv_form": atv_form,
+        "has_write_permission": has_write_permission,
+    }
     return render(request, 'analysis/analysis_templates_list.html', context)
 
 
