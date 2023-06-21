@@ -526,6 +526,21 @@ function formatClinGenAlleleId(cellValue) {
 }
 
 
+function splitAndLink(rawValue, split, buildLinkFunc) {
+    let formattedValue = '';
+    if (rawValue) {
+        const raw_value_list = rawValue.split(split);
+        const links = [];
+        for(let i=0 ; i<raw_value_list.length ; ++i) {
+            let value = raw_value_list[i];
+            links.push(buildLinkFunc(value));
+        }
+        formattedValue = links.join();
+    }
+    return formattedValue;
+}
+
+
 function unitAsPercentFormatter(unitValue) {
     let percentValue = "";
     // Allele Frequency missing data passed as "." to match VCF
@@ -539,8 +554,6 @@ function unitAsPercentFormatter(unitValue) {
 
 
 function formatMasterMindMMID3(value) {
-    console.log("formatMasterMindMMID3: " + value);
-
     function buildMasterMindLink(mmid3) {
         return "<a title='View MasterMind in new window' target='_blank' href='https://mastermind.genomenon.com/detail?mutation=" + mmid3 + "'>" + mmid3 + "</a>"
     }
