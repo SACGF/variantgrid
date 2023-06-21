@@ -8,6 +8,7 @@ from django.contrib import admin
 
 class ReviewQuestionInline(TabularInline):
     model = ReviewQuestion
+    ordering = ("order", )
     # fields = ("id", "flag_type", "user", "resolution", "data")
     show_change_link = True
 
