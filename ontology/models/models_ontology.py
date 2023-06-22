@@ -300,7 +300,7 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
         elif not self.name:
             name = "No Name Provided"
         else:
-            name = name
+            name = self.name
         return self.preview_with(
             title=name,
             summary=self.definition
