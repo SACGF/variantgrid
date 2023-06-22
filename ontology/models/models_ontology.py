@@ -294,8 +294,15 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
 
     @property
     def preview(self) -> PreviewData:
+        name: str
+        if self.is_stub:
+            name = "Term Not Found"
+        elif not self.name:
+            name = "No Name Provided"
+        else:
+            name = name
         return self.preview_with(
-            title="Term Not Found" if self.is_stub else self.name,
+            title=name,
             summary=self.definition
         )
 
