@@ -228,29 +228,29 @@ def load_mondo(filename: str, force: bool):
                         extra={"subtype": "genus"}
                     )
 
-                for restriction in axiom.get("restrictions"):
+                if restrictions := axiom.get("restrictions"):
+                    for restriction in restrictions:
+                        filler = TermId(restriction.get("fillerId"))
+                        if filler.type != "HGNC":
+                            continue
 
-                    filler = TermId(restriction.get("fillerId"))
-                    if filler.type != "HGNC":
-                        continue
+                        relation = GENE_RELATIONS.get(restriction.get("propertyId"))
+                        if relation is None:
+                            print("Unexpected relationship " + restriction.get("propertyId"))
+                            continue
 
-                    relation = GENE_RELATIONS.get(restriction.get("propertyId"))
-                    if relation is None:
-                        print("Unexpected relationship " + restriction.get("propertyId"))
-                        continue
-
-                    ontology_builder.add_ontology_relation(
-                        source_term_id=defined_class_id.id,
-                        dest_term_id=filler.id,
-                        extra={"via": ", ".join([m.id for m in mondo_genus])},
-                        relation=relation
-                    )
-                    for term in mondo_genus:
                         ontology_builder.add_ontology_relation(
-                            source_term_id=term.id,
+                            source_term_id=defined_class_id.id,
                             dest_term_id=filler.id,
+                            extra={"via": ", ".join([m.id for m in mondo_genus])},
                             relation=relation
                         )
+                        for term in mondo_genus:
+                            ontology_builder.add_ontology_relation(
+                                source_term_id=term.id,
+                                dest_term_id=filler.id,
+                                relation=relation
+                            )
 
         print("** Reviewing edges")
 
