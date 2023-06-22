@@ -316,12 +316,18 @@ def load_hpo(filename: str, force: bool):
         if not term_id.startswith(OntologyService.HPO):
             continue
 
+        status = None
+        if not term.name:
+            # HP file seems to just wipe names if a term has been moved
+            status = OntologyTermStatus.DEPRECATED
+
         ontology_builder.add_term(
             term_id=term_id,
             name=term.name,
             extra=extra,
             definition=term.definition,
             primary_source=True,
+            status=status,
             aliases=list(aliases)
         )
 
