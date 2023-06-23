@@ -190,7 +190,7 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
         agg_kwargs[f"{classification}_count"] = Count(count_path, filter=classification_q, distinct=True)
         if clinical_significance:
             for cs in clinical_significance_list:
-                q_clinical_significance = Q(**{f"{classification}__{clinical_significance_path}": cs})
+                q_clinical_significance = Q(**{f"{count_path}__{clinical_significance_path}": cs})
                 if classification_q:
                     q_clinical_significance &= classification_q
                 agg_kwargs[f"{classification}_{cs}"] = Count(count_path, filter=q_clinical_significance, distinct=True)
