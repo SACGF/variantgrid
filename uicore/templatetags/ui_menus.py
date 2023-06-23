@@ -76,7 +76,9 @@ def menu_item(
             return {'invalid': True}
         url = reverse(url_name, args=args)
 
-    current_url_name: str = context.request.resolver_match.url_name
+    current_url_name: Optional[str] = None
+    if rm := context.request.resolver_match:
+        current_url_name = rm.url_name
     is_active = url_name == current_url_name
     if not is_active and other_urls:
         other_url_parts = other_urls.split(',')
