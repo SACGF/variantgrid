@@ -28,12 +28,15 @@ def settings_context_processor(request):
         'site_name': settings.SITE_NAME,
         'timezone': settings.TIME_ZONE,
         'top_right_search_form': SearchForm(search_allow_blank=True),
-        'url_name': request.resolver_match.url_name,
         'url_name_visible': get_visible_url_names(),
         'use_oidc': settings.USE_OIDC,  # whether user is managed by django or externally by open connect
         'user_feedback_enabled': settings.ROLLBAR.get('enabled', False) and settings.USER_FEEDBACK_ENABLED,
         "contact_us_enabled": settings.CONTACT_US_ENABLED
     }
+
+    # This can fail on bad urls
+    if rm := request.resolver_match:
+        context['url_name'] = rm.url_name
 
     if settings.DEBUG:
         context['debug'] = True
