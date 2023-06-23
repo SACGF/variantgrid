@@ -198,10 +198,10 @@ class ClassificationApiExportView(APIView):
 
 @not_minified_response
 def template_report(request: HttpRequest, classification_id) -> HttpResponseBase:
-    c = Classification.objects.get(pk=classification_id)
-    c.check_can_view(request.user)
-
-    return ClassificationReport(c.last_published_version, user=request.user).serve()
+    record_ref = ClassificationRef.init_from_str(request.user, classification_id)
+    record_ref.check_exists()
+    record_ref.check_security()
+    return ClassificationReport(record_ref.record.last_published_version, user=request.user).serve()
 
 
 def redcap_data_dictionary(request: HttpRequest) -> HttpResponseBase:
