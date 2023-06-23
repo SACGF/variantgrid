@@ -712,6 +712,9 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
             "min_dp": WIDGET_INTEGER_MIN_0,
             "min_gq": WIDGET_INTEGER_MIN_0,
             "max_pl": WIDGET_INTEGER_MIN_0,
+            "sample_gene_list": ModelSelect2Multiple(url='category_gene_list_autocomplete',
+                                                     attrs={'data-placeholder': 'Sample Gene List...'},
+                                                     forward=(None, 'category'),),  # Set in __init__
         }
 
     def __init__(self, *args, has_genotype=True, lock_input_sources=False, **kwargs):
@@ -727,6 +730,13 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
         for f in remove_fields:
             if f in self.fields:
                 del self.fields[f]
+
+        # Set forward
+        sample_gl = GeneListCategory.get_or_create_category(GeneListCategory.SAMPLE_GENE_LIST, hidden=True)
+        self.fields["sample_gene_list"].widget.forward = [
+            forward.Const(sample_gl.pk, "category")
+        ]
+
 
 
 class SelectedInParentNodeForm(BaseNodeForm):
