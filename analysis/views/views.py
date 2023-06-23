@@ -65,7 +65,7 @@ def analysis_list(request):
     if request.method == "POST":
         if form.is_valid():
             analysis = form.save()
-            return redirect(f"/analysis/{analysis.id}")
+            return redirect(analysis)
         add_save_message(request, False, "Analysis")
 
     context = {"create_analysis_form": form,
