@@ -59,6 +59,8 @@ CSRF_TRUSTED_ORIGINS = [f"https://{WEB_HOSTNAME}"]
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTOCOL', 'https')
 
+HGVS_DEFAULT_METHOD = "biocommons_hgvs"
+
 PEDIGREE_MADELINE2_COMMAND = "madeline2"
 
 # Lock down menu - hide some VariantGrid urls / menu
