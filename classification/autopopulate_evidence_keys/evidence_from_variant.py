@@ -1,4 +1,5 @@
 import itertools
+from urllib.error import HTTPError
 
 from django.conf import settings
 from django.contrib.sites.models import Site
@@ -379,9 +380,15 @@ def get_evidence_fields_from_preferred_transcript(
     if gnomad_oe_lof_summary:
         data[SpecialEKeys.GNOMAD_OE_LOF] = gnomad_oe_lof_summary
 
-    gs_count = GeneSymbolPubMedCount.get_for_gene_symbol(gene_symbol_id)
-    data[SpecialEKeys.PUBMED_GENE_SEARCH_COUNT] = {"value": gs_count.count,
-                                                   "note": f"Retrieved {gs_count.modified.date()}"}
+    try:
+        gs_count = GeneSymbolPubMedCount.get_for_gene_symbol(gene_symbol_id)
+        pubmed_data = {"value": gs_count.count,
+                       "note": f"Retrieved {gs_count.modified.date()}"}
+    except HTTPError:
+        pubmed_data = {
+            "value": "<NOT AVAILABLE> - network error connecting to PubMed. Please fill this in manually."
+        }
+    data[SpecialEKeys.PUBMED_GENE_SEARCH_COUNT] = pubmed_data
     return data
 
 
