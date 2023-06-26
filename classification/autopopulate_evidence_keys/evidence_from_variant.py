@@ -1,5 +1,6 @@
 import itertools
 from typing import List, Tuple, Iterable, Optional
+from urllib.error import HTTPError
 
 from django.conf import settings
 from django.contrib.sites.models import Site
@@ -392,9 +393,15 @@ def get_evidence_fields_from_preferred_transcript(
     if gnomad_oe_lof_summary:
         data[SpecialEKeys.GNOMAD_OE_LOF] = gnomad_oe_lof_summary
 
-    gs_count = GeneSymbolPubMedCount.get_for_gene_symbol(gene_symbol_id)
-    data[SpecialEKeys.PUBMED_GENE_SEARCH_COUNT] = {"value": gs_count.count,
-                                                   "note": f"Retrieved {gs_count.modified.date()}"}
+    try:
+        gs_count = GeneSymbolPubMedCount.get_for_gene_symbol(gene_symbol_id)
+        pubmed_data = {"value": gs_count.count,
+                       "note": f"Retrieved {gs_count.modified.date()}"}
+    except HTTPError:
+        pubmed_data = {
+            "value": "<NOT AVAILABLE> - network error connecting to PubMed. Please fill this in manually."
+        }
+    data[SpecialEKeys.PUBMED_GENE_SEARCH_COUNT] = pubmed_data
     return data
 
 
@@ -497,6 +504,7 @@ def get_evidence_fields_from_variant_query(
     # If gnomad_af is not populated, fall back on gnomAD2 liftover AF
     if SpecialEKeys.GNOMAD_AF not in data:
         if g2_af := values.get(gnomad2_liftover_af):
+            note = "Native gnomAD not available. Fell back on using gnomAD2 liftover"
             set_evidence(data, SpecialEKeys.GNOMAD_AF, g2_af, False, ekey_formatters, note=note)
     return data
 
