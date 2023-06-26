@@ -417,6 +417,36 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
             analysis_name_template = self.active.analysis_name_template
         return analysis_name_template
 
+    @staticmethod
+    def _get_unique_name(name):
+        """ AnalysisTemplate.name is unique, so we need to search to find them """
+        names_qs = AnalysisTemplate.objects.filter(name__contains=name)
+        potential_name_collisions = set(names_qs.values_list("name", flat=True))
+        unique_name = name
+        i = 2
+        while True:
+            if unique_name not in potential_name_collisions:
+                break
+            unique_name = f"{name} {i}"
+            i += 1
+        return unique_name
+
+    def clone(self, user: User = None):
+        analysis_copy = self.analysis.clone(user)
+        analysis_copy.template_type = AnalysisTemplateType.TEMPLATE
+        analysis_copy.save()
+
+        now = timezone.now()
+        template_copy = self
+        template_copy.pk = None  # to save as new
+        template_copy.name = AnalysisTemplate._get_unique_name(f"Copy of {self.name}")
+        template_copy.user = user
+        template_copy.analysis = analysis_copy
+        template_copy.created = now
+        template_copy.modified = now
+        template_copy.save()
+        return template_copy
+
     def __str__(self):
         s = self.name
         if self.deleted:

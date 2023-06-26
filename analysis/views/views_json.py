@@ -472,3 +472,12 @@ def analysis_template_save(request, pk):
                                            active=True,
                                            requires_sample_gene_list=requires_sample_gene_list)
     return JsonResponse({"version": version})
+
+
+@require_POST
+def analysis_template_clone(request, pk):
+    analysis_template = AnalysisTemplate.get_for_user(request.user, pk, write=False)
+    new_analysis_template = analysis_template.clone(request.user)
+    reload_analysis_nodes(new_analysis_template.analysis.pk)
+    return JsonResponse({"analysis_template_id": new_analysis_template.pk})
+

@@ -9,6 +9,32 @@
 
 {% block submenu_page_content %}
 <script>
+    function grid_init_func(grid, pagerId) {
+        function copy_analysis_template(a) {
+            let analysisTemplateId = grid.getGridParam('selrow');
+            if (analysisTemplateId) {
+                $.ajax({
+                    type: "POST",
+                    url: Urls.analysis_template_clone(analysisTemplateId),
+                    success: function(data) {
+                        grid.jqGrid('setGridParam', {page: 1, sortname: 'id', sortorder: "desc"}).trigger('reloadGrid');
+                    },
+                });
+            }
+        }
+
+        grid.jqGrid(
+            'navButtonAdd', pagerId, {
+            caption : "Clone",
+            buttonicon : "ui-icon-copy",
+            onClickButton : copy_analysis_template,
+            position : "last",
+            title : "Clone Analysis Template",
+            cursor : "pointer"
+        });
+    }
+
+
     $(document).ready(() => {
         jQuery.extend($.fn.fmatter , {
             analysisLink : function(cellvalue, options, rowObject) {
@@ -46,7 +72,7 @@
 </div>
 <div class="container-table">
     {% user_data_grid_filter 'analysis_templates' 'Analysis Templates' %}
-    {% jqgrid 'analysis_templates_grid' 'analysis_templates' search=False delete=True %}
+    {% jqgrid 'analysis_templates_grid' 'analysis_templates' search=False delete=True  download_grid_json_as_csv=True init_func='grid_init_func' %}
 </div>
 
 {% endblock submenu_page_content %}

@@ -1,6 +1,7 @@
 import itertools
 import operator
 from collections import defaultdict
+from typing import Dict
 
 from crispy_forms.bootstrap import FieldWithButtons, StrictButton
 from crispy_forms.layout import Layout, Field
@@ -8,7 +9,8 @@ from dal import forward
 from django import forms
 from django.forms.widgets import TextInput
 
-from analysis.models import Analysis, NodeGraphType, FilterNodeItem, AnalysisTemplate, AnalysisTemplateVersion
+from analysis.models import Analysis, NodeGraphType, FilterNodeItem, AnalysisTemplate, AnalysisTemplateVersion, \
+    AnalysisNode
 from analysis.models.enums import SNPMatrix, AnalysisTemplateType, TrioSample
 from analysis.models.models_karyomapping import KaryomappingGene
 from analysis.models.nodes.node_types import get_nodes_by_classification
@@ -179,7 +181,7 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
         user = kwargs.pop("user")
         super().__init__(*args, **kwargs)
 
-        if not user.is_superuser:
+        if self.instance.template_type != AnalysisTemplateType.TEMPLATE and not user.is_superuser:
             for f in AnalysisForm.SUPER_USER_ONLY_FIELDS:
                 if f in self.fields:
                     del self.fields[f]
@@ -196,7 +198,7 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
         fni_qs = FilterNodeItem.objects.filter(filter_node__analysis=self.instance)
         invalid_items = fni_qs.exclude(field__in=valid_columns)
         if invalid_items.exists():
-            node_items = defaultdict(set)
+            node_items: Dict[AnalysisNode, set] = defaultdict(set)
             for fni in invalid_items.order_by("filter_node"):
                 node_items[fni.filter_node].add(fni.column.label)
 

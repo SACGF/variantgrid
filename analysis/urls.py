@@ -17,6 +17,8 @@ urlpatterns = [
     # Templates
     perm_path('analysis_template/<pk>/save/', views_json.analysis_template_save, name='analysis_template_save'),
     perm_path('analysis_template/<pk>/list/', views.analysis_templates_list, name='analysis_templates_list'),
+    perm_path('analysis_template/<pk>/clone/', views_json.analysis_template_clone, name='analysis_template_clone'),
+
 
     # For node views below - a Node contains the analysis ID - so we don't need to pass analysis_id, but do so
     # to make it easier to debug errors if nodes were deleted
