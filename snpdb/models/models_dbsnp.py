@@ -8,7 +8,7 @@ from requests import request
 
 from snpdb.models import GenomeBuild
 
-DBSNP_PATTERN = re.compile(r"^rs(\d+)$")
+DBSNP_PATTERN = re.compile(r"^rs(\d+)$", re.IGNORECASE)
 
 
 class DbSNP(TimeStampedModel):
