@@ -109,7 +109,7 @@ class EvidenceMixin:
             raise ValueError("Classification does not have a value for genome build")
 
     @cached_property
-    def db_refs(self) -> List[Dict]:
+    def db_refs(self) -> List[VCDbRefDict]:
         all_db_refs = []
         for blob in self._evidence.values():
             db_refs = blob.get('db_refs')
