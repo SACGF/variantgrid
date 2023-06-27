@@ -11,7 +11,11 @@ from library.utils import DebugTimer
 
 @receiver(classification_post_publish_signal, sender=Classification)
 def turn_off_unsubmitted_edits(sender, classification, previously_published, newly_published, user, debug_timer: DebugTimer, **kwargs):  # pylint: disable=unused-argument
-    # somewhat redundant to Classification.insert() but if publish is called without an insert, the outstanding edits flag wont be closed
+    """
+    Removes outstanding edit flags if there aren't any left.
+    This is a bit messy as regular code inserts it, but a signal closes it.
+    (somewhat redundant to Classification.insert() but if publish is called without an insert, the outstanding edits flag wont be closed)
+    """
     classification.flag_collection_safe.ensure_resolution(
         flag_type=classification_flag_types.classification_outstanding_edits,
         resolution='closed'
@@ -19,8 +23,12 @@ def turn_off_unsubmitted_edits(sender, classification, previously_published, new
 
 
 @receiver(classification_post_publish_signal, sender=Classification)
-def published(sender, classification, previously_published, newly_published, user, debug_timer: DebugTimer, **kwargs):  # pylint: disable=unused-argument
+def clinical_significance_change_check(sender, classification, previously_published, newly_published, user, debug_timer: DebugTimer, **kwargs):  # pylint: disable=unused-argument
+    """
+    Raises a clinical significance change flag if the clinical significance has changed after publishing
+    """
 
+    # TODO move this into classification_hooks_share_flags
     if classification.share_level_enum.index > ShareLevel.INSTITUTION.index:
         classification.flag_collection_safe.close_open_flags_of_type(
             flag_type=classification_flag_types.unshared_flag

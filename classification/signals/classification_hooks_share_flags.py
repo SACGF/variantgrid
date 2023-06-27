@@ -8,6 +8,11 @@ from classification.models.classification import \
 from classification.models.flag_types import classification_flag_types
 
 
+"""
+Responsible for injecting or removing the unshared flag based on share level
+"""
+
+
 @receiver(classification_revalidate_signal, sender=Classification)
 def revalidate(sender, classification: Classification, **kwargs):  # pylint: disable=unused-argument
     if settings.UNSHARED_FLAG_ENABLED and classification.share_level_enum.index <= ShareLevel.INSTITUTION.index:

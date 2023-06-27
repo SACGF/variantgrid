@@ -10,7 +10,12 @@ from classification.models.classification_utils import ValidationMerger
 
 
 @receiver(classification_validation_signal, sender=Classification)
-def validate_variant_fields(sender, **kwargs) -> ValidationMerger:  # pylint: disable=unused-argument
+def assign_classification_user(sender, **kwargs) -> ValidationMerger:  # pylint: disable=unused-argument
+    """
+    If the owner evidence key has been set, see if that corresponds to a user in the system, and re-assign the user value.
+    Note that the user field doesn't get used much anymore
+    """
+
     """ Checks the owner is valid """
     patch_meta: PatchMeta = kwargs.get('patch_meta')
     record: Classification = kwargs.get('classification')

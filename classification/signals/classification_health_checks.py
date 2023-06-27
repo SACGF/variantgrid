@@ -11,6 +11,11 @@ from library.health_check import health_check_signal, \
     HealthCheckRequest, HealthCheckTotalAmount, HealthCheckRecentActivity, HealthCheckStat
 
 
+"""
+Reports information about classifications to the Slack health report
+"""
+
+
 @receiver(signal=health_check_signal)
 def allele_info_health_check(sender, health_request: HealthCheckRequest, **kwargs):
     output: List[HealthCheckStat] = []

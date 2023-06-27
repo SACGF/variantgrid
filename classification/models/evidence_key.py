@@ -18,19 +18,37 @@ from snpdb.models import VariantGridColumn, Lab
 from uicore.json.json_utils import strip_json
 
 CLASSIFICATION_VALUE_TOLERANCE = 0.00000001
+"""
+The amount a float can change, and for VG to not consider it a change (this is to stop churning changes through
+caused by floating point rounding issues)
+"""
+
 
 class EvidenceKeyOption(TypedDict):
+
     key: str
+    """
+    The key for the option (as what will be sorted in the DB)
+    """
+
     label: Optional[str]
+    """
+    The label to display for the option
+    """
+
     default: Optional[bool]
+    """
+    Is this the default option - only applies to (ACMG) criteria (e.g. BA1's default is BA, PM2 is PM)
+    """
+
     override: Optional[bool]
+    """
+    Is this considered an override strength - only applies to criteria (ACMG) criteria - not default and not "not met"
+    """
+
     bucket: Optional[int]
     """
-    :cvar key: The key for the option (as what will be sorted in the DB)
-    :cvar label: The label to display for the option
-    :cvar default: Is this the default option - only applies to (ACMG) criteria (e.g. BA1's default is BA, PM2 is PM)
-    :cavr override: Is this considered an override strength - only applies to criteria (ACMG) criteria - not default and not "not met"
-    :cvar bucket: Only used for clinical_significance, what discordant bucket does each value fall into
+    Only used for clinical_significance, what discordant bucket does each value fall into
     """
 
 

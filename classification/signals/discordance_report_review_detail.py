@@ -38,6 +38,10 @@ class PendingChange:
 
 @receiver(review_detail_signal, sender=DiscordanceReport)
 def discordance_report_changes_summary(sender, instance: Review, **kwargs):
+    """
+    Convert the JSON from a discordance review to english text to display
+    """
+
     if data := instance.post_review_data:
         if changes := data.get("changes"):
             rows = []

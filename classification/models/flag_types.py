@@ -5,6 +5,10 @@ from flags.models.models import FlagType, FlagTypeContext
 
 class ClassificationFlagTypes:
 
+    """
+    All flag types for classifications
+    """
+
     @cached_property
     def classification_flag_context(self) -> FlagTypeContext:
         return FlagTypeContext.objects.get(pk='classification')
@@ -37,9 +41,6 @@ class ClassificationFlagTypes:
     def classification_withdrawn(self) -> FlagType:
         return FlagType.objects.get(pk="classification_withdrawn")
 
-    # the below are all clinical context flags
-    # should probably be put in a different class
-
     @cached_property
     def internal_review(self) -> FlagType:
         return FlagType.objects.get(pk='classification_internal_review')
@@ -47,10 +48,6 @@ class ClassificationFlagTypes:
     @cached_property
     def discordant(self) -> FlagType:
         return FlagType.objects.get(pk='classification_discordant')
-
-    @cached_property
-    def clinical_context_discordance(self) -> FlagType:
-        return FlagType.objects.get(pk='clinical_context_discordance')
 
     @cached_property
     def classification_not_public(self) -> FlagType:
@@ -61,6 +58,15 @@ class ClassificationFlagTypes:
         return FlagType.objects.get(pk='classification_pending_changes')
 
     CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY = "to_clin_sig"
+    """
+    This is the key that appears in the flag JSON data for a pending change, e.g. {"to_clin_sig": "VUS"}
+    """
+
+    # Technically a clinical_context_discordance FlagType
+
+    @cached_property
+    def clinical_context_discordance(self) -> FlagType:
+        return FlagType.objects.get(pk='clinical_context_discordance')
 
 
 classification_flag_types = ClassificationFlagTypes()

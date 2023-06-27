@@ -13,7 +13,7 @@ from zipfile import ZipFile
 class FileHandle(ABC):
     """
     Used as an abstract over file data - typical implementation is an S3 file, but one could be written for a regular
-    ol file in the local filesystem
+    ol' file in the local filesystem
     """
 
     @abstractmethod
@@ -40,6 +40,9 @@ class FileHandle(ABC):
         handle.close()
 
     def download_to(self, filename: Union[str, PathLike]):
+        """
+        Writes the file to the local file system
+        """
         with open(filename, 'wb') as output_file:
             with self.open() as input_file:
                 output_file.write(input_file.read())

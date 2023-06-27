@@ -9,7 +9,7 @@ from snpdb.models import Allele
 
 """
 Converts various events to variants_classification_changed_signal
-
+which is used to trigger snpdb.tasks.cohort_genotype_tasks.common_variant_classified_task
 """
 
 

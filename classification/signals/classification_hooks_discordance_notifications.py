@@ -13,6 +13,13 @@ from snpdb.lab_picker import LabPickerData
 from snpdb.utils import LabNotificationBuilder
 
 
+"""
+Responsible for emailing/slacking users when a discordance is detected.
+In future we'd like this to occur in bulk (as a single import can create or solve many discordances).
+Discordance is actually detected by classification_hooks_discordance_status.py
+"""
+
+
 @receiver(discordance_change_signal, sender=DiscordanceReport)
 def notify_discordance_change(discordance_report: DiscordanceReport, cause: str, **kwargs):
     if settings.DISCORDANCE_ENABLED:

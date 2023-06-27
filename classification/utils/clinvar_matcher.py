@@ -1,6 +1,6 @@
 """
 
-This file is to do with matching records that were manually submitting to ClinVar with records in VariantGrid.
+This file is to do with matching records that were manually submitting to ClinVar to records in VariantGrid.
 
 The typical scenario is a lab would have submitted records in Excel to ClinVar, and later signed up with Shariant
 and started submitting to ClinVar via Shariant. So now we want to avoid submitting those records as new records.
