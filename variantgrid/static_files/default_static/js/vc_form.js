@@ -970,9 +970,16 @@ const VCForm = (function() {
                     } else if (elem[0].nodeName === 'SPAN') {
                         elem.age('value', val);
                     } else {
-                        elem.val( val );
-                        if (elem.refresh) {
-                            elem.refesh();
+                        console.log(`Calling elem.val with name #${name}# val of #${val}#`);
+                        if (elem.val().trim() == val) {
+                            // don't remove whitespace that the user has entered
+                            // e.g. "One day I " would be changed to "One day I" before the user had a chance
+                            // to finish (if the auto-update kicked in).
+                        } else {
+                            elem.val(val);
+                            if (elem.refresh) {
+                                elem.refesh();
+                            }
                         }
                         // elem.keyup(); //keyup to trigger scientific notation
                     }

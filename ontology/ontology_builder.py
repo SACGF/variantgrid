@@ -239,7 +239,7 @@ class OntologyBuilder:
             term.aliases = aliases or []
 
         if not status:
-            if "obsolete" in name.lower():
+            if name and "obsolete" in name.lower():
                 status = OntologyTermStatus.DEPRECATED
             elif not primary_source and not trusted_source:
                 status = OntologyTermStatus.STUB

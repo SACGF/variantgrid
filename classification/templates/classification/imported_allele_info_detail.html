@@ -40,7 +40,7 @@
                     {% else %}
                     {{ 'I' | severity_icon:'Variant Matching Info' }}
                     {% endif %}
-                    <label>{{ tag.category_pretty }}</label> {{ tag.field_pretty }}
+                    <label>{{ tag.category_pretty }}</label>&nbsp;{{ tag.field_pretty }}
                 </div>
             {% endfor %}
         {% else %}<span class="no-value">None</span>{% endif %}
