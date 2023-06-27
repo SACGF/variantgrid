@@ -970,7 +970,6 @@ const VCForm = (function() {
                     } else if (elem[0].nodeName === 'SPAN') {
                         elem.age('value', val);
                     } else {
-                        console.log(`Calling elem.val with name #${name}# val of #${val}#`);
                         if (elem.val().trim() == val) {
                             // don't remove whitespace that the user has entered
                             // e.g. "One day I " would be changed to "One day I" before the user had a chance
