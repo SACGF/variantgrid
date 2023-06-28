@@ -218,7 +218,7 @@
                                value="{{ analysis.template.default_name_template }}" />
                     </div>
 
-                    <div>
+                    <div class="display-flex">
                         {% if analysis.template_type == 'S' %}
                         <label>Version:</label> <span>{{ analysis.analysistemplateversion.version }}</span>
                         {% else %}
@@ -226,9 +226,10 @@
                         <button id="analysis-template-save-version" class="btn btn-outline-primary">save version</button>
                         {% endif %}
 
-                        <span>
-                            <a href="{%  url 'analysis_templates_list' analysis.template.pk %}" target="_blank">View saved templates</a>
-                        </span>
+                        <a href="{%  url 'analysis_template_settings' analysis.template.pk %}" target="_blank">
+                            <span class="toolbar-button settings-icon"></span>
+                            Template settings
+                        </a>
                     </div>
                 </div>
             </div>

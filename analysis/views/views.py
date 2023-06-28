@@ -29,7 +29,7 @@ from analysis import forms
 from analysis.analysis_templates import populate_analysis_from_template_run
 from analysis.exceptions import NonFatalNodeError, NodeOutOfDateException
 from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, VCFLocusFilterForm, InputSamplesForm, \
-    AnalysisChoiceForm, AnalysisTemplateTypeChoiceForm, AnalysisTemplateVersionForm
+    AnalysisChoiceForm, AnalysisTemplateTypeChoiceForm, AnalysisTemplateVersionForm, AnalysisTemplateForm
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode, NodeGraphType, VariantTag, TagNode, AnalysisVariable, AnalysisTemplate, \
@@ -245,17 +245,32 @@ def stand_alone_analysis_editor_and_grid(request, analysis_id):
     return analysis_editor_and_grid(request, analysis_id, True)
 
 
-def analysis_templates_list(request, pk):
+def _get_form(request, formcls, prefix, **kwargs):
+    # From https://stackoverflow.com/a/33028994/295724
+    data = request.POST if prefix in request.POST else None
+    return formcls(data, prefix=prefix, **kwargs)
+
+
+def analysis_template_settings(request, pk):
     analysis_template = AnalysisTemplate.get_for_user(request.user, pk)
     has_write_permission = analysis_template.can_write(request.user)
 
+    at_form = _get_form(request, AnalysisTemplateForm, 'at-pre', instance=analysis_template)
     atv_form = None
     if atv := analysis_template.active:
-        atv_form = AnalysisTemplateVersionForm(request.POST or None, instance=atv)
-        if request.method == 'POST':
-            if not has_write_permission:
-                raise PermissionDenied(f"Don't have permission to modify {analysis_template}")
+        atv_form = _get_form(request, AnalysisTemplateVersionForm, 'atv-pre', instance=atv)
 
+    if request.method == 'POST':
+        if not has_write_permission:
+            raise PermissionDenied(f"Don't have permission to modify {analysis_template}")
+
+        if at_form and at_form.is_bound:
+            valid = at_form.is_valid()
+            if valid:
+                at_form.save()
+            add_save_message(request, valid, "Analysis Template")
+
+        if atv_form and atv_form.is_bound:
             valid = atv_form.is_valid()
             if valid:
                 atv_form.save()
@@ -264,10 +279,11 @@ def analysis_templates_list(request, pk):
     context = {
         "analysis_template": analysis_template,
         "analysis_template_versions": analysis_template.analysistemplateversion_set.order_by("-pk"),
+        "at_form": at_form,
         "atv_form": atv_form,
         "has_write_permission": has_write_permission,
     }
-    return render(request, 'analysis/analysis_templates_list.html', context)
+    return render(request, 'analysis/analysis_template_settings.html', context)
 
 
 def get_node_views_by_class():

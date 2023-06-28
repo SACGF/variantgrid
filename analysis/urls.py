@@ -16,7 +16,7 @@ urlpatterns = [
 
     # Templates
     perm_path('analysis_template/<pk>/save/', views_json.analysis_template_save, name='analysis_template_save'),
-    perm_path('analysis_template/<pk>/list/', views.analysis_templates_list, name='analysis_templates_list'),
+    perm_path('analysis_template/<pk>/settings/', views.analysis_template_settings, name='analysis_template_settings'),
     perm_path('analysis_template/<pk>/clone/', views_json.analysis_template_clone, name='analysis_template_clone'),
 
 

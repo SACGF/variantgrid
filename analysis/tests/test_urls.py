@@ -117,7 +117,7 @@ class Test(URLTestCase):
             ('analysis', {"analysis_id": cls.analysis.pk}, 200),
 
             # analysis templates - TODO: Need to make Template and verify it is kept private
-            # ('analysis_templates_list', {"analysis_template_id": cls.analysis.pk}, 200),
+            # ('analysis_template_settings', {"analysis_template_id": cls.analysis.pk}, 200),
 
             # Node editor
             ('node_view', analysis_version_and_node_version_params, 200),

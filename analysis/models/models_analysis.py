@@ -436,6 +436,8 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
         analysis_copy.template_type = AnalysisTemplateType.TEMPLATE
         analysis_copy.save()
 
+        assign_permission_to_user_and_groups(user, analysis_copy)
+
         now = timezone.now()
         template_copy = self
         template_copy.pk = None  # to save as new

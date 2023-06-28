@@ -105,6 +105,13 @@ class CreateAnalysisForm(UserSettingsGenomeBuildMixin, forms.ModelForm):
         return instance
 
 
+class AnalysisTemplateForm(forms.ModelForm):
+    class Meta:
+        fields = ('name', 'description')
+        model = AnalysisTemplate
+        widgets = {'name': TextInput()}
+
+
 class CreateAnalysisTemplateForm(forms.ModelForm):
     class Meta:
         fields = ('name', )

@@ -6,26 +6,33 @@
 
 {% block submenu_page_content %}
 
-    <h3>{{ analysis_template  }}</h3>
+    <h3>Template Settings: {{ analysis_template  }}</h3>
 
     <div>
         <a href="{% url 'analysis' analysis_template.analysis.pk %}">Edit Analysis Template</a>
     </div>
 
-    {% page_help page_id='analysis/analysis_templates_list_help' title='Analysis Template Versions' %}
+    {% page_help page_id='analysis/analysis_template_settings_help' title='Analysis Template Settings' %}
 
     <p>
-    {%  if analysis_template_versions.exists %}
-        <h4>Historical versions:</h4>
 
         <form id="active-template-version-form" method="post" action="{{ request.path }}" novalidate>
             {% csrf_token %}
+
+            {{  at_form.as_p }}
+
+            <button type="submit" name="{{at_form.prefix}}" class="btn btn-primary">save</button>
+
+
+        {%  if analysis_template_versions.exists %}
+            <h4>Historical versions:</h4>
+
+
             {{ atv_form.non_field_errors }}
             {% for hidden_field in atv_form.hidden_fields %}
                 {{ hidden_field.errors }}
                 {{ hidden_field }}
             {% endfor %}
-
 
             <table class="table">
                 <tr>
@@ -55,7 +62,7 @@
                         <td>{{ atv_form.requires_sample_gene_list }}{{ atv_form.requires_sample_gene_list.errors }}</td>
                         <td>
                             {{ atv_form.errors }}
-                            <button type="submit" class="btn btn-primary">save</button>
+                            <button type="submit" name="{{atv_form.prefix}}" class="btn btn-primary">save</button>
                         </td>
                 {% else %}
                     <td>{{ atv.analysis_name_template }}</td>
@@ -70,10 +77,12 @@
 
             </table>
             {{ atv_form.media }}
+
+        {% else %}
+           This analysis has no saved template versions.
+        {% endif %}
+
         </form>
-    {% else %}
-       This analysis has no saved template versions.
-    {% endif %}
     </p>
 
 {% endblock submenu_page_content %}
