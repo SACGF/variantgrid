@@ -12,7 +12,6 @@ from library.log_utils import NotificationBuilder
 from snpdb.lab_picker import LabPickerData
 from snpdb.utils import LabNotificationBuilder
 
-
 """
 Responsible for emailing/slacking users when a discordance is detected.
 In future we'd like this to occur in bulk (as a single import can create or solve many discordances).

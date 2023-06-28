@@ -1,4 +1,5 @@
 from django.core.management import BaseCommand
+
 from classification.models import Classification
 from library.guardian_utils import admin_bot
 

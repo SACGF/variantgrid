@@ -1,6 +1,3 @@
-import sys
-
-from django.http import Http404
 from rollbar.contrib.django.middleware import RollbarNotifierMiddleware
 
 

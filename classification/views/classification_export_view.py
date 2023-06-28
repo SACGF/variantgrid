@@ -13,7 +13,6 @@ from htmlmin.decorators import not_minified_response
 from requests.models import Response
 from rest_framework.views import APIView
 
-from classification.models import Classification
 from classification.models.classification import ClassificationModification
 from classification.models.classification_ref import ClassificationRef
 from classification.views.classification_export_report import ClassificationReport

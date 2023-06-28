@@ -10,7 +10,6 @@ from flags.models.flag_health_check import flag_chanced_since
 from library.health_check import health_check_signal, \
     HealthCheckRequest, HealthCheckTotalAmount, HealthCheckRecentActivity, HealthCheckStat
 
-
 """
 Reports information about classifications to the Slack health report
 """

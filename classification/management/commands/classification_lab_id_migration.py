@@ -9,7 +9,6 @@ from django.core.management import BaseCommand
 from classification.enums import SpecialEKeys
 from classification.models import Classification
 from genes.hgvs import CHGVS
-from library.guardian_utils import admin_bot
 from snpdb.models import Lab
 
 

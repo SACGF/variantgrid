@@ -7,7 +7,7 @@ from django.test import TestCase, override_settings
 from pyhgvs import HGVSName  # This is used for pyhgvs specific test
 
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version, create_gata2_transcript_version
-from genes.hgvs import HGVSMatcher, HGVSException, HGVSConverterType, HgvsMatchRefAllele
+from genes.hgvs import HGVSMatcher, HGVSException, HGVSConverterType
 from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
 from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSVariant
 from snpdb.models import GenomeBuild, VariantCoordinate

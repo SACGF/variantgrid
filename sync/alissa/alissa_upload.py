@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -15,7 +16,6 @@ from library.utils import ExportRow, export_column
 from snpdb.models import Lab, GenomeBuild, Organization
 from sync.models import SyncRun
 from sync.sync_runner import SyncRunner, register_sync_runner, SyncRunInstance
-import json
 
 
 class AlissaImportOption(str, Enum):

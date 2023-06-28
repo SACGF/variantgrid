@@ -7,7 +7,6 @@ from classification.models.classification import \
     Classification, classification_revalidate_signal
 from classification.models.flag_types import classification_flag_types
 
-
 """
 Responsible for injecting or removing the unshared flag based on share level
 """

@@ -1,6 +1,6 @@
+from sync.alissa import *  # to get decorators to register
 from sync.models import SyncStatus
 from sync.shariant import *  # to get decorators to register
-from sync.alissa import *  # to get decorators to register
 from sync.sync_runner import sync_runner_for_destination
 
 

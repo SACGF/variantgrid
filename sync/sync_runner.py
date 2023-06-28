@@ -1,13 +1,14 @@
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
 from typing import Optional, Callable, Dict, List
+
 from library.oauth import ServerAuth
 from library.utils import parse_http_header_date
 from sync.models import SyncStatus
 from sync.models.models import SyncDestination, SyncRun
-import json
 
 
 class SyncRunInstance:

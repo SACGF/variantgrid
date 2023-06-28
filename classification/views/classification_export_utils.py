@@ -10,7 +10,6 @@ from django.db.models.query import QuerySet
 from classification.models.classification import ClassificationModification
 from classification.models.evidence_key import EvidenceKeyMap, EvidenceKey
 from genes.hgvs import CHGVS
-from library.utils import html_to_text
 
 
 class KeyValueFormatter:

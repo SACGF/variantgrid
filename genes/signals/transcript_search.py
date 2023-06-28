@@ -1,6 +1,5 @@
 import re
-from collections import defaultdict
-from typing import Dict, Optional, List
+from typing import List
 
 from genes.models import Transcript, TranscriptVersion
 from library.utils import first
