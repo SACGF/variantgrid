@@ -439,7 +439,7 @@ $(document).ready(function() {
 
 	{% load jqgrid_tags %}
 	<div id='grid-filter-message'></div>
-	{% jqgrid 'patient_grid' 'patient' search=False delete=True grid_complete='patients_grid_complete' %}
+	{% jqgrid 'patient_grid' 'patient' search=False delete=True download_grid_json_as_csv=True grid_complete='patients_grid_complete' %}
 
 	</div>
 {% endblock submenu_page_content %}
