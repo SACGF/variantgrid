@@ -509,12 +509,17 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         # If these were in wrong order they have been switched now
         if hgvs_variant.transcript and hgvs_variant.gene:
             annotation_consortium = AnnotationConsortium.get_from_transcript_accession(used_transcript_accession)
-            transcript_version = TranscriptVersion.get(used_transcript_accession, genome_build,
-                                                       annotation_consortium=annotation_consortium)
-            alias_symbol_strs = transcript_version.gene_version.gene_symbol.alias_meta.alias_symbol_strs
-            if hgvs_variant.gene.upper() not in [a.upper() for a in alias_symbol_strs]:
-                search_messages.append(SearchMessage(f"Symbol \"{hgvs_variant.gene}\" not associated with transcript "
-                                       f"{used_transcript_accession} (known symbols='{', '.join(alias_symbol_strs)}')"))
+            try:
+                # If we look it up using a different method (eg ClinGen Allele registry) the used transcript accession
+                # May not exist on our system. That's ok
+                transcript_version = TranscriptVersion.get(used_transcript_accession, genome_build,
+                                                           annotation_consortium=annotation_consortium)
+                alias_symbol_strs = transcript_version.gene_version.gene_symbol.alias_meta.alias_symbol_strs
+                if hgvs_variant.gene.upper() not in [a.upper() for a in alias_symbol_strs]:
+                    search_messages.append(SearchMessage(f"Symbol \"{hgvs_variant.gene}\" not associated with transcript "
+                                           f"{used_transcript_accession} (known symbols='{', '.join(alias_symbol_strs)}')"))
+            except TranscriptVersion.DoesNotExist:
+                pass  # Doesn't exist - OK just can't check
 
     # TODO: alter initial_score based on warning messages of alt not matching?
     # also - _lrg_get_variant_tuple should add matches_reference to search warnings list
