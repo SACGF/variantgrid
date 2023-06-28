@@ -100,6 +100,7 @@ class GeneListSerializer(serializers.ModelSerializer):
         return can_write
 
     def get_fields(self):
+        # Code from https://timmytango.com/notes/excluding-fields-in-drf-serializers/
         fields = super().get_fields()
 
         exclude_fields = self.context.get('exclude_fields', [])
