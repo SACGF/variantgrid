@@ -85,7 +85,11 @@ class BioCommonsHGVSConverter(HGVSConverter):
     def __init__(self, genome_build: GenomeBuild):
         super().__init__(genome_build)
         self.hdp = DjangoTranscriptDataProvider(genome_build)
-        self.babelfish = Babelfish(self.hdp, genome_build.name)
+        if genome_build.name == 'GRCh37':
+            assembly_name = genome_build.get_build_with_patch()  # Need to include patch to get MT in GRCh37
+        else:
+            assembly_name = genome_build.name
+        self.babelfish = Babelfish(self.hdp, assembly_name)
         self.am = AssemblyMapper(self.hdp,
                                  assembly_name=genome_build.name,
                                  alt_aln_method='splign')
@@ -182,10 +186,17 @@ class BioCommonsHGVSConverter(HGVSConverter):
     def description(self) -> str:
         return f"BioCommons hgvs v{metadata.version('hgvs')}"
 
+    @staticmethod
+    def _m_to_g(var_m):
+        # mito is basically the same as genomic except for the letter
+        var_m.type = 'g'
+        return var_m
+
     def _hgvs_to_g_hgvs(self, hgvs_string: str):
         CONVERT_TO_G = {
             'c': self.am.c_to_g,
             'n': self.am.n_to_g,
+            'm': self._m_to_g,
         }
 
         parser = ParserSingleton.parser()
