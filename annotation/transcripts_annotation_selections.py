@@ -168,7 +168,9 @@ class VariantTranscriptSelections:
         # Initial set to what is passed in, otherwise use representative
 
         if self.transcript_data:
-            td_canonical = sorted(self.transcript_data, key=operator.itemgetter("canonical_score"), reverse=True)
+            # Use rep transcript to fall back on ties
+            key_func = operator.itemgetter("canonical_score", self.REPRESENTATIVE)
+            td_canonical = sorted(self.transcript_data, key=key_func, reverse=True)
             td_canonical = next(iter(td_canonical))
             selected_transcript_data = None
             if settings.VARIANT_TRANSCRIPT_USE_TRANSCRIPT_CANONICAL and td_canonical["canonical_score"]:
