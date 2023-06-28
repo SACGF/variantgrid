@@ -99,6 +99,18 @@ class GeneListSerializer(serializers.ModelSerializer):
 
         return can_write
 
+    def get_fields(self):
+        fields = super().get_fields()
+
+        exclude_fields = self.context.get('exclude_fields', [])
+        for field in exclude_fields:
+            # providing a default prevents a KeyError
+            # if the field does not exist
+            fields.pop(field, default=None)
+
+        return fields
+
+
 
 class GeneAnnotationReleaseSerializer(serializers.ModelSerializer):
     __str__ = serializers.SerializerMethodField()

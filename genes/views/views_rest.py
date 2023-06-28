@@ -142,7 +142,12 @@ class TextToGeneListView(APIView):
         gene_list_text = self.request.data['gene_list_text']
 
         gene_list = create_fake_gene_list(name=name, user=request.user)
-        serializer = GeneListSerializer(gene_list, context={"request": request})
+        context = {
+            "request": request,
+            "exclude_fields": ["genelistgenesymbol_set"],
+        }
+        serializer = GeneListSerializer(gene_list,
+                                        context=context)
         data = serializer.data
 
         if gene_list_text:
