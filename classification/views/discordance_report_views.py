@@ -359,17 +359,18 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
 
         action = request.POST.get('action')
         if action == "postpone":
+            review.user = request.user
             review.complete_with_data_and_save({
                 "outcome": "postpone"
             })
             log_admin_change(
                 obj=review,
                 message=review.as_json(),
-                user=review.user
+                user=request.user
             )
 
         elif action == "change":
-
+            review.user = request.user
             notes = request.POST.get('notes')
             report = data.report
             report.notes = notes or ''
