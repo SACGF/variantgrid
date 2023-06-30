@@ -7,8 +7,8 @@ from variantgrid.settings.components.default_settings import get_aws_secrets
 # export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
 # export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
 
-GDAL_LIBRARY_PATH="/opt/homebrew/Cellar/gdal/3.6.4_4/lib/libgdal.32.3.6.4.dylib"
-GEOS_LIBRARY_PATH="/opt/homebrew/Cellar/geos/3.11.2/lib/libgeos_c.1.17.2.dylib"
+#GDAL_LIBRARY_PATH="/opt/homebrew/Cellar/gdal/3.6.4_4/lib/libgdal.32.3.6.4.dylib"
+#GEOS_LIBRARY_PATH="/opt/homebrew/Cellar/geos/3.11.2/lib/libgeos_c.1.17.2.dylib"
 # IMPORTANT : THE BELOW IMPORTS ARE USED TO APPLY THEIR RESPECTIVE SETTINGS VALUES
 
 from variantgrid.settings.components.celery_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
