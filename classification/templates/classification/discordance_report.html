@@ -7,6 +7,7 @@
 {% load ui_utils %}
 {% load ui_help %}
 {% load ui_menu_bars %}
+{% load user_tags %}
 {% block title %}Discordance Report{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
@@ -90,7 +91,7 @@
                 {% endlabelled %}
                 {% if data.report.report_closed_by %}
                     {% labelled label="Closed by" %}
-                        <span class="username">{{ data.report.report_closed_by.username }}</span>
+                        <span class="username">{% user data.report.report_closed_by size="tiny" show_group=True %}</span>
                     {% endlabelled %}
                 {% endif %}
                 {% labelled label="Initial Trigger for Discordance" %}{{ data.report.cause_text | default:"Unknown" }}{% endlabelled %}
