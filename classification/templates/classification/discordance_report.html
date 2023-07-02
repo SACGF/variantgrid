@@ -138,7 +138,12 @@
                 <h4>Actions</h4>
                 {% if data.is_pending_concordance %}<p class="text-info">There are outstanding pending changes for this discordance. When labs re-submit with the agreed changes the discordance should be resolved. There is likely no need to action this.</p>{% endif %}
                 <a class="btn btn-primary" href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">
-                    {% if data.review %}Continue{% else %}Start{% endif %} Discordance Review
+                    {% if data.review %}
+                        {% if data.review.post_review_data.outcome == "postpone" %}Continue{% else %}Edit{% endif %}
+                    {% else %}
+                        Start
+                    {% endif %}
+                    Discordance Review
                 </a>
             {% endif %}
         {% endif %}
