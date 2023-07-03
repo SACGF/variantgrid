@@ -27,7 +27,7 @@ def classification_search(search_input: SearchInputInstance):
     """ Search for LabId which can be either:
         "vc1080" or "Molecular Genetics, Frome Road / vc1080" (as it appears in classification) """
 
-    filters = [Q(classification__lab_record_id=search_string)]  # exact match
+    filters = [Q(classification__lab_record_id__iexact=search_string)]  # exact match
     slash_index = search_string.find("/")
     if slash_index > 0:
         parts = [p.strip() for p in search_string.split("/")]
