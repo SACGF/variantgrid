@@ -231,6 +231,7 @@ class ClassificationExportFormatter(ABC):
         """
         :return: An iterator for a single streaming file, call either this or yield_file
         """
+        is_first_row = True
         try:
             for header in self.with_new_lines(self.header()):
                 yield header
@@ -239,6 +240,12 @@ class ClassificationExportFormatter(ABC):
                 rows = self.with_new_lines(rows)
                 for row in rows:
                     self.row_count += 1
+
+                    if not is_first_row:
+                        row = f"{self.delimiter_for_row}{row}"
+                    else:
+                        is_first_row = False
+
                     yield row
 
             for footer in self.with_new_lines(self.footer()):
