@@ -65,7 +65,10 @@ class ClassificationExportFormatter(ABC):
         filename_parts.append(self.format_type)
 
         if part is not None:
-            filename_parts.append(f"part_{part:02}")
+            if isinstance(part, int):
+                filename_parts.append(f"part_{part:02}")
+            else:
+                filename_parts.append(f"part_{part}")
 
         filename = "_".join(filename_parts)
 
