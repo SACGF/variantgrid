@@ -129,7 +129,8 @@ let EKey = (function() {
         },
 
         asSafeHtml: function(val) {
-            let html = $('<span>' + val + '</span>');
+            let html = $('<div>' + val + '</div>');
+
             let allTags = html.find('*');
             for (let tag of allTags) {
                 if (!EKey.HTML_WHITE_LIST.has(tag.tagName)) {
