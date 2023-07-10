@@ -9,7 +9,7 @@ from classification.models import Classification, ClinVarExport, ClinVarExportBa
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.models.clinvar_export_sync import clinvar_export_sync, ClinVarResponseOutcome
-from classification.models.tests.test_utils import ClassificationTestUtils
+from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import admin_bot
 from snpdb.models import GenomeBuild, ClinVarKey, GenomeBuildPatchVersion
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant, create_mock_allele

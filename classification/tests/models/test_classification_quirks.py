@@ -4,7 +4,7 @@ from classification.enums import SubmissionSource, CriteriaEvaluation, Validatio
 from classification.models import VCDataDict, EvidenceKeyMap
 from classification.models.classification import Classification
 from classification.models.classification_inserter import BulkClassificationInserter
-from classification.models.tests.test_utils import ClassificationTestUtils
+from classification.tests.models.test_utils import ClassificationTestUtils
 
 
 class ClassificationTestQuirks(TestCase):

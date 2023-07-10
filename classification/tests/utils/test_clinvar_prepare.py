@@ -4,7 +4,7 @@ from unittest import TestCase
 
 from classification.models import ConditionResolved
 from classification.models.clinvar_export_prepare import ConsolidatingMerger
-from classification.tests.data_utils import ConditionMock
+from classification.tests.utils.data_utils import ConditionMock
 from ontology.models import OntologyTerm
 
 

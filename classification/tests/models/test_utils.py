@@ -53,10 +53,6 @@ class ClassificationTestUtils:
     @staticmethod
     def tearDown():
         pass
-        # Lab.objects.filter(group_name='instx/labby').delete()
-        # Lab.objects.filter(group_name='instx/ext').delete()
-        # User.objects.filter(username__in=['joejoe', 'joejoe2']).delete()
-        # Classification.objects.all().delete()
 
     @staticmethod
     def lab_and_user() -> Tuple[Lab, User]:
