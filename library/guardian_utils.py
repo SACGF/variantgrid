@@ -1,6 +1,6 @@
 from functools import lru_cache
 from typing import Union, List
-
+import sys
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
@@ -24,10 +24,20 @@ def public_group():
     g, _ = Group.objects.get_or_create(name=settings.PUBLIC_GROUP_NAME)
     return g
 
-
 @lru_cache()
-def admin_bot():
+def _cached_admin_bot():
     return User.objects.get(username='admin_bot')
+
+
+def admin_bot():
+    """
+    lru_cache is great for performance, but it can break unit tests by caching a User object across sessions (when the DB has been rolled back).
+    Specifically this object is often referenced by things that want to save the user to the DB.
+    """
+    if settings.UNIT_TEST:
+        return User.objects.get(username='admin_bot')
+    else:
+        return _cached_admin_bot()
 
 
 def bot_group():
