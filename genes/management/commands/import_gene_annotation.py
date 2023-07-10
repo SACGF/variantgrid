@@ -216,6 +216,7 @@ class Command(BaseCommand):
                 if hgnc_identifier in hgnc_ids:
                     hgnc_id = hgnc_identifier
 
+            biotype = self.get_biotype(gv_data)
             import_source = self._get_import_source_by_url(genome_build, annotation_consortium, gv_data["url"])
             gene_version = GeneVersion(gene_id=gene_id,
                                        version=version,
@@ -223,7 +224,7 @@ class Command(BaseCommand):
                                        hgnc_identifier=hgnc_identifier,
                                        hgnc_id=hgnc_id,
                                        description=gv_data.get("description"),
-                                       biotype=gv_data.get("biotype"),
+                                       biotype=biotype,
                                        genome_build=genome_build,
                                        import_source=import_source)
 
@@ -271,9 +272,7 @@ class Command(BaseCommand):
             gene_version_id = gene_version_ids_by_accession[gene_accession]
             import_source = self._get_import_source_by_url(genome_build, annotation_consortium, build_data["url"])
             contig = genome_build.chrom_contig_mappings[build_data["contig"]]
-            if biotype := tv_data.get("biotype"):
-                # Biotype stored as a list of strings
-                biotype = ", ".join(sorted(biotype))
+            biotype = self.get_biotype(tv_data)
             transcript_version = TranscriptVersion(transcript_id=transcript_id,
                                                    version=version,
                                                    gene_version_id=gene_version_id,
@@ -310,3 +309,15 @@ class Command(BaseCommand):
         if new_genes and annotation_consortium == AnnotationConsortium.REFSEQ:
             print("Created new RefSeq genes - retrieving gene summaries via API")
             retrieve_refseq_gene_summaries()
+
+    @staticmethod
+    def get_biotype(data):
+        biotype = None
+        if biotype_raw := data.get("biotype"):
+            if isinstance(biotype_raw, list):
+                biotype = ", ".join(sorted(biotype_raw))
+            elif isinstance(biotype_raw, str):
+                biotype = biotype_raw
+            else:
+                raise ValueError(f"Gene biotype '{biotype_raw}' of unknown type ({type(biotype_raw)})")
+        return biotype
