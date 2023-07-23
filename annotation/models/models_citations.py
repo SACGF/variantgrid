@@ -672,7 +672,7 @@ class CitationFetchRequest:
 
         except Exception as ex:
             # if this fails it's probably because a single id in ids ruined it for everybody
-            report_exc_info(f'Error when attempting to Entrez.efetch ids {ids}')
+            report_exc_info(extra_data={"target": f'Error when attempting to Entrez.efetch ids {ids}'})
             self._mark_error_if_not_fetched(ids, f'Error when attempting to Entrez.efetch ids {request_ids} : {str(ex)}')
 
     @staticmethod

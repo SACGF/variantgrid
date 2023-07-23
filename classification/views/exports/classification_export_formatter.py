@@ -65,7 +65,10 @@ class ClassificationExportFormatter(ABC):
         filename_parts.append(self.format_type)
 
         if part is not None:
-            filename_parts.append(f"part_{part:02}")
+            if isinstance(part, int):
+                filename_parts.append(f"part_{part:02}")
+            else:
+                filename_parts.append(f"part_{part}")
 
         filename = "_".join(filename_parts)
 
@@ -228,6 +231,7 @@ class ClassificationExportFormatter(ABC):
         """
         :return: An iterator for a single streaming file, call either this or yield_file
         """
+        is_first_row = True
         try:
             for header in self.with_new_lines(self.header()):
                 yield header
@@ -236,6 +240,12 @@ class ClassificationExportFormatter(ABC):
                 rows = self.with_new_lines(rows)
                 for row in rows:
                     self.row_count += 1
+
+                    if not is_first_row:
+                        row = f"{self.delimiter_for_row}{row}"
+                    else:
+                        is_first_row = False
+
                     yield row
 
             for footer in self.with_new_lines(self.footer()):

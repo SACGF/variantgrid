@@ -177,7 +177,7 @@ function enhanceAndMonitor() {
         },
 
         // everything with a title (that isn't data-content aka popover) give a tooltip
-        {test: '[title]:not([data-content])',
+        {test: '[title]:not([data-content]):not(.ui-datepicker-prev):not(.ui-datepicker-next)',
             func: (node) => {
                 node.tooltip({html:true, trigger : 'hover'});
                 node.click(function(e) {$(this).tooltip('hide');});
