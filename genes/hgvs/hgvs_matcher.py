@@ -299,7 +299,7 @@ class HGVSMatcher:
                     variant_tuple, matches_reference = self.hgvs_converter.hgvs_to_variant_coords_and_reference_match(hgvs_string_for_version, tv)
                 elif method == self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY:
                     if self._clingen_allele_registry_ok(tv.accession):
-                        error_message = f"Could not convert '{hgvs_string}' using ClinGenAllele Registry: %s"
+                        error_message = f"Could not convert \"{hgvs_string}\" using ClinGenAllele Registry: %s"
                         try:
                             matches_reference = True  # ClnGen fails if different
                             variant_tuple = self._clingen_get_variant_tuple(hgvs_string_for_version)
@@ -323,10 +323,10 @@ class HGVSMatcher:
 
             if variant_tuple is None:
                 if hgvs_methods:
-                    attempts = ", ".join(hgvs_methods)
-                    raise ValueError(f"Could not convert {hgvs_string} - tried: {attempts}")
+                    attempts = "\n".join(hgvs_methods)
+                    raise ValueError(f"Could not convert \"{hgvs_string}\" - tried:\n{attempts}")
                 else:
-                    raise ValueError(f"'{transcript_accession}': No transcripts found")
+                    raise ValueError(f"\"{transcript_accession}\": No transcripts found")
         else:
             # g. HGVS
             method = self.hgvs_converter.description()
