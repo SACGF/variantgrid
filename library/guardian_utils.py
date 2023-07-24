@@ -1,6 +1,6 @@
 from functools import lru_cache
 from typing import Union, List
-import sys
+
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied

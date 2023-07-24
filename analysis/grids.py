@@ -25,7 +25,8 @@ from ontology.models import OntologyTermRelation, GeneDiseaseClassification, Ont
 from patients.models_enums import Zygosity
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position, \
     get_variantgrid_extra_annotate
-from snpdb.grid_columns.grid_sample_columns import get_available_format_columns, get_variantgrid_zygosity_annotation_kwargs
+from snpdb.grid_columns.grid_sample_columns import get_available_format_columns, \
+    get_variantgrid_zygosity_annotation_kwargs
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, CohortGenotype
 from snpdb.models.models_genome import GenomeBuild
