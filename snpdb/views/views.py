@@ -726,10 +726,14 @@ def _settings_override_node_counts_tab(request, settings_override, has_write_per
 def view_user(request, pk):
     user = get_object_or_404(User, pk=pk)
     user_contact = UserContact.get_for_user(user)
+    user_groups = set(user.groups.all().values_list("name", flat=True))
+    my_groups = set(request.user.groups.all().values_list("name", flat=True))
+    common_groups = user_groups & my_groups
 
     context = {
         "other_user": user,
-        'user_contact': user_contact
+        'user_contact': user_contact,
+        'common_groups': sorted(common_groups),
     }
     return render(request, 'snpdb/settings/view_user.html', context)
 

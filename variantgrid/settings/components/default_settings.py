@@ -526,6 +526,7 @@ SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN = False  # set True to only 
 SEARCH_SUMMARY_VARIANT_SHOW_CLINVAR = True
 SEARCH_HGVS_GENE_SYMBOL_USE_MANE = True
 SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS = False
+SEARCH_USER_ADMIN_ONLY = False
 
 SILENCED_SYSTEM_CHECKS = ['models.E006',  # 'captcha.recaptcha_test_key_error'
                           'fields.W907']  # CITextField deprecated. Waiting for Django 4.2.3 see issue #831

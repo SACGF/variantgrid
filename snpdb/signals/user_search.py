@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Value, CharField
 from django.db.models.functions import Lower, Concat
@@ -10,7 +11,7 @@ from snpdb.search import search_receiver, SearchInputInstance, \
 @search_receiver(
     search_type=UserPreview,
     pattern=HAS_ALPHA_PATTERN,
-    admin_only=True,
+    admin_only=settings.SEARCH_USER_ADMIN_ONLY,
     example=SearchExample(
         note="Search on username, name or email",
         examples=["jane@institute.org.au", "Lisa"]

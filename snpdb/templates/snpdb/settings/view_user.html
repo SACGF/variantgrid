@@ -19,6 +19,22 @@
                 <a href="{% url 'activity_user' user_id=other_user.pk %}">View Classification Edits</a>
             </div>
         </div>
+        <div class="card">
+            <div class="card-header">Shared groups</div>
+            <div class="card-body">
+                {% if common_groups %}
+                    <p>You have the following groups in common with {{ other_user }}:</p>
+
+                    <ul>
+                    {% for g in common_groups %}
+                        <li>{{ g }}</li>
+                    {% endfor %}
+                    </ul>
+                {% else %}
+                    You have no groups in common with this user.
+                {% endif %}
+            </div>
+        </div>
     </div>
 
 {% endblock %}
