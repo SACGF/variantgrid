@@ -12,7 +12,6 @@ from library.utils import single_quote
 from library.utils.database_utils import run_sql
 from patients.models_enums import Zygosity
 from snpdb.common_variants import get_common_filter
-from snpdb.grid_columns.grid_sample_columns import get_left_outer_join_on_variant
 from snpdb.models import Cohort, ImportStatus, CohortGenotypeCommonFilterVersion, Variant, CommonVariantClassified
 from snpdb.models import CohortGenotypeCollection, CohortGenotype, CohortGenotypeTaskVersion
 
@@ -97,6 +96,9 @@ def create_cohort_genotype_collection(cohort):
 def _get_sample_zygosity_count_sql(sample_value, zygosity):
     return f'CASE WHEN (({sample_value}) = \'{zygosity}\') THEN 1 ELSE 0 END'
 
+def _get_left_outer_join_on_variant(partition_table):
+    return f'LEFT OUTER JOIN "{partition_table}" ON ("snpdb_variant"."id" = "{partition_table}"."variant_id")'
+
 
 def get_insert_cohort_genotype_sql(cgc: CohortGenotypeCollection):
     cohort = cgc.cohort
@@ -116,7 +118,7 @@ def get_insert_cohort_genotype_sql(cgc: CohortGenotypeCollection):
     for sample in samples:
         sample_cgc = sample.vcf.cohort.cohort_genotype_collection
         partition_table = sample_cgc.get_partition_table()
-        joins.add(get_left_outer_join_on_variant(partition_table))
+        joins.add(_get_left_outer_join_on_variant(partition_table))
         i = sample_cgc.get_sql_index_for_sample_id(sample.pk)
 
         for column, (is_array, empty_value) in CohortGenotype.COLUMN_IS_ARRAY_EMPTY_VALUE.items():

@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Optional, List, Tuple
+from typing import Optional
 
 from django.conf import settings
 from django.db.models import F, QuerySet
@@ -8,12 +8,9 @@ from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 from guardian.shortcuts import get_objects_for_user
 
-from library.jqgrid.jqgrid_sql import JqGridSQL
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import calculate_age
-from library.utils.database_utils import get_queryset_column_names, \
-    get_queryset_select_from_where_parts
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
     GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig, GenomeBuild, ClinGenAllele, \
@@ -326,7 +323,7 @@ def server_side_format_exon_and_intron(row, field):
     return val
 
 
-class AbstractVariantGrid(JqGridSQL):
+class AbstractVariantGrid(JqGridUserRowConfig):
     model = Variant
 
     def __init__(self, *args, **kwargs):
@@ -400,7 +397,7 @@ class AbstractVariantGrid(JqGridSQL):
     def _get_permission_user(self):
         return self.user
 
-    def _get_queryset(self, request):
+    def get_queryset(self, request):
         qs = self._get_base_queryset()
         # Annotate so we can use global_variant_zygosity in grid columns
         qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
@@ -411,57 +408,17 @@ class AbstractVariantGrid(JqGridSQL):
         if self.sort_by_contig_and_position:
             # These 2 are custom_columns.ID_FORMATTER_REQUIRED_FIELDS so won't add extra cols
             qs = qs.order_by("locus__contig__name", "locus__position")
-            self.queryset_is_sorted = True
-        return qs
 
-    def get_values_queryset(self, request, field_names: List = None):
-        queryset = self._get_queryset(request)
-        if field_names is None:
-            field_names = self.get_queryset_field_names()
-            a_kwargs = self._get_grid_only_annotation_kwargs()
-            queryset = queryset.annotate(**a_kwargs)
-            field_names.extend(a_kwargs)
-        return queryset.values(*field_names)
-
-    def get_sql_params_and_columns(self, request):
-        values_queryset = self.get_values_queryset(request)
-        is_sorted = self.queryset_is_sorted
-        order_by = None
-        if not is_sorted:
-            # If sort column is normal, go through normal sort_items path.
-            # If special, modify SQL below
-            sidx = request.GET.get('sidx', 'id')
-            if self.column_in_queryset_fields(sidx):
-                values_queryset = self.sort_items(request, values_queryset)
-                is_sorted = True
-
-            override = self.get_override(sidx)
-            order_by = override.get("order_by")
-
-        sql, column_names = self._get_sql_and_columns(values_queryset, order_by)
-        return sql, [], column_names, is_sorted
+        field_names = self.get_queryset_field_names()
+        a_kwargs = self._get_grid_only_annotation_kwargs()
+        qs = qs.annotate(**a_kwargs)
+        field_names.extend(a_kwargs)
+        return qs.values(*field_names)
 
     def _get_grid_only_annotation_kwargs(self):
         """ Things not used in counts etc - only to display grid """
         user = self._get_permission_user()
         return get_variantgrid_extra_annotate(user)
-
-    def _get_sql_and_columns(self, values_queryset, order_by: str):
-        new_columns, select_part, from_part, where_part = self._get_new_columns_select_from_where_parts(values_queryset)
-
-        extra_column_selects = []
-        if order_by:  # SELECT DISTINCT, ORDER BY expressions must appear in select list
-            extra_column_selects.append(order_by)
-        if extra_column_selects:
-            select_part += ",\n" + ",\n".join(extra_column_selects)
-
-        sql = '\n'.join([select_part, from_part, where_part])
-        column_names = get_queryset_column_names(values_queryset, new_columns)
-        return sql, column_names
-
-    def _get_new_columns_select_from_where_parts(self, values_queryset) -> Tuple[List[str], str, str, str]:
-        select_part, from_part, where_part = get_queryset_select_from_where_parts(values_queryset)
-        return [], select_part, from_part, where_part
 
     def _get_q(self) -> Optional[Q]:
         return None

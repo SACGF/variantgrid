@@ -1,18 +1,15 @@
 """
-Helper functions for grid to be able to use custom SQL to join to sample columns
+Helper functions for grid to join to cohort genotype
 
 This is in snpdb not analysis as it needs to be called by snpdb.tasks.cohort_genotype_tasks
 and I don't want cross-dependencies between those apps
 """
-from collections import defaultdict
+from typing import Iterable
 
-from library.utils import single_quote
-from library.utils.database_utils import get_queryset_select_from_where_parts
-from snpdb.models import CohortGenotype, VCF
+from django.db.models import Value
+from django.db.models.functions import Coalesce
 
-
-def get_left_outer_join_on_variant(partition_table):
-    return f'LEFT OUTER JOIN "{partition_table}" ON ("snpdb_variant"."id" = "{partition_table}"."variant_id")'
+from snpdb.models import CohortGenotype, VCF, Cohort
 
 
 def get_available_format_columns(cohorts):
@@ -38,41 +35,30 @@ def get_available_format_columns(cohorts):
     return available_format_columns
 
 
-def get_columns_and_sql_parts_for_cohorts(values_queryset, cohorts):
-    new_column_pack_lists = defaultdict(list)
-    new_joins = []
+def get_variantgrid_zygosity_annotation_kwargs(cohorts: Iterable[Cohort], common_variants: bool):
     available_format_columns = get_available_format_columns(cohorts)
+    annotation_kwargs = {}
 
+    cgc_fields = {f.name: f for f in CohortGenotype._meta.fields}
     for cohort in cohorts:
-        partition_table = cohort.cohort_genotype_collection.get_partition_table()
+        # How did this ever work with multiple cohorts - did it overwrite??
+        # TODO: After we've done this - try and optimise to only doing rare if we can
+        cgc = cohort.cohort_genotype_collection
+        annotation_kwargs.update(cgc.get_annotation_kwargs(common_variants=common_variants))
+
         for column, (is_array, empty_value) in CohortGenotype.COLUMN_IS_ARRAY_EMPTY_VALUE.items():
             if not available_format_columns[column]:
                 continue  # No data, so don't show
 
             if is_array:
-                array_values = ", ".join(str(s) for s in [empty_value] * cohort.sample_count)
-                empty_data = f"array[{array_values}]"
+                empty_data = [empty_value] * cohort.sample_count
             else:
                 empty_data = empty_value * cohort.sample_count
-                empty_data = single_quote(empty_data)
 
-            pack_entry = f"coalesce({partition_table}.{column}, {empty_data})"
-            new_column_pack_lists[column].append(pack_entry)
-        new_joins.append(get_left_outer_join_on_variant(partition_table))
+            output_field = cgc_fields[column]
+            packed_column = f"packed_{column}"
+            alias = cgc.cohortgenotype_alias
+            annotation_kwargs[packed_column] = Coalesce(f"{alias}__{column}", Value(empty_data),
+                                                        output_field=output_field)
 
-    return _get_columns_and_sql_parts_for_pack_lists_and_joins(values_queryset, new_column_pack_lists, new_joins)
-
-
-def _get_columns_and_sql_parts_for_pack_lists_and_joins(values_queryset, new_column_pack_lists, new_joins):
-    select_part, from_part, where_part = get_queryset_select_from_where_parts(values_queryset)
-    new_columns = []
-    new_select = []
-    for column, pack_entry in new_column_pack_lists.items():
-        packed_column = f"packed_{column}"
-        packed_source = " || ".join(pack_entry)  # || works for both string and arrays
-        new_select.append(f"{packed_source} as {packed_column}")
-        new_columns.append(packed_column)
-
-    select_part = ",\n".join([select_part] + new_select)
-    from_part = "\n".join([from_part] + new_joins)
-    return new_columns, select_part, from_part, where_part
+    return annotation_kwargs

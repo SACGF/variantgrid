@@ -25,7 +25,7 @@ from ontology.models import OntologyTermRelation, GeneDiseaseClassification, Ont
 from patients.models_enums import Zygosity
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position, \
     get_variantgrid_extra_annotate
-from snpdb.grid_columns.grid_sample_columns import get_columns_and_sql_parts_for_cohorts, get_available_format_columns
+from snpdb.grid_columns.grid_sample_columns import get_available_format_columns, get_variantgrid_zygosity_annotation_kwargs
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, CohortGenotype
 from snpdb.models.models_genome import GenomeBuild
@@ -104,18 +104,11 @@ class VariantGrid(AbstractVariantGrid):
 
     def _get_grid_only_annotation_kwargs(self):
         """ Things not used in counts etc - only to display grid """
-        return get_variantgrid_extra_annotate(self.user, exclude_analysis=self.node.analysis)
-
-    def _get_new_columns_select_from_where_parts(self, values_queryset) -> Tuple[List[str], str, str, str]:
+        annotation_kwargs = get_variantgrid_extra_annotate(self.user, exclude_analysis=self.node.analysis)
         cohorts, _visibility = self.node.get_cohorts_and_sample_visibility()
-
-        if cohorts:
-            ret = get_columns_and_sql_parts_for_cohorts(values_queryset, cohorts)
-            new_columns, select_part, from_part, where_part = ret
-        else:
-            return super()._get_new_columns_select_from_where_parts(values_queryset)
-
-        return new_columns, select_part, from_part, where_part
+        common_variants = self.node._has_common_variants()
+        annotation_kwargs.update(get_variantgrid_zygosity_annotation_kwargs(cohorts, common_variants))
+        return annotation_kwargs
 
     def get_count(self, request):  # pylint: disable=unused-argument
         """ Used by paginator, set from stored value so that we don't

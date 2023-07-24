@@ -145,7 +145,7 @@ def _replace_transcripts_iterator(request, grid, ctc: CanonicalTranscriptCollect
                 transcript_replace_fields[suffix] = f
 
     # We only need things from VariantTranscriptAnnotation - so join there directly
-    variants_qs = grid.get_values_queryset(request, field_names=["id"])
+    variants_qs = grid.get_queryset(request).values_list("id")
     version = grid.node.analysis.annotation_version.variant_annotation_version
     ct_qs = ctc.canonicaltranscript_set
     transcript_versions = ct_qs.values_list("transcript_version", flat=True)

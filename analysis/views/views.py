@@ -52,7 +52,7 @@ from library.constants import WEEK_SECS, HOUR_SECS
 from library.django_utils import add_save_message, get_field_counts, set_form_read_only
 from library.guardian_utils import is_superuser
 from library.utils import full_class_name, defaultdict_to_dict
-from library.utils.database_utils import run_sql
+from library.utils.database_utils import run_sql, queryset_to_sql
 from pedigree.models import Pedigree
 from snpdb.graphs import graphcache
 from snpdb.models import UserSettings, Sample, \
@@ -314,14 +314,16 @@ def node_view(request, analysis_id, analysis_version, node_id, node_version, ext
 def get_node_sql(grid):
     # Temporarily disabling SQL formatting as it's really slow.
     request = RequestFactory().get('/fake')
-    grid_sql = grid.get_sql_params_and_columns(request)[0]
+    qs = grid.get_queryset(request)
+    grid_sql = queryset_to_sql(qs)
     # grid_sql = sqlparse.format(grid_sql, reindent=True, keyword_case='upper')
 
     grid.fields = ['id']
-    node_sql_ = grid.get_sql_params_and_columns(request)[0]
+    qs = grid.get_queryset(request)
+    node_sql = queryset_to_sql(qs)
     # node_sql_ = sqlparse.format(node_sql_, reindent=True, keyword_case='upper')
 
-    return node_sql_, grid_sql
+    return node_sql, grid_sql
 
 
 @not_minified_response
