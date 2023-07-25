@@ -15,3 +15,10 @@ In future it would be good to bring Vue.js to VariantGrid (there's a project for
 ## UICore TemplateTags
 
 UICore provides many templatetags (probably too many, some should be consolidated).
+
+## Common Tags
+
+labelled: {% labelled label="name" %}{{ name }}{% endlabelled %}
+
+This is just a short-cut to making a Bootstrap row that assigns a consistent amount of cols for different screen sizes.
+
