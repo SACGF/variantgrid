@@ -13,8 +13,7 @@ from lazy import lazy
 
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeStatus, NodeVersion
-from library.database_utils import queryset_to_sql
-from snpdb.models import VariantCollection, ProcessingStatus
+from snpdb.models import VariantCollection, VariantCollectionRecord, ProcessingStatus
 
 
 class VennNode(AnalysisNode):
