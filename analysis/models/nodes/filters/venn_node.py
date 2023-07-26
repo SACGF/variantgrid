@@ -112,11 +112,11 @@ class VennNode(AnalysisNode):
     def get_venn_flag(self):
         return [t[0] for t in SetOperations.choices].index(self.set_operation)
 
-    def get_cache_task_args_objs_set(self, force_cache=False):
+    def get_cache_task_args_set(self, force_cache=False):
         """ Override from AnalysisNode - returns Celery tasks which are called
             in node_utils.get_analysis_update_task before children are loaded  """
 
-        task_args_objs_set = set()
+        task_args_set = set()
         if self.is_valid():
             try:
                 a, b = self.ordered_parents
@@ -147,7 +147,7 @@ class VennNode(AnalysisNode):
                         task = venn_cache_count
                         cache_args = (vennode_cache.pk, )
 
-                    task_args_objs_set.add((task, cache_args, vennode_cache))
+                    task_args_set.add((task, cache_args))
             except Exception as e:
                 errors = f"get_cache_task_args_objs_set exception: {e}"
                 self.errors = errors  # Setting error here is in effect permanent (never cleared)
@@ -155,7 +155,7 @@ class VennNode(AnalysisNode):
                 self.save()
                 logging.error(errors)
 
-        return task_args_objs_set
+        return task_args_set
 
     def get_vennodecache_intersection_types(self):
         INTERSECTIONS = {

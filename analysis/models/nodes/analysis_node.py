@@ -214,23 +214,23 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     def get_update_task(self):
         return Signature(self.UPDATE_TASK, args=(self.pk, self.version), immutable=True)
 
-    def get_cache_task_args_objs_set(self, force_cache=False):
+    def get_cache_task_args_set(self, force_cache=False):
         """ returns Celery tasks which are called in node_utils.get_analysis_update_task before children are loaded
             Uses tasks not signatures so they are hashable in a set to be able to remove dupes """
 
-        task_args_objs_set = set()
+        task_args_set = set()
         if self.is_valid() and (force_cache or self.use_cache):
             if parent := self.get_unmodified_single_parent_node():
-                return parent.get_cache_task_args_objs_set(force_cache=force_cache)
+                return parent.get_cache_task_args_set(force_cache=force_cache)
 
             node_cache, created = NodeCache.get_or_create_for_node(self)
             if created:
-                task_args_objs_set.add((self.NODE_CACHE_TASK, (self.pk, self.version), node_cache))
+                task_args_set.add((self.NODE_CACHE_TASK, (self.pk, self.version)))
             else:
                 # Cache has been launched already, we just need to make sure it's ready, so launch a task
                 # waiting on it, to be used as a dependency
-                task_args_objs_set.add((self.WAIT_FOR_CACHE_TASK, (node_cache.pk, ), node_cache))
-        return task_args_objs_set
+                task_args_set.add((self.WAIT_FOR_CACHE_TASK, (node_cache.pk, )))
+        return task_args_set
 
     def get_parent_subclasses_and_errors(self):
         if self._cached_parents is None:

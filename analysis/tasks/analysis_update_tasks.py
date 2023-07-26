@@ -127,7 +127,7 @@ def _add_jobs_for_group(nodes_to_update, dependencies, grp, groups, existing_cac
             update_job = node.get_update_task()
 
             # Cache jobs are separated, and put in a set to remove dupes such as when >=2 venn's have the same parents
-            task_args_objs_set = node.get_cache_task_args_objs_set()
+            task_args_objs_set = node.get_cache_task_args_set()
             new_cache_jobs = task_args_objs_set - existing_cache_jobs
             if new_cache_jobs:
                 cache_jobs.update(new_cache_jobs)
@@ -141,7 +141,7 @@ def _add_jobs_for_group(nodes_to_update, dependencies, grp, groups, existing_cac
                 jobs.append(wait_for_node.si(node.pk))  # @UndefinedVariable
 
     if cache_jobs:
-        for task, args, _ in cache_jobs:
+        for task, args in cache_jobs:
             if task:
                 jobs.append(Signature(task, args=args, immutable=True))
 
