@@ -1092,6 +1092,7 @@ class NodeVersion(models.Model):
 
 
 class NodeCache(models.Model):
+    """ This is only used by Intersection node now """
     node_version = models.OneToOneField(NodeVersion, on_delete=CASCADE)
     variant_collection = models.OneToOneField(VariantCollection, on_delete=CASCADE)
 
