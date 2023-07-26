@@ -15,7 +15,6 @@ from analysis.models.enums import SetOperations
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeStatus, NodeVersion
 from library.database_utils import queryset_to_sql
 from snpdb.models import VariantCollection, ProcessingStatus
-from snpdb.variant_collection import write_variant_set_operation
 
 
 class VennNode(AnalysisNode):
@@ -261,17 +260,35 @@ def venn_cache_count(vennode_cache_id):
         a_qs = a.get_queryset()
         b_qs = b.get_queryset()
 
-        a_sql = queryset_to_sql(a_qs.values_list('id'))
-        b_sql = queryset_to_sql(b_qs.values_list('id'))
+        # We now retrieve variant ids and do set operations in Python
+        # We originally did this via except/intersect then select into but sometimes
+        # died w/ "too many range tables" (joining across too many partitions)
 
+        # If we were going to do that we should have used Django QS methods instead
+        # https://docs.djangoproject.com/en/4.1/ref/models/querysets/#union
+        # and then write_sql_to_variant_collection
+
+        a_variants = set(a_qs.values_list("pk", flat=True))
+        b_variants = set(b_qs.values_list("pk", flat=True))
+        variants = set()
         if vennode_cache.intersection_type == VennNodeCache.A_ONLY:
-            write_variant_set_operation(vc, a_sql, b_sql, 'EXCEPT')
+            variants = a_variants - b_variants
         elif vennode_cache.intersection_type == VennNodeCache.INTERSECTION:
-            write_variant_set_operation(vc, a_sql, b_sql, 'INTERSECT')
+            variants = a_variants & b_variants
         elif vennode_cache.intersection_type == VennNodeCache.B_ONLY:
-            write_variant_set_operation(vc, b_sql, a_sql, 'EXCEPT')
+            variants = b_variants - a_variants
 
-        # TODO: Do we need to set something here so it's ready?
+        if variants:
+            # We need to join to our partition - so hack the db_table but be sure to put it back in finally
+            old_db_table = VariantCollectionRecord._meta.db_table
+            try:
+                VariantCollectionRecord._meta.db_table = vc.get_partition_table()
+                vcr_iterator = (VariantCollectionRecord(variant_collection=vc, variant_id=v_id)
+                                for v_id in variants)
+                VariantCollectionRecord.objects.bulk_create(vcr_iterator, batch_size=2000)
+            finally:
+                VariantCollectionRecord._meta.db_table = old_db_table
+
         logging.debug("Done writing variant collection")
         vc.status = ProcessingStatus.SUCCESS
     except Exception as e:
