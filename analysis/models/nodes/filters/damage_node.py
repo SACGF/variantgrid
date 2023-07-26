@@ -106,7 +106,7 @@ class DamageNode(AnalysisNode):
 
     def has_individual_pathogenic_predictions(self) -> bool:
         _COLUMNS_VERSION = {
-            1: [self.cadd_score_min, self.revel_score_min, ],
+            1: [self.cadd_score_min, self.revel_score_min],
             2: [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min, self.clinpred_rankscore_min,
                 self.metalr_rankscore_min, self.revel_rankscore_min, self.vest4_rankscore_min],
         }
