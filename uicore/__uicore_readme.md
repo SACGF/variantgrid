@@ -22,3 +22,13 @@ labelled: {% labelled label="name" %}{{ name }}{% endlabelled %}
 
 This is just a short-cut to making a Bootstrap row that assigns a consistent amount of cols for different screen sizes.
 
+UI Tab Builder
+Used for dividing a page into bootstrap tabs, where the tabs can either be ui_register_tab_embedded and have the data in them or
+ui_register_tab where you provide a URL creating an AJAX tab where the contents are loaded when needed. 
+
+*TODO* It would be nice to merge english_tags.py, js_tags.py & ui_utils.py as a few tags within js_tags.py have nothing to do with JavaScript
+
+## ValidatedJson
+
+ValidatedJson is a way of storing & displaying JSON with inbuilt infos, warnings & errors.
+Primarily used by ClinVarExports it show the JSON we would be sending to ClinVar, with any issues inlined.
