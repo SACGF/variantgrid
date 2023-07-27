@@ -307,72 +307,75 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         ct: ConditionText
         ct, ct_is_new = ConditionText.objects.get_or_create(normalized_text=normalized, lab=lab)
 
-        # ensure each step of the hierarchy is present
-        root, new_root = ConditionTextMatch.objects.get_or_create(
-            condition_text=ct,
-            gene_symbol=None,
-            mode_of_inheritance=None,
-            classification=None
-        )
+        ct = ConditionText.objects.select_for_update().filter(pk=ct.pk).first()
+        with transaction.atomic():
 
-        gene_level, new_gene_level = ConditionTextMatch.objects.get_or_create(
-            parent=root,
-            condition_text=ct,
-            gene_symbol=gene_symbol,
-            mode_of_inheritance=None,
-            classification=None
-        )
+            # ensure each step of the hierarchy is present
+            root, new_root = ConditionTextMatch.objects.get_or_create(
+                condition_text=ct,
+                gene_symbol=None,
+                mode_of_inheritance=None,
+                classification=None
+            )
 
-        mode_of_inheritance_level, _ = ConditionTextMatch.objects.get_or_create(
-            parent=gene_level,
-            condition_text=ct,
-            gene_symbol=gene_symbol,
-            mode_of_inheritance=mode_of_inheritance,
-            classification=None
-        )
+            gene_level, new_gene_level = ConditionTextMatch.objects.get_or_create(
+                parent=root,
+                condition_text=ct,
+                gene_symbol=gene_symbol,
+                mode_of_inheritance=None,
+                classification=None
+            )
 
-        ct_save_required = False
-        if existing:
-            if existing.parent != mode_of_inheritance_level or \
-                    existing.condition_text != ct or \
-                    existing.gene_symbol != gene_symbol or \
-                    existing.mode_of_inheritance != mode_of_inheritance:
-
-                # update existing to new hierarchy
-                # assume if a condition has been set for this classification specifically that it's
-                # still valid
-                old_text = existing.condition_text
-                existing.parent = mode_of_inheritance_level
-                existing.condition_text = ct
-                existing.mode_of_inheritance = mode_of_inheritance
-                existing.save()
-                ct_save_required = True
-                if update_counts:
-                    update_condition_text_match_counts(old_text)
-                    old_text.save()
-            else:
-                # nothing has changed, no need to update anything
-                return
-        else:
-            ConditionTextMatch.objects.create(
-                parent=mode_of_inheritance_level,
+            mode_of_inheritance_level, _ = ConditionTextMatch.objects.get_or_create(
+                parent=gene_level,
                 condition_text=ct,
                 gene_symbol=gene_symbol,
                 mode_of_inheritance=mode_of_inheritance,
-                classification=classification
+                classification=None
             )
 
-        if attempt_automatch and (new_root or new_gene_level):
-            ConditionTextMatch.attempt_automatch(ct)
-            ct_save_required = True
+            ct_save_required = False
+            if existing:
+                if existing.parent != mode_of_inheritance_level or \
+                        existing.condition_text != ct or \
+                        existing.gene_symbol != gene_symbol or \
+                        existing.mode_of_inheritance != mode_of_inheritance:
 
-        if update_counts:
-            update_condition_text_match_counts(ct)
-            ct_save_required = True
+                    # update existing to new hierarchy
+                    # assume if a condition has been set for this classification specifically that it's
+                    # still valid
+                    old_text = existing.condition_text
+                    existing.parent = mode_of_inheritance_level
+                    existing.condition_text = ct
+                    existing.mode_of_inheritance = mode_of_inheritance
+                    existing.save()
+                    ct_save_required = True
+                    if update_counts:
+                        update_condition_text_match_counts(old_text)
+                        old_text.save()
+                else:
+                    # nothing has changed, no need to update anything
+                    return
+            else:
+                ConditionTextMatch.objects.create(
+                    parent=mode_of_inheritance_level,
+                    condition_text=ct,
+                    gene_symbol=gene_symbol,
+                    mode_of_inheritance=mode_of_inheritance,
+                    classification=classification
+                )
 
-        if ct_save_required:
-            ct.save()
+	        if attempt_automatch and (new_root or new_gene_level):
+	            ConditionTextMatch.attempt_automatch(ct)
+	            ct_save_required = True
 
+	        if update_counts:
+	            update_condition_text_match_counts(ct)
+	            ct_save_required = True
+
+	        if ct_save_required:
+	            ct.save()
+                
     def as_resolved_condition(self) -> Optional[ConditionResolvedDict]:
         """
         Converts this specific ConditionTextMatch to a ConditionResolvedDict (suitabe for saving on a classification).
