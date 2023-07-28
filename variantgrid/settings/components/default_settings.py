@@ -954,7 +954,7 @@ VARIANT_MANUAL_CREATE = True
 VARIANT_MANUAL_CREATE_BY_NON_ADMIN = True
 # Below this size, variants are stored with ref/alt sequences. Above this threshold, they become
 # structural variants and use symbolic
-VARIANT_STRUCTURAL_SIZE = 1000
+VARIANT_SYMBOLIC_ALT_SIZE = 1000
 
 VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS = False
 VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS_PREFER_CANONICAL_WITH_DIFF_VERSION = True

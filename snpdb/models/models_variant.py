@@ -245,30 +245,28 @@ class AlleleMergeLog(TimeStampedModel):
 @dataclass(frozen=True)
 class VariantCoordinate(FormerTuple):
     chrom: str
-    pos: int
+    start: int
+    end: int
     ref: str
     alt: str
-    end: int
 
     @property
     def as_tuple(self) -> Tuple:
-        return self.chrom, self.pos, self.ref, self.alt, self.end
+        return self.chrom, self.start, self.end, self.ref, self.alt
 
     def __str__(self):
-        s = f"{self.chrom}:{self.pos} {self.ref}>{self.alt}"
-        if self.end is not None:
-            s += f" (end={self.end})"
+        s = f"{self.chrom}:{self.start}-{self.end} {self.ref}>{self.alt}"
         return s
 
     @staticmethod
     def from_clean_str(clean_str: str):
         if full_match := VARIANT_PATTERN.fullmatch(clean_str):
             chrom = full_match.group(1)
-            pos = int(full_match.group(2))
+            start = int(full_match.group(2))
             ref = full_match.group(3)
             alt = full_match.group(4)
-            end = pos + abs(len(ref) - len(alt))
-            return VariantCoordinate(chrom, pos, ref, alt, end)
+            end = start + abs(len(ref) - len(alt))
+            return VariantCoordinate(chrom, start, end, ref, alt)
 
 
 class Sequence(models.Model):
@@ -425,18 +423,18 @@ class Variant(PreviewModelMixin, models.Model):
         return f"{chrom}:{p_str}:{d_str}:{i_str}"
 
     @staticmethod
-    def format_tuple(chrom, position, ref, alt, end, abbreviate=False) -> str:
+    def format_tuple(chrom, start, end, ref, alt, abbreviate=False) -> str:
         is_symbolic = Sequence.allele_is_symbolic(ref) or Sequence.allele_is_symbolic(alt)
         if is_symbolic:
             if alt == "<CNV>":
                 # There's not really a format for these
-                return f"CNV {chrom}:{position}-{end}"
-            return Variant.tuple_to_spdi(chrom, position, ref, alt, end)
+                return f"CNV {chrom}:{start}-{end}"
+            return Variant.tuple_to_spdi(chrom, start, end, ref, alt)
 
         if abbreviate:
             ref = Sequence.abbreviate(ref)
             alt = Sequence.abbreviate(alt)
-        return f"{chrom}:{position} {ref}>{alt}"
+        return f"{chrom}:{start} {ref}>{alt}"
 
     @staticmethod
     def get_tuple_from_string(variant_string: str, genome_build: GenomeBuild,
@@ -449,7 +447,7 @@ class Variant(PreviewModelMixin, models.Model):
                                                                      want_chr=genome_build.reference_fasta_has_chr)
             contig = genome_build.chrom_contig_mappings[chrom]
             end = Variant.calculate_end(position, ref, alt)
-            variant_tuple = VariantCoordinate(contig.name, int(position), ref, alt, end)
+            variant_tuple = VariantCoordinate(contig.name, int(position), end, ref, alt)
         return variant_tuple
 
     @staticmethod
@@ -477,8 +475,8 @@ class Variant(PreviewModelMixin, models.Model):
     def coordinate(self) -> VariantCoordinate:
         locus = self.locus
         contig = locus.contig
-        return VariantCoordinate(chrom=contig.name, pos=locus.position, ref=locus.ref.seq, alt=self.alt.seq,
-                                 end=self.end)
+        return VariantCoordinate(chrom=contig.name, start=locus.position, end=self.end,
+                                 ref=locus.ref.seq, alt=self.alt.seq)
 
     @staticmethod
     def is_ref_alt_reference(ref, alt):

@@ -224,9 +224,11 @@ class TestHGVS(TestCase):
     def _test_reference_diff(self, hgvs_converter_type: HGVSConverterType):
         TEST_HGVS = [
             # No provided ref
-            ('NM_001145661.2(GATA2):c.1113dup', VariantCoordinate(chrom='3', pos=128200691, ref='C', alt='CG'), True),
+            ('NM_001145661.2(GATA2):c.1113dup', VariantCoordinate(chrom='3', start=128200691, end=128200692,
+                                                                  ref='C', alt='CG'), True),
             # provided ref = genomic ref
-            ('NM_001145661.2(GATA2):c.1113dupC', VariantCoordinate(chrom='3', pos=128200691, ref='C', alt='CG'), True),
+            ('NM_001145661.2(GATA2):c.1113dupC', VariantCoordinate(chrom='3', start=128200691, end=128200692,
+                                                                   ref='C', alt='CG'), True),
             # GATA2 is '-' strand, so provided ref C = genomic ref = G
             # This is normalized left
             #('NM_001145661.2(GATA2):c.1113dupG', VariantCoordinate(chrom='3', pos=128200690, ref='G', alt='GC'),

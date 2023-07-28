@@ -24,17 +24,37 @@ def _as_interbase(posedit):
 
 
 class Babelfish:
-    def __init__(self, hdp, assembly_name):
+    def __init__(self, hdp, assembly_name, symbolic_size_threshold=None):
+        """ symbolic_size_threshold - size of alt where you use symbolic alts eg <DEL> or <DUP>
+                                    - you need to call hgvs_to_vcf_start_end
+        """
         self.assembly_name = assembly_name
         self.hdp = hdp
         self.hn = hgvs.normalizer.Normalizer(hdp, cross_boundaries=False, shuffle_direction=5, validate=False)
         self.ac_to_name_map = make_ac_name_map(assembly_name)
         self.name_to_ac_map = make_name_ac_map(assembly_name)
+        self.symbolic_size_threshold = symbolic_size_threshold
 
     def hgvs_to_vcf(self, var_g):
+        if self.symbolic_size_threshold is not None:
+            raise ValueError("You must call call 'hgvs_to_vcf_with_end' or 'hgvs_to_vcf_and_info' "
+                             "when 'symbolic_size_threshold' is set")
+        chrom, start_i, _, ref, alt, typ = self.hgvs_to_vcf_with_end(var_g)
+        return chrom, start_i, ref, alt, typ
+
+    @staticmethod
+    def allele_is_symbolic(allele):
+        return allele.startswith("<") and allele.endswith(">")
+
+    def hgvs_to_vcf_with_info(self, var_g):
+        chrom, start_i, end_i, ref, alt, typ = self.hgvs_to_vcf_with_end(var_g)
+        info = {}
+        return chrom, start_i, ref, alt, info, typ
+
+    def hgvs_to_vcf_with_end(self, var_g):
         """**EXPERIMENTAL**
 
-        converts a single hgvs allele to (chr, pos, ref, alt) using
+        converts a single hgvs allele to (chr, start, end, ref, alt, type) using
         the given assembly_name. The chr name uses official chromosome
         name (i.e., without a "chr" prefix).
         """
@@ -44,11 +64,20 @@ class Babelfish:
 
         vleft = self.hn.normalize(var_g)
 
-        (start_i, end_i) = _as_interbase(vleft.posedit)
+        start_i, end_i = _as_interbase(vleft.posedit)
 
         chrom = self.ac_to_name_map[vleft.ac]
 
         typ = vleft.posedit.edit.type
+
+        # Symbolic
+        if self.symbolic_size_threshold is not None and typ in ('dup', 'del'):
+            length = end_i - start_i
+            if length >= self.symbolic_size_threshold:
+                # Just need 1 base REF
+                ref = self.hdp.seqfetcher.fetch_seq(vleft.ac, start_i-1, start_i)
+                alt = "<" + typ.upper() + ">"
+                return chrom, start_i, end_i, ref, alt, typ
 
         if typ == "dup":
             start_i -= 1
@@ -68,7 +97,7 @@ class Babelfish:
                 ref = vleft.posedit.edit.ref
                 if ref == alt:
                     alt = '.'
-        return chrom, start_i + 1, ref, alt, typ
+        return chrom, start_i + 1, end_i, ref, alt, typ
 
     def vcf_to_g_hgvs(self, chrom, position, ref, alt):
         ac = self.name_to_ac_map[chrom]
@@ -103,50 +132,3 @@ class Babelfish:
                                                          uncertain=False)))
         n = Normalizer(self.hdp)
         return n.normalize(var_g)
-
-
-if __name__ == "__main__":
-    """
-      49949___  400       410       420
-                  |123456789|123456789|
-    NC_000006.12  GACCAGAAAGAAAAATAAAAC
-
-    """
-
-    import hgvs.easy
-    import hgvs.normalizer
-    from hgvs.extras.babelfish import Babelfish
-
-    babelfish38 = Babelfish(hgvs.easy.hdp, assembly_name="GRCh38")
-    hnl = hgvs.normalizer.Normalizer(hgvs.easy.hdp, cross_boundaries=False, shuffle_direction=5, validate=False)
-
-    def _h2v(h):
-        return babelfish38.hgvs_to_vcf(hgvs.easy.parser.parse(h))
-
-    def _vp(h):
-        v = hgvs.easy.parser.parse(h)
-        vl = hnl.normalize(v)
-        return (v, vl)
-
-    for h in (
-        # Non-variation
-        "NC_000006.12:g.49949407=",
-        # SNV
-        "NC_000006.12:g.49949407A>T",
-        # delins
-        "NC_000006.12:g.49949413_49949414delinsCC",
-        # del
-        "NC_000006.12:g.49949415del",
-        "NC_000006.12:g.49949413del",
-        "NC_000006.12:g.49949414del",
-        "NC_000006.12:g.49949413_49949414del",
-        # ins
-        "NC_000006.12:g.49949413_49949414insC",
-        "NC_000006.12:g.49949414_49949415insC",
-        "NC_000006.12:g.49949414_49949415insCC",
-        # ins (dup)
-        "NC_000006.12:g.49949413_49949414insA",
-        "NC_000006.12:g.49949414_49949415insA",
-        "NC_000006.12:g.49949414_49949415insAA",
-    ):
-        print('assert _h2v("{h}") == {res}'.format(res=str(_h2v(h)), h=h))

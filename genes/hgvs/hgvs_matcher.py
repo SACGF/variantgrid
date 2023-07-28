@@ -114,7 +114,7 @@ class HGVSMatcher:
             variant_coord = ca.get_variant_tuple(self.genome_build)
             # Was converted to internal, need to return raw strings so standard base validation is OK
             if variant_coord.alt == Variant.REFERENCE_ALT:
-                variant_coord = VariantCoordinate(variant_coord.chrom, variant_coord.pos,
+                variant_coord = VariantCoordinate(variant_coord.chrom, variant_coord.start, variant_coord.end,
                                                   variant_coord.ref, variant_coord.ref)  # ref == alt
             return variant_coord
         except ClinGenAlleleAPIException:
@@ -332,24 +332,15 @@ class HGVSMatcher:
             method = self.hgvs_converter.description()
             variant_tuple, matches_reference = self.hgvs_converter.hgvs_to_variant_coords_and_reference_match(hgvs_string, None)
 
-        (chrom, position, ref, alt) = variant_tuple
+        (chrom, start, end, ref, alt) = variant_tuple
 
         ref = ref.upper()
         alt = alt.upper()
 
-        if settings.VARIANT_STANDARD_BASES_ONLY:
-            for k, v in {"alt": alt, "ref": ref}.items():
-                non_standard_bases = v
-                for n in "GATC":
-                    non_standard_bases = non_standard_bases.replace(n, "")
-                if non_standard_bases:
-                    msg = f"'{hgvs_string}': {k}={v} contains non-standard (A,C,G,T) bases: {non_standard_bases}"
-                    raise HGVSException(msg)
-
         if Variant.is_ref_alt_reference(ref, alt):
             alt = Variant.REFERENCE_ALT
         return VariantCoordinateAndDetails(
-            variant_coordinate=VariantCoordinate(chrom, position, ref, alt),
+            variant_coordinate=VariantCoordinate(chrom, start, end, ref, alt),
             transcript_accession=used_transcript_accession,
             kind=kind,
             method=method,

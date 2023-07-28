@@ -8,7 +8,7 @@ def variant_link_info(variant: Variant, genome_build: GenomeBuild) -> Dict[str, 
     link_data: Dict[str, Any] = {}
     coordinate = variant.coordinate
     #FIXME this really needs to refer to SpecialEKeys but can't due to its package
-    link_data['variant_coordinate'] = f'{coordinate.chrom}:{coordinate.pos} {coordinate.ref}>{coordinate.alt}'
+    link_data['variant_coordinate'] = f'{coordinate.chrom}:{coordinate.start} {coordinate.ref}>{coordinate.alt}'
     link_data['variant_string'] = str(variant)
     link_data['genome_build'] = genome_build.name
     link_data['canonical_c_hgvs'] = variant.get_canonical_c_hgvs(genome_build)

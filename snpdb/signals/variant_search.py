@@ -179,7 +179,7 @@ def get_results_from_variant_tuples(qs: QuerySet, data: VariantCoordinate, any_a
     :param any_alt: If true, search without using alt and return all matches
     :return: A QuerySet of variants
     """
-    chrom, position, ref, alt, end = data
+    chrom, position, end, ref, alt = data
     position = int(position)
 
     results = qs.filter(Variant.get_chrom_q(chrom), locus__position=position, locus__ref__seq=ref, end=end)
@@ -203,7 +203,7 @@ def yield_search_variant_match(search_input: SearchInputInstance):
                                                                  want_chr=genome_build.reference_fasta_has_chr)
         end = Variant.calculate_end(position, ref, alt)
         results = get_results_from_variant_tuples(search_input.get_visible_variants(genome_build),
-                                                  VariantCoordinate(chrom, position, ref, alt, end))
+                                                  VariantCoordinate(chrom, position, end, ref, alt))
         has_results = False
         if results.exists():
             has_results = True
@@ -213,7 +213,7 @@ def yield_search_variant_match(search_input: SearchInputInstance):
             yield SearchMessageOverall(", ".join(errors), genome_builds=[genome_build])
         else:
             if not has_results:
-                variant_string = Variant.format_tuple(chrom, position, ref, alt)
+                variant_string = Variant.format_tuple(chrom, position, end, ref, alt)
                 if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build, variant_string=variant_string):
                     search_message = f"The variant {variant_string} does not exist in our database"
                     yield create_manual, search_message
