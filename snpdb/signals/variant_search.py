@@ -179,10 +179,10 @@ def get_results_from_variant_tuples(qs: QuerySet, data: VariantCoordinate, any_a
     :param any_alt: If true, search without using alt and return all matches
     :return: A QuerySet of variants
     """
-    (chrom, position, ref, alt) = data
+    chrom, position, ref, alt, end = data
     position = int(position)
 
-    results = qs.filter(Variant.get_chrom_q(chrom), locus__position=position, locus__ref__seq=ref)
+    results = qs.filter(Variant.get_chrom_q(chrom), locus__position=position, locus__ref__seq=ref, end=end)
     if not any_alt:
         results = results.filter(alt__seq=alt)
 
@@ -201,8 +201,10 @@ def yield_search_variant_match(search_input: SearchInputInstance):
         chrom, position, ref, alt = search_input.match.groups()
         chrom, position, ref, alt = Variant.clean_variant_fields(chrom, position, ref, alt,
                                                                  want_chr=genome_build.reference_fasta_has_chr)
+        end = Variant.calculate_end(position, ref, alt)
+        results = get_results_from_variant_tuples(search_input.get_visible_variants(genome_build),
+                                                  VariantCoordinate(chrom, position, ref, alt, end))
         has_results = False
-        results = get_results_from_variant_tuples(search_input.get_visible_variants(genome_build), VariantCoordinate(chrom, position, ref, alt))
         if results.exists():
             has_results = True
             yield results

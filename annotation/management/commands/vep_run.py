@@ -9,6 +9,7 @@ import os
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
+from annotation.models import VariantAnnotationPipelineType
 from annotation.vep_annotation import run_vep
 from snpdb.models.models_genome import GenomeBuild
 
@@ -47,7 +48,8 @@ class Command(BaseCommand):
 
         output_filename = os.path.join(output_dir, f"{base_name}.{vep_suffix}.vcf.gz")
         return_code, std_out, std_err = run_vep(vcf_filename, output_filename,
-                                                genome_build, genome_build.annotation_consortium)
+                                                genome_build, genome_build.annotation_consortium,
+                                                VariantAnnotationPipelineType.STANDARD)
         if return_code != 0:
             logging.info(std_out)
             logging.error(std_err)

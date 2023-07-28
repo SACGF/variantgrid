@@ -46,11 +46,14 @@
         <div class="card-header">Annotation Run ({{ annotation_run.pk }})</div>
         <div class="card-body">
             {% labelled hint="tiny" label="Status" %}{{ annotation_run.get_status_display }}{% endlabelled %}
+            {% labelled hint="tiny" label="Pipeline Type" %}{{ annotation_run.get_pipeline_type_display }}{% endlabelled %}
+
             <hr/>
             <div class="row">
 
                 <div class="col-6">
                     {% labelled hint="tiny" label="Upload Attempts" %}{{ annotation_run.upload_attempts }}{% endlabelled %}
+                    {% labelled hint="tiny" label="Dump Count" %}{{ annotation_run.dump_count }}{% endlabelled %}
                     {% labelled hint="tiny" label="Annotated Count" %}{{ annotation_run.annotated_count }}{% endlabelled %}
                     {% labelled hint="tiny" label="VEP Skipped Count" %}{{ annotation_run.vep_skipped_count }}{% endlabelled %}
                     {% labelled hint="tiny" label="VEP Warnings" %}{% code_shell annotation_run.vep_warnings %}{% endlabelled %}

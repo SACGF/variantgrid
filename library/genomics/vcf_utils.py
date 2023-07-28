@@ -4,9 +4,10 @@ import re
 from collections import defaultdict
 from typing import Tuple
 
+import cyvcf2
 import vcf
 
-from snpdb.models import Variant
+from snpdb.models import Variant, Sequence
 
 
 class VCFConstant:
@@ -15,6 +16,7 @@ class VCFConstant:
     DEFAULT_ALLELE_FIELD = 'AD'
     DEFAULT_ALLELE_FREQUENCY_FIELD = "AF"
     DEFAULT_READ_DEPTH_FIELD = 'DP'
+    DEFAULT_GENOTYPE_FIELD = 'GT'
     DEFAULT_GENOTYPE_QUALITY_FIELD = 'GQ'
     DEFAULT_PHRED_LIKILIHOOD_FIELD = 'PL'
     DEFAULT_SAMPLE_FILTERS_FIELD = 'FT'
@@ -54,7 +56,7 @@ def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=Fal
     if tuples_have_id_field:
         vcf_tuples = variant_tuples
     else:
-        vcf_tuples = ((chrom, position, ".", ref, alt) for (chrom, position, ref, alt) in variant_tuples)
+        vcf_tuples = ((chrom, position, ".", ref, alt, end) for (chrom, position, ref, alt, end) in variant_tuples)
 
     vcf_tuples = sorted(vcf_tuples, key=operator.itemgetter(0, 1, 3, 4))
     columns = "\t".join(["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"])
@@ -63,7 +65,7 @@ def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=Fal
     with open(vcf_filename, "wt", encoding="utf-8") as f:
         f.write(header + "\n")
         for vcf_record in vcf_tuples:
-            (chrom, position, id_col, ref, alt) = vcf_record
+            (chrom, position, id_col, ref, alt, end) = vcf_record
             if alt == Variant.REFERENCE_ALT:
                 alt = "."
             line = "\t".join((chrom, str(position), str(id_col), ref, alt)) + empty_columns
@@ -96,3 +98,27 @@ def get_variant_caller_and_version_from_vcf(filename) -> Tuple[str, str]:
                     version = version.replace('"', "")  # Strip quotes
 
     return variant_caller, version
+
+
+def vcf_allele_is_symbolic(allele: str) -> bool:
+    return allele.startswith("<") and allele.endswith(">")
+
+
+def vcf_get_ref_alt_end(variant: cyvcf2.Variant):
+    ref = variant.REF.strip().upper()
+    if variant.ALT:
+        alt = variant.ALT[0].strip().upper()
+    else:
+        alt = Variant.REFERENCE_ALT
+
+    if Sequence.allele_is_symbolic(ref) or Sequence.allele_is_symbolic(alt):
+        # Need to provide END or SVLEN
+        if end_info := variant.INFO.get('END'):
+            end = end_info
+        elif svlen_info := variant.INFO.get('SVLEN'):
+            end = variant.POS + abs(svlen_info)
+        else:
+            raise ValueError(f"SVLEN or END info field MUST be provided for symbolic (ie '<x>') {ref=},{alt=}")
+    else:
+        end = variant.POS + abs(len(ref) - len(alt))
+    return ref, alt, end

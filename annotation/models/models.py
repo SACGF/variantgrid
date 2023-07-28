@@ -27,7 +27,8 @@ from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
 from annotation.models.models_enums import AnnotationStatus, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
-    ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, EssentialGeneGeneTrap
+    ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, \
+    EssentialGeneGeneTrap, VariantAnnotationPipelineType
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
@@ -571,7 +572,9 @@ class AnnotationRangeLock(models.Model):
 
 class AnnotationRun(TimeStampedModel):
     status = models.CharField(max_length=1, choices=AnnotationStatus.choices, default=AnnotationStatus.CREATED)
-    annotation_range_lock = models.OneToOneField(AnnotationRangeLock, null=True, on_delete=CASCADE)
+    annotation_range_lock = models.ForeignKey(AnnotationRangeLock, null=True, on_delete=CASCADE)
+    pipeline_type = models.CharField(max_length=1, choices=VariantAnnotationPipelineType.choices,
+                                     default=VariantAnnotationPipelineType.STANDARD)
     # task_id is used as a lock to prevent multiple Celery jobs from executing same job
     task_id = models.CharField(max_length=36, null=True)
     dump_start = models.DateTimeField(null=True)
@@ -590,8 +593,12 @@ class AnnotationRun(TimeStampedModel):
     vep_warnings = models.TextField(null=True)
     vcf_dump_filename = models.TextField(null=True)
     vcf_annotated_filename = models.TextField(null=True)
+    dump_count = models.IntegerField(null=True)
     annotated_count = models.IntegerField(null=True)
     celery_task_logs = models.JSONField(null=False, default=dict)  # Key=task_id, so we keep logs from multiple runs
+
+    class Meta:
+        unique_together = ('annotation_range_lock', 'pipeline_type')
 
     @property
     def variant_annotation_version(self):
@@ -610,14 +617,17 @@ class AnnotationRun(TimeStampedModel):
                 status = AnnotationStatus.DUMP_STARTED
             if self.dump_end:
                 status = AnnotationStatus.DUMP_COMPLETED
-            if self.annotation_start:
-                status = AnnotationStatus.ANNOTATION_STARTED
-            if self.annotation_end:
-                status = AnnotationStatus.ANNOTATION_COMPLETED
-            if self.upload_start:
-                status = AnnotationStatus.UPLOAD_STARTED
-            if self.upload_end:
+            if self.dump_count == 0:
                 status = AnnotationStatus.FINISHED
+            else:
+                if self.annotation_start:
+                    status = AnnotationStatus.ANNOTATION_STARTED
+                if self.annotation_end:
+                    status = AnnotationStatus.ANNOTATION_COMPLETED
+                if self.upload_start:
+                    status = AnnotationStatus.UPLOAD_STARTED
+                if self.upload_end:
+                    status = AnnotationStatus.FINISHED
         return status
 
     @property
@@ -636,6 +646,15 @@ class AnnotationRun(TimeStampedModel):
             qs = get_queryset_for_annotation_version(klass, annotation_version)
             qs.filter(annotation_run=self).delete()
 
+    def get_dump_filename(self) -> str:
+        PIPELINE_TYPE = {
+            VariantAnnotationPipelineType.STANDARD: "standard",
+            VariantAnnotationPipelineType.CNV: "cnv",
+        }
+        type_desc = PIPELINE_TYPE.get(self.pipeline_type, str(self.pipeline_type))
+        vcf_base_name = f"dump_{self.pk}_{type_desc}.vcf"
+        return os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, vcf_base_name)
+
     def delete(self, using=None, keep_parents=False):
         self.delete_related_objects()
         super().delete(using=using, keep_parents=keep_parents)
@@ -646,7 +665,7 @@ class AnnotationRun(TimeStampedModel):
         task_log[key] = value
 
     def __str__(self):
-        return f"AnnotationRun: {localtime(self.modified)} ({self.status})"
+        return f"AnnotationRun: {self.pk}/{self.get_pipeline_type_display()}: ({self.status})"
 
 
 class AbstractVariantAnnotation(models.Model):
@@ -667,7 +686,8 @@ class AbstractVariantAnnotation(models.Model):
     # The best way to see how these map to VEP fields is via the annotation details page
     amino_acids = models.TextField(null=True, blank=True)
     cadd_phred = models.FloatField(null=True, blank=True)
-    canonical = models.BooleanField(null=True, blank=True)  # TODO: This doesn't need to be nullable (default=False)
+    # TODO: This doesn't need to be nullable (default=False) - but will be slow. Change with next schema change
+    canonical = models.BooleanField(null=True, blank=True)
     nmd_escaping_variant = models.BooleanField(null=True, blank=True)
     codons = models.TextField(null=True, blank=True)
     consequence = models.TextField(null=True, blank=True)
@@ -869,7 +889,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
     # List of filters to describe variants that can be annotated
     VARIANT_ANNOTATION_Q = [
         Variant.get_no_reference_q(),
-        ~Q(alt__seq__in=['.', '*', "<DEL>"]),  # Exclude non-standard variants
+        ~Q(alt__seq__in=['.', '*']),  # Exclude non-standard variants
     ]
 
     @cached_property

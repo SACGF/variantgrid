@@ -88,10 +88,10 @@ def annotate_variants(annotation_run_id):
                        extra_data={'output': error_message,
                                    'error': tb})
 
+        create_event(None, "AnnotationRun failed", tb, severity=LogLevel.ERROR)
         annotation_run.error_exception = tb
         annotation_run.set_task_log("error_exception", tb)
         annotation_run.save()
-        create_event(None, "AnnotationRun failed", tb, severity=LogLevel.ERROR)
         raise
     finally:
         annotation_run.set_task_log("end", timezone.now())
@@ -100,9 +100,7 @@ def annotate_variants(annotation_run_id):
 
 
 def dump_and_annotate_variants(annotation_run):
-    vcf_base_name = f"dump_{annotation_run.pk}.vcf"
-    vcf_dump_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, vcf_base_name)
-
+    vcf_dump_filename = annotation_run.get_dump_filename()
     annotation_run.dump_start = timezone.now()
     annotation_run.vcf_dump_filename = vcf_dump_filename
     annotation_run.save()
@@ -110,18 +108,20 @@ def dump_and_annotate_variants(annotation_run):
     genome_build = annotation_run.genome_build
     annotation_consortium = annotation_run.annotation_consortium
     variants_to_annotate = _unannotated_variants_to_vcf(genome_build, vcf_dump_filename,
-                                                        annotation_run.annotation_range_lock)
+                                                        annotation_run.annotation_range_lock,
+                                                        annotation_run.pipeline_type)
+
+    annotation_run.dump_end = timezone.now()
+    annotation_run.save()
 
     logging.info("Annotating %d variants", variants_to_annotate)
     if variants_to_annotate:
-        annotation_run.dump_end = timezone.now()
-        annotation_run.save()
-
         name = name_from_filename(vcf_dump_filename)
         vcf_annotated_basename = f"{name}.vep_annotated_{genome_build.name}.vcf.gz"
         vcf_annotated_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, vcf_annotated_basename)
 
-        cmd = get_vep_command(vcf_dump_filename, vcf_annotated_filename, genome_build, annotation_consortium)
+        cmd = get_vep_command(vcf_dump_filename, vcf_annotated_filename, genome_build, annotation_consortium,
+                              annotation_run.pipeline_type)
         annotation_run.annotation_start = timezone.now()
         annotation_run.pipeline_command = " ".join(cmd)
         annotation_run.save()
@@ -134,10 +134,14 @@ def dump_and_annotate_variants(annotation_run):
             annotation_run.save()  # save stdout/stderr
             raise RuntimeError(f"VEP returned {return_code}")
 
-        now = timezone.now()
         annotation_run.vcf_annotated_filename = vcf_annotated_filename
-        annotation_run.annotation_end = now
-        annotation_run.save()
+        annotation_run.annotation_end = timezone.now()
+    else:
+        # Now we have standard/CNV type pipelines, it's possible some can be empty
+        annotation_run.dump_count = 0
+        annotation_run.annotated_count = 0
+
+    annotation_run.save()
 
 
 def annotation_run_retry(annotation_run: AnnotationRun, upload_only=False) -> AnnotationRun:
@@ -165,7 +169,7 @@ def annotation_run_retry(annotation_run: AnnotationRun, upload_only=False) -> An
     else:
         # Delete old AnnotationRun then try again.
         old_annotation_run = annotation_run
-        annotation_run = AnnotationRun.objects.create()
+        annotation_run = AnnotationRun.objects.create(pipeline_type=old_annotation_run.pipeline_type)
         tasks = [
             delete_annotation_run.si(old_annotation_run.pk),
             assign_range_lock_to_annotation_run.si(annotation_run.pk, annotation_range_lock.pk),
@@ -178,7 +182,8 @@ def annotation_run_retry(annotation_run: AnnotationRun, upload_only=False) -> An
     return annotation_run
 
 
-def _unannotated_variants_to_vcf(genome_build: GenomeBuild, vcf_filename, annotation_range_lock):
+def _unannotated_variants_to_vcf(genome_build: GenomeBuild, vcf_filename,
+                                 annotation_range_lock, pipeline_type):
     logging.info("unannotated_variants_to_vcf()")
     if os.path.exists(vcf_filename):
         raise ValueError(f"Don't want to overwrite '{vcf_filename}' which already exists!")
@@ -190,7 +195,7 @@ def _unannotated_variants_to_vcf(genome_build: GenomeBuild, vcf_filename, annota
             kwargs["max_variant_id"] = annotation_range_lock.max_variant.pk
 
         annotation_version = annotation_range_lock.version.get_any_annotation_version()
-        qs = get_unannotated_variants_qs(annotation_version, **kwargs)
+        qs = get_unannotated_variants_qs(annotation_version, pipeline_type=pipeline_type, **kwargs)
         qs = qs.order_by("locus__contig__genomebuildcontig__order", "locus__position")
-        sorted_values = qs.values("id", "locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq")
+        sorted_values = qs.values("id", "locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq", "end")
         return write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict=VARIANT_GRID_INFO_DICT)

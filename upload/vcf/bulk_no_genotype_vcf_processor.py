@@ -7,6 +7,7 @@ No point complicating BulkGenotypeVCFProcessor with lots of if statements etc
 import cyvcf2
 from django.conf import settings
 
+from library.genomics.vcf_utils import vcf_get_ref_alt_end
 from library.git import Git
 from patients.models_enums import Zygosity
 from upload.models import VCFImporter
@@ -43,8 +44,8 @@ class BulkNoGenotypeVCFProcessor(BulkGenotypeVCFProcessor):
 
     def process_entry(self, variant):
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
-        ref, alt = self.get_ref_alt(variant)
-        alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, ref, alt)
+        ref, alt, end = vcf_get_ref_alt_end(variant)
+        alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, ref, alt, end)
 
         # Don't need to worry about processing all loci - go straight onto variant lists for insert
         self.variant_hashes.append(alt_hash)
