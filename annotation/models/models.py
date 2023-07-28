@@ -127,6 +127,25 @@ class ClinVar(models.Model):
     drug_response = models.BooleanField(default=False)
 
     @property
+    def clinvar_disease_database_terms(self) -> List[str]:
+        if db_name_text := self.clinvar_disease_database_name:
+            def fix_name(name: str):
+                name = name.strip()
+                if name.startswith("MONDO:MONDO:"):
+                    name = name.replace("MONDO:MONDO:", "MONDO:")
+                return name
+
+            db_names = [fix_name(db_name) for db_name in db_name_text.split(",")]
+            return db_names
+        return []
+
+    @property
+    def clinvar_clinical_sources_list(self) -> List[str]:
+        if clinvar_clinical_sources := self.clinvar_clinical_sources:
+            return [name.strip() for name in clinvar_clinical_sources.split(",")]
+        return []
+
+    @property
     def fetch_json_summary(self) -> JsonObjType:
         try:
             url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id={self.clinvar_variation_id}&retmode=json"
