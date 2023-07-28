@@ -134,6 +134,11 @@ def code_json(data: JsonDataType, css_class: Optional[str] = "", dash_if_empty: 
     return {"data": data, "css_class": css_class}
 
 
+@register.inclusion_tag("uicore/tags/code_block_xml.html")
+def code_xml(data: str, css_class: Optional[str] = "code-block"):
+    return {"data": data, "css_class": css_class}
+
+
 @register.inclusion_tag("uicore/tags/code_block_regex.html")
 def code_regex(data: str):
     error = None

@@ -38,9 +38,9 @@
                 {% else %}<span class="no-value">No Citations.</span>
                 {% endif %}
             {% endlabelled %}
-            {% labelled label="JSON" %}
+            {% labelled label="RCV Data" %}
                 {% modal label="API Response" admin_only=True %}
-                    {% code_json clinvar.fetch_json_summary css_class="modal-body" %}
+                    {% code_xml clinvar.fetch_rcv_data css_class="modal-body" %}
                 {% endmodal %}
             {% endlabelled %}
             <div id="clinvar-citation-div" class="collapse">
