@@ -7,7 +7,7 @@
 {% load settings_tags %}
 {% load user_tag_color_tags %}
 {% load settings_tags %}
-
+{% load clinvar_tags %}
 {% settings_value 'ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED' as annotation_pubmed_search_terms_enabled %}
 {% settings_value 'VARIANT_DETAILS_SHOW_ANNOTATION' as show_annotation %}
 {% settings_value 'VARIANT_DETAILS_SHOW_GENE_COVERAGE' as show_gene_coverage %}
@@ -555,50 +555,8 @@ function applyVariantValues() {
 
 
 {% if show_annotation and variant_annotation %}
-    <div class="container">
-        <div class="card mt-4">
-            <div class="card-header">ClinVar</div>
-            <div class="card-body">
-            {% if clinvar %}
-                {% labelled label="Allele" %}
-                 <a class='hover-link' target='_blank' href='https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}'>{{ clinvar.clinvar_variation_id }}</a>
-                    &nbsp;<b>AlleleID</b> {{ clinvar.clinvar_allele_id }}
-                {% endlabelled %}
-                {% labelled label="Highest pathogenicity" %}{{ clinvar.highest_pathogenicity }}{% endlabelled %}
-                {% labelled label="Clinical significance" %}{{ clinvar.clinical_significance }}{% endlabelled %}
-                {% if clinvar.conflicting_clinical_significance %}
-                    {% labelled label="Conflicting clinical significance" %}{{ clinvar.conflicting_clinical_significance }}{% endlabelled %}
-                {% endif %}
-                {% labelled label="Preferred disease name" %}{{ clinvar.clinvar_preferred_disease_name }}{% endlabelled %}
-                {% labelled label="Disease database name" %}{{ clinvar.clinvar_disease_database_name }}{% endlabelled %}
-                {% labelled label="Review status" %}
-                    {% load clinvar_tags %}
-                    <a class='hover-link' target="_blank" href="https://www.ncbi.nlm.nih.gov/clinvar/docs/review_status/">
-                    {% clinvar_stars clinvar.stars %} {{ clinvar.get_clinvar_review_status_display }}
-                    </a>
-                {% endlabelled %}
-                {% labelled label="Clinical sources" %}{{ clinvar.clinvar_clinical_sources }}{% endlabelled %}
-                {% labelled label="Origin" %}{{ clinvar.get_origin_display }}{% endlabelled %}
-                {% if clinvar_suspect_reason_code %}
-                    {% labelled label="Suspect reason code" %}{{ clinvar.get_suspect_reason_code_display }}{% endlabelled %}
-                {% endif %}
-                {% labelled label="Drug response" %}{{ clinvar.drug_response }}{% endlabelled %}
-                {% labelled label="Citations" %}
-                    {% if num_clinvar_citations %}<a class='toggle-link' data-toggle="collapse" href='#clinvar-citation-div'>Show {{ num_clinvar_citations }} Literature Citations</a>
-                    {% else %}No Citations.
-                    {% endif %}
-                {% endlabelled %}
-                <div id="clinvar-citation-div" class="collapse">
-                    {% for citation_id in clinvar_citations %}
-                    <div data-citation-id="{{ citation_id }}"></div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                No ClinVar entry (version: {{ annotation_version.clinvar_version.annotation_date.date  }})
-                <a href="https://www.ncbi.nlm.nih.gov/clinvar/?term={{ g_hgvs }}">Search ClinVar</a>
-            {% endif %}
-            </div>
-        </div>
+    <div class="container mt-4">
+        {% clinvar variant=variant annotation_version=annotation_version %}
     </div>
 
     <div class="container">

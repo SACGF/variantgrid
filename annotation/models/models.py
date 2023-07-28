@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from functools import cached_property
 from typing import List, Optional, Dict, Callable, Tuple
 
+import requests
 from Bio import Entrez
 from Bio.Data.IUPACData import protein_letters_1to3
 from django.conf import settings
@@ -32,7 +33,8 @@ from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAn
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
 from library.django_utils.django_partition import RelatedModelsPartitionModel
-from library.utils import invert_dict, name_from_filename
+from library.log_utils import report_exc_info
+from library.utils import invert_dict, name_from_filename, JsonObjType
 from ontology.models import OntologyVersion
 from patients.models_enums import GnomADPopulation
 from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN, \
@@ -123,6 +125,17 @@ class ClinVar(models.Model):
     clinvar_origin = models.IntegerField(default=0)
     clinvar_suspect_reason_code = models.IntegerField(default=0)
     drug_response = models.BooleanField(default=False)
+
+    @property
+    def fetch_json_summary(self) -> JsonObjType:
+        try:
+            url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id={self.clinvar_variation_id}&retmode=json"
+            r = requests.get(url)
+            r.raise_for_status()
+            return r.json()
+        except:
+            report_exc_info()
+            return {}
 
     @property
     def stars(self):

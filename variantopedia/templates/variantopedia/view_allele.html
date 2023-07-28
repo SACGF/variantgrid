@@ -6,7 +6,7 @@
 {% load ui_help %}
 {% load ui_menu_bars %}
 {% load settings_tags %}
-
+{% load clinvar_tags %}
 {% block submenu %}{% menu_bar_data %}{% endblock submenu %}
 {% block head %}
 <script>
@@ -146,6 +146,10 @@
             {% endif %}
         </div>
     {% endif %}
+
+    <div class="container mt-4">
+        {% clinvar allele=allele %}
+    </div>
 
 
 {% endblock content %}
