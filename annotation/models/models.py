@@ -4,6 +4,7 @@ import re
 from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import cached_property
+from io import BytesIO
 from typing import List, Optional, Dict, Callable, Tuple
 
 import requests
@@ -22,6 +23,7 @@ from django_extensions.db.models import TimeStampedModel
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
 
+from annotation.clinvar_xml_parser import ClinVarParser
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction
@@ -165,7 +167,13 @@ class ClinVar(models.Model):
                 rcv_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=clinvar&rettype=clinvarset&id={found_rcv}"
                 r = requests.get(rcv_url)
                 r.raise_for_status()
-            return r.text
+                xml_str = r.text
+                xml_bytes = BytesIO(xml_str.encode("UTF-8"))
+                for result in ClinVarParser(genome_build=self.version.genome_build_id).parse(xml_bytes):
+                    print(result)
+                return xml_str
+            else:
+                return r.text
         except:
             report_exc_info()
             return ""
