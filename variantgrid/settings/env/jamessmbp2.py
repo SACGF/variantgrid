@@ -127,50 +127,63 @@ ANNOTATION = {
     BUILD_GRCH37: {
         "enabled": True,
         "annotation_consortium": "Ensembl",
-        "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz"),
-        "reference_fasta_has_chr": False,
+        "columns_version": 1,
         "cytoband": os.path.join(VG_REFERENCE_DIR, "hg19", "cytoband.hg19.txt.gz"),
+        "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.25_GRCh37.p13_genomic.fna.gz"),
+        "reference_fasta_has_chr": False,
 
         # VEP paths are relative to ANNOTATION_VEP_BASE_DIR - worked out at runtime
         # so you can change just that variable and have everything else work
         # The names correspond to VEPPlugin or VEPCustom entries (but lower case)
         "vep_config": {
-            "dbnsfp": "annotation_data/GRCh37/dbNSFP4.0b2a.hg19.stripped.gz",
+            "cosmic": "annotation_data/GRCh37/CosmicCodingMuts_v95_20211101_grch37.normal.vcf.gz",
+            "dbnsfp": "annotation_data/GRCh37/dbNSFP4.0a.grch37.stripped.gz",
             "dbscsnv": "annotation_data/GRCh37/dbscSNV1.1_GRCh37.txt.gz",
-            "gnomad": "annotation_data/GRCh37/gnomad_GRCh37_combined_af.vcf.bgz",
+            "gnomad2": "annotation_data/GRCh37/gnomad2.1.1_GRCh37_combined_af.vcf.bgz",
+            "mastermind": "annotation_data/GRCh37/mastermind_cited_variants_reference-2022.04.02-grch37.vcf.gz",
             "maxentscan": "annotation_data/all_builds/maxentscan",
             'phastcons100way': "annotation_data/GRCh37/hg19.100way.phastCons.bw",
-            'phastcons30way': None,  # n/a for GRCh37
             'phastcons46way': "annotation_data/GRCh37/hg19.phastCons46way.placental.bw",
+            'phastcons30way': None,  # n/a for GRCh37
             'phylop100way': "annotation_data/GRCh37/hg19.100way.phyloP100way.bw",
-            'phylop30way': None,  # n/a for GRCh37
             'phylop46way': "annotation_data/GRCh37/hg19.phyloP46way.placental.bw",
+            'phylop30way': None,  # n/a for GRCh37
             "repeatmasker": "annotation_data/GRCh37/repeatmasker_hg19.bed.gz",
+            "spliceai_snv": "annotation_data/GRCh37/spliceai_scores.raw.snv.hg19.vcf.gz",
+            "spliceai_indel": "annotation_data/GRCh37/spliceai_scores.raw.indel.hg19.vcf.gz",
             "topmed": "annotation_data/GRCh37/TOPMED_GRCh37.vcf.gz",
             "uk10k": "annotation_data/GRCh37/UK10K_COHORT.20160215.sites.vcf.gz",
         }
     },
     # GRCh38 is NOT enabled by default - overwrite "enabled" in your server settings to use
     BUILD_GRCH38: {
-        "enabled": True,
+        "enabled": False,
         "annotation_consortium": "Ensembl",
-        "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"),
-        "reference_fasta_has_chr": False,
+        "columns_version": 1,
         "cytoband": os.path.join(VG_REFERENCE_DIR, "hg38", "cytoband.hg38.txt.gz"),
+        "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.39_GRCh38.p13_genomic.fna.gz"),
+        "reference_fasta_has_chr": False,
 
         # VEP paths are relative to ANNOTATION_VEP_BASE_DIR - worked out at runtime
         # so you can change just that variable and have everything else work
         # The names correspond to VEPPlugin or VEPCustom entries (but lower case)
         "vep_config": {
-            "dbnsfp": "annotation_data/GRCh38/dbNSFP4.0b2a.hg38.stripped.gz",
+            "cosmic": "annotation_data/GRCh38/CosmicCodingMuts_v95_20211101_grch38.normal.vcf.gz",
+            "dbnsfp": "annotation_data/GRCh38/dbNSFP4.0a.grch38.stripped.gz",
             "dbscsnv": "annotation_data/GRCh38/dbscSNV1.1_GRCh38.txt.gz",
-            "gnomad": "annotation_data/GRCh38/gnomad_GRCh38_combined_af.vcf.bgz",
+            "gnomad2": "annotation_data/GRCh38/gnomad2.1.1_GRCh38_combined_af.vcf.bgz",
+            "gnomad3": "annotation_data/GRCh38/gnomad3.1_GRCh38_merged.vcf.bgz",
+            "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2022.04.02-grch38.vcf.gz",
             "maxentscan": "annotation_data/all_builds/maxentscan",
             'phastcons100way': "annotation_data/GRCh38/hg38.phastCons100way.bw",
+            'phastcons46way': None,  # n/a for GRCh38
             'phastcons30way': "annotation_data/GRCh38/hg38.phastCons30way.bw",
             'phylop100way': "annotation_data/GRCh38/hg38.phyloP100way.bw",
+            "phylop46way": None,  # n/a for GRCh38
             'phylop30way': "annotation_data/GRCh38/hg38.phyloP30way.bw",
             "repeatmasker": "annotation_data/GRCh38/repeatmasker_hg38.bed.gz",
+            "spliceai_snv": "annotation_data/GRCh38/spliceai_scores.raw.snv.hg38.vcf.gz",
+            "spliceai_indel": "annotation_data/GRCh38/spliceai_scores.raw.indel.hg38.vcf.gz",
             "topmed": "annotation_data/GRCh38/TOPMED_GRCh38_20180418.vcf.gz",
             "uk10k": "annotation_data/GRCh38/UK10K_COHORT.20160215.sites.GRCh38.vcf.gz",
         }
