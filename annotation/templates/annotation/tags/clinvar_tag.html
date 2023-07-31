@@ -3,6 +3,16 @@
 {% load ui_utils %}
 {% load js_tags %}
 {% load english_tags %}
+<h4>ClinVar Records</h4>
+{% if clinvar %}
+    <a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}">View on ClinVar</a>
+    <div data-toggle="ajax" href="{% url "view_clinvar_detail" clinvar.clinvar_variation_id %}">
+        Loading...
+    </div>
+{% else %}
+    No ClinVar entry <span class="text-muted">(as of version: {{ annotation_version.clinvar_version.annotation_date.date  }})</span> <a href="https://www.ncbi.nlm.nih.gov/clinvar/?term={{ g_hgvs }}">Search ClinVar</a>
+{% endif %}
+{% comment %}
 <div class="card">
     <div class="card-header">ClinVar (<a title="ClinVar Variation ID" class='hover-link' target='_blank' href='https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}'>{{ clinvar.clinvar_variation_id }}</a>)</div>
     <div class="card-body">
@@ -25,7 +35,7 @@
             {% endlabelled %}
             {% labelled label="Clinical Sources" %}
                 {% for term in clinvar.clinvar_clinical_sources_list %}
-                    {{ term }}<br/>
+                    {{ term | code_to_english }}<br/>
                 {% endfor %}
             {% endlabelled %}
             {% labelled label="Origin" %}{{ clinvar.get_origin_display }}{% endlabelled %}
@@ -54,3 +64,4 @@
         {% endif %}
     </div>
 </div>
+{% endcomment %}

@@ -1,0 +1,26 @@
+{% if records %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>SCV</th>
+                <th>Submitter</th>
+                <th>Status</th>
+                <th>Clinical Significance</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in records %}
+                <tr>
+                    <td>{{ record.record_id }}</td>
+                    <td>{{ record.submitter }}</td>
+                    <td>{{ record.review_status }}</td>
+                    <td>{{ record.clinical_significance }}</td>
+                    <td>{{ record.submitter_date }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="no-value mb-4 text-center">No records</div>
+{% endif %}

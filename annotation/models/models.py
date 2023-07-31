@@ -148,37 +148,6 @@ class ClinVar(models.Model):
         return []
 
     @property
-    def fetch_rcv_data(self) -> str:
-        # it's XML but we don't handle that nicely at the moment
-        try:
-            url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id={self.clinvar_variation_id}&retmode=json"
-            r = requests.get(url)
-            r.raise_for_status()
-            json_data = r.json()
-            found_rcv = None
-            if result := json_data.get("result"):
-                if uuids := result.get("uids"):
-                    if uuid_data := result.get(uuids[0]):
-                        if supporting_submissions := uuid_data.get("supporting_submissions"):
-                            if rcvs := supporting_submissions.get("rcv"):
-                                found_rcv = rcvs[0]
-
-            if found_rcv:
-                rcv_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=clinvar&rettype=clinvarset&id={found_rcv}"
-                r = requests.get(rcv_url)
-                r.raise_for_status()
-                xml_str = r.text
-                xml_bytes = BytesIO(xml_str.encode("UTF-8"))
-                for result in ClinVarParser(genome_build=self.version.genome_build_id).parse(xml_bytes):
-                    print(result)
-                return xml_str
-            else:
-                return r.text
-        except:
-            report_exc_info()
-            return ""
-
-    @property
     def stars(self):
         return ClinVarReviewStatus(self.clinvar_review_status).stars()
 

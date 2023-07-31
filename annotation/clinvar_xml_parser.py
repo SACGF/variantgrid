@@ -1,9 +1,14 @@
 from dataclasses import dataclass
-from typing import Optional
+from io import BytesIO
+from typing import Optional, List
 import re
 
+import requests
+
+from library.log_utils import report_exc_info
 from library.utils import ExportRow, export_column
 from library.utils.xml_utils import XmlParser, parser_path, PP
+from snpdb.models import GenomeBuild
 
 CLINVAR_TO_VG_CLIN_SIG = {
     "Benign": "B",
@@ -15,10 +20,14 @@ CLINVAR_TO_VG_CLIN_SIG = {
     "drug response": "D"
 }
 
+
 @dataclass
-class ConvertedClinVarOutput(ExportRow):
+class ClinVarAPIRecord:
     record_id: Optional[str] = None
     genome_build: Optional[str] = None
+    review_status: Optional[str] = None
+    submitter: Optional[str] = None
+    submitter_date: Optional[str] = None
     c_hgvs: Optional[str] = None
     condition: Optional[str] = None
     clinical_significance: Optional[str] = None
@@ -28,22 +37,6 @@ class ConvertedClinVarOutput(ExportRow):
     assertion_method: Optional[str] = None
     allele_origin: Optional[str] = None
 
-    @export_column("lab_record_id")
-    def export_record_id(self):
-        return self.record_id
-
-    @export_column("genome_build")
-    def genome_build(self):
-        return self.genome_build
-
-    @export_column("c_hgvs")
-    def export_c_hgvs(self):
-        return self.c_hgvs
-
-    @export_column("gene_symbol")
-    def export_gene_symbol(self):
-        return self.gene_symbol
-
     @export_column("condition")
     def export_condition(self):
         return self.condition or "Not set"
@@ -51,14 +44,6 @@ class ConvertedClinVarOutput(ExportRow):
     @export_column("clinical_significance")
     def export_clinical_significance(self):
         return CLINVAR_TO_VG_CLIN_SIG.get(self.clinical_significance, "VUS")
-
-    # @export_column("allele_origin")
-    # def export_allele_origin(self):
-    #     return self.allele_origin or "unknown"
-
-    @export_column("interpretation_summary")
-    def export_interpretation_summary(self):
-        return self.interpretation_summary
 
     @property
     def is_good_quality(self) -> bool:
@@ -77,16 +62,47 @@ class ClinVarParser(XmlParser):
     RE_GOOD_CHGVS = re.compile("^(N._[0-9]+[.][0-9]+:c[.][0-9_a-zA-Z>]+)( .*)?$")
     RE_ORPHA = re.compile("ORPHA([0-9]+)")
 
-    def __init__(self, genome_build: str):
-        self.latest: Optional[ConvertedClinVarOutput] = None
-        self.genome_build = genome_build
+    @staticmethod
+    def load_from_clinvar_id(clinvar_variation_id) -> List[ClinVarAPIRecord]:
+        # FIXME, shouldn't have to load genome_build_id
+        # it's XML but we don't handle that nicely at the moment
+        try:
+            url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id={clinvar_variation_id}&retmode=json"
+            r = requests.get(url)
+            r.raise_for_status()
+            json_data = r.json()
+            found_rcv = None
+            if result := json_data.get("result"):
+                if uuids := result.get("uids"):
+                    if uuid_data := result.get(uuids[0]):
+                        if supporting_submissions := uuid_data.get("supporting_submissions"):
+                            if rcvs := supporting_submissions.get("rcv"):
+                                found_rcv = rcvs[0]
+
+            if found_rcv:
+                rcv_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=clinvar&rettype=clinvarset&id={found_rcv}"
+                r = requests.get(rcv_url)
+                r.raise_for_status()
+                xml_str = r.text
+                xml_bytes = BytesIO(xml_str.encode("UTF-8"))
+                results = []
+                for result in ClinVarParser().parse(xml_bytes):
+                    results.append(result)
+                return results
+            else:
+                return []
+        except:
+            report_exc_info()
+            return []
+
+    def __init__(self):
+        self.latest: Optional[ClinVarAPIRecord] = None
         super().__init__()
 
     def reset(self):
         if self.latest and self.latest.is_good_quality:
             self.set_yieldable(self.latest)
-        self.latest = ConvertedClinVarOutput()
-        self.latest.genome_build = self.genome_build
+        self.latest = ClinVarAPIRecord()
 
     def finish(self):
         self.reset()
@@ -122,6 +138,24 @@ class ClinVarParser(XmlParser):
             if match := ClinVarParser.RE_GOOD_CHGVS.match(hgvs):
                 hgvs = match.group(1)
                 self.latest.c_hgvs = hgvs
+
+    @parser_path(
+        "ClinVarResult-Set",
+        "ClinVarSet",
+        "ClinVarAssertion",
+        "ClinVarSubmissionID")
+    def parse_reviewer(self, elem):
+        self.latest.submitter = elem.get("submitter")
+        self.latest.submitter_date = elem.get("submitterDate")
+
+    @parser_path(
+        "ClinVarResult-Set",
+        "ClinVarSet",
+        "ClinVarAssertion",
+        "ClinicalSignificance",
+        "ReviewStatus")
+    def parse_review_status(self, elem):
+        self.latest.review_status = elem.text
 
     @parser_path(
         "ClinVarResult-Set",

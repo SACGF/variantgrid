@@ -183,4 +183,5 @@ class XmlParser:
 
     def _clear(self):
         # really not sure when the right time to call this is
-        self._stack[0].clear()
+        if self._stack:
+            self._stack[0].clear()

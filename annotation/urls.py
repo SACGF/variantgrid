@@ -31,7 +31,9 @@ urlpatterns = [
 
     perm_path('citations_json/<path:citations_ids_list>', views.citations_json, name='citations_json'),
     perm_path('citation/<str:citation_id>', views.view_citation, name='view_citation'),
-    perm_path('citation/<str:citation_id>/detail', views.view_citation_detail, name='view_citation_detail')
+    perm_path('citation/<str:citation_id>/detail', views.view_citation_detail, name='view_citation_detail'),
+
+    perm_path('clinvar/<int:clinvar_variation_id>/detail', views.view_clinvar_detail, name='view_clinvar_detail')
 ]
 
 rest_urlpatterns = [
