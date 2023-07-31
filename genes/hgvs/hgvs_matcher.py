@@ -516,7 +516,7 @@ class HGVSMatcher:
         cleaned_hgvs = clean_string(hgvs_string)  # remove non-printable characters
         cleaned_hgvs = cleaned_hgvs.replace(" ", "")  # No whitespace in HGVS
         cleaned_hgvs = cleaned_hgvs.replace("::", ":")  # Fix double colon
-        if cleaned_hgvs.startswith("M_") or cleaned_hgvs.startswith("m_"):
+        if cleaned_hgvs[0:2].upper() == "M_":
             cleaned_hgvs = "NM_" + cleaned_hgvs[2:]
         # Lowercase mutation types, e.g. NM_032638:c.1126_1133DUP - won't matter if also changes gene name as that's
         # case-insensitive
