@@ -39,7 +39,7 @@ git+https://github.com/davmlaw/django-messages/#egg=django-messages
 git+https://github.com/davmlaw/django-starfield#egg=django_starfield
 git+https://github.com/davmlaw/django-js-reverse#egg=django-js-reverse
 git+https://github.com/SACGF/hgvs#egg=pyhgvs
-hgvs
+git+https://github.com/davmlaw/hgvs@variantgrid#egg=hgvs
 HTSeq
 ijson
 ipython
