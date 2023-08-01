@@ -92,6 +92,12 @@ class ClinVarDetails:
 
 
 @register.inclusion_tag("annotation/tags/clinvar_tag.html")
-def clinvar(allele: Optional[Union[int, Allele]] = None, variant: Optional[Union[int, Variant]] = None, genome_build: Optional[GenomeBuild] = None, annotation_version: Optional[AnnotationVersion] = None):
+def clinvar(allele: Optional[Union[int, Allele]] = None, variant: Optional[Union[int, Variant]] = None, genome_build: Optional[GenomeBuild] = None, annotation_version: Optional[AnnotationVersion] = None, auto_load=True):
     data = ClinVarDetails.instance_from(allele=allele, variant=variant, genome_build=genome_build, annotation_version=annotation_version)
-    return dict(asdict(data).items())
+    context = dict(asdict(data).items())
+    if data.clinvar:
+        context["review_status"] = data.clinvar.get_clinvar_review_status_display()
+
+    context = dict(asdict(data).items())
+    context["auto_load"] = auto_load
+    return context

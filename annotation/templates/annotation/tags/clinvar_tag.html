@@ -5,10 +5,16 @@
 {% load english_tags %}
 <h4>ClinVar Records</h4>
 {% if clinvar %}
-    <a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}">View on ClinVar</a>
-    <div data-toggle="ajax" href="{% url "view_clinvar_detail" clinvar.clinvar_variation_id %}">
-        Loading...
-    </div>
+    {{ clinvar.get_clinvar_review_status_display }} <span class="text-muted">|</span> {{ clinvar.clinical_significance | code_to_english }} <span class="text-muted">|</span> as of version {% timestamp annotation_version.clinvar_version.annotation_date time_ago=True %}
+   <span class="text-muted">|</span> <a href="https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}">View on ClinVar</a>
+    <br/>
+    {% if auto_load %}
+        <div data-toggle="ajax" href="{% url "view_clinvar_detail" clinvar.clinvar_variation_id %}">
+            Loading...
+        </div>
+    {% else %}
+        <div data-toggle="ajax-collapse" href="{% url 'view_clinvar_detail' clinvar.clinvar_variation_id %}" title="Individual ClinVar Records"></div>
+    {% endif %}
 {% else %}
     No ClinVar entry <span class="text-muted">(as of version: {{ annotation_version.clinvar_version.annotation_date.date  }})</span> <a href="https://www.ncbi.nlm.nih.gov/clinvar/?term={{ g_hgvs }}">Search ClinVar</a>
 {% endif %}
