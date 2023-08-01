@@ -1,17 +1,12 @@
 from datetime import datetime
 from dataclasses import dataclass
 from functools import cached_property
-from io import BytesIO
 from typing import Optional, List
 import re
-
+import json
 import requests
-
-from library.cache import timed_cache
-from library.log_utils import report_exc_info
-from library.utils import ExportRow, export_column
+from Bio import Entrez
 from library.utils.xml_utils import XmlParser, parser_path, PP
-from snpdb.models import GenomeBuild
 
 CLINVAR_TO_VG_CLIN_SIG = {
     "Benign": "B",
@@ -94,15 +89,17 @@ class ClinVarParser(XmlParser):
     RE_ORPHA = re.compile("ORPHA([0-9]+)")
 
     @staticmethod
-    @timed_cache(ttl=3600)
     def load_from_clinvar_id(clinvar_variation_id) -> ClinVarApiResponse:
-        # FIXME, shouldn't have to load genome_build_id
-        # it's XML but we don't handle that nicely at the moment
+
         url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id={clinvar_variation_id}&retmode=json"
         r = requests.get(url)
-        r.raise_for_status()
-        json_data = r.json()
-        all_rcvs: List[str]
+
+        cv_handle = Entrez.esummary(db="clinvar", retmode="json", id=clinvar_variation_id)
+        json_data = json.loads(cv_handle.read())
+        cv_handle.close()
+
+        all_rcvs: List[str] = []
+        parsed_results: List[ClinVarAPIRecord] = []
         if result := json_data.get("result"):
             if uuids := result.get("uids"):
                 if uuid_data := result.get(uuids[0]):
@@ -110,19 +107,12 @@ class ClinVarParser(XmlParser):
                         if rcvs := supporting_submissions.get("rcv"):
                             all_rcvs = rcvs
 
-        parsed_results = []
-        for rcv in all_rcvs:
-            if rcv:
-                rcv_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=clinvar&rettype=clinvarset&id={rcv}"
-                r = requests.get(rcv_url)
-                r.raise_for_status()
-                xml_str = r.text
-                xml_bytes = BytesIO(xml_str.encode("UTF-8"))
-
-                for result in ClinVarParser().parse(xml_bytes):
-                    parsed_results.append(result)
-
-        parsed_results.sort(reverse=True)
+        if all_rcvs:
+            handle = Entrez.efetch(db="clinvar", rettype="clinvarset", id=all_rcvs)
+            parsed_results = []
+            for result in ClinVarParser().parse(handle):
+                parsed_results.append(result)
+            handle.close()
 
         return ClinVarApiResponse(
             clinvar_variation_id=clinvar_variation_id,
