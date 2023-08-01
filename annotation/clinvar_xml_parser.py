@@ -113,6 +113,7 @@ class ClinVarParser(XmlParser):
             for result in ClinVarParser().parse(handle):
                 parsed_results.append(result)
             handle.close()
+            parsed_results.sort(reverse=True)
 
         return ClinVarApiResponse(
             clinvar_variation_id=clinvar_variation_id,
@@ -277,7 +278,7 @@ class ClinVarParser(XmlParser):
                 final_value = f"OMIM:{id}"
             elif db == "Orphanet":
                 if m := ClinVarParser.RE_ORPHA.match(id):
-                    final_value = f"ORPHA:{m.group(1)}"
+                    final_value = f"Orphanet:{m.group(1)}"
             elif db == "MedGen":
                 final_value = f"MedGen:{id}"
             elif db == "HP":
