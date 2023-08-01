@@ -504,4 +504,4 @@ def citations_json(request, citations_ids_list):
 
 
 def view_clinvar_detail(request, clinvar_variation_id: int):
-    return render(request, "annotation/clinvar_detail.html", {"records": ClinVarParser.load_from_clinvar_id(clinvar_variation_id)})
+    return render(request, "annotation/clinvar_detail.html", {"response": ClinVarParser.load_from_clinvar_id(clinvar_variation_id)})

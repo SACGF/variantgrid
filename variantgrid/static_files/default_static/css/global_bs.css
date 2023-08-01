@@ -330,6 +330,14 @@ a {
   cursor: pointer;
 }
 
+.subtle-link {
+  color: #446 !important;
+}
+
+.subtle-link::after {
+  content: none !important;
+}
+
 .external-link::after {
   display: inline-block;
   font-style: normal;

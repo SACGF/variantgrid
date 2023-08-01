@@ -1,22 +1,41 @@
-{% if records %}
+{% load js_tags %}
+{% load clinvar_tags %}
+{% load classification_tags %}
+{% load ontology_tags %}
+{% load ui_utils %}
+{% if user.is_superuser %}
+    <div style="float:right; position: relative; height: 0; bottom: 22px">
+    {% modal label="Debug" admin_only=True size="md" %}
+        <div class="modal-body">
+            <div class="list-group">
+                <a class="list-group-item list-group-item-action" href="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id={{ response.clinvar_variation_id }}&retmode=json">ClinVar Variation ID {{ response.clinvar_variation_id }} JSON</a>
+                {% for rcv in response.rcvs %}
+                    <a class="list-group-item list-group-item-action" href="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=clinvar&rettype=clinvarset&id={{ rcv }}">{{ rcv }} XML</a>
+                {% endfor %}
+            </div>
+        </div>
+    {% endmodal %}
+    </div>
+{% endif %}
+{% if response.records %}
     <table class="table">
         <thead>
             <tr>
-                <th>SCV</th>
                 <th>Submitter</th>
-                <th>Status</th>
-                <th>Clinical Significance</th>
-                <th>Date</th>
+                <th style="min-width:200px">c.HGVS</th>
+                <th style="width:150px">Clinical Significance</th>
+                <th style="min-width:200px">Condition</th>
+                <th style="width:155px">Updated</th>
             </tr>
         </thead>
         <tbody>
-            {% for record in records %}
+            {% for record in response.records %}
                 <tr>
-                    <td>{{ record.record_id }}</td>
-                    <td>{{ record.submitter }}</td>
-                    <td>{{ record.review_status }}</td>
-                    <td>{{ record.clinical_significance }}</td>
-                    <td>{{ record.submitter_date }}</td>
+                    <td>{% clinvar_stars record.stars record.review_status %} <a class="subtle-link" href="https://www.ncbi.nlm.nih.gov/clinvar/submitters/{{ record.org_id }}">{{ record.submitter }}</a></td>
+                    <td>{% if record.c_hgvs %}{% c_hgvs record.c_hgvs %}{% elif record.variant_coordinate %}{{ record.variant_coordinate }}{% else %}<span class="no-value">-</span>{% endif %}</td>
+                    <td class="cs-{{ record.clinical_significance_vg|lower }} text-center">{{ record.clinical_significance_vg | ekey:"clinical_significance" }}</td>
+                    <td>{% if record.condition %}{% ontology_term record.condition %}{% else %}<span class="no-value">-</span>{% endif %}</td>
+                    <td>{% timestamp record.submitter_datetime time_ago=True %}</td>
                 </tr>
             {% endfor %}
         </tbody>

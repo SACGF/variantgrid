@@ -1,10 +1,13 @@
+from datetime import datetime
 from dataclasses import dataclass
+from functools import cached_property
 from io import BytesIO
 from typing import Optional, List
 import re
 
 import requests
 
+from library.cache import timed_cache
 from library.log_utils import report_exc_info
 from library.utils import ExportRow, export_column
 from library.utils.xml_utils import XmlParser, parser_path, PP
@@ -20,15 +23,25 @@ CLINVAR_TO_VG_CLIN_SIG = {
     "drug response": "D"
 }
 
+CLINVAR_REVIEW_STATUS_TO_STARS = {
+    "no assertion criteria provided": 1,
+    "criteria provided, single submitter": 2,
+    "reviewed by expert panel": 3,
+    # FIXME, need to confirm this is 4 stars
+    "practise guidelines": 4
+}
+
 
 @dataclass
 class ClinVarAPIRecord:
     record_id: Optional[str] = None
+    org_id: Optional[str] = None
     genome_build: Optional[str] = None
     review_status: Optional[str] = None
     submitter: Optional[str] = None
     submitter_date: Optional[str] = None
     c_hgvs: Optional[str] = None
+    variant_coordinate: Optional[str] = None
     condition: Optional[str] = None
     clinical_significance: Optional[str] = None
     gene_symbol: Optional[str] = None
@@ -37,12 +50,26 @@ class ClinVarAPIRecord:
     assertion_method: Optional[str] = None
     allele_origin: Optional[str] = None
 
-    @export_column("condition")
+    @property
+    def _sort_order(self):
+        return self.stars, self.submitter_datetime
+
+    def __lt__(self, other):
+        return self._sort_order < other._sort_order
+
+    @property
+    def submitter_datetime(self) -> datetime:
+        return datetime.strptime(self.submitter_date, "%Y-%m-%d")
+
     def export_condition(self):
         return self.condition or "Not set"
 
-    @export_column("clinical_significance")
-    def export_clinical_significance(self):
+    @cached_property
+    def stars(self) -> int:
+        return CLINVAR_REVIEW_STATUS_TO_STARS.get(self.review_status, 0)
+
+    @property
+    def clinical_significance_vg(self):
         return CLINVAR_TO_VG_CLIN_SIG.get(self.clinical_significance, "VUS")
 
     @property
@@ -53,8 +80,12 @@ class ClinVarAPIRecord:
         #     return False
         return True
 
-    def __repr__(self):
-        return str(self.to_csv())
+
+@dataclass
+class ClinVarApiResponse:
+    clinvar_variation_id: int
+    rcvs: List[str]
+    records: List[ClinVarAPIRecord]
 
 
 class ClinVarParser(XmlParser):
@@ -63,37 +94,41 @@ class ClinVarParser(XmlParser):
     RE_ORPHA = re.compile("ORPHA([0-9]+)")
 
     @staticmethod
-    def load_from_clinvar_id(clinvar_variation_id) -> List[ClinVarAPIRecord]:
+    @timed_cache(ttl=3600)
+    def load_from_clinvar_id(clinvar_variation_id) -> ClinVarApiResponse:
         # FIXME, shouldn't have to load genome_build_id
         # it's XML but we don't handle that nicely at the moment
-        try:
-            url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id={clinvar_variation_id}&retmode=json"
-            r = requests.get(url)
-            r.raise_for_status()
-            json_data = r.json()
-            found_rcv = None
-            if result := json_data.get("result"):
-                if uuids := result.get("uids"):
-                    if uuid_data := result.get(uuids[0]):
-                        if supporting_submissions := uuid_data.get("supporting_submissions"):
-                            if rcvs := supporting_submissions.get("rcv"):
-                                found_rcv = rcvs[0]
+        url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id={clinvar_variation_id}&retmode=json"
+        r = requests.get(url)
+        r.raise_for_status()
+        json_data = r.json()
+        all_rcvs: List[str]
+        if result := json_data.get("result"):
+            if uuids := result.get("uids"):
+                if uuid_data := result.get(uuids[0]):
+                    if supporting_submissions := uuid_data.get("supporting_submissions"):
+                        if rcvs := supporting_submissions.get("rcv"):
+                            all_rcvs = rcvs
 
-            if found_rcv:
-                rcv_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=clinvar&rettype=clinvarset&id={found_rcv}"
+        parsed_results = []
+        for rcv in all_rcvs:
+            if rcv:
+                rcv_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=clinvar&rettype=clinvarset&id={rcv}"
                 r = requests.get(rcv_url)
                 r.raise_for_status()
                 xml_str = r.text
                 xml_bytes = BytesIO(xml_str.encode("UTF-8"))
-                results = []
+
                 for result in ClinVarParser().parse(xml_bytes):
-                    results.append(result)
-                return results
-            else:
-                return []
-        except:
-            report_exc_info()
-            return []
+                    parsed_results.append(result)
+
+        parsed_results.sort(reverse=True)
+
+        return ClinVarApiResponse(
+            clinvar_variation_id=clinvar_variation_id,
+            rcvs=all_rcvs,
+            records=parsed_results
+        )
 
     def __init__(self):
         self.latest: Optional[ClinVarAPIRecord] = None
@@ -114,6 +149,7 @@ class ClinVarParser(XmlParser):
     @parser_path("ClinVarResult-Set", "ClinVarSet", "ClinVarAssertion", PP("ClinVarAccession", Type="SCV"))
     def record_id(self, elem):
         self.latest.record_id = elem.get("Acc")
+        self.latest.org_id = elem.get("OrgID")
 
     @parser_path(
         "ClinVarResult-Set",
@@ -138,6 +174,23 @@ class ClinVarParser(XmlParser):
             if match := ClinVarParser.RE_GOOD_CHGVS.match(hgvs):
                 hgvs = match.group(1)
                 self.latest.c_hgvs = hgvs
+            self.latest.c_hgvs = hgvs
+
+    @parser_path(
+        "ClinVarResult-Set",
+        "ClinVarSet",
+        "ClinVarAssertion",
+        PP("MeasureSet", Type="Variant"),
+        PP("Measure", Type="Variation"),
+        "SequenceLocation")
+    def parse_variant_coordinate(self, elem):
+        assembly = elem.get("Assembly")
+        chr = elem.get("Chr")
+        start = elem.get("start")
+        ref = elem.get("referenceAllele")
+        alt = elem.get("alternateAllele")
+        self.latest.variant_coordinate = f"{chr}:{start} {ref}>{alt} ({assembly})"
+
 
     @parser_path(
         "ClinVarResult-Set",

@@ -16,10 +16,10 @@ register = Library()
 
 
 @register.inclusion_tag("annotation/tags/clinvar_stars.html")
-def clinvar_stars(stars):
+def clinvar_stars(stars, review_status: Optional[str] = None):
     MAX_STARS = 4
-    stars = ([True] * stars) + ([False] * (MAX_STARS - stars))
-    return {"stars": stars}
+    star_bools = ([True] * stars) + ([False] * (MAX_STARS - stars))
+    return {"stars": star_bools, "review_status": review_status}
 
 
 @dataclass
