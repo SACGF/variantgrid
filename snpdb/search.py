@@ -794,6 +794,7 @@ def search_data(user: User, search_string: str, classify: bool = False) -> Searc
     return SearchResponsesCombined(search_input, responses)
 
 
+INVALID_INPUT = object()
 def search_receiver(
         search_type: Optional[PreviewCoordinator],
         pattern: Pattern = HAS_ANYTHING,
@@ -870,7 +871,10 @@ def search_receiver(
                     # as Variants get merged into Alleles, we want to avoid limiting them (except under extreme conditions)
                     limit = MAX_VARIANT_RESULTS if search_type.preview_category() == "Variant" else MAX_RESULTS_PER_SEARCH
                     for result in func(SearchInputInstance(expected_type=search_type, search_input=search_input, match=match)):
-                        if result is None:
+                        if result == INVALID_INPUT:
+                            matched_pattern = False
+                            break
+                        elif result is None:
                             raise ValueError(f"Search {sender.__name__} returned None")
                         elif isinstance(result, SearchMessageOverall):
                             overall_messages.add(result)

@@ -46,6 +46,7 @@ class OntologyService(models.TextChoices):
 
     DOID = "DOID", "DOID"
     ORPHANET = "Orphanet", "Orphanet"
+    MEDGEN = "MedGen", "MedGen"
 
     EXPECTED_LENGTHS: Dict[str, int] = Constant({
         MONDO[0]: 7,
@@ -53,7 +54,8 @@ class OntologyService(models.TextChoices):
         HPO[0]: 7,
         HGNC[0]: 1,  # HGNC ids aren't typically 0 padded, because they're not monsters
         DOID[0]: None,  # variable length with padded 0s
-        ORPHANET[0]: 1  # ORPHANET ids aren't typically 0 padded
+        ORPHANET[0]: 1,  # ORPHANET ids aren't typically 0 padded
+        MEDGEN[0]: None
     })
 
     IMPORTANCE: Dict[str, int] = Constant({
@@ -62,7 +64,8 @@ class OntologyService(models.TextChoices):
         HPO[0]: 4,  # put HPO relationships last as they occasionally spam OMIM
         DOID[0]: 5,
         ORPHANET[0]: 6,
-        HGNC[0]: 1  # show gene relationships first
+        HGNC[0]: 1,  # show gene relationships first
+        MEDGEN[0]: 7
     })
 
     URLS: Dict[str, str] = Constant({
@@ -71,7 +74,8 @@ class OntologyService(models.TextChoices):
         HPO[0]: "https://hpo.jax.org/app/browse/term/HP:${1}",
         HGNC[0]: "https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:${1}",
         DOID[0]: "https://www.ebi.ac.uk/ols/ontologies/doid/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FDOID_${1}",
-        ORPHANET[0]: "https://www.orpha.net/consor/cgi-bin/OC_Exp.php?lng=EN&Expert=${1}"
+        ORPHANET[0]: "https://www.orpha.net/consor/cgi-bin/OC_Exp.php?lng=EN&Expert=${1}",
+        MEDGEN[0]: "https://www.ncbi.nlm.nih.gov/medgen/?term=${1}"
     })
 
     LOCAL_ONTOLOGY_PREFIXES: Set[str] = Constant({
@@ -86,7 +90,8 @@ class OntologyService(models.TextChoices):
         OMIM[0],
         HPO[0],
         DOID[0],
-        ORPHANET[0]
+        ORPHANET[0],
+        MEDGEN[0]
     })
 
     @staticmethod
@@ -239,6 +244,12 @@ class OntologyIdNormalized:
     def num_part(self) -> int:
         return int(self.postfix)
 
+    def num_part_safe(self) -> int:
+        try:
+            return self.num_part
+        except:
+            return 0
+
     @staticmethod
     def normalize(dirty_id: str) -> 'OntologyIdNormalized':
         parts = re.split("[:|_]", dirty_id)
@@ -250,17 +261,18 @@ class OntologyIdNormalized:
             prefix = "Orphanet"
         elif prefix.upper() == "MIM":
             prefix = "OMIM"
+        elif prefix.upper() == "MEDGEN":
+            prefix = "MedGen"
         prefix = OntologyService(prefix)
         postfix = parts[1].strip()
         try:
-            num_part = int(postfix)
+            num_part = str(postfix)
             clean_id: str
             if OntologyService.EXPECTED_LENGTHS[prefix]:
                 clean_id = OntologyService.index_to_id(prefix, num_part)
             else:
                 # variable length IDs like DOID
                 clean_id = f"{prefix}:{postfix}"
-
             return OntologyIdNormalized(prefix=prefix, postfix=postfix, full_id=clean_id, clean=True)
 
         except ValueError:
@@ -443,10 +455,14 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
         if normal_id.clean:
             if existing := OntologyTerm.objects.filter(id=normal_id.full_id).first():
                 return existing
+            try:
+                index_num_part_value = normal_id.num_part
+            except :
+                index_num_part_value = normal_id.num_part_safe  # Ontologies like MedGen can have alpha characters in the "index", providing an index of 0 until we update the model
             return OntologyTerm(
                 id=normal_id.full_id,
                 ontology_service=normal_id.prefix,
-                index=normal_id.num_part,
+                index=index_num_part_value,
                 name=""
             )
         else:

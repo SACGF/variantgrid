@@ -27,8 +27,7 @@ def validate_ontology(term: OntologyTerm, preview_proxy: Optional[PreviewProxyMo
     return SearchResult(preview, messages=messages)
 
 
-ONTOLOGY_TERM_PATTERN = re.compile(r"^(MONDO|OMIM|MIM|HPO|HP|DOID|ORPHANET)\s*:\s*[0-9]+$", re.IGNORECASE)
-
+ONTOLOGY_TERM_PATTERN = re.compile(r"^((MONDO|OMIM|MIM|HPO|HP|DOID|ORPHANET)\s*:\s*[0-9]+)|(MEDGEN\s*:\s*\w{0,2}[0-9]+)$", re.IGNORECASE)
 
 @search_receiver(
     search_type=OntologyTerm,
