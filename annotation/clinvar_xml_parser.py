@@ -1,11 +1,13 @@
 from datetime import datetime
 from dataclasses import dataclass
+from enum import Enum
 from functools import cached_property
 from typing import Optional, List
 import re
 import json
-import requests
 from Bio import Entrez
+
+from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from library.utils.xml_utils import XmlParser, parser_path, PP
 
 CLINVAR_TO_VG_CLIN_SIG = {
@@ -28,7 +30,7 @@ CLINVAR_REVIEW_STATUS_TO_STARS = {
 
 
 @dataclass
-class ClinVarAPIRecord:
+class ClinVarRecord:
     record_id: Optional[str] = None
     org_id: Optional[str] = None
     genome_build: Optional[str] = None
@@ -44,6 +46,8 @@ class ClinVarAPIRecord:
     interpretation_summary: Optional[str] = None
     assertion_method: Optional[str] = None
     allele_origin: Optional[str] = None
+    parser_version: int = 1
+    parsed_date: Optional[datetime] = None
 
     @property
     def _sort_order(self):
@@ -75,31 +79,51 @@ class ClinVarAPIRecord:
         #     return False
         return True
 
+    @property
+    def is_expert_panel_or_greater(self):
+        return self.stars >= CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
+
 
 @dataclass
-class ClinVarApiResponse:
+class ClinVarFetchResponse:
     clinvar_variation_id: int
     rcvs: List[str]
-    records: List[ClinVarAPIRecord]
+    records: List[ClinVarRecord]
+    cached: bool = False
 
 
-class ClinVarParser(XmlParser):
+class ClinVarRetrieveMode(str, Enum):
+    EXPERT_PANEL_ONLY = "expect"
+    ALL_RECORDS = "all"
+
+
+def fetch_clinvar_records(clinvar_variation_id, record_mode: ClinVarRetrieveMode) -> ClinVarFetchResponse:
+    """
+    Call to retrieve individual ClinVarRecords
+    :param clinvar_variation_id:
+    :param mode:
+    :return:
+    """
+    response = ClinVarXmlParser.load_from_clinvar_id(clinvar_variation_id)
+    response.records = [r for r in response.records if r.is_expert_panel_or_greater]
+    return response
+
+
+class ClinVarXmlParser(XmlParser):
 
     RE_GOOD_CHGVS = re.compile("^(N._[0-9]+[.][0-9]+:c[.][0-9_a-zA-Z>]+)( .*)?$")
     RE_ORPHA = re.compile("ORPHA([0-9]+)")
+    PARSER_VERSION = 1  # if we start caching these in the database, this is useful to know
 
     @staticmethod
-    def load_from_clinvar_id(clinvar_variation_id) -> ClinVarApiResponse:
-
-        url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id={clinvar_variation_id}&retmode=json"
-        r = requests.get(url)
+    def load_from_clinvar_id(clinvar_variation_id) -> ClinVarFetchResponse:
 
         cv_handle = Entrez.esummary(db="clinvar", retmode="json", id=clinvar_variation_id)
         json_data = json.loads(cv_handle.read())
         cv_handle.close()
 
         all_rcvs: List[str] = []
-        parsed_results: List[ClinVarAPIRecord] = []
+        parsed_results: List[ClinVarRecord] = []
         if result := json_data.get("result"):
             if uuids := result.get("uids"):
                 if uuid_data := result.get(uuids[0]):
@@ -109,26 +133,33 @@ class ClinVarParser(XmlParser):
 
         if all_rcvs:
             handle = Entrez.efetch(db="clinvar", rettype="clinvarset", id=all_rcvs)
-            parsed_results = []
-            for result in ClinVarParser().parse(handle):
-                parsed_results.append(result)
+            parsed_results = ClinVarXmlParser.load_from_input(handle)
             handle.close()
-            parsed_results.sort(reverse=True)
 
-        return ClinVarApiResponse(
+        return ClinVarFetchResponse(
             clinvar_variation_id=clinvar_variation_id,
             rcvs=all_rcvs,
             records=parsed_results
         )
 
+    @staticmethod
+    def load_from_input(handle) -> List[ClinVarRecord]:
+        parsed_results = []
+        for result in ClinVarXmlParser().parse(handle):
+            parsed_results.append(result)
+        parsed_results.sort(reverse=True)
+        return parsed_results
+
     def __init__(self):
-        self.latest: Optional[ClinVarAPIRecord] = None
+        self.latest: Optional[ClinVarRecord] = None
         super().__init__()
 
     def reset(self):
         if self.latest and self.latest.is_good_quality:
+            self.latest.parser_version = ClinVarXmlParser.PARSER_VERSION
+            self.latest.parsed_date = datetime.now()
             self.set_yieldable(self.latest)
-        self.latest = ClinVarAPIRecord()
+        self.latest = ClinVarRecord()
 
     def finish(self):
         self.reset()
@@ -162,7 +193,7 @@ class ClinVarParser(XmlParser):
         PP("Attribute", Type="HGVS"))
     def parse_c_hgvs(self, elem):
         if hgvs := elem.text:
-            if match := ClinVarParser.RE_GOOD_CHGVS.match(hgvs):
+            if match := ClinVarXmlParser.RE_GOOD_CHGVS.match(hgvs):
                 hgvs = match.group(1)
                 self.latest.c_hgvs = hgvs
             self.latest.c_hgvs = hgvs
@@ -277,8 +308,8 @@ class ClinVarParser(XmlParser):
             elif db == "OMIM":
                 final_value = f"OMIM:{id}"
             elif db == "Orphanet":
-                if m := ClinVarParser.RE_ORPHA.match(id):
-                    final_value = f"Orphanet:{m.group(1)}"
+                if m := ClinVarXmlParser.RE_ORPHA.match(id):
+                    final_value = f"ORPHA:{m.group(1)}"
             elif db == "MedGen":
                 final_value = f"MedGen:{id}"
             elif db == "HP":

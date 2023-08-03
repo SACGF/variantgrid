@@ -22,8 +22,6 @@ from django.utils.timezone import localtime
 from django_extensions.db.models import TimeStampedModel
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
-
-from annotation.clinvar_xml_parser import ClinVarParser
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction
@@ -31,6 +29,7 @@ from annotation.models.models_citations import Citation, CitationFetchRequest, C
 from annotation.models.models_enums import AnnotationStatus, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
     ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, EssentialGeneGeneTrap
+from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
@@ -135,21 +134,27 @@ class ClinVar(models.Model):
                 name = name.strip()
                 if name.startswith("MONDO:MONDO:"):
                     name = name.replace("MONDO:MONDO:", "MONDO:")
+                elif name.startswith("Orphanet:ORPHA"):
+                    name = "ORPHA:" + name[len("Orphanet:ORPHA"):]
                 return name
 
-            db_names = [fix_name(db_name) for db_name in db_name_text.split(",")]
+            db_names = [fix_name(db_name) for db_name in re.split("[|,]", db_name_text)]
             return db_names
         return []
 
     @property
     def clinvar_clinical_sources_list(self) -> List[str]:
         if clinvar_clinical_sources := self.clinvar_clinical_sources:
-            return [name.strip() for name in clinvar_clinical_sources.split(",")]
+            return [name.strip() for name in clinvar_clinical_sources.split("|")]
         return []
 
     @property
     def stars(self):
         return ClinVarReviewStatus(self.clinvar_review_status).stars()
+
+    @property
+    def is_expert_panel_or_greater(self):
+        return self.stars >= CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 
     def get_origin_display(self):
         return ClinVar.ALLELE_ORIGIN.get(self.clinvar_origin)

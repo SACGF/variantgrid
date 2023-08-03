@@ -5,7 +5,7 @@ from typing import Optional, Union, List
 from django.template import Library
 from more_itertools import first
 
-from annotation.clinvar_xml_parser import ClinVarParser
+from annotation.clinvar_xml_parser import ClinVarXmlParser
 from annotation.models import ClinVar, AnnotationVersion
 from genes.hgvs import HGVSMatcher
 from library.log_utils import report_exc_info
@@ -29,8 +29,10 @@ class ClinVarDetails:
     genome_build: GenomeBuild
     annotation_version: AnnotationVersion
     g_hgvs: str
-    clinvar_citations: Optional[List[str]]
-    num_clinvar_citations: Optional[int]
+
+    @property
+    def is_expert_panel_or_greater(self) -> bool:
+        return self.clinvar and self.clinvar.is_expert_panel_or_greater
 
     def instance_from(allele: Optional[Union[int, Allele]] = None, variant: Optional[Union[int, Variant]] = None, genome_build: Optional[GenomeBuild] = None, annotation_version: Optional[AnnotationVersion] = None):
         if not allele and not variant:
@@ -70,34 +72,30 @@ class ClinVarDetails:
             except ClinVar.DoesNotExist:
                 pass
 
-        clinvar_citations: List[str] = None
-        num_clinvar_citations: Optional[int] = None
-
         g_hgvs: Optional[str] = None
         if not clinvar_record:
             g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
-        else:
-            clinvar_citations = clinvar_record.citation_ids
-            num_clinvar_citations = len(clinvar_citations)
 
         return ClinVarDetails(
             clinvar=clinvar_record,
             is_desired_build=is_desired_build,
             genome_build=genome_build,
             annotation_version=annotation_version,
-            g_hgvs=g_hgvs,
-            clinvar_citations=clinvar_citations,
-            num_clinvar_citations=num_clinvar_citations
+            g_hgvs=g_hgvs
         )
 
 
 @register.inclusion_tag("annotation/tags/clinvar_tag.html")
-def clinvar(allele: Optional[Union[int, Allele]] = None, variant: Optional[Union[int, Variant]] = None, genome_build: Optional[GenomeBuild] = None, annotation_version: Optional[AnnotationVersion] = None, auto_load=True):
+def clinvar(
+        allele: Optional[Union[int, Allele]] = None,
+        variant: Optional[Union[int, Variant]] = None,
+        genome_build: Optional[GenomeBuild] = None,
+        annotation_version: Optional[AnnotationVersion] = None,
+        expert_panel_only=False):
     data = ClinVarDetails.instance_from(allele=allele, variant=variant, genome_build=genome_build, annotation_version=annotation_version)
-    context = dict(asdict(data).items())
-    if data.clinvar:
-        context["review_status"] = data.clinvar.get_clinvar_review_status_display()
 
-    context = dict(asdict(data).items())
-    context["auto_load"] = auto_load
-    return context
+    return {
+        "data": data,
+        "expert_panel_only": expert_panel_only,
+        "record_mode": "expert" if expert_panel_only else "all"
+    }
