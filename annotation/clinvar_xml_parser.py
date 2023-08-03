@@ -13,7 +13,7 @@ from library.utils.xml_utils import XmlParser, parser_path, PP
 CLINVAR_TO_VG_CLIN_SIG = {
     "Benign": "B",
     "Likely benign": "LB",
-    "Uncertain Significance": "VUS",
+    "Uncertain significance": "VUS",
     "Likely pathogenic": "LP",
     "Pathogenic": "P",
     "risk factor": "R",
@@ -69,7 +69,8 @@ class ClinVarRecord:
 
     @property
     def clinical_significance_vg(self):
-        return CLINVAR_TO_VG_CLIN_SIG.get(self.clinical_significance, "VUS")
+        raw_value = self.clinical_significance
+        return CLINVAR_TO_VG_CLIN_SIG.get(self.clinical_significance, raw_value)
 
     @property
     def is_good_quality(self) -> bool:
@@ -97,15 +98,16 @@ class ClinVarRetrieveMode(str, Enum):
     ALL_RECORDS = "all"
 
 
-def fetch_clinvar_records(clinvar_variation_id, record_mode: ClinVarRetrieveMode) -> ClinVarFetchResponse:
+def fetch_clinvar_records(clinvar_variation_id, retrieve_mode: ClinVarRetrieveMode) -> ClinVarFetchResponse:
     """
     Call to retrieve individual ClinVarRecords
-    :param clinvar_variation_id:
-    :param mode:
-    :return:
+    :param clinvar_variation_id: ClinVarVariation ID
+    :param retrieve_mode: If we want all records or just expert panel (if all expert it's assumed that this is only called
+    as a result of the overall annotation being marked as expert
     """
     response = ClinVarXmlParser.load_from_clinvar_id(clinvar_variation_id)
-    response.records = [r for r in response.records if r.is_expert_panel_or_greater]
+    if retrieve_mode == ClinVarRetrieveMode.EXPERT_PANEL_ONLY:
+        response.records = [r for r in response.records if r.is_expert_panel_or_greater]
     return response
 
 

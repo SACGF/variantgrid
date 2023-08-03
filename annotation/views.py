@@ -503,6 +503,6 @@ def citations_json(request, citations_ids_list):
     return JsonResponse({"citations": CitationFetchRequest.fetch_all_now(citation_ids).to_json()})
 
 
-def view_clinvar_detail(request, clinvar_variation_id: int, record_mode: str):
-    data = fetch_clinvar_records(clinvar_variation_id=clinvar_variation_id, record_mode=record_mode)
+def view_clinvar_detail(request, clinvar_variation_id: int, retrieve_mode: str):
+    data = fetch_clinvar_records(clinvar_variation_id=clinvar_variation_id, retrieve_mode=retrieve_mode)
     return render(request, "annotation/clinvar_detail.html", {"response": data})

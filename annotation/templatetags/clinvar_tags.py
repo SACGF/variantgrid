@@ -5,7 +5,7 @@ from typing import Optional, Union, List
 from django.template import Library
 from more_itertools import first
 
-from annotation.clinvar_xml_parser import ClinVarXmlParser
+from annotation.clinvar_xml_parser import ClinVarXmlParser, ClinVarRetrieveMode
 from annotation.models import ClinVar, AnnotationVersion
 from genes.hgvs import HGVSMatcher
 from library.log_utils import report_exc_info
@@ -97,5 +97,5 @@ def clinvar(
     return {
         "data": data,
         "expert_panel_only": expert_panel_only,
-        "record_mode": "expert" if expert_panel_only else "all"
+        "retrieve_mode": ClinVarRetrieveMode.EXPERT_PANEL_ONLY if expert_panel_only else ClinVarRetrieveMode.ALL_RECORDS
     }
