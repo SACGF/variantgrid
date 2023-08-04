@@ -97,5 +97,5 @@ def clinvar(
     return {
         "data": data,
         "expert_panel_only": expert_panel_only,
-        "retrieve_mode": ClinVarRetrieveMode.EXPERT_PANEL_ONLY if expert_panel_only else ClinVarRetrieveMode.ALL_RECORDS
+        "retrieve_mode": (ClinVarRetrieveMode.EXPERT_PANEL_ONLY if expert_panel_only else ClinVarRetrieveMode.ALL_RECORDS).value
     }

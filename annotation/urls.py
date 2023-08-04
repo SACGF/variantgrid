@@ -33,7 +33,7 @@ urlpatterns = [
     perm_path('citation/<str:citation_id>', views.view_citation, name='view_citation'),
     perm_path('citation/<str:citation_id>/detail', views.view_citation_detail, name='view_citation_detail'),
 
-    perm_path('clinvar/<int:clinvar_variation_id>/detail/<str:retrieve_mode>', views.view_clinvar_detail, name='view_clinvar_detail')
+    perm_path('clinvar/<int:clinvar_variation_id>/detail/<str:retrieve_mode>', views.view_clinvar_records_detail, name='view_clinvar_records_detail')
 ]
 
 rest_urlpatterns = [

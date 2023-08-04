@@ -3,6 +3,7 @@ import datetime
 import json
 import re
 import urllib
+from datetime import date
 from decimal import Decimal
 from html import escape
 from typing import Union, Any, Optional
@@ -171,6 +172,11 @@ def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False, tex
 
     if timestamp:
         if not isinstance(timestamp, (int, float)):
+            if not hasattr(timestamp, 'timestamp'):
+                if isinstance(timestamp, date):
+                    timestamp = datetime.datetime(year=timestamp.year, month=timestamp.month, day=timestamp.day)
+                else:
+                    raise ValueError(f"Unsure how to convert {timestamp} to timestamp")
             timestamp = timestamp.timestamp()
         return {
             "datetime": datetime.datetime.fromtimestamp(timestamp),

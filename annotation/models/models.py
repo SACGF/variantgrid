@@ -4,14 +4,12 @@ import re
 from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import cached_property
-from io import BytesIO
 from typing import List, Optional, Dict, Callable, Tuple
-
-import requests
 from Bio import Entrez
 from Bio.Data.IUPACData import protein_letters_1to3
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction, connection
 from django.db.models.deletion import PROTECT, CASCADE, SET_NULL
@@ -34,8 +32,7 @@ from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAn
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
 from library.django_utils.django_partition import RelatedModelsPartitionModel
-from library.log_utils import report_exc_info
-from library.utils import invert_dict, name_from_filename, JsonObjType
+from library.utils import invert_dict, name_from_filename
 from ontology.models import OntologyVersion
 from patients.models_enums import GnomADPopulation
 from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN, \
@@ -90,6 +87,11 @@ def clinvar_version_pre_delete_handler(sender, instance, **kwargs):  # pylint: d
 
 
 class ClinVar(models.Model):
+
+    class Meta:
+        verbose_name = "ClinVar annotation"
+        verbose_name_plural = "ClinVar annotations"
+
     ALLELE_ORIGIN = {0: 'unknown',
                      1: 'germline',
                      2: 'somatic',
@@ -179,6 +181,55 @@ class ClinVar(models.Model):
 
     def __str__(self):
         return f"ClinVar: variant: {self.variant}, path: {self.highest_pathogenicity}"
+
+
+class ClinVarRecordCollection(TimeStampedModel):
+
+    class Meta:
+        verbose_name = "ClinVar record collection"
+
+    clinvar_variation_id = models.IntegerField(primary_key=True)
+    rcvs = ArrayField(base_field=models.TextField(), blank=True, null=True, size=None)
+    last_loaded = models.DateTimeField(blank=True, null=True)
+    parser_version = models.IntegerField(blank=True, null=True)
+    min_stars_loaded = models.IntegerField(blank=True, null=True)
+
+    def records_with_min_stars(self, min_stars: int) -> List['ClinVarRecord']:
+        return list(sorted(self.clinvarrecord_set.filter(stars__gte=min_stars), reverse=True))
+
+
+class ClinVarRecord(TimeStampedModel):
+
+    class Meta:
+        verbose_name = "ClinVar record"
+
+    clinvar_record_collection = models.ForeignKey(ClinVarRecordCollection, on_delete=CASCADE)
+    record_id = models.TextField(primary_key=True)  # SCV
+    stars = models.IntegerField()
+    org_id = models.TextField()
+    genome_build = models.TextField()
+    review_status = models.TextField()
+    submitter = models.TextField()
+    submitter_date = models.DateField()
+
+    date_last_evaluated = models.DateField(null=True, blank=True)
+    c_hgvs = models.TextField(null=True, blank=True)
+    variant_coordinate = models.TextField(null=True, blank=True)
+    condition = models.TextField(null=True, blank=True)
+    clinical_significance = models.TextField(null=True, blank=True)
+    gene_symbol = models.TextField(null=True, blank=True)
+    interpretation_summary = models.TextField(null=True, blank=True)
+    assertion_method = models.TextField(null=True, blank=True)
+    allele_origin = models.TextField(null=True, blank=True)
+
+    def __lt__(self, other):
+        def sort_key(record: ClinVarRecord):
+            return record.stars, record.date_last_evaluated or record.submitter_date
+        return sort_key(self) < sort_key(other)
+
+    @property
+    def is_expert_panel_or_greater(self):
+        return self.stars >= CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 
 
 class ClinVarCitationsCollection(models.Model):

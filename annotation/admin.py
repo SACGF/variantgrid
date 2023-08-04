@@ -1,16 +1,43 @@
 from datetime import timedelta
 
 from django.contrib import admin
+from django.contrib.admin import TabularInline
 from django.db.models import QuerySet
 
 from annotation import models
-from annotation.models import Citation, CitationFetchRequest
+from annotation.models import Citation, CitationFetchRequest, ClinVarRecordCollection, ClinVarRecord
 from snpdb.admin_utils import ModelAdminBasics, admin_action
 
 admin.site.register(models.AnnotationRun)
 admin.site.register(models.AnnotationVersion)
 admin.site.register(models.ClinVar)
 admin.site.register(models.VariantAnnotationVersion)
+
+
+class ClinVarRecordAdmin(TabularInline):
+    model = ClinVarRecord
+
+    fields = ("record_id", "clinical_significance", "stars")
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_add_permission(self, request, obj):
+        return False
+
+
+@admin.register(ClinVarRecordCollection)
+class ClinVarRecordCollectionAdmin(ModelAdminBasics):
+    inlines = (ClinVarRecordAdmin, )
+
+    list_display = ("clinvar_variation_id", "min_stars_loaded", "last_loaded")
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_add_permission(self, request):
+        return False
+
 
 class HasErrorFilter(admin.SimpleListFilter):
     title = "Has Errors"

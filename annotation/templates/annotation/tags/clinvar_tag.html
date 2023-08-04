@@ -20,7 +20,7 @@
                 {% if expert_panel_only and data.is_expert_panel_or_greater %}
                     {% comment %}If we're only showing expert panels - insta-show them{% endcomment %}
                     <div class="mt-2">
-                        <div data-toggle="ajax" href="{% url "view_clinvar_detail" clinvar.clinvar_variation_id record_mode %}">
+                        <div data-toggle="ajax" href="{% url "view_clinvar_records_detail" clinvar.clinvar_variation_id retrieve_mode %}">
                             Loading...
                         </div>
                     </div>
@@ -32,7 +32,7 @@
                         {% labelled label="Clinical Sources" %}{% for source in clinvar.clinvar_clinical_sources_list %}{% if not forloop.first %}<span class="text-muted">|</span>{% endif %} {{ source | code_to_english }} {% endfor %}{% endlabelled %}
                     </div>
                     <div class="mt-2">
-                        <div data-toggle="ajax-collapse" href="{% url 'view_clinvar_detail' clinvar.clinvar_variation_id retrieve_mode %}" title="Individual ClinVar Records"></div>
+                        <div data-toggle="ajax-collapse" href="{% url 'view_clinvar_records_detail' clinvar.clinvar_variation_id retrieve_mode %}" title="Individual ClinVar Records"></div>
                     </div>
                     {% with citation_ids=clinvar.citation_ids %}
                         <div class="mt-2">
