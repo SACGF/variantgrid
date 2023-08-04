@@ -75,7 +75,7 @@ class OntologyService(models.TextChoices):
         HGNC[0]: "https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:${1}",
         DOID[0]: "https://www.ebi.ac.uk/ols/ontologies/doid/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FDOID_${1}",
         ORPHANET[0]: "https://www.orpha.net/consor/cgi-bin/OC_Exp.php?lng=EN&Expert=${1}",
-        MEDGEN[0]: "https://www.ncbi.nlm.nih.gov/medgen/?term=${1}"
+        MEDGEN[0]: "https://www.ncbi.nlm.nih.gov/medgen/${1}"
     })
 
     LOCAL_ONTOLOGY_PREFIXES: Set[str] = Constant({

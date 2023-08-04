@@ -795,6 +795,10 @@ def search_data(user: User, search_string: str, classify: bool = False) -> Searc
 
 
 INVALID_INPUT = object()
+"""
+Return this (and only this) from a search if you want to act as if the search pattern wasn't met 
+"""
+
 def search_receiver(
         search_type: Optional[PreviewCoordinator],
         pattern: Pattern = HAS_ANYTHING,
