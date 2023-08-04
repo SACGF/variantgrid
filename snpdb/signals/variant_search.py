@@ -23,7 +23,7 @@ from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import Variant, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DbSNP, DBSNP_PATTERN, VariantCoordinate, \
     ClinGenAllele, GenomeBuild, Contig, HGVS_UNCLEANED_PATTERN
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample, SearchResult, SearchMessageOverall, \
-    SearchMessage
+    SearchMessage, INVALID_INPUT
 from upload.models import ModifiedImportedVariant
 
 COSMIC_PATTERN = re.compile(r"^(COS[VM])[0-9]{3,}$", re.IGNORECASE)
@@ -398,7 +398,6 @@ def _search_hgvs_using_gene_symbol(
         elif not (settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE or settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS):
             yield SearchMessageOverall("\n".join(messages_as_strs))
 
-
 @search_receiver(
     search_type=Variant,
     pattern=HGVS_UNCLEANED_PATTERN,
@@ -409,6 +408,8 @@ def _search_hgvs_using_gene_symbol(
     )
 )
 def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
+    if search_input.search_string.lower().startswith("medgen"):
+        return [INVALID_INPUT]
     for_all_genome_builds = []
     for genome_build in search_input.genome_builds:
         for_all_genome_builds.append(_search_hgvs(hgvs_string=search_input.search_string, user=search_input.user, genome_build=genome_build, visible_variants=search_input.get_visible_variants(genome_build), classify=search_input.classify))
