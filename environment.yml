@@ -19,7 +19,6 @@ dependencies:
   - configargparse=1.5
   - coreapi=2.3
   - cyvcf2==0.30.16
-  - hgvs=1.5
   - htseq=2.0
   - ijson=3.1
   - ipython=8.6
