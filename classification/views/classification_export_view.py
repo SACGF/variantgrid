@@ -80,6 +80,7 @@ def export_view(request: HttpRequest) -> Response:
     format_mvl = {'id': 'mvl', 'name': 'MVL'}
     format_csv = {'id': 'csv', 'name': 'CSV'}
     format_clinvar_compare = {'id': 'clinvar_compare', 'name': 'ClinVar Compare', 'admin_only': True}
+    format_clinvar_expert_compare = {'id': 'clinvar_compare_expert', 'name': 'ClinVar Expert Panel Compare', 'admin_only': True}
     format_json = {'id': 'json', 'name': 'JSON'}
     format_spelling = {'id': 'spelling', 'name': 'Spelling Report', 'admin_only': True}
     format_redcap = {'id': 'redcap', 'name': 'REDCap'}
@@ -88,6 +89,7 @@ def export_view(request: HttpRequest) -> Response:
         format_keys,
         format_csv,
         format_clinvar_compare,
+        format_clinvar_expert_compare,
         format_spelling,
         format_json,
         format_mvl
