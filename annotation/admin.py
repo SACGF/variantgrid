@@ -17,7 +17,7 @@ admin.site.register(models.VariantAnnotationVersion)
 class ClinVarRecordAdmin(TabularInline):
     model = ClinVarRecord
 
-    fields = ("record_id", "clinical_significance", "stars")
+    fields = ("record_id", "submitter", "stars", "date_last_evaluated", "clinical_significance")
 
     def has_change_permission(self, request, obj=None):
         return False
