@@ -395,3 +395,9 @@ class FormerTuple(ABC):
 
     def __getitem__(self, item):
         return self.as_tuple[item]
+
+    def __eq__(self, other):
+        # default implementation assumes all parts implement __eq__
+        if not type(self) is type(other):
+            return False
+        return self.as_tuple == other.as_tuple
