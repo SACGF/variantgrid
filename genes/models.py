@@ -45,7 +45,7 @@ from library.guardian_utils import assign_permission_to_user_and_groups, DjangoP
     add_public_group_read_permission
 from library.log_utils import log_traceback
 from library.preview_request import PreviewData, PreviewModelMixin
-from library.utils import get_single_element, iter_fixed_chunks
+from library.utils import get_single_element, iter_fixed_chunks, FormerTuple
 from library.utils.file_utils import mk_path
 from snpdb.models import Wiki, Company, Sample, DataState
 from snpdb.models.models_enums import ImportStatus
@@ -588,7 +588,19 @@ class GeneVersion(models.Model):
         return f"{self.accession} ({self.gene_symbol}/{self.genome_build})"
 
 
-TranscriptParts = namedtuple('TranscriptParts', ['identifier', 'version'])
+@dataclass
+class TranscriptParts(FormerTuple):
+    identifier: str
+    version: Optional[int]
+
+    @property
+    def as_tuple(self) -> Tuple:
+        return self.identifier, self.version
+
+    def __repr__(self):
+        if self.version:
+            return f"{self.identifier}.{self.version}"
+        return self.identifier
 
 
 class Transcript(models.Model, PreviewModelMixin):
@@ -725,8 +737,13 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     def threep_utr(self):
         return self._transcript_regions[2]
 
+    @property
+    def as_parts(self):
+        return TranscriptParts(self.transcript.identifier, self.version)
+
     @staticmethod
     def transcript_parts(identifier: str) -> TranscriptParts:
+        # TODO - is this redundant to HGVSMatcher's get_transcript_parts?
         t_regex = re.compile(r"^([_A-Z0-9]+)(?:[.]([0-9]+))?$", re.RegexFlag.IGNORECASE)
         if m := t_regex.match(identifier):
             version = m.group(2)
@@ -858,14 +875,14 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         return False
 
     @staticmethod
-    def get_transcript_id_and_version(transcript_accession: str) -> Tuple[str, int]:
+    def get_transcript_id_and_version(transcript_accession: str) -> TranscriptParts:
         parts = transcript_accession.split(".")
         if len(parts) == 2:
             identifier = str(parts[0])
             version = int(parts[1])
         else:
             identifier, version = transcript_accession, None
-        return identifier, version
+        return TranscriptParts(identifier, version)
 
     @staticmethod
     def transcript_versions_by_id(genome_build: GenomeBuild = None, annotation_consortium=None) -> \

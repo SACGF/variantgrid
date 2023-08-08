@@ -113,7 +113,7 @@ class ResolvedVariantInfo(TimeStampedModel):
         self.c_hgvs = None
         self.c_hgvs_full = None
         self.gene_symbol = None
-        self.transcript_version = None
+        self.transcript_version: Optional[TranscriptVersion] = None
 
         self.variant = variant
         genome_build = self.genome_build

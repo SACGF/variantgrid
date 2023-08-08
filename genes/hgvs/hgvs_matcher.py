@@ -14,7 +14,7 @@ from genes.hgvs.hgvs_converter import HGVSConverterType, HgvsMatchRefAllele
 from genes.hgvs.hgvs_converter_combo import ComboCheckerHGVSConverter
 from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSConverter
 from genes.models import TranscriptVersion, Transcript, GeneSymbol, LRGRefSeqGene, BadTranscript, \
-    NoTranscript
+    NoTranscript, TranscriptParts
 from genes.transcripts_utils import transcript_is_lrg, looks_like_transcript, looks_like_hgvs_prefix
 from library.constants import WEEK_SECS
 from library.log_utils import report_exc_info
@@ -359,9 +359,15 @@ class HGVSMatcher:
     def get_transcript_accession(self, hgvs_string: str) -> str:
         return self.hgvs_converter.get_transcript_accession(hgvs_string)
 
+    def get_transcript_parts(self, hgvs_string: str) -> TranscriptParts:
+        accession = self.hgvs_converter.get_transcript_accession(hgvs_string)
+        return TranscriptVersion.get_transcript_id_and_version(accession)
+
     def get_transcript_id(self, hgvs_string: str) -> str:
-        transcript_accession = self.get_transcript_accession(hgvs_string)
-        return TranscriptVersion.get_transcript_id_and_version(transcript_accession)[0]
+        """
+        Deprecated - use get_transcript_parts(hgvs_string).identifier
+        """
+        return self.get_transcript_parts(hgvs_string).identifier
 
     def _lrg_variant_to_hgvs(self, variant: Variant, lrg_identifier: str = None) -> Tuple[HGVSVariant, str]:
         if transcript_version := LRGRefSeqGene.get_transcript_version(self.genome_build, lrg_identifier):
