@@ -12,6 +12,8 @@ from annotation.models import ClinVarRecord, ClinVarRecordCollection
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from library.utils.xml_utils import XmlParser, parser_path, PP
 
+CLINVAR_RECORD_CACHE_DAYS = 60
+
 CLINVAR_TO_VG_CLIN_SIG = {
     "Benign": "B",
     "Likely benign": "LB",
@@ -35,7 +37,7 @@ CLINVAR_REVIEW_STATUS_TO_STARS = {
 class ClinVarFetchRequest:
     clinvar_variation_id: int
     min_stars: int
-    max_cache_age: timedelta = field(default=timedelta(days=30))
+    max_cache_age: timedelta = field(default=timedelta(days=CLINVAR_RECORD_CACHE_DAYS))
 
     def fetch(self) -> ClinVarRecordCollection:
 
@@ -102,9 +104,17 @@ class ClinVarRetrieveMode(str, Enum):
 
 class ClinVarXmlParser(XmlParser):
 
+    RE_DATE_EXTRACTOR = re.compile("([0-9]+-[0-9]+-[0-9]+).*")
     RE_GOOD_CHGVS = re.compile("^(N._[0-9]+[.][0-9]+:c[.][0-9_a-zA-Z>]+)( .*)?$")
     RE_ORPHA = re.compile("ORPHA([0-9]+)")
     PARSER_VERSION = 1  # if we start caching these in the database, this is useful to know
+
+    @staticmethod
+    def parse_xml_date(text: str) -> Optional[datetime]:
+        if match := ClinVarXmlParser.RE_DATE_EXTRACTOR.match(text):
+            relevant_text = match.group(1)
+            return datetime.strptime(relevant_text, "%Y-%m-%d")
+        return None
 
     @staticmethod
     def load_from_clinvar_id(clinvar_record_collection: ClinVarRecordCollection) -> ClinVarFetchResponse:
@@ -210,7 +220,7 @@ class ClinVarXmlParser(XmlParser):
     def parse_reviewer(self, elem):
         self.latest.submitter = elem.get("submitter")
         if submitter_date := elem.get("submitterDate"):
-            self.latest.submitter_date = datetime.strptime(submitter_date, "%Y-%m-%d")
+            self.latest.submitter_date = ClinVarXmlParser.parse_xml_date(submitter_date)
 
     @parser_path(
         "ClinVarResult-Set",
@@ -282,7 +292,7 @@ class ClinVarXmlParser(XmlParser):
         "ClinicalSignificance")
     def parse_date_last_evaluated(self, elem):
         if last_evaluated := elem.get("DateLastEvaluated"):
-            self.latest.date_last_evaluated = datetime.strptime(last_evaluated, "%Y-%m-%d")
+            self.latest.date_last_evaluated = ClinVarXmlParser.parse_xml_date(last_evaluated)
 
     @parser_path(
         "ClinVarResult-Set",
