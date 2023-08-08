@@ -439,6 +439,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
 
     try:
         variant_tuple, used_transcript_accession, kind, method, matches_reference = hgvs_matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(hgvs_string)
+        logging.info("get_variant_tuple_used_transcript_kind_method_and_matches_reference - variant_tuple=%s", variant_tuple)
         if not matches_reference:
             ref_base = variant_tuple[2]
 

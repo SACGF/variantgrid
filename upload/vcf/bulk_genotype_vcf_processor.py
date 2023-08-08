@@ -317,7 +317,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             if self.last_locus_tuple != locus_tuple:
                 self.finished_locus()
 
-        alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, ref, alt, end)
+        alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, end, ref, alt)
         format_json = self._get_format_json(self.num_samples, variant)
         info_json = self._get_info_json(variant)
 

@@ -403,12 +403,12 @@ class Variant(PreviewModelMixin, models.Model):
         return errors
 
     @staticmethod
-    def tuple_to_spdi(chrom, position, ref, alt, end) -> str:
+    def tuple_to_spdi(chrom, start, end, ref, alt) -> str:
         """ SPDI: data model for variants and applications at NCBI
             @see https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7523648/ """
-        p_str = str(position - 1)
+        p_str = str(start - 1)
         if Sequence.allele_is_symbolic(alt):
-            length = end - position
+            length = end - start
             if alt == "<DEL>":
                 d_str = length
                 i_str = ""

@@ -56,7 +56,7 @@ def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=Fal
     if tuples_have_id_field:
         vcf_tuples = variant_tuples
     else:
-        vcf_tuples = ((chrom, position, ".", ref, alt, end) for (chrom, position, ref, alt, end) in variant_tuples)
+        vcf_tuples = ((chrom, start, end, ".", ref, alt) for (chrom, start, end, ref, alt) in variant_tuples)
 
     vcf_tuples = sorted(vcf_tuples, key=operator.itemgetter(0, 1, 3, 4))
     columns = "\t".join(["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"])
@@ -65,7 +65,7 @@ def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=Fal
     with open(vcf_filename, "wt", encoding="utf-8") as f:
         f.write(header + "\n")
         for vcf_record in vcf_tuples:
-            (chrom, position, id_col, ref, alt, end) = vcf_record
+            (chrom, position, end, id_col, ref, alt) = vcf_record
             if alt == Variant.REFERENCE_ALT:
                 alt = "."
             line = "\t".join((chrom, str(position), str(id_col), ref, alt)) + empty_columns

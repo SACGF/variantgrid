@@ -51,7 +51,7 @@ class BulkUnknownVariantInserter:
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
         # This has been decomposed (only be 1 alt per line)
         ref, alt, end = vcf_get_ref_alt_end(variant)
-        self.variant_pk_lookup.add(variant.CHROM, variant.POS, ref, alt, end)
+        self.variant_pk_lookup.add(variant.CHROM, variant.POS, end, ref, alt)
         self.batch_process_check()
 
     def finish(self):
@@ -161,8 +161,8 @@ class InsertUnknownVariantsTask(ImportVCFStepTask):
             items_processed = 0
             # Python CSV reader dies with extremely long lines, so we just do by hand (not quoted or anything)
             for line in f:
-                chrom, position, ref, alt, end = line.strip().split(",")  # Not quoted, exactly 4 columns
-                variant_pk_lookup.add(chrom, position, ref, alt, end)
+                chrom, start, end, ref, alt = line.strip().split(",")  # Not quoted, exactly 4 columns
+                variant_pk_lookup.add(chrom, start, end, ref, alt)
                 variant_pk_lookup.batch_check(settings.SQL_BATCH_INSERT_SIZE, insert_unknown=True)
                 items_processed += 1
             # Any remaining

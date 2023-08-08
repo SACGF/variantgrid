@@ -27,7 +27,7 @@ class BulkMinimalVCFProcessor(AbstractBulkVCFProcessor):
 
     def process_entry(self, variant):
         ref, alt, end = vcf_get_ref_alt_end(variant)
-        variant_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, ref, alt, end)
+        variant_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, end, ref, alt)
         self.variant_hashes.append(variant_hash)
         self.add_modified_imported_variant(variant, variant_hash)
         self.batch_process_check()

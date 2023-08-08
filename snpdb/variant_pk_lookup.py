@@ -75,17 +75,17 @@ class VariantPKLookup(abc.ABC):
     def filter_non_reference(self, variant_hashes, variant_ids) -> List:
         pass
 
-    def get_variant_coordinate_hash(self, chrom, position, ref, alt, end):
+    def get_variant_coordinate_hash(self, chrom, start, end, ref, alt):
         """ For VCF records (needs GenomeBuild supplied) """
         if self.chrom_contig_id_mappings is None:
             raise ValueError("Need to initialise w/GenomeBuild to call get_variant_coordinate_hash")
         contig_id = self.chrom_contig_id_mappings[chrom]
         ref_id = self.sequence_pk_by_seq[ref]
         alt_id = self.sequence_pk_by_seq[alt]
-        return self._get_variant_hash(contig_id, position, ref_id, alt_id, end)
+        return self._get_variant_hash(contig_id, start, ref_id, alt_id, end)
 
-    def add(self, chrom, position, ref, alt, end):
-        variant_coordinate = (chrom, position, ref, alt, end)
+    def add(self, chrom, start, end, ref, alt):
+        variant_coordinate = (chrom, start, end, ref, alt)
         # If sequence isn't known, variant is definitely unknown
         if ref in self.sequence_pk_by_seq and alt in self.sequence_pk_by_seq:
             # Maybe unknown, need to check
@@ -161,11 +161,11 @@ class VariantPKLookup(abc.ABC):
 
         loci_parts_by_hash = {}
         locus_hash_alt_id_and_end_by_variant_hash = {}
-        for chrom, position, ref, alt, end in self.unknown_variant_coordinates:
+        for chrom, start, end, ref, alt in self.unknown_variant_coordinates:
             contig_id = self.chrom_contig_id_mappings[chrom]
             ref_id = self.sequence_pk_by_seq[ref]
             alt_id = self.sequence_pk_by_seq[alt]
-            loci_parts = (contig_id, position, ref_id)
+            loci_parts = (contig_id, start, ref_id)
             locus_hash = self._get_locus_hash(*loci_parts)
             loci_parts_by_hash[locus_hash] = loci_parts
             variant_parts = (contig_id, position, ref_id, alt_id, end)

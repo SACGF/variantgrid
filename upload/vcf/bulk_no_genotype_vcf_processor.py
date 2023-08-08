@@ -45,7 +45,7 @@ class BulkNoGenotypeVCFProcessor(BulkGenotypeVCFProcessor):
     def process_entry(self, variant):
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
         ref, alt, end = vcf_get_ref_alt_end(variant)
-        alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, ref, alt, end)
+        alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, end, ref, alt)
 
         # Don't need to worry about processing all loci - go straight onto variant lists for insert
         self.variant_hashes.append(alt_hash)
