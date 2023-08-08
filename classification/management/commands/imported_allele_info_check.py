@@ -8,7 +8,7 @@ from django.db.models import Max
 from classification.models import ImportedAlleleInfo
 from genes.hgvs import HGVSMatcher, HGVSConverterType
 from genes.models import TranscriptVersion, TranscriptParts
-from library.utils import ExportRow, export_column
+from library.utils import ExportRow, export_column, delimited_row
 from snpdb.models import Variant, GenomeBuild, VariantCoordinate
 
 
@@ -39,6 +39,9 @@ class VariantChange(int, Enum):
         elif self == VariantChange.changed:
             return "changed"
 
+    def __repr__(self):
+        return str(self)
+
 
 class TranscriptChange(int, Enum):
     same = 0
@@ -64,6 +67,22 @@ class TranscriptChange(int, Enum):
                     return TranscriptChange.changed_to_exact
             return TranscriptChange.changed
 
+    def __str__(self):
+        if self == TranscriptChange.same:
+            return "same"
+        elif self == TranscriptChange.gained:
+            return "match gained"
+        elif self == TranscriptChange.lost:
+            return "match lost"
+        elif self == TranscriptChange.changed:
+            return "changed"
+        elif self == TranscriptChange.changed_from_exact:
+            return "changed - lost exact"
+        elif self == TranscriptChange.changed_to_exact:
+            return "changed - to exact"
+
+    def __repr__(self):
+        return str(self)
 
 @dataclass
 class HgvsSummary(ExportRow):
@@ -145,73 +164,70 @@ class Command(BaseCommand):
 
         variant_diff_count = Counter()
         transcript_diff_count = Counter()
-        diff_rows = []
         iai: ImportedAlleleInfo
         hgvs_matchers_by_build = {}
         for genome_build in GenomeBuild.builds_with_annotation():
             matcher = HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.COMBO)
             hgvs_matchers_by_build[genome_build] = matcher
 
-        for iai in ImportedAlleleInfo.objects.filter(imported_c_hgvs__isnull=False).iterator(chunk_size=100):
+        filename = "classification_match_diff.csv"
+        with open(filename, "w") as out:
+            out.write(delimited_row(ChgvsDiff.csv_header()))
 
-            genome_build = iai.imported_genome_build
-            matcher = hgvs_matchers_by_build[genome_build]
-            imported_c_hgvs = iai.imported_c_hgvs
+            for iai in ImportedAlleleInfo.objects.filter(imported_c_hgvs__isnull=False).iterator(chunk_size=100):
 
-            provided = HgvsSummary()
-            resolved = HgvsSummary()
-            updated = HgvsSummary()
-            diff = ChgvsDiff(
-                imported_c_hgvs=imported_c_hgvs,
-                provided=provided,
-                resolved=resolved,
-                updated=updated
-            )
+                genome_build = iai.imported_genome_build
+                matcher = hgvs_matchers_by_build[genome_build]
+                imported_c_hgvs = iai.imported_c_hgvs
 
-            # PROVIDED
-            try:
-                provided.full_c_hgvs = imported_c_hgvs
-                provided.transcript = matcher.get_transcript_parts(imported_c_hgvs)
-            except Exception as ex:
-                provided.error_str = str(ex)
+                provided = HgvsSummary()
+                resolved = HgvsSummary()
+                updated = HgvsSummary()
+                diff = ChgvsDiff(
+                    imported_c_hgvs=imported_c_hgvs,
+                    provided=provided,
+                    resolved=resolved,
+                    updated=updated
+                )
 
-            # RESOLVED
-            try:
-                if variant_info := iai[iai.imported_genome_build]:
-                    resolved.full_c_hgvs = variant_info.c_hgvs
-                    if variant := variant_info.variant:
-                        resolved.variant_coordinate = variant.coordinate
-                        if transcript_version := variant_info.transcript_version:
-                            resolved.transcript = transcript_version.as_parts
-                    if error := variant_info.error:
-                        resolved.error_str = error
-            except Exception as ex:
-                resolved.error_str = str(ex)
+                # PROVIDED
+                try:
+                    provided.full_c_hgvs = imported_c_hgvs
+                    provided.transcript = matcher.get_transcript_parts(imported_c_hgvs)
+                except Exception as ex:
+                    provided.error_str = str(ex)
 
-            # UPDATED
-            try:
-                vcd = matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(imported_c_hgvs)
-                updated.variant_coordinate = vcd.variant_coordinate
-                updated.transcript = TranscriptVersion.get_transcript_id_and_version(vcd.transcript_accession)
-            except Exception as ex:
-                updated.error_str = str(ex)
+                # RESOLVED
+                try:
+                    if variant_info := iai[iai.imported_genome_build]:
+                        resolved.full_c_hgvs = variant_info.c_hgvs
+                        if variant := variant_info.variant:
+                            resolved.variant_coordinate = variant.coordinate
+                            if transcript_version := variant_info.transcript_version:
+                                resolved.transcript = transcript_version.as_parts
+                        if error := variant_info.error:
+                            resolved.error_str = error
+                except Exception as ex:
+                    resolved.error_str = str(ex)
 
-            if diff.has_difference:
-                diff_rows.append(diff)
+                # UPDATED
+                try:
+                    vcd = matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(imported_c_hgvs)
+                    updated.variant_coordinate = vcd.variant_coordinate
+                    updated.transcript = TranscriptVersion.get_transcript_id_and_version(vcd.transcript_accession)
+                except Exception as ex:
+                    updated.error_str = str(ex)
 
-            variant_diff_count[diff.variant_change()] += 1
-            transcript_diff_count[diff.transcript_change()] += 1
+                if diff.has_difference:
+                    out.write(delimited_row(diff.to_csv()))
+
+                variant_diff_count[diff.variant_change()] += 1
+                transcript_diff_count[diff.transcript_change()] += 1
 
         print("==== Variant matching ====")
-        print(variant_diff_count)
+        print(dict(variant_diff_count))
         print("==== Transcripts: ==== ")
-        print(transcript_diff_count)
-
-        if diff_rows:
-            filename = "classification_match_diff.csv"
-            with open(filename, "w") as out:
-                for row in ChgvsDiff.csv_generator(diff_rows):
-                    out.write(row)
+        print(dict(transcript_diff_count))
 
         end_last_modified = self._get_last_modified()
         if start_last_modified != end_last_modified:
