@@ -406,7 +406,6 @@ class Variant(PreviewModelMixin, models.Model):
     def tuple_to_spdi(chrom, start, end, ref, alt) -> str:
         """ SPDI: data model for variants and applications at NCBI
             @see https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7523648/ """
-        p_str = str(start - 1)
         if Sequence.allele_is_symbolic(alt):
             length = end - start
             if alt == "<DEL>":
@@ -420,7 +419,7 @@ class Variant(PreviewModelMixin, models.Model):
         else:
             d_str = ref
             i_str = alt
-        return f"{chrom}:{p_str}:{d_str}:{i_str}"
+        return f"{chrom}:{start}:{d_str}:{i_str}"
 
     @staticmethod
     def format_tuple(chrom, start, end, ref, alt, abbreviate=False) -> str:
