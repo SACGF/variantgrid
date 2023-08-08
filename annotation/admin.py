@@ -6,6 +6,7 @@ from django.db.models import QuerySet
 from django.utils.safestring import SafeString
 
 from annotation import models
+from annotation.clinvar_xml_parser import ClinVarFetchRequest
 from annotation.models import Citation, CitationFetchRequest, ClinVarRecordCollection, ClinVarRecord, VariantAnnotation, \
     ClinVar
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, get_admin_url
@@ -69,6 +70,23 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
 
     def has_add_permission(self, request):
         return False
+
+    @admin_action("Refresh: If Old")
+    def refresh_old(self, request, queryset: QuerySet[ClinVarRecordCollection]):
+        for obj in queryset:
+            ClinVarFetchRequest(
+                clinvar_variation_id=obj.clinvar_variation_id,
+                min_stars=obj.min_stars_loaded
+            ).fetch()
+
+    @admin_action("Refresh: Force")
+    def refresh_force(self, request, queryset: QuerySet[ClinVarRecordCollection]):
+        for obj in queryset:
+            ClinVarFetchRequest(
+                clinvar_variation_id=obj.clinvar_variation_id,
+                min_stars=obj.min_stars_loaded,
+                max_cache_age=timedelta(seconds=0)
+            ).fetch()
 
 
 class HasErrorFilter(admin.SimpleListFilter):

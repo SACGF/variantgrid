@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import timedelta, datetime
+from urllib.error import HTTPError
+import time
 from django.utils import timezone
 from enum import Enum
 from typing import Optional, List
@@ -10,6 +12,7 @@ from django.db import transaction
 
 from annotation.models import ClinVarRecord, ClinVarRecordCollection
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
+from library.log_utils import report_message
 from library.utils.xml_utils import XmlParser, parser_path, PP
 
 CLINVAR_RECORD_CACHE_DAYS = 60
@@ -43,8 +46,8 @@ class ClinVarFetchRequest:
 
         fetch_date = timezone.now()
 
-        clinvar_record_collection, created = ClinVarRecordCollection.objects.get_or_create(clinvar_variation_id=self.clinvar_variation_id)
         with transaction.atomic():
+            clinvar_record_collection, created = ClinVarRecordCollection.objects.get_or_create(clinvar_variation_id=self.clinvar_variation_id)
             # stops two simultaneous requests for updating the same clinvar_record_collection
             clinvar_record_collection = ClinVarRecordCollection.objects.select_for_update().get(pk=clinvar_record_collection.pk)
             wipe_old_records = False
@@ -54,26 +57,40 @@ class ClinVarFetchRequest:
                         clinvar_record_collection.min_stars_loaded is not None and \
                         (clinvar_record_collection.min_stars_loaded <= self.min_stars) and \
                         clinvar_record_collection.last_loaded and \
-                        ((clinvar_record_collection.last_loaded - fetch_date) <= self.max_cache_age):
+                        ((fetch_date - clinvar_record_collection.last_loaded) <= self.max_cache_age):
                     # if all the above is true, then our cache is fine
 
                     return clinvar_record_collection
                 else:
                     wipe_old_records = True
 
-            response = ClinVarXmlParser.load_from_clinvar_id(clinvar_record_collection).with_min_stars(self.min_stars)
+            attempt_count = 2
+            while True:
+                try:
+                    response = ClinVarXmlParser.load_from_clinvar_id(clinvar_record_collection).with_min_stars(self.min_stars)
 
-            # update our cache
-            clinvar_record_collection.last_loaded = fetch_date
-            clinvar_record_collection.min_stars_loaded = self.min_stars
-            clinvar_record_collection.rcvs = response.rcvs
-            clinvar_record_collection.parser_version = ClinVarXmlParser.PARSER_VERSION
-            clinvar_record_collection.save()
+                    # update our cache
+                    clinvar_record_collection.last_loaded = fetch_date
+                    clinvar_record_collection.min_stars_loaded = self.min_stars
+                    clinvar_record_collection.rcvs = response.rcvs
+                    clinvar_record_collection.parser_version = ClinVarXmlParser.PARSER_VERSION
+                    clinvar_record_collection.save()
 
-            if wipe_old_records:
-                ClinVarRecord.objects.filter(clinvar_record_collection=clinvar_record_collection).delete()
+                    if wipe_old_records:
+                        ClinVarRecord.objects.filter(clinvar_record_collection=clinvar_record_collection).delete()
 
-            ClinVarRecord.objects.bulk_create(response.records)
+                    ClinVarRecord.objects.bulk_create(response.records)
+                    break
+
+                except HTTPError as http_ex:
+                    if http_ex.code == 400:
+                        attempt_count -= 1
+                        if attempt_count > 0:
+                            report_message(f"400 from Entrez when fetching ClinVarRecord, waiting then trying again", level='warning')
+                            time.sleep(10)
+                            continue
+                    # out of attempts or not 400
+                    raise
 
         return clinvar_record_collection
 
