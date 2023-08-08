@@ -1,11 +1,8 @@
-from dataclasses import dataclass, asdict
-from functools import cached_property
-from typing import Optional, Union, List
-
+from dataclasses import dataclass
+from typing import Optional, Union
 from django.template import Library
 from more_itertools import first
-
-from annotation.clinvar_xml_parser import ClinVarXmlParser, ClinVarRetrieveMode
+from annotation.clinvar_xml_parser import ClinVarRetrieveMode
 from annotation.models import ClinVar, AnnotationVersion
 from genes.hgvs import HGVSMatcher
 from library.log_utils import report_exc_info
