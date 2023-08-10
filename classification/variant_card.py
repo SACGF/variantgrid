@@ -8,6 +8,7 @@ from classification.models import Classification, ImportedAlleleInfo
 from genes.hgvs import HGVSMatcher
 from snpdb.models import Allele, GenomeBuild, VariantAllele, VariantAlleleSource, GenomeFasta, Contig, Liftover, \
     Variant, AlleleOrigin, AlleleMergeLog
+from snpdb.variant_links import variant_link_info
 
 
 class VariantCard:
@@ -74,16 +75,7 @@ class VariantCard:
     @property
     def quick_link_data(self):
         if variant := self.variant:
-            link_data: Dict[str, Any] = {}
-
-            coordinate = variant.coordinate
-
-            # FIXME this really needs to refer to SpecialEKeys but can't due to its package
-            link_data['variant_coordinate'] = f'{coordinate.chrom}:{coordinate.pos} {coordinate.ref}>{coordinate.alt}'
-            link_data['variant_string'] = str(variant)
-            link_data['genome_build'] = self.genome_build.name
-            link_data['canonical_c_hgvs'] = variant.get_canonical_c_hgvs(self.genome_build)
-            return link_data
+            return variant_link_info(variant, self.genome_build)
         return None
 
         # If we can include these in link_data we'll get more links

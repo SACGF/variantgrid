@@ -470,48 +470,6 @@ def classification_count(obj: Allele) -> int:
         return 0
 
 
-@register.inclusion_tag("classification/tags/variant_card.html", takes_context=True)
-def variant_card(context, allele: Allele, genome_build: GenomeBuild):
-    request = context.request
-    can_create_classification = Classification.can_create_via_web_form(request.user)
-    va: VariantAllele = allele.variant_alleles().filter(genome_build=genome_build).first()
-    liftover_error_qs = allele.liftovererror_set.filter(liftover__genome_build=genome_build)
-
-    unfinished_liftover = None
-    can_create_variant = False
-    if va is None:
-        unfinished_liftover = VariantAlleleSource.get_liftover_for_allele(allele, genome_build)
-        if unfinished_liftover is None:
-            try:
-                check_can_create_variants(request.user)
-                try:
-                    # See if we can have data already to liftover
-                    conversion_tool, _ = allele.get_liftover_tuple(genome_build)
-                    can_create_variant = conversion_tool is not None
-                except (Contig.ContigNotInBuildError, GenomeFasta.ContigNotInFastaError):
-                    pass
-            except CreateManualVariantForbidden:
-                pass
-
-    return {
-        "user": request.user,
-        "allele": allele,
-        "unfinished_liftover": unfinished_liftover,
-        "genome_build": genome_build,
-        "variant_allele": va,
-        "liftover_error_qs": liftover_error_qs,
-        "can_create_classification": can_create_classification,
-        "can_create_variant": can_create_variant,
-    }
-
-
-@register.filter
-def quick_link_data(variant_allele: VariantAllele):
-    """ Needs to be VariantAllele as we need genome_build too """
-    data = variant_link_info(variant_allele.variant, variant_allele.genome_build)
-    return jsonify(data)
-
-
 @register.inclusion_tag("classification/tags/db_ref.html")
 def db_ref(data: VCDbRefDict, css: Optional[str] = ''):
     context = dict(data)

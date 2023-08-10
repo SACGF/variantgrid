@@ -454,15 +454,11 @@ def view_allele(request, allele_id: int):
         'classification__allele_info__latest_validation'
     )
 
-    allele_merge_log_qs = AlleleMergeLog.objects.filter(Q(old_allele=allele) | Q(new_allele=allele)).order_by("pk")
     context = {
         "allele_card": AlleleCard(user=request.user, allele=allele),
         "allele": allele,
         "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True',
-        "allele_merge_log_qs": allele_merge_log_qs,
-        "classifications": latest_classifications,
-        "annotated_builds": GenomeBuild.builds_with_annotation(),
-        "imported_alleles": ImportedAlleleInfo.objects.filter(allele=allele)
+        "classifications": latest_classifications
     }
     return render(request, "variantopedia/view_allele.html", context)
 
