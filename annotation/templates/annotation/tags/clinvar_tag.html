@@ -14,7 +14,7 @@
                 {% elif not clinvar.is_expert_panel_or_greater %}
                     No expert panel available as of ClinVar Export {% timestamp data.annotation_version.clinvar_version.annotation_date time_ago=True %}
                 {% endif %}
-                <a class="external-link" href="https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}">View on ClinVar</a>
+                <a class="hover-link external-link" href="https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}">View on ClinVar</a>
                 <br/>
                 {% if expert_panel_only and data.is_expert_panel_or_greater %}
                     {% comment %}If we're only showing expert panels - insta-show them{% endcomment %}

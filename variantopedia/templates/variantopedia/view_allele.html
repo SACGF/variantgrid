@@ -139,35 +139,7 @@
 
         {% endlabelled %}
 
-    {% comment %}
-            {% with data=allele_card.clinvar_data %}
-                {% with clinvar=data.clinvar %}
-                    {% if clinvar %}
-                        {% if not expert_panel_only %}
-                            {% clinvar_stars clinvar.stars %}{{ clinvar.get_clinvar_review_status_display }} <span class="text-muted">|</span> <b>{{ clinvar.clinical_significance | code_to_english }}</b> <span class="text-muted">|</span>
-                            as of ClinVar Export {% timestamp data.annotation_version.clinvar_version.annotation_date time_ago=True %}
-                            <span class="text-muted">|</span>
-                        {% elif not clinvar.is_expert_panel_or_greater %}
-                            No expert panel available as of ClinVar Export {% timestamp data.annotation_version.clinvar_version.annotation_date time_ago=True %}
-                        {% endif %}
-                        <a class="external-link" href="https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}">View on ClinVar</a>
-                        <br/>
-                        {% if expert_panel_only and data.is_expert_panel_or_greater %}
-
-                            <div class="mt-2">
-                                <div data-toggle="ajax" href="{% url "view_clinvar_records_detail" clinvar.clinvar_variation_id retrieve_mode %}">
-                                    Loading...
-                                </div>
-                            </div>
-                        {% elif not expert_panel_only %}
-                    {% endif %}
-                {% endwidth %}
-            {% endwith %}
-
-    {% endcomment %}
-
         {% comment %}#### VARIANT TABLE{% endcomment %}
-
 
         <table class="table">
             <thead>
@@ -182,7 +154,7 @@
                     {% for vc in allele_card.variant_cards %}
                         <td>
                             {% if vc.variant %}
-                                <a href="{% url 'view_variant' vc.variant.pk %}">{{ vc.variant }}</a>
+                                <a class="hover-link" href="{% url 'view_variant' vc.variant.pk %}">{{ vc.variant }}</a>
                                 {% if vc.variant.is_abbreviated %}
                                     <a class="ml-2" data-toggle="collapse" href="#variant-coordinate-{{ vc.variant.pk }}">Show all bases</a>
                                     <div class="collapse" id="variant-coordinate-{{ vc.pk }}">
