@@ -60,12 +60,12 @@
             <a class="hover-link" href="{{ allele_card.allele.clingen_allele.human_url }}">{{ allele.clingen_allele }}</a>
         {% endlabelled %}
 
-        {% labelled label="Liftover Details" %}
+        {% labelled label="Liftover Details" admin_only=True %}
             {% modal label="Liftover Details" %}
                 <div class="card-body">
                     {% for vc in allele_card.variant_cards %}
 
-                        <h4>{{ vc.genome_build }}</h4>
+                        <h5>{{ vc.genome_build }}</h5>
                         {% labelled label="Imported As" %}{{ vc.variant_allele.get_origin_display }}{% endlabelled %}
                         {% if not vc.is_imported_directly %}
                             {% labelled label="Liftover" %}{{ vc.variant_allele.get_allele_linking_tool_display }}{% endlabelled %}
@@ -88,7 +88,7 @@
                         {% endif %}
 
                     {% endfor %}
-                    <h4>ClinGen API Response</h4>
+                    <h5>ClinGen API Response</h5>
 
                     {% if allele_card.allele.clingen_error %}
                         {% with clingen_error=allele_card.allele.clingen_error %}
@@ -101,7 +101,7 @@
                     {% endif %}
 
                     {% if allele_merge_log_qs.exists %}
-                        <h4>Allele Merge Log</h4>
+                        <h5>Allele Merge Log</h5>
                             <table class="table">
                                 <thead>
                                     <tr>
@@ -139,13 +139,41 @@
 
         {% endlabelled %}
 
+    {% comment %}
+            {% with data=allele_card.clinvar_data %}
+                {% with clinvar=data.clinvar %}
+                    {% if clinvar %}
+                        {% if not expert_panel_only %}
+                            {% clinvar_stars clinvar.stars %}{{ clinvar.get_clinvar_review_status_display }} <span class="text-muted">|</span> <b>{{ clinvar.clinical_significance | code_to_english }}</b> <span class="text-muted">|</span>
+                            as of ClinVar Export {% timestamp data.annotation_version.clinvar_version.annotation_date time_ago=True %}
+                            <span class="text-muted">|</span>
+                        {% elif not clinvar.is_expert_panel_or_greater %}
+                            No expert panel available as of ClinVar Export {% timestamp data.annotation_version.clinvar_version.annotation_date time_ago=True %}
+                        {% endif %}
+                        <a class="external-link" href="https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}">View on ClinVar</a>
+                        <br/>
+                        {% if expert_panel_only and data.is_expert_panel_or_greater %}
+
+                            <div class="mt-2">
+                                <div data-toggle="ajax" href="{% url "view_clinvar_records_detail" clinvar.clinvar_variation_id retrieve_mode %}">
+                                    Loading...
+                                </div>
+                            </div>
+                        {% elif not expert_panel_only %}
+                    {% endif %}
+                {% endwidth %}
+            {% endwith %}
+
+    {% endcomment %}
+
         {% comment %}#### VARIANT TABLE{% endcomment %}
+
 
         <table class="table">
             <thead>
                 <tr>
-                    <th style="width:33%"></th>
-                    {% for vc in allele_card.variant_cards %}<th style="width:33%">{{ vc.genome_build }}</th>{% endfor %}
+                    <th style="width:25%"></th>
+                    {% for vc in allele_card.variant_cards %}<th style="width:37.5%">{{ vc.genome_build }}</th>{% endfor %}
                 </tr>
             </thead>
             <tbody>
@@ -198,7 +226,7 @@
                     {% for vc in allele_card.variant_cards %}
                         <td>
                             {% for imported_allele in vc.imported_allele_infos %}
-                                <div class="mt-2">{% imported_allele_info imported_allele on_allele_page=True %}</div>
+                                <div {% if not forloop.first %}class="mt-2"{% endif %}>{% imported_allele_info imported_allele on_allele_page=True %}</div>
                                 {% empty %}<span class="no-value">-</span>
                             {% endfor %}
                         </td>
@@ -233,13 +261,13 @@
 
     {% if classifications_new_grouping and not edit_clinical_groupings %}
         <div class="container mt-4">
-            <h3>Classifications</h3>
+            <h4>Classifications</h4>
             {% url 'allele_classifications_download' allele.id as download_link %}
             {% classification_groups classifications link_discordance_reports=discordance_enabled download_link=download_link context_object=allele %}
         </div>
     {% else %}
         <div class="container-table mt-4">
-            <h3 style="margin-bottom:0">Classifications</h3>
+            <h4 style="margin-bottom:0">Classifications</h4>
             {% if classifications %}
                 {% classification_table classifications show_clinical_context=True allele=allele edit_clinical_groupings=edit_clinical_groupings %}
             {% else %}
@@ -252,6 +280,5 @@
     <div class="container mt-4">
         {% clinvar allele=allele expert_panel_only=True %}
     </div>
-
 
 {% endblock content %}

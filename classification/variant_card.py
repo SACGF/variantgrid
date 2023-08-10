@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
 
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
+from annotation.templatetags.clinvar_tags import ClinVarDetails
 from classification.models import Classification, ImportedAlleleInfo
 from genes.hgvs import HGVSMatcher
 from snpdb.models import Allele, GenomeBuild, VariantAllele, VariantAlleleSource, GenomeFasta, Contig, Liftover, \
@@ -108,3 +109,7 @@ class AlleleCard:
     def allele_merge_log_qs(self) -> QuerySet[AlleleMergeLog]:
         allele = self.allele
         return AlleleMergeLog.objects.filter(Q(old_allele=allele) | Q(new_allele=allele)).order_by("pk")
+
+    @cached_property
+    def clinvar_data(self) -> ClinVarDetails:
+        return ClinVarDetails.instance_from(allele=self.allele)

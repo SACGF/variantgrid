@@ -31,7 +31,12 @@ class ClinVarDetails:
     def is_expert_panel_or_greater(self) -> bool:
         return self.clinvar and self.clinvar.is_expert_panel_or_greater
 
-    def instance_from(allele: Optional[Union[int, Allele]] = None, variant: Optional[Union[int, Variant]] = None, genome_build: Optional[GenomeBuild] = None, annotation_version: Optional[AnnotationVersion] = None):
+    @staticmethod
+    def instance_from(
+            allele: Optional[Union[int, Allele]] = None,
+            variant: Optional[Union[int, Variant]] = None,
+            genome_build: Optional[GenomeBuild] = None,
+            annotation_version: Optional[AnnotationVersion] = None) -> Optional['ClinVarDetails']:
         if not allele and not variant:
             raise ValueError("One of allele or variant must be provided")
 

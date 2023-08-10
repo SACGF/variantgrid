@@ -44,6 +44,7 @@ class ClinVarRecordAdmin(TabularInline):
 @admin.register(ClinVarRecordCollection)
 class ClinVarRecordCollectionAdmin(ModelAdminBasics):
     inlines = (ClinVarRecordAdmin, )
+    list_per_page = 20
 
     list_display = ("pk", "clinvar", "allele", "min_stars_loaded", "last_loaded")
 

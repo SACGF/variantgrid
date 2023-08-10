@@ -108,7 +108,7 @@ class ClinVarFetchResponse:
 
 
 class ClinVarRetrieveMode(str, Enum):
-    EXPERT_PANEL_ONLY = "expect"
+    EXPERT_PANEL_ONLY = "expert"
     ALL_RECORDS = "all"
 
     @property
