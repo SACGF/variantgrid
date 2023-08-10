@@ -8,6 +8,7 @@ from django.db.models import Max
 from classification.models import ImportedAlleleInfo
 from genes.hgvs import HGVSMatcher, HGVSConverterType
 from genes.models import TranscriptVersion, TranscriptParts
+from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column, delimited_row
 from snpdb.models import Variant, GenomeBuild, VariantCoordinate
 
@@ -107,7 +108,7 @@ class HgvsSummary(ExportRow):
 @dataclass
 class ChgvsDiff(ExportRow):
 
-    imported_c_hgvs: str
+    imported_allele_info: ImportedAlleleInfo
     provided: HgvsSummary
     resolved: HgvsSummary
     updated: HgvsSummary
@@ -120,6 +121,10 @@ class ChgvsDiff(ExportRow):
             return True
         return False
 
+    @export_column("$site_name URL")
+    def _allele_id(self):
+        return get_url_from_view_path(self.imported_allele_info.get_absolute_url())
+
     @export_column()
     def variant_change(self):
         return VariantChange.change_for(self.resolved.variant_coordinate, self.updated.variant_coordinate)
@@ -130,7 +135,7 @@ class ChgvsDiff(ExportRow):
 
     @export_column()
     def _imported_c_hgvs(self):
-        return self.imported_c_hgvs
+        return self.imported_allele_info.imported_c_hgvs
 
     @export_column("provided", sub_data=HgvsSummary)
     def _provided(self):
@@ -184,7 +189,7 @@ class Command(BaseCommand):
                 resolved = HgvsSummary()
                 updated = HgvsSummary()
                 diff = ChgvsDiff(
-                    imported_c_hgvs=imported_c_hgvs,
+                    imported_allele_info=iai,
                     provided=provided,
                     resolved=resolved,
                     updated=updated

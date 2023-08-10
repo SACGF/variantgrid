@@ -838,7 +838,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
             match_summary = ", ".join(cdna_errors)
         elif exons := self.genome_build_data.get("exons"):
             gap_operations = Counter()
-            for (_, _, _, _, gap) in exons:
+            for _, _, _, _, _, gap in exons:
                 if gap:
                     for gap_op in gap.split():
                         code = gap_op[0]
