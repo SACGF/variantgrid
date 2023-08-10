@@ -20,6 +20,7 @@ from annotation.models import AnnotationRun, AnnotationVersion, ClassificationMo
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.models import ImportedAlleleInfo
 from classification.models.classification_import_run import ClassificationImportRun
+from classification.variant_card import AlleleCard
 from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
@@ -455,6 +456,7 @@ def view_allele(request, allele_id: int):
 
     allele_merge_log_qs = AlleleMergeLog.objects.filter(Q(old_allele=allele) | Q(new_allele=allele)).order_by("pk")
     context = {
+        "allele_card": AlleleCard(user=request.user, allele=allele),
         "allele": allele,
         "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True',
         "allele_merge_log_qs": allele_merge_log_qs,
