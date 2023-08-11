@@ -138,9 +138,11 @@ class ClinVar(models.Model):
                     name = name.replace("MONDO:MONDO:", "MONDO:")
                 elif name.startswith("Orphanet:ORPHA"):
                     name = "ORPHA:" + name[len("Orphanet:ORPHA"):]
+                elif name.startswith("Human_Phenotype_Ontology"):
+                    name = name[25:]
                 return name
 
-            db_names = [fix_name(db_name) for db_name in re.split("[|,]", db_name_text)]
+            db_names = list(sorted(fix_name(db_name) for db_name in re.split("[|,]", db_name_text)))
             return db_names
         return []
 

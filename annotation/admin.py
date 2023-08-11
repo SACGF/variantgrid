@@ -72,7 +72,7 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
     def has_add_permission(self, request):
         return False
 
-    @admin_action("Refresh: If Old")
+    @admin_action("Refresh: If Old (current stars)")
     def refresh_old(self, request, queryset: QuerySet[ClinVarRecordCollection]):
         for obj in queryset:
             ClinVarFetchRequest(
@@ -80,12 +80,21 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
                 min_stars=obj.min_stars_loaded
             ).fetch()
 
-    @admin_action("Refresh: Force")
+    @admin_action("Refresh: Force (current stars)")
     def refresh_force(self, request, queryset: QuerySet[ClinVarRecordCollection]):
         for obj in queryset:
             ClinVarFetchRequest(
                 clinvar_variation_id=obj.clinvar_variation_id,
                 min_stars=obj.min_stars_loaded,
+                max_cache_age=timedelta(seconds=0)
+            ).fetch()
+
+    @admin_action("Refresh: Force (1+ stars)")
+    def refresh_force_one_plus_stars(self, request, queryset: QuerySet[ClinVarRecordCollection]):
+        for obj in queryset:
+            ClinVarFetchRequest(
+                clinvar_variation_id=obj.clinvar_variation_id,
+                min_stars=1,
                 max_cache_age=timedelta(seconds=0)
             ).fetch()
 

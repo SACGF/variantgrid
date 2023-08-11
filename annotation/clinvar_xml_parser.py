@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
 from datetime import timedelta, datetime
+from functools import cached_property
 from urllib.error import HTTPError
 import time
 from django.utils import timezone
-from enum import Enum
 from typing import Optional, List
 import re
 import json
@@ -11,11 +11,13 @@ from Bio import Entrez
 from django.db import transaction
 
 from annotation.models import ClinVarRecord, ClinVarRecordCollection
-from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from library.log_utils import report_message
 from library.utils.xml_utils import XmlParser, parser_path, PP
 
 CLINVAR_RECORD_CACHE_DAYS = 60
+"""
+Number of days we keep ClinVar records cached before we will re-ask ClinGen for them
+"""
 
 CLINVAR_TO_VG_CLIN_SIG = {
     "Benign": "B",
@@ -31,26 +33,66 @@ CLINVAR_REVIEW_STATUS_TO_STARS = {
     "no assertion criteria provided": 1,
     "criteria provided, single submitter": 2,
     "reviewed by expert panel": 3,
-    # FIXME, need to confirm this is 4 stars
     "practise guidelines": 4
 }
 
 
 @dataclass
+class ClinVarFetchResponse:
+    """
+    Wrap a clinvar_record_collection just so we can override records to match the number of stars
+    requested
+    """
+
+    clinvar_record_collection: ClinVarRecordCollection
+    min_stars: int
+
+    @property
+    def clinvar_variation_id(self):
+        return self.clinvar_record_collection.clinvar_variation_id
+
+    @property
+    def rcvs(self):
+        return self.clinvar_record_collection.rcvs
+
+    @property
+    def last_loaded(self):
+        return self.clinvar_record_collection.last_loaded
+
+    @cached_property
+    def records(self):
+        # it's possible that we've retrieved records with min stars of 1
+        # and now we re-used the cache, but only want records with min stars of 3 (so filter the others out)
+        return self.clinvar_record_collection.records_with_min_stars(self.min_stars)
+
+
+@dataclass
 class ClinVarFetchRequest:
+    """
+    Is used to retrieve individual ClinVar records from the ClinVar web service for a given clinvar_variation_id
+    """
+
     clinvar_variation_id: int
     min_stars: int
+    """
+    The API currently only allows us to ask for all records for that clinvar_variation_id and then we can cache
+    only the ones we want. if we've already cached records (but with a lower min_stars, we can just re-use that)
+    """
+
     max_cache_age: timedelta = field(default=timedelta(days=CLINVAR_RECORD_CACHE_DAYS))
+    """
+    How old until the cache is considered stale, provide seconds=0 if you want to force a refresh
+    """
 
-    def fetch(self) -> ClinVarRecordCollection:
-
+    def fetch(self) -> ClinVarFetchResponse:
         fetch_date = timezone.now()
 
         with transaction.atomic():
             clinvar_record_collection, created = ClinVarRecordCollection.objects.get_or_create(clinvar_variation_id=self.clinvar_variation_id)
-            # stops two simultaneous requests for updating the same clinvar_record_collection
+            # the select_for_update() stops two simultaneous requests for updating the same clinvar_record_collection
             clinvar_record_collection = ClinVarRecordCollection.objects.select_for_update().get(pk=clinvar_record_collection.pk)
             wipe_old_records = False
+            fetch_from_clinvar = True
             if not created:
                 if \
                         (clinvar_record_collection.parser_version == ClinVarXmlParser.PARSER_VERSION) and \
@@ -59,64 +101,53 @@ class ClinVarFetchRequest:
                         clinvar_record_collection.last_loaded and \
                         ((fetch_date - clinvar_record_collection.last_loaded) <= self.max_cache_age):
                     # if all the above is true, then our cache is fine
-
-                    return clinvar_record_collection
+                    fetch_from_clinvar = False
                 else:
                     wipe_old_records = True
 
-            attempt_count = 2
-            while True:
-                try:
-                    response = ClinVarXmlParser.load_from_clinvar_id(clinvar_record_collection).with_min_stars(self.min_stars)
+            if fetch_from_clinvar:
+                # so while Entrez does automatically retry on 500s, ClinVar has been providing 400s (Bad Request) when
+                # the request is fine
+                attempt_count = 2
+                while True:
+                    # loop is broken out of if it works, or raise if it fails after attempt_count
+                    try:
+                        response = ClinVarXmlParser.load_from_clinvar_id(clinvar_record_collection)
 
-                    # update our cache
-                    clinvar_record_collection.last_loaded = fetch_date
-                    clinvar_record_collection.min_stars_loaded = self.min_stars
-                    clinvar_record_collection.rcvs = response.rcvs
-                    clinvar_record_collection.parser_version = ClinVarXmlParser.PARSER_VERSION
-                    clinvar_record_collection.save()
+                        # update our cache
+                        clinvar_record_collection.last_loaded = fetch_date
+                        clinvar_record_collection.min_stars_loaded = self.min_stars
+                        clinvar_record_collection.rcvs = response.rcvs
+                        clinvar_record_collection.parser_version = ClinVarXmlParser.PARSER_VERSION
+                        clinvar_record_collection.save()
 
-                    if wipe_old_records:
-                        ClinVarRecord.objects.filter(clinvar_record_collection=clinvar_record_collection).delete()
+                        if wipe_old_records:
+                            ClinVarRecord.objects.filter(clinvar_record_collection=clinvar_record_collection).delete()
 
-                    ClinVarRecord.objects.bulk_create(response.records)
-                    break
+                        min_star_records = [r for r in response.all_records if r.stars >= self.min_stars]
+                        ClinVarRecord.objects.bulk_create(min_star_records)
+                        break
 
-                except HTTPError as http_ex:
-                    if http_ex.code == 400:
-                        attempt_count -= 1
-                        if attempt_count > 0:
-                            report_message(f"400 from Entrez when fetching ClinVarRecord, waiting then trying again", level='warning')
-                            time.sleep(10)
-                            continue
-                    # out of attempts or not 400
-                    raise
+                    except HTTPError as http_ex:
+                        if http_ex.code == 400:
+                            attempt_count -= 1
+                            if attempt_count > 0:
+                                report_message(f"400 from Entrez when fetching ClinVarRecord, waiting then trying again", level='warning')
+                                time.sleep(10)
+                                continue
+                        # out of attempts or not 400
+                        raise
 
-        return clinvar_record_collection
-
-
-@dataclass
-class ClinVarFetchResponse:
-    rcvs: List[str]
-    records: List[ClinVarRecord]
-
-    def with_min_stars(self, min_stars: int) -> 'ClinVarFetchResponse':
         return ClinVarFetchResponse(
-            rcvs=self.rcvs,
-            records=[r for r in self.records if r.stars >= min_stars]
+            clinvar_record_collection=clinvar_record_collection,
+            min_stars=self.min_stars
         )
 
 
-class ClinVarRetrieveMode(str, Enum):
-    EXPERT_PANEL_ONLY = "expert"
-    ALL_RECORDS = "all"
-
-    @property
-    def min_stars(self):
-        if self == ClinVarRetrieveMode.EXPERT_PANEL_ONLY:
-            return CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
-        else:
-            return 0
+@dataclass
+class ClinVarXmlParserOutput:
+    rcvs: List[str]
+    all_records: List[ClinVarRecord]
 
 
 class ClinVarXmlParser(XmlParser):
@@ -134,7 +165,7 @@ class ClinVarXmlParser(XmlParser):
         return None
 
     @staticmethod
-    def load_from_clinvar_id(clinvar_record_collection: ClinVarRecordCollection) -> ClinVarFetchResponse:
+    def load_from_clinvar_id(clinvar_record_collection: ClinVarRecordCollection) -> ClinVarXmlParserOutput:
 
         cv_handle = Entrez.esummary(db="clinvar", retmode="json", id=clinvar_record_collection.clinvar_variation_id)
         json_data = json.loads(cv_handle.read())
@@ -147,6 +178,8 @@ class ClinVarXmlParser(XmlParser):
                 if uuid_data := result.get(uuids[0]):
                     if supporting_submissions := uuid_data.get("supporting_submissions"):
                         if rcvs := supporting_submissions.get("rcv"):
+                            # rcv is a combination of a variant and condition
+                            # we need to retrieve all of them to get the full data
                             all_rcvs = rcvs
 
         if all_rcvs:
@@ -154,9 +187,9 @@ class ClinVarXmlParser(XmlParser):
             parsed_results = ClinVarXmlParser.load_from_input(handle, clinvar_record_collection=clinvar_record_collection)
             handle.close()
 
-        return ClinVarFetchResponse(
+        return ClinVarXmlParserOutput(
             rcvs=all_rcvs,
-            records=parsed_results
+            all_records=parsed_results
         )
 
     @staticmethod

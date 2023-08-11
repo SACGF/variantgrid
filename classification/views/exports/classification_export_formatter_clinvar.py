@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, date
+from datetime import datetime
 from enum import Enum
 from functools import cached_property
 from itertools import groupby
@@ -392,12 +392,14 @@ class ClassificationExportFormatterClinVarCompareExpert(ClassificationExportForm
                     records = ClinVarFetchRequest(
                         clinvar_variation_id=clinvar_record.clinvar_variation_id,
                         min_stars=CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
-                    ).fetch().records_with_min_stars(CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE)
+                    ).fetch().records
                     if records:
                         if len(records) > 1:
                             logging.warning(f"For allele {allele_data.allele_id} we have {len(records)} expert panels")
 
-                        sort_key = lambda x: x.classification.lab
+                        def sort_key(cm):
+                            return cm.classification.lab
+
                         all_cms = sorted([cm for cm in allele_data.all_cms if not cm.withdrawn], key=sort_key)
                         for lab, cms_by_lab in groupby(all_cms, key=sort_key):
                             new_rows = [delimited_row(

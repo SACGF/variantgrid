@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from typing import Optional, Union
 from django.template import Library
 from more_itertools import first
-from annotation.clinvar_xml_parser import ClinVarRetrieveMode
 from annotation.models import ClinVar, AnnotationVersion
+from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from genes.hgvs import HGVSMatcher
 from library.log_utils import report_exc_info
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -21,8 +21,18 @@ def clinvar_stars(stars, review_status: Optional[str] = None):
 
 @dataclass
 class ClinVarDetails:
-    clinvar: ClinVar
+    """
+    All the data that we have from ClinVar based on the pre-loaded annotations.
+    If we don't have a ClinVar instance, then we have access to the g_hgvs so we can prompt the user to search
+    """
+
+    clinvar: Optional[ClinVar]
     is_desired_build: bool
+    """
+    When asking for ClinVar details on an allele, set this based on if it was the genome build that was originally
+    requested for
+    """
+
     genome_build: GenomeBuild
     annotation_version: AnnotationVersion
     g_hgvs: str
@@ -37,6 +47,7 @@ class ClinVarDetails:
             variant: Optional[Union[int, Variant]] = None,
             genome_build: Optional[GenomeBuild] = None,
             annotation_version: Optional[AnnotationVersion] = None) -> Optional['ClinVarDetails']:
+
         if not allele and not variant:
             raise ValueError("One of allele or variant must be provided")
 
@@ -94,10 +105,18 @@ def clinvar(
         genome_build: Optional[GenomeBuild] = None,
         annotation_version: Optional[AnnotationVersion] = None,
         expert_panel_only=False):
+    """
+    :param allele: In most cases can just provide allele and nothing else
+    :param variant: If retrieving just for a single genome build (provide in combination with genome build)
+    :param genome_build: Defaults to genome build manager
+    :param annotation_version: Defaults to the latest for a genome build
+    :param expert_panel_only: Set to true if we only care about expert panels
+    """
+
     data = ClinVarDetails.instance_from(allele=allele, variant=variant, genome_build=genome_build, annotation_version=annotation_version)
 
     return {
         "data": data,
         "expert_panel_only": expert_panel_only,
-        "retrieve_mode": (ClinVarRetrieveMode.EXPERT_PANEL_ONLY if expert_panel_only else ClinVarRetrieveMode.ALL_RECORDS).value
+        "min_stars": CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE if expert_panel_only else 1
     }

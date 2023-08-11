@@ -6,15 +6,15 @@
 
 <div style="float:right; position: relative; height: 0; bottom: 28px">
     <div class="d-flex flex-row">
-        <div><label>Fetched:</label>&nbsp;{% timestamp clinvar_record_collection.last_loaded time_ago=True %}</div>
+        <div><label>Fetched:</label>&nbsp;{% timestamp clinvar_records.last_loaded time_ago=True %}</div>
         {% if user.is_superuser %}
             <div class="ml-2">
                 {% modal label="Debug" admin_only=True size="md" %}
                     <div class="modal-body">
-                        {% admin_link clinvar_record_collection %}
+                        {% admin_link clinvar_records.clinvar_record_collection %}
                         <div class="list-group">
-                            <a class="list-group-item list-group-item-action" href="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id={{ clinvar_record_collection.clinvar_variation_id }}&retmode=json">ClinVar Variation ID {{ clinvar_record_collection.clinvar_variation_id }} JSON</a>
-                            {% for rcv in clinvar_record_collection.rcvs %}
+                            <a class="list-group-item list-group-item-action" href="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id={{ clinvar_records.clinvar_variation_id }}&retmode=json">ClinVar Variation ID {{ clinvar_records.clinvar_variation_id }} JSON</a>
+                            {% for rcv in clinvar_records.rcvs %}
                                 <a class="list-group-item list-group-item-action" href="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=clinvar&rettype=clinvarset&id={{ rcv }}">{{ rcv }} XML</a>
                             {% endfor %}
                         </div>
@@ -24,7 +24,7 @@
         {% endif %}
     </div>
 </div>
-{% if records %}
+{% if clinvar_records.records %}
     <table class="table">
         <thead>
             <tr>
@@ -36,7 +36,7 @@
             </tr>
         </thead>
         <tbody>
-            {% for record in records %}
+            {% for record in clinvar_records.records %}
                 <tr>
                     <td>{% clinvar_stars record.stars record.review_status %} <a class="subtle-link" href="https://www.ncbi.nlm.nih.gov/clinvar/submitters/{{ record.org_id }}">{{ record.submitter }}</a></td>
                     <td>{% if record.c_hgvs %}{% c_hgvs record.c_hgvs %}{% elif record.variant_coordinate %}{{ record.variant_coordinate }}{% else %}<span class="no-value">-</span>{% endif %}</td>
