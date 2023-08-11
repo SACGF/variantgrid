@@ -22,6 +22,7 @@
     </script>
 
     <div class="current-record-menu-item">
+    {% if not term.is_stub %}
         {% if is_ontology %}
             <div class="text-small text-muted">viewing</div>
             <div><i class="fa-solid fa-circle main-icon mr-1" style="color:#bbb; font-size:8pt"></i><span class="text-monospace">{{ term.id }}</span></div>
@@ -30,6 +31,10 @@
             <div class="text-small text-muted">viewing</div>
             <i class="fas fa-dna main-icon"></i><label>{{ term.name }}</label>
         {% endif %}
+    {% else %}
+        <div class="text-small text-muted">viewing</div>
+            <i class="fa-solid fa-circle main-icon mr-1" style="color:#bbb; font-size:8pt"></i><label>{{ term.id }}</label>
+    {% endif %}
     </div>
 
     <div class="container" style="position:relative">
