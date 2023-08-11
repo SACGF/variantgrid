@@ -18,6 +18,9 @@ jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
 
     strategy:
       fail-fast: false
@@ -41,8 +44,7 @@ jobs:
         # By default, queries listed here will override any specified in a config file. 
         # Prefix the list here with "+" to use these queries and those in the config file.
         # queries: ./path/to/local/query, your-org/your-repo/queries@main
-        languages: python 
-        setup-python-dependencies: false
+        languages: python
 
     # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
     # If this step fails, then you should remove it and run the build manually (see below)
@@ -62,3 +64,16 @@ jobs:
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2
+
+      # Initializes the CodeQL tools for scanning.
+    - name: Set up Conda
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        channel: conda-forge, bioconda, anaconda, defaults
+        auto-activate-base: false
+        auto-update-conda: true
+        miniconda-version: "latest"
+        environment-file: environment.yml
+
+    - name: Conda info
+      run: conda info

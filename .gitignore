@@ -3,9 +3,11 @@
 vcf_reader
 *~
 data/*
-media_root/*
 /.settings/
+### Django ###
 __pycache__/
+media_root/*
+
 LabNameLocations.csv
 /jshintrc
 dump.rdb
@@ -19,3 +21,17 @@ lint.txt
 **/.sass-cache/
 /source_id_migration.log
 csv-editor.xml
+
+#ignore developers env settings
+/variantgrid/settings/env_developers/
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+cover/

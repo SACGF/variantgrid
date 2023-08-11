@@ -28,13 +28,20 @@ if django_settings_module == DEFAULT_DJANGO_SETTINGS:
         flattened_hostname = "s" + flattened_hostname
 
     pwd = os.path.dirname(__file__)
-    flattened_hostname_path = os.path.join(pwd, 'env', f"{flattened_hostname}.py")
-
-    logging.info('LOADING settings file %s', flattened_hostname_path)
-    if os.path.exists(flattened_hostname_path):
-        flattened_hostname_module = f"variantgrid.settings.env.{flattened_hostname}"
+    # Search for the environment file in the 'env_developers' folder first
+    flattened_hostname_path_override = os.path.join(pwd, 'env_developers', f"{flattened_hostname}.py")
+    if os.path.exists(flattened_hostname_path_override):
+        flattened_hostname_module = f"variantgrid.settings.env_developers.{flattened_hostname}"
         exec(f"from {flattened_hostname_module} import *")
     else:
-        logging.error("Settings file doesn't exist %s", flattened_hostname_path)
+        # If not found, use the environment file from the original 'env'
+        flattened_hostname_path = os.path.join(pwd, 'env', f"{flattened_hostname}.py")
+
+        logging.info('LOADING settings file %s', flattened_hostname_path)
+        if os.path.exists(flattened_hostname_path):
+            flattened_hostname_module = f"variantgrid.settings.env.{flattened_hostname}"
+            exec(f"from {flattened_hostname_module} import *")
+        else:
+            logging.error("Settings file doesn't exist %s", flattened_hostname_path)
 else:
     exec(f"from {django_settings_module} import *")
