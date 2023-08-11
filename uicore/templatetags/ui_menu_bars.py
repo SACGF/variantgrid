@@ -63,6 +63,7 @@ def menu_bar_sequencing(context):
 
 @register.inclusion_tag("uicore/menus/menu_bar_settings.html", takes_context=True)
 def menu_bar_settings(context):
+
     return {
         'seqauto_enabled': settings.SEQAUTO_ENABLED
     }
