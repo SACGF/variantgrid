@@ -50,6 +50,12 @@
       "host": "https://variantgrid.com",
       "oauth_url": "",
       "client_id": "variantgrid-remote-client"
+    },
+    "AWS": {
+        "S3": {
+            "access_key_id": null,
+            "secret_access_key": null
+        }
     }
   }
 }
