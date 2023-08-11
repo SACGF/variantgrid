@@ -1,4 +1,5 @@
 {% load ui_menus %}
+{% load settings_tags %}
 
 {% menu_item 'admin' href="/admin/" admin_only=True external=True%}
 {% menu_item 'eventlog' title="Event Log" admin_only=True %}
@@ -16,5 +17,17 @@
 {% menu_item 'changelog' %}
 {% menu_item 'version' %}
 <hr/>
-{% menu_item 'auth_logout' title="Logout <i class=\"fas fa-sign-out-alt\"></i>" css_class='logout' %}
-<a href="{% url 'oidc_logout' %}">OIDC Logout</a>
+{% settings_value "USE_OIDC" as use_oidc %}
+{% if use_oidc %}
+    <script>
+        function logout() {
+            $("#logout-form").submit();
+        }
+    </script>
+    <form id="logout-form" method="POST" action="{% url 'oidc_logout' %}">
+        {% csrf_token %}
+    </form>
+    <a href="#" onclick="logout()" class="nav-link">Logout <i class="fas fa-sign-out-alt"></i></a>
+{% else %}
+    {% menu_item 'auth_logout' title="Logout <i class=\"fas fa-sign-out-alt\"></i>" css_class='logout' %}
+{% endif %}

@@ -64,7 +64,7 @@ OIDC_RP_SIGN_ALGO = 'RS256'
 OIDC_RP_CLIENT_ID = 'variantgrid'
 OIDC_RP_CLIENT_SECRET = get_secret('OIDC.client_secret')
 
-KEY_CLOAK_BASE = 'http://localhost:8081'
+KEY_CLOAK_BASE = 'http://localhost:8081/auth'
 
 KEY_CLOAK_REALM = 'agha'
 KEY_CLOAK_PROTOCOL_BASE = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/protocol/openid-connect'
@@ -74,11 +74,14 @@ OIDC_OP_TOKEN_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/token'
 OIDC_OP_USER_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/userinfo'
 OIDC_USER_SERVICES = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/account'
 LOGIN_REDIRECT_URL = '/variantopedia/dashboard'
-LOGOUT_REDIRECT_URL = "http://127.0.0.1:8000"
-# LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?post_logout_redirect_uri=http%3A%2F%2F127.0.0.1%3A8000'
 LOGIN_REDIRECT_URL_FAILURE = '/accounts/logout'
-ALLOW_LOGOUT_GET_METHOD = True
+OIDC_STORE_ID_TOKEN = True  # needed so we can pass the token back to keycloak for an automatic logout
+
+# this will generate a URL to logout of KeyCloak and then have KeyCloak redirect to LOGOUT_REDIRECT_URL
 OIDC_OP_LOGOUT_URL_METHOD = 'auth.backend.provider_logout'
+LOGOUT_REDIRECT_URL = "http://0.0.0.0:8000"
+
+KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
 
 ALLOWED_HOSTS = ["*"]
 COMPRESS_ENABLED = False

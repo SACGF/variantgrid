@@ -103,12 +103,13 @@ OIDC_OP_TOKEN_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/token'
 OIDC_OP_USER_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/userinfo'
 OIDC_USER_SERVICES = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/account'
 OIDC_OP_LOGOUT_URL_METHOD = 'auth.backend.provider_logout'
+OIDC_STORE_ID_TOKEN = True  # needed so we can pass the token back to keycloak for an automatic logout
 
 # login failure is generally user is inactive, which is how prod distinguishes between prod and test logins
 
 HELP_URL = "https://shariant.readthedocs.io/en/latest/"
 # LOGIN_REDIRECT_URL = '/variantopedia/dashboard'
-LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=https%3A%2F%2Fshariant.org.au'
+LOGOUT_REDIRECT_URL = "https://shariant.org.au"
 LOGIN_REDIRECT_URL_FAILURE = '/accounts/logout'
 
 EMAIL_BACKEND = 'django_amazon_ses.EmailBackend'

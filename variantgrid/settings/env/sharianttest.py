@@ -30,7 +30,7 @@ VARIANT_CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE = True
 # OIDC SETTINGS
 OIDC_RP_CLIENT_ID = 'shariant-test'
 OIDC_REQUIRED_GROUP = None
-LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=https%3A%2F%2Ftest.shariant.org.au'
+LOGOUT_REDIRECT_URL = "https://test.shariant.org.au"
 
 _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded annotation (${ANNOTATION_BASE_DIR} from wiki)
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'test_annotation_scratch')

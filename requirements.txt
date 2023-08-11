@@ -49,7 +49,7 @@ kombu==5.2.3
 levenshtein==0.20.9
 Markdown==3.1.1
 matplotlib==3.5.1
-mozilla_django_oidc==2.0.0
+mozilla_django_oidc==3.0.0
 nameparser==1.1.1
 networkx==2.4
 nltk==3.7

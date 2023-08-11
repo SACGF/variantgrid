@@ -1,3 +1,4 @@
+from urllib.parse import quote, urlencode
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import Group, User
@@ -133,9 +134,13 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         user.save()
         return user
 
+
 def provider_logout(request) -> str:
     oidc_logout = import_from_settings("KEY_CLOAK_PROTOCOL_BASE", "") + "/logout"
     if redirect := import_from_settings("LOGOUT_REDIRECT_URL", ""):
-        
-
-    return "https://google.com"
+        if oidc_id_token := request.session["oidc_id_token"]:
+            oidc_logout += "?" + urlencode({
+                "id_token_hint": oidc_id_token,
+                "post_logout_redirect_uri": redirect
+            })
+    return oidc_logout
