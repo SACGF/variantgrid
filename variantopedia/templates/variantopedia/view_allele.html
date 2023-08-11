@@ -171,10 +171,12 @@
                     {% endfor %}
                 </tr>
 
+                {% comment %}  If we ever want to show g.HGVSs on allele page
                 <tr>
                     <th class="text-right">g.HGVS</th>
                     {% for vc in allele_card.variant_cards %}<td>{{ vc.g_hgvs | dash_if_empty }}</td>{% endfor %}
                 </tr>
+                {% endcomment %}
 
                 <tr>
                     <th class="text-right">Quick Links</th>
@@ -193,17 +195,19 @@
                     {% endfor %}
                 </tr>
 
-                <tr>
-                    <th class="text-right" style="vertical-align: middle">Resolved From</th>
-                    {% for vc in allele_card.variant_cards %}
-                        <td>
-                            {% for imported_allele in vc.imported_allele_infos %}
-                                <div {% if not forloop.first %}class="mt-2"{% endif %}>{% imported_allele_info imported_allele on_allele_page=True %}</div>
-                                {% empty %}<span class="no-value">-</span>
-                            {% endfor %}
-                        </td>
-                    {% endfor %}
-                </tr>
+                {% if allele_card.has_imported_allele_infos %}
+                    <tr>
+                        <th class="text-right" style="vertical-align: middle">Imported As</th>
+                        {% for vc in allele_card.variant_cards %}
+                            <td>
+                                {% for imported_allele in vc.imported_allele_infos %}
+                                    <div {% if not forloop.first %}class="mt-2"{% endif %}>{% imported_allele_info imported_allele on_allele_page=True %}</div>
+                                    {% empty %}<span class="no-value">-</span>
+                                {% endfor %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% endif %}
 
                 {% if allele_card.has_operation %}
                     <tr>

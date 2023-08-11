@@ -113,3 +113,7 @@ class AlleleCard:
     @cached_property
     def clinvar_data(self) -> ClinVarDetails:
         return ClinVarDetails.instance_from(allele=self.allele)
+
+    @property
+    def has_imported_allele_infos(self) -> bool:
+        return any(bool(vc.imported_allele_infos) for vc in self.variant_cards)
