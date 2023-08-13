@@ -165,7 +165,7 @@ class Command(BaseCommand):
                 print("Release not linked - you will have to manually do so via Django Admin")
 
     def _import_merged_data(self, genome_build: GenomeBuild, annotation_consortium, cdot_data: Dict, cdot_version):
-        print("_import_merged_data")
+        print(f"importing {genome_build}/{annotation_consortium}")
 
         known_uc_gene_symbols = set(GeneSymbol.objects.annotate(uc_symbol=Upper("symbol")).values_list("uc_symbol", flat=True))
         genes_qs = Gene.objects.filter(annotation_consortium=annotation_consortium)
