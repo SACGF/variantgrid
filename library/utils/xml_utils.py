@@ -94,6 +94,16 @@ def parser_path(*args, on_start=True):
 
 
 class XmlParser:
+    """
+    A utility for helping us parse streaming XML data (as in open tag/close tag events) into classes.
+    Can be run on things like clinvar's multi GB XML output, or just a few kb of XML.
+
+    Annotate methods with a parser_path (a series of cascading path predicates), if the predicate is matched
+    at the stage of processing the XML, then the method is called.
+
+    There's an expectation that we're only populating one kind of object. When the XML indicates that there should
+    be a new instance, call `set_yieldable` with the new object. Then other methods should parse it.
+    """
 
     @staticmethod
     def get_parser_methods(klass):

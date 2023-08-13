@@ -176,16 +176,16 @@ class ClinVar(models.Model):
         return sorted(set(ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
                                        clinvar_allele_id=self.clinvar_allele_id).values_list('citation_id', flat=True)))
 
-    # def get_citations(self) -> QuerySet[Citation]:
-    #     cvc_qs = ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
-    #                                             clinvar_allele_id=self.clinvar_allele_id)
-    #     return Citation.objects.filter(clinvarcitation__in=cvc_qs)
-
     def __str__(self):
         return f"ClinVar: variant: {self.variant}, path: {self.highest_pathogenicity}"
 
 
 class ClinVarRecordCollection(TimeStampedModel):
+    """
+    Stores data about when we've retrieved individual ClinVar records for a clinvar variation id.
+    Importantly, when we did it, and what was the minimum number of stars on a record that we kept.
+    Let's us know if we can re-use the cached ClinVarRecords or if we should retrieve them fresh from ClinVar.
+    """
 
     class Meta:
         verbose_name = "ClinVar record collection"
@@ -201,6 +201,10 @@ class ClinVarRecordCollection(TimeStampedModel):
 
 
 class ClinVarRecord(TimeStampedModel):
+    """
+    Represents a single record within ClinVar.
+    Important to note this has been retrieved from ClinVar, and not our submission to ClinVar.
+    """
 
     class Meta:
         verbose_name = "ClinVar record"

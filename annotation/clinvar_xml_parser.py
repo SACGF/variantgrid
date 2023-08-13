@@ -14,6 +14,11 @@ from annotation.models import ClinVarRecord, ClinVarRecordCollection
 from library.log_utils import report_message
 from library.utils.xml_utils import XmlParser, parser_path, PP
 
+"""
+This file is responsible for retrieving data from the ClinVar API end points to get more granular data about a given
+ClinVar variant.
+"""
+
 CLINVAR_RECORD_CACHE_DAYS = 60
 """
 Number of days we keep ClinVar records cached before we will re-ask ClinGen for them
@@ -40,7 +45,7 @@ CLINVAR_REVIEW_STATUS_TO_STARS = {
 @dataclass
 class ClinVarFetchResponse:
     """
-    Wrap a clinvar_record_collection just so we can override records to match the number of stars
+    This warps a clinvar_record_collection just so we can override records to match the number of stars
     requested
     """
 
@@ -122,6 +127,8 @@ class ClinVarFetchRequest:
                         clinvar_record_collection.save()
 
                         if wipe_old_records:
+                            # We *could* try to update based on SCV, and delete missing records / insert other records
+                            # but a wipe and replace is easier
                             ClinVarRecord.objects.filter(clinvar_record_collection=clinvar_record_collection).delete()
 
                         min_star_records = [r for r in response.all_records if r.stars >= self.min_stars]
@@ -146,8 +153,21 @@ class ClinVarFetchRequest:
 
 @dataclass
 class ClinVarXmlParserOutput:
+    """
+    When we retrieve from ClinVar, this is our result.
+    """
     rcvs: List[str]
+    """
+    rcvs Are condition/variant combinations - a single variant might have multiple of these to retrieve.
+    The list of rcvs is only useful for debugging purposes.
+    """
     all_records: List[ClinVarRecord]
+    """
+    All records that ClinVar had for the a given clinvar_variation_id regardless of stars.
+    Up to the caller to only save the relevant records.
+    Note that these will always be freshly created ClinVarRecords (which may or may not clash with existing records
+    unless the caller wipes data first).
+    """
 
 
 class ClinVarXmlParser(XmlParser):
@@ -166,6 +186,10 @@ class ClinVarXmlParser(XmlParser):
 
     @staticmethod
     def load_from_clinvar_id(clinvar_record_collection: ClinVarRecordCollection) -> ClinVarXmlParserOutput:
+        """
+        :param clinvar_record_collection: The ClinVarRecordCollection the records should link to, also provides
+        the clinvar_variation_id for us to query on.
+        """
 
         cv_handle = Entrez.esummary(db="clinvar", retmode="json", id=clinvar_record_collection.clinvar_variation_id)
         json_data = json.loads(cv_handle.read())
@@ -178,7 +202,7 @@ class ClinVarXmlParser(XmlParser):
                 if uuid_data := result.get(uuids[0]):
                     if supporting_submissions := uuid_data.get("supporting_submissions"):
                         if rcvs := supporting_submissions.get("rcv"):
-                            # rcv is a combination of a variant and condition
+                            # rcv is a combination of a condition and variant of which there's 1 or more
                             # we need to retrieve all of them to get the full data
                             all_rcvs = rcvs
 
@@ -356,6 +380,8 @@ class ClinVarXmlParser(XmlParser):
             db = elem.get("DB")
             id = elem.get("ID")
             final_value = None
+            # ClinVar is always a bit weird about how it represents different conditions
+            # use this to convert to standard term descriptions
             if db == "MONDO":
                 final_value = id
             elif db == "OMIM":

@@ -1,6 +1,4 @@
 <div class="d-inline-block mr-2 {% if review_status %}hover-detail{% endif %}" style="font-size:8pt; letter-spacing: -1px" {% if review_status %}title="{{ review_status }}"{% endif %}>
-{% comment %}yeah I know this is brute force coding you wouldn't expect form a graduate, but since I was changing
-the colour of the stars, it was just easier{% endcomment %}
 {% for star in stars %}
     {% if star %}<i class="fa-solid fa-star text-success" style="margin:0"></i>{% else %}<i class="fa-regular fa-star" style="opacity:0.25; margin:0"></i>{% endif %}
 {% endfor %}
