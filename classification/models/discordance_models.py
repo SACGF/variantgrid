@@ -378,6 +378,17 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
     def all_classification_modifications(self) -> List[ClassificationModification]:
         return [drc.classification_effective for drc in self.discordance_report_classifications]
 
+    @property
+    def is_medically_significant(self):
+        ds = self.clinical_context.discordance_status
+
+        if ds.is_discordant and not ds.pending_concordance:
+            for cm in self.all_classification_modifications:
+                if not cm.classification.withdrawn:
+                    if "P" in cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE):
+                        return True
+            return False
+
     def all_c_hgvs(self, genome_build: Optional[GenomeBuild] = None) -> List[CHGVS]:
         if not genome_build:
             genome_build = GenomeBuildManager.get_current_genome_build()
