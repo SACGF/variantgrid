@@ -420,6 +420,14 @@ class DiscordanceReportRowData(ExportRow):
     def _chgvs(self):
         return str(self.c_hgvs)
 
+    @property
+    def is_medically_significant(self):
+        return self.discordance_report.is_medically_significant
+
+    @export_column(label="is_medically_significant")
+    def _is_medically_significant(self):
+        return self.is_medically_significant
+
     @export_column(label="Lab Significances")
     def _lab_significances(self):
         summaries = self.lab_significances
@@ -569,6 +577,8 @@ class DiscordanceReportTableData:
             if summary.is_valid_including_withdraws:
                 if summary.is_requiring_attention:
                     summaries.append(summary)
+
+        summaries.sort(key=lambda s: (s.discordance_report.is_medically_significant, s.discordance_report.report_started_date), reverse=True)
         return summaries
 
     @cached_property
