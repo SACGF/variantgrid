@@ -46,8 +46,13 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
     inlines = (ClinVarRecordAdmin, )
     list_per_page = 20
 
-    list_display = ("pk", "clinvar", "allele", "min_stars_loaded", "last_loaded")
+    # list_display = ("pk", "clinvar", "allele", "min_stars_loaded", "last_loaded")
 
+    list_display = ("pk", "clinvar_variation_id", "min_stars_loaded", "last_loaded")
+
+    """
+    # these took prohibitively long to load
+    
     @admin_list_column(limit=0)
     def clinvar(self, obj: ClinVarRecordCollection):
         try:
@@ -65,6 +70,7 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
             return SafeString(f"<a href=\"{href}\">{allele}</a>")
         except Exception as ex:
             return str(ex)
+    """
 
     def has_change_permission(self, request, obj=None):
         return False
