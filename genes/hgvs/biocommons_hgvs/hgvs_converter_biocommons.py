@@ -127,6 +127,8 @@ class BioCommonsHGVSConverter(HGVSConverter):
         var_g = self._hgvs_to_g_hgvs(hgvs_string)
         try:
             (chrom, position, ref, alt, typ) = self.babelfish.hgvs_to_vcf(var_g)
+            if alt == '.':
+                alt = ref
         except HGVSDataNotAvailableError:
             raise Contig.ContigNotInBuildError()
         matches_reference = self.get_hgvs_match_ref_allele(hgvs_string, var_g, ref, alt)
