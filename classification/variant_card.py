@@ -114,6 +114,18 @@ class AlleleCard:
     def clinvar_data(self) -> ClinVarDetails:
         return ClinVarDetails.instance_from(allele=self.allele)
 
+    @cached_property
+    def imported_allele_infos(self):
+        return list(
+            sorted(ImportedAlleleInfo.objects.filter(
+                allele=self.allele
+            ).all())
+        )
+
     @property
-    def has_imported_allele_infos(self) -> bool:
-        return any(bool(vc.imported_allele_infos) for vc in self.variant_cards)
+    def imported_allele_info_label(self):
+        count = len(self.imported_allele_infos)
+        if count == 1:
+            return "1 Imported c.HGVS Resolving to this Allele"
+        else:
+            return f"{count} Imported c.HGVSs resolving to this Allele"

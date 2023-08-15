@@ -482,7 +482,7 @@ function applyVariantValues() {
         <div class="card" id="clingen-allele">
             <div class="card-header">Variant</div>
             <div class="card-body">
-                {% labelled id="g-hgvs" label="g.HGVS" value_css="variant-coordinate variant_coordinate" %}{{ g_hgvs }}{% endlabelled %}
+                {% labelled id="g-hgvs" label="g.HGVS" value_css="variant-coordinate variant_coordinate" %}{% c_hgvs g_hgvs %}{% endlabelled %}
                 {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
                 {% labelled label="Genome Build" %}{{ genome_build }}{% endlabelled %}
                 {% if variant.can_have_annotation and variant_show_canonical_hgvs %}

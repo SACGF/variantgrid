@@ -267,6 +267,11 @@ class GenomeBuildPatchVersion(models.Model):
     def __str__(self):
         return self.name
 
+    def __lt__(self, other: 'GenomeBuildPatchVersion'):
+        def sort_key(obj: GenomeBuildPatchVersion):
+            return obj.genome_build.name, obj.patch_version or 0
+        return sort_key(self) < sort_key(other)
+
     @staticmethod
     def get_or_create(name: str) -> 'GenomeBuildPatchVersion':
         if match := GenomeBuildPatchVersion.GENOME_BUILD_VERSION_RE.match(name):

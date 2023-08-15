@@ -60,6 +60,22 @@
             <a class="hover-link" href="{{ allele_card.allele.clingen_allele.human_url }}">{{ allele.clingen_allele }}</a>
         {% endlabelled %}
 
+        {% if allele_card.imported_allele_infos %}
+            {% labelled label="Imported As" %}
+                {% if allele_card.imported_allele_infos|length == 1 %}
+                    {% imported_allele_info allele_card.imported_allele_infos.0 %}
+                {% else %}
+                    {% modal label=allele_card.imported_allele_info_label size="md" %}
+                        <div class="modal-body">
+                            {% for allele_info in allele_card.imported_allele_infos %}
+                                <div {% if not forloop.first %}class="mt-4"{% endif %}>{% imported_allele_info allele_info %}</div>
+                            {% endfor %}
+                        </div>
+                    {% endmodal %}
+                {% endif %}
+            {% endlabelled %}
+        {% endif %}
+
         {% labelled label="Liftover Details" admin_only=True %}
             {% modal label="Liftover Details" %}
                 <div class="card-body">
@@ -149,6 +165,7 @@
                 </tr>
             </thead>
             <tbody>
+                {% comment %}
                 <tr>
                     <th class="text-right">Variant Coordinate</th>
                     {% for vc in allele_card.variant_cards %}
@@ -170,13 +187,15 @@
                         </td>
                     {% endfor %}
                 </tr>
+                {% endcomment %}
 
-                {% comment %}  If we ever want to show g.HGVSs on allele page
                 <tr>
                     <th class="text-right">g.HGVS</th>
-                    {% for vc in allele_card.variant_cards %}<td>{{ vc.g_hgvs | dash_if_empty }}</td>{% endfor %}
+                    {% for vc in allele_card.variant_cards %}<td>
+                        <a class="hover-link" href="{% url 'view_variant' vc.variant.pk %}">{% c_hgvs vc.g_hgvs %}</a>
+                    </td>
+                    {% endfor %}
                 </tr>
-                {% endcomment %}
 
                 <tr>
                     <th class="text-right">Quick Links</th>
@@ -194,20 +213,6 @@
                         </td>
                     {% endfor %}
                 </tr>
-
-                {% if allele_card.has_imported_allele_infos %}
-                    <tr>
-                        <th class="text-right" style="vertical-align: middle">Imported As</th>
-                        {% for vc in allele_card.variant_cards %}
-                            <td>
-                                {% for imported_allele in vc.imported_allele_infos %}
-                                    <div {% if not forloop.first %}class="mt-2"{% endif %}>{% imported_allele_info imported_allele on_allele_page=True %}</div>
-                                    {% empty %}<span class="no-value">-</span>
-                                {% endfor %}
-                            </td>
-                        {% endfor %}
-                    </tr>
-                {% endif %}
 
                 {% if allele_card.has_operation %}
                     <tr>

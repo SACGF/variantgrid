@@ -403,6 +403,11 @@ class ImportedAlleleInfo(TimeStampedModel):
     def __str__(self):
         return f"{self.imported_genome_build_patch_version} {self.imported_c_hgvs or self.imported_g_hgvs}"
 
+    def __lt__(self, other: 'ImportedAlleleInfo'):
+        def sort_key(obj: ImportedAlleleInfo):
+            return obj.imported_genome_build_patch_version, obj.imported_c_hgvs
+        return sort_key(self) < sort_key(other)
+
     @property
     def variant_coordinates_imported_and_resolved(self) -> Tuple[VariantCoordinate, VariantCoordinate]:
         imported_vc: Optional[VariantCoordinate] = self.variant_coordinate_obj

@@ -49,6 +49,6 @@
             {% endwith %}
         {% endif %}
     {% else %}
-        No ClinVar entry <span class="text-muted">(as of version: {{ data.annotation_version.clinvar_version.annotation_date.date  }})</span> <a href="https://www.ncbi.nlm.nih.gov/clinvar/?term={{ data.g_hgvs }}">Search ClinVar</a>
+        No ClinVar entry <span class="text-muted">(as of version: {{ data.annotation_version.clinvar_version.annotation_date.date  }})</span> <a class="hover-link" href="https://www.ncbi.nlm.nih.gov/clinvar/?term={{ data.g_hgvs }}">Search ClinVar</a>
     {% endif %}
 {% endwith %}

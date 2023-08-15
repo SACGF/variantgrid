@@ -1151,7 +1151,12 @@ a .c-hgvs-body .c-hgvs-transcript, a .c-hgvs-body .c-hgvs-nomen {
 .c-hgvs-body .colon {
   margin-left: -1pt;
   margin-right: 1pt;
-  color: #444;
+  color: #666;
+}
+.c-hgvs-body .colon-no-gene-symbol {
+  margin-left: 2pt;
+  margin-right: 2pt;
+  color: #666;
 }
 .c-hgvs-body .c-hgvs-transcript, .c-hgvs-body .c-hgvs-gene-symbol-b {
   white-space: nowrap;
