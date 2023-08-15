@@ -194,7 +194,6 @@ class ClinVarRecordCollection(TimeStampedModel):
     rcvs = ArrayField(base_field=models.TextField(), blank=True, null=True, size=None)
     last_loaded = models.DateTimeField(blank=True, null=True)
     parser_version = models.IntegerField(blank=True, null=True)
-    min_stars_loaded = models.IntegerField(blank=True, null=True)
 
     def records_with_min_stars(self, min_stars: int) -> List['ClinVarRecord']:
         return list(sorted(self.clinvarrecord_set.filter(stars__gte=min_stars), reverse=True))

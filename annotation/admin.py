@@ -6,7 +6,7 @@ from django.db.models import QuerySet
 from django.utils.safestring import SafeString
 
 from annotation import models
-from annotation.clinvar_xml_parser import ClinVarFetchRequest
+from annotation.clinvar_xml_parser import ClinVarFetchRequest, CLINVAR_RECORD_CACHE_DAYS
 from annotation.models import Citation, CitationFetchRequest, ClinVarRecordCollection, ClinVarRecord, VariantAnnotation, \
     ClinVar
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, get_admin_url
@@ -48,7 +48,7 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
 
     # list_display = ("pk", "clinvar", "allele", "min_stars_loaded", "last_loaded")
 
-    list_display = ("pk", "clinvar_variation_id", "min_stars_loaded", "last_loaded")
+    list_display = ("pk", "clinvar_variation_id", "last_loaded")
 
     """
     # these took prohibitively long to load
@@ -78,29 +78,18 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
     def has_add_permission(self, request):
         return False
 
-    @admin_action("Refresh: If Old (current stars)")
+    @admin_action(f"Refresh: If Older than {CLINVAR_RECORD_CACHE_DAYS} days")
     def refresh_old(self, request, queryset: QuerySet[ClinVarRecordCollection]):
         for obj in queryset:
             ClinVarFetchRequest(
                 clinvar_variation_id=obj.clinvar_variation_id,
-                min_stars=obj.min_stars_loaded
             ).fetch()
 
-    @admin_action("Refresh: Force (current stars)")
+    @admin_action("Refresh: Force")
     def refresh_force(self, request, queryset: QuerySet[ClinVarRecordCollection]):
         for obj in queryset:
             ClinVarFetchRequest(
                 clinvar_variation_id=obj.clinvar_variation_id,
-                min_stars=obj.min_stars_loaded,
-                max_cache_age=timedelta(seconds=0)
-            ).fetch()
-
-    @admin_action("Refresh: Force (1+ stars)")
-    def refresh_force_one_plus_stars(self, request, queryset: QuerySet[ClinVarRecordCollection]):
-        for obj in queryset:
-            ClinVarFetchRequest(
-                clinvar_variation_id=obj.clinvar_variation_id,
-                min_stars=1,
                 max_cache_age=timedelta(seconds=0)
             ).fetch()
 

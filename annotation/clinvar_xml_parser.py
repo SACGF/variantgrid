@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from datetime import timedelta, datetime
-from functools import cached_property
 from urllib.error import HTTPError
 import time
 from django.utils import timezone
@@ -43,42 +42,12 @@ CLINVAR_REVIEW_STATUS_TO_STARS = {
 
 
 @dataclass
-class ClinVarFetchResponse:
-    """
-    This warps a clinvar_record_collection just so we can override records to match the number of stars
-    requested
-    """
-
-    clinvar_record_collection: ClinVarRecordCollection
-    min_stars: int
-
-    @property
-    def clinvar_variation_id(self):
-        return self.clinvar_record_collection.clinvar_variation_id
-
-    @property
-    def rcvs(self):
-        return self.clinvar_record_collection.rcvs
-
-    @property
-    def last_loaded(self):
-        return self.clinvar_record_collection.last_loaded
-
-    @cached_property
-    def records(self):
-        # it's possible that we've retrieved records with min stars of 1
-        # and now we re-used the cache, but only want records with min stars of 3 (so filter the others out)
-        return self.clinvar_record_collection.records_with_min_stars(self.min_stars)
-
-
-@dataclass
 class ClinVarFetchRequest:
     """
     Is used to retrieve individual ClinVar records from the ClinVar web service for a given clinvar_variation_id
     """
 
     clinvar_variation_id: int
-    min_stars: int
     """
     The API currently only allows us to ask for all records for that clinvar_variation_id and then we can cache
     only the ones we want. if we've already cached records (but with a lower min_stars, we can just re-use that)
@@ -89,7 +58,7 @@ class ClinVarFetchRequest:
     How old until the cache is considered stale, provide seconds=0 if you want to force a refresh
     """
 
-    def fetch(self) -> ClinVarFetchResponse:
+    def fetch(self) -> ClinVarRecordCollection:
         fetch_date = timezone.now()
 
         with transaction.atomic():
@@ -101,8 +70,6 @@ class ClinVarFetchRequest:
             if not created:
                 if \
                         (clinvar_record_collection.parser_version == ClinVarXmlParser.PARSER_VERSION) and \
-                        clinvar_record_collection.min_stars_loaded is not None and \
-                        (clinvar_record_collection.min_stars_loaded <= self.min_stars) and \
                         clinvar_record_collection.last_loaded and \
                         ((fetch_date - clinvar_record_collection.last_loaded) <= self.max_cache_age):
                     # if all the above is true, then our cache is fine
@@ -121,7 +88,6 @@ class ClinVarFetchRequest:
 
                         # update our cache
                         clinvar_record_collection.last_loaded = fetch_date
-                        clinvar_record_collection.min_stars_loaded = self.min_stars
                         clinvar_record_collection.rcvs = response.rcvs
                         clinvar_record_collection.parser_version = ClinVarXmlParser.PARSER_VERSION
                         clinvar_record_collection.save()
@@ -131,8 +97,7 @@ class ClinVarFetchRequest:
                             # but a wipe and replace is easier
                             ClinVarRecord.objects.filter(clinvar_record_collection=clinvar_record_collection).delete()
 
-                        min_star_records = [r for r in response.all_records if r.stars >= self.min_stars]
-                        ClinVarRecord.objects.bulk_create(min_star_records)
+                        ClinVarRecord.objects.bulk_create(response.all_records)
                         break
 
                     except HTTPError as http_ex:
@@ -145,10 +110,7 @@ class ClinVarFetchRequest:
                         # out of attempts or not 400
                         raise
 
-        return ClinVarFetchResponse(
-            clinvar_record_collection=clinvar_record_collection,
-            min_stars=self.min_stars
-        )
+        return clinvar_record_collection
 
 
 @dataclass

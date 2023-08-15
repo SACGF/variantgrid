@@ -504,10 +504,10 @@ def citations_json(request, citations_ids_list):
 
 
 def view_clinvar_records_detail(request, clinvar_variation_id: int, min_stars: int):
-    records = clinvar_record_collection = ClinVarFetchRequest(
-        clinvar_variation_id=clinvar_variation_id,
-        min_stars=min_stars
+    clinvar_record_collection = ClinVarFetchRequest(
+        clinvar_variation_id=clinvar_variation_id
     ).fetch()
     return render(request, "annotation/clinvar_records_detail.html", {
-        "clinvar_records": records
+        "clinvar_record_collection": clinvar_record_collection,
+        "records": clinvar_record_collection.records_with_min_stars(min_stars)
     })

@@ -390,9 +390,8 @@ class ClassificationExportFormatterClinVarCompareExpert(ClassificationExportForm
             if clinvar_record := allele_data["clinvar"]:
                 if clinvar_record.is_expert_panel_or_greater:
                     records = ClinVarFetchRequest(
-                        clinvar_variation_id=clinvar_record.clinvar_variation_id,
-                        min_stars=CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
-                    ).fetch().records
+                        clinvar_variation_id=clinvar_record.clinvar_variation_id
+                    ).fetch().records_with_min_stars(CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE)
                     if records:
                         if len(records) > 1:
                             logging.warning(f"For allele {allele_data.allele_id} we have {len(records)} expert panels")
