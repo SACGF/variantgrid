@@ -6,7 +6,7 @@
 {% load ui_help %}
 {% load ui_menu_bars %}
 {% load settings_tags %}
-
+{% load clinvar_tags %}
 {% block submenu %}{% menu_bar_data %}{% endblock submenu %}
 {% block head %}
 <script>
@@ -15,14 +15,17 @@
 
         EKeys.load().then(eKeys => {
             let vcLinks = new VCLinks(eKeys);
-            {% for va in allele.variant_alleles %}
-                {
-                    let links = vcLinks.generateLinks(
-                        {{ va | quick_link_data }}
-                    );
-                    let anchors = links.filter(link => !link.isMissing()).map(link => link.asAnchor("bootstrap"));
-                    $('#quick-links-{{ va.pk }}').html($("<ul>", {class:"list-group", html:anchors}));
-                }
+            {% for vc in allele_card.variant_cards %}
+                {% with quick_link_data=vc.quick_link_data %}
+                    {% if quick_link_data %}
+                        {
+                            let links = vcLinks.generateLinks({{ vc.quick_link_data | jsonify }});
+                            let anchors = links.filter(link => !link.isMissing()).map(link => link.asAnchor("bootstrap"));
+                            let content = $("<ul>", {class:"list-group", html:anchors});
+                            $('#quick-links-{{ vc.variant.pk }}').html(content);
+                        }
+                    {% endif %}
+                {% endwith %}
             {% endfor %}
         });
     });
@@ -49,95 +52,203 @@
     <div class="container">
         {% page_help page_id='variantdetails/view_allele_help' title='Allele' %}
 
-        <div class="row equal">
-            <div class="col col-md-4">
-                <div class="card" id="allele-card">
-                    <div class="card-header">Allele {% admin_link allele %} <div class="d-inline-block ml-2" style="position:absolute" data-flags="{{allele.flag_collection_safe.id}}"></div></div>
-                    <div class="card-body">
-                        {% labelled label="Internal Allele ID" hint="chunky" %}{{ allele.id }}{% endlabelled %}
-                        {% if allele.clingen_allele %}
-                            {% labelled label="ClinGen Canonical Allele ID" hint="chunky" %}
-                                <a class="hover-link" href="{{ allele.clingen_allele.human_url }}">{{ allele.clingen_allele }}</a>
-                            {% endlabelled %}
-                            {% modal label="API Response" admin_only=True %}
-                                {% code_json allele.clingen_allele.api_response css_class="modal-body" %}
-                            {% endmodal %}
-                            {% if allele_merge_log_qs.exists %}
-                                {% modal label="Allele Merge Log" admin_only=True %}
+        {% labelled label="Internal Allele ID" %}
+            {{ allele_card.allele.pk }} {% admin_link allele_card.allele %}
+        {% endlabelled %}
+
+        {% labelled label="ClinGen Canonical Allele ID" %}
+            <a class="hover-link" href="{{ allele_card.allele.clingen_allele.human_url }}">{{ allele.clingen_allele }}</a>
+        {% endlabelled %}
+
+        {% if allele_card.imported_allele_infos %}
+            {% labelled label="Imported As" %}
+                {% if allele_card.imported_allele_infos|length == 1 %}
+                    {% imported_allele_info allele_card.imported_allele_infos.0 %}
+                {% else %}
+                    {% modal label=allele_card.imported_allele_info_label size="md" %}
+                        <div class="modal-body">
+                            {% for allele_info in allele_card.imported_allele_infos %}
+                                <div {% if not forloop.first %}class="mt-4"{% endif %}>{% imported_allele_info allele_info %}</div>
+                            {% endfor %}
+                        </div>
+                    {% endmodal %}
+                {% endif %}
+            {% endlabelled %}
+        {% endif %}
+
+        {% labelled label="Liftover Details" admin_only=True %}
+            {% modal label="Liftover Details" %}
+                <div class="card-body">
+                    {% for vc in allele_card.variant_cards %}
+
+                        <h5>{{ vc.genome_build }}</h5>
+                        {% labelled label="Imported As" %}{{ vc.variant_allele.get_origin_display }}{% endlabelled %}
+                        {% if not vc.is_imported_directly %}
+                            {% labelled label="Liftover" %}{{ vc.variant_allele.get_allele_linking_tool_display }}{% endlabelled %}
+                        {% endif %}
+
+                        {% if vc.liftover_error_qs.exists %}
+                            {% for liftover_error in liftover_error_qs %}
+                                <div>
+                                    Liftover Failed: {{ liftover_error.liftover }} on {% timestamp liftover_error.liftover.modified %}
+                                    {% if liftover_error.variant %}
+                                        <p>
+                                            {{ liftover_error.liftover.get_allele_linking_tool_display }} returned:
+                                            <a href="{% url 'view_variant' liftover_error.variant.pk %}">{{ liftover_error.variant }}</a>
+                                             which is NOT linked to this allele.
+                                        </p>
+                                    {% endif %}
+                                    {{ liftover_error.error_message }}
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+
+                    {% endfor %}
+                    <h5>ClinGen API Response</h5>
+
+                    {% if allele_card.allele.clingen_error %}
+                        {% with clingen_error=allele_card.allele.clingen_error %}
+                            <h4>Error retrieving ClinGen Allele</h4>
+                            {% labelled hint="tiny" label='Message' %}{{ clingen_error.message }}{% endlabelled %}
+                            {% labelled hint="tiny" label='Type' %}{{ clingen_error.errorType }}{% endlabelled %}
+                            {% labelled hint="tiny" label='Input' %}{{ clingen_error.inputLine }}{% endlabelled %}
+                            {% labelled hint="tiny" label='Description' %}{{ clingen_error.description }}{% endlabelled %}
+                        {% endwith %}
+                    {% endif %}
+
+                    {% if allele_merge_log_qs.exists %}
+                        <h5>Allele Merge Log</h5>
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Linked to Allele via</th>
+                                        <th>Status</th>
+                                        <th>Message</th>
+                                        <th>Other Allele</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                {% for amr in allele_merge_log_qs %}
+                                    <tr>
+                                        <td class="text-center">{{ amr.created }}</td>
+                                        <td class="text-center">{{ amr.get_allele_linking_tool_display }}</td>
+                                        <td class="text-center">{{ amr.success|yesno:"Success,Failure" }}
+                                        <td class="text-center">{{ amr.message }}</td>
+                                        <td class="text-center">
+                                            {% if allele == amr.old_allele %}
+                                                <a href="{% url 'view_allele' amr.new_allele.pk %}">{{ amr.new_allele }}</a>
+                                            {% else %}
+                                                <a href="{% url 'view_allele' amr.old_allele.pk %}">{{ amr.old_allele }}</a>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endif %}
+
+                    {% code_json allele.clingen_allele.api_response css_class="modal-body" %}
+                </div>
+            {% endmodal %}
+
+        {% endlabelled %}
+
+        {% comment %}#### VARIANT TABLE{% endcomment %}
+
+        <table class="table" style="font-size:10pt">
+            <thead>
+                <tr>
+                    <th style="width:25%"></th>
+                    {% for vc in allele_card.variant_cards %}<th style="width:37.5%">{{ vc.genome_build }}</th>{% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% comment %}
+                <tr>
+                    <th class="text-right">Variant Coordinate</th>
+                    {% for vc in allele_card.variant_cards %}
+                        <td>
+                            {% if vc.variant %}
+                                <a class="hover-link" href="{% url 'view_variant' vc.variant.pk %}">{{ vc.variant }}</a>
+                                {% if vc.variant.is_abbreviated %}
+                                    <a class="ml-2" data-toggle="collapse" href="#variant-coordinate-{{ vc.variant.pk }}">Show all bases</a>
+                                    <div class="collapse" id="variant-coordinate-{{ vc.pk }}">
+                                        {{ vc.variant.full_string  }}
+                                    </div>
+                                {% endif %}
+                            {% elif vc.unfinished_liftover %}
+                                    This variant is being lifted over via {{ vc.unfinished_liftover.get_conversion_tool_display }}
+                                    <br/>(last updated {% timestamp vc.unfinished_liftover.modified time_ago=True %} ago)
+                            {% else %}
+                                {{ 'E' | severity_icon}} Not Lifted Over
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+                {% endcomment %}
+
+                <tr>
+                    <th class="text-right">g.HGVS</th>
+                    {% for vc in allele_card.variant_cards %}<td>
+                        <a class="hover-link" href="{% url 'view_variant' vc.variant.pk %}">{% c_hgvs vc.g_hgvs %}</a>
+                    </td>
+                    {% endfor %}
+                </tr>
+
+                <tr>
+                    <th class="text-right">Quick Links</th>
+                    {% for vc in allele_card.variant_cards %}
+                        <td>
+                            {% if vc.quick_link_data %}
+                                {% modal label="Quick Links" size="md" %}
                                     <div class="modal-body">
-                                        <table class="table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Date</th>
-                                                    <th>Linked to Allele via</th>
-                                                    <th>Status</th>
-                                                    <th>Message</th>
-                                                    <th>Other Allele</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            {% for amr in allele_merge_log_qs %}
-                                                <tr>
-                                                    <td class="text-center">{{ amr.created }}</td>
-                                                    <td class="text-center">{{ amr.get_allele_linking_tool_display }}</td>
-                                                    <td class="text-center">{{ amr.success|yesno:"Success,Failure" }}
-                                                    <td class="text-center">{{ amr.message }}</td>
-                                                    <td class="text-center">
-                                                        {% if allele == amr.old_allele %}
-                                                            <a href="{% url 'view_allele' amr.new_allele.pk %}">{{ amr.new_allele }}</a>
-                                                        {% else %}
-                                                            <a href="{% url 'view_allele' amr.old_allele.pk %}">{{ amr.old_allele }}</a>
-                                                        {% endif %}
-                                                    </td>
-                                                </tr>
-                                            {% endfor %}
-                                            </tbody>
-                                        </table>
+                                        <div class="quick-links" id="quick-links-{{ vc.variant.pk }}">Loading ...</div>
                                     </div>
                                 {% endmodal %}
+                            {% else %}
+                                <span class="no-value">-</span>
                             {% endif %}
-                        {% elif allele.clingen_error %}
-                            {% labelled hint="tiny" label="ClinGen Canonical Allele ID" %}
-                                Error retrieving <a class="hover-link external-link" target="_blank" href="{{ clingen_url }}">ClinGen Allele</a>
-                                <a class="hover-link" data-toggle="collapse" href="#clingen-errors-{{ allele.id }}">(more info)</a>
-                            {% endlabelled %}
-                            <div id="clingen-errors-{{ allele.id }}" class="collapse">
-                            {% labelled hint="tiny" label='Message' %}{{ allele.clingen_error.message }}{% endlabelled %}
-                            {% labelled hint="tiny" label='Type' %}{{ allele.clingen_error.errorType }}{% endlabelled %}
-                            {% labelled hint="tiny" label='Input' %}{{ allele.clingen_error.inputLine }}{% endlabelled %}
-                            {% labelled hint="tiny" label='Description' %}{{ allele.clingen_error.description }}{% endlabelled %}
-                            </div>
-                        {% endif %}
-                        {% if imported_alleles %}
-                            <div class="mt-3">
-                                <label>Resolved From</label>
-                                <div style="font-size:10pt">
-                                {% for imported_allele in imported_alleles %}
-                                    <div class="mt-2">{% imported_allele_info imported_allele on_allele_page=True %}</div>
-                                {% endfor %}
-                                </div>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            {% for genome_build in annotated_builds %}
-                <div class="col col-md-4">
-                {% variant_card allele genome_build %}
-                </div>
-            {% endfor %}
-        </div>
-    </div>
+                        </td>
+                    {% endfor %}
+                </tr>
+
+                {% if allele_card.has_operation %}
+                    <tr>
+                        <th class="text-right" style="vertical-align: middle">Operation</th>
+                        {% for vc in allele_card.variant_cards %}
+                            <th>
+                                {% if vc.can_create_classification %}
+                                    <a class="btn btn-primary w-100" href="{% url 'create_classification_for_variant' vc.variant.pk vc.genome_build.pk %}">
+                                        <i class="fas fa-plus-circle"></i> New Classification ({{ vc.genome_build }})
+                                    </a>
+                                {% elif vc.can_create_variant %}
+                                    <form action="{% url 'create_variant_for_allele' vc.allele.pk vc.genome_build.pk %}" method="POST">
+                                        {% csrf_token %}
+                                        <button class="btn btn-primary w-100" type="submit">
+                                            Create Variant ({{ vc.genome_build }})
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <span class="no-value">-</span>
+                                {% endif %}
+                            </th>
+                        {% endfor %}
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
 
     {% if classifications_new_grouping and not edit_clinical_groupings %}
         <div class="container mt-4">
-            <h3>Classifications</h3>
+            <h4>Classifications</h4>
             {% url 'allele_classifications_download' allele.id as download_link %}
             {% classification_groups classifications link_discordance_reports=discordance_enabled download_link=download_link context_object=allele %}
         </div>
     {% else %}
         <div class="container-table mt-4">
-            <h3 style="margin-bottom:0">Classifications</h3>
+            <h4 style="margin-bottom:0">Classifications</h4>
             {% if classifications %}
                 {% classification_table classifications show_clinical_context=True allele=allele edit_clinical_groupings=edit_clinical_groupings %}
             {% else %}
@@ -147,5 +258,8 @@
         </div>
     {% endif %}
 
+    <div class="container mt-4">
+        {% clinvar allele=allele expert_panel_only=True %}
+    </div>
 
 {% endblock content %}

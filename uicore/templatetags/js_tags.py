@@ -3,6 +3,7 @@ import datetime
 import json
 import re
 import urllib
+from datetime import date
 from decimal import Decimal
 from html import escape
 from typing import Union, Any, Optional
@@ -134,6 +135,11 @@ def code_json(data: JsonDataType, css_class: Optional[str] = "", dash_if_empty: 
     return {"data": data, "css_class": css_class}
 
 
+@register.inclusion_tag("uicore/tags/code_block_xml.html")
+def code_xml(data: str, css_class: Optional[str] = "code-block"):
+    return {"data": data, "css_class": css_class}
+
+
 @register.inclusion_tag("uicore/tags/code_block_regex.html")
 def code_regex(data: str):
     error = None
@@ -166,6 +172,11 @@ def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False, tex
 
     if timestamp:
         if not isinstance(timestamp, (int, float)):
+            if not hasattr(timestamp, 'timestamp'):
+                if isinstance(timestamp, date):
+                    timestamp = datetime.datetime(year=timestamp.year, month=timestamp.month, day=timestamp.day)
+                else:
+                    raise ValueError(f"Unsure how to convert {timestamp} to timestamp")
             timestamp = timestamp.timestamp()
         return {
             "datetime": datetime.datetime.fromtimestamp(timestamp),

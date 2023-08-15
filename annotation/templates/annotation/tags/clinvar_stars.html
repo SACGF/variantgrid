@@ -1,14 +1,5 @@
-<style>
-.filled-star {
-    color: #fdb81e;
-}
-</style>
-<div class="clinvar-stars">
-    {%  for star in stars %}
-        {% if star %}
-            <span class="filled-star">&#x2605;</span>
-        {%  else %}
-            <span>&#x2605;</span>
-        {%  endif %}
-    {%  endfor %}
+<div class="d-inline-block mr-2 {% if review_status %}hover-detail{% endif %}" style="font-size:8pt; letter-spacing: -1px" {% if review_status %}title="{{ review_status }}"{% endif %}>
+{% for star in stars %}
+    {% if star %}<i class="fa-solid fa-star text-success" style="margin:0"></i>{% else %}<i class="fa-regular fa-star" style="opacity:0.25; margin:0"></i>{% endif %}
+{% endfor %}
 </div>

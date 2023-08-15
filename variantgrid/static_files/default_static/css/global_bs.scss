@@ -400,6 +400,12 @@ a.list-group-item-action {
 a {
     cursor: pointer;
 }
+.subtle-link {
+  color: #446 !important;
+}
+.subtle-link::after {
+  content: none !important;
+}
 .external-link::after {
     display: inline-block;
     font-style: normal;
@@ -1172,7 +1178,12 @@ a .c-hgvs-body {
   .colon {
     margin-left: -1pt;
     margin-right: 1pt;
-    color: #444;
+    color: #666;
+  }
+  .colon-no-gene-symbol {
+    margin-left: 2pt;
+    margin-right: 2pt;
+    color: #666;
   }
   .c-hgvs-transcript, .c-hgvs-gene-symbol-b {
     white-space: nowrap;

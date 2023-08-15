@@ -1,16 +1,96 @@
 from datetime import timedelta
 
 from django.contrib import admin
+from django.contrib.admin import TabularInline
 from django.db.models import QuerySet
+from django.utils.safestring import SafeString
 
 from annotation import models
-from annotation.models import Citation, CitationFetchRequest
-from snpdb.admin_utils import ModelAdminBasics, admin_action
+from annotation.clinvar_xml_parser import ClinVarFetchRequest, CLINVAR_RECORD_CACHE_DAYS
+from annotation.models import Citation, CitationFetchRequest, ClinVarRecordCollection, ClinVarRecord, VariantAnnotation, \
+    ClinVar
+from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, get_admin_url
+from snpdb.models import VariantAllele
 
 admin.site.register(models.AnnotationRun)
 admin.site.register(models.AnnotationVersion)
-admin.site.register(models.ClinVar)
 admin.site.register(models.VariantAnnotationVersion)
+
+
+@admin.register(ClinVar)
+class ClinVarAdmin(ModelAdminBasics):
+
+    list_display = ("pk", "version", "clinvar_variation_id", "variant", "clinvar_review_status")
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_add_permission(self, request):
+        return False
+
+
+class ClinVarRecordAdmin(TabularInline):
+    model = ClinVarRecord
+
+    fields = ("record_id", "submitter", "stars", "date_last_evaluated", "clinical_significance")
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ClinVarRecordCollection)
+class ClinVarRecordCollectionAdmin(ModelAdminBasics):
+    inlines = (ClinVarRecordAdmin, )
+    list_per_page = 20
+
+    list_display = ("pk", "clinvar_variation_id", "last_loaded")
+
+    """
+    # these took prohibitively long to load
+    
+    @admin_list_column(limit=0)
+    def clinvar(self, obj: ClinVarRecordCollection):
+        try:
+            clinvar = ClinVar.objects.filter(clinvar_variation_id=obj.clinvar_variation_id).order_by('-version').first()
+            href = get_admin_url(clinvar)
+            return SafeString(f"<a href=\"{href}\">{clinvar.clinvar_variation_id}</a>")
+        except Exception as ex:
+            return str(ex)
+
+    @admin_list_column(limit=0)
+    def allele(self, obj: ClinVarRecordCollection):
+        try:
+            allele = ClinVar.objects.filter(clinvar_variation_id=obj.clinvar_variation_id).order_by('-version').first().variant.allele
+            href = get_admin_url(allele)
+            return SafeString(f"<a href=\"{href}\">{allele}</a>")
+        except Exception as ex:
+            return str(ex)
+    """
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_add_permission(self, request):
+        return False
+
+    @admin_action(f"Refresh: If Older than {CLINVAR_RECORD_CACHE_DAYS} days")
+    def refresh_old(self, request, queryset: QuerySet[ClinVarRecordCollection]):
+        for obj in queryset:
+            ClinVarFetchRequest(
+                clinvar_variation_id=obj.clinvar_variation_id,
+            ).fetch()
+
+    @admin_action("Refresh: Force")
+    def refresh_force(self, request, queryset: QuerySet[ClinVarRecordCollection]):
+        for obj in queryset:
+            ClinVarFetchRequest(
+                clinvar_variation_id=obj.clinvar_variation_id,
+                max_cache_age=timedelta(seconds=0)
+            ).fetch()
+
 
 class HasErrorFilter(admin.SimpleListFilter):
     title = "Has Errors"

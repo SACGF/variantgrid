@@ -497,15 +497,10 @@ class ImportedAlleleInfo(TimeStampedModel):
         latest_validation.save()
         self.latest_validation = latest_validation
 
-    def __lt__(self, other):
-        if self.grch38:
-            if other.grch38:
-                return self.grch38 < other.grch38
-            else:
-                return False
-        elif other.grch38:
-            return True
-        return self.imported_c_hgvs < other.imported_c_hgvs
+    def __lt__(self, other: 'ImportedAlleleInfo'):
+        def sort_key(obj: ImportedAlleleInfo):
+            return obj.imported_genome_build_patch_version, obj.imported_c_hgvs
+        return sort_key(self) < sort_key(other)
 
     @property
     def imported_c_hgvs_obj(self) -> Optional[CHGVS]:

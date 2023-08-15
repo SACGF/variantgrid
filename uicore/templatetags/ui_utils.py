@@ -477,10 +477,10 @@ def value(value: Any, no_value: Optional[str] = None) -> str:
 
 
 @register.filter()
-def multi_line_text(value: str):
+def multi_line_text(value: str, sep="\n"):
     if isinstance(value, str):
-        lines = value.split("\n")
-        return SafeString("<br/>".join(escape(line) for line in lines))
+        lines = value.split(sep)
+        return SafeString("<br/>".join(escape(line.strip()) for line in lines))
     return ""
 
 

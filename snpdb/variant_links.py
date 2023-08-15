@@ -1,5 +1,6 @@
 from typing import Dict, Any
 
+from classification.enums import SpecialEKeys
 from snpdb.models import Variant, GenomeBuild
 
 
@@ -7,6 +8,7 @@ def variant_link_info(variant: Variant, genome_build: GenomeBuild) -> Dict[str, 
     """ Needs to be passed a VariantAllele """
     link_data: Dict[str, Any] = {}
     coordinate = variant.coordinate
+
     #FIXME this really needs to refer to SpecialEKeys but can't due to its package
     link_data['variant_coordinate'] = f'{coordinate.chrom}:{coordinate.pos} {coordinate.ref}>{coordinate.alt}'
     link_data['variant_string'] = str(variant)

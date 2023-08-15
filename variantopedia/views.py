@@ -20,6 +20,7 @@ from annotation.models import AnnotationRun, AnnotationVersion, ClassificationMo
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.models import ImportedAlleleInfo
 from classification.models.classification_import_run import ClassificationImportRun
+from classification.variant_card import AlleleCard
 from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
@@ -453,14 +454,11 @@ def view_allele(request, allele_id: int):
         'classification__allele_info__latest_validation'
     )
 
-    allele_merge_log_qs = AlleleMergeLog.objects.filter(Q(old_allele=allele) | Q(new_allele=allele)).order_by("pk")
     context = {
+        "allele_card": AlleleCard(user=request.user, allele=allele),
         "allele": allele,
         "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True',
-        "allele_merge_log_qs": allele_merge_log_qs,
-        "classifications": latest_classifications,
-        "annotated_builds": GenomeBuild.builds_with_annotation(),
-        "imported_alleles": ImportedAlleleInfo.objects.filter(allele=allele)
+        "classifications": latest_classifications
     }
     return render(request, "variantopedia/view_allele.html", context)
 
@@ -523,10 +521,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     latest_annotation_version = AnnotationVersion.latest(genome_build)
     variant_annotation = None
     vts = None
-    clinvar = None
     genes_canonical_transcripts = None
-    num_clinvar_citations = 0
-    clinvar_citations = None
     num_variant_annotation_versions = variant.variantannotation_set.count()
     user_settings = UserSettings.get_for_user(request.user)
 
@@ -548,22 +543,6 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
             genes_canonical_transcripts = get_genes_canonical_transcripts(variant, annotation_version)
 
-            clinvar_qs = ClinVar.objects.filter(variant=variant, version=annotation_version.clinvar_version)
-            clinvar: Optional[ClinVar] = None
-            try:
-                clinvar = clinvar_qs.get()
-            except ClinVar.MultipleObjectsReturned:
-                # Report this - but carry on for the user
-                details = f"Multiple ClinVar entries found for variant {variant.pk}"
-                create_event(request.user, "duplicate_annotation", details, LogLevel.WARNING)
-                clinvar = clinvar_qs.first()
-            except ClinVar.DoesNotExist:
-                pass
-
-            if clinvar:
-                # FIXME, make it so we can load citations without fetching them
-                clinvar_citations = clinvar.citation_ids
-                num_clinvar_citations = len(clinvar_citations)
         except:  # May not have been annotated?
             log_traceback()
 
@@ -593,7 +572,6 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "annotation_version": annotation_version,
         "can_create_classification": Classification.can_create_via_web_form(request.user),
         "classifications": latest_classifications,
-        "clinvar": clinvar,
         "genes_canonical_transcripts": genes_canonical_transcripts,
         "genome_build": genome_build,
         "g_hgvs": g_hgvs,
@@ -601,8 +579,6 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "latest_annotation_version": latest_annotation_version,
         "modified_normalised_variants": modified_normalised_variants,
         "num_variant_annotation_versions": num_variant_annotation_versions,
-        "num_clinvar_citations": num_clinvar_citations,
-        "clinvar_citations": clinvar_citations,
         "tag_form": TagForm(),
         "tool_tips": user_settings.tool_tips,
         "igv_links_enabled": get_settings_form_features().igv_links_enabled,

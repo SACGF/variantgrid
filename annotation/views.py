@@ -18,6 +18,7 @@ from django.views.decorators.vary import vary_on_cookie
 from htmlmin.decorators import not_minified_response
 
 from annotation.annotation_versions import get_variant_annotation_version
+from annotation.clinvar_xml_parser import ClinVarFetchRequest
 from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
     VariantAnnotationVersionDiff, Citation
@@ -500,3 +501,13 @@ def citations_json(request, citations_ids_list):
     """
     citation_ids = citations_ids_list.split("/")
     return JsonResponse({"citations": CitationFetchRequest.fetch_all_now(citation_ids).to_json()})
+
+
+def view_clinvar_records_detail(request, clinvar_variation_id: int, min_stars: int):
+    clinvar_record_collection = ClinVarFetchRequest(
+        clinvar_variation_id=clinvar_variation_id
+    ).fetch()
+    return render(request, "annotation/clinvar_records_detail.html", {
+        "clinvar_record_collection": clinvar_record_collection,
+        "records": clinvar_record_collection.records_with_min_stars(min_stars)
+    })

@@ -79,7 +79,7 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
             error = va.error
         return error
 
-    def variant_alleles(self):
+    def variant_alleles(self) -> QuerySet['VariantAllele']:
         return self.variantallele_set.select_related('variant__locus', 'variant__locus__contig', 'variant__locus__ref', 'variant__alt').order_by("genome_build__name")
 
     @cached_property

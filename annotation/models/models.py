@@ -5,11 +5,11 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import cached_property
 from typing import List, Optional, Dict, Callable, Tuple
-
 from Bio import Entrez
 from Bio.Data.IUPACData import protein_letters_1to3
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction, connection
 from django.db.models.deletion import PROTECT, CASCADE, SET_NULL
@@ -20,7 +20,6 @@ from django.utils.timezone import localtime
 from django_extensions.db.models import TimeStampedModel
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
-
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction
@@ -28,6 +27,7 @@ from annotation.models.models_citations import Citation, CitationFetchRequest, C
 from annotation.models.models_enums import AnnotationStatus, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
     ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, EssentialGeneGeneTrap
+from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
@@ -87,6 +87,11 @@ def clinvar_version_pre_delete_handler(sender, instance, **kwargs):  # pylint: d
 
 
 class ClinVar(models.Model):
+
+    class Meta:
+        verbose_name = "ClinVar annotation"
+        verbose_name_plural = "ClinVar annotations"
+
     ALLELE_ORIGIN = {0: 'unknown',
                      1: 'germline',
                      2: 'somatic',
@@ -125,8 +130,35 @@ class ClinVar(models.Model):
     drug_response = models.BooleanField(default=False)
 
     @property
+    def clinvar_disease_database_terms(self) -> List[str]:
+        if db_name_text := self.clinvar_disease_database_name:
+            def fix_name(name: str):
+                name = name.strip()
+                if name.startswith("MONDO:MONDO:"):
+                    name = name.replace("MONDO:MONDO:", "MONDO:")
+                elif name.startswith("Orphanet:ORPHA"):
+                    name = "ORPHA:" + name[len("Orphanet:ORPHA"):]
+                elif name.startswith("Human_Phenotype_Ontology"):
+                    name = name[25:]
+                return name
+
+            db_names = list(sorted(fix_name(db_name) for db_name in re.split("[|,]", db_name_text)))
+            return db_names
+        return []
+
+    @property
+    def clinvar_clinical_sources_list(self) -> List[str]:
+        if clinvar_clinical_sources := self.clinvar_clinical_sources:
+            return [name.strip() for name in clinvar_clinical_sources.split("|")]
+        return []
+
+    @property
     def stars(self):
         return ClinVarReviewStatus(self.clinvar_review_status).stars()
+
+    @property
+    def is_expert_panel_or_greater(self):
+        return self.stars >= CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 
     def get_origin_display(self):
         return ClinVar.ALLELE_ORIGIN.get(self.clinvar_origin)
@@ -144,13 +176,65 @@ class ClinVar(models.Model):
         return sorted(set(ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
                                        clinvar_allele_id=self.clinvar_allele_id).values_list('citation_id', flat=True)))
 
-    # def get_citations(self) -> QuerySet[Citation]:
-    #     cvc_qs = ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
-    #                                             clinvar_allele_id=self.clinvar_allele_id)
-    #     return Citation.objects.filter(clinvarcitation__in=cvc_qs)
-
     def __str__(self):
         return f"ClinVar: variant: {self.variant}, path: {self.highest_pathogenicity}"
+
+
+class ClinVarRecordCollection(TimeStampedModel):
+    """
+    Stores data about when we've retrieved individual ClinVar records for a clinvar variation id.
+    Importantly, when we did it, and what was the minimum number of stars on a record that we kept.
+    Let's us know if we can re-use the cached ClinVarRecords or if we should retrieve them fresh from ClinVar.
+    """
+
+    class Meta:
+        verbose_name = "ClinVar record collection"
+
+    clinvar_variation_id = models.IntegerField(primary_key=True)
+    rcvs = ArrayField(base_field=models.TextField(), blank=True, null=True, size=None)
+    last_loaded = models.DateTimeField(blank=True, null=True)
+    parser_version = models.IntegerField(blank=True, null=True)
+
+    def records_with_min_stars(self, min_stars: int) -> List['ClinVarRecord']:
+        return list(sorted(self.clinvarrecord_set.filter(stars__gte=min_stars), reverse=True))
+
+
+class ClinVarRecord(TimeStampedModel):
+    """
+    Represents a single record within ClinVar.
+    Important to note this has been retrieved from ClinVar, and not our submission to ClinVar.
+    """
+
+    class Meta:
+        verbose_name = "ClinVar record"
+
+    clinvar_record_collection = models.ForeignKey(ClinVarRecordCollection, on_delete=CASCADE)
+    record_id = models.TextField(primary_key=True)  # SCV
+    stars = models.IntegerField()
+    org_id = models.TextField()
+    genome_build = models.TextField()
+    review_status = models.TextField()
+    submitter = models.TextField()
+    submitter_date = models.DateField()
+
+    date_last_evaluated = models.DateField(null=True, blank=True)
+    c_hgvs = models.TextField(null=True, blank=True)
+    variant_coordinate = models.TextField(null=True, blank=True)
+    condition = models.TextField(null=True, blank=True)
+    clinical_significance = models.TextField(null=True, blank=True)
+    gene_symbol = models.TextField(null=True, blank=True)
+    interpretation_summary = models.TextField(null=True, blank=True)
+    assertion_method = models.TextField(null=True, blank=True)
+    allele_origin = models.TextField(null=True, blank=True)
+
+    def __lt__(self, other):
+        def sort_key(record: ClinVarRecord):
+            return record.stars, record.date_last_evaluated or record.submitter_date
+        return sort_key(self) < sort_key(other)
+
+    @property
+    def is_expert_panel_or_greater(self):
+        return self.stars >= CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 
 
 class ClinVarCitationsCollection(models.Model):

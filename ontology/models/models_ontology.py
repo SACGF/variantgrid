@@ -318,6 +318,10 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
             summary=self.definition
         )
 
+    @property
+    def is_locally_stored(self):
+        return self.ontology_service in OntologyService.LOCAL_ONTOLOGY_PREFIXES
+
     def __str__(self):
         return f"{self.id} {self.name}"
 
@@ -337,9 +341,6 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
         if self.ontology_service == OntologyService.HGNC:
             return self.name < other.name
         return self.index < other.index
-
-    def get_absolute_url(self):
-        return reverse('ontology_term', kwargs={"term": self.url_safe_id})
 
     @property
     def is_stub(self):
@@ -479,6 +480,17 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
     @property
     def external_url(self):
         return OntologyService.URLS[self.ontology_service].replace("${1}", self.padded_index)
+
+    def get_absolute_url(self):
+        return reverse('ontology_term', kwargs={"term": self.url_safe_id})
+
+    @property
+    def best_url(self):
+        if self.is_locally_stored:
+            return self.get_absolute_url()
+        else:
+            return self.external_url
+
 
     @property
     def url(self):

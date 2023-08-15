@@ -1,4 +1,5 @@
-{% if show_link %}<a href="{{ term.get_absolute_url }}" class="hover-link">{% endif %}
+{% if term %}
+    {% if show_link %}<a href="{{ term.best_url }}" class="hover-link">{% endif %}
     {% if is_gene %}<span style="letter-spacing: 1px" class="{% if show_link %}hover-link{% endif %} font-weight-bold">{{ term.name }}</span>&nbsp;
     {% else %}
         <span class="text-monospace {% if term.is_obsolete %}text-danger{% endif %}">{{ term.id }}</span>
@@ -7,3 +8,6 @@
         {% if not compact %}{% if term.moved_to %}<span class="text-muted" title="MOVED TO {{ term.moved_to }}">Moved</span>{% elif term.name %}{{ term.name }}{% endif %}{% endif %}
     {% endif %}
 {% if show_link %}</a>{% endif %}
+{% else %}
+    <span class="text-monospace">{{ text }}</span>
+{% endif %}

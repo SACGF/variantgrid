@@ -19,17 +19,20 @@ def ontology_meta(data: OntologyMatch):
 
 @register.inclusion_tag("ontology/tags/ontology_term.html")
 def ontology_term(data: Union[OntologyTerm, str], show_link: bool = True, spaced: bool = False):
-    if isinstance(data, str):
-        data = OntologyTerm.get_or_stub(data)
+    try:
+        if isinstance(data, str):
+            data = OntologyTerm.get_or_stub(data)
 
-    is_gene = data.ontology_service == OntologyService.HGNC
+        is_gene = data.ontology_service == OntologyService.HGNC
 
-    return {
-        "term": data,
-        "is_gene": is_gene,
-        "show_link": show_link,
-        "spaced": spaced
-    }
+        return {
+            "term": data,
+            "is_gene": is_gene,
+            "show_link": show_link,
+            "spaced": spaced
+        }
+    except ValueError:
+        return {"text": data}
 
 
 @register.inclusion_tag("ontology/tags/ontology_relationship_table.html")

@@ -1,0 +1,54 @@
+{% load clinvar_tags %}
+{% load ontology_tags %}
+{% load ui_utils %}
+{% load js_tags %}
+{% load english_tags %}
+<h4>{% if expert_panel_only %}Expert Panels{% else %}ClinVar Records{% endif %}</h4>
+
+{% with clinvar=data.clinvar %}
+    {% if clinvar %}
+        {% if not expert_panel_only %}
+            {% clinvar_stars clinvar.stars %}{{ clinvar.get_clinvar_review_status_display }} <span class="text-muted">|</span> <b>{{ clinvar.clinical_significance | code_to_english }}</b> <span class="text-muted">|</span>
+            as of ClinVar Export {% timestamp data.annotation_version.clinvar_version.annotation_date time_ago=True %}
+            <span class="text-muted">|</span>
+        {% elif not clinvar.is_expert_panel_or_greater %}
+            No expert panel available as of ClinVar Export {% timestamp data.annotation_version.clinvar_version.annotation_date time_ago=True %}
+        {% endif %}
+        <a class="hover-link external-link" href="https://www.ncbi.nlm.nih.gov/clinvar/variation/{{ clinvar.clinvar_variation_id }}">View on ClinVar</a>
+        <br/>
+        {% if expert_panel_only and data.is_expert_panel_or_greater %}
+            {% comment %}If we're only showing expert panels - insta-show them{% endcomment %}
+            <div class="mt-2">
+                <div data-toggle="ajax" href="{% url "view_clinvar_records_detail" clinvar.clinvar_variation_id min_stars %}">
+                    Loading...
+                </div>
+            </div>
+        {% elif not expert_panel_only %}
+            {% comment %}Do we need to restore more data that was in ClinVar tag before? e.g. drug_response, etc{% endcomment %}
+            <div class="mt-4">
+                {% labelled label="Origin" %}{{ clinvar.get_origin_display }}{% endlabelled %}
+                {% labelled label="Diseases" %}{% for term in clinvar.clinvar_disease_database_terms %}{% if not forloop.first %}<span class="text-muted">|</span>{% endif %} {% ontology_term term %} {% endfor %}{% endlabelled %}
+                {% labelled label="Clinical Sources" %}{% for source in clinvar.clinvar_clinical_sources_list %}{% if not forloop.first %}<span class="text-muted">|</span>{% endif %} {{ source | code_to_english }} {% endfor %}{% endlabelled %}
+            </div>
+            <div class="mt-2">
+                <div data-toggle="ajax-collapse" href="{% url 'view_clinvar_records_detail' clinvar.clinvar_variation_id min_stars %}" title="Individual ClinVar Records"></div>
+            </div>
+            {% with citation_ids=clinvar.citation_ids %}
+                <div class="mt-2">
+                    {% if citation_ids %}
+                        <a class="toggle-link" data-toggle="collapse" href="#clinvar-citations">Toggle {% count citation_ids singular='Citation' plural='Citations' %} from ClinVar</a>
+                        <div id="clinvar-citations" class="collapse mt-2">
+                            {% for citation_id in citation_ids %}
+                                <div data-citation-id="{{ citation_id }}"></div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="no-value">No citations from ClinVar found</div>
+                    {% endif %}
+                </div>
+            {% endwith %}
+        {% endif %}
+    {% else %}
+        No ClinVar entry <span class="text-muted">(as of version: {{ data.annotation_version.clinvar_version.annotation_date.date  }})</span> <a class="hover-link" href="https://www.ncbi.nlm.nih.gov/clinvar/?term={{ data.g_hgvs }}">Search ClinVar</a>
+    {% endif %}
+{% endwith %}
