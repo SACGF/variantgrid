@@ -46,8 +46,7 @@ class EmailLabSummaryData:
         # TODO if user setting isn't set, grab it from lab instead
         return UserSettings.get_genome_build_or_default(self.user)
 
-    @cached_property
-    def discordance_report_summaries(self) -> DiscordanceReportTableData:
+    def _get_discordance_report_summaries(self):
         discordant_vcs = FlagCollection.filter_for_open_flags(
             Classification.objects.filter(lab=self.lab),
             flag_types=[classification_flag_types.discordant]
@@ -58,11 +57,27 @@ class EmailLabSummaryData:
             classification_original__classification__in=discordant_vcs,
             report__resolution=DiscordanceReportResolution.ONGOING).values_list('report', flat=True)
         dr_qs = DiscordanceReport.objects.filter(pk__in=report_ids).order_by('-id')
+        return dr_qs
+
+
+    @cached_property
+    def discordance_report_summaries(self) -> DiscordanceReportTableData:
+        dr_qs = self._get_discordance_report_summaries()
 
         return DiscordanceReportTableData(
             perspective=LabPickerData.for_lab(self.lab),
             discordance_reports=dr_qs
         )
+
+    @cached_property
+    def is_medically_insignificance_count(self) -> int:
+        dr_qs = self._get_discordance_report_summaries()
+        insignificance_count = 0
+        for i in dr_qs:
+            if not i.is_medically_significant:
+                insignificance_count += 1
+        return insignificance_count
+
 
     @cached_property
     def flagged_variants(self) -> QuerySet[Flag]:

@@ -60,6 +60,7 @@ Hello Shariant User,
                 </thead>
                 <tbody>
                     {% for discordance_report_summary in lab_summary.discordance_report_summaries.summaries %}
+                        {% if discordance_report_summary.is_medically_significant %}
                         <tr style="border-top: 1px solid #bbb;">
                             <td><a href="{% absolute_url 'discordance_report' discordance_report_summary.id %}">DR {{ discordance_report_summary.id }}</a></td>
                             <td style="font-family:monospace">{{ discordance_report_summary.date_detected_str }}</td>
@@ -88,10 +89,17 @@ Hello Shariant User,
                                 {% endfor %}
                             </td>
                          </tr>
+                        {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        <div>{% if lab_summary.is_medically_insignificance_count == 1 %}There's {{ lab_summary.is_medically_insignificance_count }} more discordance that is not medically significant and can be accessed
+            <span style="color:#444"><a href="{% absolute_url 'discordance_reports' %}">here</a>.</span>
+        {% elif lab_summary.is_medically_insignificance_count > 1 %}There are {{ lab_summary.is_medically_insignificance_count }} more discordances that are not medically significant and can be accessed
+            <span style="color:#444"><a href="{% absolute_url 'discordance_reports' %}">here</a>.</span>
+        {% endif %}
+            </div> <br>
     {% endif %}
 {% endfor %}
 

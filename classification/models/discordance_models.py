@@ -378,6 +378,17 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
     def all_classification_modifications(self) -> List[ClassificationModification]:
         return [drc.classification_effective for drc in self.discordance_report_classifications]
 
+    @property
+    def is_medically_significant(self):
+        ds = self.clinical_context.discordance_status
+
+        if ds.is_discordant and not ds.pending_concordance:
+            for cm in self.all_classification_modifications:
+                if not cm.classification.withdrawn:
+                    if "P" in cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE):
+                        return True
+            return False
+
     def all_c_hgvs(self, genome_build: Optional[GenomeBuild] = None) -> List[CHGVS]:
         if not genome_build:
             genome_build = GenomeBuildManager.get_current_genome_build()
@@ -419,6 +430,14 @@ class DiscordanceReportRowData(ExportRow):
     @export_column(label="c.HGVS")
     def _chgvs(self):
         return str(self.c_hgvs)
+
+    @property
+    def is_medically_significant(self):
+        return self.discordance_report.is_medically_significant
+
+    @export_column(label="is_medically_significant")
+    def _is_medically_significant(self):
+        return self.is_medically_significant
 
     @export_column(label="Lab Significances")
     def _lab_significances(self):
@@ -569,6 +588,8 @@ class DiscordanceReportTableData:
             if summary.is_valid_including_withdraws:
                 if summary.is_requiring_attention:
                     summaries.append(summary)
+
+        summaries.sort(key=lambda s: (s.discordance_report.is_medically_significant, s.discordance_report.report_started_date), reverse=True)
         return summaries
 
     @cached_property
