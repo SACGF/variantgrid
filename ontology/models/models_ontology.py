@@ -45,7 +45,7 @@ class OntologyService(models.TextChoices):
     HGNC = "HGNC", "HGNC"
 
     DOID = "DOID", "DOID"
-    ORPHANET = "Orphanet", "Orphanet"
+    ORPHANET = "ORPHA", "ORPHA"
     MEDGEN = "MedGen", "MedGen"
 
     EXPECTED_LENGTHS: Dict[str, int] = Constant({
@@ -257,8 +257,8 @@ class OntologyIdNormalized:
             raise ValueError(f"Can not convert {dirty_id} to a proper id")
 
         prefix = parts[0].strip().upper()
-        if prefix == "ORPHANET":  # Orphanet is the one ontology (so far) where the standard is sentance case
-            prefix = "Orphanet"
+        if prefix == "ORPHA":  # Orphanet is the one ontology (so far) where the standard is sentance case
+            prefix = "ORPHA"
         elif prefix.upper() == "MIM":
             prefix = "OMIM"
         elif prefix.upper() == "MEDGEN":
