@@ -76,7 +76,7 @@ class DbRegexes:
     NIHMS = DbRefRegex(db="NIHMS", prefixes="NIHMS", link="https://www.ncbi.nlm.nih.gov/pubmed/?term=NIHMS${1}")
     # smallest OMIM starts with a 1, so there's no 0 padding there, expect min length
     OMIM = DbRefRegex(db="OMIM", prefixes=["OMIM", "MIM"], link=OntologyService.URLS[OntologyService.OMIM], min_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM])
-    ORPHA = DbRefRegex(db="Orphanet", prefixes=["ORPHANET", "ORPHA"], link=OntologyService.URLS[OntologyService.ORPHANET], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.ORPHANET])
+    ORPHA = DbRefRegex(db="ORPHA", prefixes=["ORPHANET", "ORPHA"], link=OntologyService.URLS[OntologyService.ORPHANET], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.ORPHANET])
     PUBMED_CENTRAL = DbRefRegex(db="PMCID", prefixes=["PMCID", "PubMedCentral", "PMC"], link="https://www.ncbi.nlm.nih.gov/pmc/articles/${1}", match_type=MatchType.OPT_ALPHA_MAN_NUMERIC)
     PUBMED = DbRefRegex(db="PMID", prefixes=["PubMed", "PMID"], link="https://www.ncbi.nlm.nih.gov/pubmed/${1}")
     SNP = DbRefRegex(db="SNP", prefixes="rs", link="https://www.ncbi.nlm.nih.gov/snp/${1}", match_type=MatchType.SIMPLE_NUMBERS)
