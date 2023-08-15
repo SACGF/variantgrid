@@ -32,7 +32,7 @@
                 <th style="min-width:200px">c.HGVS</th>
                 <th style="width:150px">Clinical Significance</th>
                 <th style="min-width:200px">Condition</th>
-                <th style="width:155px">Updated</th>
+                <th style="width:155px">Curated</th>
             </tr>
         </thead>
         <tbody>
@@ -42,7 +42,7 @@
                     <td>{% if record.c_hgvs %}{% c_hgvs record.c_hgvs %}{% elif record.variant_coordinate %}{{ record.variant_coordinate }}{% else %}<span class="no-value">-</span>{% endif %}</td>
                     <td class="cs-{{ record.clinical_significance|lower }} text-center">{{ record.clinical_significance | ekey:"clinical_significance" }}</td>
                     <td>{% if record.condition %}{% ontology_term record.condition %}{% else %}<span class="no-value">-</span>{% endif %}</td>
-                    <td>{% timestamp record.submitter_date time_ago=True %}</td>
+                    <td>{% timestamp record.date_last_evaluated time_ago=True %}</td>
                 </tr>
             {% endfor %}
         </tbody>
