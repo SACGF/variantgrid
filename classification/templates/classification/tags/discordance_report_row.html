@@ -23,6 +23,9 @@
                 <span class="text-success">Pending Concordance</span>
             {% else %}
                 <span class="no-value">Active Discordance</span>
+                {% if summary.is_medically_significant %}
+                    <div title="Medically Significant" class="fa-solid fa-kit-medical fa-lg hover-detail ml-1 px-4" style="color: #dd4040;"></div>
+                {% endif %}
             {% endif %}
         </div>
         {% classification_lab_summaries summary.lab_significances %}
