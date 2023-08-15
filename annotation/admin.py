@@ -46,8 +46,6 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
     inlines = (ClinVarRecordAdmin, )
     list_per_page = 20
 
-    # list_display = ("pk", "clinvar", "allele", "min_stars_loaded", "last_loaded")
-
     list_display = ("pk", "clinvar_variation_id", "last_loaded")
 
     """
