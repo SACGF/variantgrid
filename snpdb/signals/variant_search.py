@@ -444,7 +444,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
             # reporting on the "provided" reference is slightly promblematic as it's not always provided directly, it could be indirectly
 
             if isinstance(matches_reference, HgvsMatchRefAllele) and matches_reference.provided_ref:
-                reference_message.append(SearchMessage(f'Using reference "{ref_base}" from our build, in place of provided reference "{matches_reference.provided_ref}"', LogLevel.ERROR, substituted=True))
+                reference_message.append(SearchMessage(f'Using genomic reference "{matches_reference.calculated_ref}" from our build, in place of provided reference "{matches_reference.provided_ref}"', LogLevel.ERROR, substituted=True))
             else:
                 # if no reference was provided, do we even need to provide a message?
                 # e.g. this is providing a ref for when we have a delins, e.g. delinsGT => delCCinsGT

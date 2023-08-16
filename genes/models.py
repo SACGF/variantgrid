@@ -753,19 +753,24 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         raise ValueError(f'Invalid transcript identifier {identifier}')
 
     @staticmethod
-    def get(accession: str, genome_build: GenomeBuild, annotation_consortium):
+    def get(accession: str, genome_build: GenomeBuild, annotation_consortium=None):
         """
         @param accession transcript_id w/optional version
         """
-        parts = TranscriptVersion.transcript_parts(accession)
-        t_qs = TranscriptVersion.objects.filter(transcript_id=parts[0],
-                                                transcript__annotation_consortium=annotation_consortium,
-                                                genome_build=genome_build)
-        if parts[1]:
-            t_qs = t_qs.filter(version=parts[1])
-        transcript_version = t_qs.order_by("version").last()
-        if not transcript_version:
-            t_qs.get()  # Throw does not exist
+        transcript_id, version = TranscriptVersion.transcript_parts(accession)
+        kwargs = {}
+        if annotation_consortium is not None:
+            kwargs["transcript__annotation_consortium"] = annotation_consortium
+        if version:
+            kwargs["version"] = version
+        t_qs = TranscriptVersion.objects.filter(transcript_id=transcript_id,
+                                                genome_build=genome_build, **kwargs)
+        if version:
+            transcript_version = t_qs.get()  # Should only be 1
+        else:
+            transcript_version = t_qs.order_by("version").last()
+            if not transcript_version:
+                t_qs.get()  # Throw does not exist
         return transcript_version
 
     @staticmethod
@@ -1065,10 +1070,13 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         return exons[-1][1]
 
     @property
+    def strand(self) -> str:
+        return self.genome_build_data["strand"]
+
+    @property
     def coordinates(self):
         """ 1-based for humans """
-        strand = self.genome_build_data["strand"]
-        return f"{self.chrom}:{self.start + 1}-{self.end} ({strand})"
+        return f"{self.chrom}:{self.start + 1}-{self.end} ({self.strand})"
 
     @cached_property
     def tags(self) -> List[str]:
