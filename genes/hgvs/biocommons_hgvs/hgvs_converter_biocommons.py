@@ -4,6 +4,7 @@ import re
 from importlib import metadata
 from typing import Tuple
 
+from bioutils.sequences import reverse_complement
 from django.conf import settings
 from hgvs.assemblymapper import AssemblyMapper
 from hgvs.enums import ValidationLevel
@@ -16,6 +17,7 @@ from hgvs.validator import ExtrinsicValidator
 from genes.hgvs import HGVSVariant, HGVSException
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele
+from genes.models import TranscriptVersion
 from genes.transcripts_utils import looks_like_transcript
 from snpdb.models import GenomeBuild, VariantCoordinate, Contig
 
@@ -92,7 +94,8 @@ class BioCommonsHGVSConverter(HGVSConverter):
         self.babelfish = Babelfish(self.hdp, assembly_name)
         self.am = AssemblyMapper(self.hdp,
                                  assembly_name=genome_build.name,
-                                 alt_aln_method='splign')
+                                 alt_aln_method='splign',
+                                 replace_reference=True)
         self.ev = ExtrinsicValidator(self.hdp)
 
 
@@ -124,14 +127,13 @@ class BioCommonsHGVSConverter(HGVSConverter):
         return BioCommonsHGVSVariant(var_c)
 
     def hgvs_to_variant_coords_and_reference_match(self, hgvs_string: str, transcript_version=None) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
-        var_g = self._hgvs_to_g_hgvs(hgvs_string)
+        var_g, matches_reference = self._hgvs_to_g_hgvs(hgvs_string)
         try:
             (chrom, position, ref, alt, typ) = self.babelfish.hgvs_to_vcf(var_g)
             if alt == '.':
                 alt = ref
         except HGVSDataNotAvailableError:
             raise Contig.ContigNotInBuildError()
-        matches_reference = self.get_hgvs_match_ref_allele(hgvs_string, var_g, ref, alt)
         return VariantCoordinate(chrom, position, ref, alt), matches_reference
 
     def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
@@ -159,32 +161,6 @@ class BioCommonsHGVSConverter(HGVSConverter):
             alt = alt[i:]
         return ref, alt
 
-    def get_hgvs_match_ref_allele(self, hgvs_string, var_g: SequenceVariant, vcf_ref: str, vcf_alt: str) -> HgvsMatchRefAllele:
-        """Return True if provided reference allele matches genomic sequence."""
-
-        parser = ParserSingleton.parser()
-        var_hgvs = parser.parse_hgvs_variant(hgvs_string)
-
-        if provided_ref := var_hgvs.posedit.edit.ref:  # Will be '' if not given
-            provided_ref = var_g.posedit.edit.ref
-
-        ev = ExtrinsicValidator(self.hdp)
-        validation_level, msg = ev._ref_is_valid(var_g)
-        if validation_level == ValidationLevel.VALID:
-            ref, _ = self._strip_common_prefix(vcf_ref, vcf_alt)
-            if provided_ref:
-                if provided_ref != ref:
-                    logging.debug(f"************* {provided_ref=} != {ref=}")
-                provided_ref = ref
-            calculated_ref = ref
-        else:
-            if m := self.pattern.match(msg):
-                _, calculated_ref = m.groups()
-            else:
-                raise ValueError(f"Couldn't obtain ref/genome_ref from '{msg}'")
-
-        return HgvsMatchRefAllele(provided_ref=provided_ref, calculated_ref=calculated_ref)
-
     def description(self) -> str:
         return f"BioCommons hgvs v{metadata.version('hgvs')}"
 
@@ -194,7 +170,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
         var_m.type = 'g'
         return var_m
 
-    def _hgvs_to_g_hgvs(self, hgvs_string: str):
+    def _hgvs_to_g_hgvs(self, hgvs_string: str) -> Tuple[SequenceVariant, HgvsMatchRefAllele]:
         CONVERT_TO_G = {
             'c': self.am.c_to_g,
             'n': self.am.n_to_g,
@@ -203,24 +179,48 @@ class BioCommonsHGVSConverter(HGVSConverter):
 
         parser = ParserSingleton.parser()
         var_x = parser.parse_hgvs_variant(hgvs_string)
-        var_cleaned = parser.parse_hgvs_variant(var_x.format())
+        matches_reference = None
+
         try:
             self.ev.validate(var_x, strict=True)  # Validate in transcript range
         except HGVSInvalidVariantError as hgvs_e:
             ACCEPTABLE_VALIDATION_MESSAGES = [
                 'Cannot validate sequence of an intronic variant',
-                'does not agree with reference sequence'
             ]
             ok = False
             exception_str = str(hgvs_e)
-            for msg in ACCEPTABLE_VALIDATION_MESSAGES:
-                if msg in exception_str:
-                    ok = True
-                    break
+            # Switch reference base
+            # Conversion also does validation, so we have to switch out reference base in original HGVS
+            if m := self.pattern.match(exception_str):
+                ok = True
+                provided_ref, calculated_ref = m.groups()
+                var_x.posedit.edit.ref = calculated_ref  # Switch reference
+                # HgvsMatchRefAllele wants genomic refs, may need to convert
+                provided_g_ref = provided_ref
+                calculated_g_ref = calculated_ref
+                if var_x.type in ['c', 'n']:
+                    transcript_accession = self.get_transcript_accession(hgvs_string)
+                    tv = TranscriptVersion.get_transcript_version(self.genome_build, transcript_accession)
+                    if tv.strand == '-':
+                        provided_g_ref = reverse_complement(provided_ref)
+                        calculated_g_ref = reverse_complement(calculated_ref)
+                matches_reference = HgvsMatchRefAllele(provided_ref=provided_g_ref, calculated_ref=calculated_g_ref)
+            else:
+                for msg in ACCEPTABLE_VALIDATION_MESSAGES:
+                    if msg in exception_str:
+                        ok = True
+                        break
             if not ok:
                 raise
 
         if converter := CONVERT_TO_G.get(var_x.type):
-            var_x = converter(var_cleaned)
-        return var_x
+            var_g = converter(var_x)
+        else:
+            var_g = var_x
+
+        # If not set, must have passed ref validation - so grab genomic ref from g.HGVS
+        if matches_reference is None:
+            ref = var_g.posedit.edit.ref
+            matches_reference = HgvsMatchRefAllele(provided_ref='', calculated_ref=ref)
+        return var_g, matches_reference
 
