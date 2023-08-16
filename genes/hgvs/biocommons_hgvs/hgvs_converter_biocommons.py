@@ -8,12 +8,12 @@ from django.conf import settings
 from hgvs.assemblymapper import AssemblyMapper
 from hgvs.enums import ValidationLevel
 from hgvs.exceptions import HGVSDataNotAvailableError, HGVSError, HGVSInvalidVariantError
+from hgvs.extras.babelfish import Babelfish
 from hgvs.parser import Parser
 from hgvs.sequencevariant import SequenceVariant
 from hgvs.validator import ExtrinsicValidator
 
 from genes.hgvs import HGVSVariant, HGVSException
-from genes.hgvs.biocommons_hgvs.babelfish import Babelfish
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele
 from genes.transcripts_utils import looks_like_transcript

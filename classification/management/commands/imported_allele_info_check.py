@@ -137,6 +137,10 @@ class ChgvsDiff(ExportRow):
     def _imported_c_hgvs(self):
         return self.imported_allele_info.imported_c_hgvs
 
+    @export_column()
+    def _imported_genome_build(self):
+        return self.imported_allele_info.imported_genome_build
+
     @export_column("provided", sub_data=HgvsSummary)
     def _provided(self):
         return self.provided
@@ -178,9 +182,10 @@ class Command(BaseCommand):
         filename = "classification_match_diff.csv"
         with open(filename, "w") as out:
             out.write(delimited_row(ChgvsDiff.csv_header()))
-
-            for iai in ImportedAlleleInfo.objects.filter(imported_c_hgvs__isnull=False).iterator(chunk_size=100):
-
+            iai_qs = ImportedAlleleInfo.objects.filter(imported_c_hgvs__isnull=False)
+            # Skip these as they won't match with HGVSMatcher
+            # iai_qs = iai_qs.exclude(message="HGVS matched by 'ClinGen Allele Registry'")
+            for iai in iai_qs.iterator(chunk_size=100):
                 genome_build = iai.imported_genome_build
                 matcher = hgvs_matchers_by_build[genome_build]
                 imported_c_hgvs = iai.imported_c_hgvs
