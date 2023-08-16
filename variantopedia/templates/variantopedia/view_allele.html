@@ -192,7 +192,9 @@
                 <tr>
                     <th class="text-right">g.HGVS</th>
                     {% for vc in allele_card.variant_cards %}<td>
-                        <a class="hover-link" href="{% url 'view_variant' vc.variant.pk %}">{% c_hgvs vc.g_hgvs %}</a>
+                        {% if vc.variant %}
+                            <a class="hover-link" href="{% url 'view_variant' vc.variant.pk %}">{% c_hgvs vc.g_hgvs %}</a>
+                        {% endif %}
                     </td>
                     {% endfor %}
                 </tr>
