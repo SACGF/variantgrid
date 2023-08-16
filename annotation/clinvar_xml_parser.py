@@ -9,9 +9,10 @@ import json
 from Bio import Entrez
 from django.db import transaction
 
-from annotation.models import ClinVarRecord, ClinVarRecordCollection
+from annotation.models import ClinVarRecord, ClinVarRecordCollection, ClinVar
 from library.log_utils import report_message
 from library.utils.xml_utils import XmlParser, parser_path, PP
+from snpdb.models import VariantAllele
 
 """
 This file is responsible for retrieving data from the ClinVar API end points to get more granular data about a given
@@ -65,7 +66,6 @@ class ClinVarFetchRequest:
             clinvar_record_collection, created = ClinVarRecordCollection.objects.get_or_create(clinvar_variation_id=self.clinvar_variation_id)
             # the select_for_update() stops two simultaneous requests for updating the same clinvar_record_collection
             clinvar_record_collection = ClinVarRecordCollection.objects.select_for_update().get(pk=clinvar_record_collection.pk)
-            wipe_old_records = False
             fetch_from_clinvar = True
             if not created:
                 if \
@@ -74,8 +74,16 @@ class ClinVarFetchRequest:
                         ((fetch_date - clinvar_record_collection.last_loaded) <= self.max_cache_age):
                     # if all the above is true, then our cache is fine
                     fetch_from_clinvar = False
-                else:
-                    wipe_old_records = True
+
+            allele_id = clinvar_record_collection.allele_id
+            if not allele_id:
+                if variant_id := ClinVar.objects.filter(clinvar_variation_id=self.clinvar_variation_id).order_by('-version').values_list('variant', flat=True).first():
+                    if va := VariantAllele.objects.filter(variant_id=variant_id).first():
+                        allele_id = va.allele_id
+                clinvar_record_collection.allele_id = allele_id
+
+            if not allele_id:
+                raise ValueError(f"Couldn't determine Allele for clinvar_variation_id {self.clinvar_variation_id}")
 
             if fetch_from_clinvar:
                 # so while Entrez does automatically retry on 500s, ClinVar has been providing 400s (Bad Request) when
@@ -84,20 +92,14 @@ class ClinVarFetchRequest:
                 while True:
                     # loop is broken out of if it works, or raise if it fails after attempt_count
                     try:
-                        response = ClinVarXmlParser.load_from_clinvar_id(clinvar_record_collection)
+                        response = ClinVarXmlParser.load_from_clinvar_id(clinvar_variation_id=self.clinvar_variation_id)
 
                         # update our cache
                         clinvar_record_collection.last_loaded = fetch_date
                         clinvar_record_collection.rcvs = response.rcvs
                         clinvar_record_collection.parser_version = ClinVarXmlParser.PARSER_VERSION
-                        clinvar_record_collection.save()
 
-                        if wipe_old_records:
-                            # We *could* try to update based on SCV, and delete missing records / insert other records
-                            # but a wipe and replace is easier
-                            ClinVarRecord.objects.filter(clinvar_record_collection=clinvar_record_collection).delete()
-
-                        ClinVarRecord.objects.bulk_create(response.all_records)
+                        clinvar_record_collection.update_with_records_and_save(response.all_records)
                         break
 
                     except HTTPError as http_ex:
@@ -137,7 +139,7 @@ class ClinVarXmlParser(XmlParser):
     RE_DATE_EXTRACTOR = re.compile("([0-9]+-[0-9]+-[0-9]+).*")
     RE_GOOD_CHGVS = re.compile("^(N._[0-9]+[.][0-9]+:c[.][0-9_a-zA-Z>]+)( .*)?$")
     RE_ORPHA = re.compile("ORPHA([0-9]+)")
-    PARSER_VERSION = 1  # if we start caching these in the database, this is useful to know
+    PARSER_VERSION = 2  # if we start caching these in the database, this is useful to know
 
     @staticmethod
     def parse_xml_date(text: str) -> Optional[datetime]:
@@ -147,13 +149,13 @@ class ClinVarXmlParser(XmlParser):
         return None
 
     @staticmethod
-    def load_from_clinvar_id(clinvar_record_collection: ClinVarRecordCollection) -> ClinVarXmlParserOutput:
+    def load_from_clinvar_id(clinvar_variation_id: int) -> ClinVarXmlParserOutput:
         """
         :param clinvar_record_collection: The ClinVarRecordCollection the records should link to, also provides
         the clinvar_variation_id for us to query on.
         """
 
-        cv_handle = Entrez.esummary(db="clinvar", retmode="json", id=clinvar_record_collection.clinvar_variation_id)
+        cv_handle = Entrez.esummary(db="clinvar", retmode="json", id=clinvar_variation_id)
         json_data = json.loads(cv_handle.read())
         cv_handle.close()
 
@@ -170,7 +172,7 @@ class ClinVarXmlParser(XmlParser):
 
         if all_rcvs:
             handle = Entrez.efetch(db="clinvar", rettype="clinvarset", id=all_rcvs)
-            parsed_results = ClinVarXmlParser.load_from_input(handle, clinvar_record_collection=clinvar_record_collection)
+            parsed_results = ClinVarXmlParser.load_from_input(handle)
             handle.close()
 
         return ClinVarXmlParserOutput(
@@ -179,22 +181,21 @@ class ClinVarXmlParser(XmlParser):
         )
 
     @staticmethod
-    def load_from_input(handle, clinvar_record_collection: ClinVarRecordCollection) -> List[ClinVarRecord]:
+    def load_from_input(handle) -> List[ClinVarRecord]:
         parsed_results = []
-        for result in ClinVarXmlParser(clinvar_record_collection=clinvar_record_collection).parse(handle):
+        for result in ClinVarXmlParser().parse(handle):
             parsed_results.append(result)
         parsed_results.sort(reverse=True)
         return parsed_results
 
-    def __init__(self, clinvar_record_collection: ClinVarRecordCollection):
-        self.clinvar_record_collection = clinvar_record_collection
+    def __init__(self):
         self.latest: Optional[ClinVarRecord] = None
         super().__init__()
 
     def reset(self):
         if self.latest:
             self.set_yieldable(self.latest)
-        self.latest = ClinVarRecord(clinvar_record_collection=self.clinvar_record_collection)
+        self.latest = ClinVarRecord()
 
     def finish(self):
         self.reset()
