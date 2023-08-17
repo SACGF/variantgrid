@@ -723,7 +723,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
 
     @property
     def is_coding(self) -> bool:
-        return bool(self.data.get("start_codon"))
+        return "start_codon" in self.data
 
     @cached_property
     def fivep_utr(self):
