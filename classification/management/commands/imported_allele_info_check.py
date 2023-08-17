@@ -1,7 +1,7 @@
 from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Optional, Any
 from django.core.management import BaseCommand
 from django.db.models import Max
 
@@ -13,38 +13,7 @@ from library.utils import ExportRow, export_column, delimited_row
 from snpdb.models import Variant, GenomeBuild, VariantCoordinate
 
 
-class VariantChange(int, Enum):
-    same = 0
-    gained = 1
-    lost = 2
-    changed = 3
-
-    @staticmethod
-    def change_for(resolved: Optional[VariantCoordinate], updated: Optional[VariantCoordinate]):
-        if resolved == updated:
-            return VariantChange.same
-        elif (not resolved) and updated:
-            return VariantChange.gained
-        elif resolved and (not updated):
-            return VariantChange.lost
-        else:
-            return VariantChange.changed
-
-    def __str__(self):
-        if self == VariantChange.same:
-            return "same"
-        elif self == VariantChange.gained:
-            return "match gained"
-        elif self == VariantChange.lost:
-            return "match lost"
-        elif self == VariantChange.changed:
-            return "changed"
-
-    def __repr__(self):
-        return str(self)
-
-
-class TranscriptChange(int, Enum):
+class Change(int, Enum):
     same = 0
     gained = 1
     lost = 2
@@ -53,42 +22,55 @@ class TranscriptChange(int, Enum):
     changed_to_exact = 5
 
     @staticmethod
-    def change_for(provided: Optional[TranscriptParts], resolved: Optional[TranscriptParts], updated: Optional[TranscriptParts]):
+    def compare_3(provided: Any, resolved: Any, updated: Any) -> 'Change':
         if resolved == updated:
-            return TranscriptChange.same
+            return Change.same
         elif (not resolved) and updated:
-            return TranscriptChange.gained
+            return Change.gained
         elif resolved and (not updated):
-            return TranscriptChange.lost
+            return Change.lost
         else:
             if provided:
                 if provided == resolved:
-                    return TranscriptChange.changed_from_exact
+                    return Change.changed_from_exact
                 if provided == updated:
-                    return TranscriptChange.changed_to_exact
-            return TranscriptChange.changed
+                    return Change.changed_to_exact
+            return Change.changed
+
+    @staticmethod
+    def compare_2(resolved: Any, updated: Any) -> 'Change':
+        if resolved == updated:
+            return Change.same
+        elif (not resolved) and updated:
+            return Change.gained
+        elif resolved and (not updated):
+            return Change.lost
+        else:
+            return Change.changed
 
     def __str__(self):
-        if self == TranscriptChange.same:
+        if self == Change.same:
             return "same"
-        elif self == TranscriptChange.gained:
-            return "match gained"
-        elif self == TranscriptChange.lost:
-            return "match lost"
-        elif self == TranscriptChange.changed:
+        elif self == Change.gained:
+            return "gained value"
+        elif self == Change.lost:
+            return "lost value"
+        elif self == Change.changed:
             return "changed"
-        elif self == TranscriptChange.changed_from_exact:
-            return "changed - lost exact"
-        elif self == TranscriptChange.changed_to_exact:
-            return "changed - to exact"
+        elif self == Change.changed_from_exact:
+            return "changed - lost exact match"
+        elif self == Change.changed_to_exact:
+            return "changed - gained exact match"
 
     def __repr__(self):
         return str(self)
+
 
 @dataclass
 class HgvsSummary(ExportRow):
     transcript: Optional[TranscriptParts] = None
     variant_coordinate: Optional[VariantCoordinate] = None
+    c_hgvs: Optional[str] = None
     error_str: Optional[str] = None
 
     @export_column("variant_coordinate")
@@ -99,6 +81,10 @@ class HgvsSummary(ExportRow):
     @export_column("transcript")
     def _transcript_export(self):
         return self.transcript
+
+    @export_column("c_hgvs")
+    def _c_hgvs_export(self):
+        return self.c_hgvs
 
     @export_column("error")
     def _error_str(self):
@@ -115,23 +101,30 @@ class ChgvsDiff(ExportRow):
 
     @property
     def has_difference(self):
-        if self.resolved.variant_coordinate != self.updated.variant_coordinate:
-            return True
-        if self.resolved.transcript != self.resolved.transcript:
-            return True
-        return False
+        return self.variant_coordinate_change() or self.transcript_change() or self.c_hgvs_change()
 
     @export_column("$site_name URL")
     def _allele_id(self):
         return get_url_from_view_path(self.imported_allele_info.get_absolute_url())
 
+    @export_column("labs")
+    def _labs(self):
+        parts = []
+        for classification in self.imported_allele_info.classification_set.select_related('lab', 'lab__organization'):
+            parts.append(str(classification.lab))
+        return ", ".join(parts)
+
     @export_column()
-    def variant_change(self):
-        return VariantChange.change_for(self.resolved.variant_coordinate, self.updated.variant_coordinate)
+    def variant_coordinate_change(self):
+        return Change.compare_2(self.resolved.variant_coordinate, self.updated.variant_coordinate)
 
     @export_column()
     def transcript_change(self):
-        return TranscriptChange.change_for(self.provided.transcript, self.resolved.transcript, self.updated.transcript)
+        return Change.compare_3(self.provided.transcript, self.resolved.transcript, self.updated.transcript)
+
+    @export_column()
+    def c_hgvs_change(self):
+        return Change.compare_3(self.provided.c_hgvs, self.resolved.c_hgvs, self.updated.c_hgvs)
 
     @export_column()
     def _imported_c_hgvs(self):
@@ -173,6 +166,8 @@ class Command(BaseCommand):
 
         variant_diff_count = Counter()
         transcript_diff_count = Counter()
+        c_hgvs_diff_count = Counter()
+
         iai: ImportedAlleleInfo
         hgvs_matchers_by_build = {}
         for genome_build in GenomeBuild.builds_with_annotation():
@@ -202,15 +197,15 @@ class Command(BaseCommand):
 
                 # PROVIDED
                 try:
-                    provided.full_c_hgvs = imported_c_hgvs
+                    provided.c_hgvs = imported_c_hgvs
                     provided.transcript = matcher.get_transcript_parts(imported_c_hgvs)
                 except Exception as ex:
-                    provided.error_str = str(ex)
+                    provided.error_str = ex.__class__.__name__ + ": " + str(ex)
 
                 # RESOLVED
                 try:
                     if variant_info := iai[iai.imported_genome_build]:
-                        resolved.full_c_hgvs = variant_info.c_hgvs
+                        resolved.c_hgvs = variant_info.c_hgvs
                         if variant := variant_info.variant:
                             resolved.variant_coordinate = variant.coordinate
                             if transcript_version := variant_info.transcript_version:
@@ -218,26 +213,33 @@ class Command(BaseCommand):
                         if error := variant_info.error:
                             resolved.error_str = error
                 except Exception as ex:
-                    resolved.error_str = str(ex)
+                    resolved.error_str = ex.__class__.__name__ + ": " + str(ex)
 
                 # UPDATED
                 try:
                     vcd = matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(imported_c_hgvs)
                     updated.variant_coordinate = vcd.variant_coordinate
                     updated.transcript = TranscriptVersion.get_transcript_id_and_version(vcd.transcript_accession)
+
+                    if updated.variant_coordinate and updated.transcript:
+                        updated.c_hgvs = matcher.variant_coordinate_to_c_hgvs_variant(updated.variant_coordinate, str(updated.transcript))
+
                 except Exception as ex:
-                    updated.error_str = str(ex)
+                    updated.error_str = ex.__class__.__name__ + ": " + str(ex)
 
                 if diff.has_difference:
                     out.write(delimited_row(diff.to_csv()))
 
-                variant_diff_count[diff.variant_change()] += 1
+                variant_diff_count[diff.variant_coordinate_change()] += 1
                 transcript_diff_count[diff.transcript_change()] += 1
+                c_hgvs_diff_count[diff.c_hgvs_change()] += 1
 
         print("==== Variant matching ====")
         print(dict(variant_diff_count))
         print("==== Transcripts: ==== ")
         print(dict(transcript_diff_count))
+        print("==== c.HGVS: ==== ")
+        print(dict(c_hgvs_diff_count))
 
         end_last_modified = self._get_last_modified()
         if start_last_modified != end_last_modified:
