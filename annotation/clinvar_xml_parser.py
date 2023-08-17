@@ -1,4 +1,5 @@
 import io
+import logging
 from dataclasses import dataclass, field
 from datetime import timedelta, datetime
 from urllib.error import HTTPError
@@ -83,8 +84,8 @@ class ClinVarFetchRequest:
                         allele_id = va.allele_id
                 clinvar_record_collection.allele_id = allele_id
 
-            # if not allele_id:
-            #     raise ValueError(f"Couldn't determine Allele for clinvar_variation_id {self.clinvar_variation_id}")
+            if not allele_id:
+                raise ValueError(f"Couldn't determine Allele for clinvar_variation_id {self.clinvar_variation_id}")
 
             if fetch_from_clinvar:
                 # so while Entrez does automatically retry on 500s, ClinVar has been providing 400s (Bad Request) when
@@ -107,7 +108,7 @@ class ClinVarFetchRequest:
                         if http_ex.code == 400:
                             attempt_count -= 1
                             if attempt_count > 0:
-                                report_message(f"400 from Entrez when fetching ClinVarRecord, waiting then trying again", level='warning')
+                                logging.warning(f"400 from Entrez when fetching ClinVarRecord, waiting then trying again")
                                 time.sleep(10)
                                 continue
                         # out of attempts or not 400
