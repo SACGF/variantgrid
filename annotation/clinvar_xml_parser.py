@@ -83,8 +83,8 @@ class ClinVarFetchRequest:
                         allele_id = va.allele_id
                 clinvar_record_collection.allele_id = allele_id
 
-            if not allele_id:
-                raise ValueError(f"Couldn't determine Allele for clinvar_variation_id {self.clinvar_variation_id}")
+            # if not allele_id:
+            #     raise ValueError(f"Couldn't determine Allele for clinvar_variation_id {self.clinvar_variation_id}")
 
             if fetch_from_clinvar:
                 # so while Entrez does automatically retry on 500s, ClinVar has been providing 400s (Bad Request) when
@@ -140,7 +140,7 @@ class ClinVarXmlParser(XmlParser):
     RE_DATE_EXTRACTOR = re.compile("([0-9]+-[0-9]+-[0-9]+).*")
     RE_GOOD_CHGVS = re.compile("^(N._[0-9]+[.][0-9]+:c[.][0-9_a-zA-Z>]+)( .*)?$")
     RE_ORPHA = re.compile("ORPHA([0-9]+)")
-    PARSER_VERSION = 2  # if we start caching these in the database, this is useful to know
+    PARSER_VERSION = 3  # change this whenever the parsing changes, so we know to ignore the old cache
 
     @staticmethod
     def parse_xml_date(text: str) -> Optional[datetime]:
@@ -209,6 +209,8 @@ class ClinVarXmlParser(XmlParser):
     def record_id(self, elem):
         self.latest.record_id = elem.get("Acc")
         self.latest.org_id = elem.get("OrgID")
+        self.latest.date_clinvar_created = ClinVarXmlParser.parse_xml_date(elem.get("DateCreated"))
+        self.latest.date_clinvar_updated = ClinVarXmlParser.parse_xml_date(elem.get("DateUpdated"))
 
     @parser_path(
         "ClinVarResult-Set",

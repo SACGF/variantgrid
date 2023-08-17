@@ -235,9 +235,12 @@ class ClinVarRecord(TimeStampedModel):
     genome_build = models.TextField(null=True, blank=True)
     review_status = models.TextField()
     submitter = models.TextField()
-    submitter_date = models.DateField()
 
+    submitter_date = models.DateField(null=True, blank=True)
     date_last_evaluated = models.DateField(null=True, blank=True)
+    date_clinvar_created = models.DateField(null=True, blank=True)
+    date_clinvar_updated = models.DateField(null=True, blank=True)
+
     c_hgvs = models.TextField(null=True, blank=True)
     variant_coordinate = models.TextField(null=True, blank=True)
     condition = models.TextField(null=True, blank=True)
