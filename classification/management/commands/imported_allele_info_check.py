@@ -116,6 +116,10 @@ class ChgvsDiff(ExportRow):
     def _imported_genome_build(self):
         return self.imported_allele_info.imported_genome_build
 
+    @export_column("c.HGVS/VariantCoordinate/Transcript Change")
+    def _all_changes(self):
+        return str(self.c_hgvs_change()) + "/" + str(self.variant_coordinate_change()) + "/" + str(self.transcript_change())
+
     @export_column("Previous Error")
     def _error_previous(self):
         return self.resolved.error_str
