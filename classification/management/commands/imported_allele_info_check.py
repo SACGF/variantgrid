@@ -1,7 +1,7 @@
 from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Any
+from typing import Optional, Any, List
 from django.core.management import BaseCommand
 from django.db.models import Max
 
@@ -71,24 +71,15 @@ class HgvsSummary(ExportRow):
     transcript: Optional[TranscriptParts] = None
     variant_coordinate: Optional[VariantCoordinate] = None
     c_hgvs: Optional[str] = None
+    errors: List[str] = None
     error_str: Optional[str] = None
 
-    @export_column("variant_coordinate")
-    def _variant_coordinate(self):
+    @property
+    def variant_coordinate_str(self):
         if self.variant_coordinate:
             return Variant.format_tuple(*self.variant_coordinate)
-
-    @export_column("transcript")
-    def _transcript_export(self):
-        return self.transcript
-
-    @export_column("c_hgvs")
-    def _c_hgvs_export(self):
-        return self.c_hgvs
-
-    @export_column("error")
-    def _error_str(self):
-        return self.error_str
+        else:
+            return ""
 
 
 @dataclass
@@ -107,44 +98,68 @@ class ChgvsDiff(ExportRow):
     def _allele_id(self):
         return get_url_from_view_path(self.imported_allele_info.get_absolute_url())
 
-    @export_column("labs")
+    @export_column("Labs")
     def _labs(self):
         parts = []
         for classification in self.imported_allele_info.classification_set.select_related('lab', 'lab__organization'):
             parts.append(str(classification.lab))
         return ", ".join(parts)
 
-    @export_column()
-    def variant_coordinate_change(self):
-        return Change.compare_2(self.resolved.variant_coordinate, self.updated.variant_coordinate)
-
-    @export_column()
-    def transcript_change(self):
-        return Change.compare_3(self.provided.transcript, self.resolved.transcript, self.updated.transcript)
-
-    @export_column()
-    def c_hgvs_change(self):
-        return Change.compare_3(self.provided.c_hgvs, self.resolved.c_hgvs, self.updated.c_hgvs)
-
-    @export_column()
-    def _imported_c_hgvs(self):
-        return self.imported_allele_info.imported_c_hgvs
-
-    @export_column()
+    @export_column("Imported Genome Build")
     def _imported_genome_build(self):
         return self.imported_allele_info.imported_genome_build
 
-    @export_column("provided", sub_data=HgvsSummary)
-    def _provided(self):
-        return self.provided
+    @export_column("Previous Error")
+    def _error_previous(self):
+        return self.resolved.error_str
 
-    @export_column("resolved", sub_data=HgvsSummary)
-    def _resolved(self):
-        return self.resolved
+    @export_column("New Error")
+    def _error_new(self):
+        return self.updated.error_str
 
-    @export_column("updated", sub_data=HgvsSummary)
-    def _updated(self):
-        return self.updated
+    @export_column("c.HGVS Change")
+    def c_hgvs_change(self):
+        return Change.compare_3(self.provided.c_hgvs, self.resolved.c_hgvs, self.updated.c_hgvs)
+
+    @export_column("c.HGVS Imported")
+    def _c_hgvs_imported(self):
+        return self.provided.c_hgvs
+
+    @export_column("c.HGVS Previous")
+    def _c_hgvs_previous(self):
+        return self.resolved.c_hgvs
+
+    @export_column("c.HGVS New")
+    def _c_hgvs_new(self):
+        return self.updated.c_hgvs
+
+    @export_column("Variant Coordinate Change")
+    def variant_coordinate_change(self):
+        return Change.compare_2(self.resolved.variant_coordinate, self.updated.variant_coordinate)
+
+    @export_column("Variant Coordinate Old")
+    def _variant_coordinate_old(self):
+        return self.resolved.variant_coordinate_str
+
+    @export_column("Variant Coordinate New")
+    def _variant_coordinate_new(self):
+        return self.updated.variant_coordinate_str
+
+    @export_column("Transcript Change")
+    def transcript_change(self):
+        return Change.compare_3(self.provided.transcript, self.resolved.transcript, self.updated.transcript)
+
+    @export_column("Transcript Imported")
+    def _transcript_imported(self):
+        return self.provided.transcript
+
+    @export_column("Transcript Previous")
+    def _transcript_old(self):
+        return self.resolved.transcript
+
+    @export_column("Transcript New")
+    def _transcript_updated(self):
+        return self.updated.transcript
 
 
 class Command(BaseCommand):
@@ -216,16 +231,20 @@ class Command(BaseCommand):
                     resolved.error_str = ex.__class__.__name__ + ": " + str(ex)
 
                 # UPDATED
+                stage = "Getting Coordinates"
                 try:
                     vcd = matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(imported_c_hgvs)
                     updated.variant_coordinate = vcd.variant_coordinate
+
+                    stage = "Getting Transcript"
                     updated.transcript = TranscriptVersion.get_transcript_id_and_version(vcd.transcript_accession)
 
                     if updated.variant_coordinate and updated.transcript:
+                        stage = "Resolving c.HGVS"
                         updated.c_hgvs = matcher.variant_coordinate_to_c_hgvs_variant(updated.variant_coordinate, str(updated.transcript))
 
                 except Exception as ex:
-                    updated.error_str = ex.__class__.__name__ + ": " + str(ex)
+                    updated.error_str = stage + ": " + ex.__class__.__name__ + ": " + str(ex)
 
                 if diff.has_difference:
                     out.write(delimited_row(diff.to_csv()))
