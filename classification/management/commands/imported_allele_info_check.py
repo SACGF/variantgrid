@@ -77,7 +77,7 @@ class HgvsSummary(ExportRow):
     @property
     def variant_coordinate_str(self):
         if self.variant_coordinate:
-            return Variant.format_tuple(*self.variant_coordinate)
+            return Variant.format_tuple(*self.variant_coordinate, abbreviate=True)
         else:
             return ""
 
@@ -241,7 +241,8 @@ class Command(BaseCommand):
 
                     if updated.variant_coordinate and updated.transcript:
                         stage = "Resolving c.HGVS"
-                        updated.c_hgvs = matcher.variant_coordinate_to_c_hgvs_variant(updated.variant_coordinate, str(updated.transcript))
+                        if hgvs_variant := matcher.variant_coordinate_to_c_hgvs_variant(updated.variant_coordinate, str(updated.transcript)):
+                            updated.c_hgvs = str(hgvs_variant)
 
                 except Exception as ex:
                     updated.error_str = stage + ": " + ex.__class__.__name__ + ": " + str(ex)
