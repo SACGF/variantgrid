@@ -32,7 +32,7 @@ class ClinVarAdmin(ModelAdminBasics):
 class ClinVarRecordAdmin(TabularInline):
     model = ClinVarRecord
 
-    fields = ("record_id", "submitter", "stars", "date_last_evaluated", "clinical_significance")
+    fields = ("record_id", "submitter", "condition", "stars", "date_last_evaluated", "clinical_significance")
 
     def has_change_permission(self, request, obj=None):
         return False

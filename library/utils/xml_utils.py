@@ -77,7 +77,7 @@ class ParserMethod:
         return self.path.is_satisfied
 
 
-def parser_path(*args, on_start=True):
+def parser_path(*args, on_start=False):
     """
     Extend XmlParser and annotate methods with parser_path.
     """

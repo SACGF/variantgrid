@@ -1,3 +1,4 @@
+import io
 from dataclasses import dataclass, field
 from datetime import timedelta, datetime
 from urllib.error import HTTPError
@@ -200,7 +201,7 @@ class ClinVarXmlParser(XmlParser):
     def finish(self):
         self.reset()
 
-    @parser_path("ClinVarResult-Set", "ClinVarSet", "ClinVarAssertion")
+    @parser_path("ClinVarResult-Set", "ClinVarSet", "ClinVarAssertion", on_start=True)
     def new_record(self, elem):
         self.reset()
 
@@ -365,3 +366,15 @@ class ClinVarXmlParser(XmlParser):
 
             if final_value:
                 self.latest.condition = final_value
+
+    @parser_path(
+        "ClinVarResult-Set",
+        "ClinVarSet",
+        "ClinVarAssertion",
+        PP("TraitSet", Type="DrugResponse"),
+        PP("Trait", Type="DrugResponse"),
+        "Name",
+        PP("ElementValue", Type="Preferred"))
+    def parse_drug_response(self, elem):
+        if not self.latest.condition:
+            self.latest.condition = elem.text

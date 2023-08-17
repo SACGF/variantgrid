@@ -232,7 +232,7 @@ class ClinVarRecord(TimeStampedModel):
     record_id = models.TextField(primary_key=True)  # SCV
     stars = models.IntegerField()
     org_id = models.TextField()
-    genome_build = models.TextField()
+    genome_build = models.TextField(null=True, blank=True)
     review_status = models.TextField()
     submitter = models.TextField()
     submitter_date = models.DateField()
@@ -254,7 +254,7 @@ class ClinVarRecord(TimeStampedModel):
 
     def __str__(self):
         date_last_evaluated_str = ""
-        if date_last_evaluated := self.date_last_evaluated:
+        if date_last_evaluated := self.date_last_evaluated or self.submitter_date:
             date_last_evaluated_str = date_last_evaluated.strftime('%Y-%m-%d')
 
         return f"{self.record_id} {self.stars} stars, {self.clinical_significance}, {date_last_evaluated_str}"
