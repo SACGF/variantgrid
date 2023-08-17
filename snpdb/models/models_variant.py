@@ -261,6 +261,14 @@ class VariantCoordinate(FormerTuple):
         if full_match := VARIANT_PATTERN.fullmatch(clean_str):
             return VariantCoordinate(chrom=full_match.group(1), pos=int(full_match.group(2)), ref=full_match.group(3), alt=full_match.group(4))
 
+    def explicit_reference(self):
+        if self.alt == Variant.REFERENCE_ALT:
+            # Convert from our internal format (alt='=' for ref) to explicit
+            alt = self.ref
+            return VariantCoordinate(chrom=self.chrom, pos=self.pos, ref=self.ref, alt=alt)
+        return self
+
+
 
 class Sequence(models.Model):
     """

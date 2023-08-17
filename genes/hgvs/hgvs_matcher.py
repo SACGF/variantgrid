@@ -482,6 +482,7 @@ class HGVSMatcher:
         return self.variant_coordinate_to_g_hgvs(variant.coordinate)
 
     def variant_coordinate_to_g_hgvs(self, variant_coordinate: VariantCoordinate) -> str:
+        variant_coordinate = variant_coordinate.explicit_reference()
         (chrom, offset, ref, alt) = variant_coordinate
         alt_length = len(alt)
         if alt_length == 1 and len(ref) == alt_length:
@@ -496,6 +497,7 @@ class HGVSMatcher:
         return self.variant_coordinate_to_c_hgvs_variant(variant.coordinate, transcript_accession)
 
     def variant_coordinate_to_c_hgvs_variant(self, variant_coordinate: VariantCoordinate, transcript_accession: str) -> HGVSVariant:
+        variant_coordinate = variant_coordinate.explicit_reference()
         transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_accession)
         return self.hgvs_converter.variant_coords_to_c_hgvs(variant_coordinate, transcript_version)
 
