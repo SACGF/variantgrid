@@ -79,7 +79,14 @@ class HgvsSummary(ExportRow):
         if self.variant_coordinate:
             return Variant.format_tuple(*self.variant_coordinate, abbreviate=True)
         else:
-            return ""
+            return None
+
+    @property
+    def c_hgvs_str(self):
+        if self.c_hgvs:
+            return str(self.c_hgvs)
+        else:
+            return None
 
 
 @dataclass
@@ -119,19 +126,19 @@ class ChgvsDiff(ExportRow):
 
     @export_column("c.HGVS Change")
     def c_hgvs_change(self):
-        return Change.compare_3(self.provided.c_hgvs, self.resolved.c_hgvs, self.updated.c_hgvs)
+        return Change.compare_3(self.provided.c_hgvs_str, self.resolved.c_hgvs_str, self.updated.c_hgvs_str)
 
     @export_column("c.HGVS Imported")
     def _c_hgvs_imported(self):
-        return self.provided.c_hgvs
+        return self.provided.c_hgvs_str
 
     @export_column("c.HGVS Previous")
     def _c_hgvs_previous(self):
-        return self.resolved.c_hgvs
+        return self.resolved.c_hgvs_str
 
     @export_column("c.HGVS New")
     def _c_hgvs_new(self):
-        return self.updated.c_hgvs
+        return self.updated.c_hgvs_str
 
     @export_column("Variant Coordinate Change")
     def variant_coordinate_change(self):
@@ -241,8 +248,7 @@ class Command(BaseCommand):
 
                     if updated.variant_coordinate and updated.transcript:
                         stage = "Resolving c.HGVS"
-                        if hgvs_variant := matcher.variant_coordinate_to_c_hgvs_variant(updated.variant_coordinate, str(updated.transcript)):
-                            updated.c_hgvs = str(hgvs_variant)
+                        updated.c_hgvs = matcher.variant_coordinate_to_c_hgvs_variant(updated.variant_coordinate, str(updated.transcript)):
 
                 except Exception as ex:
                     updated.error_str = stage + ": " + ex.__class__.__name__ + ": " + str(ex)
