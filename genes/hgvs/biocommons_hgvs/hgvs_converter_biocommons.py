@@ -82,7 +82,8 @@ class BioCommonsHGVSVariant(HGVSVariant):
 
 
 class BioCommonsHGVSConverter(HGVSConverter):
-    pattern = re.compile(r".*: Variant reference \((.*)\) does not agree with reference sequence \((.*)\)")
+    dup_int_pattern = re.compile(r"(.*dup)(\d+)$")
+    reference_sequence_pattern = re.compile(r".*: Variant reference \((.*)\) does not agree with reference sequence \((.*)\)")
 
     def __init__(self, genome_build: GenomeBuild):
         super().__init__(genome_build)
@@ -98,11 +99,29 @@ class BioCommonsHGVSConverter(HGVSConverter):
                                  replace_reference=True)
         self.ev = ExtrinsicValidator(self.hdp)
 
+    @staticmethod
+    def _parser_hgvs(hgvs_string: str) -> SequenceVariant:
+        """ All calls to parsing go through here """
+
+        # Biocommons HGVS doesn't accept integers on the end of dups - ie NM_001354689.1(RAF1):c.1_2dup3
+        # We want to strip these and raise an error if the span is wrong
+        provided_dup_length = None
+        if m := BioCommonsHGVSConverter.dup_int_pattern.match(hgvs_string):
+            hgvs_string, provided_dup_length = m.groups()
+            provided_dup_length = int(provided_dup_length)
+
+        parser = ParserSingleton.parser()
+        sequence_variant = parser.parse_hgvs_variant(hgvs_string)
+        if provided_dup_length is not None:
+            coord_span = sequence_variant.posedit.length_change()
+            if coord_span != provided_dup_length:
+                raise HGVSException(f"dup coordinate span ({coord_span}) not equal to provided ref length {provided_dup_length}")
+        return sequence_variant
 
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
+
         try:
-            parser = ParserSingleton.parser()
-            sequence_variant = parser.parse_hgvs_variant(hgvs_string)
+            sequence_variant = self._parser_hgvs(hgvs_string)
             return BioCommonsHGVSVariant(sequence_variant)
         except HGVSError as e:
             raise HGVSException from e
@@ -137,8 +156,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
         return VariantCoordinate(chrom, position, ref, alt), matches_reference
 
     def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
-        parser = ParserSingleton.parser()
-        sequence_variant = parser.parse_hgvs_variant(hgvs_string)
+        sequence_variant = self._parser_hgvs(hgvs_string)
         sequence_variant.gene = None
         return sequence_variant.format()
 
@@ -146,8 +164,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
         """ Only returns anything if c. HGVS """
         transcript_accession = ''
         if hgvs_string is not None:
-            parser = ParserSingleton.parser()
-            sequence_variant = parser.parse_hgvs_variant(hgvs_string)
+            sequence_variant = self._parser_hgvs(hgvs_string)
             if sequence_variant.type != 'g':
                 if looks_like_transcript(sequence_variant.ac):
                     transcript_accession = sequence_variant.ac
@@ -177,8 +194,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
             'm': self._m_to_g,
         }
 
-        parser = ParserSingleton.parser()
-        var_x = parser.parse_hgvs_variant(hgvs_string)
+        var_x = self._parser_hgvs(hgvs_string)
         matches_reference = None
 
         try:
@@ -191,7 +207,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
             exception_str = str(hgvs_e)
             # Switch reference base
             # Conversion also does validation, so we have to switch out reference base in original HGVS
-            if m := self.pattern.match(exception_str):
+            if m := self.reference_sequence_pattern.match(exception_str):
                 ok = True
                 provided_ref, calculated_ref = m.groups()
                 var_x.posedit.edit.ref = calculated_ref  # Switch reference
