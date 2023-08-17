@@ -1,0 +1,3236 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<ClinVarResult-Set><ClinVarSet ID="152102139">
+  <RecordStatus>current</RecordStatus>
+  <Replaces>RCV000206355</Replaces>
+  <Title>NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr) AND not provided</Title>
+  <ReferenceClinVarAssertion ID="98884" DateLastUpdated="2023-08-13" DateCreated="2013-04-12">
+    <ClinVarAccession Acc="RCV000034558" Version="20" Type="RCV" DateUpdated="2023-08-13" DateCreated="2013-04-12"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2021-11-03">
+      <ReviewStatus>criteria provided, conflicting interpretations</ReviewStatus>
+      <Description>Conflicting interpretations of pathogenicity</Description>
+      <Explanation DataSource="ClinVar" Type="public">Uncertain significance(2); Likely benign(2)</Explanation>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>yes</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData ID="133068007">
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>no</AffectedStatus>
+        <NumberTested>208</NumberTested>
+      </Sample>
+      <Method>
+        <NamePlatform>Illumina GAIIx</NamePlatform>
+        <Purpose>Discovery</Purpose>
+        <MethodType>research</MethodType>
+      </Method>
+      <ObservedData ID="133068008">
+        <Attribute integerValue="1" Type="VariantAlleles"/>
+      </ObservedData>
+    </ObservedIn>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>not provided</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData ID="133068009">
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData ID="133068010">
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <ObservedIn>
+      <Sample>
+        <Origin>unknown</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData ID="133068011">
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant" ID="41650" Acc="VCV000041650" Version="45">
+      <Measure Type="single nucleotide variant" ID="50089">
+        <Name>
+          <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+        </Name>
+        <CanonicalSPDI>NC_000002.12:47403194:G:A</CanonicalSPDI>
+        <AttributeSet>
+          <Attribute Accession="LRG_218t1" Type="HGVS, coding, LRG">LRG_218t1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_001258281" Version="1" Change="c.-31+20G&gt;A" Type="HGVS, coding, RefSeq">NM_001258281.1:c.-31+20G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="3" Change="c.4G&gt;A" Type="HGVS, coding, RefSeq" MANESelect="true">NM_000251.3:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218" Type="HGVS, genomic, LRG">LRG_218:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NG_007110" Version="2" Change="g.5072G&gt;A" Type="HGVS, genomic, RefSeqGene">NG_007110.2:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="12" Change="g.47403195G&gt;A" Type="HGVS, genomic, top level" integerValue="38">NC_000002.12:g.47403195G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="11" Change="g.47630334G&gt;A" Type="HGVS, genomic, top level, previous" integerValue="37">NC_000002.11:g.47630334G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="1" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="2" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein">p.A2T</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218p1" Change="p.Ala2Thr" Type="HGVS, protein">LRG_218p1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="P43246" Change="p.Ala2Thr" Type="HGVS, protein">P43246:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">intron variant</Attribute>
+          <XRef ID="SO:0001627" DB="Sequence Ontology"/>
+          <XRef ID="NM_001258281.1:c.-31+20G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">missense variant</Attribute>
+          <XRef ID="SO:0001583" DB="Sequence Ontology"/>
+          <XRef ID="NM_000251.3:c.4G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="ProteinChange1LetterCode">A2T</Attribute>
+        </AttributeSet>
+        <AlleleFrequencyList>
+          <AlleleFrequency Value="0.00039" Source="Exome Aggregation Consortium (ExAC)"/>
+          <AlleleFrequency Value="0.00003" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00008" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00015" Source="The Genome Aggregation Database (gnomAD), exomes"/>
+          <AlleleFrequency Value="0.00010" Source="Trans-Omics for Precision Medicine (TOPMed)"/>
+        </AlleleFrequencyList>
+        <CytogeneticLocation>2p21</CytogeneticLocation>
+        <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403195" stop="47403195" display_start="47403195" display_stop="47403195" variantLength="1" positionVCF="47403195" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630334" stop="47630334" display_start="47630334" display_stop="47630334" variantLength="1" positionVCF="47630334" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <MeasureRelationship Type="within single gene">
+          <Name>
+            <ElementValue Type="Preferred">mutS homolog 2</ElementValue>
+          </Name>
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Haploinsufficiency">Sufficient evidence for dosage pathogenicity</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Triplosensitivity">No evidence available</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403067" stop="47709830" display_start="47403067" display_stop="47709830" Strand="+"/>
+          <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630205" stop="47710366" display_start="47630205" display_stop="47710366" variantLength="80162" Strand="+"/>
+          <XRef ID="4436" DB="Gene"/>
+          <XRef Type="MIM" ID="609309" DB="OMIM"/>
+          <XRef ID="HGNC:7325" DB="HGNC"/>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2013 (PubMed 23788249) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2016 (PubMed 27854360) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2021 (SF v3.0; PubMed 34012068) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2022 (SF v3.1; PubMed 35802134) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+        </MeasureRelationship>
+        <XRef ID="CV_varv_765" DB="Institute of Human Genetics, University of Leipzig Medical Center"/>
+        <XRef ID="c.4G&gt;A" DB="International Society for Gastrointestinal Hereditary Tumours (InSiGHT)"/>
+        <XRef ID="294" DB="Mayo Clinic Laboratories, Mayo Clinic"/>
+        <XRef ID="2643642" DB="Quest Diagnostics Nichols Institute San Juan Capistrano"/>
+        <XRef ID="P43246#VAR_054511" DB="UniProtKB"/>
+        <XRef Type="rs" ID="63750466" DB="dbSNP"/>
+      </Measure>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <AttributeSet>
+        <Attribute Type="SubmitterVariantId">2330</Attribute>
+      </AttributeSet>
+      <XRef ID="CA021232" DB="ClinGen"/>
+    </MeasureSet>
+    <TraitSet Type="Disease" ID="9460">
+      <Trait ID="17556" Type="Disease">
+        <Name>
+          <ElementValue Type="Preferred">not provided</ElementValue>
+          <XRef ID="13DG0619" DB="Developmental Genetics Unit, King Faisal Specialist Hospital &amp; Research Centre"/>
+        </Name>
+        <Name>
+          <ElementValue Type="Alternate">none provided</ElementValue>
+        </Name>
+        <AttributeSet>
+          <Attribute Type="public definition">The term 'not provided' is registered in MedGen to support identification of submissions to ClinVar for which no condition was named when assessing the variant. 'not provided' differs from 'not specified', which is used when a variant is asserted to be benign, likely benign, or of uncertain significance for conditions that have not been specified.</Attribute>
+        </AttributeSet>
+        <XRef ID="CN517202" DB="MedGen"/>
+      </Trait>
+    </TraitSet>
+  </ReferenceClinVarAssertion>
+  <ClinVarAssertion ID="98456" SubmissionName="ClinSeq_cancer">
+    <ClinVarSubmissionID localKey="NM_000251.1:c.4G&gt;A|not provided" submitter="Biesecker Lab/Clinical Genomics Section, National Institutes of Health"/>
+    <ClinVarAccession Acc="SCV000043334" Version="1" Type="SCV" OrgID="1160" OrganizationCategory="laboratory" OrgType="primary" DateUpdated="2013-04-12" DateCreated="2013-04-12"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2012-07-13">
+      <ReviewStatus>no assertion criteria provided</ReviewStatus>
+      <Description>variant of unknown significance</Description>
+      <Comment>Converted during submission to Uncertain significance.</Comment>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>no</AffectedStatus>
+        <NumberTested>208</NumberTested>
+      </Sample>
+      <Method>
+        <NamePlatform>Illumina GAIIx</NamePlatform>
+        <TypePlatform>High-Throughput DNA Sequencing</TypePlatform>
+        <Purpose>discovery</Purpose>
+        <Software name="Eland" purpose="alignment"/>
+        <Software name="Most Probable Genotype" purpose="variant calls"/>
+        <MethodType>research</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="VariantAlleles" integerValue="1"/>
+      </ObservedData>
+      <Comment>The study set was not selected for affection status in relation to any cancer. Pathogenicity categories were based on literature curation. See Pubmed ID:22703879 for details.</Comment>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <Name>
+          <ElementValue Type="Alternate">p.Ala2Thr</ElementValue>
+        </Name>
+        <AttributeSet>
+          <Attribute Type="HGVS">NM_000251.1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <MeasureRelationship Type="variant in gene">
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+        </MeasureRelationship>
+        <XRef DB="dbSNP" ID="63750466" Type="rsNumber"/>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <Name>
+          <ElementValue Type="Preferred">not provided</ElementValue>
+        </Name>
+      </Trait>
+    </TraitSet>
+    <Citation Type="general">
+      <ID Source="PubMed">22703879</ID>
+    </Citation>
+    <StudyName>ClinSeq</StudyName>
+  </ClinVarAssertion>
+  <ClinVarAssertion ID="270097">
+    <ClinVarSubmissionID localKey="GDX:39748|Not Provided" submittedAssembly="GRCh37" submitter="GeneDx" submitterDate="2019-06-24"/>
+    <ClinVarAccession Acc="SCV000149443" Version="15" Type="SCV" OrgID="26957" OrganizationCategory="laboratory" OrgType="primary" DateUpdated="2019-07-13" DateCreated="2013-04-12"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2018-11-06">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Likely benign</Description>
+      <Comment>This variant is considered likely benign or benign based on one or more of the following criteria: it is a conservative change, it occurs at a poorly conserved position in the protein, it is predicted to be benign by multiple in silico algorithms, and/or has population frequency not consistent with disease.</Comment>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ExternalID DB="GeneDx" ID="GDX:39748"/>
+    <AttributeSet>
+      <Attribute Type="AssertionMethod">GeneDx Variant Classification (06012015)</Attribute>
+      <Citation Type="general">
+        <URL>https://submit.ncbi.nlm.nih.gov/ft/byid/dhtz9flo/genedx_interprules_final_061215.pdf</URL>
+      </Citation>
+    </AttributeSet>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>yes</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <AttributeSet>
+          <Attribute Type="HGVS">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <SequenceLocation Assembly="GRCh37" Chr="2" alternateAllele="A" referenceAllele="G" start="47630334" stop="47630334" variantLength="1"/>
+        <MeasureRelationship Type="variant in gene">
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+        </MeasureRelationship>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <Name>
+          <ElementValue Type="Preferred">Not Provided</ElementValue>
+        </Name>
+      </Trait>
+    </TraitSet>
+  </ClinVarAssertion>
+  <ClinVarAssertion ID="1730382" SubmissionName="SUB4618058">
+    <ClinVarSubmissionID localKey="3115|Not Provided" submittedAssembly="GRCh37" submitter="ARUP Laboratories, Molecular Genetics and Genomics, ARUP Laboratories" submitterDate="2018-10-10"/>
+    <ClinVarAccession Acc="SCV000884129" Version="1" Type="SCV" OrgID="25969" OrganizationCategory="laboratory" OrgType="primary" DateUpdated="2013-04-12" DateCreated="2013-04-12"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2018-02-06">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Uncertain significance</Description>
+      <Comment>The MSH2 c.4G&gt;A; p.Ala2Thr variant (rs63750466) is reported in the literature in multiple individuals with Lynch syndrome (Kurzawski 2006, Mangold 2005a, Mangold 2005b, Nagasaka 2010, Pagenstecher 2006, Parc 2003). However, it has been reported to co-occur with a pathogenic MSH2 nonsense variant (Mangold 2005a) and a 3'EPCAM deletion where MSH2 promoter methylation was seen (Nagasaka 2010). This variant is also reported to co-segregate with disease in a large Lynch syndrome family where loss of the MSH2 protein was seen in four individual's tumors; however, RNA analysis showed normal expression, suggesting this variant may be a marker in this family but the functional consequences are uncertain (Pagenstecher 2006). This variant is considered uncertain by an expert review panel in ClinVar (Variation ID: 41650), and is found in the general population with an overall allele frequency of 0.01% (34/241756 alleles) in the Genome Aggregation Database. This variant occurs in a conserved nucleotide of the Kozak consensus sequence, but computational algorithms do not agree as to the effect this variant may have on the protein (SIFT: Tolerated, PolyPhen2: Probably Damaging). Based on available information, the clinical significance of p.Ala2Thr is uncertain at this time. REFERENCES Kurzawski G et al. Germline MSH2 and MLH1 mutational spectrum including large rearrangements in HNPCC families from Poland (update study). Clin Genet. 2006 Jan;69(1):40-7. Mangold E et al. Spectrum and frequencies of mutations in MSH2 and MLH1 identified in 1,721 German families suspected of hereditary nonpolyposis colorectal cancer. Int J Cancer. 2005a Sep 20;116(5):692-702. Mangold E et al. Tumours from MSH2 mutation carriers show loss of MSH2 expression but many tumours from MLH1 mutation carriers exhibit weak positive MLH1 staining. J Pathol. 2005b Dec;207(4):385-95. Nagasaka T et al. Somatic hypermethylation of MSH2 is a frequent event in Lynch Syndrome colorectal cancers. Cancer Res. 2010 Apr 15;70(8):3098-108. Pagenstecher C et al. Aberrant splicing in MLH1 and MSH2 due to exonic and intronic variants. Hum Genet. 2006 Mar;119(1-2):9-22. Parc Y et al. Cancer risk in 348 French MSH2 or MLH1 gene carriers. J Med Genet. 2003 Mar;40(3):208-13.</Comment>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ExternalID DB="Molecular Genetics" ID="3115"/>
+    <AttributeSet>
+      <Attribute Type="AssertionMethod">ARUP Molecular Germline Variant Investigation Process</Attribute>
+      <Citation>
+        <URL>https://submit.ncbi.nlm.nih.gov/ft/byid/w2yp3qyt/arup_molecular_germline_variant_investigation_process.pdf</URL>
+      </Citation>
+    </AttributeSet>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <Name>
+          <ElementValue Type="Alternate">p.Ala2Thr</ElementValue>
+        </Name>
+        <AttributeSet>
+          <Attribute Type="HGVS">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <SequenceLocation Assembly="GRCh37" Chr="2" alternateAllele="A" referenceAllele="G" start="47630334" stop="47630334" variantLength="1"/>
+        <XRef DB="dbSNP" ID="63750466" Type="rsNumber"/>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <Name>
+          <ElementValue Type="Preferred">Not Provided</ElementValue>
+        </Name>
+      </Trait>
+    </TraitSet>
+  </ClinVarAssertion>
+  <ClinVarAssertion ID="2239331">
+    <ClinVarSubmissionID localKey="S4361|not provided" submittedAssembly="GRCh37" submitter="Quest Diagnostics Nichols Institute San Juan Capistrano" submitterDate="2022-12-28"/>
+    <ClinVarAccession Acc="SCV001134367" Version="4" Type="SCV" OrgID="500110" OrganizationCategory="laboratory" OrgType="primary" DateUpdated="2022-12-31" DateCreated="2020-01-05"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2021-08-09">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Likely benign</Description>
+      <Citation>
+        <ID Source="PubMed">30798936</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">26556299</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">26580448</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">21642682</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">20007843</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">15849733</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">16341550</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">22703879</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">12624141</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">16451135</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">20388775</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">17192056</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">16216036</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">26528695</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">22949387</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">30998989</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">29769598</ID>
+      </Citation>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ExternalID DB="Quest Diagnostics Nichols Institute San Juan Capistrano" ID="S4361"/>
+    <AttributeSet>
+      <Attribute Type="AssertionMethod">Quest Diagnostics criteria</Attribute>
+      <Citation>
+        <ID Source="PubMed">26467025</ID>
+      </Citation>
+    </AttributeSet>
+    <ObservedIn>
+      <Sample>
+        <Origin>unknown</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <AttributeSet>
+          <Attribute Type="HGVS">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <Name>
+          <ElementValue Type="Preferred">not provided</ElementValue>
+        </Name>
+      </Trait>
+    </TraitSet>
+  </ClinVarAssertion>
+  <ClinVarAssertion ID="3924778">
+    <ClinVarSubmissionID localKey="Chr.2_47403195_47403195_G_A|not provided" submitter="Institute for Clinical Genetics, University Hospital TU Dresden, University Hospital TU Dresden" submitterDate="2023-07-12"/>
+    <ClinVarAccession Acc="SCV002009326" Version="3" Type="SCV" OrgID="505632" OrganizationCategory="clinic" OrgType="primary" DateUpdated="2023-07-16" DateCreated="2021-11-05"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2021-11-03">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Uncertain significance</Description>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <AttributeSet>
+      <Attribute Type="AssertionMethod">ACMG Guidelines, 2015</Attribute>
+      <Citation>
+        <ID Source="PubMed">25741868</ID>
+      </Citation>
+    </AttributeSet>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>not provided</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <SequenceLocation Assembly="GRCh38" Chr="2" alternateAllele="A" referenceAllele="G" start="47403195" stop="47403195"/>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <Name>
+          <ElementValue Type="Preferred">not provided</ElementValue>
+        </Name>
+      </Trait>
+    </TraitSet>
+  </ClinVarAssertion>
+</ClinVarSet><ClinVarSet ID="152106173">
+  <RecordStatus>current</RecordStatus>
+  <Title>NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr) AND Lynch syndrome 1</Title>
+  <ReferenceClinVarAssertion ID="188804" DateLastUpdated="2023-08-13" DateCreated="2013-12-19">
+    <ClinVarAccession Acc="RCV000076617" Version="9" Type="RCV" DateUpdated="2023-08-13" DateCreated="2013-12-19"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2018-06-13">
+      <ReviewStatus>reviewed by expert panel</ReviewStatus>
+      <Description>Likely benign</Description>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ObservedIn>
+      <Sample>
+        <Origin>unknown</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData ID="134553329">
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+      <ObservedData ID="134553329">
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>yes</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>curation</MethodType>
+      </Method>
+      <ObservedData ID="134555837">
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant" ID="41650" Acc="VCV000041650" Version="45">
+      <Measure Type="single nucleotide variant" ID="50089">
+        <Name>
+          <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+        </Name>
+        <CanonicalSPDI>NC_000002.12:47403194:G:A</CanonicalSPDI>
+        <AttributeSet>
+          <Attribute Accession="LRG_218t1" Type="HGVS, coding, LRG">LRG_218t1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_001258281" Version="1" Change="c.-31+20G&gt;A" Type="HGVS, coding, RefSeq">NM_001258281.1:c.-31+20G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="3" Change="c.4G&gt;A" Type="HGVS, coding, RefSeq" MANESelect="true">NM_000251.3:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218" Type="HGVS, genomic, LRG">LRG_218:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NG_007110" Version="2" Change="g.5072G&gt;A" Type="HGVS, genomic, RefSeqGene">NG_007110.2:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="12" Change="g.47403195G&gt;A" Type="HGVS, genomic, top level" integerValue="38">NC_000002.12:g.47403195G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="11" Change="g.47630334G&gt;A" Type="HGVS, genomic, top level, previous" integerValue="37">NC_000002.11:g.47630334G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="1" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="2" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein">p.A2T</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218p1" Change="p.Ala2Thr" Type="HGVS, protein">LRG_218p1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="P43246" Change="p.Ala2Thr" Type="HGVS, protein">P43246:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">intron variant</Attribute>
+          <XRef ID="SO:0001627" DB="Sequence Ontology"/>
+          <XRef ID="NM_001258281.1:c.-31+20G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">missense variant</Attribute>
+          <XRef ID="SO:0001583" DB="Sequence Ontology"/>
+          <XRef ID="NM_000251.3:c.4G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="ProteinChange1LetterCode">A2T</Attribute>
+        </AttributeSet>
+        <AlleleFrequencyList>
+          <AlleleFrequency Value="0.00039" Source="Exome Aggregation Consortium (ExAC)"/>
+          <AlleleFrequency Value="0.00003" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00008" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00015" Source="The Genome Aggregation Database (gnomAD), exomes"/>
+          <AlleleFrequency Value="0.00010" Source="Trans-Omics for Precision Medicine (TOPMed)"/>
+        </AlleleFrequencyList>
+        <CytogeneticLocation>2p21</CytogeneticLocation>
+        <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403195" stop="47403195" display_start="47403195" display_stop="47403195" variantLength="1" positionVCF="47403195" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630334" stop="47630334" display_start="47630334" display_stop="47630334" variantLength="1" positionVCF="47630334" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <MeasureRelationship Type="within single gene">
+          <Name>
+            <ElementValue Type="Preferred">mutS homolog 2</ElementValue>
+          </Name>
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Haploinsufficiency">Sufficient evidence for dosage pathogenicity</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Triplosensitivity">No evidence available</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403067" stop="47709830" display_start="47403067" display_stop="47709830" Strand="+"/>
+          <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630205" stop="47710366" display_start="47630205" display_stop="47710366" variantLength="80162" Strand="+"/>
+          <XRef ID="4436" DB="Gene"/>
+          <XRef Type="MIM" ID="609309" DB="OMIM"/>
+          <XRef ID="HGNC:7325" DB="HGNC"/>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2013 (PubMed 23788249) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2016 (PubMed 27854360) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2021 (SF v3.0; PubMed 34012068) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2022 (SF v3.1; PubMed 35802134) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+        </MeasureRelationship>
+        <XRef ID="CV_varv_765" DB="Institute of Human Genetics, University of Leipzig Medical Center"/>
+        <XRef ID="c.4G&gt;A" DB="International Society for Gastrointestinal Hereditary Tumours (InSiGHT)"/>
+        <XRef ID="294" DB="Mayo Clinic Laboratories, Mayo Clinic"/>
+        <XRef ID="2643642" DB="Quest Diagnostics Nichols Institute San Juan Capistrano"/>
+        <XRef ID="P43246#VAR_054511" DB="UniProtKB"/>
+        <XRef Type="rs" ID="63750466" DB="dbSNP"/>
+      </Measure>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <AttributeSet>
+        <Attribute Type="SubmitterVariantId">2330</Attribute>
+      </AttributeSet>
+      <XRef ID="CA021232" DB="ClinGen"/>
+    </MeasureSet>
+    <TraitSet Type="Disease" ID="451">
+      <Trait ID="2582" Type="Disease">
+        <Name>
+          <ElementValue Type="Preferred">Lynch syndrome 1</ElementValue>
+          <XRef ID="MONDO:0007356" DB="MONDO"/>
+        </Name>
+        <Name>
+          <ElementValue Type="Alternate">COLON CANCER, FAMILIAL NONPOLYPOSIS, TYPE 1</ElementValue>
+          <XRef Type="MIM" ID="120435" DB="OMIM"/>
+        </Name>
+        <Name>
+          <ElementValue Type="Alternate">MSH2-Related Hereditary Non-Polyposis Colon Cancer</ElementValue>
+        </Name>
+        <Name>
+          <ElementValue Type="Alternate">Lynch syndrome I</ElementValue>
+          <Citation Type="general" Abbrev="Vasen et al., 2007">
+            <ID Source="pmc">2740877</ID>
+          </Citation>
+          <XRef ID="Colorectal+Cancer%2C+Hereditary+Nonpolyposis%2C+Type+1/1748" DB="Genetic Alliance"/>
+        </Name>
+        <Name>
+          <ElementValue Type="Alternate">Colorectal cancer, hereditary, nonpolyposis, type 1</ElementValue>
+        </Name>
+        <Name>
+          <ElementValue Type="Alternate">Hereditary non-polyposis colorectal cancer, type 1</ElementValue>
+        </Name>
+        <Name>
+          <ElementValue Type="Alternate">MSH2-Related Lynch Syndrome</ElementValue>
+        </Name>
+        <Symbol>
+          <ElementValue Type="Alternate">FCC1</ElementValue>
+          <XRef Type="MIM" ID="120435" DB="OMIM"/>
+        </Symbol>
+        <Symbol>
+          <ElementValue Type="Alternate">HNPCC1</ElementValue>
+          <XRef Type="MIM" ID="120435" DB="OMIM"/>
+        </Symbol>
+        <AttributeSet>
+          <Attribute Type="public definition">Lynch syndrome is characterized by an increased risk for colorectal cancer (CRC) and cancers of the endometrium, ovary, stomach, small bowel, urinary tract, biliary tract, brain (usually glioblastoma), skin (sebaceous adenomas, sebaceous carcinomas, and keratoacanthomas), pancreas, and prostate. Cancer risks and age of onset vary depending on the associated gene. Several other cancer types have been reported to occur in individuals with Lynch syndrome (e.g., breast, sarcomas, adrenocortical carcinoma). However, the data are not sufficient to demonstrate that the risk of developing these cancers is increased in individuals with Lynch syndrome.</Attribute>
+          <XRef ID="NBK1211" DB="GeneReviews"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="disease mechanism" integerValue="273">loss of function</Attribute>
+          <XRef ID="GTR000501399" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000501401" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000507864" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000510683" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000512645" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000514729" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000518997" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000518999" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000530120" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000558503" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000569406" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000595970" DB="Genetic Testing Registry (GTR)"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="keyword">Neoplasm</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="keyword">Hereditary cancer syndrome</Attribute>
+        </AttributeSet>
+        <Citation Type="review" Abbrev="GeneReviews">
+          <ID Source="PubMed">20301390</ID>
+          <ID Source="BookShelf">NBK1211</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="EGAPP, 2009">
+          <ID Source="pmc">2743612</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ASCO, 2010">
+          <ID Source="PubMed">20065170</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="Vasen et al., 2007">
+          <ID Source="pmc">2740877</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ASCRS, 2001">
+          <ID Source="PubMed">11598466</ID>
+        </Citation>
+        <Citation Type="Translational/Evidence-based" Abbrev="EuroGenetest, 2010">
+          <ID Source="pmc">2987434</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ACMG, 2013">
+          <ID Source="PubMed">23788249</ID>
+        </Citation>
+        <Citation Type="Suggested Reading" Abbrev="AMA/NCHPEG, 2012">
+          <URL>http://www.nchpeg.org/documents/crc/11-0456%20Fact%20sheets%20(MSI%20and%20IHC%20testing).pdf</URL>
+        </Citation>
+        <Citation Type="practice guideline" Abbrev="SGO, 2014">
+          <URL>https://www.sgo.org/clinical-practice/guidelines/screening-for-lynch-syndrome-in-endometrial-cancer</URL>
+          <CitationText>Society of Gynecologic Oncology (SGO) Clinical Practice Statement: Screening for Lynch Syndrome in Endometrial Cancer</CitationText>
+        </Citation>
+        <Citation Type="general" Abbrev="MSTF, 2014">
+          <ID Source="PubMed">25070057</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ASCO, 2014">
+          <ID Source="PubMed">24493721</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="CAPS, 2013">
+          <ID Source="pmc">3585492</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ACMG/NSGC, 2015">
+          <ID Source="PubMed">25394175</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ASCO/ESMO, 2015">
+          <ID Source="PubMed">25452455</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ACMG, 2014">
+          <ID Source="PubMed">24310308</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="Mork et al., 2015">
+          <ID Source="PubMed">25711197</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="Dutch SCG, 2013">
+          <ID Source="PubMed">23535968</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ACG, 2015">
+          <ID Source="PubMed">25645574</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="Mallorca group, 2013">
+          <ID Source="PubMed">23408351</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ACMG, 2015">
+          <ID Source="PubMed">25356965</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ACMG, 2016">
+          <ID Source="PubMed">27854360</ID>
+          <ID Source="DOI">10.1038/gim.2016.190</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="NSGC/CCA-ICC, 2012">
+          <ID Source="PubMed">22167527</ID>
+        </Citation>
+        <Citation Type="Suggested Reading" Abbrev="NCI PDQ, Genetics of Colorectal Cancer">
+          <ID Source="PubMed">26389505</ID>
+        </Citation>
+        <Citation Type="Suggested Reading" Abbrev="NCI PDQ, Breast and Gynecologic Cancers">
+          <ID Source="PubMed">26389210</ID>
+        </Citation>
+        <Citation Type="Suggested Reading" Abbrev="NCI PDQ, Cancer Genetics Counseling">
+          <ID Source="PubMed">26389258</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ACMG SF v3.0, 2021">
+          <ID Source="PubMed">34012068</ID>
+          <ID Source="DOI">10.1038/s41436-021-01172-3</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ACMG SF v3.1, 2022">
+          <ID Source="PubMed">35802134</ID>
+          <ID Source="DOI">10.1016/j.gim.2022.04.006</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ASCO, 2015">
+          <ID Source="PubMed">26324357</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="CAPS, 2020">
+          <ID Source="PubMed">31672839</ID>
+          <ID Source="pmc">7295005</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="EHTG/ESCP, 2021">
+          <ID Source="PubMed">34043773</ID>
+        </Citation>
+        <Citation Type="practice guideline" Abbrev="ACMG ACT, 2012">
+          <URL>https://www.acmg.net/PDFLibrary/Colon-Cancer.pdf</URL>
+          <CitationText>American College of Medical Genetics and Genomics Family History ACT Sheet, Colon Cancer (Asymptomatic), 2012</CitationText>
+        </Citation>
+        <Citation Type="practice guideline" Abbrev="ACMG ACT, 2019">
+          <URL>https://www.acmg.net/PDFLibrary/Lynch-Syndrome.pdf</URL>
+          <CitationText>American College of Medical Genetics and Genomics, Genomic Testing (Secondary Findings) ACT Sheet, MLH1, MSH2, MSH6, PMS2, EPCAM Pathogenic Variants, Lynch Syndrome (Hereditary Non-polyposis Colon Cancer [HNPCC]), 2019</CitationText>
+        </Citation>
+        <Citation Type="practice guideline" Abbrev="NICE, 2021">
+          <URL>https://www.nice.org.uk/guidance/ng151</URL>
+          <CitationText>UK NICE Guideline NG151, Colorectal cancer, 2021</CitationText>
+        </Citation>
+        <Citation Type="practice guideline" Abbrev="NICE, 2020">
+          <URL>https://www.nice.org.uk/guidance/dg42</URL>
+          <CitationText>UK NICE Diagnostics Guidance DG42, Testing strategies for Lynch syndrome in people with endometrial cancer, 2020</CitationText>
+        </Citation>
+        <XRef ID="MONDO:0007356" DB="MONDO"/>
+        <XRef ID="C2936783" DB="MedGen"/>
+        <XRef ID="144" DB="Orphanet"/>
+        <XRef Type="MIM" ID="120435" DB="OMIM"/>
+      </Trait>
+    </TraitSet>
+  </ReferenceClinVarAssertion>
+  <ClinVarAssertion ID="186493" SubmissionName="SUB4489882">
+    <ClinVarSubmissionID localKey="NM_000251.2:c.4G&gt;A|OMIM:120435" submittedAssembly="not applicable" submitter="International Society for Gastrointestinal Hereditary Tumours (InSiGHT)" submitterDate="2018-09-05"/>
+    <ClinVarAccession Acc="SCV000107653" Version="5" Type="SCV" OrgID="500189" OrganizationCategory="other" OrgType="primary" DateUpdated="2022-12-11" DateCreated="2013-12-19"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2018-06-13">
+      <ReviewStatus>reviewed by expert panel</ReviewStatus>
+      <Description>Likely benign</Description>
+      <Comment>Multifactorial likelihood analysis posterior probability &lt; 0.05 (0.006)</Comment>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <AttributeSet>
+      <Attribute Type="AssertionMethod">Guidelines v2.4</Attribute>
+      <Citation>
+        <URL>https://submit.ncbi.nlm.nih.gov/ft/byid/awnlmlr7/2018-06_insight_vic_v2.4.pdf</URL>
+      </Citation>
+    </AttributeSet>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>yes</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>curation</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <AttributeSet>
+          <Attribute Type="HGVS">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <MeasureRelationship Type="variant in gene">
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+        </MeasureRelationship>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <XRef DB="OMIM" ID="120435" Type="MIM"/>
+      </Trait>
+    </TraitSet>
+    <Citation>
+      <URL>http://www.insight-database.org/classifications/?gene=MSH2&amp;variant=c.4G%3EA</URL>
+    </Citation>
+  </ClinVarAssertion>
+  <ClinVarAssertion ID="952589" SubmissionName="Counsyl2016">
+    <ClinVarSubmissionID localKey="122629|OMIM:120435" submittedAssembly="GRCh37" submitter="Counsyl" submitterDate="2016-11-23"/>
+    <ClinVarAccession Acc="SCV000488838" Version="2" Type="SCV" OrgID="320494" OrganizationCategory="laboratory" OrgType="primary" DateUpdated="2022-12-24" DateCreated="2016-01-31"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2016-07-05">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Uncertain significance</Description>
+      <Citation>
+        <ID Source="PubMed">12624141</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">22949387</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">22949387</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">16451135</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">22949387</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">16636019</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">12624141</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">22703879</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">16451135</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">16341550</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">22949387</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">24362816</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">15849733</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">20388775</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">21642682</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">26951660</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">26556299</ID>
+      </Citation>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ExternalID DB="Counsyl" ID="122629"/>
+    <AttributeSet>
+      <Attribute Type="AssertionMethod">Counsyl Autosomal Dominant Disease Classification criteria (2015)</Attribute>
+      <Citation Type="general">
+        <URL>https://submit.ncbi.nlm.nih.gov/ft/byid/qikq0wz6/counsyl_autosomal_dominant_disease_classification_criteria_2015__v1_4_2_.pdf</URL>
+        <CitationText>Counsyl Autosomal Dominant Disease Classification criteria (2015)</CitationText>
+      </Citation>
+    </AttributeSet>
+    <ObservedIn>
+      <Sample>
+        <Origin>unknown</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <AttributeSet>
+          <Attribute Type="HGVS">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <MeasureRelationship Type="variant in gene">
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+        </MeasureRelationship>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <XRef DB="OMIM" ID="120435" Type="MIM"/>
+      </Trait>
+    </TraitSet>
+  </ClinVarAssertion>
+  <ClinVarAssertion ID="7518557" SubmissionName="SUB13707487">
+    <ClinVarSubmissionID localKey="2330|OMIM:120435" submitter="Myriad Genetics, Inc." submitterDate="2023-07-25"/>
+    <ClinVarAccession Acc="SCV004018428" Version="1" Type="SCV" OrgID="507240" OrganizationCategory="laboratory" OrgType="primary" DateUpdated="2023-07-29" DateCreated="2023-07-29"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2023-03-24">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Benign</Description>
+      <Citation>
+        <ID Source="PubMed">25085752</ID>
+      </Citation>
+      <Comment>This variant is considered benign. This variant has been observed in trans with a known pathogenic variant in one or more individuals lacking clinical features consistent with gene-specific recessive disease. This variant is strongly associated with less severe personal and family histories of cancer, typical for individuals without pathogenic variants in this gene [PMID: 25085752].</Comment>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <AttributeSet>
+      <Attribute Type="AssertionMethod">Myriad Autosomal Dominant, Autosomal Recessive and X-Linked Classification Criteria (2023)</Attribute>
+      <Citation>
+        <URL>https://submit.ncbi.nlm.nih.gov/ft/byid/8ufcwsf2/myriad_genetics_classification_criteria_2023.pdf</URL>
+      </Citation>
+    </AttributeSet>
+    <ObservedIn>
+      <Sample>
+        <Origin>unknown</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <SequenceLocation Assembly="hg19" Chr="2" alternateAllele="A" referenceAllele="G" start="47630334" stop="47630334"/>
+        <MeasureRelationship Type="variant in gene">
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+        </MeasureRelationship>
+      </Measure>
+      <AttributeSet>
+        <Attribute Type="SubmitterVariantId">2330</Attribute>
+      </AttributeSet>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <XRef DB="OMIM" ID="120435" Type="MIM"/>
+      </Trait>
+    </TraitSet>
+  </ClinVarAssertion>
+</ClinVarSet><ClinVarSet ID="152110806">
+  <RecordStatus>current</RecordStatus>
+  <Title>NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr) AND Hereditary cancer-predisposing syndrome</Title>
+  <ReferenceClinVarAssertion ID="271231" DateLastUpdated="2023-08-13" DateCreated="2014-05-17">
+    <ClinVarAccession Acc="RCV000115534" Version="12" Type="RCV" DateUpdated="2023-08-13" DateCreated="2014-05-17"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2021-04-09">
+      <ReviewStatus>criteria provided, multiple submitters, no conflicts</ReviewStatus>
+      <Description>Likely benign</Description>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+        <NumberTested>1</NumberTested>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <Method>
+        <MethodType>curation</MethodType>
+      </Method>
+      <ObservedData ID="126636700">
+        <Attribute integerValue="1" Type="VariantAlleles"/>
+      </ObservedData>
+      <ObservedData ID="126636700">
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+      <ObservedData ID="126636700">
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant" ID="41650" Acc="VCV000041650" Version="45">
+      <Measure Type="single nucleotide variant" ID="50089">
+        <Name>
+          <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+        </Name>
+        <CanonicalSPDI>NC_000002.12:47403194:G:A</CanonicalSPDI>
+        <AttributeSet>
+          <Attribute Accession="LRG_218t1" Type="HGVS, coding, LRG">LRG_218t1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_001258281" Version="1" Change="c.-31+20G&gt;A" Type="HGVS, coding, RefSeq">NM_001258281.1:c.-31+20G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="3" Change="c.4G&gt;A" Type="HGVS, coding, RefSeq" MANESelect="true">NM_000251.3:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218" Type="HGVS, genomic, LRG">LRG_218:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NG_007110" Version="2" Change="g.5072G&gt;A" Type="HGVS, genomic, RefSeqGene">NG_007110.2:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="12" Change="g.47403195G&gt;A" Type="HGVS, genomic, top level" integerValue="38">NC_000002.12:g.47403195G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="11" Change="g.47630334G&gt;A" Type="HGVS, genomic, top level, previous" integerValue="37">NC_000002.11:g.47630334G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="1" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="2" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein">p.A2T</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218p1" Change="p.Ala2Thr" Type="HGVS, protein">LRG_218p1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="P43246" Change="p.Ala2Thr" Type="HGVS, protein">P43246:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">intron variant</Attribute>
+          <XRef ID="SO:0001627" DB="Sequence Ontology"/>
+          <XRef ID="NM_001258281.1:c.-31+20G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">missense variant</Attribute>
+          <XRef ID="SO:0001583" DB="Sequence Ontology"/>
+          <XRef ID="NM_000251.3:c.4G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="ProteinChange1LetterCode">A2T</Attribute>
+        </AttributeSet>
+        <AlleleFrequencyList>
+          <AlleleFrequency Value="0.00039" Source="Exome Aggregation Consortium (ExAC)"/>
+          <AlleleFrequency Value="0.00003" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00008" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00015" Source="The Genome Aggregation Database (gnomAD), exomes"/>
+          <AlleleFrequency Value="0.00010" Source="Trans-Omics for Precision Medicine (TOPMed)"/>
+        </AlleleFrequencyList>
+        <CytogeneticLocation>2p21</CytogeneticLocation>
+        <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403195" stop="47403195" display_start="47403195" display_stop="47403195" variantLength="1" positionVCF="47403195" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630334" stop="47630334" display_start="47630334" display_stop="47630334" variantLength="1" positionVCF="47630334" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <MeasureRelationship Type="within single gene">
+          <Name>
+            <ElementValue Type="Preferred">mutS homolog 2</ElementValue>
+          </Name>
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Haploinsufficiency">Sufficient evidence for dosage pathogenicity</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Triplosensitivity">No evidence available</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403067" stop="47709830" display_start="47403067" display_stop="47709830" Strand="+"/>
+          <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630205" stop="47710366" display_start="47630205" display_stop="47710366" variantLength="80162" Strand="+"/>
+          <XRef ID="4436" DB="Gene"/>
+          <XRef Type="MIM" ID="609309" DB="OMIM"/>
+          <XRef ID="HGNC:7325" DB="HGNC"/>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2013 (PubMed 23788249) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2016 (PubMed 27854360) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2021 (SF v3.0; PubMed 34012068) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2022 (SF v3.1; PubMed 35802134) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+        </MeasureRelationship>
+        <XRef ID="CV_varv_765" DB="Institute of Human Genetics, University of Leipzig Medical Center"/>
+        <XRef ID="c.4G&gt;A" DB="International Society for Gastrointestinal Hereditary Tumours (InSiGHT)"/>
+        <XRef ID="294" DB="Mayo Clinic Laboratories, Mayo Clinic"/>
+        <XRef ID="2643642" DB="Quest Diagnostics Nichols Institute San Juan Capistrano"/>
+        <XRef ID="P43246#VAR_054511" DB="UniProtKB"/>
+        <XRef Type="rs" ID="63750466" DB="dbSNP"/>
+      </Measure>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <AttributeSet>
+        <Attribute Type="SubmitterVariantId">2330</Attribute>
+      </AttributeSet>
+      <XRef ID="CA021232" DB="ClinGen"/>
+    </MeasureSet>
+    <TraitSet Type="Disease" ID="13598">
+      <Trait ID="18746" Type="Disease">
+        <Name>
+          <ElementValue Type="Preferred">Hereditary cancer-predisposing syndrome</ElementValue>
+          <XRef ID="699346009" DB="SNOMED CT"/>
+        </Name>
+        <Name>
+          <ElementValue Type="Alternate">Neoplastic Syndromes, Hereditary</ElementValue>
+          <XRef ID="D009386" DB="MeSH"/>
+        </Name>
+        <Name>
+          <ElementValue Type="Alternate">Tumor predisposition</ElementValue>
+        </Name>
+        <Name>
+          <ElementValue Type="Alternate">Cancer predisposition</ElementValue>
+          <XRef ID="Hereditary+Cancer/3345" DB="Genetic Alliance"/>
+        </Name>
+        <Name>
+          <ElementValue Type="Alternate">Hereditary Cancer Syndrome</ElementValue>
+        </Name>
+        <AttributeSet>
+          <Attribute Type="keyword">Neoplasm</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="keyword">Hereditary cancer syndrome</Attribute>
+        </AttributeSet>
+        <Citation Type="general" Abbrev="IARC, 2008">
+          <ID Source="pmc">3075918</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ACMG/NSGC, 2015">
+          <ID Source="PubMed">25394175</ID>
+        </Citation>
+        <XRef ID="MONDO:0015356" DB="MONDO"/>
+        <XRef ID="D009386" DB="MeSH"/>
+        <XRef ID="C0027672" DB="MedGen"/>
+      </Trait>
+    </TraitSet>
+  </ReferenceClinVarAssertion>
+  <ClinVarAssertion ID="303228">
+    <ClinVarSubmissionID localKey="a6383" localKeyIsSubmitted="1" submittedAssembly="GRCh37" submitter="Ambry Genetics" submitterDate="2022-11-11"/>
+    <ClinVarAccession Acc="SCV000184713" Version="8" Type="SCV" OrgID="61756" OrganizationCategory="laboratory" OrgType="primary" DateUpdated="2022-11-29" DateCreated="2014-08-06"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2018-09-24">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Likely benign</Description>
+      <Citation>
+        <ID Source="PubMed">12624141</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">15849733</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">16216036</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">16341550</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">16451135</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">17192056</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">20388775</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">22703879</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">25980754</ID>
+      </Citation>
+      <Comment>This alteration is classified as likely benign based on a combination of the following: population frequency, intact protein function, lack of segregation with disease, co-occurrence, RNA analysis, in silico models, amino acid conservation, lack of disease association in case-control studies, and/or the mechanism of disease or impacted region is inconsistent with a known cause of pathogenicity.</Comment>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ExternalID DB="Ambry Genetics" ID="a6383"/>
+    <AttributeSet>
+      <Attribute Type="AssertionMethod">Ambry General Variant Classification Scheme_2022</Attribute>
+      <Citation>
+        <URL>https://submit.ncbi.nlm.nih.gov/ft/byid/5hsvndk6/ambry_general_variant_classification_scheme_2022.pdf</URL>
+      </Citation>
+    </AttributeSet>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+        <NumberTested>1</NumberTested>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="VariantAlleles" integerValue="1"/>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <AttributeSet>
+          <Attribute Type="HGVS">NM_000251.1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <MeasureRelationship Type="variant in gene">
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+        </MeasureRelationship>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <XRef DB="MedGen" ID="C0027672" Type="CUI"/>
+      </Trait>
+    </TraitSet>
+  </ClinVarAssertion>
+  <ClinVarAssertion ID="1770693" SubmissionName="SUB4721021">
+    <ClinVarSubmissionID localKey="Db4KrQBSZeoE7-orUyypkZV0xnTaJ3TPyi4JKa7NGhk|MedGen:C0027672" submittedAssembly="GRCh37" submitter="Color Diagnostics, LLC DBA Color Health" submitterDate="2018-11-06"/>
+    <ClinVarAccession Acc="SCV000902739" Version="1" Type="SCV" OrgID="505849" OrganizationCategory="laboratory" OrgType="primary" DateUpdated="2019-05-19" DateCreated="2019-05-19"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2015-02-19">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Likely benign</Description>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ExternalID DB="Color" ID="Db4KrQBSZeoE7-orUyypkZV0xnTaJ3TPyi4JKa7NGhk"/>
+    <AttributeSet>
+      <Attribute Type="AssertionMethod">ACMG Guidelines, 2015</Attribute>
+      <Citation>
+        <ID Source="PubMed">25741868</ID>
+      </Citation>
+    </AttributeSet>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <TypePlatform>NGS</TypePlatform>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <AttributeSet>
+          <Attribute Type="HGVS">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <MeasureRelationship Type="variant in gene">
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+        </MeasureRelationship>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <Name>
+          <ElementValue Type="Preferred">Hereditary cancer-predisposing syndrome</ElementValue>
+        </Name>
+        <XRef DB="MedGen" ID="C0027672" Type="CUI"/>
+      </Trait>
+    </TraitSet>
+  </ClinVarAssertion>
+  <ClinVarAssertion ID="4955115" SubmissionName="SUB11360768">
+    <ClinVarSubmissionID localKey="NM_000251.2:c.4G&gt;A|MedGen:C0027672" submittedAssembly="GRCh37" submitter="Sema4, Sema4" submitterDate="2022-04-25"/>
+    <ClinVarAccession Acc="SCV002534527" Version="1" Type="SCV" OrgID="500057" OrganizationCategory="laboratory" OrgType="primary" DateUpdated="2022-06-24" DateCreated="2022-06-24"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2021-04-09">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Likely benign</Description>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <AttributeSet>
+      <Attribute Type="AssertionMethod">Sema4 Curation Guidelines</Attribute>
+      <Citation>
+        <URL>https://submit.ncbi.nlm.nih.gov/ft/byid/cy0kpury/sema4_variant_curation_guidelines-clinvar_april_2022.docx</URL>
+      </Citation>
+    </AttributeSet>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>curation</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <AttributeSet>
+          <Attribute Type="HGVS">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <MeasureRelationship Type="variant in gene">
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+        </MeasureRelationship>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <XRef DB="MedGen" ID="C0027672" Type="CUI"/>
+      </Trait>
+    </TraitSet>
+  </ClinVarAssertion>
+</ClinVarSet><ClinVarSet ID="152124248">
+  <RecordStatus>current</RecordStatus>
+  <Title>NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr) AND not specified</Title>
+  <ReferenceClinVarAssertion ID="479909" DateLastUpdated="2023-08-13" DateCreated="2015-11-20">
+    <ClinVarAccession Acc="RCV000202071" Version="13" Type="RCV" DateUpdated="2023-08-13" DateCreated="2015-11-20"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2022-07-30">
+      <ReviewStatus>criteria provided, multiple submitters, no conflicts</ReviewStatus>
+      <Description>Likely benign</Description>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData ID="135058609">
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+      <ObservedData ID="135058609">
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <ObservedIn>
+      <Sample>
+        <Origin>unknown</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>research</MethodType>
+      </Method>
+      <ObservedData ID="135058610">
+        <Attribute integerValue="1" Type="VariantAlleles"/>
+      </ObservedData>
+      <ObservedData ID="135058610">
+        <Attribute integerValue="0" Type="Homozygote"/>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant" ID="41650" Acc="VCV000041650" Version="45">
+      <Measure Type="single nucleotide variant" ID="50089">
+        <Name>
+          <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+        </Name>
+        <CanonicalSPDI>NC_000002.12:47403194:G:A</CanonicalSPDI>
+        <AttributeSet>
+          <Attribute Accession="LRG_218t1" Type="HGVS, coding, LRG">LRG_218t1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_001258281" Version="1" Change="c.-31+20G&gt;A" Type="HGVS, coding, RefSeq">NM_001258281.1:c.-31+20G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="3" Change="c.4G&gt;A" Type="HGVS, coding, RefSeq" MANESelect="true">NM_000251.3:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218" Type="HGVS, genomic, LRG">LRG_218:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NG_007110" Version="2" Change="g.5072G&gt;A" Type="HGVS, genomic, RefSeqGene">NG_007110.2:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="12" Change="g.47403195G&gt;A" Type="HGVS, genomic, top level" integerValue="38">NC_000002.12:g.47403195G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="11" Change="g.47630334G&gt;A" Type="HGVS, genomic, top level, previous" integerValue="37">NC_000002.11:g.47630334G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="1" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="2" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein">p.A2T</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218p1" Change="p.Ala2Thr" Type="HGVS, protein">LRG_218p1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="P43246" Change="p.Ala2Thr" Type="HGVS, protein">P43246:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">intron variant</Attribute>
+          <XRef ID="SO:0001627" DB="Sequence Ontology"/>
+          <XRef ID="NM_001258281.1:c.-31+20G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">missense variant</Attribute>
+          <XRef ID="SO:0001583" DB="Sequence Ontology"/>
+          <XRef ID="NM_000251.3:c.4G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="ProteinChange1LetterCode">A2T</Attribute>
+        </AttributeSet>
+        <AlleleFrequencyList>
+          <AlleleFrequency Value="0.00039" Source="Exome Aggregation Consortium (ExAC)"/>
+          <AlleleFrequency Value="0.00003" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00008" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00015" Source="The Genome Aggregation Database (gnomAD), exomes"/>
+          <AlleleFrequency Value="0.00010" Source="Trans-Omics for Precision Medicine (TOPMed)"/>
+        </AlleleFrequencyList>
+        <CytogeneticLocation>2p21</CytogeneticLocation>
+        <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403195" stop="47403195" display_start="47403195" display_stop="47403195" variantLength="1" positionVCF="47403195" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630334" stop="47630334" display_start="47630334" display_stop="47630334" variantLength="1" positionVCF="47630334" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <MeasureRelationship Type="within single gene">
+          <Name>
+            <ElementValue Type="Preferred">mutS homolog 2</ElementValue>
+          </Name>
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Haploinsufficiency">Sufficient evidence for dosage pathogenicity</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Triplosensitivity">No evidence available</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403067" stop="47709830" display_start="47403067" display_stop="47709830" Strand="+"/>
+          <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630205" stop="47710366" display_start="47630205" display_stop="47710366" variantLength="80162" Strand="+"/>
+          <XRef ID="4436" DB="Gene"/>
+          <XRef Type="MIM" ID="609309" DB="OMIM"/>
+          <XRef ID="HGNC:7325" DB="HGNC"/>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2013 (PubMed 23788249) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2016 (PubMed 27854360) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2021 (SF v3.0; PubMed 34012068) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2022 (SF v3.1; PubMed 35802134) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+        </MeasureRelationship>
+        <XRef ID="CV_varv_765" DB="Institute of Human Genetics, University of Leipzig Medical Center"/>
+        <XRef ID="c.4G&gt;A" DB="International Society for Gastrointestinal Hereditary Tumours (InSiGHT)"/>
+        <XRef ID="294" DB="Mayo Clinic Laboratories, Mayo Clinic"/>
+        <XRef ID="2643642" DB="Quest Diagnostics Nichols Institute San Juan Capistrano"/>
+        <XRef ID="P43246#VAR_054511" DB="UniProtKB"/>
+        <XRef Type="rs" ID="63750466" DB="dbSNP"/>
+      </Measure>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <AttributeSet>
+        <Attribute Type="SubmitterVariantId">2330</Attribute>
+      </AttributeSet>
+      <XRef ID="CA021232" DB="ClinGen"/>
+    </MeasureSet>
+    <TraitSet Type="Disease" ID="9590">
+      <Trait ID="16789" Type="Disease">
+        <Name>
+          <ElementValue Type="Preferred">not specified</ElementValue>
+        </Name>
+        <Name>
+          <ElementValue Type="Alternate">AllHighlyPenetrant</ElementValue>
+        </Name>
+        <AttributeSet>
+          <Attribute Type="public definition">The term 'not specified' was created for use in ClinVar so that submitters can convey the concept that a variant is benign, likely benign, or of uncertain significance for an unspecified set of disorders.  This usage was introduced in 2014 to replace AllHighlyPenetrant.</Attribute>
+        </AttributeSet>
+        <XRef ID="CN169374" DB="MedGen"/>
+      </Trait>
+    </TraitSet>
+  </ReferenceClinVarAssertion>
+  <ClinVarAssertion ID="479659" SubmissionName="MC_20151112">
+    <ClinVarSubmissionID localKey="294" localKeyIsSubmitted="1" submitter="Mayo Clinic Laboratories, Mayo Clinic" submitterDate="2015-11-19"/>
+    <ClinVarAccession Acc="SCV000257190" Version="1" Type="SCV" OrgID="500068" OrganizationCategory="laboratory" OrgType="primary" DateUpdated="2015-11-20" DateCreated="2015-11-20"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance>
+      <ReviewStatus>no assertion criteria provided</ReviewStatus>
+      <Description>Uncertain significance</Description>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ExternalID DB="Mayo Clinic Genetic Testing Laboratories" ID="294"/>
+    <ObservedIn>
+      <Sample>
+        <Origin>unknown</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>research</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="VariantAlleles" integerValue="1"/>
+      </ObservedData>
+      <ObservedData>
+        <Attribute Type="Homozygote" integerValue="0"/>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <AttributeSet>
+          <Attribute Type="HGVS">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <MeasureRelationship Type="variant in gene">
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+        </MeasureRelationship>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <Name>
+          <ElementValue Type="Preferred">not specified</ElementValue>
+        </Name>
+      </Trait>
+    </TraitSet>
+  </ClinVarAssertion>
+  <ClinVarAssertion ID="1362625" SubmissionName="SUB6341163">
+    <ClinVarSubmissionID localKey="NM_000251.2:c.4G&gt;A|MedGen:CN169374" submittedAssembly="GRCh37" submitter="Women's Health and Genetics/Laboratory Corporation of America, LabCorp" submitterDate="2019-09-24"/>
+    <ClinVarAccession Acc="SCV000696273" Version="3" Type="SCV" OrgID="500026" OrganizationCategory="laboratory" OrgType="primary" DateUpdated="2019-07-28" DateCreated="2013-04-12"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2019-05-03">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Likely benign</Description>
+      <Citation>
+        <ID Source="PubMed">12624141</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">16451135</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">15849733</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">20007843</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">17192056</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">16341550</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">22703879</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">22949387</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">21642682</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">16216036</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">20388775</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">16636019</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">26556299</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">26580448</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">29769598</ID>
+      </Citation>
+      <Comment>Variant summary: MSH2 c.4G&gt;A (p.Ala2Thr) results in a non-conservative amino acid change in the encoded protein sequence. Five of five in-silico tools predict a damaging effect of the variant on protein function. 5/5 computational tools predict no significant impact on normal splicing. This was confirmed by RT-PCR results (Pagenstecher_2006). The variant allele was found at a frequency of 0.00016 in 217422 control chromosomes (gnomAD and publication data). This frequency is not significantly higher than expected for a pathogenic variant in MSH2 causing Lynch Syndrome (0.00016 vs 0.00057), allowing no conclusion about variant significance. The variant, c.4G&gt;A, has been reported in the literature in individuals affected with Lynch Syndrome, uveal malignant melanoma or autosomal dominant cancer predisposition syndromes (Mangold_2005, Kurzawski_2006, Schrader_2016, Bonadona_2011, Hajkova_2018, Zhang_2015). One publication reported one family where it showed segregation of this variant with Lynch syndrome (Mangold_2005). However, in many reports, not all MMR genes were tested or MLPA applied. Consequently, these reports do not provide unequivocal conclusions about association of the variant with Lynch Syndrome. Furthermore, in some of these families co-occurrences with other pathogenic variants have been reported (MSH2 c.1835C&gt;G, p.Ser612X (Mangold_2005); EPCAM deletion associated with MSH2 promoter methylation (Nagasaka_2010); MSH2 c.1delA (UMD); RAD51C c.97C&gt;T, p.Gln33X (Internal database)), providing supporting evidence for a benign role. To our knowledge, no experimental evidence demonstrating an impact on protein function has been reported. Six clinical diagnostic laboratories and one expert panel (InSiGHT) have submitted clinical-significance assessments for this variant to ClinVar after 2014 without evidence for independent evaluation (Likely benign (n=4 to include the expert panel), VUS (n=3)). Based on the evidence outlined above, the variant was classified as likely benign.</Comment>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <AttributeSet>
+      <Attribute Type="AssertionMethod">LabCorp Variant Classification Summary - May 2015</Attribute>
+      <Citation>
+        <URL>https://submit.ncbi.nlm.nih.gov/ft/byid/rtxspsnt/labcorp_variant_classification_method_-_may_2015.pdf</URL>
+      </Citation>
+    </AttributeSet>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <AttributeSet>
+          <Attribute Type="HGVS">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <MeasureRelationship Type="variant in gene">
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+        </MeasureRelationship>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <Name>
+          <ElementValue Type="Preferred">not specified</ElementValue>
+        </Name>
+        <XRef DB="MedGen" ID="CN169374" Type="CUI"/>
+      </Trait>
+    </TraitSet>
+  </ClinVarAssertion>
+  <ClinVarAssertion ID="4993882">
+    <ClinVarSubmissionID localKey="NM_000251.3:c.4G&gt;A|not specified" submitter="Center for Genomic Medicine, Rigshospitalet, Copenhagen University Hospital" submitterDate="2023-08-11"/>
+    <ClinVarAccession Acc="SCV002552181" Version="3" Type="SCV" OrgID="505691" OrganizationCategory="laboratory" OrgType="primary" DateUpdated="2023-08-13" DateCreated="2022-07-27"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2022-07-30">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Likely benign</Description>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <AttributeSet>
+      <Attribute Type="AssertionMethod">ACMG Guidelines, 2015</Attribute>
+      <Citation>
+        <ID Source="PubMed">25741868</ID>
+      </Citation>
+    </AttributeSet>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <AttributeSet>
+          <Attribute Type="HGVS">NM_000251.3:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <MeasureRelationship Type="variant in gene">
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+        </MeasureRelationship>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <Name>
+          <ElementValue Type="Preferred">not specified</ElementValue>
+        </Name>
+      </Trait>
+    </TraitSet>
+  </ClinVarAssertion>
+</ClinVarSet><ClinVarSet ID="152178696">
+  <RecordStatus>current</RecordStatus>
+  <Title>NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr) AND Lynch syndrome</Title>
+  <ReferenceClinVarAssertion ID="1538347" DateLastUpdated="2023-08-13" DateCreated="2018-07-28">
+    <ClinVarAccession Acc="RCV000664313" Version="4" Type="RCV" DateUpdated="2023-08-13" DateCreated="2018-07-28"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2018-02-01">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Likely benign</Description>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <AttributeSet>
+      <Attribute Type="ModeOfInheritance" integerValue="262">Autosomal dominant inheritance</Attribute>
+    </AttributeSet>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>no</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData ID="127523117">
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant" ID="41650" Acc="VCV000041650" Version="45">
+      <Measure Type="single nucleotide variant" ID="50089">
+        <Name>
+          <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+        </Name>
+        <CanonicalSPDI>NC_000002.12:47403194:G:A</CanonicalSPDI>
+        <AttributeSet>
+          <Attribute Accession="LRG_218t1" Type="HGVS, coding, LRG">LRG_218t1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_001258281" Version="1" Change="c.-31+20G&gt;A" Type="HGVS, coding, RefSeq">NM_001258281.1:c.-31+20G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="3" Change="c.4G&gt;A" Type="HGVS, coding, RefSeq" MANESelect="true">NM_000251.3:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218" Type="HGVS, genomic, LRG">LRG_218:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NG_007110" Version="2" Change="g.5072G&gt;A" Type="HGVS, genomic, RefSeqGene">NG_007110.2:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="12" Change="g.47403195G&gt;A" Type="HGVS, genomic, top level" integerValue="38">NC_000002.12:g.47403195G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="11" Change="g.47630334G&gt;A" Type="HGVS, genomic, top level, previous" integerValue="37">NC_000002.11:g.47630334G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="1" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="2" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein">p.A2T</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218p1" Change="p.Ala2Thr" Type="HGVS, protein">LRG_218p1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="P43246" Change="p.Ala2Thr" Type="HGVS, protein">P43246:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">intron variant</Attribute>
+          <XRef ID="SO:0001627" DB="Sequence Ontology"/>
+          <XRef ID="NM_001258281.1:c.-31+20G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">missense variant</Attribute>
+          <XRef ID="SO:0001583" DB="Sequence Ontology"/>
+          <XRef ID="NM_000251.3:c.4G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="ProteinChange1LetterCode">A2T</Attribute>
+        </AttributeSet>
+        <AlleleFrequencyList>
+          <AlleleFrequency Value="0.00039" Source="Exome Aggregation Consortium (ExAC)"/>
+          <AlleleFrequency Value="0.00003" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00008" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00015" Source="The Genome Aggregation Database (gnomAD), exomes"/>
+          <AlleleFrequency Value="0.00010" Source="Trans-Omics for Precision Medicine (TOPMed)"/>
+        </AlleleFrequencyList>
+        <CytogeneticLocation>2p21</CytogeneticLocation>
+        <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403195" stop="47403195" display_start="47403195" display_stop="47403195" variantLength="1" positionVCF="47403195" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630334" stop="47630334" display_start="47630334" display_stop="47630334" variantLength="1" positionVCF="47630334" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <MeasureRelationship Type="within single gene">
+          <Name>
+            <ElementValue Type="Preferred">mutS homolog 2</ElementValue>
+          </Name>
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Haploinsufficiency">Sufficient evidence for dosage pathogenicity</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Triplosensitivity">No evidence available</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403067" stop="47709830" display_start="47403067" display_stop="47709830" Strand="+"/>
+          <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630205" stop="47710366" display_start="47630205" display_stop="47710366" variantLength="80162" Strand="+"/>
+          <XRef ID="4436" DB="Gene"/>
+          <XRef Type="MIM" ID="609309" DB="OMIM"/>
+          <XRef ID="HGNC:7325" DB="HGNC"/>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2013 (PubMed 23788249) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2016 (PubMed 27854360) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2021 (SF v3.0; PubMed 34012068) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2022 (SF v3.1; PubMed 35802134) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+        </MeasureRelationship>
+        <XRef ID="CV_varv_765" DB="Institute of Human Genetics, University of Leipzig Medical Center"/>
+        <XRef ID="c.4G&gt;A" DB="International Society for Gastrointestinal Hereditary Tumours (InSiGHT)"/>
+        <XRef ID="294" DB="Mayo Clinic Laboratories, Mayo Clinic"/>
+        <XRef ID="2643642" DB="Quest Diagnostics Nichols Institute San Juan Capistrano"/>
+        <XRef ID="P43246#VAR_054511" DB="UniProtKB"/>
+        <XRef Type="rs" ID="63750466" DB="dbSNP"/>
+      </Measure>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <AttributeSet>
+        <Attribute Type="SubmitterVariantId">2330</Attribute>
+      </AttributeSet>
+      <XRef ID="CA021232" DB="ClinGen"/>
+    </MeasureSet>
+    <TraitSet Type="Disease" ID="8777">
+      <Trait ID="14688" Type="Disease">
+        <Name>
+          <ElementValue Type="Preferred">Lynch syndrome</ElementValue>
+          <XRef ID="2622" DB="GeneTests"/>
+          <XRef ID="Hereditary+Non-Polyposis+Colorectal+Cancer+%28HNPCC%29/3371" DB="Genetic Alliance"/>
+          <XRef ID="MONDO:0005835" DB="MONDO"/>
+        </Name>
+        <AttributeSet>
+          <Attribute Type="public definition">Lynch syndrome is characterized by an increased risk for colorectal cancer (CRC) and cancers of the endometrium, ovary, stomach, small bowel, urinary tract, biliary tract, brain (usually glioblastoma), skin (sebaceous adenomas, sebaceous carcinomas, and keratoacanthomas), pancreas, and prostate. Cancer risks and age of onset vary depending on the associated gene. Several other cancer types have been reported to occur in individuals with Lynch syndrome (e.g., breast, sarcomas, adrenocortical carcinoma). However, the data are not sufficient to demonstrate that the risk of developing these cancers is increased in individuals with Lynch syndrome.</Attribute>
+          <XRef ID="NBK1211" DB="GeneReviews"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="disease mechanism" integerValue="273">loss of function</Attribute>
+          <XRef ID="GTR000316595" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000321105" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000322202" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000325623" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000332519" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000512403" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000512828" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000515534" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000515774" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000515821" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000518997" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000518999" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000519150" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000519254" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000520030" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000520080" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000520392" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000520394" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000520865" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000520867" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000520868" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000520869" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000520870" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000520871" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000520872" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000522224" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000522225" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000522278" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000522559" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000527981" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000527983" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000527984" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000528529" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000528534" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000528914" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000528915" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000528930" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000529017" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000530028" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000530120" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000530202" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000551450" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000551459" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000551461" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000551463" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000551464" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000552183" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000552184" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000552245" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000552440" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000558503" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000558908" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000561860" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000562151" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000568362" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000568365" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000569916" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000569958" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000570011" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000591173" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000591263" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000604264" DB="Genetic Testing Registry (GTR)"/>
+        </AttributeSet>
+        <Citation Type="review" Abbrev="GeneReviews">
+          <ID Source="PubMed">20301390</ID>
+          <ID Source="BookShelf">NBK1211</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="EGAPP, 2009">
+          <ID Source="pmc">2743612</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ASCRS, 2001">
+          <ID Source="PubMed">11598466</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="NSGC, 2004">
+          <ID Source="PubMed">15604628</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ACMG, 2013">
+          <ID Source="PubMed">23788249</ID>
+        </Citation>
+        <Citation Type="Suggested Reading" Abbrev="AMA/NCHPEG, 2012">
+          <URL>http://www.nchpeg.org/documents/crc/11-0456%20Fact%20sheets%20(MSI%20and%20IHC%20testing).pdf</URL>
+        </Citation>
+        <Citation Type="practice guideline" Abbrev="SGO, 2014">
+          <URL>https://www.sgo.org/clinical-practice/guidelines/screening-for-lynch-syndrome-in-endometrial-cancer</URL>
+          <CitationText>Society of Gynecologic Oncology (SGO) Clinical Practice Statement: Screening for Lynch Syndrome in Endometrial Cancer</CitationText>
+        </Citation>
+        <Citation Type="general" Abbrev="MSTF, 2014">
+          <ID Source="PubMed">25070057</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ASCO, 2014">
+          <ID Source="PubMed">24493721</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="CAPS, 2013">
+          <ID Source="pmc">3585492</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ASCO/ESMO, 2015">
+          <ID Source="PubMed">25452455</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ACMG, 2014">
+          <ID Source="PubMed">24310308</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="Mork et al., 2015">
+          <ID Source="PubMed">25711197</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="Dutch SCG, 2013">
+          <ID Source="PubMed">23535968</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ACG, 2015">
+          <ID Source="PubMed">25645574</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="Mallorca group, 2013">
+          <ID Source="PubMed">23408351</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ACMG, 2015">
+          <ID Source="PubMed">25356965</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ACMG, 2016">
+          <ID Source="PubMed">27854360</ID>
+          <ID Source="DOI">10.1038/gim.2016.190</ID>
+        </Citation>
+        <Citation Type="Suggested Reading" Abbrev="NCI PDQ, Genetics of Colorectal Cancer">
+          <ID Source="PubMed">26389505</ID>
+        </Citation>
+        <Citation Type="Suggested Reading" Abbrev="NCI PDQ, Breast and Gynecologic Cancers">
+          <ID Source="PubMed">26389210</ID>
+        </Citation>
+        <Citation Type="Suggested Reading" Abbrev="NCI PDQ, Cancer Genetics Counseling">
+          <ID Source="PubMed">26389258</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ASCO, 2015">
+          <ID Source="PubMed">26324357</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="CAPS, 2020">
+          <ID Source="PubMed">31672839</ID>
+          <ID Source="pmc">7295005</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="EHTG/ESCP, 2021">
+          <ID Source="PubMed">34043773</ID>
+        </Citation>
+        <Citation Type="Suggested Reading" Abbrev="Goldberg et al, 2019">
+          <ID Source="PubMed">31302137</ID>
+        </Citation>
+        <Citation Type="practice guideline" Abbrev="ACMG ACT, 2012">
+          <URL>https://www.acmg.net/PDFLibrary/Colon-Cancer.pdf</URL>
+          <CitationText>American College of Medical Genetics and Genomics Family History ACT Sheet, Colon Cancer (Asymptomatic), 2012</CitationText>
+        </Citation>
+        <Citation Type="practice guideline" Abbrev="NICE, 2021">
+          <URL>https://www.nice.org.uk/guidance/ng151</URL>
+          <CitationText>UK NICE Guideline NG151, Colorectal cancer, 2021</CitationText>
+        </Citation>
+        <Citation Type="practice guideline" Abbrev="NICE, 2020">
+          <URL>https://www.nice.org.uk/guidance/dg42</URL>
+          <CitationText>UK NICE Diagnostics Guidance DG42, Testing strategies for Lynch syndrome in people with endometrial cancer, 2020</CitationText>
+        </Citation>
+        <XRef ID="MONDO:0005835" DB="MONDO"/>
+        <XRef ID="C4552100" DB="MedGen"/>
+      </Trait>
+    </TraitSet>
+  </ReferenceClinVarAssertion>
+  <ClinVarAssertion ID="1538210" SubmissionName="SUB3766086">
+    <ClinVarSubmissionID localKey="Chr2:47630334_G_A|MedGen:C1333990" submittedAssembly="GRCh37" submitter="University of Washington Department of Laboratory Medicine, University of Washington" submitterDate="2018-03-09"/>
+    <ClinVarAccession Acc="SCV000788246" Version="1" Type="SCV" OrgID="506834" OrganizationCategory="laboratory" OrgType="primary" DateUpdated="2018-07-28" DateCreated="2018-07-28"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2018-02-01">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Likely benign</Description>
+      <Citation>
+        <ID Source="PubMed">16341550</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">15849733</ID>
+      </Citation>
+      <Citation>
+        <ID Source="PubMed">20388775</ID>
+      </Citation>
+      <Comment>MSH2 p.A2T has been reported to co-occur with a MSH2 nonsense variant and a 3' EPCAM deletion where MSH2 promoter methylation was identified (Mangold 2005, Nagasaka 2010). Functional RNA studies performed on peripheral blood found normal RNA levels in patients that carry p.A2T (Pagenstecher 2006). MSH2 p.A2T was observed at an allele frequency of 0.0724% (14/19320 alleles) in large population cohorts (NHLBI Exome Sequencing Project, The 1000 Genomes Consortium 2015, Lek 2016), and it was observed in 1/208 individuals with atherosclerosis, with no specific information about cancer history (Johnston 2012).</Comment>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ExternalID DB="University of Washington Department of Laboratory Medicine" ID="Chr2:47630334_G_A"/>
+    <AttributeSet>
+      <Attribute Type="ModeOfInheritance">Autosomal dominant inheritance</Attribute>
+    </AttributeSet>
+    <AttributeSet>
+      <Attribute Type="AssertionMethod">Shirts BH et al. (Genet Med 2016)</Attribute>
+      <Citation>
+        <ID Source="PubMed">26845104</ID>
+      </Citation>
+    </AttributeSet>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>no</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+      <TraitSet Type="Finding">
+        <Trait ClinicalFeaturesAffectedStatus="present" Type="Finding">
+          <Name>
+            <ElementValue Type="Preferred">Colon cancer</ElementValue>
+          </Name>
+        </Trait>
+        <Trait ClinicalFeaturesAffectedStatus="present" Type="Finding">
+          <Name>
+            <ElementValue Type="Preferred">Colorectal polyps</ElementValue>
+          </Name>
+        </Trait>
+      </TraitSet>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <AttributeSet>
+          <Attribute Type="HGVS">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <MeasureRelationship Type="variant in gene">
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+        </MeasureRelationship>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <XRef DB="MedGen" ID="C1333990" Type="CUI"/>
+      </Trait>
+    </TraitSet>
+  </ClinVarAssertion>
+</ClinVarSet><ClinVarSet ID="152207015">
+  <RecordStatus>current</RecordStatus>
+  <Title>NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr) AND Hereditary nonpolyposis colorectal neoplasms</Title>
+  <ReferenceClinVarAssertion ID="2460177" DateLastUpdated="2023-08-13" DateCreated="2020-05-04">
+    <ClinVarAccession Acc="RCV001083980" Version="7" Type="RCV" DateUpdated="2023-08-13" DateCreated="2020-05-04"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2022-10-31">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Likely benign</Description>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData ID="126746089">
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant" ID="41650" Acc="VCV000041650" Version="45">
+      <Measure Type="single nucleotide variant" ID="50089">
+        <Name>
+          <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+        </Name>
+        <CanonicalSPDI>NC_000002.12:47403194:G:A</CanonicalSPDI>
+        <AttributeSet>
+          <Attribute Accession="LRG_218t1" Type="HGVS, coding, LRG">LRG_218t1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_001258281" Version="1" Change="c.-31+20G&gt;A" Type="HGVS, coding, RefSeq">NM_001258281.1:c.-31+20G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="3" Change="c.4G&gt;A" Type="HGVS, coding, RefSeq" MANESelect="true">NM_000251.3:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218" Type="HGVS, genomic, LRG">LRG_218:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NG_007110" Version="2" Change="g.5072G&gt;A" Type="HGVS, genomic, RefSeqGene">NG_007110.2:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="12" Change="g.47403195G&gt;A" Type="HGVS, genomic, top level" integerValue="38">NC_000002.12:g.47403195G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="11" Change="g.47630334G&gt;A" Type="HGVS, genomic, top level, previous" integerValue="37">NC_000002.11:g.47630334G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="1" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="2" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein">p.A2T</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218p1" Change="p.Ala2Thr" Type="HGVS, protein">LRG_218p1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="P43246" Change="p.Ala2Thr" Type="HGVS, protein">P43246:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">intron variant</Attribute>
+          <XRef ID="SO:0001627" DB="Sequence Ontology"/>
+          <XRef ID="NM_001258281.1:c.-31+20G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">missense variant</Attribute>
+          <XRef ID="SO:0001583" DB="Sequence Ontology"/>
+          <XRef ID="NM_000251.3:c.4G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="ProteinChange1LetterCode">A2T</Attribute>
+        </AttributeSet>
+        <AlleleFrequencyList>
+          <AlleleFrequency Value="0.00039" Source="Exome Aggregation Consortium (ExAC)"/>
+          <AlleleFrequency Value="0.00003" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00008" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00015" Source="The Genome Aggregation Database (gnomAD), exomes"/>
+          <AlleleFrequency Value="0.00010" Source="Trans-Omics for Precision Medicine (TOPMed)"/>
+        </AlleleFrequencyList>
+        <CytogeneticLocation>2p21</CytogeneticLocation>
+        <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403195" stop="47403195" display_start="47403195" display_stop="47403195" variantLength="1" positionVCF="47403195" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630334" stop="47630334" display_start="47630334" display_stop="47630334" variantLength="1" positionVCF="47630334" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <MeasureRelationship Type="within single gene">
+          <Name>
+            <ElementValue Type="Preferred">mutS homolog 2</ElementValue>
+          </Name>
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Haploinsufficiency">Sufficient evidence for dosage pathogenicity</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Triplosensitivity">No evidence available</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403067" stop="47709830" display_start="47403067" display_stop="47709830" Strand="+"/>
+          <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630205" stop="47710366" display_start="47630205" display_stop="47710366" variantLength="80162" Strand="+"/>
+          <XRef ID="4436" DB="Gene"/>
+          <XRef Type="MIM" ID="609309" DB="OMIM"/>
+          <XRef ID="HGNC:7325" DB="HGNC"/>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2013 (PubMed 23788249) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2016 (PubMed 27854360) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2021 (SF v3.0; PubMed 34012068) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2022 (SF v3.1; PubMed 35802134) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+        </MeasureRelationship>
+        <XRef ID="CV_varv_765" DB="Institute of Human Genetics, University of Leipzig Medical Center"/>
+        <XRef ID="c.4G&gt;A" DB="International Society for Gastrointestinal Hereditary Tumours (InSiGHT)"/>
+        <XRef ID="294" DB="Mayo Clinic Laboratories, Mayo Clinic"/>
+        <XRef ID="2643642" DB="Quest Diagnostics Nichols Institute San Juan Capistrano"/>
+        <XRef ID="P43246#VAR_054511" DB="UniProtKB"/>
+        <XRef Type="rs" ID="63750466" DB="dbSNP"/>
+      </Measure>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <AttributeSet>
+        <Attribute Type="SubmitterVariantId">2330</Attribute>
+      </AttributeSet>
+      <XRef ID="CA021232" DB="ClinGen"/>
+    </MeasureSet>
+    <TraitSet Type="Disease" ID="37727">
+      <Trait ID="38245" Type="Disease">
+        <Name>
+          <ElementValue Type="Preferred">Hereditary nonpolyposis colorectal neoplasms</ElementValue>
+          <XRef ID="D003123" DB="MeSH"/>
+        </Name>
+        <XRef ID="D003123" DB="MeSH"/>
+        <XRef ID="C0009405" DB="MedGen"/>
+      </Trait>
+    </TraitSet>
+  </ReferenceClinVarAssertion>
+  <ClinVarAssertion ID="484338">
+    <ClinVarSubmissionID localKey="259413|MedGen:C0009405" submittedAssembly="GRCh37" submitter="Invitae" submitterDate="2023-01-10"/>
+    <ClinVarAccession Acc="SCV000259383" Version="10" Type="SCV" OrgID="500031" OrganizationCategory="laboratory" OrgType="primary" DateUpdated="2023-02-07" DateCreated="2016-01-31"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2022-10-31">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Likely benign</Description>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ExternalID DB="Invitae" ID="259413"/>
+    <AttributeSet>
+      <Attribute Type="AssertionMethod">Invitae Variant Classification Sherloc (09022015)</Attribute>
+      <Citation>
+        <ID Source="PubMed">28492532</ID>
+      </Citation>
+    </AttributeSet>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <AttributeSet>
+          <Attribute Type="HGVS">NC_000002.11:g.47630334G&gt;A</Attribute>
+        </AttributeSet>
+        <MeasureRelationship Type="variant in gene">
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+        </MeasureRelationship>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <XRef DB="MedGen" ID="C0009405" Type="CUI"/>
+      </Trait>
+    </TraitSet>
+  </ClinVarAssertion>
+</ClinVarSet><ClinVarSet ID="152223735">
+  <RecordStatus>current</RecordStatus>
+  <Title>NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr) AND Breast carcinoma</Title>
+  <ReferenceClinVarAssertion ID="2845014" DateLastUpdated="2023-08-13" DateCreated="2020-10-31">
+    <ClinVarAccession Acc="RCV001262884" Version="2" Type="RCV" DateUpdated="2023-08-13" DateCreated="2020-10-31"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2019-01-01">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Uncertain significance</Description>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ObservedIn>
+      <Sample>
+        <Origin>unknown</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>yes</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData ID="126764508">
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant" ID="41650" Acc="VCV000041650" Version="45">
+      <Measure Type="single nucleotide variant" ID="50089">
+        <Name>
+          <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+        </Name>
+        <CanonicalSPDI>NC_000002.12:47403194:G:A</CanonicalSPDI>
+        <AttributeSet>
+          <Attribute Accession="LRG_218t1" Type="HGVS, coding, LRG">LRG_218t1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_001258281" Version="1" Change="c.-31+20G&gt;A" Type="HGVS, coding, RefSeq">NM_001258281.1:c.-31+20G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="3" Change="c.4G&gt;A" Type="HGVS, coding, RefSeq" MANESelect="true">NM_000251.3:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218" Type="HGVS, genomic, LRG">LRG_218:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NG_007110" Version="2" Change="g.5072G&gt;A" Type="HGVS, genomic, RefSeqGene">NG_007110.2:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="12" Change="g.47403195G&gt;A" Type="HGVS, genomic, top level" integerValue="38">NC_000002.12:g.47403195G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="11" Change="g.47630334G&gt;A" Type="HGVS, genomic, top level, previous" integerValue="37">NC_000002.11:g.47630334G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="1" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="2" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein">p.A2T</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218p1" Change="p.Ala2Thr" Type="HGVS, protein">LRG_218p1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="P43246" Change="p.Ala2Thr" Type="HGVS, protein">P43246:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">intron variant</Attribute>
+          <XRef ID="SO:0001627" DB="Sequence Ontology"/>
+          <XRef ID="NM_001258281.1:c.-31+20G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">missense variant</Attribute>
+          <XRef ID="SO:0001583" DB="Sequence Ontology"/>
+          <XRef ID="NM_000251.3:c.4G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="ProteinChange1LetterCode">A2T</Attribute>
+        </AttributeSet>
+        <AlleleFrequencyList>
+          <AlleleFrequency Value="0.00039" Source="Exome Aggregation Consortium (ExAC)"/>
+          <AlleleFrequency Value="0.00003" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00008" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00015" Source="The Genome Aggregation Database (gnomAD), exomes"/>
+          <AlleleFrequency Value="0.00010" Source="Trans-Omics for Precision Medicine (TOPMed)"/>
+        </AlleleFrequencyList>
+        <CytogeneticLocation>2p21</CytogeneticLocation>
+        <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403195" stop="47403195" display_start="47403195" display_stop="47403195" variantLength="1" positionVCF="47403195" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630334" stop="47630334" display_start="47630334" display_stop="47630334" variantLength="1" positionVCF="47630334" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <MeasureRelationship Type="within single gene">
+          <Name>
+            <ElementValue Type="Preferred">mutS homolog 2</ElementValue>
+          </Name>
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Haploinsufficiency">Sufficient evidence for dosage pathogenicity</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Triplosensitivity">No evidence available</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403067" stop="47709830" display_start="47403067" display_stop="47709830" Strand="+"/>
+          <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630205" stop="47710366" display_start="47630205" display_stop="47710366" variantLength="80162" Strand="+"/>
+          <XRef ID="4436" DB="Gene"/>
+          <XRef Type="MIM" ID="609309" DB="OMIM"/>
+          <XRef ID="HGNC:7325" DB="HGNC"/>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2013 (PubMed 23788249) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2016 (PubMed 27854360) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2021 (SF v3.0; PubMed 34012068) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2022 (SF v3.1; PubMed 35802134) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+        </MeasureRelationship>
+        <XRef ID="CV_varv_765" DB="Institute of Human Genetics, University of Leipzig Medical Center"/>
+        <XRef ID="c.4G&gt;A" DB="International Society for Gastrointestinal Hereditary Tumours (InSiGHT)"/>
+        <XRef ID="294" DB="Mayo Clinic Laboratories, Mayo Clinic"/>
+        <XRef ID="2643642" DB="Quest Diagnostics Nichols Institute San Juan Capistrano"/>
+        <XRef ID="P43246#VAR_054511" DB="UniProtKB"/>
+        <XRef Type="rs" ID="63750466" DB="dbSNP"/>
+      </Measure>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <AttributeSet>
+        <Attribute Type="SubmitterVariantId">2330</Attribute>
+      </AttributeSet>
+      <XRef ID="CA021232" DB="ClinGen"/>
+    </MeasureSet>
+    <TraitSet Type="Finding" ID="17313">
+      <Trait ID="23475" Type="Disease">
+        <Name>
+          <ElementValue Type="Preferred">Breast carcinoma</ElementValue>
+          <XRef ID="HP:0003002" DB="Human Phenotype Ontology"/>
+          <XRef ID="MONDO:0004989" DB="MONDO"/>
+        </Name>
+        <Name>
+          <ElementValue Type="Alternate">Carcinoma of breast</ElementValue>
+          <XRef ID="254838004" DB="SNOMED CT"/>
+        </Name>
+        <XRef ID="MONDO:0004989" DB="MONDO"/>
+        <XRef ID="C0678222" DB="MedGen"/>
+        <XRef Type="primary" ID="HP:0003002" DB="Human Phenotype Ontology"/>
+      </Trait>
+    </TraitSet>
+  </ReferenceClinVarAssertion>
+  <ClinVarAssertion ID="2843982" SubmissionName="varv_082020">
+    <ClinVarSubmissionID localKey="CV_varv_765|Breast carcinoma" submittedAssembly="GRCh37" submitter="Institute of Human Genetics, University of Leipzig Medical Center" submitterDate="2020-10-12"/>
+    <ClinVarAccession Acc="SCV001440919" Version="1" Type="SCV" OrgID="506086" OrganizationCategory="clinic" OrgType="primary" DateUpdated="2020-10-31" DateCreated="2020-10-31"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2019-01-01">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Uncertain significance</Description>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ExternalID DB="Institute of Human Genetics" ID="CV_varv_765"/>
+    <AttributeSet>
+      <Attribute Type="AssertionMethod">ACMG Guidelines, 2015</Attribute>
+      <Citation>
+        <ID Source="PubMed">25741868</ID>
+      </Citation>
+    </AttributeSet>
+    <ObservedIn>
+      <Sample>
+        <Origin>unknown</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>yes</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <AttributeSet>
+          <Attribute Type="HGVS">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <MeasureRelationship Type="variant in gene">
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+        </MeasureRelationship>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Finding">
+      <Trait Type="Finding">
+        <Name>
+          <ElementValue Type="Preferred">Breast carcinoma</ElementValue>
+        </Name>
+      </Trait>
+    </TraitSet>
+  </ClinVarAssertion>
+</ClinVarSet><ClinVarSet ID="152228595">
+  <RecordStatus>current</RecordStatus>
+  <Title>NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr) AND Malignant tumor of breast</Title>
+  <ReferenceClinVarAssertion ID="3059616" DateLastUpdated="2023-08-13" DateCreated="2021-04-13">
+    <ClinVarAccession Acc="RCV001356983" Version="2" Type="RCV" DateUpdated="2023-08-13" DateCreated="2021-04-13"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance>
+      <ReviewStatus>no assertion criteria provided</ReviewStatus>
+      <Description>Uncertain significance</Description>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ObservedIn>
+      <Sample>
+        <Origin>unknown</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>yes</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData ID="130763390">
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant" ID="41650" Acc="VCV000041650" Version="45">
+      <Measure Type="single nucleotide variant" ID="50089">
+        <Name>
+          <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+        </Name>
+        <CanonicalSPDI>NC_000002.12:47403194:G:A</CanonicalSPDI>
+        <AttributeSet>
+          <Attribute Accession="LRG_218t1" Type="HGVS, coding, LRG">LRG_218t1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_001258281" Version="1" Change="c.-31+20G&gt;A" Type="HGVS, coding, RefSeq">NM_001258281.1:c.-31+20G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="3" Change="c.4G&gt;A" Type="HGVS, coding, RefSeq" MANESelect="true">NM_000251.3:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218" Type="HGVS, genomic, LRG">LRG_218:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NG_007110" Version="2" Change="g.5072G&gt;A" Type="HGVS, genomic, RefSeqGene">NG_007110.2:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="12" Change="g.47403195G&gt;A" Type="HGVS, genomic, top level" integerValue="38">NC_000002.12:g.47403195G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="11" Change="g.47630334G&gt;A" Type="HGVS, genomic, top level, previous" integerValue="37">NC_000002.11:g.47630334G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="1" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="2" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein">p.A2T</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218p1" Change="p.Ala2Thr" Type="HGVS, protein">LRG_218p1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="P43246" Change="p.Ala2Thr" Type="HGVS, protein">P43246:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">intron variant</Attribute>
+          <XRef ID="SO:0001627" DB="Sequence Ontology"/>
+          <XRef ID="NM_001258281.1:c.-31+20G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">missense variant</Attribute>
+          <XRef ID="SO:0001583" DB="Sequence Ontology"/>
+          <XRef ID="NM_000251.3:c.4G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="ProteinChange1LetterCode">A2T</Attribute>
+        </AttributeSet>
+        <AlleleFrequencyList>
+          <AlleleFrequency Value="0.00039" Source="Exome Aggregation Consortium (ExAC)"/>
+          <AlleleFrequency Value="0.00003" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00008" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00015" Source="The Genome Aggregation Database (gnomAD), exomes"/>
+          <AlleleFrequency Value="0.00010" Source="Trans-Omics for Precision Medicine (TOPMed)"/>
+        </AlleleFrequencyList>
+        <CytogeneticLocation>2p21</CytogeneticLocation>
+        <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403195" stop="47403195" display_start="47403195" display_stop="47403195" variantLength="1" positionVCF="47403195" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630334" stop="47630334" display_start="47630334" display_stop="47630334" variantLength="1" positionVCF="47630334" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <MeasureRelationship Type="within single gene">
+          <Name>
+            <ElementValue Type="Preferred">mutS homolog 2</ElementValue>
+          </Name>
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Haploinsufficiency">Sufficient evidence for dosage pathogenicity</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Triplosensitivity">No evidence available</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403067" stop="47709830" display_start="47403067" display_stop="47709830" Strand="+"/>
+          <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630205" stop="47710366" display_start="47630205" display_stop="47710366" variantLength="80162" Strand="+"/>
+          <XRef ID="4436" DB="Gene"/>
+          <XRef Type="MIM" ID="609309" DB="OMIM"/>
+          <XRef ID="HGNC:7325" DB="HGNC"/>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2013 (PubMed 23788249) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2016 (PubMed 27854360) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2021 (SF v3.0; PubMed 34012068) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2022 (SF v3.1; PubMed 35802134) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+        </MeasureRelationship>
+        <XRef ID="CV_varv_765" DB="Institute of Human Genetics, University of Leipzig Medical Center"/>
+        <XRef ID="c.4G&gt;A" DB="International Society for Gastrointestinal Hereditary Tumours (InSiGHT)"/>
+        <XRef ID="294" DB="Mayo Clinic Laboratories, Mayo Clinic"/>
+        <XRef ID="2643642" DB="Quest Diagnostics Nichols Institute San Juan Capistrano"/>
+        <XRef ID="P43246#VAR_054511" DB="UniProtKB"/>
+        <XRef Type="rs" ID="63750466" DB="dbSNP"/>
+      </Measure>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <AttributeSet>
+        <Attribute Type="SubmitterVariantId">2330</Attribute>
+      </AttributeSet>
+      <XRef ID="CA021232" DB="ClinGen"/>
+    </MeasureSet>
+    <TraitSet Type="Finding" ID="25616">
+      <Trait ID="34847" Type="Finding">
+        <Name>
+          <ElementValue Type="Preferred">Malignant tumor of breast</ElementValue>
+          <XRef ID="254837009" DB="SNOMED CT"/>
+        </Name>
+        <Name>
+          <ElementValue Type="Alternate">Malignant breast neoplasm</ElementValue>
+          <XRef ID="C9335" DB="NCI"/>
+        </Name>
+        <Name>
+          <ElementValue Type="Alternate">Cancer breast</ElementValue>
+        </Name>
+        <AttributeSet>
+          <Attribute Type="disease mechanism" integerValue="273">loss of function</Attribute>
+          <XRef ID="GTR000569423" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000570011" DB="Genetic Testing Registry (GTR)"/>
+          <XRef ID="GTR000604264" DB="Genetic Testing Registry (GTR)"/>
+        </AttributeSet>
+        <Citation Type="general" Abbrev="ASCO, 2010">
+          <ID Source="pmc">2936467</ID>
+        </Citation>
+        <Citation Type="Suggested Reading" Abbrev="NCI PDQ, Breast and Gynecologic Cancers">
+          <ID Source="PubMed">26389210</ID>
+        </Citation>
+        <Citation Type="Suggested Reading" Abbrev="NCI PDQ, Cancer Genetics Counseling">
+          <ID Source="PubMed">26389258</ID>
+        </Citation>
+        <Citation Type="practice guideline" Abbrev="NCCN, 2023">
+          <URL>https://www.nccn.org/guidelines/guidelines-detail?category=1&amp;id=1419</URL>
+          <CitationText>Breast Cancer, NCCN Guidelines Version 4.2022</CitationText>
+        </Citation>
+        <Citation Type="general" Abbrev="ASCO, 2018">
+          <ID Source="PubMed">29939840</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="USPSTF, 2019">
+          <ID Source="PubMed">31479144</ID>
+        </Citation>
+        <Citation Type="general" Abbrev="ASCO, 2019">
+          <ID Source="PubMed">30452337</ID>
+        </Citation>
+        <Citation Type="practice guideline" Abbrev="NICE, 2018">
+          <URL>https://www.nice.org.uk/guidance/dg34</URL>
+          <CitationText>Tumour profiling tests to guide adjuvant chemotherapy decisions in early breast cancer (DG34)</CitationText>
+        </Citation>
+        <XRef ID="MONDO:0007254" DB="MONDO"/>
+        <XRef ID="C0006142" DB="MedGen"/>
+      </Trait>
+    </TraitSet>
+  </ReferenceClinVarAssertion>
+  <ClinVarAssertion ID="3053325" SubmissionName="SUB9371647">
+    <ClinVarSubmissionID localKey="chr2:47630333-47630334:1d909d722c2f594054aa9df6b5d07fbf-BREAST" localKeyIsSubmitted="1" submittedAssembly="GRCh37" submitter="Department of Pathology and Laboratory Medicine, Sinai Health System" submitterDate="2021-03-31"/>
+    <ClinVarAccession Acc="SCV001552292" Version="1" Type="SCV" OrgID="506152" OrganizationCategory="laboratory" OrgType="primary" DateUpdated="2021-04-13" DateCreated="2021-04-13"/>
+    <AdditionalSubmitters>
+      <SubmitterDescription OrgID="506759" SubmitterName="Franklin by Genoox" Type="secondary" category="other"/>
+    </AdditionalSubmitters>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance>
+      <ReviewStatus>no assertion criteria provided</ReviewStatus>
+      <Description>Uncertain significance</Description>
+      <Comment>The MSH2 p.Ala2Thr variant was identified in 15 of 38724 proband chromosomes (frequency: 0.0004) from individuals or families with lynch syndrome or colorectal cancer (Bonadona 2011, Dymerska 2010, Johnston 2012, Kurzawski 2006, Mangold 2005, Nagasaka 2010, Parc 2003). The variant was identified in dbSNP (ID: rs63750466) as â€šÃ„ÃºWith Uncertain significance alleleâ€šÃ„Ã¹, ClinVar (as uncertain significance, reviewed by an expert panel including 6x as uncertain significance and 2x as likely benign), Clinvitae (5x), UMD-LSDB (30x as neutral), Mismatch Repair Genes Variant Database, and in the Insight Hereditary Tumors database (19x). In UMD the variant was identified with a co-occurring pathogenic MSH2 variant (c.1delA, p.Met1?), increasing the likelihood that the p.Ala2Thr variant does not have clinical significance. The variant was not identified in the COGR, Cosmic, MutDB, or Zhejiang University databases. The variant was identified in control databases in 34 of 241756 chromosomes at a frequency of 0.0001 (Genome Aggregation Database Feb 27, 2017). It was observed in the following populations: â€šÃ„ÃºOtherâ€šÃ„Ã¹ in 1 of 5740 chromosomes (freq: 0.0002), European in 25 of 109176 chromosomes (freq: 0.0002), and Finnish in 8 of 21430 chromosomes (freq: 0.0004); it was not observed in the African, Latino, Ashkenazi Jewish, East Asian, or South Asian populations. The p.Ala2 residue is conserved across mammals and other organisms, and four out of five computational analyses (PolyPhen-2, SIFT, AlignGVGD, BLOSUM, MutationTaster) suggest that the variant may impact the protein; however, this information is not predictive enough to assume pathogenicity. The variant occurs outside of the splicing consensus sequence and 1 of 5 in silico or computational prediction software programs (SpliceSiteFinder, MaxEntScan, NNSPLICE, GeneSplicer, HumanSpliceFinder) predict a greater than 10% difference in splicing; this is not very predictive of pathogenicity. In one study, Immunohistochemical analysis of this variant in tumors from relatives (mother and son - both of whom were carriers of the variant) revealed a loss of MSH2 protein expression; this finding supported a pathogenic role for the MSH2, c.4G&gt;A, p.Ala2Thr variant (Mangold 2005). In another publication this variant is reported to segregate with the disease in several family members (at least 10 meioses) and showed loss of MSH2 expression in tumors of four affected family members. This variant is clearly linked to the disease in this specific family (Pagenstecher 2006). However, there is conflicting evidence in the literature; this variant was identified in an individual as co-occurring with pathogenic variant in MSH2 (c.1835C&gt;G, p.S612X) (Lucci-Cordisco 2006, Mangold 2005). In summary, based on the above information the clinical significance of this variant cannot be determined with certainty at this time. This variant is classified as a variant of uncertain significance.</Comment>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ExternalID DB="Department of Pathology and Laboratory Medicine" ID="chr2:47630333-47630334:1d909d722c2f594054aa9df6b5d07fbf"/>
+    <ObservedIn>
+      <Sample>
+        <Origin>unknown</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>yes</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <SequenceLocation Assembly="GRCh37" Chr="2" alternateAllele="A" referenceAllele="G" start="47630334" stop="47630334" variantLength="1"/>
+        <MeasureRelationship Type="variant in gene">
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+        </MeasureRelationship>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <XRef DB="MONDO" ID="MONDO:0007254"/>
+      </Trait>
+    </TraitSet>
+    <StudyName>The Canadian Open Genetics Repository (COGR)</StudyName>
+  </ClinVarAssertion>
+</ClinVarSet><ClinVarSet ID="152356389">
+  <RecordStatus>current</RecordStatus>
+  <Title>NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr) AND Breast and/or ovarian cancer</Title>
+  <ReferenceClinVarAssertion ID="7166395" DateLastUpdated="2023-08-13" DateCreated="2023-03-11">
+    <ClinVarAccession Acc="RCV003149608" Version="2" Type="RCV" DateUpdated="2023-08-13" DateCreated="2023-03-11"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2021-10-08">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Uncertain significance</Description>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData ID="127579819">
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant" ID="41650" Acc="VCV000041650" Version="45">
+      <Measure Type="single nucleotide variant" ID="50089">
+        <Name>
+          <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+        </Name>
+        <CanonicalSPDI>NC_000002.12:47403194:G:A</CanonicalSPDI>
+        <AttributeSet>
+          <Attribute Accession="LRG_218t1" Type="HGVS, coding, LRG">LRG_218t1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_001258281" Version="1" Change="c.-31+20G&gt;A" Type="HGVS, coding, RefSeq">NM_001258281.1:c.-31+20G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="3" Change="c.4G&gt;A" Type="HGVS, coding, RefSeq" MANESelect="true">NM_000251.3:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218" Type="HGVS, genomic, LRG">LRG_218:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NG_007110" Version="2" Change="g.5072G&gt;A" Type="HGVS, genomic, RefSeqGene">NG_007110.2:g.5072G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="12" Change="g.47403195G&gt;A" Type="HGVS, genomic, top level" integerValue="38">NC_000002.12:g.47403195G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NC_000002" Version="11" Change="g.47630334G&gt;A" Type="HGVS, genomic, top level, previous" integerValue="37">NC_000002.11:g.47630334G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="1" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.1:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NM_000251" Version="2" Change="c.4G&gt;A" Type="HGVS, previous">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="HGVS, protein">p.A2T</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="LRG_218p1" Change="p.Ala2Thr" Type="HGVS, protein">LRG_218p1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="P43246" Change="p.Ala2Thr" Type="HGVS, protein">P43246:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Accession="NP_000242" Version="1" Change="p.Ala2Thr" Type="HGVS, protein, RefSeq">NP_000242.1:p.Ala2Thr</Attribute>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">intron variant</Attribute>
+          <XRef ID="SO:0001627" DB="Sequence Ontology"/>
+          <XRef ID="NM_001258281.1:c.-31+20G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="MolecularConsequence">missense variant</Attribute>
+          <XRef ID="SO:0001583" DB="Sequence Ontology"/>
+          <XRef ID="NM_000251.3:c.4G&gt;A" DB="RefSeq"/>
+        </AttributeSet>
+        <AttributeSet>
+          <Attribute Type="ProteinChange1LetterCode">A2T</Attribute>
+        </AttributeSet>
+        <AlleleFrequencyList>
+          <AlleleFrequency Value="0.00039" Source="Exome Aggregation Consortium (ExAC)"/>
+          <AlleleFrequency Value="0.00003" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00008" Source="The Genome Aggregation Database (gnomAD)"/>
+          <AlleleFrequency Value="0.00015" Source="The Genome Aggregation Database (gnomAD), exomes"/>
+          <AlleleFrequency Value="0.00010" Source="Trans-Omics for Precision Medicine (TOPMed)"/>
+        </AlleleFrequencyList>
+        <CytogeneticLocation>2p21</CytogeneticLocation>
+        <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403195" stop="47403195" display_start="47403195" display_stop="47403195" variantLength="1" positionVCF="47403195" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630334" stop="47630334" display_start="47630334" display_stop="47630334" variantLength="1" positionVCF="47630334" referenceAlleleVCF="G" alternateAlleleVCF="A"/>
+        <MeasureRelationship Type="within single gene">
+          <Name>
+            <ElementValue Type="Preferred">mutS homolog 2</ElementValue>
+          </Name>
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Haploinsufficiency">Sufficient evidence for dosage pathogenicity</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <AttributeSet>
+            <Attribute dateValue="2021-10-13" Type="Triplosensitivity">No evidence available</Attribute>
+            <Citation>
+              <URL>https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=MSH2</URL>
+            </Citation>
+          </AttributeSet>
+          <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="2" Accession="NC_000002.12" start="47403067" stop="47709830" display_start="47403067" display_stop="47709830" Strand="+"/>
+          <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="2" Accession="NC_000002.11" start="47630205" stop="47710366" display_start="47630205" display_stop="47710366" variantLength="80162" Strand="+"/>
+          <XRef ID="4436" DB="Gene"/>
+          <XRef Type="MIM" ID="609309" DB="OMIM"/>
+          <XRef ID="HGNC:7325" DB="HGNC"/>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2013 (PubMed 23788249) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="NCBI curation" Type="public">This gene is cited in the ACMG recommendations of 2016 (PubMed 27854360) for reporting incidental findings in exons.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2021 (SF v3.0; PubMed 34012068) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+          <Comment DataSource="ClinVar" Type="public">This gene is cited in the ACMG recommendations of 2022 (SF v3.1; PubMed 35802134) for reporting secondary findings in clinical exome and genome sequencing.</Comment>
+        </MeasureRelationship>
+        <XRef ID="CV_varv_765" DB="Institute of Human Genetics, University of Leipzig Medical Center"/>
+        <XRef ID="c.4G&gt;A" DB="International Society for Gastrointestinal Hereditary Tumours (InSiGHT)"/>
+        <XRef ID="294" DB="Mayo Clinic Laboratories, Mayo Clinic"/>
+        <XRef ID="2643642" DB="Quest Diagnostics Nichols Institute San Juan Capistrano"/>
+        <XRef ID="P43246#VAR_054511" DB="UniProtKB"/>
+        <XRef Type="rs" ID="63750466" DB="dbSNP"/>
+      </Measure>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <Name>
+        <ElementValue Type="Preferred">NM_000251.3(MSH2):c.4G&gt;A (p.Ala2Thr)</ElementValue>
+      </Name>
+      <AttributeSet>
+        <Attribute Type="SubmitterVariantId">2330</Attribute>
+      </AttributeSet>
+      <XRef ID="CA021232" DB="ClinGen"/>
+    </MeasureSet>
+    <TraitSet Type="Disease" ID="20192">
+      <Trait ID="32337" Type="Disease">
+        <Name>
+          <ElementValue Type="Preferred">Breast and/or ovarian cancer</ElementValue>
+          <XRef ID="UWMG_7622958" DB="CSER _CC_NCGL, University of Washington"/>
+        </Name>
+        <XRef ID="CN221562" DB="MedGen"/>
+      </Trait>
+    </TraitSet>
+  </ReferenceClinVarAssertion>
+  <ClinVarAssertion ID="7164735" SubmissionName="SUB12941200">
+    <ClinVarSubmissionID localKey="305770|MedGen:CN221562" submittedAssembly="GRCh37" submitter="CHEO Genetics Diagnostic Laboratory, Children's Hospital of Eastern Ontario" submitterDate="2023-03-09"/>
+    <ClinVarAccession Acc="SCV003838426" Version="1" Type="SCV" OrgID="1050" OrganizationCategory="laboratory" OrgType="primary" DateUpdated="2023-03-11" DateCreated="2023-03-11"/>
+    <RecordStatus>current</RecordStatus>
+    <ClinicalSignificance DateLastEvaluated="2021-10-08">
+      <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+      <Description>Uncertain significance</Description>
+      <Citation>
+        <ID Source="PubMed">25741868</ID>
+      </Citation>
+    </ClinicalSignificance>
+    <Assertion Type="variation to disease"/>
+    <ExternalID DB="CHEO Genetics Diagnostic Laboratory" ID="305770"/>
+    <AttributeSet>
+      <Attribute Type="AssertionMethod">ACMG Guidelines, 2015</Attribute>
+      <Citation>
+        <ID Source="PubMed">25741868</ID>
+      </Citation>
+    </AttributeSet>
+    <ObservedIn>
+      <Sample>
+        <Origin>germline</Origin>
+        <Species TaxonomyId="9606">human</Species>
+        <AffectedStatus>unknown</AffectedStatus>
+      </Sample>
+      <Method>
+        <MethodType>clinical testing</MethodType>
+      </Method>
+      <ObservedData>
+        <Attribute Type="Description">not provided</Attribute>
+      </ObservedData>
+    </ObservedIn>
+    <MeasureSet Type="Variant">
+      <Measure Type="Variation">
+        <AttributeSet>
+          <Attribute Type="HGVS">NM_000251.2:c.4G&gt;A</Attribute>
+        </AttributeSet>
+        <MeasureRelationship Type="variant in gene">
+          <Symbol>
+            <ElementValue Type="Preferred">MSH2</ElementValue>
+          </Symbol>
+        </MeasureRelationship>
+      </Measure>
+    </MeasureSet>
+    <TraitSet Type="Disease">
+      <Trait Type="Disease">
+        <XRef DB="MedGen" ID="CN221562" Type="CUI"/>
+      </Trait>
+    </TraitSet>
+  </ClinVarAssertion>
+</ClinVarSet>
+</ClinVarResult-Set>

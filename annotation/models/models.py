@@ -32,11 +32,11 @@ from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAn
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
 from library.django_utils.django_partition import RelatedModelsPartitionModel
-from library.utils import invert_dict, name_from_filename
+from library.utils import invert_dict, name_from_filename, first
 from ontology.models import OntologyVersion
 from patients.models_enums import GnomADPopulation
 from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN, \
-    HGVS_UNCLEANED_PATTERN
+    HGVS_UNCLEANED_PATTERN, Allele
 from snpdb.models.models_enums import ImportStatus
 
 
@@ -189,14 +189,33 @@ class ClinVarRecordCollection(TimeStampedModel):
 
     class Meta:
         verbose_name = "ClinVar record collection"
+        ordering = ["-max_stars", "-pk"]
 
     clinvar_variation_id = models.IntegerField(primary_key=True)
+    allele = models.ForeignKey(Allele, null=True, on_delete=SET_NULL)
     rcvs = ArrayField(base_field=models.TextField(), blank=True, null=True, size=None)
     last_loaded = models.DateTimeField(blank=True, null=True)
     parser_version = models.IntegerField(blank=True, null=True)
 
+    max_stars = models.IntegerField(blank=True, null=True)
+    expert_panel = models.OneToOneField('ClinVarRecord', on_delete=SET_NULL, null=True, blank=True)
+
     def records_with_min_stars(self, min_stars: int) -> List['ClinVarRecord']:
         return list(sorted(self.clinvarrecord_set.filter(stars__gte=min_stars), reverse=True))
+
+    def update_with_records_and_save(self, records: List['ClinVarRecord']):
+        records = list(sorted(records, reverse=True))
+        self.clinvarrecord_set.all().delete()
+        for record in records:
+            record.clinvar_record_collection = self
+        ClinVarRecord.objects.bulk_create(records)
+        self.expert_panel = None
+        self.max_stars = None
+        if best_record := first(records):
+            self.max_stars = best_record.stars
+            if best_record.is_expert_panel_or_greater:
+                self.expert_panel = best_record
+        self.save()
 
 
 class ClinVarRecord(TimeStampedModel):
@@ -207,17 +226,21 @@ class ClinVarRecord(TimeStampedModel):
 
     class Meta:
         verbose_name = "ClinVar record"
+        ordering = ["-stars", "-date_last_evaluated"]
 
     clinvar_record_collection = models.ForeignKey(ClinVarRecordCollection, on_delete=CASCADE)
     record_id = models.TextField(primary_key=True)  # SCV
     stars = models.IntegerField()
     org_id = models.TextField()
-    genome_build = models.TextField()
+    genome_build = models.TextField(null=True, blank=True)
     review_status = models.TextField()
     submitter = models.TextField()
-    submitter_date = models.DateField()
 
+    submitter_date = models.DateField(null=True, blank=True)
     date_last_evaluated = models.DateField(null=True, blank=True)
+    date_clinvar_created = models.DateField(null=True, blank=True)
+    date_clinvar_updated = models.DateField(null=True, blank=True)
+
     c_hgvs = models.TextField(null=True, blank=True)
     variant_coordinate = models.TextField(null=True, blank=True)
     condition = models.TextField(null=True, blank=True)
@@ -231,6 +254,13 @@ class ClinVarRecord(TimeStampedModel):
         def sort_key(record: ClinVarRecord):
             return record.stars, record.date_last_evaluated or record.submitter_date
         return sort_key(self) < sort_key(other)
+
+    def __str__(self):
+        date_last_evaluated_str = ""
+        if date_last_evaluated := self.date_last_evaluated or self.submitter_date:
+            date_last_evaluated_str = date_last_evaluated.strftime('%Y-%m-%d')
+
+        return f"{self.record_id} {self.stars} stars, {self.clinical_significance}, {date_last_evaluated_str}"
 
     @property
     def is_expert_panel_or_greater(self):

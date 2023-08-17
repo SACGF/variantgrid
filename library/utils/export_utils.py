@@ -95,6 +95,7 @@ class ExportSettings:
         from snpdb.user_settings_manager import UserSettingsManager
         return ExportSettings(tz=UserSettingsManager.get_user_timezone())
 
+
 class ExportRow:
 
     @staticmethod

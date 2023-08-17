@@ -10,7 +10,7 @@ from annotation.clinvar_xml_parser import ClinVarFetchRequest, CLINVAR_RECORD_CA
 from annotation.models import Citation, CitationFetchRequest, ClinVarRecordCollection, ClinVarRecord, VariantAnnotation, \
     ClinVar
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, get_admin_url
-from snpdb.models import VariantAllele
+from snpdb.models import VariantAllele, Allele
 
 admin.site.register(models.AnnotationRun)
 admin.site.register(models.AnnotationVersion)
@@ -32,7 +32,7 @@ class ClinVarAdmin(ModelAdminBasics):
 class ClinVarRecordAdmin(TabularInline):
     model = ClinVarRecord
 
-    fields = ("record_id", "submitter", "stars", "date_last_evaluated", "clinical_significance")
+    fields = ("record_id", "submitter", "condition", "stars", "date_last_evaluated", "clinical_significance")
 
     def has_change_permission(self, request, obj=None):
         return False
@@ -46,7 +46,7 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
     inlines = (ClinVarRecordAdmin, )
     list_per_page = 20
 
-    list_display = ("pk", "clinvar_variation_id", "last_loaded")
+    list_display = ("pk", "clinvar_variation_id", "allele_link", "max_stars", "last_loaded")
 
     """
     # these took prohibitively long to load
@@ -59,16 +59,13 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
             return SafeString(f"<a href=\"{href}\">{clinvar.clinvar_variation_id}</a>")
         except Exception as ex:
             return str(ex)
+    """
 
-    @admin_list_column(limit=0)
-    def allele(self, obj: ClinVarRecordCollection):
-        try:
-            allele = ClinVar.objects.filter(clinvar_variation_id=obj.clinvar_variation_id).order_by('-version').first().variant.allele
+    @admin_list_column("allele", limit=0)
+    def allele_link(self, obj: ClinVarRecordCollection):
+        if allele := obj.allele:
             href = get_admin_url(allele)
             return SafeString(f"<a href=\"{href}\">{allele}</a>")
-        except Exception as ex:
-            return str(ex)
-    """
 
     def has_change_permission(self, request, obj=None):
         return False
