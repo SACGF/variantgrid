@@ -20,7 +20,7 @@ from genes.hgvs import HGVSVariant, HGVSException
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele
 from genes.models import TranscriptVersion
-from genes.transcripts_utils import looks_like_transcript
+from genes.transcripts_utils import looks_like_transcript, get_refseq_type
 from snpdb.models import GenomeBuild, VariantCoordinate, Contig
 
 
@@ -205,6 +205,11 @@ class BioCommonsHGVSConverter(HGVSConverter):
         }
 
         var_x = self._parser_hgvs(hgvs_string)
+        # We are occasionally passed c. HGVS for non-coding transcripts - convert them to n.
+        if var_x.type == 'c':
+            transcript_accession = self.get_transcript_accession(hgvs_string)
+            if get_refseq_type(transcript_accession) == 'RNA':
+                var_x.type = 'n'
         matches_reference = None
 
         try:
