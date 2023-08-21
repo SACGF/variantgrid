@@ -55,7 +55,8 @@ class Command(BaseCommand):
                                                                  cohortgenotype__isnull=True,
                                                                  createdmanualvariant__isnull=True,
                                                                  min_variant__isnull=True,
-                                                                 max_variant__isnull=True)
+                                                                 max_variant__isnull=True,
+                                                                 allvariantsnode__isnull=True)
                 unused_variant_ids = list(unused_variants_qs.values_list("pk", flat=True))
                 if unused_variant_ids and check_ref:
                     print(f"{len(unused_variant_ids)=}")
