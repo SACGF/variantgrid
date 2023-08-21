@@ -14,6 +14,7 @@ from hgvs.normalizer import Normalizer
 from hgvs.parser import Parser
 from hgvs.sequencevariant import SequenceVariant
 from hgvs.validator import ExtrinsicValidator
+from hgvs.variantmapper import VariantMapper
 
 from genes.hgvs import HGVSVariant, HGVSException
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
@@ -100,6 +101,8 @@ class BioCommonsHGVSConverter(HGVSConverter):
                                  replace_reference=True)
         self.ev = ExtrinsicValidator(self.hdp)
         self.norm_5p = Normalizer(self.hdp, shuffle_direction=5)
+        self.no_validate_normalizer = Normalizer(self.hdp, validate=False,
+                                                 variantmapper=VariantMapper(self.hdp, prevalidation_level="NONE"))
 
     @staticmethod
     def _parser_hgvs(hgvs_string: str) -> SequenceVariant:
@@ -228,6 +231,9 @@ class BioCommonsHGVSConverter(HGVSConverter):
                         provided_g_ref = reverse_complement(provided_ref)
                         calculated_g_ref = reverse_complement(calculated_ref)
                 matches_reference = HgvsMatchRefAllele(provided_ref=provided_g_ref, calculated_ref=calculated_g_ref)
+            elif "Variant is outside CDS bounds" in exception_str:
+                var_x = self.no_validate_normalizer.normalize(var_x)
+                ok = True
             else:
                 for msg in ACCEPTABLE_VALIDATION_MESSAGES:
                     if msg in exception_str:
