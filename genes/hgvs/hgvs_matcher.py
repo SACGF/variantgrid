@@ -498,8 +498,15 @@ class HGVSMatcher:
 
     def variant_coordinate_to_c_hgvs_variant(self, variant_coordinate: VariantCoordinate, transcript_accession: str) -> HGVSVariant:
         variant_coordinate = variant_coordinate.explicit_reference()
-        transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_accession)
-        return self.hgvs_converter.variant_coords_to_c_hgvs(variant_coordinate, transcript_version)
+        if is_lrg := transcript_is_lrg(transcript_accession):
+            transcript_version = LRGRefSeqGene.get_transcript_version(self.genome_build, transcript_accession)
+        else:
+            transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_accession)
+        hgvs_variant = self.hgvs_converter.variant_coords_to_c_hgvs(variant_coordinate, transcript_version)
+        if is_lrg:
+            hgvs_variant.transcript = transcript_accession
+            hgvs_variant.gene = None  # Don't want this on LRG
+        return hgvs_variant
 
     def variant_to_c_hgvs(self, variant: Variant, transcript_accession: str) -> Optional[str]:
         if hgvs_variant := self.variant_to_c_hgvs_variant(variant, transcript_accession):
