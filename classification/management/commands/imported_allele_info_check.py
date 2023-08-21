@@ -146,7 +146,15 @@ class ChgvsDiff(ExportRow):
 
     @export_column("Variant Coordinate Change")
     def variant_coordinate_change(self):
-        return Change.compare_2(self.resolved.variant_coordinate, self.updated.variant_coordinate)
+        resolved = self.resolved.variant_coordinate
+        if resolved:
+            resolved = resolved.explicit_reference()
+
+        updated = self.updated.variant_coordinate
+        if updated:
+            updated = updated.explicit_reference()
+
+        return Change.compare_2(resolved, updated)
 
     @export_column("Variant Coordinate Old")
     def _variant_coordinate_old(self):
