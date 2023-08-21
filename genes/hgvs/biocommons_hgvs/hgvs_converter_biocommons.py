@@ -10,6 +10,7 @@ from hgvs.assemblymapper import AssemblyMapper
 from hgvs.enums import ValidationLevel
 from hgvs.exceptions import HGVSDataNotAvailableError, HGVSError, HGVSInvalidVariantError
 from hgvs.extras.babelfish import Babelfish
+from hgvs.normalizer import Normalizer
 from hgvs.parser import Parser
 from hgvs.sequencevariant import SequenceVariant
 from hgvs.validator import ExtrinsicValidator
@@ -98,6 +99,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
                                  alt_aln_method='splign',
                                  replace_reference=True)
         self.ev = ExtrinsicValidator(self.hdp)
+        self.norm_5p = Normalizer(self.hdp, shuffle_direction=5)
 
     @staticmethod
     def _parser_hgvs(hgvs_string: str) -> SequenceVariant:
@@ -133,7 +135,12 @@ class BioCommonsHGVSConverter(HGVSConverter):
     def variant_coords_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
         """ In VG we call non-coding "c.HGVS" as well - so hanve to handle that """
         try:
-            var_g = self.babelfish.vcf_to_g_hgvs(*vc)
+            var_g = self.babelfish.vcf_to_g_hgvs(*vc)  # returns normalized (default HGVS 3')
+            # Biocommons HGVS doesn't normalize introns as it works with transcript sequences so doesn't have introns
+            # workaround is to normalize on genome sequence first, so if it can't norm it's correct
+            if transcript_version.strand == '-':
+                var_g = self.norm_5p.normalize(var_g)
+
             if transcript_version.is_coding:
                 var_c = self.am.g_to_c(var_g, transcript_version.accession)
             else:
