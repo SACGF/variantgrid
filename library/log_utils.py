@@ -304,6 +304,16 @@ class NotificationBuilder:
         self.blocks.append(NotificationBuilder.MarkdownBlock(markdown_txt=text, indented=indented))
         return self
 
+    def merge(self, *bulk_notifications: 'NotificationBuilder') -> 'NotificationBuilder':
+        for bulk_notification in bulk_notifications:
+            if bulk_notification.blocks and isinstance(bulk_notification.blocks[0], NotificationBuilder.HeaderBlock):
+                self.blocks.append(bulk_notification.blocks[0])
+
+            for block in bulk_notification.blocks:
+                if isinstance(block, (NotificationBuilder.FieldsBlock, NotificationBuilder.MarkdownBlock)):
+                    self.blocks.append(block)
+        return self
+
     @property
     def webhook_url(self) -> Optional[str]:
         return None

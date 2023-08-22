@@ -22,7 +22,7 @@ from classification.enums.classification_enums import SpecialEKeys, ClinicalSign
 from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_lab_summaries import ClassificationLabSummary
-from classification.models.clinical_context_models import ClinicalContext
+from classification.models.clinical_context_models import ClinicalContext, ClinicalContextRecalcTrigger
 from classification.models.flag_types import classification_flag_types
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
@@ -42,7 +42,6 @@ class NotifyLevel(str, Enum):
     NEVER_NOTIFY = "never-notify"
     NOTIFY_IF_CHANGE = "notify-if-change"
     ALWAYS_NOTIFY = "always-notify"
-
 
 class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 
@@ -157,7 +156,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=cause_text)
 
     @transaction.atomic
-    def update(self, cause_text: str = '', notify_level: NotifyLevel = NotifyLevel.NOTIFY_IF_CHANGE):
+    def update(self, cause_text: str = '', cause_code: str = '', notify_level: NotifyLevel = NotifyLevel.NOTIFY_IF_CHANGE):
         if not self.is_active:
             raise ValueError('Cannot update non active Discordance Report')
 
@@ -197,10 +196,10 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
             if notify_level == NotifyLevel.NEVER_NOTIFY:
                 pass
             elif notify_level == NotifyLevel.ALWAYS_NOTIFY:
-                discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=cause_text)
+                discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=cause_text, cause_code=cause_code)
             elif newly_added_labs:  # change is significant
                 newly_added_labs_str = ", ".join(str(lab) for lab in newly_added_labs)
-                discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=f"{cause_text} and newly added labs {newly_added_labs_str}")
+                discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=f"{cause_text} and newly added labs {newly_added_labs_str}", cause_code=cause_code)
 
     @property
     def all_actively_involved_labs(self) -> Set[Lab]:
@@ -300,7 +299,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         return DiscordanceReport.latest_report(self.clinical_context) == self
 
     @staticmethod
-    def update_latest(clinical_context: ClinicalContext, cause: str, update_flags: bool):
+    def update_latest(clinical_context: ClinicalContext, cause: str, cause_code, update_flags: bool):
         try:
             latest_report = DiscordanceReport.latest_report(clinical_context=clinical_context)
             if latest_report:
@@ -318,7 +317,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
 
             if clinical_context.is_discordant():
                 report = DiscordanceReport(clinical_context=clinical_context, cause_text=cause)
-                report.update(cause_text=cause)
+                report.update(cause_text=cause, cause_code=cause_code)
                 return report
 
             # no report has been made

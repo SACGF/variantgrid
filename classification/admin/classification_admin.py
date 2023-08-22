@@ -3,7 +3,7 @@ from datetime import timedelta
 from typing import Set, Union, Dict, Optional
 
 from django.contrib import admin, messages
-from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter
+from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter, DateFieldListFilter
 from django.db.models import QuerySet, Q
 from django.forms import Widget
 from django.utils import timezone
@@ -19,9 +19,9 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
-from classification.models.clinical_context_models import ClinicalContextRecalcTrigger
+from classification.models.clinical_context_models import ClinicalContextRecalcTrigger, DiscordanceNotification
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
-from classification.signals import send_discordance_notification
+from classification.signals import send_prepared_discordance_notifications
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.cache import timed_cache
 from library.django_utils import get_url_from_view_path
@@ -867,7 +867,7 @@ class DiscordanceReportAdmin(ModelAdminBasics):
     def send_notification(self, request, queryset):
         ds: DiscordanceReport
         for ds in queryset:
-            send_discordance_notification(ds, cause="Admin Send discordance notification")
+            send_prepared_discordance_notifications(ds, cause="Admin Send discordance notification")
 
     @admin_action("Re-calculate latest")
     def re_calculate(self, request, queryset):
@@ -929,6 +929,22 @@ class DiscordanceReportAdmin(ModelAdminBasics):
     #
     #     return AdminDiscordanceExport.streaming(request, queryset, filename="discordance_reports_admin")
     #
+
+
+@admin.register(DiscordanceNotification)
+class DiscordanceNotificationAdmin(ModelAdminBasics):
+    list_display = ("lab", "discordance_report", "notification_sent_date")
+    list_filter = (('lab', RelatedFieldListFilter), ('notification_sent_date', DateFieldListFilter))
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
 
 @admin.register(UploadedClassificationsUnmapped)
 class UploadedClassificationsUnmappedAdmin(ModelAdminBasics):
