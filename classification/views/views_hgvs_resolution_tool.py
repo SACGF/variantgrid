@@ -96,7 +96,7 @@ def hgvs_resolution_tool(request: HttpRequest):
                 if tv := resolved_variant.transcript_version:
                     output.transcript_version = tv.as_parts
                 if v := resolved_variant.variant:
-                    iai.variant_coordinate = v.coordinate
+                    output.variant_coordinate = v.coordinate
 
         use_matchers = [(HGVSConverterType.BIOCOMMONS_HGVS, "biocommons"), (HGVSConverterType.PYHGVS, "pyhgvs")]
         for matcher_id, matcher_name in use_matchers:
@@ -111,7 +111,7 @@ def hgvs_resolution_tool(request: HttpRequest):
                 output.variant_coordinate = vcd.variant_coordinate
 
                 stage = "Getting Transcript"
-                output.transcript = TranscriptVersion.get_transcript_id_and_version(vcd.transcript_accession)
+                output.transcript_version = TranscriptVersion.get_transcript_id_and_version(vcd.transcript_accession)
 
                 if output.variant_coordinate and output.transcript:
                     stage = "Resolving c.HGVS"
