@@ -395,7 +395,10 @@ class HGVSMatcher:
         raise ValueError(f"Could not convert {variant} to HGVS using '{lrg_identifier}': {problem_str}")
 
     def _variant_to_hgvs(self, variant: Variant, transcript_accession: str = None) -> Tuple[HGVSVariant, str]:
-        """ returns (hgvs, method) - hgvs is c.HGVS is transcript provided, g.HGVS if not
+        """
+            returns (hgvs, method) - hgvs is c.HGVS is transcript provided, g.HGVS if not
+
+            This handles using different methods (eg local/ClinGen allele registry)
             We always generate the HGVS with full-length reference bases etc, as we adjust that in HGVSExtra.format()
         """
 
@@ -464,10 +467,9 @@ class HGVSMatcher:
 
         return hgvs_variant, hgvs_method
 
-    def variant_to_hgvs(self, variant: Variant, transcript_name=None) -> Optional[str]:
+    def variant_to_hgvs_variant(self, variant: Variant, transcript_name=None) -> HGVSVariant:
         """ returns c.HGVS is transcript provided, g.HGVS if no transcript"""
-        hgvs_variant = self._variant_to_hgvs(variant, transcript_name)[0]
-        return hgvs_variant.format()
+        return self._variant_to_hgvs(variant, transcript_name)[0]
 
     @staticmethod
     def _fast_variant_coordinate_to_g_hgvs(refseq_accession, offset, ref, alt) -> str:
@@ -484,8 +486,7 @@ class HGVSMatcher:
     def variant_coordinate_to_g_hgvs(self, variant_coordinate: VariantCoordinate) -> str:
         variant_coordinate = variant_coordinate.explicit_reference()
         (chrom, offset, ref, alt) = variant_coordinate
-        alt_length = len(alt)
-        if alt_length == 1 and len(ref) == alt_length:
+        if len(alt) == 1 and len(ref) == 1:
             contig = self.genome_build.chrom_contig_mappings[chrom]
             hgvs_str = self._fast_variant_coordinate_to_g_hgvs(contig.refseq_accession, offset, ref, alt)
         else:
@@ -497,22 +498,17 @@ class HGVSMatcher:
         return self.variant_coordinate_to_c_hgvs_variant(variant.coordinate, transcript_accession)
 
     def variant_coordinate_to_c_hgvs_variant(self, variant_coordinate: VariantCoordinate, transcript_accession: str) -> HGVSVariant:
+        """ This doesn't do anything tricky like handle LRG or try different methods like ClinGen
+            For that, use variant_to_hgvs
+        """
         variant_coordinate = variant_coordinate.explicit_reference()
-        if is_lrg := transcript_is_lrg(transcript_accession):
-            transcript_version = LRGRefSeqGene.get_transcript_version(self.genome_build, transcript_accession)
-        else:
-            transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_accession)
-        hgvs_variant = self.hgvs_converter.variant_coords_to_c_hgvs(variant_coordinate, transcript_version)
-        if is_lrg:
-            hgvs_variant.transcript = transcript_accession
-            hgvs_variant.gene = None  # Don't want this on LRG
-        return hgvs_variant
+        transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_accession)
+        return self.hgvs_converter.variant_coords_to_c_hgvs(variant_coordinate, transcript_version)
 
     def variant_to_c_hgvs(self, variant: Variant, transcript_accession: str) -> Optional[str]:
-        if hgvs_variant := self.variant_to_c_hgvs_variant(variant, transcript_accession):
-            return hgvs_variant.format()
         if transcript_accession:
-            return self.variant_to_hgvs(variant, transcript_accession)
+            if hgvs_variant := self.variant_to_hgvs_variant(variant, transcript_accession):
+                return hgvs_variant.format()
         return None
 
     def variant_to_c_hgvs_parts(self, variant: Variant, transcript: Optional[str], throw_on_issue: bool = False) -> Optional[CHGVS]:
