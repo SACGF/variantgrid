@@ -6,7 +6,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from itertools import islice
 from typing import Iterable, Iterator, List, TypeVar, Any, Generic, Set, Callable, Tuple, Optional, Dict, Sequence, \
-    Union
+    Union, Collection
 
 from django.utils.functional import SimpleLazyObject
 
@@ -49,8 +49,7 @@ T = TypeVar("T")
 
 
 def first(obj: Iterable[T]) -> T:
-    # FIXME, seems inferior to get_single_element in every way
-    # (note this will return None instead of ValueError)
+    # FIXME, use collection_tools.first()
     for element in obj:
         return element
     return None

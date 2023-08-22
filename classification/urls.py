@@ -29,6 +29,7 @@ from classification.views.exports.classification_export_formatter_redcap import 
 from classification.views.imported_allele_info_view import view_imported_allele_info, ImportedAlleleInfoColumns, \
     view_imported_allele_info_detail, download_allele_info
 from classification.views.views import classification_import_tool, AutopopulateView
+from classification.views.views_hgvs_resolution_tool import hgvs_resolution_tool
 from classification.views.views_uploaded_classifications_unmapped import UploadedClassificationsUnmappedView, \
     UploadedClassificationsUnmappedColumns, download_classification_unmapped_file, \
     view_uploaded_classification_unmapped, view_uploaded_classification_unmapped_detail, \
@@ -142,6 +143,8 @@ urlpatterns = [
     perm_path('export', classification_export_view.export_view, name='classification_export'),
     perm_path('export_redirect', classification_export_view.export_view_redirector, name='classification_export_redirect'),
     perm_path('import', classification_import_tool, name='classification_import_tool'),
+
+    perm_path('hgvs_resolution_tool', hgvs_resolution_tool, name='hgvs_resolution_tool'),
 
     perm_path('clinical_context', post_clinical_context, name='clinical_context'),
     perm_path('overlaps', view_overlaps, name='overlaps'),

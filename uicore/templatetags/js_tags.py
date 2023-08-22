@@ -112,7 +112,7 @@ def format_unit_as_percent(val: Optional[float]):
 
 @register.filter()
 def dash_if_empty(val):
-    if val is None or len(val.strip()) == 0:
+    if val is None or len(str(val).strip()) == 0:
         return mark_safe('<span class="no-value">-</span>')
     return val
 

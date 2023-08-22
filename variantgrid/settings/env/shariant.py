@@ -202,6 +202,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "sequencing_software_versions": False,
     "classification_dashboard": True,
     "classification_import_tool": True,
+    "hgvs_resolution_tool": True,
     "keycloak_admin": True,
     "hgvs_issues": True,
 

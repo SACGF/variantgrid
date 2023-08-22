@@ -68,7 +68,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
 
     @staticmethod
     @timed_cache(ttl=60)
-    def get_name_or_alias(build_name):
+    def get_name_or_alias(build_name) -> 'GenomeBuild':
         """ Get by insensitive name or alias """
 
         build_no_patch = build_name.split(".", 1)[0]

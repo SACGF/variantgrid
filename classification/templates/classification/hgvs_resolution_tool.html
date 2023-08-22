@@ -1,0 +1,59 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load classification_tags %}
+{% load js_tags %}
+{% load compress %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% load settings_tags %}
+{% block title %}HGVS Tool{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+{% endblock %}
+{% block content %}
+    <div class="container">
+        <h3>HGVS Resolution Tool</h3>
+        <form method="GET" action="{% url 'hgvs_resolution_tool' %}">
+            <div class="card">
+                <div class="card-header">Input</div>
+                <div class="card-body">
+                    {% crispy form form_helper.no_csrf.horizontal %}
+                </div>
+                <div class="card-footer">
+                    <input type="submit" class="btn btn-primary" />
+                </div>
+            </div>
+        </form>
+
+        {% if outputs %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Source</th>
+                        <th>Variant Coordinate {% if not outputs.all_equal_variant_coordinate %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
+                        <th>Transcript {% if not outputs.all_equal_transcript_version %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
+                        <th>c.HGVS {% if not outputs.all_equal_hgvs %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
+                        <th>Error</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for output in outputs %}
+                        <tr>
+                            <th>
+                                {{ output.matcher_name }}
+                                {% if output.imported_allele_info %}
+                                    <div>{% imported_allele_info output.imported_allele_info %}</div>
+                                {% endif %}
+                            </th>
+                            <td>{{ output.variant_coordinate|dash_if_empty }}</td>
+                            <td>{{ output.transcript_version|dash_if_empty }}</td>
+                            <td>{% c_hgvs output.hgvs %}</td>
+                            <td>{{ output.error_str|default_if_none:"" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </div>
+{% endblock %}

@@ -918,6 +918,7 @@ _URLS_NAME_REGISTER_DEFAULT = True
 _URLS_NAME_REGISTER_OVERRIDE = {
     "view_patient_contact_tab": False,
     "classification_import_tool": False,
+    "hgvs_resolution_tool": False,
     "classification_view_metrics": False,
     "condition_aliases": False,
     "clinvar_key_summary": False,
