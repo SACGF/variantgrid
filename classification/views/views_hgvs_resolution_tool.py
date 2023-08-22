@@ -103,19 +103,19 @@ def hgvs_resolution_tool(request: HttpRequest):
             output = MatcherOutput(matcher_name=matcher.hgvs_converter.description())
             all_output.append(output)
 
-            stage = "Basic Parsing"
+            stage = "Deriving Variant Coordinate"
             try:
                 variant_coordinate: Optional[VariantCoordinate] = None
                 if vcd := matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(hgvs_str):
                     variant_coordinate = vcd.variant_coordinate
                     output.variant_coordinate = variant_coordinate
 
-                stage = "Getting Transcript"
+                stage = "Deriving Transcript"
                 transcript_version = TranscriptVersion.get_transcript_id_and_version(vcd.transcript_accession)
                 output.transcript_version = transcript_version
 
                 if variant_coordinate and transcript_version:
-                    stage = "Resolving c.HGVS"
+                    stage = "Deriving c.HGVS"
                     if variant_details := matcher.variant_coordinate_to_c_hgvs_variant(variant_coordinate,
                                                                                        str(transcript_version)):
                         output.hgvs = variant_details.format()
