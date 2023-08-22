@@ -30,17 +30,11 @@ class MatcherOutput:
     transcript_version: Optional[TranscriptParts] = None
     hgvs: Optional[str] = None
     error: Optional[str] = None
-    error_stage: Optional[str] = None
 
     @property
     def explicit_variant_coordinate(self):
         if vc := self.variant_coordinate:
             return vc.explicit_reference()
-
-    @property
-    def error_str(self):
-        if error := self.error:
-            return f"{self.error_stage}: {error}"
 
 
 class MatcherOutputs:
@@ -97,8 +91,9 @@ def hgvs_resolution_tool(request: HttpRequest):
                     output.transcript_version = tv.as_parts
                 if v := resolved_variant.variant:
                     output.variant_coordinate = v.coordinate
+            output.error = iai.message
 
-        use_matchers = [(HGVSConverterType.BIOCOMMONS_HGVS, "biocommons"), (HGVSConverterType.PYHGVS, "pyhgvs")]
+        use_matchers = [(HGVSConverterType.PYHGVS, "pyhgvs"), (HGVSConverterType.BIOCOMMONS_HGVS, "biocommons")]
         for matcher_id, matcher_name in use_matchers:
             matcher = HGVSMatcher(genome_build, hgvs_converter_type=matcher_id)
 
@@ -107,21 +102,23 @@ def hgvs_resolution_tool(request: HttpRequest):
 
             stage = "Basic Parsing"
             try:
-                vcd = matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(hgvs_str)
-                output.variant_coordinate = vcd.variant_coordinate
+                variant_coordinate: Optional[VariantCoordinate] = None
+                if vcd := matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(hgvs_str):
+                    variant_coordinate = vcd.variant_coordinate
+                    output.variant_coordinate = variant_coordinate
 
                 stage = "Getting Transcript"
-                output.transcript_version = TranscriptVersion.get_transcript_id_and_version(vcd.transcript_accession)
+                transcript_version = TranscriptVersion.get_transcript_id_and_version(vcd.transcript_accession)
+                output.transcript_version = transcript_version
 
-                if output.variant_coordinate and output.transcript:
+                if variant_coordinate and transcript_version:
                     stage = "Resolving c.HGVS"
-                    if variant_details := matcher.variant_coordinate_to_c_hgvs_variant(output.variant_coordinate,
-                                                                                       str(output.transcript)):
+                    if variant_details := matcher.variant_coordinate_to_c_hgvs_variant(variant_coordinate,
+                                                                                       str(transcript_version)):
                         output.hgvs = variant_details.format()
 
             except Exception as ex:
-                output.error = str(ex)
-                output.error_stage = stage
+                output.error = stage + ": " + str(ex)
 
     return render(request, "classification/hgvs_resolution_tool.html", context)
 

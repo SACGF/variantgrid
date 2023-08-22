@@ -34,7 +34,7 @@
                         <th>Variant Coordinate {% if not outputs.all_equal_variant_coordinate %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
                         <th>Transcript {% if not outputs.all_equal_transcript_version %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
                         <th>c.HGVS {% if not outputs.all_equal_hgvs %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
-                        <th>Error</th>
+                        <th>Message</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -49,7 +49,7 @@
                             <td>{{ output.variant_coordinate|dash_if_empty }}</td>
                             <td>{{ output.transcript_version|dash_if_empty }}</td>
                             <td>{% c_hgvs output.hgvs %}</td>
-                            <td>{{ output.error_str|default_if_none:"" }}</td>
+                            <td>{{ output.error|default_if_none:"" }}</td>
                         </tr>
                     {% endfor %}
                 </tbody>
