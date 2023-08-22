@@ -4,6 +4,8 @@ from enum import Enum
 from typing import Optional, Any, List
 from django.core.management import BaseCommand
 from django.db.models import Max
+from django.urls import reverse
+from django.utils.http import urlencode
 
 from classification.models import ImportedAlleleInfo
 from genes.hgvs import HGVSMatcher, HGVSConverterType
@@ -101,20 +103,33 @@ class ChgvsDiff(ExportRow):
     def has_difference(self):
         return self.variant_coordinate_change() or self.transcript_change() or self.c_hgvs_change()
 
-    @export_column("$site_name URL")
-    def _allele_id(self):
-        return get_url_from_view_path(self.imported_allele_info.get_absolute_url())
+    # @export_column("$site_name URL")
+    # def _allele_id(self):
+    #     return get_url_from_view_path(self.imported_allele_info.get_absolute_url())
 
-    @export_column("Labs")
-    def _labs(self):
-        parts = []
-        for classification in self.imported_allele_info.classification_set.select_related('lab', 'lab__organization'):
-            parts.append(str(classification.lab))
-        return ", ".join(parts)
+    @export_column("$site_name Compare URL")
+    def _compare_url(self):
+        return get_url_from_view_path(reverse('hgvs_resolution_tool')) + "?" + urlencode(
+            {
+                "genome_build": self.imported_allele_info.imported_genome_build.pk,
+                "hgvs": self.imported_allele_info.imported_c_hgvs
+            }
+        )
+
+    # @export_column("Labs")
+    # def _labs(self):
+    #     parts = []
+    #     for classification in self.imported_allele_info.classification_set.select_related('lab', 'lab__organization'):
+    #         parts.append(str(classification.lab))
+    #     return ", ".join(parts)
 
     @export_column("Imported Genome Build")
     def _imported_genome_build(self):
         return self.imported_allele_info.imported_genome_build
+
+    @export_column("c.HGVS Imported")
+    def _c_hgvs_imported(self):
+        return self.provided.c_hgvs_str
 
     @export_column("c.HGVS/VariantCoordinate/Transcript Change")
     def _all_changes(self):
@@ -131,10 +146,6 @@ class ChgvsDiff(ExportRow):
     @export_column("c.HGVS Change")
     def c_hgvs_change(self):
         return Change.compare_3(self.provided.c_hgvs_str, self.resolved.c_hgvs_str, self.updated.c_hgvs_str)
-
-    @export_column("c.HGVS Imported")
-    def _c_hgvs_imported(self):
-        return self.provided.c_hgvs_str
 
     @export_column("c.HGVS Previous")
     def _c_hgvs_previous(self):
