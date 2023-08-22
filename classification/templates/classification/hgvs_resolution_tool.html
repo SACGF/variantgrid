@@ -3,6 +3,7 @@
 {% load static %}
 {% load classification_tags %}
 {% load js_tags %}
+{% load ui_utils %}
 {% load compress %}
 {% load ui_help %}
 {% load ui_menu_bars %}
@@ -49,7 +50,13 @@
                             <td>{{ output.variant_coordinate|dash_if_empty }}</td>
                             <td>{{ output.transcript_version|dash_if_empty }}</td>
                             <td>{% c_hgvs output.hgvs %}</td>
-                            <td>{{ output.error|default_if_none:"" }}</td>
+                            <td>
+                                {% if output.is_error %}
+                                    {{ 'E' | severity_icon }} {{ output.message }}
+                                {% elif output.message %}
+                                    <span class="text-secondary">{{ output.message }}</span>
+                                {% endif %}
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>

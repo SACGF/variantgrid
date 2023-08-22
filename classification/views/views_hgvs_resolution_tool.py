@@ -29,12 +29,16 @@ class MatcherOutput:
     variant_coordinate: Optional[VariantCoordinate] = None
     transcript_version: Optional[TranscriptParts] = None
     hgvs: Optional[str] = None
-    error: Optional[str] = None
+    message: Optional[str] = None
 
     @property
     def explicit_variant_coordinate(self):
         if vc := self.variant_coordinate:
             return vc.explicit_reference()
+
+    @property
+    def is_error(self):
+        return not self.hgvs
 
 
 class MatcherOutputs:
@@ -91,13 +95,12 @@ def hgvs_resolution_tool(request: HttpRequest):
                     output.transcript_version = tv.as_parts
                 if v := resolved_variant.variant:
                     output.variant_coordinate = v.coordinate
-            output.error = iai.message
+            output.message = iai.message
 
-        use_matchers = [(HGVSConverterType.PYHGVS, "pyhgvs"), (HGVSConverterType.BIOCOMMONS_HGVS, "biocommons")]
-        for matcher_id, matcher_name in use_matchers:
+        for matcher_id in [HGVSConverterType.PYHGVS, HGVSConverterType.BIOCOMMONS_HGVS]:
             matcher = HGVSMatcher(genome_build, hgvs_converter_type=matcher_id)
 
-            output = MatcherOutput(matcher_name=matcher_name)
+            output = MatcherOutput(matcher_name=matcher.hgvs_converter.description())
             all_output.append(output)
 
             stage = "Basic Parsing"
@@ -118,7 +121,7 @@ def hgvs_resolution_tool(request: HttpRequest):
                         output.hgvs = variant_details.format()
 
             except Exception as ex:
-                output.error = stage + ": " + str(ex)
+                output.message = stage + ": " + str(ex)
 
     return render(request, "classification/hgvs_resolution_tool.html", context)
 
