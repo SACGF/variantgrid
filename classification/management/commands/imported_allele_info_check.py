@@ -271,7 +271,7 @@ class Command(BaseCommand):
 
                     if updated.variant_coordinate and updated.transcript:
                         stage = "Resolving c.HGVS"
-                        if hgvs_variant := matcher.variant_coordinate_to_c_hgvs_variant(updated.variant_coordinate, str(updated.transcript)):
+                        if hgvs_variant := matcher.variant_coordinate_to_hgvs_variant(updated.variant_coordinate, str(updated.transcript)):
                             updated.c_hgvs = hgvs_variant.format()
 
                 except Exception as ex:

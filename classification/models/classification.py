@@ -2160,7 +2160,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             transcript_id = None
             try:
                 transcript_id = self.transcript
-                c_hgvs = hgvs_matcher.variant_to_c_hgvs(variant, transcript_id)
+                hgvs_variant = hgvs_matcher.variant_to_hgvs_variant(variant, transcript_id)
+                c_hgvs = hgvs_variant.format()
             except Exception:
                 # can't map between builds
                 report_exc_info(extra_data={

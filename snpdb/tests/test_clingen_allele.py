@@ -1,5 +1,6 @@
 from django.test import TestCase
 
+from annotation.fake_annotation import get_fake_annotation_version
 from snpdb.clingen_allele import ClinGenAlleleServerException, get_clingen_allele, \
     ClinGenAlleleAPIException, get_clingen_allele_for_variant, variant_allele_clingen
 from snpdb.models import GenomeBuild
@@ -8,6 +9,13 @@ from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
 class ClinGenAlleleTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        # We need this as HGVSMatcher (biocommons) needs annotation version / genomes
+        super().setUpTestData()
+        grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(grch37)
 
     def test_server_exception(self):
         """ Server responds with error code """

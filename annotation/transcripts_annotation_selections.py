@@ -243,7 +243,8 @@ class VariantTranscriptSelections:
                     pass
 
                 try:
-                    t_data["hgvs_c"] = hgvs_matcher.variant_to_c_hgvs(variant, transcript_version.accession)
+                    hgvs_variant = hgvs_matcher.variant_to_hgvs_variant(variant, transcript_version.accession)
+                    t_data["hgvs_c"] = hgvs_variant.format()
                 except (HGVSException, KeyError):
                     pass
                 self.transcript_data.append(t_data)

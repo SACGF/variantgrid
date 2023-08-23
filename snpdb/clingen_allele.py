@@ -27,7 +27,8 @@ from django.conf import settings
 from library.constants import MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.utils import iter_fixed_chunks, get_single_element
-from snpdb.models import Allele, ClinGenAllele, GenomeBuild, Variant, VariantAllele, Contig, GenomeFasta
+from snpdb.models import Allele, ClinGenAllele, GenomeBuild, Variant, VariantAllele, Contig, GenomeFasta, \
+    VariantCoordinate
 from snpdb.models.models_enums import AlleleOrigin, AlleleConversionTool, ClinGenAlleleExternalRecordType
 
 
@@ -374,6 +375,20 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
                                                                    known_variants=known_variants)
         va = variant_allele_by_build[genome_build]
     return va
+
+
+def get_clingen_allele_for_variant_coordinate(genome_build: GenomeBuild, variant_coordinate: VariantCoordinate,
+                                              hgvs_matcher, clingen_api: ClinGenAlleleRegistryAPI = None) -> ClinGenAllele:
+    """ hgvs_converter_func - only used if we need it - to reduce circular dependencies on HGVS """
+    try:
+        # Use variant if we have it in the system so we can lookup cache, or store result
+        variant = Variant.get_from_tuple(variant_coordinate, genome_build)
+        ca = get_clingen_allele_for_variant(genome_build, variant, clingen_api=clingen_api)
+    except Variant.DoesNotExist:
+        g_hgvs_string = hgvs_matcher.variant_coordinate_to_g_hgvs(variant_coordinate).format()
+        ca = get_clingen_allele_from_hgvs(g_hgvs_string, clingen_api=clingen_api)
+    return ca
+
 
 
 def get_clingen_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
