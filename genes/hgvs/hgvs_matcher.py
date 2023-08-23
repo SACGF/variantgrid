@@ -363,12 +363,6 @@ class HGVSMatcher:
         accession = self.hgvs_converter.get_transcript_accession(hgvs_string)
         return TranscriptVersion.get_transcript_id_and_version(accession)
 
-    def get_transcript_id(self, hgvs_string: str) -> str:
-        """
-        Deprecated - use get_transcript_parts(hgvs_string).identifier
-        """
-        return self.get_transcript_parts(hgvs_string).identifier
-
     def _lrg_variant_to_hgvs(self, variant: Variant, lrg_identifier: str = None) -> Tuple[HGVSVariant, str]:
         if transcript_version := LRGRefSeqGene.get_transcript_version(self.genome_build, lrg_identifier):
             if transcript_version.hgvs_ok:
