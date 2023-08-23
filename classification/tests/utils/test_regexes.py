@@ -45,7 +45,7 @@ class RegexTests(TestCase):
         self.assertEqual(len(results), 3)
         self.assertEqual(str(results[0]), 'MedGen:C3150878')
         self.assertEqual(str(results[1]), 'OMIM:613616')
-        self.assertEqual(str(results[2]), 'Orphanet:93600')
+        self.assertEqual(str(results[2]), 'ORPHA:93600')
 
     def test_comma_diff_no_rs(self):
         text = 'rs749899964, 6/249'
