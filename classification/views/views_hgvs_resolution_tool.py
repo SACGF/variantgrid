@@ -109,12 +109,13 @@ def hgvs_resolution_tool(request: HttpRequest):
                     variant_coordinate = vcd.variant_coordinate
                     output.variant_coordinate = variant_coordinate
 
-                output.transcript_version = vcd.transcript_accession
+                if vcd.transcript_accession:
+                    output.transcript_version = TranscriptVersion.transcript_parts(vcd.transcript_accession)
 
-                if variant_coordinate and vcd.transcript_accession:
-                    if variant_details := matcher.variant_coordinate_to_hgvs_variant(variant_coordinate,
-                                                                                     str(vcd.transcript_accession)):
-                        output.hgvs = variant_details.format()
+                    if variant_coordinate:
+                        if variant_details := matcher.variant_coordinate_to_hgvs_variant(variant_coordinate,
+                                                                                         vcd.transcript_accession):
+                            output.hgvs = variant_details.format()
 
             except Exception as ex:
                 output.message = str(ex)
