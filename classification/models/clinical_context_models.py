@@ -29,7 +29,7 @@ from library.utils import invalidate_cached_property
 from snpdb.models import Lab
 from snpdb.models.models_variant import Allele
 
-clinical_context_signal = django.dispatch.Signal()  # args: "clinical_context", "status", "is_significance_change", "ClinicalContextChangeData"
+clinical_context_signal = django.dispatch.Signal()  # args: "clinical_context", "status", "is_significance_change", "clinical_context_change_data:ClinicalContextChangeData"
 
 # TODO, consider moving this into the clinical significance evidence key options rather than hardcoded
 SPECIAL_VUS = {

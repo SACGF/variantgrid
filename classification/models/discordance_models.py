@@ -36,7 +36,7 @@ from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, GenomeBuild
 from classification.models.clinical_context_models import ClinicalContextChangeData
 
-discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report", "ClinicalContextChangeData"
+discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report", "clinical_context_change_data:ClinicalContextChangeData"
 
 
 class NotifyLevel(str, Enum):
