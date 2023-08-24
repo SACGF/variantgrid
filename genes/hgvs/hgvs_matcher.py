@@ -469,6 +469,7 @@ class HGVSMatcher:
         return self.variant_coordinate_to_hgvs_variant(variant.coordinate, transcript_name=transcript_name)
 
     def variant_coordinate_to_hgvs_variant(self, variant_coordinate: VariantCoordinate, transcript_name=None) -> HGVSVariant:
+        variant_coordinate = variant_coordinate.explicit_reference()
         return self._variant_coordinate_to_hgvs_and_method(variant_coordinate, transcript_name)[0]
 
     @staticmethod
