@@ -16,7 +16,7 @@ from annotation.transcripts_annotation_selections import VariantTranscriptSelect
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import VEP_SEPARATOR
 from classification.enums import SubmissionSource, \
     SpecialEKeys
-from classification.models.evidence_key import EvidenceKeyMap
+from classification.models.evidence_key import EvidenceKeyMap, EvidenceKey
 from genes.hgvs import HGVSMatcher
 from genes.models import TranscriptVersion, GnomADGeneConstraint
 from genes.models_enums import AnnotationConsortium
@@ -79,7 +79,10 @@ class AutopopulateData:
             for other_data in self.linked:
                 for key, value in other_data.data.items():
                     if key in all_data and key in AUTOPOPULATE_MERGE_KEYS:
-                        all_data[key] = '\n'.join([all_data[key], value])
+                        # value can be {'value': '...'} or strings
+                        existing_value = EvidenceKey.get_value(all_data[key])
+                        if new_value := EvidenceKey.get_value(value):
+                            all_data[key] = '\n'.join([existing_value, new_value])
                     else:
                         all_data[key] = value
             self._all_data = all_data

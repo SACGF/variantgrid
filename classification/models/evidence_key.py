@@ -370,6 +370,13 @@ class EvidenceKey(TimeStampedModel):
             'see': self.see
         })
 
+    @staticmethod
+    def get_value(blob: Union[Mapping, Any]):
+        """ Returns value from an Ekey blob (can be {'value': VAL} or just VAL) """
+        if isinstance(blob, Mapping):
+            return blob.get('value')
+        return blob
+
     def __str__(self):
         if self.label and self.label != self.key:
             name = f"{self.key}: {self.label}"
