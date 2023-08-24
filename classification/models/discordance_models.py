@@ -34,8 +34,9 @@ from review.models import ReviewableModelMixin, Review
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, GenomeBuild
+from classification.models.clinical_context_models import ClinicalContextChangeData
 
-discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report", "cause"
+discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report", "ClinicalContextChangeData"
 
 
 class NotifyLevel(str, Enum):
@@ -156,7 +157,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=cause_text)
 
     @transaction.atomic
-    def update(self, cause_text: str = '', cause_code: str = '', notify_level: NotifyLevel = NotifyLevel.NOTIFY_IF_CHANGE):
+    def update(self, clinical_context_change_data: ClinicalContextChangeData, notify_level: NotifyLevel = NotifyLevel.NOTIFY_IF_CHANGE):
         if not self.is_active:
             raise ValueError('Cannot update non active Discordance Report')
 
@@ -191,15 +192,16 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         if not self.clinical_context.discordance_status.is_discordant:
             # hey we've reached concordance, let's close this
             # close will fire off a notification event
-            self.close(expected_resolution=DiscordanceReportResolution.CONCORDANT, cause_text=cause_text)
+            self.close(expected_resolution=DiscordanceReportResolution.CONCORDANT, cause_text=clinical_context_change_data.cause_text)
         else:
             if notify_level == NotifyLevel.NEVER_NOTIFY:
                 pass
             elif notify_level == NotifyLevel.ALWAYS_NOTIFY:
-                discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=cause_text, cause_code=cause_code)
+                discordance_change_signal.send(DiscordanceReport, discordance_report=self, clinical_context_change_data=clinical_context_change_data)
             elif newly_added_labs:  # change is significant
                 newly_added_labs_str = ", ".join(str(lab) for lab in newly_added_labs)
-                discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=f"{cause_text} and newly added labs {newly_added_labs_str}", cause_code=cause_code)
+                clinical_context_change_data_cause = ClinicalContextChangeData(cause_text=f"{clinical_context_change_data.cause_text} and newly added labs {newly_added_labs_str}", cause_code=clinical_context_change_data.cause_code)
+                discordance_change_signal.send(DiscordanceReport, discordance_report=self, clinical_context_change_data=clinical_context_change_data_cause)
 
     @property
     def all_actively_involved_labs(self) -> Set[Lab]:
@@ -299,12 +301,12 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         return DiscordanceReport.latest_report(self.clinical_context) == self
 
     @staticmethod
-    def update_latest(clinical_context: ClinicalContext, cause: str, cause_code, update_flags: bool):
+    def update_latest(clinical_context: ClinicalContext, clinical_context_change_data:ClinicalContextChangeData, update_flags: bool):
         try:
             latest_report = DiscordanceReport.latest_report(clinical_context=clinical_context)
             if latest_report:
                 if latest_report.is_active:
-                    latest_report.update(cause_text=cause)
+                    latest_report.update(clinical_context_change_data=clinical_context_change_data)
                     return latest_report
                 if latest_report.resolution == DiscordanceReportResolution.CONCORDANT:
                     # most recent report ended with discordance, can start fresh
@@ -312,12 +314,12 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
                 elif latest_report.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
                     # create a new report if data has changed significantly
                     if latest_report.should_reopen_continued_discordance:
-                        return latest_report.reopen_continued_discordance(cause=f'Change after previous report marked as continued discordance - {cause}')
+                        return latest_report.reopen_continued_discordance(cause=f'Change after previous report marked as continued discordance - {clinical_context_change_data.cause_text}')
                     return None
 
             if clinical_context.is_discordant():
-                report = DiscordanceReport(clinical_context=clinical_context, cause_text=cause)
-                report.update(cause_text=cause, cause_code=cause_code)
+                report = DiscordanceReport(clinical_context=clinical_context, cause_text=clinical_context_change_data.cause_text)
+                report.update(clinical_context_change_data=clinical_context_change_data)
                 return report
 
             # no report has been made

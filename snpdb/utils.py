@@ -40,7 +40,9 @@ class LabNotificationBuilder(NotificationBuilder):
         self.sent = True
         if slack_web_hook := empty_to_none(self.lab.slack_webhook):
             # send to lab's external slack
-            self.add_header(f"Notification for {self.lab.name}")
+            if settings.DEBUG:
+                self.blocks.insert(0, NotificationBuilder.HeaderBlock(f"Notification for {self.lab.name}"))
+
             send_notification(message=self.message, blocks=self.as_slack(), slack_webhook_url=slack_web_hook)
 
         if self.notification_type == LabNotificationBuilder.NotificationType.SLACK_ONLY:

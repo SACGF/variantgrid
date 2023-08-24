@@ -18,7 +18,7 @@ from classification.models.classification import Classification, \
 from classification.models.classification_utils import ValidationMerger
 from classification.models.classification_variant_info_models import allele_info_changed_signal
 from classification.models.clinical_context_models import ClinicalContext, \
-    clinical_context_signal, ClinicalContextRecalcTrigger
+    clinical_context_signal, ClinicalContextRecalcTrigger, ClinicalContextChangeData
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
@@ -190,9 +190,9 @@ def published(sender,
 
 
 @receiver(clinical_context_signal, sender=ClinicalContext)
-def clinical_context_update(sender, clinical_context: ClinicalContext, status: str, is_significance_change: bool, cause: str, cause_code, **kwargs):  # pylint: disable=unused-argument
+def clinical_context_update(sender, clinical_context: ClinicalContext, status: str, is_significance_change: bool, clinical_context_change_data:ClinicalContextChangeData, **kwargs):  # pylint: disable=unused-argument
     if settings.DISCORDANCE_ENABLED:
-        DiscordanceReport.update_latest(clinical_context, cause=cause, cause_code=cause_code, update_flags=True)
+        DiscordanceReport.update_latest(clinical_context, clinical_context_change_data, update_flags=True)
     else:
         clinical_context.flag_collection_safe.close_open_flags_of_type(
             flag_type=classification_flag_types.clinical_context_discordance,
