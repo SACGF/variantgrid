@@ -154,7 +154,8 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         for drc in DiscordanceReportClassification.objects.filter(report=self):  # type: DiscordanceReportClassification
             drc.close()
 
-        discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=cause_text)
+        clinical_context_change_data_close = ClinicalContextChangeData(cause_text=cause_text, cause_code=ClinicalContextRecalcTrigger.WITHDRAW_DELETE)
+        discordance_change_signal.send(DiscordanceReport, discordance_report=self, clinical_context_change_data=clinical_context_change_data_close)
 
     @transaction.atomic
     def update(self, clinical_context_change_data: ClinicalContextChangeData, notify_level: NotifyLevel = NotifyLevel.NOTIFY_IF_CHANGE):
