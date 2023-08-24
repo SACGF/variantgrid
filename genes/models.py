@@ -1286,19 +1286,21 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
         return TranscriptVersion.get_accession(self.transcript_id, self.version)
 
     @staticmethod
-    def get(transcript_accession: str) -> 'TranscriptVersionSequenceInfo':
+    def get(transcript_accession: str, retrieve=True) -> Optional['TranscriptVersionSequenceInfo']:
         """ Returns DB copy if we have it, or retrieves + stores from API """
 
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
         if tvi := TranscriptVersionSequenceInfo.objects.filter(transcript_id=transcript_id, version=version).first():
             return tvi
 
-        annotation_consortium = AnnotationConsortium.get_from_transcript_accession(transcript_accession)
-        if annotation_consortium == AnnotationConsortium.REFSEQ:
-            tvi = TranscriptVersionSequenceInfo._get_and_store_from_refseq_api(transcript_accession)
-        else:
-            tvi = TranscriptVersionSequenceInfo._get_and_store_from_ensembl_api(transcript_accession)
+        if retrieve:
+            annotation_consortium = AnnotationConsortium.get_from_transcript_accession(transcript_accession)
+            if annotation_consortium == AnnotationConsortium.REFSEQ:
+                tvi = TranscriptVersionSequenceInfo._get_and_store_from_refseq_api(transcript_accession)
+            else:
+                tvi = TranscriptVersionSequenceInfo._get_and_store_from_ensembl_api(transcript_accession)
         return tvi
+
 
     @staticmethod
     def _get_kwargs_from_genbank_record(record):
