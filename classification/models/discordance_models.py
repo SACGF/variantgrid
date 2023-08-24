@@ -389,7 +389,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
                 if not cm.classification.withdrawn:
                     if "P" in cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE):
                         return True
-            return False
+        return False
 
     def all_c_hgvs(self, genome_build: Optional[GenomeBuild] = None) -> List[CHGVS]:
         if not genome_build:
