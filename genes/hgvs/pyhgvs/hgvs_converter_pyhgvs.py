@@ -40,6 +40,12 @@ class PyHGVSVariant(HGVSVariant):
     def _get_mutation_type(self):
         return self._hgvs_name.mutation_type
 
+    def _get_ref_allele(self):
+        return self._hgvs_name.ref_allele
+
+    def _set_ref_allele(self, value):
+        self._hgvs_name.ref_allele = value
+
     def _safe(self) -> HGVSName:
         params = vars(self._hgvs_name)
         params.pop('name', None)  # don't provide name a second time as parsing of name redundantly recalculates values

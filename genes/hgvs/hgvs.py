@@ -437,6 +437,15 @@ class HGVSVariant(abc.ABC):
     def kind(self, value):
         self._set_kind(value)
 
+    @property
+    def ref_allele(self) -> str:
+        return self._get_ref_allele()
+
+    @kind.setter
+    def ref_allele(self, value):
+        self._set_ref_allele(value)
+
+
     @abc.abstractmethod
     def _get_kind(self):
         pass
@@ -459,6 +468,14 @@ class HGVSVariant(abc.ABC):
 
     @abc.abstractmethod
     def get_cdna_coords(self) -> str:
+        pass
+
+    @abc.abstractmethod
+    def _get_ref_allele(self):
+        pass
+
+    @abc.abstractmethod
+    def _set_ref_allele(self, value):
         pass
 
     @abc.abstractmethod

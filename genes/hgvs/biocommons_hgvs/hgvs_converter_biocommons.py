@@ -61,6 +61,12 @@ class BioCommonsHGVSVariant(HGVSVariant):
     def _set_kind(self, value):
         self._sequence_variant.type = value
 
+    def _get_ref_allele(self):
+        return self._sequence_variant.posedit.edit.ref
+
+    def _set_ref_allele(self, value):
+        self._sequence_variant.posedit.edit.ref = value
+
     def _get_mutation_type(self):
         biocommons_type = self._sequence_variant.posedit.edit.type
         if biocommons_type == "sub":
