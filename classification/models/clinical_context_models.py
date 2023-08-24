@@ -19,6 +19,7 @@ from classification.models.classification import Classification, \
     ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRun, \
     classification_imports_complete_signal
+
 from flags.models import Flag, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
@@ -28,7 +29,7 @@ from library.utils import invalidate_cached_property
 from snpdb.models import Lab
 from snpdb.models.models_variant import Allele
 
-clinical_context_signal = django.dispatch.Signal()  # args: "clinical_context", "status", "is_significance_change", "cause"
+clinical_context_signal = django.dispatch.Signal()  # args: "clinical_context", "status", "is_significance_change", "clinical_context_change_data:ClinicalContextChangeData"
 
 # TODO, consider moving this into the clinical significance evidence key options rather than hardcoded
 SPECIAL_VUS = {
@@ -248,6 +249,16 @@ class DiscordanceStatus:
         )
 
 
+class DiscordanceNotification(TimeStampedModel):
+    lab = models.ForeignKey(Lab, on_delete=CASCADE)
+    discordance_report = models.ForeignKey('DiscordanceReport', on_delete=CASCADE)
+    cause = models.TextField(null=True, blank=True)
+    notification_sent_date = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.lab} - {self.discordance_report}"
+
+
 class ClinicalContextRecalcTrigger(Enum):
     ADMIN = "admin"
     VARIANT_SET = "variant_set"
@@ -256,6 +267,13 @@ class ClinicalContextRecalcTrigger(Enum):
     SUBMISSION = "submission"
     DELAYED = "delayed"
     OTHER = "other"
+    PENDING_CS_CHANGE = "pending_cs_change"
+
+
+@dataclass(frozen=True)
+class ClinicalContextChangeData:
+    cause_text: str
+    cause_code: ClinicalContextRecalcTrigger
 
 
 class ClinicalContext(FlagsMixin, TimeStampedModel):
@@ -385,9 +403,10 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
             self.pending_status = None
 
             self.save()
+            clinical_context_change_data_recalc = ClinicalContextChangeData(cause_text=cause, cause_code=cause_code)
 
             # clinical_context_signal is now in charge of applying all relevant flags to clinical context and classifications
-            clinical_context_signal.send(sender=ClinicalContext, clinical_context=self, status=new_status, is_significance_change=is_significance_change, cause=cause)
+            clinical_context_signal.send(sender=ClinicalContext, clinical_context=self, status=new_status, is_significance_change=is_significance_change, clinical_context_change_data=clinical_context_change_data_recalc)
 
     @property
     def is_default(self) -> bool:
@@ -425,20 +444,3 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
             return 'Default Grouping for Allele'
         return self.name
 
-
-@receiver(flag_collection_extra_info_signal, sender=FlagCollection)
-def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs):  # pylint: disable=unused-argument
-    ccs = ClinicalContext.objects.filter(flag_collection__in=flag_infos.ids).select_related('allele')
-    for cc in ccs:
-        flag_infos.set_extra_info(cc.flag_collection_id, {
-            'label': f'{cc.allele} - "{cc.name}"',
-            'cc_id': cc.id
-        }, source_object=cc)
-
-
-@receiver(classification_imports_complete_signal, sender=ClassificationImportRun)
-def import_complete(**kwargs):
-    # this is called when there are no ongoing imports, find all the delayed clinical contexts, and calculate them
-    for cc in ClinicalContext.objects.filter(pending_cause__isnull=False):
-        # cause should automatically be loaded from pending cause anyway
-        cc.recalc_and_save(cause=cc.pending_cause, cause_code=ClinicalContextRecalcTrigger.DELAYED)

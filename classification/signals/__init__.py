@@ -7,3 +7,4 @@ from classification.signals.classification_hooks_significant_change import *  # 
 from classification.signals.classification_hooks_variants_classification_changes import *  # so we load the receivers
 from classification.signals.classification_search import *  # so we load the receivers
 from classification.signals.discordance_report_review_detail import *  # so we load the receivers
+from classification.signals.classification_hooks_import_notifications import *  # so we load the receivers

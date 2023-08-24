@@ -16,7 +16,7 @@ from classification.enums import SpecialEKeys
 from classification.enums.discordance_enums import ContinuedDiscordanceReason, DiscordanceReportResolution
 from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext, \
     EvidenceKeyMap, classification_flag_types, discordance_change_signal, \
-    DiscordanceReportRowData, ClassificationFlagTypes
+    DiscordanceReportRowData, ClassificationFlagTypes, ClinicalContextChangeData, ClinicalContextRecalcTrigger
 from classification.models.classification_groups import ClassificationGroupUtils, ClassificationGroups
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.evidence_key import EvidenceKeyOption
@@ -445,7 +445,8 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
                 # a bit messy to call the signal here directly
                 # was listening for the individual flags to be raised, but then since it's typically multiple flags raised at once
                 # it was hard to stop multiple notifications going out
-                discordance_change_signal.send(DiscordanceReport, discordance_report=data.report, cause="Pending Concordance")
+                clinical_context_change_data_view = ClinicalContextChangeData(cause_text="Pending Concordance", cause_code=ClinicalContextRecalcTrigger.PENDING_CS_CHANGE)
+                discordance_change_signal.send(DiscordanceReport, clinical_context_change_data=clinical_context_change_data_view)
             else:
                 raise ValueError(f"Expected resolution of {resolution} but allele {report.clinical_context.allele_id} is not pending concordance")
 
