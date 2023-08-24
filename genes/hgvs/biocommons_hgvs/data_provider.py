@@ -1,8 +1,34 @@
-from cdot.hgvs.dataproviders import LocalDataProvider, FastaSeqFetcher
+from cdot.hgvs.dataproviders import LocalDataProvider, FastaSeqFetcher, ChainedSeqFetcher
+from hgvs.exceptions import HGVSDataNotAvailableError
 
-from genes.models import TranscriptVersion
+from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo
 from genes.transcripts_utils import get_refseq_type
 from snpdb.models import Contig
+
+def is_contig(ac):
+    if refseq_type := get_refseq_type(ac):
+        return refseq_type == "genomic"
+    return False
+
+
+class DBTranscriptSeqFetcher:
+    """ We store some transcripts in the database, use them if we have them   """
+    source = "VG DB Transcript sequences (transcript fasta/API)"
+
+    def fetch_seq(self, ac, start_i=None, end_i=None):
+        if is_contig(ac):
+            raise HGVSDataNotAvailableError("This SeqFetcher implementation doesn't handle contigs")
+
+        try:
+            tvsi = TranscriptVersionSequenceInfo.get(ac)
+        except TranscriptVersionSequenceInfo.DoesNotExist:
+            raise HGVSDataNotAvailableError(f"No database sequence for {ac}")
+        transcript_seq = tvsi.sequence
+        if start_i is None:
+            start_i = 0
+        if end_i is None:
+            end_i = len(transcript_seq)
+        return transcript_seq[start_i:end_i]
 
 
 class SingleBuildFastaSeqFetcher(FastaSeqFetcher):
@@ -15,17 +41,20 @@ class SingleBuildFastaSeqFetcher(FastaSeqFetcher):
     def fetch_seq(self, ac, start_i=None, end_i=None):
         # If FastaSeqFetcher is called with contigs from another build it will try and lookup transcripts
         # Just fail ASAP
-        if refseq_type := get_refseq_type(ac):
-            if refseq_type == "genomic":
-                if ac not in self.contig_fastas:
-                    raise Contig.ContigNotInBuildError(f"Contig '{ac}' not in genome build '{self.genome_build.name}'")
+        if is_contig(ac):
+            if ac not in self.contig_fastas:
+                raise Contig.ContigNotInBuildError(f"Contig '{ac}' not in genome build '{self.genome_build.name}'")
+
         return super().fetch_seq(ac, start_i=start_i, end_i=end_i)
 
 
 class DjangoTranscriptDataProvider(LocalDataProvider):
 
     def __init__(self, genome_build):
-        seqfetcher = SingleBuildFastaSeqFetcher(genome_build)
+        db_transcript_seqfetcher = DBTranscriptSeqFetcher()
+        fasta_seqfetcher = SingleBuildFastaSeqFetcher(genome_build)
+        seqfetcher = ChainedSeqFetcher(db_transcript_seqfetcher, fasta_seqfetcher)
+
         super().__init__(assemblies=[genome_build.name], seqfetcher=seqfetcher)
         self.genome_build = genome_build
 
