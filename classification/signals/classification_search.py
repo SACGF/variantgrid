@@ -2,6 +2,7 @@ import operator
 from functools import reduce
 from typing import Optional, List
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.dispatch import receiver
@@ -18,7 +19,7 @@ from snpdb.search import search_receiver, SearchInputInstance, SearchExample
     search_type=Classification,
     example=SearchExample(
         note="The lab record ID",
-        examples=["CR_1545"]
+        examples=["CR_1545" if settings.VARIANT_CLASSIFICATION_ID_OVERRIDE_PREFIX else "vc1545"]
     )
 )
 def classification_search(search_input: SearchInputInstance):

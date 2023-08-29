@@ -340,8 +340,8 @@ VARIANT_ZYGOSITY_GLOBAL_COLLECTION = "global"
 
 PREFER_ALLELE_LINKS = False
 
-# if replace None with any value, CR_lab_id will be used for records instead of lab record ID
-VARIANT_CLASSIFICATION_ID_OVERRIDE_PREFIX = None
+# if True, CR_lab_id will be used in all instances
+VARIANT_CLASSIFICATION_ID_OVERRIDE_PREFIX = False
 
 CLINGEN_ALLELE_REGISTRY_DOMAIN = "http://reg.genome.network"
 CLINGEN_ALLELE_REGISTRY_MAX_RECORDS = 2000
