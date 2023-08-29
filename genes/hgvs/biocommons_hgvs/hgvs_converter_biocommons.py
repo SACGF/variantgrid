@@ -164,7 +164,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
     def hgvs_to_variant_coords_and_reference_match(self, hgvs_string: str, transcript_version=None) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
         var_g, matches_reference = self._hgvs_to_g_hgvs(hgvs_string)
         try:
-            (chrom, start, end, ref, alt, typ) = self.babelfish.hgvs_to_vcf(var_g)
+            (chrom, start, end, ref, alt, typ) = self.babelfish.hgvs_to_vcf_symbolic(var_g)
             if alt == '.':
                 alt = ref
         except HGVSDataNotAvailableError:
