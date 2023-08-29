@@ -690,8 +690,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return str(self.id)
 
     @property
+    def cr_lab_id(self):
+        if settings.VARIANT_CLASSIFICATION_ID_OVERRIDE_PREFIX:
+            return f"CR_{self.id}"
+        return self.lab_record_id
+
+    @property
     def friendly_label(self):
-        return self.lab.name + ' / ' + self.lab_record_id
+        return self.lab.name + ' / ' + self.cr_lab_id
 
     @staticmethod
     def to_date(date_str: str) -> Optional[datetime]:
@@ -1816,6 +1822,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             'lab_record_id': self.lab_record_id,
             'institution_name': self.lab.organization.name,
             'lab_id': self.lab.group_name,
+            'cr_lab_id': self.cr_lab_id,
             'org_name': self.lab.organization.shortest_name,
             'lab_name': self.lab.name,
             'title': title,
@@ -2275,6 +2282,12 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     @property
     def id_str(self) -> str:
         return self.classification.id_str + '.' + str(self.created.timestamp())
+
+    @property
+    def cr_lab_id(self) -> str:
+        if settings.VARIANT_CLASSIFICATION_ID_OVERRIDE_PREFIX:
+            return f"CR_{self.classification.id_str}"
+        return self.classification.lab_record_id
 
     @property
     def curated_date(self) -> datetime:

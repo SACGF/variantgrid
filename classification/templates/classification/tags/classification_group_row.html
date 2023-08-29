@@ -112,7 +112,7 @@
             <div>
                 {% for record in group.modifications %}
                     <div class="mt-2 d-flex" style="align-items:center;position:relative;top:5px">
-                        <a class="hover-link" style="font-weight:bold" href="{% url 'view_classification' record.classification_id %}">{{ record.classification.lab_record_id }}</a>
+                        <a class="hover-link" style="font-weight:bold" href="{% url 'view_classification' record.classification_id %}">{{ record.classification.cr_lab_id}}</a>
                         {{ record.classification.allele_info.issue_icon|default_if_none:'' }}
                         <div class="flags d-inline-block" style="margin-left:12px" data-flags="{{ record.classification.flag_collection_id }}">...</div>
                     </div>

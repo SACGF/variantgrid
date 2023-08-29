@@ -260,3 +260,6 @@ UNSHARED_FLAG_ENABLED = True
 VIEW_GENE_HOTSPOT_GRAPH = False
 
 GENE_RELATION_PANEL_APP_LIVE_UPDATE = True
+
+# if False lab record ID will be used for records instead of CR_lab_id
+VARIANT_CLASSIFICATION_ID_OVERRIDE_PREFIX = True

@@ -79,13 +79,17 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                     value = str(value)
                     if id_filter.lower() in value.lower():
                         matches[key] = value
+        if settings.VARIANT_CLASSIFICATION_ID_OVERRIDE_PREFIX:
+            cr_lab_id = f"CR_{row.get('classification__id')}"
+        else:
+            cr_lab_id = row.get('classification__lab_record_id')
 
         return {
             "id": row.get('classification__id'),
             # should we start using short names?
             "org_name": row.get('classification__lab__organization__short_name') or row.get('classification__lab__organization__name'),
             "lab_name": row.get('classification__lab__name'),
-            "lab_record_id": row.get('classification__lab_record_id'),
+            "lab_record_id": cr_lab_id,
             "share_level": row.get('classification__share_level'),
             "matches": matches,
             "search": id_filter

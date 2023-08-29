@@ -803,6 +803,9 @@ const VCForm = (function() {
 
             jSyncStatus.empty();
 
+            if (this.lab_record_id) {
+                appendLabelHeading('Lab ID', $('<span>', {text: this.lab_record_id}));
+            }
             appendLabelHeadingForKey(SpecialEKeys.GENOME_BUILD, true, 'Build');
 
             if (this.record.allele && this.record.allele.resolved) {
@@ -1130,6 +1133,7 @@ const VCForm = (function() {
             jLinks = $(params.links);
             jShareButtons = $(params.shareButtons);
             this.userAdmin = params.userAdmin;
+            this.lab_record_id = params.lab_record_id;
             this.citations = params.citations;
             this.attachmentsEnabled = params.attachmentsEnabled || false;
             
