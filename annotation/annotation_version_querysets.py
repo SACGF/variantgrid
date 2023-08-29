@@ -15,7 +15,7 @@ from functools import reduce
 
 from django.db.models.query_utils import Q
 
-from annotation.models import AnnotationVersion, VariantAnnotation
+from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationPipelineType
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
 from snpdb.models import Variant
 
@@ -43,12 +43,21 @@ def get_queryset_for_annotation_version(klass, annotation_version):
     return qs
 
 
-def get_unannotated_variants_qs(annotation_version, min_variant_id=None, max_variant_id=None):
+def get_unannotated_variants_qs(annotation_version, pipeline_type=None, min_variant_id=None, max_variant_id=None):
     # Explicitly join to version partition so other version annotations don't count
     qs = get_variant_queryset_for_annotation_version(annotation_version)
     q_filters = VariantAnnotation.VARIANT_ANNOTATION_Q + \
         [Variant.get_contigs_q(annotation_version.genome_build),
          Q(variantannotation__isnull=True)]  # Not annotated
+
+    q_symbolic = Q(locus__ref__seq__contains='<') | Q(alt__seq__contains='<')
+    if pipeline_type:
+        if pipeline_type == VariantAnnotationPipelineType.STANDARD:
+            q_filters.append(~q_symbolic)
+        elif pipeline_type == VariantAnnotationPipelineType.CNV:
+            q_filters.append(q_symbolic)
+        else:
+            raise ValueError(f"Unrecognised {pipeline_type=}")
 
     if min_variant_id:
         q_filters.append(Q(pk__gte=min_variant_id))

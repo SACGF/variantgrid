@@ -1,6 +1,6 @@
 
 def get_vcf_header_lines(top_lines=None, info_dict=None, formats=None, contigs=None, samples=None):
-    """ info_dict - values of ('number', 'type', 'description')
+    """ info_dict - values = dict with keys of 'type', 'description' (optional 'number' default = 1)
         contigs - tuples of (contig, length, assembly)
     """
 
@@ -13,6 +13,8 @@ def get_vcf_header_lines(top_lines=None, info_dict=None, formats=None, contigs=N
     if info_dict:
         for info_id, data in info_dict.items():
             data['id'] = info_id
+            if data.get("number") is None:
+                data["number"] = 1
             line_template = '##INFO=<ID=%(id)s,Number=%(number)s,Type=%(type)s,Description="%(description)s">'
             line = line_template % data
             header_lines.append(line)

@@ -82,7 +82,7 @@ class BioCommonsHGVSVariant(HGVSVariant):
         return ref, alt
 
     def get_cdna_coords(self) -> str:
-        return str(self._sequence_variant.posedit.pos)
+        return str(self._sequence_variant.posedit.start)
 
     def format(self, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH):
         conf = {"max_ref_length": max_ref_length}
@@ -100,7 +100,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
             assembly_name = genome_build.get_build_with_patch()  # Need to include patch to get MT in GRCh37
         else:
             assembly_name = genome_build.name
-        self.babelfish = Babelfish(self.hdp, assembly_name)
+        self.babelfish = Babelfish(self.hdp, assembly_name, symbolic_size_threshold=settings.VARIANT_SYMBOLIC_ALT_SIZE)
         self.am = AssemblyMapper(self.hdp,
                                  assembly_name=genome_build.name,
                                  alt_aln_method='splign',
@@ -164,12 +164,12 @@ class BioCommonsHGVSConverter(HGVSConverter):
     def hgvs_to_variant_coords_and_reference_match(self, hgvs_string: str, transcript_version=None) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
         var_g, matches_reference = self._hgvs_to_g_hgvs(hgvs_string)
         try:
-            (chrom, position, ref, alt, typ) = self.babelfish.hgvs_to_vcf(var_g)
+            (chrom, start, end, ref, alt, typ) = self.babelfish.hgvs_to_vcf(var_g)
             if alt == '.':
                 alt = ref
         except HGVSDataNotAvailableError:
             raise Contig.ContigNotInBuildError()
-        return VariantCoordinate(chrom, position, ref, alt), matches_reference
+        return VariantCoordinate(chrom, start, end, ref, alt), matches_reference
 
     def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
         sequence_variant = self._parser_hgvs(hgvs_string)

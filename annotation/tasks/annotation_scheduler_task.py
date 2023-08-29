@@ -5,7 +5,7 @@ from django.conf import settings
 from django.core.cache import cache
 
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
-from annotation.models import AnnotationRun
+from annotation.models import AnnotationRun, VariantAnnotationPipelineType
 from annotation.models.models import AnnotationVersion, AnnotationRangeLock
 from annotation.tasks.annotate_variants import annotate_variants
 from library.log_utils import log_traceback
@@ -43,8 +43,9 @@ def annotation_scheduler(active=True):
 
 
 def _handle_range_lock(range_lock):
-    annotation_run = AnnotationRun.objects.create(annotation_range_lock=range_lock)
-    annotate_variants.apply_async((annotation_run.pk,))  # @UndefinedVariable
+    for pipeline_type in VariantAnnotationPipelineType:
+        annotation_run = AnnotationRun.objects.create(annotation_range_lock=range_lock, pipeline_type=pipeline_type)
+        annotate_variants.apply_async((annotation_run.pk,))  # @UndefinedVariable
 
 
 def _handle_variant_annotation_version(variant_annotation_version):

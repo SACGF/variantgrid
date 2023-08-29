@@ -10,7 +10,7 @@ from pyhgvs.utils import make_transcript
 from genes.hgvs import HGVSVariant, HGVSException
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele
 from genes.transcripts_utils import transcript_is_lrg
-from snpdb.models import GenomeBuild, VariantCoordinate
+from snpdb.models import GenomeBuild, VariantCoordinate, Variant
 
 
 class PyHGVSVariant(HGVSVariant):
@@ -153,12 +153,19 @@ class PyHGVSConverter(HGVSConverter):
                                                transcript=pyhgvs_transcript,
                                                indels_start_with_same_base=False)
 
-        chrom, position, ref, alt = variant_tuple
+        chrom, start, ref, alt = variant_tuple
+        end = Variant.calculate_end(start, ref, alt)
+        if settings.VARIANT_SYMBOLIC_ALT_SIZE is not None:
+            if end - start >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
+                if hgvs_name.mutation_type in ('del', 'dup'):
+                    ref = ref[0]
+                    alt = '<' + hgvs_name.mutation_type.upper() + '>'
+
         contig = self.genome_build.chrom_contig_mappings[chrom]
         chrom = contig.name
 
         matches_reference = self.get_hgvs_match_ref_allele(hgvs_name, pyhgvs_transcript)
-        return VariantCoordinate(chrom, position, ref, alt), matches_reference
+        return VariantCoordinate(chrom, start, end, ref, alt), matches_reference
 
     def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
         # ClinGen Allele Registry doesn't like gene names - so strip (unless LRG_)

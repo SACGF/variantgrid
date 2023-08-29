@@ -8,7 +8,7 @@ from django.conf import settings
 
 from annotation.fake_annotation import get_fake_vep_version
 from annotation.models.models import ColumnVEPField
-from annotation.models.models_enums import VEPPlugin, VEPCustom
+from annotation.models.models_enums import VEPPlugin, VEPCustom, VariantAnnotationPipelineType
 from genes.models_enums import AnnotationConsortium
 from library.utils import get_single_element, execute_cmd
 from library.utils.file_utils import get_extension_without_gzip, mk_path_for_file, open_handle_gzip
@@ -66,7 +66,8 @@ def _get_custom_params_list(fields, prefix, data_path) -> list:
     return ["--custom", command]
 
 
-def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium):
+def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium,
+                    pipeline_type: VariantAnnotationPipelineType):
     vc = VEPConfig(genome_build)
     vep_cmd = os.path.join(settings.ANNOTATION_VEP_CODE_DIR, "vep")
     reference_fasta = genome_build.reference_fasta
@@ -97,9 +98,6 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         "--af",
         "--pubmed",
         "--variant_class",
-        # Plugins that don't require data
-        "--plugin", "Grantham",
-        "--plugin", "SpliceRegion",
     ]
 
     if settings.ANNOTATION_VEP_PICK_ORDER:
@@ -108,38 +106,6 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
 
     if settings.ANNOTATION_VEP_DISTANCE is not None:
         cmd.extend(["--distance", str(settings.ANNOTATION_VEP_DISTANCE)])
-
-    # Plugins that require data - ok for these to fail when retrieving vep config
-    PLUGINS = {VEPPlugin.MASTERMIND: lambda: f"Mastermind,{vc['mastermind']},1",  # 1 to not filter
-               VEPPlugin.MAXENTSCAN: lambda: f"MaxEntScan,{vc['maxentscan']}",
-               VEPPlugin.DBNSFP: lambda: _get_dbnsfp_plugin_command(genome_build, vc),
-               VEPPlugin.DBSCSNV: lambda: f"dbscSNV,{vc['dbscsnv']}",
-               VEPPlugin.SPLICEAI: lambda: f"SpliceAI,snv={vc['spliceai_snv']},indel={vc['spliceai_indel']}"}
-
-    if vc.columns_version >= 2:
-        cmd.extend(["--plugin", "NMD"])
-
-    for vep_plugin, plugin_arg_func in PLUGINS.items():
-        try:
-            cmd.extend(["--plugin", plugin_arg_func()])
-        except Exception as e:
-            logging.warning(e)
-            logging.warning("No annotation set for plugin: %s", vep_plugin)
-
-    # Custom
-    for vep_custom, prefix in dict(VEPCustom.choices).items():
-        try:
-            if fields := ColumnVEPField.get_source_fields(genome_build, vep_custom=vep_custom):
-                prefix_lc = prefix.lower()
-                if cfg := vc[prefix_lc]:  # annotation settings are lower case
-                    cmd.extend(_get_custom_params_list(fields, prefix, cfg))
-                else:
-                    logging.info("Skipping due to settings.ANNOTATION[%s][vep_config][%s] = None",
-                                 genome_build.name, prefix_lc)
-        except Exception as e:
-            logging.warning(e)
-            # Not all annotations available for all builds - ok to just warn
-            logging.warning("Skipped custom annotation: %s", prefix)
 
     if annotation_consortium == AnnotationConsortium.REFSEQ:
         cmd.append("--refseq")
@@ -153,13 +119,56 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     if settings.ANNOTATION_VEP_ARGS:
         cmd.extend(settings.ANNOTATION_VEP_ARGS)
 
+    if pipeline_type == VariantAnnotationPipelineType.STANDARD:
+        # TODO: At the moment we just skip everything, perhaps we should:
+        # a) Add ColumnVEPField.pipeline_type (or maybe have a list of all types) so we can configure it to run on both
+        # b) Run another pipeline for CNVs
+
+        cmd.extend([
+            # Plugins that don't require data
+            "--plugin", "Grantham",
+            "--plugin", "SpliceRegion",
+        ])
+
+        # Plugins that require data - ok for these to fail when retrieving vep config
+        PLUGINS = {VEPPlugin.MASTERMIND: lambda: f"Mastermind,{vc['mastermind']},1",  # 1 to not filter
+                   VEPPlugin.MAXENTSCAN: lambda: f"MaxEntScan,{vc['maxentscan']}",
+                   VEPPlugin.DBNSFP: lambda: _get_dbnsfp_plugin_command(genome_build, vc),
+                   VEPPlugin.DBSCSNV: lambda: f"dbscSNV,{vc['dbscsnv']}",
+                   VEPPlugin.SPLICEAI: lambda: f"SpliceAI,snv={vc['spliceai_snv']},indel={vc['spliceai_indel']}"}
+
+        if vc.columns_version >= 2:
+            cmd.extend(["--plugin", "NMD"])
+
+        for vep_plugin, plugin_arg_func in PLUGINS.items():
+            try:
+                cmd.extend(["--plugin", plugin_arg_func()])
+            except Exception as e:
+                logging.warning(e)
+                logging.warning("No annotation set for plugin: %s", vep_plugin)
+
+        # Custom
+        for vep_custom, prefix in dict(VEPCustom.choices).items():
+            try:
+                if fields := ColumnVEPField.get_source_fields(genome_build, vep_custom=vep_custom):
+                    prefix_lc = prefix.lower()
+                    if cfg := vc[prefix_lc]:  # annotation settings are lower case
+                        cmd.extend(_get_custom_params_list(fields, prefix, cfg))
+                    else:
+                        logging.info("Skipping due to settings.ANNOTATION[%s][vep_config][%s] = None",
+                                     genome_build.name, prefix_lc)
+            except Exception as e:
+                logging.warning(e)
+                # Not all annotations available for all builds - ok to just warn
+                logging.warning("Skipped custom annotation: %s", prefix)
+
     return cmd
 
 
-def run_vep(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium):
+def run_vep(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium, pipeline_type):
     """ executes VEP command. Returns (command_line, code, stdout, stderr) """
 
-    cmd = get_vep_command(vcf_filename, output_filename, genome_build, annotation_consortium)
+    cmd = get_vep_command(vcf_filename, output_filename, genome_build, annotation_consortium, pipeline_type)
     logging.info("Executing VEP:")
     logging.info(" ".join(cmd))
     return execute_cmd(cmd)
@@ -180,7 +189,8 @@ def get_vep_version(genome_build: GenomeBuild, annotation_consortium):
 
     output_basename = f"fake.vep_annotated_{genome_build.name}.vcf.gz"
     output_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, output_basename)
-    returncode, std_out, std_err = run_vep(vcf_filename, output_filename, genome_build, annotation_consortium)
+    returncode, std_out, std_err = run_vep(vcf_filename, output_filename, genome_build,
+                                           annotation_consortium, VariantAnnotationPipelineType.STANDARD)
     if returncode != 0:
         logging.info(std_out)
         logging.error(std_err)

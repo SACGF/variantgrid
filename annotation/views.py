@@ -25,7 +25,7 @@ from annotation.models import AnnotationVersion, AnnotationRun, VariantAnnotatio
 from annotation.models.models import CachedWebResource, HumanProteinAtlasAnnotationVersion, \
     HumanProteinAtlasAnnotation, ColumnVEPField, DBNSFPGeneAnnotationVersion
 from annotation.models.models_citations import CitationFetchRequest
-from annotation.models.models_enums import AnnotationStatus
+from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
 from annotation.vep_annotation import get_vep_command
@@ -290,7 +290,8 @@ def annotation_versions(request):
         qs = AnnotationVersion.objects.filter(genome_build=genome_build).order_by("-annotation_date")
         has_annotation = qs.exists()
         has_active = qs.filter(variant_annotation_version__active=True).exists()
-        vep_command = get_vep_command("in.vcf", "out.vcf", genome_build, genome_build.annotation_consortium)
+        vep_command = get_vep_command("in.vcf", "out.vcf", genome_build, genome_build.annotation_consortium,
+                                      VariantAnnotationPipelineType.STANDARD)
         vep_command = " ".join(vep_command).replace(" -", "\n")
         anno_versions[genome_build.name] = (vep_command, qs, latest, has_annotation, has_active)
 

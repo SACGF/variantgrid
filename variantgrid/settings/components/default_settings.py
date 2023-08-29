@@ -383,7 +383,7 @@ COMPANY = None  # Used for gene list categories
 
 GENERATED_DIR = os.path.join(MEDIA_ROOT, 'generated')
 
-HGVS_DEFAULT_METHOD = "pyhgvs"  # HGVSConverterType (any case) ie "pyhgvs", "biocommons_hgvs"
+HGVS_DEFAULT_METHOD = "combo"  # HGVSConverterType (any case) ie "pyhgvs", "biocommons_hgvs", "combo"
 HGVS_MAX_REF_ALLELE_LENGTH = 10  # Set to 0 for "del" instead of "delC" etc
 HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH = True
 
@@ -458,7 +458,6 @@ ANALYSIS_NODE_CACHE_Q = True
 ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX = 1000
 
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
-VARIANT_STANDARD_BASES_ONLY = True  # True to reject anything other than A, C, G, T
 VARIANT_SHOW_CANONICAL_HGVS = True
 
 VARIANT_CLASSIFICATION_OMNI_IMPORTER_APP_DIR = None  # location of OmniImporter (if present) to map imported classifications
@@ -957,6 +956,9 @@ VARIANT_DETAILS_NEARBY_SHOW_GENE = False
 VARIANT_VCF_DB_PREFIX = "vg"
 VARIANT_MANUAL_CREATE = True
 VARIANT_MANUAL_CREATE_BY_NON_ADMIN = True
+# Below this size, variants are stored with ref/alt sequences. Above this threshold, they become
+# structural variants and use symbolic
+VARIANT_SYMBOLIC_ALT_SIZE = 1000
 
 VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS = False
 VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS_PREFER_CANONICAL_WITH_DIFF_VERSION = True

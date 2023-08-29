@@ -45,7 +45,7 @@ def get_method_summaries(variant, annotation_version, distance=None):
         gene_summary = "Intergenic, no gene search performed"
 
     start = variant.start - distance
-    end = variant.end + distance
+    end = variant.get_end() + distance
     range_summary = f"{variant.locus.contig.name}: {start}-{end} ({distance} bases)"
 
     return {
@@ -200,7 +200,7 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
 
 def filter_variant_range(qs, variant: Variant, distance):
     start = variant.start - distance
-    end = variant.end + distance
+    end = variant.get_end() + distance
     annotation_kwargs, q = Variant.get_overlap_annotate_and_q(variant.locus.contig, start, end)
     return qs.annotate(**annotation_kwargs).filter(q)
 

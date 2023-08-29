@@ -57,7 +57,7 @@ def set_allele_depth_format_fields(vcf: VCF, vcf_formats, vcf_source, default_al
 
     if ad is None:
         msg = f"Couldn't determine allele depth format field, source: '{vcf_source}', formats: {vcf_formats}"
-        raise ValueError(msg)
+        logging.warning(msg)
 
     vcf.allele_depth_field = ad
 
@@ -186,6 +186,7 @@ def configure_vcf_from_header(vcf, vcf_reader):
     vcf.source = source
     if vcf.genotype_samples:  # Has sample format fields
         set_allele_depth_format_fields(vcf, vcf_formats, source, VCFConstant.DEFAULT_ALLELE_FIELD)
+        vcf.genotype_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_GENOTYPE_FIELD)
         vcf.read_depth_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_READ_DEPTH_FIELD)
         vcf.genotype_quality_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_GENOTYPE_QUALITY_FIELD)
         vcf.phred_likelihood_field = get_phred_likelihood_field(vcf_formats, source,
