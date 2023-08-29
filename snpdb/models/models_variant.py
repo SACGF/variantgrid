@@ -601,7 +601,7 @@ class Variant(PreviewModelMixin, models.Model):
         # TODO: Replace this with a call to end after everyone has run population migration
         if self.end is not None:
             return self.end
-        return self.calculate_end(self.locus.position, self.locus.ref, self.locus.alt)
+        return self.calculate_end(self.locus.position, self.locus.ref, self.alt)
 
     @staticmethod
     def calculate_end_from_lengths(position, ref_length, alt_length) -> int:

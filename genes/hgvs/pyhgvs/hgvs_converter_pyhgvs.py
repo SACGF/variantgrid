@@ -126,8 +126,8 @@ class PyHGVSConverter(HGVSConverter):
         return PyHGVSVariant(self._hgvs_name(hgvs_string))
 
     def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
-        chrom, offset, ref, alt = vc
-        hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt,
+        chrom, start, end, ref, alt = vc
+        hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, start, ref, alt,
                                                 self.genome_build.genome_fasta.fasta,
                                                 transcript=None, max_allele_length=sys.maxsize)
         contig = self.genome_build.chrom_contig_mappings[chrom]

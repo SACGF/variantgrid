@@ -477,10 +477,10 @@ class HGVSMatcher:
 
     def variant_coordinate_to_g_hgvs(self, variant_coordinate: VariantCoordinate) -> str:
         variant_coordinate = variant_coordinate.explicit_reference()
-        (chrom, offset, ref, alt) = variant_coordinate
+        (chrom, start, end, ref, alt) = variant_coordinate
         if len(alt) == 1 and len(ref) == 1:
             contig = self.genome_build.chrom_contig_mappings[chrom]
-            hgvs_str = self._fast_variant_coordinate_to_g_hgvs(contig.refseq_accession, offset, ref, alt)
+            hgvs_str = self._fast_variant_coordinate_to_g_hgvs(contig.refseq_accession, start, ref, alt)
         else:
             hgvs_variant = self.hgvs_converter.variant_coords_to_g_hgvs(variant_coordinate)
             hgvs_str = str(hgvs_variant)
