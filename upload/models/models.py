@@ -599,24 +599,26 @@ class ModifiedImportedVariant(models.Model):
         return old_variants
 
     @staticmethod
-    def get_old_variant_from_tuple(chrom, position, ref, alt) -> str:
+    def get_old_variant_from_tuple(chrom, position, _end, ref, alt) -> str:
+        # TODO - this doesn't work w/symbolic alts but neither does VT - will eventually rewrite this to use
+        # BCF tools
         return f"{chrom}:{int(position)}:{ref}/{alt}"
 
     @classmethod
-    def get_upload_pipeline_unnormalized_variant(cls, upload_pipeline, chrom, position, ref, alt):
+    def get_upload_pipeline_unnormalized_variant(cls, upload_pipeline, chrom, start, end, ref, alt):
         """ throws DoesNotExist """
-        old_variant = cls.get_old_variant_from_tuple(chrom, position, ref, alt)
+        old_variant = cls.get_old_variant_from_tuple(chrom, start, end, ref, alt)
         return cls.objects.get(import_info__upload_step__upload_pipeline=upload_pipeline,
                                old_variant_formatted=old_variant)
 
     @classmethod
-    def get_variant_for_unnormalized_variant(cls, upload_pipeline, chrom, position, ref, alt) -> Variant:
-        miv = cls.get_upload_pipeline_unnormalized_variant(upload_pipeline, chrom, position, ref, alt)
+    def get_variant_for_unnormalized_variant(cls, upload_pipeline, chrom, start, end, ref, alt) -> Variant:
+        miv = cls.get_upload_pipeline_unnormalized_variant(upload_pipeline, chrom, start, end, ref, alt)
         return miv.variant
 
     @classmethod
-    def get_variants_for_unnormalized_variant(cls, chrom, position, ref, alt) -> QuerySet:
-        old_variant = cls.get_old_variant_from_tuple(chrom, position, ref, alt)
+    def get_variants_for_unnormalized_variant(cls, chrom, start, end, ref, alt) -> QuerySet:
+        old_variant = cls.get_old_variant_from_tuple(chrom, start, end, ref, alt)
         return Variant.objects.filter(modifiedimportedvariant__old_variant_formatted=old_variant).distinct()
 
     @classmethod

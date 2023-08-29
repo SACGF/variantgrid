@@ -546,7 +546,7 @@ class Variant(PreviewModelMixin, models.Model):
         return self.format_tuple(*self.as_tuple())
 
     def __str__(self):
-        return self.format_tuple(self.locus.contig.name, self.locus.position, self.locus.ref, self.alt, self.end)
+        return self.format_tuple(self.locus.contig.name, self.locus.position, self.end, self.locus.ref, self.alt)
 
     def get_absolute_url(self):
         # will show allele if there is one, otherwise go to variant page
@@ -618,7 +618,7 @@ class Variant(PreviewModelMixin, models.Model):
         if Variant.is_ref_alt_reference(ref, alt):
             alt = Variant.REFERENCE_ALT
         chrom = format_chrom(chrom, want_chr)
-        return chrom, position, ref, alt
+        return chrom, int(position), ref, alt
 
     @property
     def sort_string(self) -> str:

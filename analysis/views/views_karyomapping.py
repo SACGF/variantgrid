@@ -77,8 +77,8 @@ def get_variant_lookup_and_scatter_data(karyomapping_bins):
         x = []
         text = []
         for variant_id, chrom, position, ref, alt in variant_data:
-
-            variant_string = Variant.format_tuple(chrom, position, ref, alt)
+            end = Variant.calculate_end(position, ref, alt)
+            variant_string = Variant.format_tuple(chrom, position, end, ref, alt)
             variant_id_lookup[variant_string] = variant_id
             x.append(position)
             text.append(variant_string)
