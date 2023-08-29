@@ -22,6 +22,7 @@
             vcform.init(
                 {
                     userAdmin: {{ user.is_superuser | jsonify }},
+                    lab_record_id: "{{ record.lab_record_id }}",
                     genomeBuild: "{{ genome_build.pk }}",
                     // citations: new Citations($('#citations')),
                     citations: $('#citations'),
@@ -124,7 +125,7 @@
         </div>
         <div id="vc-extras">
             <div id="vcform-summary" class="card m-2">
-                <div class="card-header">{{ record.org_name }} / {{ record.lab_name }} / {{ record.lab_record_id }}</div>
+                <div class="card-header">{{ record.org_name }} / {{ record.lab_name }} / {{ record.cr_lab_id }}</div>  <!-- Change here -->
                 <div class="card-body"></div>
             </div>
             <div id="vcform-flags" class="card m-2">

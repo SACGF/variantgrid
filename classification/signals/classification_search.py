@@ -18,16 +18,19 @@ from snpdb.search import search_receiver, SearchInputInstance, SearchExample
     search_type=Classification,
     example=SearchExample(
         note="The lab record ID",
-        examples=["vc1545"]
+        examples=["CR_1545"]
     )
 )
 def classification_search(search_input: SearchInputInstance):
 
     search_string = search_input.search_string
     """ Search for LabId which can be either:
-        "vc1080" or "Molecular Genetics, Frome Road / vc1080" (as it appears in classification) """
-
-    filters = [Q(classification__lab_record_id__iexact=search_string)]  # exact match
+        "vc1080" or "Molecular Genetics/ Frome Road / vc1080" (as it appears in classification) or CR_1080 or Molecular Genetics/ Frome Road / CR_1080 """
+    if search_string.startswith("CR_"):
+        search_string = search_string[3:]
+        filters = [Q(classification__id=search_string)]
+    else:
+        filters = [Q(classification__lab_record_id__iexact=search_string)]  # exact match
     slash_index = search_string.find("/")
     if slash_index > 0:
         parts = [p.strip() for p in search_string.split("/")]
@@ -50,7 +53,11 @@ def classification_search(search_input: SearchInputInstance):
                 lab_qs = lab_qs.filter(organization=org)
 
             if lab_qs:
-                filters.append(Q(classification__lab_record_id=lab_record_id) & Q(classification__lab__in=lab_qs))
+                if lab_record_id.startswith("CR_"):
+                    lab_record_id = lab_record_id[3:]
+                    filters.append(Q(classification__id=lab_record_id) & Q(classification__lab__in=lab_qs))
+                else:
+                    filters.append(Q(classification__lab_record_id=lab_record_id) & Q(classification__lab__in=lab_qs))
 
     q_cm = reduce(operator.or_, filters)
     cm_qs = ClassificationModification.filter_for_user(search_input.user).filter(is_last_published=True)

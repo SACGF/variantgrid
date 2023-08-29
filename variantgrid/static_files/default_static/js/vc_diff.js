@@ -149,7 +149,7 @@ const Diff = (function() {
                 }
                 
                 let ltd = $('<td>').appendTo(tr);
-                let label = $('<label>', {for: `ch-${uniqueId}`, text: `${v.lab_name} / ${v.lab_record_id}`}).appendTo(ltd);
+                let label = $('<label>', {for: `ch-${uniqueId}`, text: `${v.org_name} / ${v.lab_name} / ${v.cr_lab_id}`}).appendTo(ltd);
             });
             modalContent.on('');
             modalContent.modal({
@@ -279,7 +279,7 @@ const Diff = (function() {
 
                 let titleDom = $('<a>', {class:'hover-link text-center d-flex flex-column flex-align-center', href: url});
                 
-                let titlePart = $('<div>', {text: v.lab_name + ' / ' + v.lab_record_id}).appendTo(titleDom);
+                let titlePart = $('<div>', {text:  v.org_name + ' / ' + v.lab_name + ' / ' + v.cr_lab_id}).appendTo(titleDom);
                 if (v.first_seen) {
                     let first_seen_date = moment(v.first_seen * 1000).format('DD/MMM/YYYY HH:mm');
                     let last_seen_date = moment(v.version * 1000).format('DD/MMM/YYYY HH:mm');
@@ -334,6 +334,13 @@ const Diff = (function() {
                         // conditionRow
                     ]}).appendTo(headerRow);
             });
+
+            let rowLabRecordId = $('<tr>', {class: 'group no-compare'}).appendTo(table);
+            $('<th>', {text: "Lab Id", style: 'font-weight:normal'}).appendTo(rowLabRecordId);
+            includedVersions.forEach(v => {
+                $('<td>', {text: v.lab_record_id}).appendTo(rowLabRecordId);
+            });
+
             let all_db_refs = {};
 
             // loop through groups of keys
