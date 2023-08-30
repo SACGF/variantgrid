@@ -29,7 +29,7 @@
 		let graphSelector = $('#cohort-hotspot-graph');
 		graphSelector.empty();
 		graphSelector.addClass('generated-graph graph-loading');
-        var url = Urls.cohort_hotspot_graph({{ cohort.pk }}, transcriptId);
+        let url = Urls.cohort_transcript_hotspot_graph({{ cohort.pk }}, transcriptId);
         graphSelector.load(url);
 	}
 {% endblock %}
@@ -38,7 +38,7 @@
 
     $("#gene-and-transcript-form").submit(function(e){
         e.preventDefault();
-        var transcriptId = $("#id_transcript").val();
+        let transcriptId = $("#id_transcript").val();
         if (transcriptId) {
             load_hotspot_graph(transcriptId);
         }
@@ -54,7 +54,7 @@
     		<form id="gene-and-transcript-form">
                 {{ form.as_p }}
                 {{ form.media }}
-                <button id='view-cohort-hotspot'>Show Hotspots</button>
+                <button class='btn btn-primary' id='view-cohort-hotspot'>Show Hotspots</button>
 	       </form>
 			<div id='cohort-hotspot-graph'>
 				Search for a gene to load hotspot graph.

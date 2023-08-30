@@ -72,12 +72,12 @@ class TranscriptAutocompleteView(AutocompleteView):
         return qs.order_by(Length(f).asc(), f)
 
     def get_user_queryset(self, user):
-        gene = self.forwarded.get('gene', None)
+        gene_symbol = self.forwarded.get('gene_symbol', None)
         genome_build = self.forwarded.get('genome_build', None)
         qs = Transcript.objects.all().distinct()
 
-        if gene:
-            qs = qs.filter(transcriptversion__gene_version__gene=gene)
+        if gene_symbol:
+            qs = qs.filter(transcriptversion__gene_version__gene_symbol__symbol=gene_symbol)
         if genome_build:
             qs = qs.filter(transcriptversion__genome_build=genome_build)
         return qs
@@ -92,7 +92,10 @@ class GeneSymbolAutocompleteView(AutocompleteView):
 
     def get_user_queryset(self, _user):
         """ Doesn't actually use user for genes """
+        annotation_consortium = self.forwarded.get('annotation_consortium', None)
         qs = GeneSymbol.objects.all()
+        if annotation_consortium:
+            qs = qs.filter(geneversion__gene__annotation_consortium=annotation_consortium)
         if self.q:
             qs = qs.filter(symbol__istartswith=self.q)
         return qs

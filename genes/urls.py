@@ -38,7 +38,7 @@ urlpatterns = [
 
     perm_path('hotspot_graph/gene_symbol/<genome_build_name>/<gene_symbol>',
               HotspotGraphView.as_view(), name='gene_symbol_hotspot_graph'),
-    perm_path('hotspot_graph/gene_symbol/<genome_build_name>/<gene_symbol>/transcript/<transcript_accession>',
+    perm_path('hotspot_graph/gene_symbol/<genome_build_name>/<gene_symbol>/transcript_accession/<transcript_accession>',
               HotspotGraphView.as_view(), name='gene_symbol_transcript_version_hotspot_graph'),
     perm_path('hotspot_graph/gene/<genome_build_name>/<gene_id>',
               HotspotGraphView.as_view(), name='gene_hotspot_graph'),
@@ -46,14 +46,16 @@ urlpatterns = [
               HotspotGraphView.as_view(), name='transcript_hotspot_graph'),
     perm_path('hotspot_graph/classifications/gene_symbol/<genome_build_name>/<gene_symbol>',
               ClassificationsHotspotGraphView.as_view(), name='classifications_gene_symbol_hotspot_graph'),
-    perm_path('hotspot_graph/classifications/gene_symbol/<genome_build_name>/<gene_symbol>/transcript/<transcript_accession>',
+    perm_path('hotspot_graph/classifications/gene_symbol/<genome_build_name>/<gene_symbol>/transcript_accession/<transcript_accession>',
               ClassificationsHotspotGraphView.as_view(), name='classifications_gene_symbol_transcript_version_hotspot_graph'),
     perm_path('hotspot_graph/classifications/gene/<genome_build_name>/<gene_id>',
               ClassificationsHotspotGraphView.as_view(), name='classifications_gene_hotspot_graph'),
     perm_path('hotspot_graph/classifications/transcript/<genome_build_name>/<transcript_id>',
               ClassificationsHotspotGraphView.as_view(), name='classifications_transcript_hotspot_graph'),
+    perm_path('hotspot_graph/cohort/<int:cohort_id>/<transcript_id>/<transcript_accession>',
+              CohortHotspotGraphView.as_view(), name='cohort_transcript_version_hotspot_graph'),
     perm_path('hotspot_graph/cohort/<int:cohort_id>/<transcript_id>',
-              CohortHotspotGraphView.as_view(), name='cohort_hotspot_graph'),
+              CohortHotspotGraphView.as_view(), name='cohort_transcript_hotspot_graph'),
     perm_path('hotspot_graph/public', PublicRUNX1HotspotGraphView.as_view(), name='public_hotspot_graph'),
 
     # Grids
