@@ -108,6 +108,7 @@ tbody tr.dtrg-group.dtrg-start:not(:first-child) td {
     overflow-y: auto;
 }
 
+
 // not sure if we want to give all cards the pyprus background
 // but stops the screen from being too white..
 /*
@@ -498,6 +499,10 @@ a {
 }
 .toggle-link[aria-expanded=true]:before, tr.parent .toggle-link:before, .toggle-link[aria-expanded=true]:before, tr.shown .toggle-link:before {
    content: "\f107";
+}
+
+.modal form, .card form {
+    margin-block-end: 0;
 }
 
 .modal-header nav .breadcrumb {
@@ -982,6 +987,16 @@ ul.compact {
   transform-origin: top left;
   animation: fadeOutScale ease-in 0.5s;
   animation-fill-mode: forwards;
+}
+.fade-in-out-opacity {
+  animation: fadeOutOpacity ease-in-out 3s;
+  animation-fill-mode: forwards;
+}
+@keyframes fadeOutOpacity {
+  0% {opacity: 0}
+  50% {opacity: 1}
+  99% {opacity: 0}
+  100% {opacity: 0; display: none;}
 }
 
 @keyframes fadeInScale {

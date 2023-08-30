@@ -11,11 +11,13 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
-from django.db.models import QuerySet
+from django.db.models import QuerySet, TextChoices
 from django.db.models.deletion import PROTECT, CASCADE
 from django.urls.base import reverse
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
+from guardian.shortcuts import assign_perm
+from lxml.html.diff import html_escape
 from more_itertools import first
 
 from classification.enums.classification_enums import SpecialEKeys, ClinicalSignificance
@@ -30,11 +32,13 @@ from genes.hgvs import CHGVS
 from library.django_utils import get_url_from_view_path
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import invalidate_cached_property, ExportRow, export_column, ExportDataType
+from library.utils.django_utils import refresh_for_update
 from review.models import ReviewableModelMixin, Review
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, GenomeBuild
 from classification.models.clinical_context_models import ClinicalContextChangeData
+from uicore.views.ajax_form_view import LazyRender
 
 discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report", "clinical_context_change_data:ClinicalContextChangeData"
 
@@ -725,7 +729,7 @@ class DiscordanceReportClassification(TimeStampedModel):
         return ClassificationModification.objects.filter(
             classification=self.classification_original.classification,
             is_last_published=True
-        ).select_related('classification', 'classification__lab').get()
+        ).select_related('classification', 'classification__lab', 'classification__lab__organization').get()
 
     @cached_property
     def clinical_context_effective(self) -> ClinicalContext:
@@ -845,3 +849,78 @@ class DiscordanceReportClassification(TimeStampedModel):
             actions.add(DiscordanceActionsLog.CHANGE_NO_REASON_GIVEN)
 
         return actions
+
+
+class DiscordanceReportTriageStatus(TextChoices):
+    PENDING = "P", "Pending Review"
+    REVIEWED_WILL_FIX = "F", "Reviewed - Will Amend"
+    REVIEWED_WILL_DISCUSS = "D", "Reviewed - For Joint Discussion"
+    REVIEWED_SATISFACTORY = "R", "Reviewed - Confident in Classification"
+    COMPLEX = "X", "Low Penetrance/Risk Allele etc"
+    DISCORDANCE_CLOSED = "C", "Discordance Closed - No Review Required"
+
+
+class DiscordanceReportTriage(TimeStampedModel):
+    discordance_report = models.ForeignKey(DiscordanceReport, on_delete=CASCADE)
+    lab = models.ForeignKey(Lab, on_delete=CASCADE)
+    triage_status = models.TextField(max_length=1, choices=DiscordanceReportTriageStatus.choices, default=DiscordanceReportTriageStatus.PENDING)
+    note = models.TextField(null=True, blank=True)
+    triage_date = models.DateField(null=True, blank=True)
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=PROTECT)
+    """
+    These tags are more dynamic, so keep it configurable in JSON rather than a database schema for now
+    """
+
+    def can_write(self, user: User):
+        return self.lab.is_member(user, admin_check=True) and not self.triage_status == DiscordanceReportTriageStatus.DISCORDANCE_CLOSED
+
+    @property
+    def is_outstanding(self):
+        # another example of pending_concordance neeing to be an official status
+        return self.triage_status == DiscordanceReportTriageStatus.PENDING and \
+            self.discordance_report.clinical_context.discordance_status.is_discordant and \
+            not self.discordance_report.is_pending_concordance
+
+    @staticmethod
+    def outstanding_for_lab(lab: Lab):
+        return (drt for drt in DiscordanceReportTriage.objects.filter(lab=lab, review_status=DiscordanceReportTriageStatus.PENDING) if drt.is_outstanding)
+
+    @cached_property
+    def note_html(self):
+        parts = []
+        if user := self.user:
+            parts.append(f"Updated by: { user }")
+        if triage_date := self.triage_date:
+            parts.append(f"On: { triage_date }")
+        parts.append(f"To: {self.get_triage_status_display()}")
+        if note := self.note:
+            parts.append("Note: " + html_escape(note))
+        if parts:
+            return "<br/>".join(parts)
+
+    class Meta:
+        unique_together = ('discordance_report', 'lab')
+
+
+def ensure_discordance_report_triages_for(dr: DiscordanceReport):
+    with transaction.atomic():
+        dr = refresh_for_update(dr)
+        requires_adding: List[DiscordanceReportTriage] = []
+        all_lab_ids = set(dr.discordancereporttriage_set.values_list("lab", flat=True))
+        for lab in dr.reviewing_labs:
+            if lab.pk not in all_lab_ids:
+                requires_adding.append(DiscordanceReportTriage(
+                    discordance_report=dr,
+                    lab=lab
+                ))
+        if requires_adding:
+            # bulk create doesn't call save
+            # DiscordanceReportTriage.objects.bulk_create(requires_adding)
+            for add_me in requires_adding:
+                add_me.save()
+
+
+def ensure_discordance_report_triages_bulk():
+    for dr in DiscordanceReport.objects.filter(resolution__isnull=True):
+        if not dr.is_pending_concordance:
+            ensure_discordance_report_triages_for(dr)

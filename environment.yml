@@ -62,7 +62,7 @@ dependencies:
       - django_crispy_forms==2.0
       - django_dag==1.4.3
       - django_datetime_utc==1.0.3
-      - django_debug_toolbar==3.2.4
+      - django_debug_toolbar==4.2.0
       - django_downloadview==2.3.0
       - django-extensions==3.1.5
       - django-geojson==3.2.0

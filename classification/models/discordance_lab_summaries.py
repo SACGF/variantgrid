@@ -1,16 +1,34 @@
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Optional, Dict, List
 
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationLabSummary, DiscordanceReport, ClassificationLabSummaryEntry, \
-    classification_flag_types, ClassificationFlagTypes, DiscordanceReportClassification
+    classification_flag_types, ClassificationFlagTypes, DiscordanceReportClassification, DiscordanceReportTriage
 from snpdb.lab_picker import LabPickerData
+from snpdb.models import Lab
 
 
 @dataclass(frozen=True)
 class DiscordanceLabSummary(ClassificationLabSummary):
     drcs: List[DiscordanceReportClassification]
+    triage: Optional[DiscordanceReportTriage] = None
+
+    @cached_property
+    def embedded(self):
+        if triage := self.triage:
+            from classification.views.discordance_report_triage_view import DiscordanceReportTriageView
+            return DiscordanceReportTriageView.lazy_render(triage)
+
+    def _with_triage(self, triage: Optional[DiscordanceReportTriage]) -> 'DiscordanceLabSummary':
+        return DiscordanceLabSummary(
+            group=self.group,
+            is_internal=self.is_internal,
+            count=self.count,
+            drcs=self.drcs,
+            triage=triage
+        )
 
     @staticmethod
     def for_discordance_report(discordance_report: DiscordanceReport, perspective: LabPickerData) -> List['DiscordanceLabSummary']:
@@ -46,9 +64,15 @@ class DiscordanceLabSummary(ClassificationLabSummary):
                 pending=pending
             )].append(drc)
 
-        return sorted([DiscordanceLabSummary(
+        dlses: List[DiscordanceLabSummary] = list(sorted([DiscordanceLabSummary(
             group=group,
             is_internal=group.lab in perspective.labs_if_not_admin,
             count=len(drcs),
             drcs=drcs
-        ) for group, drcs in group_counts.items()])
+        ) for group, drcs in group_counts.items()]))
+
+        triage_by_lab: Dict[Lab, DiscordanceReportTriage] = {}
+        for triage in discordance_report.discordancereporttriage_set.all():
+            triage_by_lab[triage.lab] = triage
+
+        return [dls._with_triage(triage_by_lab.pop(dls.lab, None)) for dls in dlses]

@@ -9,18 +9,19 @@ from django.db.models import QuerySet
 from django.dispatch import receiver
 from django.http import HttpRequest
 from django.http.response import HttpResponse, HttpResponseBase
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-
+from django import forms
 from classification.enums import SpecialEKeys
 from classification.enums.discordance_enums import ContinuedDiscordanceReason, DiscordanceReportResolution
 from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext, \
     EvidenceKeyMap, classification_flag_types, discordance_change_signal, \
-    DiscordanceReportRowData, ClassificationFlagTypes, ClinicalContextChangeData, ClinicalContextRecalcTrigger
+	DiscordanceReportRowData, ClassificationFlagTypes, DiscordanceReportTriage, ClinicalContextChangeData, ClinicalContextRecalcTrigger
 from classification.models.classification_groups import ClassificationGroupUtils, ClassificationGroups
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.evidence_key import EvidenceKeyOption
 from classification.views.classification_dashboard_view import ClassificationDashboard
+from classification.views.discordance_report_triage_view import DiscordanceReportTriageView
 from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
@@ -31,6 +32,7 @@ from review.models import Review
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, GenomeBuild, Allele
+from uicore.views.ajax_form_view import LazyRender
 
 
 def discordance_reports_view(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:
@@ -112,6 +114,9 @@ class DiscordanceReportTemplateData:
         self.discordance_report_id = discordance_report_id
         self.report = DiscordanceReport.objects.get(pk=discordance_report_id)
         self.user = user
+
+    def triage_embeds(self) -> List[LazyRender]:
+        return [DiscordanceReportTriageView.lazy_render(triage) for triage in self.report.discordancereporttriage_set.all().order_by('-lab')]
 
     def refreshed(self) -> 'DiscordanceReportTemplateData':
         return DiscordanceReportTemplateData(discordance_report_id=self.discordance_report_id, user=self.user)

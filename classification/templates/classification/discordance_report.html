@@ -1,4 +1,5 @@
 {% extends "uicore/page/base.html" %}
+{% load guardian_tags %}
 {% load crispy_forms_tags %}
 {% load static %}
 {% load js_tags %}
@@ -115,6 +116,21 @@
         {% for nlc in data.no_longer_considered %}
             {% classification_groups nlc.classifications group_utils=data.group_utils title=nlc.reason context_object=report %}
         {% endfor %}
+
+        <h4>Triage</h4>
+        {% with triages=data.triage_embeds %}
+            {% if triages %}
+                <div class="row equal">
+                {% for triage in triages %}
+                    <div class="col-sm-12 col-md-6">
+                        {% embed triage %}
+                    </div>
+                {% endfor %}
+                </div>
+            {% else %}
+                <div class="no-value">This Discordance Report was resolved before triage functionality</div>
+            {% endif %}
+        {% endwith %}
 
         <h4>Review</h4>
         {% if data.review %}

@@ -1,0 +1,57 @@
+{% load ui_utils %}
+{% load crispy_forms_tags %}
+{% load user_tags %}
+{% if mode == "inline" %}
+    {% if triage.triage_status == "C" %}
+    {% elif triage.triage_status == "P" %}
+        <span class="no-value">Triage Pending</span>
+    {% else %}
+        <span title="{{ triage.note_html }}" class="hover-detail">
+            <span class="text-secondary">{{ triage.get_triage_status_display }}</span>
+            {% if triage.note %}<i class="fa-regular fa-message text-secondary"></i>{% endif %}
+        </span>
+    {% endif %}
+    {% if_user_can_edit triage %}
+        <a class="ml-1" href="{% url 'discordance_report_triage_detail' triage.pk %}?edit=true&mode=modal" data-toggle="ajax-modal" data-size="md">Edit</a>
+    {% end_if_user_can_edit %}
+    {% include "uicore/messages/messages.html" %}
+{% else %}
+    <div class="card-header">{{ triage.lab }} {% admin_link triage %}</div>
+    {% if form %}
+        <form data-toggle="ajax-form" method="POST" action="{% url 'discordance_report_triage_detail' triage.pk %}?edit=true&mode={{ mode }}">
+            <div class="card-body">
+                {% labelled label="Editing By" %}{% user user size="tiny" %}{% endlabelled %}
+                {% crispy form form_helper.horizontal %}
+            </div>
+            <div class="card-footer">
+                <input type="submit" class="btn btn-primary w-100" />
+            </div>
+        </form>
+    {% else %}
+        {% load ui_utils %}
+        {% load js_tags %}
+        {% load crispy_forms_tags %}
+        <div class="card-body">
+            {% labelled label="Triage status" %}
+                {% if triage.triage_status == "P" %}<span class="no-value">Pending</span>{% else %}
+                {{ triage.get_triage_status_display }}
+                {% endif %}
+            {% endlabelled %}
+            {% if triage.triage_date %}
+                {% labelled label="Triage date" %}{{ triage.review_date | date:'Y-m-d' }}{% endlabelled %}
+            {% endif %}
+            {% if triage.user %}
+                {% labelled label="Last update by" %}{% user triage.user size="tiny" %}{% endlabelled %}
+            {% endif %}
+            {% if triage.note %}
+                {% labelled label="Note" %}{{ triage.note }}{% endlabelled %}
+            {% endif %}
+            <div class="container">{% include "uicore/messages/messages.html" %}</div>
+        </div>
+        {% if_user_can_edit triage %}
+            <div class="card-footer">
+                <a class="btn btn-primary w-100" data-toggle="embed-content" href="{% url 'discordance_report_triage_detail' triage.pk %}?edit=true">Edit</a>
+            </div>
+        {% end_if_user_can_edit %}
+    {% endif %}
+{% endif %}

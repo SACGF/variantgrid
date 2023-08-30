@@ -14,7 +14,7 @@ from classification.criteria_strengths import CriteriaStrength, AcmgPointScore
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, DiscordanceReportRowData, \
-    ClassificationLabSummary, ImportedAlleleInfo
+    ClassificationLabSummary, ImportedAlleleInfo, DiscordanceReportTriage
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
     ClassificationGroupUtils
@@ -85,9 +85,7 @@ def classification_groups(
             'classification',
             'classification__clinical_context',
             'classification__lab',
-            'classification__lab__organization',
-            # if sorting by variant directly
-            # 'classification__variant', 'classification__variant__locus', 'classification__variant__locus__contig'
+            'classification__lab__organization'
         )
 
     sort_order_index = 1
@@ -489,12 +487,20 @@ def discordance_report(discordance_report: DiscordanceReport):
 
 
 @register.inclusion_tag("classification/tags/discordance_report_row.html")
-def discordance_report_row(discordance_report_summary: DiscordanceReportRowData, selected: Optional[DiscordanceReport] = None, filter: bool = False):
-    return {"summary": discordance_report_summary, "filter": filter, "is_selected": discordance_report_summary.discordance_report == selected}
+def discordance_report_row(discordance_report_summary: DiscordanceReportRowData, selected: Optional[DiscordanceReport] = None, filter: bool = False, show_triage: bool = False):
+    return {
+        "summary": discordance_report_summary,
+        "filter": filter,
+        "is_selected": discordance_report_summary.discordance_report == selected,
+    }
 
 
 @register.inclusion_tag("classification/tags/classification_lab_summaries.html")
-def classification_lab_summaries(lab_classification_summaries: Iterable[ClassificationLabSummary], shared: bool = True, include_acmg: bool = False):
+def classification_lab_summaries(
+        lab_classification_summaries: Iterable[ClassificationLabSummary],
+        shared: bool = True,
+        include_acmg: bool = False):
+
     return {
         "lab_classification_summaries": lab_classification_summaries,
         "shared": shared,

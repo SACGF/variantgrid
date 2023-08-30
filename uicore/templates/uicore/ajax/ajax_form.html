@@ -1,0 +1,5 @@
+{% load crispy_forms_tags %}
+<form class="ajax-form" action="{{ form_url }}" method="POST">
+    {% crispy form %}
+    <div class="btn btn-primary">Submit</div>
+</form>

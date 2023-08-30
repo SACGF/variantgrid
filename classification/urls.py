@@ -21,6 +21,7 @@ from classification.views.condition_match_test_view import condition_match_test_
     condition_match_test_download_view, condition_obsoletes_view
 from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
     ConditionTextColumns, ConditionTextMatchingAPI
+from classification.views.discordance_report_triage_view import DiscordanceReportTriageView
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report, \
     discordance_reports_view, discordance_reports_history_detail, discordance_reports_active_detail, \
     discordance_report_review, action_discordance_report_review, discordance_reports_download
@@ -139,6 +140,8 @@ urlpatterns = [
     perm_path('discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report'),
     perm_path('discordance_report/<int:discordance_report_id>/export', export_discordance_report, name='discordance_export'),
     perm_path('discordance_report_review_action/<int:review_id>', action_discordance_report_review, name='discordance_report_review_action'),
+
+    perm_path('discordance_report_triage/<int:discordance_report_triage_id>', DiscordanceReportTriageView.as_view(), name='discordance_report_triage_detail'),
 
     perm_path('export', classification_export_view.export_view, name='classification_export'),
     perm_path('export_redirect', classification_export_view.export_view_redirector, name='classification_export_redirect'),

@@ -83,10 +83,50 @@ function enhanceAndMonitor() {
         // load ajax blocks as soon as we see them
         {test: '[data-toggle="ajax"]', func: (node) => {loadAjaxBlock(node);}},
 
+        {test: '[data-toggle="embed-content"]', func: (node) => {
+            let $node = $(node);
+            let url = $node.attr('href');
+            let wrapper = $node.closest(".modal-content, .embed-wrapper");
+            node.click(function() {
+                loadAjaxBlock(wrapper, url).then(() => {
+                    if (wrapper.hasClass("modal-content")) {
+                        cardToModal(wrapper);
+                    }
+                });
+                return false;
+            });
+        }},
+
+        {test: '[data-replace]', func: (node) => {
+           $(node.attr('data-replace')).html(node);
+           node.fadeIn();
+        }},
+
+        {test: 'form[data-toggle="ajax-form"]', func: (node) => {
+            let $node = $(node);
+            let wrapper = $node.closest(".modal-content, .embed-wrapper");
+            $node.submit(function() { // catch the form's submit event
+                let $this = $(this);
+                $.ajax({ // create an AJAX call...
+                    data: $this.serialize(), // get the form data
+                    type: $this.attr('method'), // GET or POST
+                    url: $this.attr('action'), // the file to call
+                    success: function(response) { // on success..
+                        wrapper.html(response); // update the DIV
+                        if (wrapper.hasClass("modal-content")) {
+                            cardToModal(wrapper);
+                        }
+                    }
+                });
+                return false;
+            });
+        }},
+
         {test: '[data-toggle="ajax-modal"]', func: (node) => {
             node.addClass('modal-link');
+            let size = node.attr("data-size") || "xl";
             node.click(function() {
-                loadAjaxModal($(this));
+                loadAjaxModal($(this), size);
                 return false;
             });
         }},
@@ -499,15 +539,48 @@ function enhanceAndMonitor() {
     observer.observe($('body')[0], { attributes: false, childList: true, subtree: true });
 }
 
-function loadAjaxModal(linkDom) {
+function cardToModal(content) {
+    let modalContentDiv = content.closest('.modal-content');
+    if (modalContentDiv.length) {
+        if (content.find('.card')) {
+            content.find('.card').removeClass('card');
+            let cardHeader = content.find(".card-header");
+            let h5 = $("<h5>", {"class": "modal-title"}).append(cardHeader.contents());
+            cardHeader.removeClass("card-header").addClass("modal-header").html(
+                [
+                    h5,
+                    $(`<button type="button" class="close" data-dismiss="modal" aria-label="Close"> <span aria-hidden="true">&times;</span></button>`)
+                ]
+            );
+            content.find('.card-body').removeClass('card-body').addClass('modal-body');
+            content.find('.card-footer').removeClass('card-footer').addClass('modal-footer');
+        }
+    } else {
+        console.log("DID NOT FIND modal")
+    }
+    if (content.find('.auto-close-modal').length) {
+        console.log("ATTEMPTING TO CLOSE MODAL");
+        content.closest('.modal').modal('hide');
+    }
+}
+
+function loadAjaxModal(linkDom, size) {
     let url = linkDom.attr('data-href') || linkDom.attr('href');
     let useId = url.replace('/', '_');
-    let modalContent = createModalShell(useId, linkDom.attr('data-title') || linkDom.text());
+    let modalContent = createModalShell(useId, linkDom.attr('data-title') || linkDom.text(), size);
+    let modalContentDiv = modalContent.find('.modal-content');
     let body = modalContent.find('.modal-body');
     modalContent.find('.modal-footer').remove();
     let content = $('<div>').appendTo(body);
     let modalDialog = modalContent.modal({focus:true, show:false});
-    loadAjaxBlock(content, url);
+
+    loadAjaxBlock(content, url).then(() => {
+        if (content.find('.card')) {
+            modalContentDiv.children().detach();
+            content.appendTo(modalContentDiv);
+        }
+        cardToModal(modalContentDiv);
+    });
 
     modalContent.on('hidden.bs.modal', function() {
         modalContent.modal('dispose');
@@ -535,7 +608,7 @@ function loadAjaxBlock(dom, url) {
         dom.LoadingOverlay('show', {zIndex: 100000});
     }, 300);
 
-    $.ajax({
+    return $.ajax({
         type: "GET",
         url: url,
         async: true,
@@ -919,10 +992,10 @@ function highlightTextAsDom(value, full_text) {
 }
 
 // Dialogs
-function createModalShell(id, title) {
+function createModalShell(id, title, size="xl") {
     return $(`
         <div class="modal fade" id="${id}" tabindex="-1" role="dialog" aria-labelledby="${id}Label" aria-hidden="true">
-            <div class="modal-dialog modal-xl" role="document">
+            <div class="modal-dialog modal-${size}" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="${id}Label">${title}</h5>

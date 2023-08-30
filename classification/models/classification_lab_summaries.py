@@ -19,6 +19,10 @@ class ClassificationLabSummary:
     count: int
 
     @property
+    def embedded(self):
+        return None
+
+    @property
     def lab(self):
         return self.group.lab
 

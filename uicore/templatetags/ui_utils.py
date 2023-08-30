@@ -17,6 +17,7 @@ from library.log_utils import log_level_to_bootstrap
 from library.preview_request import PreviewModelMixin
 from library.utils import diff_text, html_id_safe
 from snpdb.admin_utils import get_admin_url
+from uicore.views.ajax_form_view import LazyRender
 from variantgrid.perm_path import get_visible_url_names
 
 register = template.Library()
@@ -658,3 +659,35 @@ def field_errors(error_list):
         output += "</div>"
         return SafeString(output)
     return ""
+
+
+@register.tag(name='if_user_can_edit')
+def if_user_can_edit(parser, token):
+    tag_name, args, kwargs = parse_tag(token, parser)
+    nodelist = parser.parse(('end_if_user_can_edit',))
+    parser.delete_first_token()
+    if not len(args) == 1:
+        raise ValueError("if_user_can_edit requires 1 argument of object to check")
+
+    return IfCanEditTag(nodelist,
+                            object_expression=args[0])
+
+
+class IfCanEditTag(template.Node):
+    def __init__(self, nodelist,
+                 object_expression: FilterExpression):
+        self.nodelist = nodelist
+        self.object_expression = object_expression
+
+    def render(self, context):
+        object_to_check = TagUtils.value(context, self.object_expression)
+
+        if object_to_check.can_write(context.request.user):
+            return self.nodelist.render(context)
+        else:
+            return ""
+
+
+@register.simple_tag(name="embed", takes_context=True)
+def _embed(context, embed: LazyRender, **kwargs):
+    return embed.embed(context.request, **kwargs)

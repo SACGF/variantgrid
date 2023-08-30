@@ -38,6 +38,7 @@ from requests import RequestException
 
 from genes.gene_coverage import load_gene_coverage_df
 from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAliasSource, MANEStatus
+from library.cache import timed_cache
 from library.constants import HOUR_SECS, WEEK_SECS, MINUTE_SECS
 from library.django_utils import SortByPKMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
@@ -173,8 +174,13 @@ class GeneSymbol(models.Model, PreviewModelMixin):
     @staticmethod
     def cast(symbol: Union[str, 'GeneSymbol']) -> Optional['GeneSymbol']:
         if isinstance(symbol, str):
-            return GeneSymbol.objects.filter(symbol=symbol).first()
+            return GeneSymbol._cast(symbol)
         return symbol
+
+    @staticmethod
+    @timed_cache(ttl=3600)
+    def _cast(symbol_str: str) -> Optional['GeneSymbol']:
+        return GeneSymbol.objects.filter(symbol=symbol_str).first()
 
     @property
     def metrics_logging_key(self) -> Tuple[str, Any]:
