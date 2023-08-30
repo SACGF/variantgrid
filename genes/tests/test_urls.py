@@ -105,7 +105,7 @@ class Test(URLTestCase):
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
             ('view_gene_list', {'gene_list_id': cls.gene_list.pk}, 200),
             ('api_view_gene_list', {"pk": cls.gene_list.pk}, 200),
-            ('cohort_hotspot_graph', {"cohort_id": cls.cohort.pk, "transcript_id": cls.transcript.pk}, 200),
+            ('cohort_transcript_hotspot_graph', {"cohort_id": cls.cohort.pk, "transcript_id": cls.transcript.pk}, 200),
         ]
 
         cls.PRIVATE_AUTOCOMPLETE_URLS = [
