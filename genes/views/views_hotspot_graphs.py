@@ -256,6 +256,10 @@ class CohortHotspotGraphView(HotspotGraphView):
                               "variantannotation__gnomad_af",
                               count_column)
 
+    def _transcript_url(self) -> str:
+        return "cohort_transcript_version_hotspot_graph"
+
+
 
 @method_decorator([cache_page(MINUTE_SECS), login_not_required], name='dispatch')
 class PublicRUNX1HotspotGraphView(ClassificationsHotspotGraphView):
