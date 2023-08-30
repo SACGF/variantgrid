@@ -18,6 +18,10 @@ class ClassificationFlagTypes:
         return FlagType.objects.get(pk='classification_submitted')
 
     @cached_property
+    def condition_resolution(self) -> FlagType:
+        return FlagType.objects.get(pk='condition_resolution')
+
+    @cached_property
     def unshared_flag(self) -> FlagType:
         return FlagType.objects.get(pk='classification_unshared')
 
