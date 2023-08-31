@@ -513,6 +513,8 @@ class HGVSMatcher:
         cleaned_hgvs = cleaned_hgvs.replace("::", ":")  # Fix double colon
         if cleaned_hgvs[0:2].upper() == "M_":
             cleaned_hgvs = "NM_" + cleaned_hgvs[2:]
+        if cleaned_hgvs[0:2].upper() == "C_":
+            cleaned_hgvs = "NC_" + cleaned_hgvs[2:]
         # Lowercase mutation types, e.g. NM_032638:c.1126_1133DUP - won't matter if also changes gene name as that's
         # case-insensitive
         MUTATION_TYPES = ["ins", "del", "dup", "inv"]  # Will also handle delins and del...ins

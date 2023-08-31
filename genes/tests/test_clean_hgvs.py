@@ -17,6 +17,9 @@ class TestCleanHGVS(TestCase):
             ("nm_206933.3(USH2A):c.4298G>A", "NM_206933.3(USH2A):c.4298G>A"),
             ("m_206933.3(USH2A)::c.4298G>A", "NM_206933.3(USH2A):c.4298G>A"),
             ("m_206933.3(USH2A):c.4298G>A", "NM_206933.3(USH2A):c.4298G>A"),
+            ("c_000007.13:g.117199563G>T", "NC_000007.13:g.117199563G>T"),
+            ("c_000007.13::g.117199563G>T", "NC_000007.13:g.117199563G>T"),
+            ("nc_000007.13:g.117199563G>T", "NC_000007.13:g.117199563G>T"),
         ]
 
         for input_hgvs, expected_result in test_cases:
