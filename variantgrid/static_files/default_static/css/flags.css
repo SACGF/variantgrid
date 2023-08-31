@@ -251,6 +251,9 @@
 .flag.flag-classification_submitted {
   background-image: url(/static/icons/flags/upload-button.svg);
 }
+.flag.flag-condition_resolution {
+  background-image: url(/static/icons/flags/condition_resolution.svg);
+}
 .flag.flag-classification_internal_review {
   background-image: url(/static/icons/flags/work.svg);
 }

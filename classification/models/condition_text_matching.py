@@ -18,7 +18,7 @@ from model_utils.models import TimeStampedModel
 from annotation.regexes import db_ref_regexes
 from classification.enums import SpecialEKeys, ShareLevel
 from classification.models import Classification, ClassificationModification, classification_post_publish_signal, \
-    flag_types, EvidenceKeyMap, ConditionResolvedDict, ConditionResolved
+    flag_types, EvidenceKeyMap, ConditionResolvedDict, ConditionResolved, classification_flag_types
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol, GeneSymbolAlias
 from library.cache import timed_cache
@@ -1063,6 +1063,33 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
     return suggestions
 
 
+def apply_condition_resolution(classification: Classification, new_condition_resolution: Optional[ConditionResolvedDict] = None):
+    with transaction.atomic():
+        classification_data = Classification.objects.filter(id=classification.id
+                                                            ).select_for_update().values('condition_resolution').first()
+        old_condition_resolution = classification_data['condition_resolution']
+        condition_text_old = "No Condition"
+        condition_text = "No Condition"
+        if old_condition_resolution:
+            condition_text_old = ConditionResolved.from_dict(old_condition_resolution)
+            condition_text_old = condition_text_old.summary
+
+        if new_condition_resolution:
+            condition_text = ConditionResolved.from_dict(new_condition_resolution)
+            condition_text = condition_text.summary
+
+        if old_condition_resolution != new_condition_resolution:
+            condition_text = f"{condition_text_old} --> {condition_text}"
+            classification.condition_resolution = new_condition_resolution
+
+            classification.flag_collection_safe.add_flag(
+                comment=condition_text,
+                data=new_condition_resolution,
+                flag_type=classification_flag_types.condition_resolution,
+            )
+            classification.save(update_fields=['condition_resolution'])
+
+
 def apply_condition_resolution_to_classifications(ctm: ConditionTextMatch):
     """
     Updates classification's cached condition_resolution (where appropriate) for the ConditionTextMatch
@@ -1071,10 +1098,9 @@ def apply_condition_resolution_to_classifications(ctm: ConditionTextMatch):
     if ctm.classification_id:
         classification = ctm.classification
         if matching := condition_text_match_for_classification_id(ctm.classification_id):
-            classification.condition_resolution = matching.as_resolved_condition()
+            apply_condition_resolution(classification, matching.as_resolved_condition())
         else:
-            classification.condition_resolution = None
-        classification.save()
+            apply_condition_resolution(classification, None)
     else:
         # we're higher level than a classification now
         lowest_valid = ctm
@@ -1088,8 +1114,7 @@ def apply_condition_resolution_to_classifications(ctm: ConditionTextMatch):
             for child in children:
                 if not child.is_valid:  # if child is valid then it already has a value unaffected by this
                     if classification := child.classification:
-                        classification.condition_resolution = condition_resolution
-                        classification.save()
+                        apply_condition_resolution(classification, condition_resolution)
                     else:
                         new_children.append(child)
             children = ConditionTextMatch.objects.filter(parent__in=new_children)
