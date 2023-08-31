@@ -1063,27 +1063,30 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
     return suggestions
 
 
-def apply_condition_resolution(classification: Classification, new_condition_resolution: ConditionResolvedDict = None):
+def apply_condition_resolution(classification: Classification, new_condition_resolution: Optional[ConditionResolvedDict] = None):
     with transaction.atomic():
         classification_data = Classification.objects.filter(id=classification.id
                                                             ).select_for_update().values('condition_resolution').first()
         old_condition_resolution = classification_data['condition_resolution']
         condition_text_old = "No Condition"
+        condition_text = "No Condition"
         if old_condition_resolution:
             condition_text_old = ConditionResolved.from_dict(old_condition_resolution)
             condition_text_old = condition_text_old.summary
 
+        if new_condition_resolution:
+            condition_text = ConditionResolved.from_dict(new_condition_resolution)
+            condition_text = condition_text.summary
+
         if old_condition_resolution != new_condition_resolution:
-            condition_text = "No Condition"
-            if condition_obj := classification.condition_resolution_obj:
-                condition_text = condition_obj.summary
             condition_text = f"{condition_text_old} --> {condition_text}"
+            classification.condition_resolution = new_condition_resolution
+
             classification.flag_collection_safe.add_flag(
                 comment=condition_text,
                 data=new_condition_resolution,
                 flag_type=classification_flag_types.condition_resolution,
             )
-            classification.condition_resolution = new_condition_resolution
             classification.save(update_fields=['condition_resolution'])
 
 
@@ -1095,10 +1098,9 @@ def apply_condition_resolution_to_classifications(ctm: ConditionTextMatch):
     if ctm.classification_id:
         classification = ctm.classification
         if matching := condition_text_match_for_classification_id(ctm.classification_id):
-            classification.condition_resolution = matching.as_resolved_condition()
-            apply_condition_resolution(classification, classification.condition_resolution)
+            apply_condition_resolution(classification, matching.as_resolved_condition())
         else:
-            classification.condition_resolution = None
+            apply_condition_resolution(classification, None)
     else:
         # we're higher level than a classification now
         lowest_valid = ctm
@@ -1112,8 +1114,7 @@ def apply_condition_resolution_to_classifications(ctm: ConditionTextMatch):
             for child in children:
                 if not child.is_valid:  # if child is valid then it already has a value unaffected by this
                     if classification := child.classification:
-                        classification.condition_resolution = condition_resolution
-                        apply_condition_resolution(classification, classification.condition_resolution)
+                        apply_condition_resolution(classification, condition_resolution)
                     else:
                         new_children.append(child)
             children = ConditionTextMatch.objects.filter(parent__in=new_children)
