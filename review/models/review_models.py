@@ -272,7 +272,7 @@ class ReviewableModelMixin(models.Model):
 
     def reviews_all(self) -> QuerySet[Review]:
         if reviews := self.reviews:
-            return reviews.review_set.order_by('-triage_date').all()
+            return reviews.review_set.order_by('-review_date').all()
         else:
             return Review.objects.none()
 
