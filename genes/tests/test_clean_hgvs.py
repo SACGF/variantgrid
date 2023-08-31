@@ -20,6 +20,8 @@ class TestCleanHGVS(TestCase):
             ("c_000007.13:g.117199563G>T", "NC_000007.13:g.117199563G>T"),
             ("c_000007.13::g.117199563G>T", "NC_000007.13:g.117199563G>T"),
             ("nc_000007.13:g.117199563G>T", "NC_000007.13:g.117199563G>T"),
+            ("R_001566.1(TERC):n.427_428insC", "NR_001566.1(TERC):n.427_428insC"),
+            ("r_001566.1(TERC)::n.427_428insC", "NR_001566.1(TERC):n.427_428insC"),
         ]
 
         for input_hgvs, expected_result in test_cases:
