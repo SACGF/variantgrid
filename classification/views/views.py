@@ -303,7 +303,7 @@ def classification_history(request, classification_id: Any):
         'changes': changes,
         'can_create_classifications': Classification.can_create_via_web_form(request.user),
         'now': now(),
-        'page_title': f'Classification Activity ({classification.lab_record_id})',
+        'page_title': f'Classification Activity ({classification.cr_lab_id})',
         'import_details': classification
     }
     return render(request, 'classification/activity.html', context)
