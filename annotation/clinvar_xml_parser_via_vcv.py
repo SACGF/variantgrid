@@ -7,7 +7,7 @@ from library.utils.xml_utils import parser_path, PP
 
 class ClinVarXmlParserViaVCV(ClinVarXmlParser):
 
-    PARSER_VERSION = 203  # change this whenever the parsing changes, so we know to ignore the old cache
+    PARSER_VERSION = 205  # change this whenever the parsing changes, so we know to ignore the old cache
 
     @classmethod
     def load_from_clinvar_id(cls, clinvar_variation_id: int) -> ClinVarXmlParserOutput:
@@ -80,18 +80,15 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         "Name"
     )
     def _parse_possible_c_hgvs(self, elem):
-        if elem.get("Type") is None and (hgvs := elem.text):
-            if hgvs := ClinVarXmlParser.parse_hgvs(hgvs):
-                self.latest.c_hgvs = hgvs
+        if not elem.get("Type"):
+            self.assign_better_hgvs(elem.text)
 
     @parser_path(
         "SimpleAllele",
         "AttributeSet",
         PP("Attribute", Type="HGVS"))
     def _parse_c_hgvs(self, elem):
-        if not self.latest.c_hgvs:
-            if hgvs := ClinVarXmlParser.parse_hgvs(elem.text):
-                self.latest.c_hgvs = hgvs
+        self.assign_better_hgvs(elem.text)
 
     @parser_path(
         "SimpleAllele",
@@ -99,10 +96,7 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         "HGVS",
         "Expression")
     def parse_hgvs_2(self, elem):
-        if not self.latest.c_hgvs:
-            if text := elem.text:
-                if text.startswith("NM_"):
-                    self.latest.c_hgvs = text
+        self.assign_better_hgvs(elem.text)
 
     @parser_path(
         "SimpleAllele",
@@ -117,7 +111,6 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         alt = elem.get("alternateAllele")
         if chr and start and ref and alt:
             self.latest.variant_coordinate = f"{chr}:{start} {ref}>{alt} ({assembly})"
-
 
     @parser_path(
         PP("TraitSet", Type="DrugResponse"),
@@ -145,7 +138,6 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
     def parse_drug_response(self, elem):
         if not self.latest.condition:
             self.latest.condition = elem.text
-
 
     @parser_path(
         PP("TraitSet", Type="Disease"),

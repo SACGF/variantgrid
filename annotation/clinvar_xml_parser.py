@@ -57,7 +57,7 @@ class ClinVarXmlParserOutput:
 class ClinVarXmlParser(XmlParser, ABC):
 
     RE_DATE_EXTRACTOR = re.compile("([0-9]+-[0-9]+-[0-9]+).*")
-    RE_GOOD_CHGVS = re.compile("^(N._(.+)?:c[.][^ ]+)( .*)?$")
+    RE_GOOD_CHGVS = re.compile("^((N._|ENST)(.+)?:[acgn][.][^ ]+)( .*)?$")
     RE_ORPHA = re.compile("ORPHA([0-9]+)")
 
     @staticmethod
@@ -67,12 +67,21 @@ class ClinVarXmlParser(XmlParser, ABC):
             return datetime.strptime(relevant_text, "%Y-%m-%d")
         return None
 
-    @staticmethod
-    def parse_hgvs(text: str) -> str:
+    def assign_better_hgvs(self, text: str) -> str:
         if text:
             if match := ClinVarXmlParser.RE_GOOD_CHGVS.match(text):
-                return match.group(1)
-        return None
+                text = match.group(1)
+                def hgvs_score(some_hgvs):
+                    if some_hgvs is None:
+                        return 0
+                    if not "c." in some_hgvs:
+                        return 1
+                    if not "(" in some_hgvs:
+                        return 2
+                    return 3
+
+                if hgvs_score(text) > hgvs_score(self.latest.c_hgvs):
+                    self.latest.c_hgvs = text
 
     @classmethod
     @abstractmethod

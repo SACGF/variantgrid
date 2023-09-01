@@ -24,7 +24,7 @@ class ClinVarXmlParserViaRCVs(ClinVarXmlParser):
         cv_handle.close()
 
         all_urls: List[str] = [f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id={clinvar_variation_id}&retmode=json"]
-        all_rcvs: List[str] = None
+        all_rcvs: List[str] = []
         parsed_results: List[ClinVarRecord] = []
         if result := json_data.get("result"):
             if uuids := result.get("uids"):
@@ -74,8 +74,7 @@ class ClinVarXmlParserViaRCVs(ClinVarXmlParser):
         "AttributeSet",
         PP("Attribute", Type="HGVS"))
     def parse_c_hgvs(self, elem):
-        if hgvs := ClinVarXmlParser.parse_hgvs(elem.text):
-            self.latest.c_hgvs = hgvs
+        self.assign_better_hgvs(elem.text)
 
     @parser_path(
         PP("MeasureSet", Type="Variant"),
@@ -83,11 +82,11 @@ class ClinVarXmlParserViaRCVs(ClinVarXmlParser):
         "SequenceLocation")
     def parse_variant_coordinate(self, elem):
         assembly = elem.get("Assembly")
-        chr = elem.get("Chr")
+        chro = elem.get("Chr")
         start = elem.get("start")
         ref = elem.get("referenceAllele")
         alt = elem.get("alternateAllele")
-        self.latest.variant_coordinate = f"{chr}:{start} {ref}>{alt} ({assembly})"
+        self.latest.variant_coordinate = f"{chro}:{start} {ref}>{alt} ({assembly})"
 
     @parser_path(
         "ClinVarSubmissionID")
