@@ -44,6 +44,9 @@ class PathPredicates:
     def __init__(self, path: List):
         self._path = [PP.convert(elem) for elem in path]
 
+    def with_prefix(self, prefix: List) -> 'PathPredicates':
+        return PathPredicates(path=prefix + self._path)
+
     def queue_test(self, elem) -> Optional['PathPredicates']:
         if self._path[0].matches(elem):
             return PathPredicates(path=self._path[1:])
@@ -105,19 +108,20 @@ class XmlParser:
     be a new instance, call `set_yieldable` with the new object. Then other methods should parse it.
     """
 
-    @staticmethod
-    def get_parser_methods(klass):
-        if not hasattr(klass, 'parser_methods'):
-            parser_methods = [func for _, func in inspect.getmembers(klass, lambda x: getattr(x, 'is_parser', False))]
-            klass.parser_methods = [ParserMethod(method=pm, path=pm.path, on_start=pm.on_start) for pm in parser_methods]
+    @classmethod
+    def get_parser_methods(cls, prefix: List):
+        if not hasattr(cls, 'parser_methods'):
+            parser_methods = [func for _, func in inspect.getmembers(cls, lambda x: getattr(x, 'is_parser', False))]
+            cls.parser_methods = [ParserMethod(method=pm, path=pm.path.with_prefix(prefix), on_start=pm.on_start) for pm in parser_methods]
 
-            if not klass.parser_methods:
-                raise ValueError(f"XmlParser class {klass} has no @parser_path")
+            if not cls.parser_methods:
+                raise ValueError(f"XmlParser class {cls} has no @parser_path")
 
-        return klass.parser_methods
+        return cls.parser_methods
 
     # determine if we only save tagName
-    def __init__(self):
+    def __init__(self, prefix: Optional[List] = None):
+        self._prefix = prefix or []
         self._stack: List = list()
         self._candidates: List[List[Callable]] = list()
         self._execute: List[List[Callable]] = list()
@@ -137,7 +141,7 @@ class XmlParser:
 
     def parse(self, source):
         self._stack = list()
-        self._candidates = [XmlParser.get_parser_methods(self.__class__)]
+        self._candidates = [self.__class__.get_parser_methods(self._prefix)]
         self._execute = list()
 
         context = etree.iterparse(source, events=('start', 'end'), huge_tree=True, recover=True, encoding="utf-8")

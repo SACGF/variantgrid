@@ -1,12 +1,15 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.admin import TabularInline
 from django.db.models import QuerySet
 from django.utils.safestring import SafeString
 
 from annotation import models
-from annotation.clinvar_xml_parser import ClinVarFetchRequest, CLINVAR_RECORD_CACHE_DAYS
+from annotation.clinvar_xml_parser import CLINVAR_RECORD_CACHE_DAYS
+from annotation.clinvar_fetch_request import ClinVarFetchRequest
+from annotation.clinvar_xml_parser_via_rcvs import ClinVarXmlParserViaRCVs
+from annotation.clinvar_xml_parser_via_vcv import ClinVarXmlParserViaVCV
 from annotation.models import Citation, CitationFetchRequest, ClinVarRecordCollection, ClinVarRecord, VariantAnnotation, \
     ClinVar
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, get_admin_url
@@ -32,7 +35,14 @@ class ClinVarAdmin(ModelAdminBasics):
 class ClinVarRecordAdmin(TabularInline):
     model = ClinVarRecord
 
-    fields = ("record_id", "submitter", "condition", "stars", "date_last_evaluated", "clinical_significance")
+    fields = ("record_id", "submitter", "hgvs", "condition", "stars", "date_last_evaluated", "clinical_significance")
+    readonly_fields = ("hgvs", )
+
+    def hgvs(self, obj: ClinVarRecord):
+        if obj.c_hgvs:
+            return obj.c_hgvs
+        return obj.variant_coordinate
+
 
     def has_change_permission(self, request, obj=None):
         return False
@@ -80,13 +90,30 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
                 clinvar_variation_id=obj.clinvar_variation_id,
             ).fetch()
 
-    @admin_action("Refresh: Force")
-    def refresh_force(self, request, queryset: QuerySet[ClinVarRecordCollection]):
+    @admin_action("Refresh: Force (using VCV - default)")
+    def refresh_force_vcv(self, request, queryset: QuerySet[ClinVarRecordCollection]):
+        start = datetime.now()
         for obj in queryset:
             ClinVarFetchRequest(
                 clinvar_variation_id=obj.clinvar_variation_id,
-                max_cache_age=timedelta(seconds=0)
+                max_cache_age=timedelta(seconds=0),
+                parser=ClinVarXmlParserViaVCV
             ).fetch()
+        duration = datetime.now() - start
+        messages.info(request, message=f"Fetching took {duration}")
+
+
+    @admin_action("Refresh: Force (using RCVS)")
+    def refresh_force_rcvs(self, request, queryset: QuerySet[ClinVarRecordCollection]):
+        start = datetime.now()
+        for obj in queryset:
+            ClinVarFetchRequest(
+                clinvar_variation_id=obj.clinvar_variation_id,
+                max_cache_age=timedelta(seconds=0),
+                parser=ClinVarXmlParserViaRCVs
+            ).fetch()
+        duration = datetime.now() - start
+        messages.info(request, message=f"Fetching took {duration}")
 
 
 class HasErrorFilter(admin.SimpleListFilter):

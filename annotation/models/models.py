@@ -193,7 +193,7 @@ class ClinVarRecordCollection(TimeStampedModel):
 
     clinvar_variation_id = models.IntegerField(primary_key=True)
     allele = models.ForeignKey(Allele, null=True, on_delete=SET_NULL)
-    rcvs = ArrayField(base_field=models.TextField(), blank=True, null=True, size=None)
+    urls = ArrayField(base_field=models.TextField(), blank=True, null=True, size=None)
     last_loaded = models.DateTimeField(blank=True, null=True)
     parser_version = models.IntegerField(blank=True, null=True)
 

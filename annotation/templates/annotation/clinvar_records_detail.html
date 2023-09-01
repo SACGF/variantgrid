@@ -13,9 +13,8 @@
                     <div class="modal-body">
                         {% admin_link clinvar_record_collection %}
                         <div class="list-group">
-                            <a class="list-group-item list-group-item-action" href="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id={{ clinvar_record_collection.clinvar_variation_id }}&retmode=json">ClinVar Variation ID {{ clinvar_record_collection.clinvar_variation_id }} JSON</a>
-                            {% for rcv in clinvar_record_collection.rcvs %}
-                                <a class="list-group-item list-group-item-action" href="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=clinvar&rettype=clinvarset&id={{ rcv }}">{{ rcv }} XML</a>
+                            {% for url in clinvar_record_collection.urls %}
+                                <a class="list-group-item list-group-item-action" href="{{ url }}">{{ url }}</a>
                             {% endfor %}
                         </div>
                     </div>
@@ -29,7 +28,7 @@
         <thead>
             <tr>
                 <th>Submitter</th>
-                <th style="min-width:200px">c.HGVS</th>
+                <th style="min-width:200px">HGVS</th>
                 <th style="width:150px">Clinical Significance</th>
                 <th style="min-width:200px">Condition</th>
                 <th style="width:155px">Curated</th>
