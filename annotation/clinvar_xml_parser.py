@@ -69,9 +69,10 @@ class ClinVarXmlParser(XmlParser, ABC):
 
     @staticmethod
     def parse_hgvs(text: str) -> str:
-        if match := ClinVarXmlParser.RE_GOOD_CHGVS.match(text):
-            return match.group(1)
-        return text
+        if text:
+            if match := ClinVarXmlParser.RE_GOOD_CHGVS.match(text):
+                return match.group(1)
+        return None
 
     @classmethod
     @abstractmethod

@@ -7,7 +7,7 @@ from library.utils.xml_utils import parser_path, PP
 
 class ClinVarXmlParserViaVCV(ClinVarXmlParser):
 
-    PARSER_VERSION = 201  # change this whenever the parsing changes, so we know to ignore the old cache
+    PARSER_VERSION = 202  # change this whenever the parsing changes, so we know to ignore the old cache
 
     @classmethod
     def load_from_clinvar_id(cls, clinvar_variation_id: int) -> ClinVarXmlParserOutput:
@@ -79,18 +79,19 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         "OtherNameList",
         "Name"
     )
-    def parse_possible_c_hgvs(self, elem):
+    def _parse_possible_c_hgvs(self, elem):
         if elem.get("Type") is None and (hgvs := elem.text):
-            self.latest.c_hgvs = ClinVarXmlParser.parse_hgvs(hgvs)
+            if hgvs := ClinVarXmlParser.parse_hgvs(hgvs):
+                self.latest.c_hgvs = hgvs
 
     @parser_path(
         "SimpleAllele",
         "AttributeSet",
         PP("Attribute", Type="HGVS"))
-    def parse_c_hgvs(self, elem):
+    def _parse_c_hgvs(self, elem):
         if not self.latest.c_hgvs:
-            if hgvs := elem.text:
-                self.latest.c_hgvs = ClinVarXmlParser.parse_hgvs(hgvs)
+            if hgvs := ClinVarXmlParser.parse_hgvs(elem.text):
+                self.latest.c_hgvs = hgvs
 
     @parser_path(
         "SimpleAllele",

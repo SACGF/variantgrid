@@ -103,7 +103,7 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
         messages.info(request, message=f"Fetching took {duration}")
 
 
-    @admin_action("Refresh: Force (using RCVS)")
+    @admin_action("Refresh: Force (using RCVs)")
     def refresh_force_rcvs(self, request, queryset: QuerySet[ClinVarRecordCollection]):
         start = datetime.now()
         for obj in queryset:

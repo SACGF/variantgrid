@@ -74,8 +74,8 @@ class ClinVarXmlParserViaRCVs(ClinVarXmlParser):
         "AttributeSet",
         PP("Attribute", Type="HGVS"))
     def parse_c_hgvs(self, elem):
-        if hgvs := elem.text:
-            self.latest.c_hgvs = ClinVarXmlParser.parse_hgvs(hgvs)
+        if hgvs := ClinVarXmlParser.parse_hgvs(elem.text):
+            self.latest.c_hgvs = hgvs
 
     @parser_path(
         PP("MeasureSet", Type="Variant"),
