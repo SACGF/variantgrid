@@ -53,6 +53,7 @@ class ClinVarRecordAdmin(TabularInline):
 
 @admin.register(ClinVarRecordCollection)
 class ClinVarRecordCollectionAdmin(ModelAdminBasics):
+    search_fields = ("clinvar_variation_id", "allele__id")
     inlines = (ClinVarRecordAdmin, )
     list_per_page = 20
 
