@@ -7,7 +7,7 @@ from library.utils.xml_utils import parser_path, PP
 
 class ClinVarXmlParserViaVCV(ClinVarXmlParser):
 
-    PARSER_VERSION = 202  # change this whenever the parsing changes, so we know to ignore the old cache
+    PARSER_VERSION = 203  # change this whenever the parsing changes, so we know to ignore the old cache
 
     @classmethod
     def load_from_clinvar_id(cls, clinvar_variation_id: int) -> ClinVarXmlParserOutput:
@@ -115,7 +115,8 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         start = elem.get("start")
         ref = elem.get("referenceAllele")
         alt = elem.get("alternateAllele")
-        self.latest.variant_coordinate = f"{chr}:{start} {ref}>{alt} ({assembly})"
+        if chr and start and ref and alt:
+            self.latest.variant_coordinate = f"{chr}:{start} {ref}>{alt} ({assembly})"
 
 
     @parser_path(

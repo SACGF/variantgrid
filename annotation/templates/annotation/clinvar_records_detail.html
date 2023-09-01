@@ -37,7 +37,9 @@
         <tbody>
             {% for record in records %}
                 <tr>
-                    <td>{% clinvar_stars record.stars record.review_status %} <a class="subtle-link" href="https://www.ncbi.nlm.nih.gov/clinvar/submitters/{{ record.org_id }}">{{ record.submitter }}</a></td>
+                    <td>{% clinvar_stars record.stars record.review_status %} <a class="subtle-link" href="https://www.ncbi.nlm.nih.gov/clinvar/submitters/{{ record.org_id }}">{{ record.submitter }}</a>
+                        <br/><span class="text-secondary">{{ record.record_id }}</span>
+                    </td>
                     <td>{% if record.c_hgvs %}{% c_hgvs record.c_hgvs %}{% elif record.variant_coordinate %}{{ record.variant_coordinate }}{% else %}<span class="no-value">-</span>{% endif %}</td>
                     <td class="cs-{{ record.clinical_significance|lower }} text-center">{{ record.clinical_significance | ekey:"clinical_significance" }}</td>
                     <td>{% if record.condition %}{% ontology_term record.condition %}{% else %}<span class="no-value">-</span>{% endif %}</td>
