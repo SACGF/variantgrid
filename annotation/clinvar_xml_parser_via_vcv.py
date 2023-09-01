@@ -94,6 +94,17 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
 
     @parser_path(
         "SimpleAllele",
+        "HGVSlist",
+        "HGVS",
+        "Expression")
+    def parse_hgvs_2(self, elem):
+        if not self.latest.c_hgvs:
+            if text := elem.text:
+                if text.startswith("NM_"):
+                    self.latest.c_hgvs = text
+
+    @parser_path(
+        "SimpleAllele",
         "Location",
         "SequenceLocation"
     )

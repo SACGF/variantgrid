@@ -57,7 +57,7 @@ class ClinVarXmlParserOutput:
 class ClinVarXmlParser(XmlParser, ABC):
 
     RE_DATE_EXTRACTOR = re.compile("([0-9]+-[0-9]+-[0-9]+).*")
-    RE_GOOD_CHGVS = re.compile("^(N._[0-9]+[.][0-9]+:c[.][0-9_a-zA-Z>]+)( .*)?$")
+    RE_GOOD_CHGVS = re.compile("^(N._(.+)?:c[.][0-9_a-zA-Z>]+)( .*)?$")
     RE_ORPHA = re.compile("ORPHA([0-9]+)")
 
     @staticmethod
