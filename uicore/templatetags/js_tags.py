@@ -12,6 +12,7 @@ from django import template
 from django.utils.safestring import mark_safe, SafeString
 
 from library.utils import format_significant_digits
+from snpdb.user_settings_manager import UserSettingsManager
 from uicore.json.json_types import JsonDataType
 from uicore.json.validated_json import ValidatedJson
 
@@ -170,16 +171,19 @@ def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False, tex
     if show_seconds:
         css_classes.append('seconds')
 
+    date_value = None
     if timestamp:
         if not isinstance(timestamp, (int, float)):
             if not hasattr(timestamp, 'timestamp'):
                 if isinstance(timestamp, date):
-                    timestamp = datetime.datetime(year=timestamp.year, month=timestamp.month, day=timestamp.day)
+                    date_value = timestamp
+                    timestamp = datetime.datetime(year=timestamp.year, month=timestamp.month, day=timestamp.day, tzinfo=UserSettingsManager.get_user_timezone())
                 else:
                     raise ValueError(f"Unsure how to convert {timestamp} to timestamp")
             timestamp = timestamp.timestamp()
         return {
             "datetime": datetime.datetime.fromtimestamp(timestamp),
+            "date": date_value,
             "timestamp": timestamp,
             "css_class": " ".join(css_classes),
             "text_only": text_only
