@@ -7,7 +7,7 @@ from library.utils.xml_utils import parser_path, PP
 
 class ClinVarXmlParserViaVCV(ClinVarXmlParser):
 
-    PARSER_VERSION = 200  # change this whenever the parsing changes, so we know to ignore the old cache
+    PARSER_VERSION = 201  # change this whenever the parsing changes, so we know to ignore the old cache
 
     @classmethod
     def load_from_clinvar_id(cls, clinvar_variation_id: int) -> ClinVarXmlParserOutput:
