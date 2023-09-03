@@ -171,7 +171,7 @@ USE_TZ = True
 # If you set this to True (and setup everything else required) the app
 # will do auth through OIDC
 USE_OIDC = False
-MAINTENANCE_MODE = False  # If true, only non-bot admin users will be able to login, currently only works for ODIC
+MAINTENANCE_MODE = get_secret("SECURITY.maintenance_mode")  # If true, only non-bot admin users will be able to login, currently only works for ODIC
 OIDC_REQUIRED_GROUP = None
 OIDC_USER_SERVICES = None
 

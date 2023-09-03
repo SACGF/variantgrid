@@ -70,6 +70,9 @@ _default_settings = {
     "ENTREZ": {
         "api_key": None,
         "email": None
+    },
+    "SECURITY": {
+        "maintenance_mode": False
     }
 }
 """
