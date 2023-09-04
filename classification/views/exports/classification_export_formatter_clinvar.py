@@ -391,6 +391,7 @@ class ClassificationExportFormatterClinVarCompareExpert(ClassificationExportForm
                 if clinvar_record.is_expert_panel_or_greater:
                     records = ClinVarFetchRequest(
                         clinvar_variation_id=clinvar_record.clinvar_variation_id,
+                        clinvar_versions=self.clinvar_versions
                     ).fetch().records_with_min_stars(CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE)
                     if records:
                         if len(records) > 1:

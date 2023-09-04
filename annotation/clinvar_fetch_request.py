@@ -2,7 +2,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Type
+from typing import Type, Optional, Collection
 from urllib.error import HTTPError
 
 from django.db import transaction
@@ -10,8 +10,8 @@ from django.utils import timezone
 
 from annotation.clinvar_xml_parser import CLINVAR_RECORD_CACHE_DAYS, ClinVarXmlParser
 from annotation.clinvar_xml_parser_via_vcv import ClinVarXmlParserViaVCV
-from annotation.models import ClinVarRecordCollection, ClinVar
-from snpdb.models import VariantAllele
+from annotation.models import ClinVarRecordCollection, ClinVar, ClinVarVersion
+from snpdb.models import VariantAllele, GenomeBuild
 
 
 @dataclass
@@ -33,8 +33,17 @@ class ClinVarFetchRequest:
 
     parser: Type[ClinVarXmlParser] = ClinVarXmlParserViaVCV
 
+    clinvar_versions: Optional[Collection[ClinVarVersion]] = None
+
     def fetch(self) -> ClinVarRecordCollection:
         fetch_date = timezone.now()
+
+        clinvar_versions = self.clinvar_versions
+        if not clinvar_versions:
+            clinvar_versions = []
+            for genome_build in GenomeBuild.builds_with_annotation():
+                if clinvar_version := ClinVarVersion.objects.filter(genome_build=genome_build).order_by('-created').first():
+                    clinvar_versions.append(clinvar_version)
 
         with transaction.atomic():
             clinvar_record_collection, created = ClinVarRecordCollection.objects.get_or_create(clinvar_variation_id=self.clinvar_variation_id)
@@ -51,9 +60,10 @@ class ClinVarFetchRequest:
 
             allele_id = clinvar_record_collection.allele_id
             if not allele_id:
-                if variant_id := ClinVar.objects.filter(clinvar_variation_id=self.clinvar_variation_id).order_by('-version').values_list('variant', flat=True).first():
-                    if va := VariantAllele.objects.filter(variant_id=variant_id).first():
-                        allele_id = va.allele_id
+                if variant_id := ClinVar.objects.filter(clinvar_variation_id=self.clinvar_variation_id)\
+                        .filter(version__in=clinvar_versions).values_list('variant', flat=True).first():
+                    if va_allele_id := VariantAllele.objects.filter(variant_id=variant_id).values_list('allele', flat=True).first():
+                        allele_id = va_allele_id
                 clinvar_record_collection.allele_id = allele_id
 
             if not allele_id:
