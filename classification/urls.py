@@ -119,6 +119,8 @@ urlpatterns = [
     perm_path('dashboard', classification_dashboard_view.classification_dashboard, name='classification_dashboard'),
     perm_path('dashboard/<str:lab_id>', classification_dashboard_view.classification_dashboard, name='classification_dashboard'),
     perm_path('dashboard_graph/<str:lab_id>', classification_dashboard_view.classification_dashboard_graph_detail, name='classification_dashboard_graph_detail'),
+    perm_path('dashboard_classification_special/<str:lab_id>', classification_dashboard_view.classification_dashboard_classification_special_detail, name='classification_dashboard_classification_special_detail'),
+
     perm_path('dashboard_download', issues_download, name='classification_dashboard_download'),
     perm_path('dashboard_download/<str:lab_id>', issues_download, name='classification_dashboard_download'),
     # legacy URL

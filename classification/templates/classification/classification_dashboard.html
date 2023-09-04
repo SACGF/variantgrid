@@ -173,46 +173,7 @@
         <p class="text-info">Classifications waiting on Variant Matching Review require an admin to action</p>
     {% endlabelled %}
 
-    <p><a href="#flagged-classifications" class="toggle-link" data-toggle="collapse">Show details</a></p>
-
-    <div id="flagged-classifications" class="collapse">
-        <p><br/><a class="download-link type-csv" href="{% url 'classification_dashboard_download' dlab.lab_picker.selection %}">Download all issues requiring action</a></p>
-
-        <p class="text-info">For instructions on how to fix the outstanding actions, click on the icons in the flag column for each classification.</p>
-
-        <div class="mt-4">
-
-            {% ui_register_tab_embedded tab_set="classification_issues" label="Pending/Review/Suggestion" badge=dlab.counts.pending_changes|add:dlab.counts.internal_review|add:dlab.counts.suggestions %}
-                <table id="classifications-matching" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationReviews"></table>
-            {% end_ui_register_tab_embedded %}
-
-            {% ui_register_tab_embedded tab_set="classification_issues" label="Significance Changes" badge=dlab.counts.significance_change %}
-                <table id="classifications-comment" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationSigChanges"></table>
-            {% end_ui_register_tab_embedded %}
-
-            {% comment %}
-            {% ui_register_tab_embedded tab_set="classification_issues" label="Variant Matching Issues" badge=dlab.counts.variant_matching %}
-                <table id="classifications-matching" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationMatchingVariant"></table>
-            {% end_ui_register_tab_embedded %}
-            {% endcomment %}
-
-            {% ui_register_tab_embedded tab_set="classification_issues" label="Unshared" badge=dlab.counts.unshared %}
-                <table id="classifications-unshared" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationUnshared"></table>
-            {% end_ui_register_tab_embedded %}
-
-            {% if clinvar_export_enabled %}
-                {% ui_register_tab_embedded tab_set="classification_issues" label="Exclude from ClinVar" badge=dlab.counts.clinvar_exclude %}
-                    <table id="classifications-exclude-clinvar" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationExcludeClinVar"></table>
-                {% end_ui_register_tab_embedded %}
-            {% endif %}
-
-            {% ui_register_tab_embedded tab_set="classification_issues" label="Withdrawn" badge=dlab.counts.withdrawn %}
-                <table id="classifications-withdrawn" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationWithdrawn"></table>
-            {% end_ui_register_tab_embedded %}
-
-            {% ui_render_tabs tab_set="classification_issues" %}
-        </div>
-    </div>
+    <p><a href="{% url 'classification_dashboard_classification_special_detail' dlab.lab_picker.selection %}" class="toggle-link" data-toggle="ajax-collapse">Show details</a></p>
 
 </div>
 {% endblock content %}

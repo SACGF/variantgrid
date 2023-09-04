@@ -212,3 +212,10 @@ def classification_dashboard_graph_detail(request: HttpRequest, lab_id: Optional
     return render(request, "classification/classification_dashboard_graph_detail.html", {
         "dlab": dlab
     })
+
+
+def classification_dashboard_classification_special_detail(request: HttpRequest, lab_id: Optional[Union[int, str]] = None) -> HttpResponse:
+    dlab = ClassificationDashboard(LabPickerData.from_request(request, lab_id))
+    return render(request, "classification/classification_dashboard_classification_special_detail.html", {
+        "dlab": dlab
+    })
