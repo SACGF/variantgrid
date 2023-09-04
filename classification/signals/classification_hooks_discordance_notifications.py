@@ -124,6 +124,7 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
         )
 
         for notification in notifications:
+            notification.sent = True
             combined_notification.merge(notification)
         combined_notification.send()
         current_date = timezone.now()
