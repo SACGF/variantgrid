@@ -575,11 +575,11 @@ function loadAjaxModal(linkDom, size) {
     let modalDialog = modalContent.modal({focus:true, show:false});
 
     loadAjaxBlock(content, url).then(() => {
-        if (content.find('.card')) {
+        if (content.find('.card').length) {
             modalContentDiv.children().detach();
             content.appendTo(modalContentDiv);
+            cardToModal(modalContentDiv);
         }
-        cardToModal(modalContentDiv);
     });
 
     modalContent.on('hidden.bs.modal', function() {
