@@ -329,7 +329,7 @@ let DataTableDefinition = (function() {
                     this.setupDom();
                     this.setupClientExpend();
                     this.setupResponsiveExpand();
-                    this.dataTable.columns.adjust().draw();
+                    // this.dataTable.columns.adjust().draw();
                 });
             });
         }
