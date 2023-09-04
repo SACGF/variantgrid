@@ -18,13 +18,16 @@ Number of days we keep ClinVar records cached before we will re-ask ClinGen for 
 """
 
 CLINVAR_TO_VG_CLIN_SIG = {
-    "Benign": "B",
-    "Likely benign": "LB",
-    "Uncertain significance": "VUS",
-    "Likely pathogenic": "LP",
-    "Pathogenic": "P",
+    "benign": "B",
+    "likely benign": "LB",
+    "uncertain significance": "VUS",
+    "variant of unknown significance": "VUS",
+    "likely pathogenic": "LP",
+    "pathogenic": "P",
     "risk factor": "R",
-    "drug response": "D"
+    "drug response": "D",
+    "not provided": None,
+    "unknown": None
 }
 
 CLINVAR_REVIEW_STATUS_TO_STARS = {

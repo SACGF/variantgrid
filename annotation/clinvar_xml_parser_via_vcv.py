@@ -1,5 +1,5 @@
 from Bio import Entrez
-
+import re
 from annotation.clinvar_xml_parser import ClinVarXmlParser, ClinVarXmlParserOutput, CLINVAR_REVIEW_STATUS_TO_STARS, \
     CLINVAR_TO_VG_CLIN_SIG
 from library.utils.xml_utils import parser_path, PP
@@ -7,7 +7,9 @@ from library.utils.xml_utils import parser_path, PP
 
 class ClinVarXmlParserViaVCV(ClinVarXmlParser):
 
-    PARSER_VERSION = 205  # change this whenever the parsing changes, so we know to ignore the old cache
+    PARSER_VERSION = 206  # change this whenever the parsing changes, so we know to ignore the old cache
+
+    RE_LEGACY_CS = re.compile("^Converted during submission to (.*?).?$")
 
     @classmethod
     def load_from_clinvar_id(cls, clinvar_variation_id: int) -> ClinVarXmlParserOutput:
@@ -70,9 +72,21 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
     @parser_path(
         "Interpretation",
         "Description")
-    def parse_clinical_significance(self, elem):
-        cs = elem.text
-        self.latest.clinical_significance = CLINVAR_TO_VG_CLIN_SIG.get(cs, cs)
+    def parse_clinical_significance_desc(self, elem):
+        if cs := elem.text:
+            cs = cs.lower()
+            self.latest.clinical_significance = CLINVAR_TO_VG_CLIN_SIG.get(cs, cs)
+
+    @parser_path(
+        "Interpretation",
+        "Comment")
+    def parse_clinical_significance_comment(self, elem):
+        # prioritise comment if it's in the format of
+        # Converted during submission to XXX
+        if cs := elem.text:
+            if match := ClinVarXmlParserViaVCV.RE_LEGACY_CS.match(cs):
+                match_cs = match.group(1).lower()
+                self.latest.clinical_significance = CLINVAR_TO_VG_CLIN_SIG.get(match_cs, match_cs)
 
     @parser_path(
         "SimpleAllele",

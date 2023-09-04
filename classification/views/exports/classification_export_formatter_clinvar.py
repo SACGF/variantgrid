@@ -325,11 +325,19 @@ class ClinVarExpertCompareRow(ExportRow):
     @export_column("Status")
     def status(self):
         bucket_map = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
+        bucket_map["no known pathogenicity"] = 1
+
         server_cs_set = self.server_clinical_significance_set
-        buckets = set([bucket_map.get(cs) for cs in server_cs_set])
+
+        bucket_list = [bucket_map.get(cs) for cs in server_cs_set]
+        buckets = set([b for b in bucket_list if b is not None]) # Drug Response doesn't have a bucket for example
+
         if len(buckets) > 1:
             return "Internal Discordance"
-        buckets.add(bucket_map.get(self.clinvar_expert_record.clinical_significance))
+
+        if bucket := bucket_map.get(self.clinvar_expert_record.clinical_significance):
+            buckets.add(bucket)
+
         if len(buckets) > 1:
             return "Discordance"
         all_css = set().union(self.server_clinical_significance_set)

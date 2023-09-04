@@ -126,7 +126,8 @@ class ClinVarXmlParserViaRCVs(ClinVarXmlParser):
         "Description")
     def parse_clinical_significance(self, elem):
         cs = elem.text
-        self.latest.clinical_significance = CLINVAR_TO_VG_CLIN_SIG.get(cs, cs)
+        if cs := cs.lower():
+            self.latest.clinical_significance = CLINVAR_TO_VG_CLIN_SIG.get(cs, cs)
 
     @parser_path(
         "ClinicalSignificance",
