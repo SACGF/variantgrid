@@ -113,8 +113,9 @@ urlpatterns = [
     perm_path('evidence_keys', views.evidence_keys, name='evidence_keys'),
 
     perm_path('summary_email', summary_email_preview_html, name='summary_email_html'),
+    perm_path('summary_email/<str:lab_id>', summary_email_preview_html, name='summary_email_html'),
     perm_path('summary_email_text', summary_email_preview_text, name='summary_email_text'),
-
+    perm_path('summary_email_text/<str:lab_id>', summary_email_preview_text, name='summary_email_html'),
 
     perm_path('dashboard', classification_dashboard_view.classification_dashboard, name='classification_dashboard'),
     perm_path('dashboard/<str:lab_id>', classification_dashboard_view.classification_dashboard, name='classification_dashboard'),

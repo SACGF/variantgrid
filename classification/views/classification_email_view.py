@@ -109,24 +109,9 @@ class EmailLabSummaryData:
 
 class EmailSummaryData:
 
-    def __init__(self, user: User):
-        self.user = user
-        # labs
-        labs_qs: QuerySet
-        if user.is_superuser:
-            labs_qs = Lab.objects
-        else:
-            labs_qs = Lab.valid_labs_qs(user)
-
-        labs_qs = labs_qs.order_by('group_name')
-        self.lab_summaries: List[EmailLabSummaryData] = [EmailLabSummaryData(lab=lab, user=user) for lab in labs_qs]
-
-    @property
-    def has_issues(self) -> bool:
-        for lab_summary in self.lab_summaries:
-            if lab_summary.flagged_variants_count > 0:
-                return True
-        return False
+    def __init__(self, perspective: LabPickerData):
+        labs = sorted(perspective.selected_labs)
+        self.lab_summaries: List[EmailLabSummaryData] = [EmailLabSummaryData(lab=lab, user=perspective.user) for lab in labs]
 
 
 @celery.shared_task
@@ -144,7 +129,7 @@ def send_summary_emails():
 def send_summary_email_to_user(user: User):
     discordance_email = settings.DISCORDANCE_EMAIL
     if discordance_email:
-        content = summary_email_content(user)
+        content = summary_email_content(LabPickerData.for_user(user))
 
         return EmailLog.send_mail(subject=content.subject,
                                   html=content.html,
@@ -153,16 +138,21 @@ def send_summary_email_to_user(user: User):
                                   recipient_list=[user.email])
 
 
-def summary_email_preview_html(request: HttpRequest) -> HttpResponse:
-    return HttpResponse(summary_email_content(request.user).html)
+def summary_email_preview_html(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponse:
+    return HttpResponse(
+        summary_email_content(LabPickerData.for_user(request.user, selection=lab_id)).html
+    )
 
 
-def summary_email_preview_text(request: HttpRequest) -> HttpResponse:
-    return HttpResponse(summary_email_content(request.user).text, content_type="text/plain")
+def summary_email_preview_text(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponse:
+    return HttpResponse(
+        summary_email_content(LabPickerData.for_user(request.user, selection=lab_id)).text,
+        content_type="text/plain"
+    )
 
 
-def summary_email_content(user: User) -> EmailOutput:
-    data = EmailSummaryData(user=user)
+def summary_email_content(perspective: LabPickerData) -> EmailOutput:
+    data = EmailSummaryData(perspective=perspective)
     subject = 'Weekly Classification Summary'
 
     context = {

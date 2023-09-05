@@ -62,8 +62,8 @@
     {% if not dlab.lab_id %}
         {% labelled row_css="my-4" label="Email Preview" admin_only=True %}
             <div class="link-toolbar">
-                <a class="download-link type-csv" href="{% url 'summary_email_html' %}">HTML</a>
-                <a class="download-link type-json" href="{% url 'summary_email_text' %}">TEXT</a>
+                <a class="download-link type-csv" href="{% url 'summary_email_html' %}/{{ dlab.lab_picker.selection }}">HTML</a>
+                <a class="download-link type-json" href="{% url 'summary_email_text' %}/{{ dlab.lab_picker.selection }}">TEXT</a>
             </div>
         {% endlabelled %}
     {% endif %}
