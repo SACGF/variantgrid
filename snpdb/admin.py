@@ -87,7 +87,7 @@ class UserSettingsOverrideAdmin(ModelAdminBasics):
     actions = ["export_as_csv"]
 
     def is_readonly_field(self, f):
-        if f.name == 'default_genome_build':
+        if f.name in ('default_genome_build', 'default_lab'):
             return False
         return super().is_readonly_field(f)
 
