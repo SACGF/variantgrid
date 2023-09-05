@@ -223,7 +223,11 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
     def discordance_report_classifications(self) -> List['DiscordanceReportClassification']:
         return list(self.discordancereportclassification_set.select_related(
             'classification_original__classification__clinical_context',
-            'classification_final__classification'
+            'classification_final__classification',
+            'classification_original__classification__allele_info__grch37',
+            'classification_original__classification__allele_info__grch38',
+            'classification_final__classification__allele_info__grch37',
+            'classification_final__classification__allele_info__grch38'
         ).all())
 
     @cached_property

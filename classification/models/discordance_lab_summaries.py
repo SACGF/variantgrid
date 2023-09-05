@@ -72,7 +72,7 @@ class DiscordanceLabSummary(ClassificationLabSummary):
         ) for group, drcs in group_counts.items()]))
 
         triage_by_lab: Dict[Lab, DiscordanceReportTriage] = {}
-        for triage in discordance_report.discordancereporttriage_set.all():
+        for triage in discordance_report.discordancereporttriage_set.select_related('lab').all():
             triage_by_lab[triage.lab] = triage
 
         return [dls._with_triage(triage_by_lab.pop(dls.lab, None)) for dls in dlses]
