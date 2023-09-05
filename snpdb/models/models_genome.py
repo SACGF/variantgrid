@@ -13,6 +13,7 @@ from django.db.models.query_utils import Q
 from genes.models_enums import AnnotationConsortium
 from library.cache import timed_cache
 from library.django_utils import SortMetaOrderingMixin
+from library.django_utils.django_object_managers import CachingObjectManager
 from library.genomics.fasta_wrapper import FastaFileWrapper
 from library.utils import invert_dict
 from snpdb.genome.fasta_index import load_genome_fasta_index
@@ -28,6 +29,8 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
 
         Build & Contig are populated via migration snpdb 0006 """
 
+    objects = CachingObjectManager()
+
     name = models.TextField(primary_key=True)
     accession = models.TextField(null=True)
     alias = models.TextField(null=True, unique=True)
@@ -36,22 +39,20 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
 
     class Meta:
         ordering = ["name"]
+        base_manager_name = 'objects'
 
     def is_version(self, version: int) -> bool:
         return str(version) in self.name
 
     @classmethod
-    @timed_cache(ttl=60)
     def grch37(cls) -> 'GenomeBuild':
         return cls.objects.get(pk='GRCh37')
 
     @classmethod
-    @timed_cache(ttl=60)
     def grch38(cls) -> 'GenomeBuild':
         return cls.objects.get(pk='GRCh38')
 
     @classmethod
-    @timed_cache(ttl=60)
     def legacy_build(cls) -> 'GenomeBuild':
         """ Use this for hacks - makes it easy to find / fix later """
         return cls.objects.get(pk='GRCh37')
