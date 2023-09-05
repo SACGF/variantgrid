@@ -59,7 +59,6 @@ class EmailLabSummaryData:
         dr_qs = DiscordanceReport.objects.filter(pk__in=report_ids).order_by('-id')
         return dr_qs
 
-
     @cached_property
     def discordance_report_summaries(self) -> DiscordanceReportTableData:
         dr_qs = self._get_discordance_report_summaries()
@@ -70,14 +69,22 @@ class EmailLabSummaryData:
         )
 
     @cached_property
-    def is_medically_insignificance_count(self) -> int:
+    def is_medically_significance_count(self) -> dict:
         dr_qs = self._get_discordance_report_summaries()
-        insignificance_count = 0
-        for i in dr_qs:
-            if not i.is_medically_significant:
-                insignificance_count += 1
-        return insignificance_count
+        medically_insignificant = 0
+        medically_significant = 0
 
+        for i in dr_qs:
+            if i.is_medically_significant:
+                medically_significant += 1
+            else:
+                medically_insignificant += 1
+
+        medical_count = {
+            'medically_insignificant': medically_insignificant,
+            'medically_significant': medically_significant
+        }
+        return medical_count
 
     @cached_property
     def flagged_variants(self) -> QuerySet[Flag]:

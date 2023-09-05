@@ -48,58 +48,61 @@ Hello Shariant User,
     </ul>
 
     {% if lab_summary.discordance_report_summaries %}
-        <div style="padding-left: 24px">
-            <table cellpadding="10" style="border-collapse: collapse;">
-                <thead>
-                    <tr>
-                        <th style="font-weight:600; text-align:left; padding-right: 8px">Shariant ID</th>
-                        <th style="font-weight:600; text-align:left; padding-right: 8px">Discordance Detected</th>
-                        <th style="font-weight:600; text-align:left; padding-right: 8px">c.HGVS ({{ lab_summary.genome_build }})</th>
-                        <th style="font-weight:600; text-align:left; padding-right: 8px">Lab / Clinical Significances</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for discordance_report_summary in lab_summary.discordance_report_summaries.summaries %}
-                        {% if discordance_report_summary.is_medically_significant %}
-                        <tr style="border-top: 1px solid #bbb;">
-                            <td><a href="{% absolute_url 'discordance_report' discordance_report_summary.id %}">DR {{ discordance_report_summary.id }}</a></td>
-                            <td style="font-family:monospace">{{ discordance_report_summary.date_detected_str }}</td>
-                            <td>
-                                {% for c_hgvs_val in discordance_report_summary.c_hgvses %}
-                                <div>{% c_hgvs c_hgvs_val show_genome_build=False %}</div>
-                                {% endfor %}
-                            </td> {% comment %}do inline style for c.hgvs{% endcomment %}
-                            <td>
-                                {% if discordance_report_summary.is_pending_concordance %}
-                                    <div style="color:#6c6;font-weight:bold">Pending Concordance</div>
-                                {% endif %}
-                                {% for lab_summ in discordance_report_summary.lab_significances %}
-                                    <div {% if lab_summ.clinical_significance_to == 'withdrawn' %}style="opacity:0.6"{% endif %}>
-                                        <span style="display:inline-block;margin-right:6px">
-                                            {% lab lab_summ.lab your_lab=lab_summ.is_internal %}
-                                            {% if lab_summ.count > 1 %}<span class="d-inline-block mx-1 text-muted">x</span>{{ lab_summ.count }}{% endif %}
-                                        </span>
-                                        {% if lab_summ.changed %}
-                                            {% clinical_significance_inline lab_summ.clinical_significance_from %} -> {% clinical_significance_inline lab_summ.clinical_significance_to %}
-                                            {% if lab_summ.pending %}(Pending){% endif %}
-                                        {% else %}
-                                            {% clinical_significance_inline lab_summ.clinical_significance_from %}
-                                        {% endif %}
-                                    </div>
-                                {% endfor %}
-                            </td>
-                         </tr>
-                        {% endif %}
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        <div>{% if lab_summary.is_medically_insignificance_count == 1 %}There's {{ lab_summary.is_medically_insignificance_count }} more discordance that is not medically significant and can be accessed
-            <span style="color:#444"><a href="{% absolute_url 'discordance_reports' %}">here</a>.</span>
-        {% elif lab_summary.is_medically_insignificance_count > 1 %}There are {{ lab_summary.is_medically_insignificance_count }} more discordances that are not medically significant and can be accessed
-            <span style="color:#444"><a href="{% absolute_url 'discordance_reports' %}">here</a>.</span>
+        {% if lab_summary.is_medically_significance_count.medically_significant > 0 %}
+            <div style="padding-left: 24px">
+                <p>The following discordances have been identified as potentially medically significant: </p>
+                <table cellpadding="10" style="border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="font-weight:600; text-align:left; padding-right: 8px">Shariant ID</th>
+                            <th style="font-weight:600; text-align:left; padding-right: 8px">Discordance Detected</th>
+                            <th style="font-weight:600; text-align:left; padding-right: 8px">c.HGVS ({{ lab_summary.genome_build }})</th>
+                            <th style="font-weight:600; text-align:left; padding-right: 8px">Lab / Clinical Significances</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for discordance_report_summary in lab_summary.discordance_report_summaries.summaries %}
+                            {% if discordance_report_summary.is_medically_significant %}
+                            <tr style="border-top: 1px solid #bbb;">
+                                <td><a href="{% absolute_url 'discordance_report' discordance_report_summary.id %}">DR {{ discordance_report_summary.id }}</a></td>
+                                <td style="font-family:monospace">{{ discordance_report_summary.date_detected_str }}</td>
+                                <td>
+                                    {% for c_hgvs_val in discordance_report_summary.c_hgvses %}
+                                    <div>{% c_hgvs c_hgvs_val show_genome_build=False %}</div>
+                                    {% endfor %}
+                                </td> {% comment %}do inline style for c.hgvs{% endcomment %}
+                                <td>
+                                    {% if discordance_report_summary.is_pending_concordance %}
+                                        <div style="color:#6c6;font-weight:bold">Pending Concordance</div>
+                                    {% endif %}
+                                    {% for lab_summ in discordance_report_summary.lab_significances %}
+                                        <div {% if lab_summ.clinical_significance_to == 'withdrawn' %}style="opacity:0.6"{% endif %}>
+                                            <span style="display:inline-block;margin-right:6px">
+                                                {% lab lab_summ.lab your_lab=lab_summ.is_internal %}
+                                                {% if lab_summ.count > 1 %}<span class="d-inline-block mx-1 text-muted">x</span>{{ lab_summ.count }}{% endif %}
+                                            </span>
+                                            {% if lab_summ.changed %}
+                                                {% clinical_significance_inline lab_summ.clinical_significance_from %} -> {% clinical_significance_inline lab_summ.clinical_significance_to %}
+                                                {% if lab_summ.pending %}(Pending){% endif %}
+                                            {% else %}
+                                                {% clinical_significance_inline lab_summ.clinical_significance_from %}
+                                            {% endif %}
+                                        </div>
+                                    {% endfor %}
+                                </td>
+                             </tr>
+                            {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         {% endif %}
-            </div> <br>
+        <div>{% if lab_summary.is_medically_significance_count.medically_insignificant == 1 %}There's {{ lab_summary.is_medically_significance_count.medically_insignificant }} more discordance that is not medically significant and can be accessed
+            <span style="color:#444"><a href="{% absolute_url 'discordance_reports' %}">here</a>.</span>
+            {% elif lab_summary.is_medically_significance_count.medically_insignificant > 1 %}There are {{ lab_summary.is_medically_significance_count.medically_insignificant }} more discordances that are not medically significant and can be accessed
+            <span style="color:#444"><a href="{% absolute_url 'discordance_reports' %}">here</a>.</span>
+            {% endif %}
+        </div> <br>
     {% endif %}
 {% endfor %}
 
