@@ -622,8 +622,8 @@ class ModifiedImportedVariant(models.Model):
         return Variant.objects.filter(modifiedimportedvariant__old_variant_formatted=old_variant).distinct()
 
     @classmethod
-    def get_variants_for_unnormalized_variant_any_alt(cls, chrom, position, ref) -> QuerySet:
-        old_variant = cls.get_old_variant_from_tuple(chrom, position, ref, "")
+    def get_variants_for_unnormalized_variant_any_alt(cls, chrom, position, end, ref) -> QuerySet:
+        old_variant = cls.get_old_variant_from_tuple(chrom, position, end, ref, "")
         return Variant.objects.filter(modifiedimportedvariant__old_variant_formatted__startswith=old_variant).distinct()
 
     @classmethod
