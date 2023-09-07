@@ -138,13 +138,13 @@ class BioCommonsHGVSConverter(HGVSConverter):
             raise HGVSException from e
 
     def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
-        var_g = self.babelfish.vcf_to_g_hgvs(*vc)
+        var_g = self.babelfish.vcf_symbolic_to_g_hgvs(*vc)
         return BioCommonsHGVSVariant(var_g)
 
     def variant_coords_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
         """ In VG we call non-coding "c.HGVS" as well - so hanve to handle that """
         try:
-            var_g = self.babelfish.vcf_to_g_hgvs(*vc)  # returns normalized (default HGVS 3')
+            var_g = self.babelfish.vcf_symbolic_to_g_hgvs(*vc)  # returns normalized (default HGVS 3')
             # Biocommons HGVS doesn't normalize introns as it works with transcript sequences so doesn't have introns
             # workaround is to normalize on genome sequence first, so if it can't norm it's correct
             if transcript_version.strand == '-':

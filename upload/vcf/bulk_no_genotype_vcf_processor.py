@@ -29,6 +29,8 @@ class BulkNoGenotypeVCFProcessor(BulkGenotypeVCFProcessor):
         None,  # samples_genotype_quality
         None,  # samples_phred_likelihood,
         None,  # samples_filters
+        [],    # format
+        {},    # info
     ]
 
     @staticmethod
