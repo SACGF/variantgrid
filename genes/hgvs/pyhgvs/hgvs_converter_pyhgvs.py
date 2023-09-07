@@ -136,7 +136,8 @@ class PyHGVSConverter(HGVSConverter):
 
     def variant_coords_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
         pyhgvs_transcript = make_transcript(transcript_version.pyhgvs_data)
-        hgvs_name = pyhgvs.variant_to_hgvs_name(*vc, self.genome_build.genome_fasta.fasta,
+        chrom, start, end, ref, alt = vc
+        hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, start, ref, alt, self.genome_build.genome_fasta.fasta,
                                                 pyhgvs_transcript, max_allele_length=sys.maxsize)
         return PyHGVSVariant(hgvs_name)
 
