@@ -10,6 +10,7 @@ from pyhgvs.utils import make_transcript
 from genes.hgvs import HGVSVariant, HGVSException
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele
 from genes.transcripts_utils import transcript_is_lrg
+from library.genomics.vcf_utils import vcf_allele_is_symbolic
 from snpdb.models import GenomeBuild, VariantCoordinate, Variant
 
 
@@ -126,7 +127,7 @@ class PyHGVSConverter(HGVSConverter):
         return PyHGVSVariant(self._hgvs_name(hgvs_string))
 
     def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
-        chrom, start, end, ref, alt = vc
+        chrom, start, ref, alt = self._variant_coord_to_explicit_ref_alt(vc)
         hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, start, ref, alt,
                                                 self.genome_build.genome_fasta.fasta,
                                                 transcript=None, max_allele_length=sys.maxsize)
@@ -136,7 +137,7 @@ class PyHGVSConverter(HGVSConverter):
 
     def variant_coords_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
         pyhgvs_transcript = make_transcript(transcript_version.pyhgvs_data)
-        chrom, start, end, ref, alt = vc
+        chrom, start, ref, alt = self._variant_coord_to_explicit_ref_alt(vc)
         hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, start, ref, alt, self.genome_build.genome_fasta.fasta,
                                                 pyhgvs_transcript, max_allele_length=sys.maxsize)
         return PyHGVSVariant(hgvs_name)
@@ -197,6 +198,13 @@ class PyHGVSConverter(HGVSConverter):
         fasta = self.genome_build.genome_fasta.fasta
         genome_ref = get_genomic_sequence(fasta, chrom, start, end)
         return HgvsMatchRefAllele(provided_ref=ref, calculated_ref=genome_ref)
+
+    @staticmethod
+    def _variant_coord_to_explicit_ref_alt(vc: VariantCoordinate) -> Tuple[str, int, str, str]:
+        chrom, position, _end, ref, alt = vc
+        if vcf_allele_is_symbolic(alt):
+            raise NotImplementedError("Need to convert symbolic alt")
+        return chrom, position, ref, alt
 
     @staticmethod
     def _validate_in_transcript_range(pyhgvs_transcript, hgvs_name: HGVSName):
