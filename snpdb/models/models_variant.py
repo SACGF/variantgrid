@@ -242,7 +242,7 @@ class AlleleMergeLog(TimeStampedModel):
     message = models.TextField(null=True)
 
 
-@dataclass(frozen=True)
+@dataclass
 class VariantCoordinate(FormerTuple):
     chrom: str
     start: int
@@ -250,12 +250,30 @@ class VariantCoordinate(FormerTuple):
     ref: str
     alt: str
 
+    def __init__(self, chrom, start, end: int = None, ref: str = None, alt: str = None):
+        self.chrom = chrom
+        self.start = start
+        if ref is None:
+            raise ValueError("ref must be supplied")
+        if alt is None:
+            raise ValueError("alt must be supplied")
+        if end is None:
+            if Sequence.allele_is_symbolic(alt):
+                raise ValueError("Must pass 'end' when using symbolic alt")
+            end = start + abs(len(ref) - len(alt))
+        self.end = end
+        self.ref = ref
+        self.alt = alt
+
     @property
     def as_tuple(self) -> Tuple:
         return self.chrom, self.start, self.end, self.ref, self.alt
 
     def __str__(self):
-        s = f"{self.chrom}:{self.start}-{self.end} {self.ref}>{self.alt}"
+        if self.is_symbolic():
+            s = f"{self.chrom}:{self.start}-{self.end} {self.ref}>{self.alt}"
+        else:
+            s = f"{self.chrom}:{self.start} {self.ref}>{self.alt}"
         return s
 
     @staticmethod
@@ -268,11 +286,52 @@ class VariantCoordinate(FormerTuple):
             end = start + abs(len(ref) - len(alt))
             return VariantCoordinate(chrom, start, end, ref, alt)
 
+    def is_symbolic(self):
+        return Sequence.allele_is_symbolic(self.alt)
+
+    def as_explicit(self, genome_build):
+        """ explicit ref/alt """
+        if self.is_symbolic():
+            contig_sequence = genome_build.genome_fasta.fasta[self.chrom]
+            ref_sequence = contig_sequence[self.start-1:self.end].upper()
+            if self.alt == "<DEL>":
+                ref = ref_sequence
+                alt = ref_sequence[0]
+            elif self.alt == "<DUP>":
+                ref = ref_sequence[0]
+                alt = ref_sequence
+            else:
+                raise ValueError(f"Unknown symbolic alt of '{self.alt}'")
+
+            return VariantCoordinate(chrom=self.chrom, start=self.start, end=self.end, ref=ref, alt=alt)
+        return self.explicit_reference()
+
+    def as_symbolic(self):
+        """ alt = <DEL> or <DUP>
+            Does not support INV yet """
+        if self.is_symbolic():
+            return self
+        vc = self.explicit_reference()
+        ref_length = len(vc.ref)
+        alt_length = len(vc.alt)
+        diff = alt_length - ref_length
+        svlen = abs(diff)
+        if svlen >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
+            end = self.start + svlen
+            if diff > 0:
+                ref = self.ref
+                alt = "<DUP>"
+            else:
+                ref = self.ref[0]
+                alt = "<DEL>"
+            return VariantCoordinate(chrom=self.chrom, start=self.start, end=end, ref=ref, alt=alt)
+        return vc
+
     def explicit_reference(self):
         if self.alt == Variant.REFERENCE_ALT:
             # Convert from our internal format (alt='=' for ref) to explicit
             alt = self.ref
-            return VariantCoordinate(chrom=self.chrom, pos=self.pos, ref=self.ref, alt=alt)
+            return VariantCoordinate(chrom=self.chrom, start=self.start, end=self.end, ref=self.ref, alt=alt)
         return self
 
 
