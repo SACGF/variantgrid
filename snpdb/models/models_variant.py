@@ -348,7 +348,7 @@ class Sequence(models.Model):
     """
     seq = models.TextField()
     seq_md5_hash = models.CharField(max_length=32, unique=True)
-    length = models.IntegerField()
+    length = models.IntegerField()  # TODO: I think we should remove this as we now have Variant.end
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if not self.seq_md5_hash:
@@ -605,7 +605,7 @@ class Variant(PreviewModelMixin, models.Model):
         return self.format_tuple(*self.as_tuple())
 
     def __str__(self):
-        return self.format_tuple(self.locus.contig.name, self.locus.position, self.end, self.locus.ref, self.alt)
+        return self.format_tuple(self.locus.contig.name, self.locus.position, self.end, self.locus.ref.seq, self.alt.seq)
 
     def get_absolute_url(self):
         # will show allele if there is one, otherwise go to variant page
