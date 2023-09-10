@@ -40,7 +40,7 @@ class VariantPKLookup(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _get_variant_hash(self, contig_id, position, ref_id, alt_id, end):
+    def _get_variant_hash(self, contig_id, position, end, ref_id, alt_id):
         pass
 
     @abc.abstractmethod
@@ -82,7 +82,7 @@ class VariantPKLookup(abc.ABC):
         contig_id = self.chrom_contig_id_mappings[chrom]
         ref_id = self.sequence_pk_by_seq[ref]
         alt_id = self.sequence_pk_by_seq[alt]
-        return self._get_variant_hash(contig_id, start, ref_id, alt_id, end)
+        return self._get_variant_hash(contig_id, start, end, ref_id, alt_id)
 
     def add(self, chrom, start, end, ref, alt):
         variant_coordinate = (chrom, start, end, ref, alt)
@@ -168,7 +168,7 @@ class VariantPKLookup(abc.ABC):
             loci_parts = (contig_id, start, ref_id)
             locus_hash = self._get_locus_hash(*loci_parts)
             loci_parts_by_hash[locus_hash] = loci_parts
-            variant_parts = (contig_id, position, ref_id, alt_id, end)
+            variant_parts = (contig_id, start, end, ref_id, alt_id)
             variant_hash = self._get_variant_hash(*variant_parts)
             locus_hash_alt_id_and_end_by_variant_hash[variant_hash] = (locus_hash, alt_id, end)
 
@@ -216,8 +216,8 @@ class DBVariantPKLookup(VariantPKLookup):
     def _get_locus_hash(self, contig_id, position, ref_id):
         return contig_id, position, ref_id
 
-    def _get_variant_hash(self, contig_id, position, ref_id, alt_id, end):
-        return contig_id, position, ref_id, alt_id, end
+    def _get_variant_hash(self, contig_id, start, end, ref_id, alt_id):
+        return contig_id, start, end, ref_id, alt_id
 
     def _get_ids_for_hashes(self, hashes: Iterable, get_queryset):
         """ hashes tuples 1st 2 elements should be contig_id, position """
@@ -234,7 +234,7 @@ class DBVariantPKLookup(VariantPKLookup):
 
     def _get_variant_ids(self, variant_hashes: Iterable) -> List[str]:
         annotate_kwargs = {
-            "hash": Concat("locus__position", Value("_"), "locus__ref_id", Value("_"), "alt_id", Value("_"), "end",
+            "hash": Concat("locus__position", Value("_"), "end", Value("_"), "locus__ref_id", Value("_"), "alt_id",
                            output_field=TextField())
         }
 

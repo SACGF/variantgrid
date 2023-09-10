@@ -53,6 +53,9 @@ class Command(BaseCommand):
         skipped_records = Counter()
         skipped_filters = Counter()
 
+        ref_standard_bases_pattern = re.compile(r"[GATC]")
+        alt_standard_bases_pattern = re.compile(r"[GATC,\.]")  # Can be multi-alts, or "." for reference
+
         skip_patterns = {}
         if skip_regex := getattr(settings, "VCF_IMPORT_SKIP_RECORD_REGEX", {}):
             for name, regex in skip_regex.items():
@@ -94,6 +97,28 @@ class Command(BaseCommand):
                         skipped_records[skip_reason] += 1
                         continue
 
+                # Check ref / alt bases are ok
+                ref = columns[3]
+                alt = columns[4]
+                if ref_standard_bases_pattern.sub("", ref):
+                    if ref.startswith("<") and ref.endswith(">"):
+                        skip_reason = f"REF = {ref}"
+                    else:
+                        skip_reason = "non-standard bases in REF sequence"
+                    skipped_records[skip_reason] += 1
+                    continue
+
+                if alt_standard_bases_pattern.sub("", alt):
+                    skip_reason = None
+                    if alt.startswith("<") and alt.endswith(">"):
+                        if alt not in settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES:
+                            skip_reason = f"ALT = {alt}"
+                    else:
+                        skip_reason = "non-standard bases in ALT sequence"
+                    if skip_reason:
+                        skipped_records[skip_reason] += 1
+                        continue
+
                 # Remove filters not in header
                 filter_column = columns[6]
                 if filter_column not in QUICK_ACCEPT_FILTERS:
@@ -131,7 +156,7 @@ class Command(BaseCommand):
         return defined_filters
 
     @staticmethod
-    def _write_skip_counts(counts, filename):
+    def _write_skip_counts(counts, filename): #
         if counts and filename:
             with open(filename, "w") as f:
                 for name, count in counts.items():
