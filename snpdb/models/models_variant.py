@@ -597,9 +597,15 @@ class Variant(PreviewModelMixin, models.Model):
         return self.locus.ref.is_symbolic() or self.alt.is_symbolic()
 
     @property
-    def can_have_clingen_allele(self) -> bool:
-        return self.length <= settings.CLINGEN_ALLELE_REGISTRY_MAX_ALLELE_SIZE
+    def can_make_g_hgvs(self) -> bool:
+        """ Can't form ones with some symbolic variants (eg <INS>) """
+        if self.is_symbolic:
+            return self.alt.seq in {"<DEL>", "<DUP>"}
+        return True
 
+    @property
+    def can_have_clingen_allele(self) -> bool:
+        return self.length <= settings.CLINGEN_ALLELE_REGISTRY_MAX_ALLELE_SIZE and self.can_make_g_hgvs
     @property
     def can_have_annotation(self) -> bool:
         return not self.is_reference

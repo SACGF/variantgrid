@@ -125,7 +125,7 @@ class VariantPKLookup(abc.ABC):
     def _insert_unknown_sequences(self):
         """ Inserts unknown from coordinates, updates sequence_pk_by_seq """
         unknown_sequences = set()
-        for _chrom, _position, ref, alt, _end in self.unknown_variant_coordinates:
+        for _chrom, _position, _end, ref, alt in self.unknown_variant_coordinates:
             if ref not in self.sequence_pk_by_seq:
                 unknown_sequences.add(ref)
             if alt not in self.sequence_pk_by_seq:

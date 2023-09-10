@@ -962,7 +962,7 @@ VARIANT_MANUAL_CREATE_BY_NON_ADMIN = True
 # Below this size, variants are stored with ref/alt sequences. Above this threshold, they become
 # structural variants and use symbolic
 VARIANT_SYMBOLIC_ALT_SIZE = 1000
-VARIANT_SYMBOLIC_ALT_VALID_TYPES = {"<DEL>", "<DUP>"}
+VARIANT_SYMBOLIC_ALT_VALID_TYPES = {"<DEL>", "<DUP>", "<INS>"}
 
 VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS = False
 VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS_PREFER_CANONICAL_WITH_DIFF_VERSION = True
