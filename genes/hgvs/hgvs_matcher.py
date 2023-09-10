@@ -460,7 +460,7 @@ class HGVSMatcher:
         return self.variant_coordinate_to_hgvs_variant(variant.coordinate, transcript_name=transcript_name)
 
     def variant_coordinate_to_hgvs_variant(self, variant_coordinate: VariantCoordinate, transcript_name=None) -> HGVSVariant:
-        variant_coordinate = variant_coordinate.explicit_reference()
+        variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
         return self._variant_coordinate_to_hgvs_and_method(variant_coordinate, transcript_name)[0]
 
     @staticmethod
@@ -476,7 +476,7 @@ class HGVSMatcher:
         return self.variant_coordinate_to_g_hgvs(variant.coordinate)
 
     def variant_coordinate_to_g_hgvs(self, variant_coordinate: VariantCoordinate) -> str:
-        variant_coordinate = variant_coordinate.explicit_reference()
+        variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
         (chrom, start, end, ref, alt) = variant_coordinate
         if len(alt) == 1 and len(ref) == 1:
             contig = self.genome_build.chrom_contig_mappings[chrom]

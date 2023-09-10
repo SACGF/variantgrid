@@ -7,8 +7,8 @@ from snpdb.models import Locus, Variant, Sequence, GenomeBuild, Allele, VariantA
 def slowly_create_test_variant(chrom: str, position: int, ref: str, alt: str, genome_build: GenomeBuild) -> Variant:
     """ For test only - doesn't use VariantPKLookup """
     contig = genome_build.contigs.get(name=chrom)
-    ref_seq, _ = Sequence.objects.get_or_create(seq=ref.upper(), length=1)
-    alt_seq, _ = Sequence.objects.get_or_create(seq=alt.upper(), length=1)
+    ref_seq, _ = Sequence.objects.get_or_create(seq=ref.upper(), length=len(ref))
+    alt_seq, _ = Sequence.objects.get_or_create(seq=alt.upper(), length=len(alt))
     locus, _ = Locus.objects.get_or_create(contig=contig, position=position, ref=ref_seq)
     variant, _ = Variant.objects.get_or_create(locus=locus, alt=alt_seq)
     return variant

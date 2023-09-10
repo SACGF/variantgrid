@@ -82,7 +82,7 @@ class BioCommonsHGVSVariant(HGVSVariant):
         return ref, alt
 
     def get_cdna_coords(self) -> str:
-        return str(self._sequence_variant.posedit.start)
+        return str(self._sequence_variant.posedit.pos.start)
 
     def format(self, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH):
         conf = {"max_ref_length": max_ref_length}
@@ -138,7 +138,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
             raise HGVSException from e
 
     def _variant_coords_to_sequence_variant(self, vc: VariantCoordinate) -> SequenceVariant:
-        chrom, position, _start, ref, alt = vc.as_explicit(self.genome_build)
+        chrom, position, _start, ref, alt = vc.as_external_explicit(self.genome_build)
         return self.babelfish.vcf_to_g_hgvs(chrom, position, ref, alt)
 
     def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
@@ -174,7 +174,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
         except HGVSDataNotAvailableError:
             raise Contig.ContigNotInBuildError()
         vc = VariantCoordinate(chrom, start, ref=ref, alt=alt)
-        return vc.as_symbolic(), matches_reference
+        return vc.as_internal_symbolic(), matches_reference
 
     def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
         sequence_variant = self._parser_hgvs(hgvs_string)

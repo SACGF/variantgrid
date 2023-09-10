@@ -244,6 +244,10 @@ class AlleleMergeLog(TimeStampedModel):
 
 @dataclass
 class VariantCoordinate(FormerTuple):
+    """ This stores coordinates, when you want to use it, be sure to call either:
+            * as_external_explicit() - if you want to interface with eg VCF
+            * as_internal_symbolic() - to store in internal Database
+    """
     chrom: str
     start: int
     end: int
@@ -289,7 +293,7 @@ class VariantCoordinate(FormerTuple):
     def is_symbolic(self):
         return Sequence.allele_is_symbolic(self.alt)
 
-    def as_explicit(self, genome_build):
+    def as_external_explicit(self, genome_build):
         """ explicit ref/alt """
         if self.is_symbolic():
             contig_sequence = genome_build.genome_fasta.fasta[self.chrom]
@@ -304,36 +308,43 @@ class VariantCoordinate(FormerTuple):
                 raise ValueError(f"Unknown symbolic alt of '{self.alt}'")
 
             return VariantCoordinate(chrom=self.chrom, start=self.start, end=self.end, ref=ref, alt=alt)
-        return self.explicit_reference()
 
-    def as_symbolic(self):
-        """ alt = <DEL> or <DUP>
-            Does not support INV yet """
-        if self.is_symbolic():
-            return self
-        vc = self.explicit_reference()
-        ref_length = len(vc.ref)
-        alt_length = len(vc.alt)
-        diff = alt_length - ref_length
-        svlen = abs(diff)
-        if svlen >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
-            end = self.start + svlen
-            if diff > 0:
-                ref = self.ref
-                alt = "<DUP>"
-            else:
-                ref = self.ref[0]
-                alt = "<DEL>"
-            return VariantCoordinate(chrom=self.chrom, start=self.start, end=end, ref=ref, alt=alt)
-        return vc
-
-    def explicit_reference(self):
         if self.alt == Variant.REFERENCE_ALT:
             # Convert from our internal format (alt='=' for ref) to explicit
             alt = self.ref
-            return VariantCoordinate(chrom=self.chrom, start=self.start, end=self.end, ref=self.ref, alt=alt)
-        return self
+        else:
+            alt = self.alt
+        return VariantCoordinate(chrom=self.chrom, start=self.start, end=self.end, ref=self.ref, alt=alt)
 
+    def as_internal_symbolic(self):
+        """ Internal format - alt can be <DEL> or <DUP>
+            Uses our internal reference representation
+        """
+        if self.is_symbolic():
+            return self
+
+        ref = self.ref
+        if self.alt == self.ref:
+            alt = Variant.REFERENCE_ALT
+        else:
+            ref_length = len(ref)
+            alt_length = len(self.alt)
+            diff = alt_length - ref_length
+            svlen = abs(diff)
+            if svlen >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
+                # TODO Check against existing end?
+                end = self.start + svlen
+                if self.end != end:
+                    raise ValueError(f"{self}: end={self.end}, calculated end={end}")
+
+                if diff > 0:
+                    alt = "<DUP>"
+                else:
+                    ref = self.ref[0]
+                    alt = "<DEL>"
+            else:
+                alt = self.alt
+        return VariantCoordinate(chrom=self.chrom, start=self.start, end=self.end, ref=ref, alt=alt)
 
 
 class Sequence(models.Model):
