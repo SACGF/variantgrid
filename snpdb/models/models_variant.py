@@ -538,7 +538,7 @@ class Variant(PreviewModelMixin, models.Model):
 
     @staticmethod
     def get_from_tuple(variant_tuple: VariantCoordinate, genome_build: GenomeBuild) -> 'Variant':
-        params = ["locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq"]
+        params = ["locus__contig__name", "locus__position", "end", "locus__ref__seq", "alt__seq"]
         return Variant.objects.get(locus__contig__genomebuildcontig__genome_build=genome_build,
                                    **dict(zip(params, variant_tuple)))
 
@@ -604,8 +604,8 @@ class Variant(PreviewModelMixin, models.Model):
     def can_have_annotation(self) -> bool:
         return not self.is_reference
 
-    def as_tuple(self) -> Tuple[str, int, str, str, int]:
-        return self.locus.contig.name, self.locus.position, self.locus.ref.seq, self.alt.seq, self.end
+    def as_tuple(self) -> Tuple[str, int, int, str, str]:
+        return self.locus.contig.name, self.locus.position, self.end, self.locus.ref.seq, self.alt.seq
 
     def is_abbreviated(self):
         return str(self) != self.full_string

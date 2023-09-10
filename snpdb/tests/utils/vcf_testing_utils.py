@@ -7,10 +7,13 @@ from snpdb.models import Locus, Variant, Sequence, GenomeBuild, Allele, VariantA
 def slowly_create_test_variant(chrom: str, position: int, ref: str, alt: str, genome_build: GenomeBuild) -> Variant:
     """ For test only - doesn't use VariantPKLookup """
     contig = genome_build.contigs.get(name=chrom)
+    if ref == alt:
+        alt = Variant.REFERENCE_ALT
     ref_seq, _ = Sequence.objects.get_or_create(seq=ref.upper(), length=len(ref))
     alt_seq, _ = Sequence.objects.get_or_create(seq=alt.upper(), length=len(alt))
     locus, _ = Locus.objects.get_or_create(contig=contig, position=position, ref=ref_seq)
-    variant, _ = Variant.objects.get_or_create(locus=locus, alt=alt_seq)
+    end = Variant.calculate_end(position, ref, alt)
+    variant, _ = Variant.objects.get_or_create(locus=locus, end=end, alt=alt_seq)
     return variant
 
 
@@ -51,6 +54,7 @@ def slowly_create_loci_and_variants_for_vcf(genome_build, vcf_filename, get_vari
             pk_by_seq[alt] = alt_id
 
         kwargs = {"locus": locus,
+                  "end": Variant.calculate_end(locus.position, ref, alt),
                   "alt_id": alt_id}
         if get_variant_id_from_info:
             kwargs["id"] = v.INFO.get("variant_id")
