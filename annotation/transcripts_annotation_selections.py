@@ -220,6 +220,8 @@ class VariantTranscriptSelections:
             "gene_version__gene_symbol_id__in": gene_symbols,
         }
 
+        # Convert once to explicit, then pass this around
+        variant_coordinate = variant.coordinate.as_external_explicit(self.genome_build)
         has_other_annotation_consortium_transcripts = False
         for transcript_version in TranscriptVersion.objects.filter(**kwargs).order_by("-version"):
             # Don't duplicate ones already available via RefSeq/Ensembl equivalence
@@ -243,7 +245,8 @@ class VariantTranscriptSelections:
                     pass
 
                 try:
-                    hgvs_variant = hgvs_matcher.variant_to_hgvs_variant(variant, transcript_version.accession)
+                    hgvs_variant = hgvs_matcher.variant_coordinate_to_hgvs_variant(variant_coordinate,
+                                                                                   transcript_version.accession)
                     t_data["hgvs_c"] = hgvs_variant.format()
                 except (HGVSException, KeyError):
                     pass
