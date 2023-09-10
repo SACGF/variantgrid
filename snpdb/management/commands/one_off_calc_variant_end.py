@@ -130,7 +130,6 @@ class Command(BaseCommand):
             if changed:
                 print(f"Changed: {changed}")
 
-        # Now, go through and delete any orphaned:
-        # * Locus w/o Variant
-        # * Sequence w/o Variant or Locus
-
+        # Delete any orphaned locus/sequences
+        Locus.objects.filter(variant__isnull=True).delete()
+        Sequence.objects.filter(locus__isnull=True, variant__isnull=True).delete()
