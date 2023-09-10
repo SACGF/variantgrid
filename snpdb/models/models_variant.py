@@ -598,7 +598,7 @@ class Variant(PreviewModelMixin, models.Model):
 
     @property
     def can_have_clingen_allele(self) -> bool:
-        return self.is_standard_variant or self.is_reference
+        return self.length <= settings.CLINGEN_ALLELE_REGISTRY_MAX_ALLELE_SIZE
 
     @property
     def can_have_annotation(self) -> bool:
@@ -667,11 +667,9 @@ class Variant(PreviewModelMixin, models.Model):
     def start(self):
         return self.locus.position
 
-    def get_end(self):
-        # TODO: Replace this with a call to end after everyone has run population migration
-        if self.end is not None:
-            return self.end
-        return self.calculate_end(self.locus.position, self.locus.ref, self.alt)
+    @property
+    def length(self) -> int:
+        return self.end - self.locus.position
 
     @staticmethod
     def calculate_end_from_lengths(position, ref_length, alt_length) -> int:

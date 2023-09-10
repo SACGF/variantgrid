@@ -343,8 +343,11 @@ PREFER_ALLELE_LINKS = False
 # if True, CR_lab_id will be used in all instances
 VARIANT_CLASSIFICATION_ID_OVERRIDE_PREFIX = False
 
+# ClinGen Allele Registry paper - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6519371/
 CLINGEN_ALLELE_REGISTRY_DOMAIN = "http://reg.genome.network"
 CLINGEN_ALLELE_REGISTRY_MAX_RECORDS = 2000
+# From paper: The maximal nucleotide (transcript or genomic) allele size is 10,000 bp
+CLINGEN_ALLELE_REGISTRY_MAX_ALLELE_SIZE = 10_000
 CLINGEN_ALLELE_REGISTRY_LOGIN = get_secret("CLINGEN_ALLELE_REGISTRY.login")
 CLINGEN_ALLELE_REGISTRY_PASSWORD = get_secret("CLINGEN_ALLELE_REGISTRY.password")
 CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS = 10_000  # On nodes and VCFs
