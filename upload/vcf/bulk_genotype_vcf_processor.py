@@ -265,6 +265,10 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             # AF will already be there
             self.cohort_genotypes.extend(self.locus_cohort_genotypes)
         else:
+            # TODO: In Python3.10 we can replace this check with zip(strict=True)
+            if len(self.locus_cohort_genotypes) != len(self.locus_allele_depths):
+                raise ValueError(f"Locus cohort genotype and locus Allele depths not equal!")
+
             # Calculate ourselves across locus
             for cgt, ad in zip(self.locus_cohort_genotypes, self.locus_allele_depths):
                 vaf = ad / self.locus_ad_sum
@@ -285,6 +289,9 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
         ref, alt, end = vcf_get_ref_alt_end(variant)
         locus_tuple = (variant.CHROM, variant.POS, ref)
+        if self.last_locus_tuple:
+            if self.last_locus_tuple != locus_tuple:
+                self.finished_locus()
 
         if self.get_ref_alt_allele_depth:
             # These ADs come out with empty value as -1 - that's what we want to store
@@ -313,10 +320,6 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         phred_likelihood_str = self.get_phred_likelihood_str(variant)
         samples_filters_str = self.get_samples_filters_str(variant)
 
-        if self.last_locus_tuple:
-            if self.last_locus_tuple != locus_tuple:
-                self.finished_locus()
-
         alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, end, ref, alt)
         format_json = self._get_format_json(self.num_samples, variant)
         info_json = self._get_info_json(variant)
@@ -334,8 +337,9 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 ''.join(alt_zygosity),
             ]
         else:
+            num_unknown = str(self.num_samples)  # All are unknown
             cohort_gt = [
-                "0", "0", "0", str(self.num_samples),
+                "0", "0", "0", num_unknown,
                 Zygosity.UNKNOWN_ZYGOSITY * self.num_samples
             ]
 
@@ -397,6 +401,15 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     def process_cohort_genotypes(self, variant_ids):
         cohort_genotypes_common = []
         cohort_genotypes_rare = []
+
+        # TODO: This check can be replaced with Python 3.10 zip(strict=True)
+        num_variants = len(variant_ids)
+        for name, array in {"variant_filters": self.variant_filters,
+                            "cohort_genotypes": self.cohort_genotypes,
+                            "gnomad_af": self.variant_gnomad_af}.items():
+            if len(array) != num_variants:
+                raise ValueError(f"Number of variant ids ({num_variants}) != num {name} ({len(array)})")
+
         # If you add any columns here, need to adjust COHORT_GT_NUM_ADDED_FIELDS
         for variant_id, filters, cohort_gt, gnomad_af in zip(variant_ids, self.variant_filters,
                                                              self.cohort_genotypes, self.variant_gnomad_af):
