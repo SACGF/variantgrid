@@ -63,7 +63,7 @@ class Command(BaseCommand):
 
             changed_data = {
                 "variant_id": v.pk,
-                "contig": v.locus.contig,
+                "contig": v.locus.contig.name,
                 "position": v.locus.position,
                 "old_ref": v.locus.ref.seq,
                 "old_alt": v.alt.seq,
@@ -76,6 +76,7 @@ class Command(BaseCommand):
                 v.alt = seq_del
                 v.save()
 
+            changed_data["end"] = v.end
             changed_data["new_ref"] = ref
             changed_data["new_alt"] = seq_del.seq
             changed_rows.append(changed_data)
@@ -100,11 +101,12 @@ class Command(BaseCommand):
                     if hgvs_variant.mutation_type == 'dup':
                         changed_data = {
                             "variant_id": v.pk,
-                            "contig": v.locus.contig,
+                            "contig": v.locus.contig.name,
                             "position": v.locus.position,
                             "old_ref": v.locus.ref.seq,
                             "old_alt": v.alt.seq,
                             "genome_build": next(iter(v.genome_builds)).name,
+                            "end": v.end,
                             "new_ref": v.locus.ref.seq,
                             "new_alt": seq_dup.seq,
                         }
@@ -169,7 +171,7 @@ class Command(BaseCommand):
                                                ref=row["old_ref"], alt=row["old_alt"])
 
                     vc_new = VariantCoordinate(chrom=row["contig"], start=row["position"],
-                                               ref=row["new_ref"], alt=row["new_alt"])
+                                               end=row["end"], ref=row["new_ref"], alt=row["new_alt"])
 
                     matcher: HGVSMatcher = build_matchers[row["genome_build"]]
                     g_hgvs_old = matcher.variant_coordinate_to_g_hgvs(vc_old)
