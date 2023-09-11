@@ -2,6 +2,8 @@ import logging
 from collections import Counter
 
 import numpy as np
+import pandas as pd
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import OuterRef, Subquery, F
 from django.db.models.functions import Abs
@@ -9,7 +11,7 @@ from django.db.models.functions import Abs
 from annotation.models import AnnotationRangeLock
 from genes.hgvs import HGVSMatcher
 from library.utils import md5sum_str
-from snpdb.models import Variant, Locus, Sequence, GenomeBuild
+from snpdb.models import Variant, Locus, Sequence, GenomeBuild, VariantCoordinate
 
 
 class Command(BaseCommand):
@@ -23,6 +25,7 @@ class Command(BaseCommand):
         parser.add_argument('--steps', type=int, default=20, required=False,
                             help="Number of steps to take in between AnnotationRangeLock regions (which are ~100k)")
         parser.add_argument('--replace', action='store_true')
+        parser.add_argument('--dry-run', action='store_true')
         parser.add_argument('--min-variant', type=int, required=False)
 
     @staticmethod
@@ -38,15 +41,15 @@ class Command(BaseCommand):
     def _create_symbolic(symbolic_alt):
         s, _ = Sequence.objects.get_or_create(seq=symbolic_alt,
                                               seq_md5_hash=md5sum_str(symbolic_alt),
-                                              length=len(symbolic_alt)) # This is wrong...
+                                              length=len(symbolic_alt))  # This is wrong...
         return s
 
     @staticmethod
-    def update_variants_in_range_make_symbolic(variant_qs):
+    def update_variants_in_range_make_symbolic(variant_qs, dry_run: bool):
         seq = {s: Sequence.objects.get(seq=s) for s in "GATC"}
         seq_del = Command._create_symbolic("<DEL>")
         seq_dup = Command._create_symbolic("<DUP>")
-        changed = Counter()
+        changed_rows = []
 
         # Make sure we don't re-do stuff
         variant_qs = variant_qs.exclude(alt__in=[seq_del, seq_dup])
@@ -58,11 +61,24 @@ class Command(BaseCommand):
             if ref != alt:
                 continue  # delins
 
-            locus, created = Locus.objects.get_or_create(contig=v.locus.contig, position=v.locus.position, ref=seq[ref])
-            v.locus = locus
-            v.alt = seq_del
-            v.save()
-            changed["<DEL>"] += 1
+            changed_data = {
+                "variant_id": v.pk,
+                "contig": v.locus.contig,
+                "position": v.locus.position,
+                "old_ref": v.locus.ref.seq,
+                "old_alt": v.alt.seq,
+                "genome_build": next(iter(v.genome_builds)).name,
+            }
+
+            if not dry_run:
+                locus, created = Locus.objects.get_or_create(contig=v.locus.contig, position=v.locus.position, ref=seq[ref])
+                v.locus = locus
+                v.alt = seq_del
+                v.save()
+
+            changed_data["new_ref"] = ref
+            changed_data["new_alt"] = seq_del.seq
+            changed_rows.append(changed_data)
 
         new_dups = []
 
@@ -72,7 +88,8 @@ class Command(BaseCommand):
             matcher = HGVSMatcher(genome_build)
 
             build_qs = variant_qs.filter(Variant.get_contigs_q(genome_build))
-            for v in build_qs.filter(locus__ref__length=1, alt__length__gte=1000).select_related("locus__ref", "alt"):
+            build_qs = build_qs.filter(locus__ref__length=1, alt__length__gte=settings.VARIANT_SYMBOLIC_ALT_SIZE)
+            for v in build_qs.select_related("locus__ref", "alt"):
                 ref = v.locus.ref.seq[0]
                 alt = v.alt.seq[0]
                 if ref != alt:
@@ -81,17 +98,28 @@ class Command(BaseCommand):
                 try:
                     hgvs_variant = matcher.variant_coordinate_to_hgvs_variant(v.coordinate)
                     if hgvs_variant.mutation_type == 'dup':
+                        changed_data = {
+                            "variant_id": v.pk,
+                            "contig": v.locus.contig,
+                            "position": v.locus.position,
+                            "old_ref": v.locus.ref.seq,
+                            "old_alt": v.alt.seq,
+                            "genome_build": next(iter(v.genome_builds)).name,
+                            "new_ref": v.locus.ref.seq,
+                            "new_alt": seq_dup.seq,
+                        }
+                        changed_rows.append(changed_data)
+
                         # Will do this in bulk
                         v.alt_id = seq_dup.pk
                         new_dups.append(v)
                 except Exception as e:
                     logging.error("Couldn't convert %s to HGVS: %s", v, e)
 
-        if len(new_dups):
-            changed["<DUP>"] += len(new_dups)
+        if not dry_run and len(new_dups):
             Variant.objects.bulk_update(new_dups, ["alt_id"], batch_size=2000)
 
-        return changed
+        return changed_rows
 
     def handle(self, *args, **options):
         # We want to do this in small batches - so use the variant annotation range locks which are all approx the same
@@ -99,9 +127,10 @@ class Command(BaseCommand):
         # Variants from different builds are mixed up together - we just want the biggest one
         steps = options["steps"]
         replace = options["replace"]
+        dry_run = options["dry_run"]
         min_variant = options["min_variant"]
 
-        changed = Counter()
+        changed_rows = []
         missing_end = Variant.objects.filter(end__isnull=True).exists()
         highest_av = AnnotationRangeLock.objects.order_by("-max_variant").first()
         arl_qs = AnnotationRangeLock.objects.filter(version=highest_av.version)
@@ -124,12 +153,41 @@ class Command(BaseCommand):
                 variant_qs = Variant.objects.filter(pk__gte=start, pk__lte=end)
                 if missing_end or replace:
                     self.update_variants_in_range_add_end(variant_qs, replace=replace)
-                changed.update(self.update_variants_in_range_make_symbolic(variant_qs))
+                changed_rows.extend(self.update_variants_in_range_make_symbolic(variant_qs, dry_run))
                 last_max = end
 
-            if changed:
-                print(f"Changed: {changed}")
+            if changed_rows:
+                build_matchers = {
+                    "GRCh37": HGVSMatcher(GenomeBuild.grch37()),
+                    "GRCh38": HGVSMatcher(GenomeBuild.grch38()),
+                }
+
+                different = 0
+                # calculate
+                for row in changed_rows:
+                    vc_old = VariantCoordinate(chrom=row["contig"], start=row["position"],
+                                               ref=row["old_ref"], alt=row["old_alt"])
+
+                    vc_new = VariantCoordinate(chrom=row["contig"], start=row["position"],
+                                               ref=row["new_ref"], alt=row["new_alt"])
+
+                    matcher: HGVSMatcher = build_matchers[row["genome_build"]]
+                    g_hgvs_old = matcher.variant_coordinate_to_g_hgvs(vc_old)
+                    g_hgvs_new = matcher.variant_coordinate_to_g_hgvs(vc_new)
+
+                    row["g_hgvs_old"] = g_hgvs_old
+                    row["g_hgvs_new"] = g_hgvs_new
+                    same = g_hgvs_new == g_hgvs_old
+                    row["same"] = same
+                    if not same:
+                        different += 1
+
+                if different:
+                    print(f"There were {different} differences!!")
+                df = pd.DataFrame.from_records(changed_rows)
+                df.to_csv("variant_symbolic_alt_changes.csv", index=False)
 
         # Delete any orphaned locus/sequences
-        Locus.objects.filter(variant__isnull=True).delete()
-        Sequence.objects.filter(locus__isnull=True, variant__isnull=True).delete()
+        if not dry_run:
+            Locus.objects.filter(variant__isnull=True).delete()
+            Sequence.objects.filter(locus__isnull=True, variant__isnull=True).delete()
