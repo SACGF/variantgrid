@@ -386,7 +386,7 @@ COMPANY = None  # Used for gene list categories
 
 GENERATED_DIR = os.path.join(MEDIA_ROOT, 'generated')
 
-HGVS_DEFAULT_METHOD = "combo"  # HGVSConverterType (any case) ie "pyhgvs", "biocommons_hgvs", "combo"
+HGVS_DEFAULT_METHOD = "pyhgvs"  # HGVSConverterType (any case) ie "pyhgvs", "biocommons_hgvs", "combo"
 HGVS_MAX_REF_ALLELE_LENGTH = 10  # Set to 0 for "del" instead of "delC" etc
 HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH = True
 

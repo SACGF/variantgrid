@@ -124,7 +124,7 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
 
         from annotation.models import VariantAnnotationVersion
         from snpdb.models.models_dbsnp import DbSNP
-        from genes.hgvs import get_hgvs_variant_tuple
+        from genes.hgvs import get_hgvs_variant_coordinate
 
         # Check if the other build shares existing contig
         genome_build_contigs = set(c.pk for c in genome_build.chrom_contig_mappings.values())
@@ -151,11 +151,11 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
                     g_hgvs = dbsnp.get_g_hgvs(genome_build, alt=va.variant.alt)
                     conversion_tool = AlleleConversionTool.DBSNP
 
-        variant_tuple = None
+        variant_coordinate = None
         if g_hgvs:
-            variant_tuple = get_hgvs_variant_tuple(g_hgvs, genome_build)
+            variant_coordinate = get_hgvs_variant_coordinate(g_hgvs, genome_build)
 
-        return conversion_tool, variant_tuple
+        return conversion_tool, variant_coordinate
 
     def merge(self, allele_linking_tool, other_allele: "Allele") -> bool:
         """ Merge other_allele into this allele """
@@ -242,7 +242,7 @@ class AlleleMergeLog(TimeStampedModel):
     message = models.TextField(null=True)
 
 
-@dataclass
+@dataclass(frozen=True)
 class VariantCoordinate(FormerTuple):
     """ This stores coordinates, when you want to use it, be sure to call either:
             * as_external_explicit() - if you want to interface with eg VCF
@@ -253,21 +253,6 @@ class VariantCoordinate(FormerTuple):
     end: int
     ref: str
     alt: str
-
-    def __init__(self, chrom, start, end: int = None, ref: str = None, alt: str = None):
-        self.chrom = chrom
-        self.start = start
-        if ref is None:
-            raise ValueError("ref must be supplied")
-        if alt is None:
-            raise ValueError("alt must be supplied")
-        if end is None:
-            if Sequence.allele_is_symbolic(alt):
-                raise ValueError("Must pass 'end' when using symbolic alt")
-            end = start + abs(len(ref) - len(alt))
-        self.end = end
-        self.ref = ref
-        self.alt = alt
 
     @property
     def as_tuple(self) -> Tuple:
@@ -281,14 +266,23 @@ class VariantCoordinate(FormerTuple):
         return s
 
     @staticmethod
-    def from_clean_str(clean_str: str):
-        if full_match := VARIANT_PATTERN.fullmatch(clean_str):
+    def from_string(variant_string: str, regex_pattern=VARIANT_PATTERN):
+        # This will only ever match standard (non-symbolic variants)
+        if full_match := regex_pattern.fullmatch(variant_string):
             chrom = full_match.group(1)
             start = int(full_match.group(2))
             ref = full_match.group(3)
             alt = full_match.group(4)
-            end = start + abs(len(ref) - len(alt))
-            return VariantCoordinate(chrom, start, end, ref, alt)
+            return VariantCoordinate.from_start_only(chrom, start, ref, alt)
+
+    @staticmethod
+    def from_start_only(chrom: str, start: int, ref: str, alt: str):
+        """ Initialise w/o providing an end """
+
+        if Sequence.allele_is_symbolic(alt):
+            raise ValueError("Must pass 'end' when using symbolic alt")
+        end = start + abs(len(ref) - len(alt))
+        return VariantCoordinate(chrom, start, end, ref, alt)
 
     def is_symbolic(self):
         return Sequence.allele_is_symbolic(self.alt)
@@ -514,33 +508,19 @@ class Variant(PreviewModelMixin, models.Model):
         return f"{chrom}:{start} {ref}>{alt}"
 
     @staticmethod
-    def get_tuple_from_string(variant_string: str, genome_build: GenomeBuild,
-                              regex_pattern: Pattern[str] = VARIANT_PATTERN) -> VariantCoordinate:
-        """ regex_pattern - has to have 4 groups, returns (chrom, position, ref, alt) """
-        variant_tuple = None
-        if m := regex_pattern.match(variant_string):
-            chrom, position, ref, alt = m.groups()
-            chrom, position, ref, alt = Variant.clean_variant_fields(chrom, position, ref, alt,
-                                                                     want_chr=genome_build.reference_fasta_has_chr)
-            contig = genome_build.chrom_contig_mappings[chrom]
-            end = Variant.calculate_end(position, ref, alt)
-            variant_tuple = VariantCoordinate(contig.name, int(position), end, ref, alt)
-        return variant_tuple
-
-    @staticmethod
-    def get_from_string(variant_string: str, genome_build: GenomeBuild,
-                        regex_pattern=VARIANT_PATTERN) -> Optional['Variant']:
-        variant_tuple = Variant.get_tuple_from_string(variant_string, genome_build, regex_pattern=regex_pattern)
+    def get_from_string(variant_string: str, genome_build: GenomeBuild) -> Optional['Variant']:
+        variant_coordinate = VariantCoordinate.from_string(variant_string)
         try:
-            return Variant.get_from_tuple(variant_tuple, genome_build)
+            return Variant.get_from_variant_coordinate(variant_coordinate, genome_build)
         except Variant.DoesNotExist:
             return None
 
     @staticmethod
-    def get_from_tuple(variant_tuple: VariantCoordinate, genome_build: GenomeBuild) -> 'Variant':
+    def get_from_variant_coordinate(variant_coordinate: VariantCoordinate, genome_build: GenomeBuild) -> 'Variant':
+        variant_coordinate = variant_coordinate.as_internal_symbolic()
         params = ["locus__contig__name", "locus__position", "end", "locus__ref__seq", "alt__seq"]
         return Variant.objects.get(locus__contig__genomebuildcontig__genome_build=genome_build,
-                                   **dict(zip(params, variant_tuple)))
+                                   **dict(zip(params, variant_coordinate)))
 
     @cached_property
     def genome_builds(self) -> Set['GenomeBuild']:

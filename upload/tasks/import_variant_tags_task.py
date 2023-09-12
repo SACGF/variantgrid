@@ -13,7 +13,7 @@ from library.pandas_utils import df_nan_to_none
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import GenomeBuild, Variant, ImportSource, Tag, VariantAlleleCollectionSource, VariantAllele, \
-    VariantAlleleCollectionRecord
+    VariantAlleleCollectionRecord, VariantCoordinate
 from upload.models import UploadedVariantTags, UploadStep, ModifiedImportedVariant, SimpleVCFImportInfo
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
@@ -58,14 +58,14 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
             if variant_string.endswith(NEW_CLASSIFICATION):
                 variant_string = variant_string[:-REMOVE_LENGTH].strip()
 
-            variant_tuple = Variant.get_tuple_from_string(variant_string, genome_build=genome_build)
-            if variant_tuple is None:
+            variant_coordinate = VariantCoordinate.from_string(variant_string)
+            if variant_coordinate is None:
                 num_skipped_records += 1
                 if "*" in variant_string:
                     num_skipped_with_star += 1
                 logging.warning("Could not convert '%s'", variant_string)
                 continue
-            variant_tuples.append(variant_tuple)
+            variant_tuples.append(variant_coordinate)
             node_id = None
             if "node__id" in row:
                 node_id = row["node__id"]
@@ -122,13 +122,13 @@ class VariantTagsInsertTask(ImportVCFStepTask):
                 tag, _ = Tag.objects.get_or_create(pk=ivt.tag_string)
                 tag_cache[tag.pk] = tag
 
-            variant_tuple = Variant.get_tuple_from_string(ivt.variant_string, genome_build=genome_build)
+            variant_coordinate = VariantCoordinate.from_string(ivt.variant_string)
             try:
-                variant = Variant.get_from_tuple(variant_tuple, genome_build)
+                variant = Variant.get_from_variant_coordinate(variant_coordinate, genome_build)
             except Variant.DoesNotExist:
                 # Must have been normalized
                 variant = ModifiedImportedVariant.get_variant_for_unnormalized_variant(upload_step.upload_pipeline,
-                                                                                       *variant_tuple)
+                                                                                       variant_coordinate)
 
             # We're not going to link analysis/nodes - as probably don't match up across systems
             analysis = None

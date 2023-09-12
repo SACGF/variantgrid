@@ -16,7 +16,7 @@ from library.utils import double_quote
 from library.utils.database_utils import postgres_arrays
 from patients.models_enums import Zygosity
 from snpdb.common_variants import get_classified_high_frequency_variants_qs
-from snpdb.models import CohortGenotype
+from snpdb.models import CohortGenotype, VariantCoordinate
 from snpdb.models.models_enums import ProcessingStatus
 from upload.models import UploadPipeline, PipelineFailedJobTerminateEarlyException, \
     VCFImporter, UploadStep, UploadStepTaskType, VCFPipelineStage
@@ -320,7 +320,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         phred_likelihood_str = self.get_phred_likelihood_str(variant)
         samples_filters_str = self.get_samples_filters_str(variant)
 
-        alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, end, ref, alt)
+        variant_coordinate = VariantCoordinate(variant.CHROM, variant.POS, end, ref, alt)
+        alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant_coordinate)
         format_json = self._get_format_json(self.num_samples, variant)
         info_json = self._get_info_json(variant)
 

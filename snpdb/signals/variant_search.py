@@ -172,27 +172,26 @@ def allele_search(search_input: SearchInputInstance):
                 yield create_manual, SearchMessage(f'"{clingen_allele}" resolved to "{variant_string_abbreviated}"', severity=LogLevel.INFO)
 
 
-def get_results_from_variant_tuples(qs: QuerySet, data: VariantCoordinate, any_alt: bool = False) -> QuerySet[Variant]:
+def get_results_from_variant_tuples(qs: QuerySet, variant_coordinate: VariantCoordinate, any_alt: bool = False) -> QuerySet[Variant]:
     """
     :param qs: A query set that we'll be searching inside of (except for when returning ModifiedImportVariants)
-    :param data: The variant coordinate to lookup
+    :param variant_coordinate: The variant coordinate to lookup
     :param any_alt: If true, search without using alt and return all matches
     :return: A QuerySet of variants
     """
-    chrom, position, end, ref, alt = data
-    position = int(position)
-
-    results = qs.filter(Variant.get_chrom_q(chrom), locus__position=position, locus__ref__seq=ref, end=end)
+    results = qs.filter(Variant.get_chrom_q(variant_coordinate.chrom),
+                        locus__position=variant_coordinate.start, end=variant_coordinate.end,
+                        locus__ref__seq=variant_coordinate.ref)
     if not any_alt:
-        results = results.filter(alt__seq=alt)
+        results = results.filter(alt__seq=variant_coordinate.alt)
 
     if not results:
         if not any_alt:
-            return ModifiedImportedVariant.get_variants_for_unnormalized_variant(chrom, position, end, ref, alt)
+            return ModifiedImportedVariant.get_variants_for_unnormalized_variant(variant_coordinate)
         else:
             # should we really be searching ModifiedImportVariants with any alt? or should that just happen for
             # the filter of "real" variants
-            return ModifiedImportedVariant.get_variants_for_unnormalized_variant_any_alt(chrom, position, end, ref)
+            return ModifiedImportedVariant.get_variants_for_unnormalized_variant_any_alt(variant_coordinate)
     return results
 
 
@@ -201,9 +200,8 @@ def yield_search_variant_match(search_input: SearchInputInstance):
         chrom, position, ref, alt = search_input.match.groups()
         chrom, position, ref, alt = Variant.clean_variant_fields(chrom, position, ref, alt,
                                                                  want_chr=genome_build.reference_fasta_has_chr)
-        end = Variant.calculate_end(position, ref, alt)
-        results = get_results_from_variant_tuples(search_input.get_visible_variants(genome_build),
-                                                  VariantCoordinate(chrom, position, end, ref, alt))
+        vc = VariantCoordinate.from_start_only(chrom, position, ref, alt)
+        results = get_results_from_variant_tuples(search_input.get_visible_variants(genome_build), vc)
         has_results = False
         if results.exists():
             has_results = True
@@ -213,8 +211,10 @@ def yield_search_variant_match(search_input: SearchInputInstance):
             yield SearchMessageOverall(", ".join(errors), genome_builds=[genome_build])
         else:
             if not has_results:
-                variant_string = Variant.format_tuple(chrom, position, end, ref, alt)
-                if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build, variant_string=variant_string):
+
+                variant_string = Variant.format_tuple(*vc)
+                if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build,
+                                                                       variant_string=variant_string):
                     search_message = f"The variant {variant_string} does not exist in our database"
                     yield create_manual, search_message
 
@@ -284,7 +284,7 @@ def search_variant_db_snp(search_input: SearchInputInstance):
         for data in dbsnp.get_alleles_for_genome_build(genome_build):
             if hgvs_string := data.get("hgvs"):
                 dbsnp_message = SearchMessage(f'dbSNP "{search_input.search_string}" resolved to "{hgvs_string}"', severity=LogLevel.INFO)
-                variant_tuple = matcher.get_variant_tuple(hgvs_string)
+                variant_tuple = matcher.get_variant_coordinate(hgvs_string)
                 results = get_results_from_variant_tuples(search_input.get_visible_variants(genome_build), variant_tuple)
                 if results.exists():
                     for r in results:
@@ -439,7 +439,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
     reference_message: List[SearchMessage] = []
 
     try:
-        variant_tuple, used_transcript_accession, kind, method, matches_reference = hgvs_matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(hgvs_string)
+        variant_tuple, used_transcript_accession, kind, method, matches_reference = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string)
         logging.info("get_variant_tuple_used_transcript_kind_method_and_matches_reference - variant_tuple=%s", variant_tuple)
         if not matches_reference:
             ref_base = variant_tuple[2]

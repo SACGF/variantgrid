@@ -53,15 +53,15 @@ class HGVSConverter(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
+    def variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
         pass
 
     @abc.abstractmethod
-    def variant_coords_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
+    def variant_coordinate_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
         pass
 
     @abc.abstractmethod
-    def hgvs_to_variant_coords_and_reference_match(self, hgvs_string: str, transcript_version) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
+    def hgvs_to_variant_coordinate_and_reference_match(self, hgvs_string: str, transcript_version) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
         pass
 
     @abc.abstractmethod

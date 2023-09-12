@@ -100,10 +100,10 @@ class TestHGVS(TestCase):
         genome_build = GenomeBuild.get_name_or_alias("GRCh37")
         create_fake_transcript_version(genome_build)  # So we can lookup 'ENST00000300305.3'
         matcher = HGVSMatcher(genome_build)
-        matcher.get_variant_tuple("ENST00000300305.3:c.1440A>T")
+        matcher.get_variant_coordinate("ENST00000300305.3:c.1440A>T")
 
         with self.assertRaises(HGVSException):
-            matcher.get_variant_tuple("ENST00000300305.3:c.9999A>T")
+            matcher.get_variant_coordinate("ENST00000300305.3:c.9999A>T")
 
     def test_sort_transcript_versions(self):
         transcript_version_and_methods = [
@@ -216,7 +216,7 @@ class TestHGVS(TestCase):
         matcher = HGVSMatcher(genome_build, hgvs_converter_type=hgvs_converter_type)
         for hgvs_string in HGVS_EXAMPLES + extra_hgvs:
             transcript_accession = matcher.get_transcript_accession(hgvs_string)
-            vc = matcher.get_variant_tuple(hgvs_string)
+            vc = matcher.get_variant_coordinate(hgvs_string)
             hgvs_variant = matcher.variant_coordinate_to_hgvs_variant(vc, transcript_accession)
             hgvs_out = hgvs_variant.format(max_ref_length=0)
             self.assertEqual(hgvs_string, hgvs_out, f"{hgvs_converter_type} Converting to and back to VariantCoordinate")
@@ -235,16 +235,12 @@ class TestHGVS(TestCase):
             # provided ref = genomic ref
             ('NM_001145661.2(GATA2):c.1113dupC', VariantCoordinate(chrom='3', start=128200691, end=128200692,
                                                                    ref='C', alt='CG'), True),
-            # GATA2 is '-' strand, so provided ref C = genomic ref = G
-            # This is normalized left
-            #('NM_001145661.2(GATA2):c.1113dupG', VariantCoordinate(chrom='3', pos=128200690, ref='G', alt='GC'),
-            # HgvsMatchRefAllele(provided_ref='C', calculated_ref='G')),
         ]
         genome_build = GenomeBuild.grch37()
         create_gata2_transcript_version(genome_build)
         matcher = HGVSMatcher(genome_build, hgvs_converter_type=hgvs_converter_type)
         for hgvs_string, expected_vc, expected_matches_ref in TEST_HGVS:
-            vcd = matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(hgvs_string)
+            vcd = matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string)
             #print(f"{vcd=}")
             #print(f"{type(vcd.matches_reference)=}")
             self.assertEqual(vcd.variant_coordinate, expected_vc)

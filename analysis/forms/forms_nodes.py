@@ -31,7 +31,7 @@ from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from genes.custom_text_gene_list import create_custom_text_gene_list
-from genes.hgvs import get_hgvs_variant_tuple, get_hgvs_variant, HGVSException
+from genes.hgvs import get_hgvs_variant_coordinate, get_hgvs_variant, HGVSException
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAppPanel
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
 from library.forms import NumberInput
@@ -472,7 +472,7 @@ class IntersectionNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
         # HGVS:
         if hgvs_string := cleaned_data.get("hgvs_string"):
             try:
-                get_hgvs_variant_tuple(hgvs_string, self.instance.analysis.genome_build)
+                get_hgvs_variant_coordinate(hgvs_string, self.instance.analysis.genome_build)
             except HGVSException as e:
                 self.add_error("hgvs_string", str(e))
 

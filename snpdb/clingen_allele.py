@@ -382,7 +382,7 @@ def get_clingen_allele_for_variant_coordinate(genome_build: GenomeBuild, variant
     """ hgvs_converter_func - only used if we need it - to reduce circular dependencies on HGVS """
     try:
         # Use variant if we have it in the system so we can lookup cache, or store result
-        variant = Variant.get_from_tuple(variant_coordinate, genome_build)
+        variant = Variant.get_from_variant_coordinate(variant_coordinate, genome_build)
         ca = get_clingen_allele_for_variant(genome_build, variant, clingen_api=clingen_api)
     except Variant.DoesNotExist:
         g_hgvs_string = hgvs_matcher.variant_coordinate_to_g_hgvs(variant_coordinate).format()
@@ -481,8 +481,8 @@ def link_allele_to_existing_variants(allele: Allele, allele_linking_tool,
         try:
             try:
                 if clingen_allele := allele.clingen_allele:
-                    variant_tuple = clingen_allele.get_variant_tuple(genome_build)
-                    variant = Variant.get_from_tuple(variant_tuple, genome_build)
+                    variant_tuple = clingen_allele.get_variant_coordinate(genome_build)
+                    variant = Variant.get_from_variant_coordinate(variant_tuple, genome_build)
                 else:
                     # no clingen allele, see if it's known
                     # TODO should an error be thrown if it's not?

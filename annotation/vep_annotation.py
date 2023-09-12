@@ -165,7 +165,8 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     return cmd
 
 
-def run_vep(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium, pipeline_type):
+def run_vep(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium,
+            pipeline_type: VariantAnnotationPipelineType):
     """ executes VEP command. Returns (command_line, code, stdout, stderr) """
 
     cmd = get_vep_command(vcf_filename, output_filename, genome_build, annotation_consortium, pipeline_type)

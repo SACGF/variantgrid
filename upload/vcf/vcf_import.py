@@ -499,7 +499,7 @@ def get_genome_build_from_contig_lengths(contig_lengths: dict, min_contig_matche
         if num_matches == 1:
             return potential_genome_builds[0]
         else:
-            matches = ", ".join(potential_genome_builds)
+            matches = ", ".join([gb.name for gb in potential_genome_builds])
             raise ContigMismatchException(f"Multiple genomes: {matches} matched supplied contigs {contig_lengths}")
     else:
         differences = ", ".join([f"{gb}: {diff}" for gb, diff in build_contig_diffs.items()])

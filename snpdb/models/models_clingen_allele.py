@@ -199,14 +199,14 @@ class ClinGenAllele(TimeStampedModel):
         msg = f"{self}/{genome_build} not in ClinGenAllele genomicAlleles response"
         raise ClinGenAllele.ClinGenBuildNotInResponseError(msg)
 
-    def get_variant_tuple(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
-        from genes.hgvs import get_hgvs_variant_tuple
+    def get_variant_coordinate(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
+        from genes.hgvs import get_hgvs_variant_coordinate
         g_hgvs = self.get_g_hgvs(genome_build)
-        return get_hgvs_variant_tuple(g_hgvs, genome_build)
+        return get_hgvs_variant_coordinate(g_hgvs, genome_build)
 
     def get_variant_string(self, genome_build: GenomeBuild, abbreviate=False):
         from snpdb.models import Variant
-        return Variant.format_tuple(*self.get_variant_tuple(genome_build), abbreviate=abbreviate)
+        return Variant.format_tuple(*self.get_variant_coordinate(genome_build), abbreviate=abbreviate)
 
     @property
     def human_url(self):

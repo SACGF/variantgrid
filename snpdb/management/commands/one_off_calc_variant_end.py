@@ -167,9 +167,8 @@ class Command(BaseCommand):
                 different = 0
                 # calculate
                 for row in changed_rows:
-                    vc_old = VariantCoordinate(chrom=row["contig"], start=row["position"],
-                                               ref=row["old_ref"], alt=row["old_alt"])
-
+                    vc_old = VariantCoordinate.from_start_only(chrom=row["contig"], start=row["position"],
+                                                               ref=row["old_ref"], alt=row["old_alt"])
                     vc_new = VariantCoordinate(chrom=row["contig"], start=row["position"],
                                                end=row["end"], ref=row["new_ref"], alt=row["new_alt"])
 

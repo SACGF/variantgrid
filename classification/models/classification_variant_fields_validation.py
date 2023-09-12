@@ -12,7 +12,7 @@ from classification.models.classification import Classification, \
 from classification.models.classification_utils import ValidationMerger
 from genes.hgvs import HGVSMatcher
 from genes.models import NoTranscript
-from snpdb.models import GenomeBuild, Variant
+from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 
 VARIANT_VALIDATING_CODES = {ValidationCode.MATCHING_ERROR, ValidationCode.INCONSISTENT_VARIANT, ValidationCode.MATCHING_ERROR}
 
@@ -73,13 +73,13 @@ def validate_variant_fields(sender, **kwargs) -> Optional[ValidationMerger]:  # 
                         #     vm.add_message(evidence_key, code=ValidationCode.MATCHING_ERROR, severity='error', message='Transcript type not yet supported')
                         #     continue
 
-                        variant_tuple = hgvs_matcher.get_variant_tuple(variant_value)
+                        variant_coordinate = hgvs_matcher.get_variant_coordinate(variant_value)
                     elif evidence_key == SpecialEKeys.VARIANT_COORDINATE:
-                        variant_tuple = Variant.get_tuple_from_string(variant_value, genome_build)
+                        variant_coordinate = VariantCoordinate.from_string(variant_value)
                     else:
                         raise ValueError(f'Unexpected evidence_key for variant matching {evidence_key}')
 
-                    variant_str = Variant.format_tuple(*variant_tuple)
+                    variant_str = Variant.format_tuple(*variant_coordinate)
                     variant_map[variant_str] = variant_map.get(variant_str, []) + [evidence_key]
                 except NoTranscript:
                     # this should find its way into Validation Matching flag

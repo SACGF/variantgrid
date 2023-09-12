@@ -43,16 +43,16 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
     def link_inserted_variants(genome_build: GenomeBuild,
                                classification_import: ClassificationImport,
                                upload_step: UploadStep):
-        variant_pk_lookup = VariantPKLookup.factory(genome_build)
-        variant_tuples_by_hash: Dict[Any, VariantCoordinate] = {}
+        variant_pk_lookup = VariantPKLookup(genome_build)
+        variant_coordinates_by_hash: Dict[Any, VariantCoordinate] = {}
         allele_info_by_hash: Dict[Any, ImportedAlleleInfo] = {}
 
         # TODO, should we filter on matched_variant__isnull=True, or on status, or not filter at all so we can rematch
         no_variant_qs = classification_import.importedalleleinfo_set.all()  # .filter(matched_variant__isnull=True)
         for allele_info in no_variant_qs:
             if variant_coordinate := allele_info.variant_coordinate_obj:
-                variant_hash = variant_pk_lookup.add(*variant_coordinate)
-                variant_tuples_by_hash[variant_hash] = variant_coordinate
+                variant_hash = variant_pk_lookup.add(variant_coordinate)
+                variant_coordinates_by_hash[variant_hash] = variant_coordinate
                 allele_info_by_hash[variant_hash] = allele_info
             else:
                 pass
@@ -64,7 +64,7 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
         #     variant_tuple = classification.get_variant_coordinates_from_evidence()
         #     if variant_tuple:
         #         variant_hash = variant_pk_lookup.add(*variant_tuple)
-        #         variant_tuples_by_hash[variant_hash] = variant_tuple
+        #         variant_coordinates_by_hash[variant_hash] = variant_tuple
         #         classifications_by_hash[variant_hash] = classification
         #     else:
         #         # note this shouldn't happen at this step - to get here get_variant_coordinates_from_evidence
@@ -76,17 +76,17 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
         for variant_hash, variant_pk in variant_pk_lookup.variant_pk_by_hash.items():
             #classification = classifications_by_hash[variant_hash]
             allele_info = allele_info_by_hash[variant_hash]
-            variant_tuple = variant_tuples_by_hash[variant_hash]
+            variant_coordinate = variant_coordinates_by_hash[variant_hash]
             try:
                 validation_message: Optional[str] = None
                 if variant_pk is None:
                     # Not inserted - was normalised during import
                     try:
-                        miv = ModifiedImportedVariant.get_upload_pipeline_unnormalized_variant(upload_step.upload_pipeline, *variant_tuple)
+                        miv = ModifiedImportedVariant.get_upload_pipeline_unnormalized_variant(upload_step.upload_pipeline, variant_coordinate)
                         variant_pk = miv.variant.pk
                         validation_message = f"{miv.old_variant} was normalized to {miv.variant}"
                     except ModifiedImportedVariant.DoesNotExist:
-                        variant_str = " ".join(map(str, variant_tuple))
+                        variant_str = " ".join(map(str, variant_coordinate))
                         validation_message = f"Variant '{variant_str}' for Allele Info {allele_info.pk} not inserted!"
 
                 variant = None

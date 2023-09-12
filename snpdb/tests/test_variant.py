@@ -18,7 +18,7 @@ class VariantTestCase(TestCase):
 
     def test_variant_coordinate(self):
         vc = self.variant.coordinate
-        v = Variant.get_from_tuple(vc, self.grch37)
+        v = Variant.get_from_variant_coordinate(vc, self.grch37)
         self.assertEqual(self.variant, v)
 
     def test_ref_variant_coordinate_explicit(self):
