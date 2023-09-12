@@ -174,8 +174,15 @@ class Command(BaseCommand):
                                                end=row["end"], ref=row["new_ref"], alt=row["new_alt"])
 
                     matcher: HGVSMatcher = build_matchers[row["genome_build"]]
-                    g_hgvs_old = matcher.variant_coordinate_to_g_hgvs(vc_old)
-                    g_hgvs_new = matcher.variant_coordinate_to_g_hgvs(vc_new)
+                    try:
+                        g_hgvs_old = matcher.variant_coordinate_to_g_hgvs(vc_old)
+                    except Exception as e:
+                        g_hgvs_old = "ERROR: " + str(e)
+
+                    try:
+                        g_hgvs_new = matcher.variant_coordinate_to_g_hgvs(vc_new)
+                    except Exception as e:
+                        g_hgvs_new = "ERROR: " + str(e)
 
                     row["g_hgvs_old"] = g_hgvs_old
                     row["g_hgvs_new"] = g_hgvs_new
