@@ -2,12 +2,25 @@ import operator
 import os
 import re
 from collections import defaultdict
+from enum import Enum
 from typing import Tuple
 
 import cyvcf2
 import vcf
 
 from snpdb.models import Variant, Sequence
+
+
+class VCFColumns:
+    CHROM = 0
+    POS = 1
+    ID = 2
+    REF = 3
+    ALT = 4
+    QUAL = 5
+    FILTER = 6
+    INFO = 7
+    FORMAT = 8
 
 
 class VCFConstant:

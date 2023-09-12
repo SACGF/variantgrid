@@ -16,6 +16,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from vcf import Reader
 
+from library.genomics.vcf_utils import VCFColumns
 from snpdb.models import GenomeBuild, GenomeFasta
 
 
@@ -71,12 +72,12 @@ class Command(BaseCommand):
                 if defined_filters is None:
                     defined_filters = self._get_defined_vcf_filters(vcf_header_lines)
                 columns = line.split("\t")
-                chrom = columns[0]
+                chrom = columns[VCFColumns.CHROM]
                 fasta_chrom = None
                 if contig_id := chrom_to_contig_id.get(chrom):
                     valid_position = False
                     try:
-                        position = int(columns[1])
+                        position = int(columns[VCFColumns.POS])
                         length = contig_lengths[contig_id]
                         valid_position = 0 < position < length
                     except ValueError:
@@ -90,7 +91,7 @@ class Command(BaseCommand):
                     if skipped_contigs_stats_file:
                         skipped_contigs[chrom] += 1
                     continue
-                columns[0] = fasta_chrom
+                columns[VCFColumns.CHROM] = fasta_chrom
 
                 if skip_patterns:
                     if skip_reason := self._check_skip_line(skip_patterns, line):
@@ -98,8 +99,8 @@ class Command(BaseCommand):
                         continue
 
                 # Check ref / alt bases are ok
-                ref = columns[3]
-                alt = columns[4]
+                ref = columns[VCFColumns.REF]
+                alt = columns[VCFColumns.ALT]
                 if ref_standard_bases_pattern.sub("", ref):
                     if ref.startswith("<") and ref.endswith(">"):
                         skip_reason = f"REF = {ref}"
@@ -120,7 +121,7 @@ class Command(BaseCommand):
                         continue
 
                 # Remove filters not in header
-                filter_column = columns[6]
+                filter_column = columns[VCFColumns.FILTER]
                 if filter_column not in QUICK_ACCEPT_FILTERS:
                     cleaned_filters = []
                     for fc in filter_column.split(";"):
@@ -133,14 +134,14 @@ class Command(BaseCommand):
                         filter_column = ";".join(cleaned_filters)
                     else:
                         filter_column = "."
-                    columns[6] = filter_column
+                    columns[VCFColumns.FILTER] = filter_column
 
                 if remove_info:
                     # Zero out INFO (makes file size smaller and causes bcftools issues)
-                    columns[7] = "."
+                    columns[VCFColumns.INFO] = "."
                     # If (7) INFO was the last column, we just stripped the newline - might need to add it back
                     if len(columns) == 8:
-                        columns[7] += "\n"
+                        columns[VCFColumns.INFO] += "\n"
                 sys.stdout.write("\t".join(columns))
 
         self._write_skip_counts(skipped_contigs, skipped_contigs_stats_file)

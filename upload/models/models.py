@@ -618,12 +618,12 @@ class ModifiedImportedVariant(models.Model):
         return miv.variant
 
     @classmethod
-    def get_variants_for_unnormalized_variant(cls, variant_coordinate: VariantCoordinate) -> QuerySet:
+    def get_variants_for_unnormalized_variant(cls, variant_coordinate: VariantCoordinate) -> QuerySet[Variant]:
         old_variant = cls.get_old_variant_from_variant_coordinate(variant_coordinate)
         return Variant.objects.filter(modifiedimportedvariant__old_variant_formatted=old_variant).distinct()
 
     @classmethod
-    def get_variants_for_unnormalized_variant_any_alt(cls, variant_coordinate: VariantCoordinate) -> QuerySet:
+    def get_variants_for_unnormalized_variant_any_alt(cls, variant_coordinate: VariantCoordinate) -> QuerySet[Variant]:
         old_variant = cls.get_old_variant_from_variant_coordinate(variant_coordinate)
         return Variant.objects.filter(modifiedimportedvariant__old_variant_formatted__startswith=old_variant).distinct()
 
