@@ -114,7 +114,7 @@ class HGVSMatcher:
             variant_coord = ca.get_variant_tuple(self.genome_build)
             # Was converted to internal, need to return raw strings so standard base validation is OK
             if variant_coord.alt == Variant.REFERENCE_ALT:
-                variant_coord = VariantCoordinate(variant_coord.chrom, variant_coord.pos,
+                variant_coord = VariantCoordinate(variant_coord.chrom, variant_coord.start, variant_coord.end,
                                                   variant_coord.ref, variant_coord.ref)  # ref == alt
             return variant_coord
         except ClinGenAlleleAPIException:
@@ -333,24 +333,15 @@ class HGVSMatcher:
             method = self.hgvs_converter.description()
             variant_tuple, matches_reference = self.hgvs_converter.hgvs_to_variant_coords_and_reference_match(hgvs_string, None)
 
-        (chrom, position, ref, alt) = variant_tuple
+        (chrom, start, end, ref, alt) = variant_tuple
 
         ref = ref.upper()
         alt = alt.upper()
 
-        if settings.VARIANT_STANDARD_BASES_ONLY:
-            for k, v in {"alt": alt, "ref": ref}.items():
-                non_standard_bases = v
-                for n in "GATC":
-                    non_standard_bases = non_standard_bases.replace(n, "")
-                if non_standard_bases:
-                    msg = f"'{hgvs_string}': {k}={v} contains non-standard (A,C,G,T) bases: {non_standard_bases}"
-                    raise HGVSException(msg)
-
         if Variant.is_ref_alt_reference(ref, alt):
             alt = Variant.REFERENCE_ALT
         return VariantCoordinateAndDetails(
-            variant_coordinate=VariantCoordinate(chrom, position, ref, alt),
+            variant_coordinate=VariantCoordinate(chrom, start, end, ref, alt),
             transcript_accession=used_transcript_accession,
             kind=kind,
             method=method,
@@ -469,7 +460,7 @@ class HGVSMatcher:
         return self.variant_coordinate_to_hgvs_variant(variant.coordinate, transcript_name=transcript_name)
 
     def variant_coordinate_to_hgvs_variant(self, variant_coordinate: VariantCoordinate, transcript_name=None) -> HGVSVariant:
-        variant_coordinate = variant_coordinate.explicit_reference()
+        variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
         return self._variant_coordinate_to_hgvs_and_method(variant_coordinate, transcript_name)[0]
 
     @staticmethod
@@ -485,11 +476,11 @@ class HGVSMatcher:
         return self.variant_coordinate_to_g_hgvs(variant.coordinate)
 
     def variant_coordinate_to_g_hgvs(self, variant_coordinate: VariantCoordinate) -> str:
-        variant_coordinate = variant_coordinate.explicit_reference()
-        (chrom, offset, ref, alt) = variant_coordinate
+        variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
+        (chrom, start, end, ref, alt) = variant_coordinate
         if len(alt) == 1 and len(ref) == 1:
             contig = self.genome_build.chrom_contig_mappings[chrom]
-            hgvs_str = self._fast_variant_coordinate_to_g_hgvs(contig.refseq_accession, offset, ref, alt)
+            hgvs_str = self._fast_variant_coordinate_to_g_hgvs(contig.refseq_accession, start, ref, alt)
         else:
             hgvs_variant = self.hgvs_converter.variant_coords_to_g_hgvs(variant_coordinate)
             hgvs_str = str(hgvs_variant)

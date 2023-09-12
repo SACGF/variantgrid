@@ -1,7 +1,7 @@
 """
 Variant table is massive, so we need a way to quickly look up a variant PK for insertion
 
-RedisVariantPKLookup deleted 2021-08-05
+The original implementation RedisVariantPKLookup used Redis to store a hash, was deleted 2021-08-05
 """
 import abc
 import logging
@@ -40,7 +40,7 @@ class VariantPKLookup(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _get_variant_hash(self, contig_id, position, ref_id, alt_id):
+    def _get_variant_hash(self, contig_id, position, end, ref_id, alt_id):
         pass
 
     @abc.abstractmethod
@@ -75,17 +75,17 @@ class VariantPKLookup(abc.ABC):
     def filter_non_reference(self, variant_hashes, variant_ids) -> List:
         pass
 
-    def get_variant_coordinate_hash(self, chrom, position, ref, alt):
+    def get_variant_coordinate_hash(self, chrom, start, end, ref, alt):
         """ For VCF records (needs GenomeBuild supplied) """
         if self.chrom_contig_id_mappings is None:
             raise ValueError("Need to initialise w/GenomeBuild to call get_variant_coordinate_hash")
         contig_id = self.chrom_contig_id_mappings[chrom]
         ref_id = self.sequence_pk_by_seq[ref]
         alt_id = self.sequence_pk_by_seq[alt]
-        return self._get_variant_hash(contig_id, position, ref_id, alt_id)
+        return self._get_variant_hash(contig_id, start, end, ref_id, alt_id)
 
-    def add(self, chrom, position, ref, alt):
-        variant_coordinate = (chrom, position, ref, alt)
+    def add(self, chrom, start, end, ref, alt):
+        variant_coordinate = (chrom, start, end, ref, alt)
         # If sequence isn't known, variant is definitely unknown
         if ref in self.sequence_pk_by_seq and alt in self.sequence_pk_by_seq:
             # Maybe unknown, need to check
@@ -125,7 +125,7 @@ class VariantPKLookup(abc.ABC):
     def _insert_unknown_sequences(self):
         """ Inserts unknown from coordinates, updates sequence_pk_by_seq """
         unknown_sequences = set()
-        for _chrom, _position, ref, alt in self.unknown_variant_coordinates:
+        for _chrom, _position, _end, ref, alt in self.unknown_variant_coordinates:
             if ref not in self.sequence_pk_by_seq:
                 unknown_sequences.add(ref)
             if alt not in self.sequence_pk_by_seq:
@@ -150,7 +150,7 @@ class VariantPKLookup(abc.ABC):
         sql_copy_files.loci_sql_copy_csv(unknown_loci_filename)
 
     def _insert_new_variants(self, new_variant_rows: List[Tuple]):
-        logging.info("1st unknown_variant_locus_id_and_alt: %s", str(new_variant_rows[0]))
+        logging.info("1st unknown variant: locus_id, alt_id, end : %s", str(new_variant_rows[0]))
         unknown_variants_filename = self._get_csv_filename("unknown_variants")
         sql_copy_files.write_sql_copy_csv(new_variant_rows, unknown_variants_filename)
         logging.info("wrote variants file: %s", unknown_variants_filename)
@@ -160,17 +160,17 @@ class VariantPKLookup(abc.ABC):
         self._insert_unknown_sequences()  # All ref/alt need to be in sequence_pk_by_seq to be able to get hash
 
         loci_parts_by_hash = {}
-        locus_hash_and_alt_id_by_variant_hash = {}
-        for chrom, position, ref, alt in self.unknown_variant_coordinates:
+        locus_hash_alt_id_and_end_by_variant_hash = {}
+        for chrom, start, end, ref, alt in self.unknown_variant_coordinates:
             contig_id = self.chrom_contig_id_mappings[chrom]
             ref_id = self.sequence_pk_by_seq[ref]
             alt_id = self.sequence_pk_by_seq[alt]
-            loci_parts = (contig_id, position, ref_id)
+            loci_parts = (contig_id, start, ref_id)
             locus_hash = self._get_locus_hash(*loci_parts)
             loci_parts_by_hash[locus_hash] = loci_parts
-            variant_parts = (contig_id, position, ref_id, alt_id)
+            variant_parts = (contig_id, start, end, ref_id, alt_id)
             variant_hash = self._get_variant_hash(*variant_parts)
-            locus_hash_and_alt_id_by_variant_hash[variant_hash] = (locus_hash, alt_id)
+            locus_hash_alt_id_and_end_by_variant_hash[variant_hash] = (locus_hash, alt_id, end)
 
         self.unknown_variant_coordinates.clear()
         loci_ids = self.get_loci_ids(loci_parts_by_hash, validate_not_null=False)  # Could have some unknowns as None
@@ -184,13 +184,13 @@ class VariantPKLookup(abc.ABC):
 
         loci_ids = self.get_loci_ids(loci_parts_by_hash)  # Validates all are not null
         locus_pk_by_hash = dict(zip(loci_parts_by_hash, loci_ids))
-        variant_ids = self.get_variant_ids(locus_hash_and_alt_id_by_variant_hash, validate_not_null=False)
+        variant_ids = self.get_variant_ids(locus_hash_alt_id_and_end_by_variant_hash, validate_not_null=False)
         unknown_variants = []
-        for variant_hash, variant_pk in zip(locus_hash_and_alt_id_by_variant_hash, variant_ids):
+        for variant_hash, variant_pk in zip(locus_hash_alt_id_and_end_by_variant_hash, variant_ids):
             if variant_pk is None:
-                (locus_hash, alt_id) = locus_hash_and_alt_id_by_variant_hash[variant_hash]
+                (locus_hash, alt_id, end) = locus_hash_alt_id_and_end_by_variant_hash[variant_hash]
                 locus_pk = locus_pk_by_hash[locus_hash]
-                unknown_variants.append((locus_pk, alt_id))
+                unknown_variants.append((locus_pk, alt_id, end))
         logging.debug("loci_hashes = %d, unknown_variants = %d", len(loci_parts_by_hash), len(unknown_variants))
 
         if unknown_variants:
@@ -216,8 +216,8 @@ class DBVariantPKLookup(VariantPKLookup):
     def _get_locus_hash(self, contig_id, position, ref_id):
         return contig_id, position, ref_id
 
-    def _get_variant_hash(self, contig_id, position, ref_id, alt_id):
-        return contig_id, position, ref_id, alt_id
+    def _get_variant_hash(self, contig_id, start, end, ref_id, alt_id):
+        return contig_id, start, end, ref_id, alt_id
 
     def _get_ids_for_hashes(self, hashes: Iterable, get_queryset):
         """ hashes tuples 1st 2 elements should be contig_id, position """
@@ -234,7 +234,7 @@ class DBVariantPKLookup(VariantPKLookup):
 
     def _get_variant_ids(self, variant_hashes: Iterable) -> List[str]:
         annotate_kwargs = {
-            "hash": Concat("locus__position", Value("_"), "locus__ref_id", Value("_"), "alt_id",
+            "hash": Concat("locus__position", Value("_"), "end", Value("_"), "locus__ref_id", Value("_"), "alt_id",
                            output_field=TextField())
         }
 

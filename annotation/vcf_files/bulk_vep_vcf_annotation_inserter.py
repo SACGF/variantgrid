@@ -2,17 +2,18 @@ import logging
 import operator
 import shutil
 from collections import defaultdict
-from functools import cached_property
+from functools import cached_property, reduce
 from typing import Tuple, Optional
 
 from django.conf import settings
+from django.db.models import Q
 
 from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     MutationAssessorPrediction, MutationTasterPrediction, Polyphen2Prediction, \
     PathogenicityImpact, ALoFTPrediction
 from annotation.models.models import ColumnVEPField, VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap
-from annotation.models.models_enums import VariantClass
+from annotation.models.models_enums import VariantClass, VariantAnnotationPipelineType
 from annotation.vep_annotation import VEPConfig
 from genes.models import TranscriptVersion, GeneVersion
 from genes.models_enums import AnnotationConsortium
@@ -85,7 +86,7 @@ class BulkVEPVCFAnnotationInserter:
         "PHENO",
         VEPColumns.PICK,
         "SOURCE",  # only populated when using --merged (which we don't use)
-        "SpliceAI_pred_SYMBOL",
+        # "SpliceAI_pred_SYMBOL",
         "STRAND",
         "SYMBOL_SOURCE",
     ]
@@ -193,11 +194,16 @@ class BulkVEPVCFAnnotationInserter:
         self.ignored_vep_fields = self.VEP_NOT_COPIED_FIELDS.copy()
 
         vc = VEPConfig(self.genome_build)
-        q_columns_version = ColumnVEPField.get_columns_version_q(vc.columns_version)
+        cvf_filters = [ColumnVEPField.get_columns_version_q(vc.columns_version)]
+        if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.CNV:
+            cvf_filters.extend([
+                Q(vep_plugin__isnull=True),
+                Q(vep_custom__isnull=True),
+            ])
         vep_source_qs = ColumnVEPField.filter_for_build(self.genome_build)
-
+        q_cvf = reduce(operator.and_, cvf_filters)
         # Sort to have consistent VCF headers
-        for cvf in vep_source_qs.filter(q_columns_version).order_by("source_field"):
+        for cvf in vep_source_qs.filter(q_cvf).order_by("source_field"):
             try:
                 if cvf.vep_custom:  # May not be configured
                     prefix = cvf.get_vep_custom_display()
@@ -241,15 +247,16 @@ class BulkVEPVCFAnnotationInserter:
 
         if validate_columns:
             # Display any unused VEP columns -
-            handled_vep_columns = set(self.ignored_vep_fields)
-            handled_vep_columns.update(self.source_field_to_columns)
+            ignored_vep_columns = set(self.ignored_vep_fields)
+            vep_columns = set(self.vep_columns) - ignored_vep_columns
+            handled_vep_columns = set(self.source_field_to_columns)
 
-            unused_vep_columns = set(self.vep_columns) - handled_vep_columns
+            unused_vep_columns = vep_columns - handled_vep_columns
             if unused_vep_columns:
                 logging.warning("Unhandled VEP CSQ columns (maybe add to VEP_NOT_COPIED_FIELDS or disable in VEP pipeline?) :")
                 logging.warning(", ".join(sorted(unused_vep_columns)))
 
-            missing_expected_vep_columns = handled_vep_columns - set(self.vep_columns)
+            missing_expected_vep_columns = handled_vep_columns - vep_columns
             if missing_expected_vep_columns:
                 missing = ", ".join(sorted(missing_expected_vep_columns))
                 msg = f"Fields missing from VEP annotated vcf CSQ columns: {missing}"

@@ -105,11 +105,3 @@ class AbstractBulkVCFProcessor:
 
         sql_job.launch_task(ImportModifiedImportedVariantSQLCopyTask)
 
-    @staticmethod
-    def get_ref_alt(variant):
-        ref = variant.REF.strip().upper()
-        if variant.ALT:
-            alt = variant.ALT[0].strip().upper()
-        else:
-            alt = Variant.REFERENCE_ALT
-        return ref, alt

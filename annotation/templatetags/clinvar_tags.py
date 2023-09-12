@@ -86,7 +86,7 @@ class ClinVarDetails:
                 pass
 
         g_hgvs: Optional[str] = None
-        if not clinvar_record:
+        if not clinvar_record and variant.can_make_g_hgvs:
             g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
 
         return ClinVarDetails(

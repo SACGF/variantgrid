@@ -551,6 +551,11 @@ class CohortGenotype(models.Model):
     samples_phred_likelihood = ArrayField(models.IntegerField(), null=True)
     # Same codes as filters, at sample level. None for no entry, PASS = ""
     samples_filters = ArrayField(models.TextField(), null=True)
+    # This stores array of format fields (array of dicts - 1 per sample)
+    format = models.JSONField(null=False, blank=True, default=list)
+    # This stores any remaining INFO fields from VCF record not used in fields above
+    info = models.JSONField(null=False, blank=True, default=dict)
+
 
     def get_sample_genotype(self, sample: Sample) -> SampleGenotype:
         sample_index = self.collection.get_array_index_for_sample_id(sample.pk)

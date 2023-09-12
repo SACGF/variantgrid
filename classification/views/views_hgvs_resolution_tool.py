@@ -34,7 +34,7 @@ class MatcherOutput:
     @property
     def explicit_variant_coordinate(self):
         if vc := self.variant_coordinate:
-            return vc.explicit_reference()
+            return vc.as_internal_symbolic()
 
     @property
     def is_error(self):

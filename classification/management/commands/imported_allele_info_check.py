@@ -157,13 +157,14 @@ class ChgvsDiff(ExportRow):
 
     @export_column("Variant Coordinate Change")
     def variant_coordinate_change(self):
+        genome_build = self._imported_genome_build
         resolved = self.resolved.variant_coordinate
         if resolved:
-            resolved = resolved.explicit_reference()
+            resolved = resolved.as_internal_symbolic()
 
         updated = self.updated.variant_coordinate
         if updated:
-            updated = updated.explicit_reference()
+            updated = updated.as_internal_symbolic()
 
         return Change.compare_2(resolved, updated)
 

@@ -367,21 +367,22 @@ class LazyAttribute:
 
 class FormerTuple(ABC):
     """
-    Base class for converting tuples (or named tuples) to data classes while maintaing decomposition
+    Base class for converting tuples (or named tuples) to data classes while maintaining decomposition
     e.g.
     @dataclass(frozen=True)
     class VariantCoordinate(FormerTuple):
         chrom: str
-        pos: int
+        start: int
+        end: int
         alt: str
         ref: str
 
         @property
         def as_tuple():
-            return (self.chrom, self.pos, self.alt, self.ref)
+            return (self.chrom, self.start, self.end, self.alt, self.ref)
 
     # existing code (still works)
-    chrom, pos, alt, ref = some_variant_coordinate
+    chrom, start, end, alt, ref = some_variant_coordinate
     """
 
     @property

@@ -1,5 +1,11 @@
 """
 Uploaded VCFs are first passed through this command to fix things that will cause VT to die (eg bad contigs)
+
+We also rename chromosomes to the RefSeq contig IDs used in our fasta file
+
+We don't use "bcftools annotate --rename-chrs" to do this as it fails if contigs are not defined in the header
+Which we unfortunately see sometimes.
+
 """
 import re
 import sys
@@ -66,9 +72,8 @@ class Command(BaseCommand):
                     defined_filters = self._get_defined_vcf_filters(vcf_header_lines)
                 columns = line.split("\t")
                 chrom = columns[0]
-                contig_id = chrom_to_contig_id.get(chrom)
                 fasta_chrom = None
-                if contig_id:
+                if contig_id := chrom_to_contig_id.get(chrom):
                     valid_position = False
                     try:
                         position = int(columns[1])
@@ -79,7 +84,6 @@ class Command(BaseCommand):
                     if not valid_position:
                         skipped_records["position out of range"] += 1
                         continue
-
                     fasta_chrom = contig_to_fasta_names.get(contig_id)
 
                 if not fasta_chrom:
@@ -94,22 +98,24 @@ class Command(BaseCommand):
                         continue
 
                 # Check ref / alt bases are ok
-                if settings.VARIANT_STANDARD_BASES_ONLY:
-                    ref = columns[3]
-                    alt = columns[4]
-                    if ref_standard_bases_pattern.sub("", ref):
-                        if ref.startswith("<") and ref.endswith(">"):
-                            skip_reason = f"REF = {ref}"
-                        else:
-                            skip_reason = "non-standard bases in REF sequence"
-                        skipped_records[skip_reason] += 1
-                        continue
+                ref = columns[3]
+                alt = columns[4]
+                if ref_standard_bases_pattern.sub("", ref):
+                    if ref.startswith("<") and ref.endswith(">"):
+                        skip_reason = f"REF = {ref}"
+                    else:
+                        skip_reason = "non-standard bases in REF sequence"
+                    skipped_records[skip_reason] += 1
+                    continue
 
-                    if alt_standard_bases_pattern.sub("", alt):
-                        if alt.startswith("<") and alt.endswith(">"):
+                if alt_standard_bases_pattern.sub("", alt):
+                    skip_reason = None
+                    if alt.startswith("<") and alt.endswith(">"):
+                        if alt not in settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES:
                             skip_reason = f"ALT = {alt}"
-                        else:
-                            skip_reason = "non-standard bases in ALT sequence"
+                    else:
+                        skip_reason = "non-standard bases in ALT sequence"
+                    if skip_reason:
                         skipped_records[skip_reason] += 1
                         continue
 
@@ -150,7 +156,7 @@ class Command(BaseCommand):
         return defined_filters
 
     @staticmethod
-    def _write_skip_counts(counts, filename):
+    def _write_skip_counts(counts, filename): #
         if counts and filename:
             with open(filename, "w") as f:
                 for name, count in counts.items():
