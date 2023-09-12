@@ -1086,6 +1086,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             value = value.replace('&gt;', '>').replace('&lt;', '<')
 
         if value is None and e_key.mandatory and not e_key.exclude_namespace:
+            if e_key.key == SpecialEKeys.CONDITION:
+                # Gene condition is not mandatory if we have a condition resolution
+                if self.condition_resolution_obj:
+                    return None
             # only provide mandatory validation for internal labs
             # don't want to dirty up imported read only classifications with errors
             cell.add_validation(code=ValidationCode.MANDATORY, severity='error', message='Missing mandatory value')
