@@ -45,7 +45,7 @@
             <ul class="nav nav-tabs mb-4" role="tablist">
                 {% for tab in tab_builder.tabs %}
                     <li class="nav-item">
-                        <a class="nav-link {% if tab.active %}show active{% endif %}"
+                        <a class="nav-link {% if tab.active %}show active{% endif %}{% if tab.tab_status %} {{ tab.tab_status }}{% endif %}"
                            data-tab-set="{{ tab_builder.tab_set }}"
                            id="{{ tab.tab_id }}-tab"
                            href="#{{ tab.tab_id }}-content"
@@ -53,7 +53,7 @@
                            {% if tab.resolved_url %}
                                 data-href="{{ tab.resolved_url }}">{{ tab.label }}{{ tab.badge | badge:tab.badge_status }}
                            {% else %}
-                               {% if tab.url %}data-href="{% if tab.param %}{% url tab.url tab.param %}{% else %}{% url tab.url %}{% endif %}"{% endif %}>
+                               {% if tab.url %}data-href="{% if tab.param is not None %}{% url tab.url tab.param %}{% else %}{% url tab.url %}{% endif %}"{% endif %}>
                                {% if tab.admin_only %}<i class="fas fa-key"></i>{% endif %}{{ tab.label }}{{ tab.badge | badge:tab.badge_status }}
                            {% endif %}
                         </a>

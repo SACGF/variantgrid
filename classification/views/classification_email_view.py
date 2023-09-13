@@ -1,6 +1,7 @@
 import collections
 import datetime
 import unicodedata
+from datetime import timezone
 from functools import cached_property
 from typing import List, Optional
 
@@ -15,7 +16,7 @@ from django.utils.timesince import timesince
 
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import Classification, classification_flag_types, \
-    DiscordanceReportClassification, DiscordanceReport, DiscordanceReportTableData
+    DiscordanceReportClassification, DiscordanceReport, DiscordanceReportTableData, DiscordanceReportCategories
 from email_manager.models import EmailLog
 from flags.models import FlagCollection, Flag
 from library.log_utils import report_exc_info, report_message
@@ -59,25 +60,9 @@ class EmailLabSummaryData:
         dr_qs = DiscordanceReport.objects.filter(pk__in=report_ids).order_by('-id')
         return dr_qs
 
-
     @cached_property
-    def discordance_report_summaries(self) -> DiscordanceReportTableData:
-        dr_qs = self._get_discordance_report_summaries()
-
-        return DiscordanceReportTableData(
-            perspective=LabPickerData.for_lab(self.lab),
-            discordance_reports=dr_qs
-        )
-
-    @cached_property
-    def is_medically_insignificance_count(self) -> int:
-        dr_qs = self._get_discordance_report_summaries()
-        insignificance_count = 0
-        for i in dr_qs:
-            if not i.is_medically_significant:
-                insignificance_count += 1
-        return insignificance_count
-
+    def discordance_report_categories(self) -> DiscordanceReportCategories:
+        return DiscordanceReportCategories(perspective=LabPickerData.for_lab(self.lab))
 
     @cached_property
     def flagged_variants(self) -> QuerySet[Flag]:
@@ -102,7 +87,7 @@ class EmailLabSummaryData:
 
     @cached_property
     def imported_30_days_count(self):
-        since = datetime.datetime.now() - datetime.timedelta(days=30)
+        since = timezone.now() - datetime.timedelta(days=30)
         vcgs = Classification.objects.filter(lab=self.lab).filter(created__gte=since)
         return vcgs.count()
 

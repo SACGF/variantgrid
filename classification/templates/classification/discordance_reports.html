@@ -14,14 +14,34 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
     <div class="container">
-        {% page_help_embedded title="Outstanding Discordances" %}
-            <p>Below is a list of all outstanding discordances where your lab is involved.</p>
-             <p>If you have discordances you can filter based on which other labs are involved - which will also display any contact details that lab has provided for resolving discordances.</p>
+        {% page_help_embedded title="Discordances" %}
+            Below are all discordances your lab is involved in.<br/>
+            If there are records "Awaiting Triage", please do a quick look at your records, and edit your triage to one of the following:<br/>
+            <table class="table mt-2">
+                <tr>
+                    <th class="text-right">Will Amend</th>
+                    <td>You have identified a problem in your classification and will make change that will result in the discordance being closed.</td>
+                </tr>
+                <tr>
+                    <th class="text-right">For Joint Discussion</th>
+                    <td>This discordance is worth discussing with the other involved labs.</td>
+                </tr>
+                <tr>
+                    <th class="text-right">Confidence in Classification</th>
+                    <td>You are confident that your classification has the correct clinical significance.</td>
+                </tr>
+                <tr>
+                    <th class="text-right">Low Penetrance/Risk Allele</th>
+                    <td>This or another terminology based issue is likely the cause of the discordance.</td>
+                </tr>
+            </table>
         {% end_page_help_embedded %}
 
         {% lab_picker dlab.lab_picker %}
 
         <a href="{% url 'discordance_reports_download' dlab.lab_picker.selection %}" class="download-link">Download Discordance Reports</a>
+
+        <p class="mt-2 text-info">If you edit a triage of a discordance below, the discordance will only change tab after reloading this page.</p>
 
         <div data-toggle="ajax" href="{% url 'discordance_reports_active_detail' dlab.lab_picker.selection %}" data-id="active-discordances">
             <div class="loading-message">Loading Discordances</div>

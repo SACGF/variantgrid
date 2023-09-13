@@ -313,6 +313,11 @@ class ClinVarExpertCompareRow(ExportRow):
                 cs_set.add(classified)
         return cs_set
 
+    @export_column("$site_name Resolution Issues")
+    def issues(self) -> str:
+        if issues := self.allele_group.issues:
+            return "\n".join(sorted(set(issue.message for issue in issues)))
+
     @export_column("$site_name Clinical Significances")
     def server_clinical_significance_set_labels(self):
         (cs_list := list(self.server_clinical_significance_set)).sort()

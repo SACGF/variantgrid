@@ -8,13 +8,11 @@ from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.template import Library
 from django.utils.safestring import mark_safe
-
-from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from classification.criteria_strengths import CriteriaStrength, AcmgPointScore
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, DiscordanceReportRowData, \
-    ClassificationLabSummary, ImportedAlleleInfo, DiscordanceReportTriage
+    ClassificationLabSummary, ImportedAlleleInfo, DiscordanceReportTableData
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
     ClassificationGroupUtils
@@ -26,12 +24,10 @@ from classification.models.evidence_mixin import VCDbRefDict
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import VariantAllele, Lab
+from snpdb.models import Lab
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Allele, Variant, VariantAlleleSource
-from snpdb.variant_links import variant_link_info
-from uicore.templatetags.js_tags import jsonify
 
 register = Library()
 
@@ -487,11 +483,19 @@ def discordance_report(discordance_report: DiscordanceReport):
 
 
 @register.inclusion_tag("classification/tags/discordance_report_row.html")
-def discordance_report_row(discordance_report_summary: DiscordanceReportRowData, selected: Optional[DiscordanceReport] = None, filter: bool = False, show_triage: bool = False):
+def discordance_report_row(discordance_report_summary: DiscordanceReportRowData, selected: Optional[DiscordanceReport] = None, filter: bool = False):
     return {
         "summary": discordance_report_summary,
         "filter": filter,
         "is_selected": discordance_report_summary.discordance_report == selected,
+    }
+
+
+@register.inclusion_tag("classification/tags/discordance_report_table.html")
+def discordance_report_table(table: DiscordanceReportTableData, filter: bool = False):
+    return {
+        "table": table,
+        "filter": filter
     }
 
 

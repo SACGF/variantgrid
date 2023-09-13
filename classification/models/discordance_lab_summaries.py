@@ -75,4 +75,19 @@ class DiscordanceLabSummary(ClassificationLabSummary):
         for triage in discordance_report.discordancereporttriage_set.select_related('lab').all():
             triage_by_lab[triage.lab] = triage
 
-        return [dls._with_triage(triage_by_lab.pop(dls.lab, None)) for dls in dlses]
+        # apply triages to the first (non withdrawn row) for each lab
+        # in case a lab has both withdrawn and non-withdrawn records
+        with_triages = []
+        for dl in dlses:
+            if not dl.clinical_significance_to == 'withdrawn':
+                dl = dl._with_triage(triage_by_lab.pop(dl.lab, None))
+            with_triages.append(dl)
+
+        if triage_by_lab:
+            # there are some triages for purely withdrawn labs
+            for dl in with_triages:
+                if not dl.triage:
+                    dl = dl._with_triage(triage_by_lab.pop(dl.lab, None))
+            with_triages.append(dl)
+
+        return with_triages

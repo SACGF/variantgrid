@@ -1,15 +1,17 @@
+from datetime import datetime
 from typing import Dict, Optional
 from django.contrib import messages
 from django import forms
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import get_object_or_404
 from classification.models import DiscordanceReportTriage, DiscordanceReportTriageStatus
+from library.log_utils import log_admin_change, log_saved_form
 from uicore.views.ajax_form_view import AjaxFormView, LazyRender
 
 
 class DiscordanceReportTriageForm(forms.ModelForm):
     triage_date = forms.DateField(
         widget=forms.TextInput(attrs={"class": "date-picker form-control"}),
-        required=True
+        required=True,
     )
     triage_status = forms.ChoiceField(
         widget=forms.RadioSelect(),
@@ -22,7 +24,8 @@ class DiscordanceReportTriageForm(forms.ModelForm):
                 DiscordanceReportTriageStatus.REVIEWED_SATISFACTORY,
                 DiscordanceReportTriageStatus.COMPLEX
             ]
-        ]
+        ],
+        help_text="Low penetrance/risk allele will be flagged as complex for future discussion"
     )
 
     class Meta:
@@ -59,11 +62,13 @@ class DiscordanceReportTriageView(AjaxFormView[DiscordanceReportTriage]):
             form = DiscordanceReportTriageForm(
                 data=request.POST or None,
                 instance=triage,
+                initial={"triage_date": datetime.now().date()},
                 prefix=f"drt{discordance_report_triage_id}"
             )
             if form.is_valid():
                 triage.user = request.user
                 form.save()
+                log_saved_form(form)
                 messages.add_message(request, level=messages.SUCCESS, message="Discordance triage saved successfully")
                 saved = True
             else:

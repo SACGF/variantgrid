@@ -120,34 +120,36 @@
     {% endif %}
 
     {% if 'discordance_report'|is_view_enabled %}
-        {% page_help_embedded title="Outstanding Discordances" %}
+        {% page_help_embedded title="Total Discordances Awaiting Triage" %}
             <p>Below is a list of all outstanding discordances where your lab is involved.</p>
         {% end_page_help_embedded %}
 
-        {% if not dlab.discordance_summaries %}
-            <div class="no-value">There are no outstanding discordances for this lab {{ 'S' | severity_icon }}</div>
-        {% else %}
-            {% labelled label="Outstanding Discordances" hint="tiny" %}
-                <div>{{ dlab.discordance_summaries.summaries|length| number:'W' }}</div>
-                {% if dlab.discordance_summaries.summaries|length > 3 %}<div>Showing most recent 3</div>{% endif %}
-                <div><a class="hover-link" href="{% url 'discordance_reports' dlab.lab_picker.selection %}"><small class="form-text">Review all discordances here</small></a></div>
-            {% endlabelled %}
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th style="width:100px" class="text-center">ID</th>
-                        <th class="text-left">Discordance Detected</th>
-                        <th class="text-left">c.HGVS ({{ genome_build.name }})</th>
-                        <th class="text-center" style="width:50%">Lab / Clinical Significances</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for summary in dlab.discordance_summaries.summaries|slice:":3" %}
-                    {% discordance_report_row summary filter=False %}
-                {% endfor %}
-                </tbody>
-            </table>
-        {% endif %}
+        {% with triage_table=dlab.discordance_reports.to_triage_table %}
+            {% if not triage_table.summaries %}
+                <div class="no-value">There are no outstanding discordances for this lab {{ 'S' | severity_icon }}</div>
+            {% else %}
+                {% labelled label="Discordances Awaiting Triage" hint="tiny" %}
+                    <div>{{ triage_table.summaries|length| number:'W' }}</div>
+                    {% if triage_table.summaries|length > 3 %}<div>Showing most recent 3</div>{% endif %}
+                    <div><a class="hover-link" href="{% url 'discordance_reports' dlab.lab_picker.selection %}"><small class="form-text">Review all discordances here</small></a></div>
+                {% endlabelled %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th style="width:100px" class="text-center">ID</th>
+                            <th class="text-left">Discordance Detected</th>
+                            <th class="text-left">c.HGVS ({{ genome_build.name }})</th>
+                            <th class="text-center" style="width:50%">Lab / Clinical Significances</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for summary in triage_table.summaries|slice:":3" %}
+                        {% discordance_report_row summary filter=False %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        {% endwith %}
 
     {% endif %}
 
@@ -173,7 +175,7 @@
         <p class="text-info">Classifications waiting on Variant Matching Review require an admin to action</p>
     {% endlabelled %}
 
-    <p><a href="{% url 'classification_dashboard_classification_special_detail' dlab.lab_picker.selection %}" class="toggle-link" data-toggle="ajax-collapse">Show details</a></p>
+    <p><a href="{% url 'classification_dashboard_classification_special_detail' dlab.lab_picker.selection %}" class="toggle-link" data-toggle="ajax-collapse" title="Flagged Classification Records"></a></p>
 
 </div>
 {% endblock content %}

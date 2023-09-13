@@ -451,7 +451,7 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
                 # was listening for the individual flags to be raised, but then since it's typically multiple flags raised at once
                 # it was hard to stop multiple notifications going out
                 clinical_context_change_data_view = ClinicalContextChangeData(cause_text="Pending Concordance", cause_code=ClinicalContextRecalcTrigger.PENDING_CS_CHANGE)
-                discordance_change_signal.send(DiscordanceReport, clinical_context_change_data=clinical_context_change_data_view)
+                discordance_change_signal.send(DiscordanceReport, discordance_report=discordance_report, clinical_context_change_data=clinical_context_change_data_view)
             else:
                 raise ValueError(f"Expected resolution of {resolution} but allele {report.clinical_context.allele_id} is not pending concordance")
 

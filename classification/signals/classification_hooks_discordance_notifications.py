@@ -28,7 +28,7 @@ Discordance is actually detected by classification_hooks_discordance_status.py
 
 @receiver(discordance_change_signal, sender=DiscordanceReport)
 def notify_discordance_change(discordance_report: DiscordanceReport, clinical_context_change_data: ClinicalContextChangeData, **kwargs):
-    if settings.DISCORDANCE_ENABLED:
+    if settings.DISCORDANCE_ENABLED and clinical_context_change_data.notify_worthy:
         prepare_discordance_notification(discordance_report=discordance_report, cause=clinical_context_change_data.cause_text)
         if clinical_context_change_data.cause_code != ClinicalContextRecalcTrigger.DELAYED:
             send_prepared_discordance_notifications()

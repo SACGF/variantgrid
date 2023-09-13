@@ -7,101 +7,152 @@ Hello Shariant User,
 <p style="color:#444">
 <a href="{% absolute_url 'classification_dashboard' %}">Click here to log in to Shariant</a>
 </p>
-{% for lab_summary in data.lab_summaries %}
-    <h4>{{ lab_summary.lab.organization.name }} / {{ lab_summary.lab.name }}</h4>
-    <ul>
-        {% if lab_summary.last_imported_new_ago %}
-            <li>Last uploaded a new classification {{ lab_summary.last_imported_new_ago }} ago</li>
-            {% if lab_summary.imported_30_days_count > 0 %}<li>In the last 30 days, {% count lab_summary.imported_30_days_count '1 new classification has' 'new classifications have' %} been uploaded</li>{% endif %}
-        {% else %}<li>Has not yet uploaded its first classifications</li>
-        {% endif %}
-        {% comment %}
-        <li>
-            {% if lab_summary.flagged_variants_count %}
-            {% count lab_summary.flagged_variants_count '1 classification requires' 'classifications require' %} attention (see the quick links for details)
-            {% else %}
-            No classifications require attention
-            {% endif %}
-        </li>
-       {% endcomment %}
-        {% if lab_summary.pending_changes_count %}
-            <li>
-            {% if lab_summary.pending_changes_count == 1 %}There is 1 outstanding pending classification change that has been agreed upon during discordance resolution</li>
-            {% else %}There are {{ lab_summary.pending_changes_count }} outstanding pending classification changes that have been agreed upon during discordance resolution</li>
-            {% endif %}
-            </li>
-        {% endif %}
+{% with th_style="text-align:right; font-weight:800; color:#444; font-family: monospace" %}
+    {% with number_style="font-family: monospace; color:#444; font-weight:600; font-size:12pt" %}
+        {% for lab_summary in data.lab_summaries %}
+            <h4>{{ lab_summary.lab.organization.name }} / {{ lab_summary.lab.name }}</h4>
 
-        {% if lab_summary.discordance_report_summaries|length %}
-        <li>This lab is involved in a total of {% count lab_summary.discordance_report_summaries '1 discordance' 'discordances' %}</li>
-        <ul>
-            {% for lab_count in lab_summary.discordance_report_summaries.counts %}
-                {% if lab_count.lab != lab_summary.lab %}
-                    <li>
-                        {% if lab_count.is_internal %}Discordances only within {{ lab_summary.discordance_report_summaries.labs_quick_str }} account for <strong>{{ lab_count.count }}</strong> of these discordances
-                        {% else %}<span style="font-weight:600">{% lab lab_count.lab %}</span> are involved in <strong>{{ lab_count.count }}</strong> of these discordances{% endif %}
-                    </li>
-                {% endif %}
-            {% endfor %}
-        </ul>
-        {% endif %}
-    </ul>
-
-    {% if lab_summary.discordance_report_summaries %}
-        <div style="padding-left: 24px">
-            <table cellpadding="10" style="border-collapse: collapse;">
-                <thead>
-                    <tr>
-                        <th style="font-weight:600; text-align:left; padding-right: 8px">Shariant ID</th>
-                        <th style="font-weight:600; text-align:left; padding-right: 8px">Discordance Detected</th>
-                        <th style="font-weight:600; text-align:left; padding-right: 8px">c.HGVS ({{ lab_summary.genome_build }})</th>
-                        <th style="font-weight:600; text-align:left; padding-right: 8px">Lab / Clinical Significances</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for discordance_report_summary in lab_summary.discordance_report_summaries.summaries %}
-                        {% if discordance_report_summary.is_medically_significant %}
-                        <tr style="border-top: 1px solid #bbb;">
-                            <td><a href="{% absolute_url 'discordance_report' discordance_report_summary.id %}">DR {{ discordance_report_summary.id }}</a></td>
-                            <td style="font-family:monospace">{{ discordance_report_summary.date_detected_str }}</td>
+            {% with counts=lab_summary.discordance_report_categories.all_counts %}
+                <table cellpadding="10" style="border-collapse: collapse;">
+                    <tbody>
+                        <tr>
+                            <th style="{{ th_style }}">Last Uploaded a New Classification</th>
                             <td>
-                                {% for c_hgvs_val in discordance_report_summary.c_hgvses %}
-                                <div>{% c_hgvs c_hgvs_val show_genome_build=False %}</div>
-                                {% endfor %}
-                            </td> {% comment %}do inline style for c.hgvs{% endcomment %}
-                            <td>
-                                {% if discordance_report_summary.is_pending_concordance %}
-                                    <div style="color:#6c6;font-weight:bold">Pending Concordance</div>
+                                {% if lab_summary.last_imported_new_ago %}
+                                    {{ lab_summary.last_imported_new_ago }} ago
+                                {% else %}
+                                    <span style="color:#888">Have not yet uploaded a classification</span>
                                 {% endif %}
-                                {% for lab_summ in discordance_report_summary.lab_significances %}
-                                    <div {% if lab_summ.clinical_significance_to == 'withdrawn' %}style="opacity:0.6"{% endif %}>
-                                        <span style="display:inline-block;margin-right:6px">
-                                            {% lab lab_summ.lab your_lab=lab_summ.is_internal %}
-                                            {% if lab_summ.count > 1 %}<span class="d-inline-block mx-1 text-muted">x</span>{{ lab_summ.count }}{% endif %}
-                                        </span>
-                                        {% if lab_summ.changed %}
-                                            {% clinical_significance_inline lab_summ.clinical_significance_from %} -> {% clinical_significance_inline lab_summ.clinical_significance_to %}
-                                            {% if lab_summ.pending %}(Pending){% endif %}
-                                        {% else %}
-                                            {% clinical_significance_inline lab_summ.clinical_significance_from %}
-                                        {% endif %}
-                                    </div>
-                                {% endfor %}
                             </td>
-                         </tr>
+                        </tr>
+
+                        <tr>
+                            <th style="{{ th_style }}">Pending Changes</th>
+                            <td>
+                                {% if lab_summary.pending_changes_count or counts.waiting_for_amend%}
+                                    {% if lab_summary.pending_changes_count %}
+                                        <div>
+                                            {% if lab_summary.pending_changes_count == 1 %}<span style="{{ number_style }}">1</span> outstanding classification change ( <i>agreed upon during discordance review</i> )
+                                            {% else %}<span style="{{ number_style }}">{{ lab_summary.pending_changes_count }}</span> outstanding classification changes ( <i>agreed upon during discordance review</i> )
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+                                    {% if counts.waiting_for_amend %}
+                                        {% if counts.waiting_for_amend == 1 %}<span style="{{ number_style }}">1</span> discordance marked as waiting for your amendment ( <i>during discordance triage</i> )
+                                        {% else %}<span style="{{ number_style }}">{{ counts.waiting_for_amend }}</span> discordance marked as waiting for your amendment ( <i>during discordance triage</i> )
+                                        {% endif %}
+                                    {% endif %}
+                                {% else %}
+                                    <span style="color:#888">No outstanding agreed to pending changes</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th style="{{ th_style }}">Discordances Active Total</th>
+                            <td>
+                                {% if counts.active %}
+                                    <a href="{% absolute_url 'discordance_reports' %}"><span style="{{ number_style }}">{{ counts.active }}</span> active discordance{% plural counts.active %}</a>
+                                {% else %}
+                                    <span style="color:#888">Not involved in any active discordances</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+
+                        {% if counts.active %}
+                            <tr>
+                                <th style="{{ th_style }}">Discordances for Discussion</th>
+                                <td>
+                                    {% if not counts.ready_to_discuss %}<span style="color:#888">No discordances are ready to discuss with other labs as there are outstanding triages</span>
+                                    {% else %}{{ counts.ready_to_discuss }} of your discordances are ready to discuss with other labs due to outstanding triages
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <th style="{{ th_style }}">Discordances Waiting for Triage</th>
+                                <td>
+                                    {% if not counts.waiting_for_triage %}
+                                        <span style="color:#888">No discordances that require your triage</span>
+                                    {% else %}
+                                        <span style="{{ number_style }}">{{ counts.waiting_for_triage }}</span> discordance{% plural items=counts.waiting_for_triage %}
+                                        ( <i>
+                                            {% if counts.waiting_for_triage_medical == 1 and counts.waiting_for_triage_medical == counts.waiting_for_triage %}
+                                                which is also medically significant
+                                            {% else %}
+                                                {% if counts.waiting_for_triage_medical == 0 %}none
+                                                {% elif counts.waiting_for_triage_medical == counts.waiting_for_triage %}all
+                                                {% else %}{{ counts.waiting_for_triage_medical }}
+                                                {% endif %}
+                                                of which {% plural items=counts.waiting_for_triage_meidcal plural='are' singular='is' %} medically significant
+                                            {% endif %}
+                                        </i> )
+                                        require{% plural items=counts.waiting_for_triage singular="s" plural="" %} your lab's triage
+                                    {% endif %}
+                                </td>
+                            </tr>
                         {% endif %}
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        <div>{% if lab_summary.is_medically_insignificance_count == 1 %}There's {{ lab_summary.is_medically_insignificance_count }} more discordance that is not medically significant and can be accessed
-            <span style="color:#444"><a href="{% absolute_url 'discordance_reports' %}">here</a>.</span>
-        {% elif lab_summary.is_medically_insignificance_count > 1 %}There are {{ lab_summary.is_medically_insignificance_count }} more discordances that are not medically significant and can be accessed
-            <span style="color:#444"><a href="{% absolute_url 'discordance_reports' %}">here</a>.</span>
-        {% endif %}
-            </div> <br>
-    {% endif %}
-{% endfor %}
+
+                    </tbody>
+                </table>
+            {% endwith %}
+
+            {% with pending_triage=lab_summary.discordance_report_categories.to_triage_table %}
+                {% with pending_triage_medical=pending_triage.medically_significant_only %}
+                    {% if pending_triage_medical %}
+                        <div style="padding-left: 24px; margin-top:16px">
+                            <span style="font-size:0.9rem; color: #444">Medically significant discordances awaiting triage</span>
+                            <table cellpadding="10" style="border-collapse: collapse;">
+                                <thead>
+                                    <tr>
+                                        <th style="font-weight:600; text-align:left; padding-right: 8px">Shariant ID</th>
+                                        <th style="font-weight:600; text-align:left; padding-right: 8px">Discordance Detected</th>
+                                        <th style="font-weight:600; text-align:left; padding-right: 8px">c.HGVS ({{ lab_summary.genome_build }})</th>
+                                        <th style="font-weight:600; text-align:left; padding-right: 8px">Lab / Clinical Significances</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for discordance_report_summary in pending_triage_medical.summaries %}
+                                        {% if discordance_report_summary.is_medically_significant %}
+                                        <tr style="border-top: 1px solid #bbb;">
+                                            <td><a href="{% absolute_url 'discordance_report' discordance_report_summary.id %}">DR {{ discordance_report_summary.id }}</a></td>
+                                            <td style="font-family:monospace">{{ discordance_report_summary.date_detected_str }}</td>
+                                            <td>
+                                                {% for c_hgvs_val in discordance_report_summary.c_hgvses %}
+                                                <div>{% c_hgvs c_hgvs_val show_genome_build=False %}</div>
+                                                {% endfor %}
+                                            </td> {% comment %}do inline style for c.hgvs{% endcomment %}
+                                            <td>
+                                                {% if discordance_report_summary.is_pending_concordance %}
+                                                    <div style="color:#6c6;font-weight:bold">Pending Concordance</div>
+                                                {% endif %}
+                                                {% for lab_summ in discordance_report_summary.lab_significances %}
+                                                    <div {% if lab_summ.clinical_significance_to == 'withdrawn' %}style="opacity:0.6"{% endif %}>
+                                                        <span style="display:inline-block;margin-right:6px">
+                                                            {% lab lab_summ.lab your_lab=lab_summ.is_internal %}
+                                                            {% if lab_summ.count > 1 %}<span class="d-inline-block mx-1 text-muted">x</span>{{ lab_summ.count }}{% endif %}
+                                                        </span>
+                                                        {% if lab_summ.changed %}
+                                                            {% clinical_significance_inline lab_summ.clinical_significance_from %} -> {% clinical_significance_inline lab_summ.clinical_significance_to %}
+                                                            {% if lab_summ.pending %}(Pending){% endif %}
+                                                        {% else %}
+                                                            {% clinical_significance_inline lab_summ.clinical_significance_from %}
+                                                        {% endif %}
+                                                    </div>
+                                                {% endfor %}
+                                            </td>
+                                         </tr>
+                                        {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endif %}
+                {% endwith %}
+            {% endwith %}
+        {% endfor %}
+    {% endwith %}
+{% endwith %}
 
 Thanks,<br/>
 The Shariant Team.

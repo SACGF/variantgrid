@@ -1227,6 +1227,18 @@ a .c-hgvs-body {
   word-break: break-word;
 }
 
+a.nav-link.not-important {
+  // used on tabs
+  color: #aaaacc !important;
+  font-style: italic;
+  span.badge-info {
+    font-style: normal;
+  }
+  &.active {
+    color: #666 !important;
+  }
+}
+
 /*
 // used in combination with gloabl.js's main active item
 

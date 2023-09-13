@@ -54,6 +54,8 @@ def discordance_report_changes_summary(sender, instance: Review, **kwargs):
         elif outcome := data.get("outcome"):
             if outcome == "postpone":
                 return "Outcome awaiting further discussion"
+            elif outcome == "discordant":
+                return "Continued discordance"
     else:
         return "Outcome was not decided"
     return json.dumps(instance.post_review_data)

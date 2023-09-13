@@ -1,7 +1,8 @@
+import logging
 import typing
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from functools import cached_property
 from typing import Set, Optional, List, Dict, Tuple, Any, Iterable
@@ -11,12 +12,12 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
-from django.db.models import QuerySet, TextChoices
+from django.db.models import TextChoices
 from django.db.models.deletion import PROTECT, CASCADE
 from django.urls.base import reverse
-from django.utils.timezone import now
+from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
-from guardian.shortcuts import assign_perm
+from frozendict import frozendict
 from lxml.html.diff import html_escape
 from more_itertools import first
 
@@ -38,7 +39,7 @@ from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, GenomeBuild
 from classification.models.clinical_context_models import ClinicalContextChangeData
-from uicore.views.ajax_form_view import LazyRender
+
 
 discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report", "clinical_context_change_data:ClinicalContextChangeData"
 
@@ -47,6 +48,7 @@ class NotifyLevel(str, Enum):
     NEVER_NOTIFY = "never-notify"
     NOTIFY_IF_CHANGE = "notify-if-change"
     ALWAYS_NOTIFY = "always-notify"
+
 
 class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 
@@ -69,9 +71,11 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
 
     admin_note = models.TextField(null=False, blank=True, default='')
 
+    @classmethod
     def preview_category(cls) -> str:
         return "Discordance Report"
 
+    @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-arrow-down-up-across-line"
 
@@ -152,7 +156,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
             raise ValueError(f'Expected to close Discordance Report as {expected_resolution} but was {self.resolution}')
 
         self.resolved_text = cause_text
-        self.report_completed_date = datetime.now()
+        self.report_completed_date = timezone.now()
         self.save()
 
         for drc in DiscordanceReportClassification.objects.filter(report=self):  # type: DiscordanceReportClassification
@@ -207,6 +211,13 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
                 newly_added_labs_str = ", ".join(str(lab) for lab in newly_added_labs)
                 clinical_context_change_data_cause = ClinicalContextChangeData(cause_text=f"{clinical_context_change_data.cause_text} and newly added labs {newly_added_labs_str}", cause_code=clinical_context_change_data.cause_code)
                 discordance_change_signal.send(DiscordanceReport, discordance_report=self, clinical_context_change_data=clinical_context_change_data_cause)
+            else:
+                # the complete withdraw of 1 lab means we might still want to close off triages
+                discordance_change_signal.send(
+                    DiscordanceReport,
+                    discordance_report=self,
+                    clinical_context_change_data=clinical_context_change_data.with_notify_worthy(notify=False)
+                )
 
     @property
     def all_actively_involved_labs(self) -> Set[Lab]:
@@ -263,7 +274,12 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         report.save()
         # there used to be code that would create a new discordance report at the state the old "continued discordance" report was in
         # but that's very confusing as the data won't match the created date aka "discordance detected date"
-        report.update(cause_text=cause, notify_level=NotifyLevel.ALWAYS_NOTIFY)
+        ccd = ClinicalContextChangeData(
+            cause_text=cause,
+            cause_code=ClinicalContextRecalcTrigger.RE_OPEN
+        )
+
+        report.update(clinical_context_change_data=ccd, notify_level=NotifyLevel.ALWAYS_NOTIFY)
         return report
 
     @property
@@ -310,7 +326,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         return DiscordanceReport.latest_report(self.clinical_context) == self
 
     @staticmethod
-    def update_latest(clinical_context: ClinicalContext, clinical_context_change_data:ClinicalContextChangeData, update_flags: bool):
+    def update_latest(clinical_context: ClinicalContext, clinical_context_change_data: ClinicalContextChangeData, update_flags: bool):
         try:
             latest_report = DiscordanceReport.latest_report(clinical_context=clinical_context)
             if latest_report:
@@ -414,6 +430,13 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
 
 # TODO all the below classes are utilites, consider moving them out
 
+class DiscordanceReportNextStep(str, Enum):
+    UNANIMOUSLy_COMPLEX = "C"
+    AWAITING_YOUR_TRIAGE = "T"
+    AWAITING_YOUR_AMEND = "A"
+    AWAITING_OTHER_LAB = "O"
+    TO_DISCUSS = "D"
+
 
 class DiscordanceReportRowData(ExportRow):
 
@@ -492,7 +515,7 @@ class DiscordanceReportRowData(ExportRow):
     def other_labs(self) -> Set[Lab]:
         involved_labs = self.all_actively_involved_labs
         if (not self.perspective.has_multi_org_selection) and (selected := self.perspective.selected_labs):
-            involved_labs = involved_labs - selected
+            involved_labs -= selected
         return involved_labs
 
     @property
@@ -528,7 +551,7 @@ class DiscordanceReportRowData(ExportRow):
     @property
     def date_detected_str(self) -> str:
         date_str = f"{self.date_detected:%Y-%m-%d}"
-        if (now() - self.date_detected) <= timedelta(days=1):
+        if (timezone.now() - self.date_detected) <= timedelta(days=1):
             date_str = f"{date_str} (NEW)"
         return date_str
 
@@ -548,6 +571,45 @@ class DiscordanceReportRowData(ExportRow):
     def lab_significances(self) -> List[ClassificationLabSummary]:
         from classification.models.discordance_lab_summaries import DiscordanceLabSummary
         return DiscordanceLabSummary.for_discordance_report(discordance_report=self.discordance_report, perspective=self.perspective)
+
+    @cached_property
+    def next_step(self):
+        if not self.is_requiring_attention:
+            return None
+
+        is_unanimously_complex = True
+        awaiting_your_triage = False
+        awaiting_your_amend = False
+        awaiting_other_lab = False
+
+        for triage in self.discordance_report.discordancereporttriage_set.select_related('lab').all():
+            if not triage.triage_status == DiscordanceReportTriageStatus.COMPLEX:
+                is_unanimously_complex = False
+
+            if triage.lab in self.perspective.selected_labs:
+                if triage.triage_status == DiscordanceReportTriageStatus.REVIEWED_WILL_FIX:
+                    awaiting_your_amend = True
+                elif triage.triage_status == DiscordanceReportTriageStatus.PENDING:
+                    awaiting_your_triage = True
+            else:
+                if triage.triage_status in (DiscordanceReportTriageStatus.PENDING, DiscordanceReportTriageStatus.REVIEWED_WILL_FIX):
+                    awaiting_other_lab = True
+
+        if is_unanimously_complex:
+            return DiscordanceReportNextStep.UNANIMOUSLy_COMPLEX
+        elif awaiting_your_triage:
+            return DiscordanceReportNextStep.AWAITING_YOUR_TRIAGE
+        elif awaiting_your_amend:
+            return DiscordanceReportNextStep.AWAITING_YOUR_AMEND
+        elif awaiting_other_lab:
+            return DiscordanceReportNextStep.AWAITING_OTHER_LAB
+        else:
+            return DiscordanceReportNextStep.TO_DISCUSS
+
+    def __lt__(self, other):
+        def sort_value(x: DiscordanceReportRowData):
+            return x.is_medically_significant and x.is_requiring_attention, x.discordance_report.pk
+        return sort_value(self) < sort_value(other)
 
 
 @dataclass(frozen=True)
@@ -571,9 +633,15 @@ class DiscordanceReportSummaryCount:
 
 class DiscordanceReportTableData:
 
-    def __init__(self, perspective: LabPickerData, discordance_reports: QuerySet[DiscordanceReport]):
+    def __init__(self, perspective: LabPickerData, summaries: Iterable[DiscordanceReportRowData]):
         self.perspective = perspective
-        self._discordance_reports = discordance_reports
+        self.summaries = summaries or []
+
+    def medically_significant_only(self) -> 'DiscordanceReportTableData':
+        return DiscordanceReportTableData(
+            perspective=self.perspective,
+            summaries=[s for s in self.summaries if s.is_medically_significant]
+        )
 
     def __len__(self):
         return len(self.summaries)
@@ -581,26 +649,9 @@ class DiscordanceReportTableData:
     def __bool__(self):
         return bool(self.summaries)
 
-    def labs(self) -> List[Lab]:
-        return sorted(self.perspective.your_labs)
-
-    def labs_quick_str(self) -> str:
-        if len(self.perspective.selected_labs) == 1:
-            return str(first(self.perspective.selected_labs))
-        else:
-            return "your assigned labs"
-
-    @cached_property
-    def summaries(self) -> List[DiscordanceReportRowData]:
-        summaries: List[DiscordanceReportRowData] = []
-        for dr in self._discordance_reports.filter(resolution__isnull=True):
-            summary = DiscordanceReportRowData(discordance_report=dr, perspective=self.perspective)
-            if summary.is_valid_including_withdraws:
-                if summary.is_requiring_attention:
-                    summaries.append(summary)
-
-        summaries.sort(key=lambda s: (s.discordance_report.is_medically_significant, s.discordance_report.report_started_date), reverse=True)
-        return summaries
+    @property
+    def genome_build(self):
+        return self.perspective.genome_build
 
     @cached_property
     def counts(self) -> List[DiscordanceReportSummaryCount]:
@@ -618,19 +669,110 @@ class DiscordanceReportTableData:
             counts.insert(0, DiscordanceReportSummaryCount(lab=None, count=internal_count))
         return counts
 
+
+@dataclass
+class DiscordanceReportCategoriesCounts:
+    active: int = 0
+    medical: int = 0
+    waiting_for_triage: int = 0
+    waiting_for_triage_medical: int = 0
+    waiting_for_amend: int = 0
+    ready_to_discuss: int = 0
+
+
+class DiscordanceReportCategories:
+
+    def __init__(self, perspective: LabPickerData):
+        self.perspective = perspective
+
+        discordant_c = DiscordanceReportClassification.objects \
+            .filter(classification_original__classification__lab__in=perspective.selected_labs) \
+            .values_list('report_id', flat=True)
+        # .filter(classification_original__classification__withdrawn=False)  used to
+        self.dr_qs = DiscordanceReport.objects.filter(pk__in=discordant_c)
+
+    def labs(self) -> List[Lab]:
+        return sorted(self.perspective.your_labs)
+
+    def labs_quick_str(self) -> str:
+        if len(self.perspective.selected_labs) == 1:
+            return str(first(self.perspective.selected_labs))
+        else:
+            return "your assigned labs"
+
     @cached_property
-    def inactive_summaries(self) -> List[DiscordanceReportRowData]:
-        inactives: List[DiscordanceReportRowData] = []
-        for dr in self._discordance_reports:
+    def all_counts(self) -> DiscordanceReportCategoriesCounts:
+        counts = DiscordanceReportCategoriesCounts()
+        counts.active = len(self.active)
+        counts.medical = len([rd for rd in self.active if rd.is_medically_significant])
+        triage = self.to_triage_table
+        counts.waiting_for_triage = len(triage)
+        counts.waiting_for_triage_medical = len(triage.medically_significant_only())
+        counts.waiting_for_amend = len(self.to_amend_table)
+        counts.ready_to_discuss = len(self.to_discuss_table)
+        return counts
+
+    @cached_property
+    def unresolved(self) -> List[DiscordanceReportRowData]:
+        all_summaries: List[DiscordanceReportRowData] = []
+        for dr in self.dr_qs.filter(resolution__isnull=True):
             summary = DiscordanceReportRowData(discordance_report=dr, perspective=self.perspective)
             if summary.is_valid_including_withdraws:
-                if not summary.is_requiring_attention:
-                    inactives.append(summary)
-        return inactives
+                all_summaries.append(summary)
+        all_summaries.sort(reverse=True)
+        return all_summaries
 
-    @property
-    def genome_build(self) -> GenomeBuild:
-        return self.perspective.genome_build
+    @cached_property
+    def active(self) -> List[DiscordanceReportRowData]:
+        return [drr for drr in self.unresolved if drr.is_requiring_attention]
+
+    @cached_property
+    def historic(self) -> List[DiscordanceReportRowData]:
+        historic: List[DiscordanceReportRowData] = []
+        # add unresolved but not requiring attention discordance reports (aka pending concordance)
+        for summary in self.unresolved:
+            if not summary.is_requiring_attention:
+                historic.append(summary)
+
+        # add resolved (e.g. concordant/continued discordances)
+        for dr in self.dr_qs.filter(resolution__isnull=False):
+            summary = DiscordanceReportRowData(discordance_report=dr, perspective=self.perspective)
+            if summary.is_valid_including_withdraws:
+                historic.append(summary)
+        historic.sort(reverse=True)
+        return historic
+
+    @cached_property
+    def active_by_next_step(self) -> Dict[DiscordanceReportNextStep, List[DiscordanceReportRowData]]:
+        by_step = defaultdict(list)
+        for row_data in self.active:
+            by_step[row_data.next_step].append(row_data)
+
+        return frozendict(by_step)
+
+    @cached_property
+    def to_historic_table(self) -> DiscordanceReportTableData:
+        return DiscordanceReportTableData(perspective=self.perspective, summaries=self.historic)
+
+    @cached_property
+    def to_triage_table(self) -> DiscordanceReportTableData:
+        return DiscordanceReportTableData(perspective=self.perspective, summaries=self.active_by_next_step.get(DiscordanceReportNextStep.AWAITING_YOUR_TRIAGE))
+
+    @cached_property
+    def to_amend_table(self) -> DiscordanceReportTableData:
+        return DiscordanceReportTableData(perspective=self.perspective, summaries=self.active_by_next_step.get(DiscordanceReportNextStep.AWAITING_YOUR_AMEND))
+
+    @cached_property
+    def to_waiting_other_table(self) -> DiscordanceReportTableData:
+        return DiscordanceReportTableData(perspective=self.perspective, summaries=self.active_by_next_step.get(DiscordanceReportNextStep.AWAITING_OTHER_LAB))
+
+    @cached_property
+    def to_complex_table(self) -> DiscordanceReportTableData:
+        return DiscordanceReportTableData(perspective=self.perspective, summaries=self.active_by_next_step.get(DiscordanceReportNextStep.UNANIMOUSLy_COMPLEX))
+
+    @cached_property
+    def to_discuss_table(self) -> DiscordanceReportTableData:
+        return DiscordanceReportTableData(perspective=self.perspective, summaries=self.active_by_next_step.get(DiscordanceReportNextStep.TO_DISCUSS))
 
 
 class DiscordanceAction:
@@ -856,12 +998,11 @@ class DiscordanceReportClassification(TimeStampedModel):
 
 
 class DiscordanceReportTriageStatus(TextChoices):
-    PENDING = "P", "Pending Review"
-    REVIEWED_WILL_FIX = "F", "Reviewed - Will Amend"
-    REVIEWED_WILL_DISCUSS = "D", "Reviewed - For Joint Discussion"
-    REVIEWED_SATISFACTORY = "R", "Reviewed - Confident in Classification"
+    PENDING = "P", "Pending Triage"
+    REVIEWED_WILL_FIX = "F", "Will Amend"
+    REVIEWED_WILL_DISCUSS = "D", "For Joint Discussion"
+    REVIEWED_SATISFACTORY = "R", "Confident in Classification"
     COMPLEX = "X", "Low Penetrance/Risk Allele etc"
-    DISCORDANCE_CLOSED = "C", "Discordance Closed - No Review Required"
 
 
 class DiscordanceReportTriage(TimeStampedModel):
@@ -871,12 +1012,13 @@ class DiscordanceReportTriage(TimeStampedModel):
     note = models.TextField(null=True, blank=True)
     triage_date = models.DateField(null=True, blank=True)
     user = models.ForeignKey(User, null=True, blank=True, on_delete=PROTECT)
+    closed = models.BooleanField(default=False)
     """
     These tags are more dynamic, so keep it configurable in JSON rather than a database schema for now
     """
 
     def can_write(self, user: User):
-        return self.lab.is_member(user, admin_check=True) and not self.triage_status == DiscordanceReportTriageStatus.DISCORDANCE_CLOSED
+        return self.lab.is_member(user, admin_check=True) and not self.closed
 
     @property
     def is_outstanding(self):
@@ -909,22 +1051,23 @@ class DiscordanceReportTriage(TimeStampedModel):
 def ensure_discordance_report_triages_for(dr: DiscordanceReport):
     with transaction.atomic():
         dr = refresh_for_update(dr)
-        requires_adding: List[DiscordanceReportTriage] = []
-        all_lab_ids = set(dr.discordancereporttriage_set.values_list("lab", flat=True))
-        for lab in dr.reviewing_labs:
-            if lab.pk not in all_lab_ids:
-                requires_adding.append(DiscordanceReportTriage(
-                    discordance_report=dr,
-                    lab=lab
-                ))
-        if requires_adding:
-            # bulk create doesn't call save
-            # DiscordanceReportTriage.objects.bulk_create(requires_adding)
-            for add_me in requires_adding:
-                add_me.save()
+
+        resolved = dr.resolution is not None or dr.is_pending_concordance
+
+        if not resolved:
+            all_actively_involved_labs = dr.all_actively_involved_labs
+
+            for lab in all_actively_involved_labs:
+                DiscordanceReportTriage.objects.get_or_create({}, discordance_report=dr, lab=lab)
+
+            DiscordanceReportTriage.objects.filter(discordance_report=dr).filter(lab__in=all_actively_involved_labs).update(closed=False)
+            # the below will happen if a lab has withdrawn out of a discordance
+            DiscordanceReportTriage.objects.filter(discordance_report=dr).exclude(lab__in=all_actively_involved_labs).update(closed=True)
+        else:
+            # it is resolved, everything should be closed
+            DiscordanceReportTriage.objects.filter(discordance_report=dr).update(closed=True)
 
 
 def ensure_discordance_report_triages_bulk():
-    for dr in DiscordanceReport.objects.filter(resolution__isnull=True):
-        if not dr.is_pending_concordance:
-            ensure_discordance_report_triages_for(dr)
+    for dr in DiscordanceReport.objects.all():
+        ensure_discordance_report_triages_for(dr)

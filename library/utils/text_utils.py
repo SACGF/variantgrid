@@ -16,7 +16,7 @@ def pretty_label(label: str) -> str:
             last_space = False
         if char == ' ':
             last_space = True
-        tidied = tidied + char
+        tidied += char
     return tidied
 
 

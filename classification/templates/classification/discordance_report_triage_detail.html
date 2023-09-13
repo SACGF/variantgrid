@@ -4,7 +4,9 @@
 {% if mode == "inline" %}
     {% if triage.triage_status == "C" %}
     {% elif triage.triage_status == "P" %}
+        {% if triage.closed %}{% else %}
         <span class="no-value">Triage Pending</span>
+        {% endif %}
     {% else %}
         <span title="{{ triage.note_html }}" class="hover-detail">
             <span class="text-secondary">{{ triage.get_triage_status_display }}</span>
@@ -18,10 +20,17 @@
 {% else %}
     <div class="card-header">{{ triage.lab }} {% admin_link triage %}</div>
     {% if form %}
+        <style>
+            .triage-form input[value="P"] + label {
+                color: #888 !important;
+            }
+        </style>
         <form data-toggle="ajax-form" method="POST" action="{% url 'discordance_report_triage_detail' triage.pk %}?edit=true&mode={{ mode }}">
             <div class="card-body">
                 {% labelled label="Editing By" %}{% user user size="tiny" %}{% endlabelled %}
+                <div class="triage-form">
                 {% crispy form form_helper.horizontal %}
+                </div>
             </div>
             <div class="card-footer">
                 <input type="submit" class="btn btn-primary w-100" />
@@ -38,7 +47,7 @@
                 {% endif %}
             {% endlabelled %}
             {% if triage.triage_date %}
-                {% labelled label="Triage date" %}{{ triage.review_date | date:'Y-m-d' }}{% endlabelled %}
+                {% labelled label="Triage date" %}{{ triage.triage_date | date:'Y-m-d' }}{% endlabelled %}
             {% endif %}
             {% if triage.user %}
                 {% labelled label="Last update by" %}{% user triage.user size="tiny" %}{% endlabelled %}

@@ -83,7 +83,9 @@
                 {% labelled label="c.HGVS "|add:data.genome_build.name %}
                     {% for c_hgvs in data.c_hgvses %}<div>{% c_hgvs c_hgvs %}</div>{% endfor %}
                 {% endlabelled %}
+                {% if data.clinical_context.name != "default" %}
                 {% labelled label="Variant Interpreted in Context of" %}{{ data.clinical_context }}{% endlabelled %}
+                {% endif %}
                 {% labelled label="Opened At" value_css="timestamp" %}{% timestamp data.report.report_started_date %}{% endlabelled %}
                 {% labelled label="Closed At" value_css="timestamp" %}
                     {% if data.report.report_completed_date %}{% timestamp data.report.report_completed_date %}
@@ -100,29 +102,30 @@
                     {% labelled label="Final Trigger to end Discordance" %}{{ data.report.resolved_text }}{% endlabelled %}
                 {% endif %}
              </div>
+
+            <div class="mx-4">
+                {% if data.is_closed %}
+                    <p class="text-info">Data is shown as it was at the time of the discordance being resolved.</p>
+                {% endif %}
+                {% url 'discordance_export' data.report.id as download_link %}
+                {% url 'activity_discordance' discordance_report_id=report.id as history_link %}
+
+                {% classification_groups data.effective_classifications group_utils=data.group_utils title="Classifications Considered" download_link=download_link history_link=history_link context_object=data.report default_sort='clinical_significance' %}
+
+                {% for nlc in data.no_longer_considered %}
+                    {% classification_groups nlc.classifications group_utils=data.group_utils title=nlc.reason context_object=report %}
+                {% endfor %}
+            </div>
         </div>
     </div>
 
     <div class="container mt-4">
-        <h4>Classifications</h4>
-        {% if data.is_closed %}
-            <p class="text-info">Data is shown as it was at the time of the discordance being resolved.</p>
-        {% endif %}
-        {% url 'discordance_export' data.report.id as download_link %}
-        {% url 'activity_discordance' discordance_report_id=report.id as history_link %}
-
-        {% classification_groups data.effective_classifications group_utils=data.group_utils title="Classifications Considered" download_link=download_link history_link=history_link context_object=data.report default_sort='clinical_significance' %}
-
-        {% for nlc in data.no_longer_considered %}
-            {% classification_groups nlc.classifications group_utils=data.group_utils title=nlc.reason context_object=report %}
-        {% endfor %}
-
-        <h4>Triage</h4>
+        <h4 style="margin-bottom:0">Triage</h4>
         {% with triages=data.triage_embeds %}
             {% if triages %}
                 <div class="row equal">
                 {% for triage in triages %}
-                    <div class="col-sm-12 col-md-6">
+                    <div class="col-sm-12 col-md-6 mt-3">
                         {% embed triage %}
                     </div>
                 {% endfor %}
@@ -132,36 +135,33 @@
             {% endif %}
         {% endwith %}
 
-        <h4>Review</h4>
+        <h4>Discussion</h4>
         {% if data.review %}
             <div data-toggle="ajax" href="{% url 'review_detail' data.review.pk %}?show_source_object=false"></div>
         {% else %}
-            <div class="no-value">This Discordance Report has not yet been reviewed</div>
+            <div class="no-value">This Discordance Report has not yet been discussed</div>
+        {% endif %}
+        {% if data.is_user_editable and data.report.resolution is empty %}
+            {% if data.is_pending_concordance %}<p class="text-info">There are outstanding pending changes for this discordance. When labs re-submit with the agreed changes the discordance should be resolved. There is likely no need to action this.</p>{% endif %}
+            <a class="mt-2 btn btn-primary" href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">
+                {% if data.review %}
+                    {% if data.review.post_review_data.outcome == "postpone" %}Continue{% else %}Edit{% endif %}
+                {% else %}
+                    Start
+                {% endif %}
+                Discordance Discussion
+            </a>
         {% endif %}
 
-        {% if data.is_user_editable %}
-            {% if data.provide_reopen %}
-                <h4>Actions</h4>
-                <div class="btn-toolbar">
-                    <form method="post">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="reopen" />
-                        <button class="btn btn-warning" onclick="return reopenWarning()">Re-open Discordance</button>
-                    </form>
-                </div>
-
-            {% elif data.report.resolution is empty %}
-                <h4>Actions</h4>
-                {% if data.is_pending_concordance %}<p class="text-info">There are outstanding pending changes for this discordance. When labs re-submit with the agreed changes the discordance should be resolved. There is likely no need to action this.</p>{% endif %}
-                <a class="btn btn-primary" href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">
-                    {% if data.review %}
-                        {% if data.review.post_review_data.outcome == "postpone" %}Continue{% else %}Edit{% endif %}
-                    {% else %}
-                        Start
-                    {% endif %}
-                    Discordance Review
-                </a>
-            {% endif %}
+        {% if data.is_user_editable and data.provide_reopen %}
+            <h4>Actions</h4>
+            <div class="btn-toolbar">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="reopen" />
+                    <button class="btn btn-warning" onclick="return reopenWarning()">Re-open Discordance</button>
+                </form>
+            </div>
         {% endif %}
 
 

@@ -1,0 +1,20 @@
+{% load classification_tags %}
+{% if table.summaries %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th style="width:100px" class="text-center">ID</th>
+                <th class="text-left">Discordance Detected</th>
+                <th class="text-left">c.HGVS (<span class="text-secondary">{{ table.genome_build.name }}</span>)</th>
+                <th class="text-center" style="width:50%">Lab / Clinical Significances</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for summary in table.summaries %}
+            {% discordance_report_row summary filter=filter %}
+        {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="no-value text-center mt-4">No matching records found</div>
+{% endif %}

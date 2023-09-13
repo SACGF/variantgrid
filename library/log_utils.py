@@ -14,6 +14,7 @@ from django.conf import settings
 from django.contrib.admin.options import get_content_type_for_model
 from django.contrib.auth.models import User
 from django.db.models import Model
+from django.forms import ModelForm
 from django.utils import timezone
 from markdown import markdown
 from rest_framework.request import Request
@@ -23,6 +24,7 @@ from email_manager.models import EmailLog
 from eventlog.models import Event
 from library.constants import MINUTE_SECS
 from library.enums.log_level import LogLevel
+from library.utils import pretty_label
 
 
 def get_current_logged_in_user() -> Optional[User]:
@@ -63,6 +65,13 @@ def report_event(name: str, request: Request = None, extra_data: Dict = None):
                          date=timezone.now(),
                          details=details,
                          severity=LogLevel.INFO)
+
+
+def log_saved_form(form: ModelForm, user: Optional[User] = None):
+    if form.has_changed() and form.is_valid():
+        changed_fields_str = ", ".join([pretty_label(f) for f in sorted(form.changed_data)])
+        message = f"Changed {changed_fields_str} via form."
+        log_admin_change(obj=form.instance, message=message, user=user)
 
 
 def log_admin_change(obj: Model, message: Union[str, dict], user: Optional[User] = None):

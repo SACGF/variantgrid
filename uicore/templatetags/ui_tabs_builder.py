@@ -19,6 +19,7 @@ class TabBuilderTab:
     label: str
     badge: Optional[int] = None
     badge_status: Optional[str] = None
+    tab_status: Optional[str] = None
     admin_only: Optional[bool] = None
     url: Optional[str] = None
     resolved_url: Optional[str] = None
@@ -77,6 +78,7 @@ def ui_register_tab(
         url_check=False,
         badge: Optional[int] = None,
         badge_status: Optional[str] = None,
+        tab_status: Optional[str] = None,
         active=False):
 
     if url_check:
@@ -97,7 +99,8 @@ def ui_register_tab(
         builder.active_tab = tab_number
 
     builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number,
-                                      tab_id=url + param_id, label=label, badge=badge, badge_status=badge_status, url=url, param=param))
+                                      tab_id=url + param_id, label=label, badge=badge, badge_status=badge_status, tab_status=tab_status,
+                                      url=url, param=param))
     return ""
 
 
@@ -138,7 +141,8 @@ def ui_register_tab_embedded(parser, token):
         label=kwargs.get('label'),
         admin_only=kwargs.get('admin_only'),
         badge=kwargs.get('badge'),
-        badge_status=kwargs.get('badge_status')
+        badge_status=kwargs.get('badge_status'),
+        tab_status=kwargs.get('tab_status')
     )
 
 
@@ -149,13 +153,15 @@ class LocalTabContent(template.Node):
                  label: FilterExpression,
                  admin_only: FilterExpression,
                  badge: FilterExpression,
-                 badge_status: FilterExpression):
+                 badge_status: FilterExpression,
+                 tab_status: FilterExpression):
         self.nodelist = nodelist
         self.tab_set = tab_set
         self.label = label
         self.admin_only = admin_only
         self.badge = badge
         self.badge_status = badge_status
+        self.tab_status = tab_status
 
     def render(self, context):
         admin_only = TagUtils.value_bool(context, self.admin_only)
@@ -163,6 +169,7 @@ class LocalTabContent(template.Node):
         label = TagUtils.value_str(context, self.label)
         badge = TagUtils.value_int(context, self.badge)
         badge_status = TagUtils.value_str(context, self.badge_status)
+        tab_status = TagUtils.value_str(context, self.tab_status)
         if not tab_set:
             raise ValueError("UI Tab requires a value for 'tab_set'")
         if not label:
@@ -187,8 +194,12 @@ class LocalTabContent(template.Node):
 
         if content.startswith('/'):
             builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number, admin_only=admin_only,
-                                              tab_id=tab_id, label=label, badge=badge, badge_status=badge_status, resolved_url=content))
+                                              tab_id=tab_id, label=label, badge=badge, badge_status=badge_status,
+                                              tab_status=tab_status,
+                                              resolved_url=content))
         else:
             builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number, admin_only=admin_only,
-                                              tab_id=tab_id, label=label, badge=badge, badge_status=badge_status, content=content))
+                                              tab_id=tab_id, label=label, badge=badge, badge_status=badge_status,
+                                              tab_status=tab_status,
+                                              content=content))
         return ""

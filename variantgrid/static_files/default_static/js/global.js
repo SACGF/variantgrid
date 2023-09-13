@@ -559,7 +559,6 @@ function cardToModal(content) {
         console.log("DID NOT FIND modal")
     }
     if (content.find('.auto-close-modal').length) {
-        console.log("ATTEMPTING TO CLOSE MODAL");
         content.closest('.modal').modal('hide');
     }
 }

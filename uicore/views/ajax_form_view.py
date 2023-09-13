@@ -27,14 +27,14 @@ T = TypeVar("T", bound=Model)
 class AjaxFormMode(str, Enum):
     INLINE = "inline"
     CARD = "card"
-    EMBEDDED_CARD = "embedded-card"  # The first time you embed a card, do this so it can be replaced
+    EMBEDDED_CARD = "embedded-card"  # The first time you embed a card, do this, so it can be replaced
     MODAL = "modal"  # almost identical to INLINE but on save will trigger the modal to disappear
 
 
 @dataclass
 class LazyRender(Generic[T]):
     """
-    A delayed rendering, that may be delayed so a template can include it
+    A delayed rendering, that may be delayed, so a template can include it
     or we might call render() on it right after.
     It helps in reducing the duplication of code, your AJAX
     """
@@ -127,7 +127,7 @@ class AjaxFormView(View, Generic[T]):
     """
 
     @classmethod
-    def lazy_render(cls, obj: T, context: Optional[Dict] = None, saved: bool = False) -> LazyRender:
+    def lazy_render(cls, obj: T, context: Optional[Dict] = None) -> LazyRender:
         """
         This method can be called to give a LazyRender that can be embedded as needed
         or it can be called by this view on get/post followed by .render()

@@ -9,7 +9,143 @@
 {% load ui_tabs_builder %}
 {% load lab_tags %}
 {% load classification_tags %}
+
+<script>
+    $(document).ready(() => {
+        $('input[name=discordances-filter]').click(() => {
+            let selected = $("input[name=discordances-filter]:checked").val();
+
+            $('.contact-details').hide();
+            $(`.contact-details[data-lab=${selected}]`).show();
+            $('.discordance-row').each((index, row) => {
+                row = $(row);
+                let data_labs = row.attr('data-labs')
+                let show = false;
+                if (selected == "all" || !data_labs) {
+                    show = true;
+                } else {
+                    if (selected == "internal") {
+                        show = data_labs == 'internal'
+                    } else {
+                        let labs = data_labs.split(";");
+                        show = labs.includes(selected);
+                    }
+                }
+                if (show) {
+                    row.show();
+                } else {
+                    row.hide();
+                }
+            });
+        });
+    });
+</script>
+
 <div>
+    {% with dr_categories=dlab.discordance_reports %}
+        {% ui_register_tab_embedded label="Awaiting Triage" tab_set="discordance_tabs" badge=dr_categories.to_triage_table|length %}
+            {% discordance_report_table dr_categories.to_triage_table %}
+        {% end_ui_register_tab_embedded %}
+
+        {% with discuss_table=dr_categories.to_discuss_table %}
+            {% ui_register_tab_embedded label="Ready to Discuss" tab_set="discordance_tabs" badge=discuss_table|length badge_status="success" %}
+                {% if discuss_table %}
+                    <ul class="list-group mb-4">
+                        <li class="list-group-item">
+                            <label class="form-check" for="discordances-filter-all">
+                                <input class="form-check-input" type="radio" name="discordances-filter" id="discordances-filter-all" value="all" checked />
+                                <span class="form-check-label">
+                                {% if discuss_table.summaries.count == 1 %}
+                                    Show the 1 discordance
+                                {% else %}
+                                    Show all {{ discuss_table.summaries.count }} ready to discuss discordances <span class="text-info">(Use the below filters to show discordances with specific labs)</span>
+                                {% endif %}
+                                </span>
+                            </label>
+                        </li>
+                        {% for lab_count in discuss_table.counts %}
+                            <li class="list-group-item">
+                                {% if lab_count.is_internal %}
+                                    <label class="form-check" for="discordances-filter-internal">
+                                        <input class="form-check-input" type="radio" name="discordances-filter" id="discordances-filter-internal" value="internal" />
+                                        <span class="form-check-label">
+                                            Discordances only within {{ dr_categories.labs_quick_str }} account for <strong>{{ lab_count.count }}</strong> of these discordances
+                                        </span>
+                                    </label>
+                                {% else %}
+                                    <label class="form-check" for="discordances-filter-{{ lab_count.lab.pk }}">
+                                        <input class="form-check-input" type="radio" name="discordances-filter" id="discordances-filter-{{ lab_count.lab.pk }}" value="{{ lab_count.lab.pk }}" />
+                                        <span class="form-check-label">
+                                            <span style="font-weight:500">{% lab lab_count.lab %}</span> are involved in <strong>{{ lab_count.count }}</strong> of these discordances
+                                        </span>
+                                        {% with contact=lab_count.lab.contact_details %}
+                                            {% if contact %}
+                                                <div class="float-right text-secondary">
+                                                    {% if contact.website %}<i class="fas fa-globe"></i>{% endif %}
+                                                    {% if contact.email %}<i class="fas fa-envelope"></i>{% endif %}
+                                                    {% if contact.phone %}<i class="fas fa-phone"></i>{% endif %}
+                                                </div>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </label>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+
+                    {% for lab_count in discuss_table.counts %}
+                        {% with lab=lab_count.lab %}
+                            {% if lab.id != dlab.lab_id %}
+                                {% with contact=lab.contact_details %}
+                                    <div class="contact-details mb-4" style="display:none" data-lab="{{ lab.id }}">
+                                        {% labelled label="Lab" %}{% lab lab %}{% endlabelled %}
+                                        {% if contact %}
+                                            {% if contact.website %}
+                                                {% labelled label="Website" %}<a href="{{ contact.website }}">{{ contact.website }}</a>{% endlabelled %}
+                                            {% endif %}
+                                            {% if contact.name %}
+                                                {% labelled label="Contact Person" %}{{ contact.name }}{% endlabelled %}
+                                            {% endif %}
+                                            {% if contact.phone %}
+                                                {% labelled label="Contact Phone" %}{{ contact.phone }}{% endlabelled %}
+                                            {% endif %}
+                                            {% if contact.email %}
+                                                {% labelled label="Contact Email" %}<a href="mailto:{{ contact.email }}" class="mail-link">{{ contact.email }}</a>{% endlabelled %}
+                                            {% endif %}
+                                        {% endif %}
+                                    </div>
+                                {% endwith %}
+                            {% endif %}
+                        {% endwith %}
+                    {% endfor %}
+                {% endif %}
+
+                {% discordance_report_table discuss_table filter=True %}
+
+            {% end_ui_register_tab_embedded %}
+        {% endwith %}
+
+        {% ui_register_tab_embedded label="Awaiting Amendment" tab_set="discordance_tabs" badge=dr_categories.to_amend_table|length %}
+            {% discordance_report_table dr_categories.to_amend_table %}
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_register_tab_embedded label="Waiting on Other Lab" tab_set="discordance_tabs" badge=dr_categories.to_waiting_other_table|length badge_status="info" tab_status="not-important" %}
+            {% discordance_report_table dr_categories.to_waiting_other_table %}
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_register_tab_embedded label="Complex" tab_set="discordance_tabs" badge=dr_categories.to_complex_table|length badge_status="info" tab_status="not-important" %}
+            {% discordance_report_table dr_categories.to_complex_table %}
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_register_tab label="Resolved" tab_set="discordance_tabs" url='discordance_reports_history_detail' param=dlab.lab_picker.selection tab_status="not-important" %}
+
+        <div class="mt-4">
+            {% ui_render_tabs tab_set="discordance_tabs" %}
+        </div>
+    {% endwith %}
+
+    {% comment %}
+
     <script>
     $(document).ready(() => {
         $('input[name=discordances-filter]').click(() => {
@@ -133,5 +269,7 @@
     {% endif %}
 
     <div data-toggle="ajax-collapse" href="{% url 'discordance_reports_history_detail' dlab.lab_picker.selection %}" title="Past Discordances" data-id="past-discordances"></div>
+
+    {% endcomment %}
 
 </div>

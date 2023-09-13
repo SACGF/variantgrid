@@ -895,7 +895,6 @@ class DiscordanceReportTriageAdmin(ModelAdminBasics):
         ensure_discordance_report_triages_bulk()
 
 
-
 @admin.register(DiscordanceNotification)
 class DiscordanceNotificationAdmin(ModelAdminBasics):
     list_display = ("lab", "discordance_report", "notification_sent_date")

@@ -268,12 +268,17 @@ class ClinicalContextRecalcTrigger(Enum):
     DELAYED = "delayed"
     OTHER = "other"
     PENDING_CS_CHANGE = "pending_cs_change"
+    RE_OPEN = "reopen"
 
 
 @dataclass(frozen=True)
 class ClinicalContextChangeData:
     cause_text: str
     cause_code: ClinicalContextRecalcTrigger
+    notify_worthy: bool = True
+
+    def with_notify_worthy(self, notify: bool) -> 'ClinicalContextChangeData':
+        return ClinicalContextChangeData(cause_text=self.cause_text, cause_code=self.cause_code, notify_worthy=notify)
 
 
 class ClinicalContext(FlagsMixin, TimeStampedModel):

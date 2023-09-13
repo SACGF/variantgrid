@@ -12,7 +12,7 @@
         {% endfor %}
     </td>
     <td style="width:40%">
-        <div class="font-weight-bold mb-1 text-center" style="padding-left:40px">
+        <div class="text-center" style="padding-left:40px">
             {% if summary.discordance_report.resolution %}
                 {% if summary.discordance_report.resolution == "C" %}
                     <span class="text-success">{{ summary.discordance_report.get_resolution_display }}</span>
@@ -22,12 +22,13 @@
             {% elif summary.is_pending_concordance %}
                 <span class="text-success">Pending Concordance</span>
             {% else %}
-                <span class="no-value">Active Discordance</span>
+                <span class="text-secondary mr-2">Active Discordance</span>
                 {% if summary.is_medically_significant %}
-                    <i title="Medically Significant" class="fa-solid fa-kit-medical fa-lg hover-detail ml-1" style="color: #dd4040;"></i>
+                   <i title="Medically Significant" class="fa-solid fa-kit-medical fa-lg hover-detail" style="color: #dd4040;"></i>
                 {% endif %}
             {% endif %}
         </div>
+
         {% classification_lab_summaries summary.lab_significances %}
     </td>
 </tr>
