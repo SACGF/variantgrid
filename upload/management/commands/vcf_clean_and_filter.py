@@ -16,7 +16,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from vcf import Reader
 
-from library.genomics.vcf_utils import VCFColumns
+from library.genomics.vcf_enums import VCFColumns
 from snpdb.models import GenomeBuild, GenomeFasta
 
 

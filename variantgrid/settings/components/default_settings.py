@@ -12,6 +12,7 @@ import socket
 import sys
 from collections import defaultdict
 
+from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.django_utils.django_secret_key import get_or_create_django_secret_key
 from library.git import Git
 # if certain user settings are not relevant for the environment, list the columns in this
@@ -962,7 +963,8 @@ VARIANT_MANUAL_CREATE_BY_NON_ADMIN = True
 # Below this size, variants are stored with ref/alt sequences. Above this threshold, they become
 # structural variants and use symbolic
 VARIANT_SYMBOLIC_ALT_SIZE = 1000
-VARIANT_SYMBOLIC_ALT_VALID_TYPES = {"<DEL>", "<DUP>", "<INS>", "<CNV>"}
+VARIANT_SYMBOLIC_ALT_VALID_TYPES = {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP,
+                                    VCFSymbolicAllele.INS, VCFSymbolicAllele.CNV}
 
 VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS = False
 VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS_PREFER_CANONICAL_WITH_DIFF_VERSION = True

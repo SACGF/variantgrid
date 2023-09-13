@@ -12,8 +12,8 @@ from django.urls.base import reverse
 from django.utils import timezone
 from django_messages.models import Message
 
-from library.genomics.vcf_utils import cyvcf2_header_types, cyvcf2_header_get, VCFConstant, \
-    cyvcf2_get_contig_lengths_dict
+from library.genomics.vcf_enums import VCFConstant
+from library.genomics.vcf_utils import cyvcf2_header_types, cyvcf2_header_get, cyvcf2_get_contig_lengths_dict
 from library.guardian_utils import assign_permission_to_user_and_groups
 from seqauto.models import SampleSheetCombinedVCFFile, VCFFile, VCFFromSequencingRun, \
     SampleFromSequencingSample, QCGeneList

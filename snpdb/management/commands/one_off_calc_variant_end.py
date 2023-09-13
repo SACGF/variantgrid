@@ -47,8 +47,8 @@ class Command(BaseCommand):
     @staticmethod
     def update_variants_in_range_make_symbolic(variant_qs, dry_run: bool):
         seq = {s: Sequence.objects.get(seq=s) for s in "GATC"}
-        seq_del = Command._create_symbolic("<DEL>")
-        seq_dup = Command._create_symbolic("<DUP>")
+        seq_del = Command._create_symbolic(VCFSymbolicAllele.DEL)
+        seq_dup = Command._create_symbolic(VCFSymbolicAllele.DUP)
         changed_rows = []
 
         # Make sure we don't re-do stuff

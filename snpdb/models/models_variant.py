@@ -2,7 +2,7 @@ import logging
 import re
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Pattern, Tuple, Iterable, Set, Union, Dict, Any, List
+from typing import Optional, Tuple, Iterable, Set, Union, Dict, Any, List
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -22,6 +22,7 @@ from flags.models import FlagCollection, flag_collection_extra_info_signal, Flag
 from flags.models.models import FlagsMixin, FlagTypeContext
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
+from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import md5sum_str, FormerTuple
 from snpdb.models import Wiki
@@ -310,10 +311,10 @@ class VariantCoordinate(FormerTuple):
         if self.is_symbolic():
             contig_sequence = genome_build.genome_fasta.fasta[self.chrom]
             ref_sequence = contig_sequence[self.start-1:self.end].upper()
-            if self.alt == "<DEL>":
+            if self.alt == VCFSymbolicAllele.DEL:
                 ref = ref_sequence
                 alt = ref_sequence[0]
-            elif self.alt == "<DUP>":
+            elif self.alt == VCFSymbolicAllele.DUP:
                 ref = ref_sequence[0]
                 alt = ref_sequence
             else:
@@ -350,10 +351,10 @@ class VariantCoordinate(FormerTuple):
                     raise ValueError(f"{self}: end={self.end}, calculated end={end}")
 
                 if diff > 0:
-                    alt = "<DUP>"
+                    alt = VCFSymbolicAllele.DUP
                 else:
                     ref = self.ref[0]
-                    alt = "<DEL>"
+                    alt = VCFSymbolicAllele.DEL
             else:
                 alt = self.alt
         return VariantCoordinate(chrom=self.chrom, start=self.start, end=self.end, ref=ref, alt=alt)
@@ -498,10 +499,10 @@ class Variant(PreviewModelMixin, models.Model):
             @see https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7523648/ """
         if Sequence.allele_is_symbolic(alt):
             length = end - start
-            if alt == "<DEL>":
+            if alt == VCFSymbolicAllele.DEL:
                 d_str = length
                 i_str = ""
-            elif alt == "<INS>":
+            elif alt == VCFSymbolicAllele.INS:
                 d_str = ""
                 i_str = length
             else:
@@ -587,7 +588,7 @@ class Variant(PreviewModelMixin, models.Model):
     @property
     def is_deletion(self) -> bool:
         if self.alt.is_symbolic:
-            return self.alt.seq == "<DEL>"
+            return self.alt.seq == VCFSymbolicAllele.DEL
         return self.alt.seq != Variant.REFERENCE_ALT and self.locus.ref.length > self.alt.length
 
     @property
@@ -598,7 +599,7 @@ class Variant(PreviewModelMixin, models.Model):
     def can_make_g_hgvs(self) -> bool:
         """ Can't form ones with some symbolic variants (eg <INS>) """
         if self.is_symbolic:
-            return self.alt.seq in {"<DEL>", "<DUP>"}
+            return self.alt.seq in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP}
         return True
 
     @property
