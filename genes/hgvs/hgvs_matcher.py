@@ -14,7 +14,7 @@ from genes.hgvs.hgvs_converter import HGVSConverterType, HgvsMatchRefAllele
 from genes.hgvs.hgvs_converter_combo import ComboCheckerHGVSConverter
 from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSConverter
 from genes.models import TranscriptVersion, Transcript, GeneSymbol, LRGRefSeqGene, BadTranscript, \
-    NoTranscript, TranscriptParts
+    NoTranscript, TranscriptParts, GeneSymbolAlias
 from genes.transcripts_utils import transcript_is_lrg, looks_like_transcript, looks_like_hgvs_prefix
 from library.constants import WEEK_SECS
 from library.log_utils import report_exc_info
@@ -596,15 +596,18 @@ class HGVSMatcher:
         fixed_hgvs_string = f"{prefix}:{allele}"
         return fixed_hgvs_string, fixed_messages
 
-    def get_gene_symbol_if_no_transcript(self, hgvs_string: str) -> Optional[GeneSymbol]:
+    def get_gene_symbol_or_alias_if_no_transcript(self, hgvs_string: str) -> Tuple[Optional[GeneSymbol], Optional[GeneSymbolAlias]]:
         """ If HGVS uses gene symbol instead of transcript, return symbol """
         # pyhgvs sets to gene, Biocommons always uses as transcript
         hgvs_variant = self.create_hgvs_variant(hgvs_string)
         if hgvs_variant.transcript and hgvs_variant.gene:
             return None  # only return symbol if transcript is not used
         symbol = hgvs_variant.transcript or hgvs_variant.gene
-        return GeneSymbol.objects.filter(pk=symbol).first()
-
+        if gene_symbol := GeneSymbol.objects.filter(pk=symbol).first():
+            alias = None
+        else:
+            alias = GeneSymbolAlias.objects.filter(alias=symbol).first()
+        return gene_symbol, alias
 
 def get_hgvs_variant_coordinate(hgvs_string: str, genome_build: GenomeBuild) -> VariantCoordinate:
     """ Convenience method for 1 off HGVS - for batches use HGVSMatcher """

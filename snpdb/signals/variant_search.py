@@ -460,16 +460,22 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         pass
     except (ValueError, NotImplementedError) as hgvs_error:
         try:
-            if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
+            gene_symbol, alias = hgvs_matcher.get_gene_symbol_or_alias_if_no_transcript(hgvs_string)
+            if alias:
+                gene_symbol = alias.gene_symbol
+            if gene_symbol:
                 has_results = False
                 for result in _search_hgvs_using_gene_symbol(hgvs_matcher, gene_symbol, search_messages,
                                                              hgvs_string, user, genome_build, variant_qs):
                     if isinstance(result, SearchResult):
                         # don't count SearchMessageOverall as a result
                         has_results = True
+                        result.messages.append(SearchMessage(str(alias)))
                         yield result
                 if has_results:
                     return
+                else:  # Valid - just no results
+                    hgvs_error = None
 
         except HGVSException:
             # might just not be a HGVS name at all
@@ -482,7 +488,8 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                     yield SearchResult(classify_no_variant, messages=[search_message])
 
         # yield SearchMessageOverall(str(hgvs_error))
-        raise hgvs_error
+        if hgvs_error:  # May have been cleared if matched gene symbol HGVS
+            raise hgvs_error
 
     if used_transcript_accession:
         if used_transcript_accession not in hgvs_string:
