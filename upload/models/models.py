@@ -27,7 +27,7 @@ from library.log_utils import get_traceback, report_message, report_exc_info
 from library.utils.file_utils import file_md5sum, mk_path
 from seqauto.models import VCFFile, SampleSheetCombinedVCFFile, get_samples_by_sequencing_sample, VariantCaller
 from snpdb.import_status import set_vcf_and_samples_import_status
-from snpdb.models import VCF, Variant, SoftwareVersion, GenomeBuild
+from snpdb.models import VCF, Variant, SoftwareVersion, GenomeBuild, VariantCoordinate
 from snpdb.models.models_enums import ImportSource, ProcessingStatus, ImportStatus
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.user_settings_manager import UserSettingsManager
@@ -575,9 +575,10 @@ class ModifiedImportedVariant(models.Model):
             May return multiple values """
         formatted_old_variants = []
         for ov in ModifiedImportedVariant._split_old_variant(old_variant):
-            variant_tuple = Variant.get_tuple_from_string(ov, genome_build,
-                                                          regex_pattern=ModifiedImportedVariant.VT_OLD_VARIANT_PATTERN)
-            formatted_old_variants.append(ModifiedImportedVariant.get_old_variant_from_tuple(*variant_tuple))
+            vc = VariantCoordinate.from_string(ov, regex_pattern=ModifiedImportedVariant.VT_OLD_VARIANT_PATTERN)
+            contig = genome_build.chrom_contig_mappings[vc.chrom]
+            variant_coordinate = VariantCoordinate(contig.name, vc.start, vc.end, vc.ref, vc.alt)
+            formatted_old_variants.append(ModifiedImportedVariant.get_old_variant_from_variant_coordinate(variant_coordinate))
         return formatted_old_variants
 
     @staticmethod
@@ -599,29 +600,31 @@ class ModifiedImportedVariant(models.Model):
         return old_variants
 
     @staticmethod
-    def get_old_variant_from_tuple(chrom, position, ref, alt) -> str:
-        return f"{chrom}:{int(position)}:{ref}/{alt}"
+    def get_old_variant_from_variant_coordinate(vc: VariantCoordinate) -> str:
+        # TODO - this doesn't work w/symbolic alts but neither does VT - will eventually rewrite this to use
+        # BCF tools
+        return f"{vc.chrom}:{int(vc.start)}:{vc.ref}/{vc.alt}"
 
     @classmethod
-    def get_upload_pipeline_unnormalized_variant(cls, upload_pipeline, chrom, position, ref, alt):
+    def get_upload_pipeline_unnormalized_variant(cls, upload_pipeline, vc: VariantCoordinate):
         """ throws DoesNotExist """
-        old_variant = cls.get_old_variant_from_tuple(chrom, position, ref, alt)
+        old_variant = cls.get_old_variant_from_variant_coordinate(vc)
         return cls.objects.get(import_info__upload_step__upload_pipeline=upload_pipeline,
                                old_variant_formatted=old_variant)
 
     @classmethod
-    def get_variant_for_unnormalized_variant(cls, upload_pipeline, chrom, position, ref, alt) -> Variant:
-        miv = cls.get_upload_pipeline_unnormalized_variant(upload_pipeline, chrom, position, ref, alt)
+    def get_variant_for_unnormalized_variant(cls, upload_pipeline, variant_coordinate: VariantCoordinate) -> Variant:
+        miv = cls.get_upload_pipeline_unnormalized_variant(upload_pipeline, variant_coordinate)
         return miv.variant
 
     @classmethod
-    def get_variants_for_unnormalized_variant(cls, chrom, position, ref, alt) -> QuerySet:
-        old_variant = cls.get_old_variant_from_tuple(chrom, position, ref, alt)
+    def get_variants_for_unnormalized_variant(cls, variant_coordinate: VariantCoordinate) -> QuerySet[Variant]:
+        old_variant = cls.get_old_variant_from_variant_coordinate(variant_coordinate)
         return Variant.objects.filter(modifiedimportedvariant__old_variant_formatted=old_variant).distinct()
 
     @classmethod
-    def get_variants_for_unnormalized_variant_any_alt(cls, chrom, position, ref) -> QuerySet:
-        old_variant = cls.get_old_variant_from_tuple(chrom, position, ref, "")
+    def get_variants_for_unnormalized_variant_any_alt(cls, variant_coordinate: VariantCoordinate) -> QuerySet[Variant]:
+        old_variant = cls.get_old_variant_from_variant_coordinate(variant_coordinate)
         return Variant.objects.filter(modifiedimportedvariant__old_variant_formatted__startswith=old_variant).distinct()
 
     @classmethod

@@ -4,12 +4,14 @@ import os
 import subprocess
 from concurrent.futures.thread import ThreadPoolExecutor
 
+import cyvcf2
 from django.conf import settings
 from django.core.cache import cache
 
+from library.genomics.vcf_utils import vcf_get_ref_alt_end
 from library.utils.file_utils import name_from_filename, mk_path
 from snpdb import variant_collection
-from snpdb.models import Variant
+from snpdb.models import Variant, VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import UploadStep, UploadStepTaskType, VCFPipelineStage
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
@@ -43,25 +45,14 @@ class BulkUnknownVariantInserter:
         self.unknown_variants_batch_id = 0
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.child_futures = []
-        self.variant_pk_lookup = VariantPKLookup.factory(upload_step.genome_build)
+        self.variant_pk_lookup = VariantPKLookup(upload_step.genome_build)
 
-    def process_vcf_line(self, line):
-        columns = line.split("\t")
-        if len(columns) < 5:
-            msg = f"VCF line: '{line}' has < 5 columns"
-            raise ValueError(msg)
-
+    def process_vcf_record(self, variant):
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
         # This has been decomposed (only be 1 alt per line)
-        chrom = columns[0]
-        position = columns[1]
-        ref = columns[3].strip().upper()
-        alt = columns[4].strip().upper()
-
-        if Variant.is_ref_alt_reference(ref, alt):
-            alt = Variant.REFERENCE_ALT
-
-        self.variant_pk_lookup.add(chrom, position, ref, alt)
+        ref, alt, end = vcf_get_ref_alt_end(variant)
+        variant_coordinate = VariantCoordinate(variant.CHROM, variant.POS, end, ref, alt)
+        self.variant_pk_lookup.add(variant_coordinate)
         self.batch_process_check()
 
     def finish(self):
@@ -103,14 +94,12 @@ class SeparateUnknownVariantsTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
         bulk_inserter = BulkUnknownVariantInserter(upload_step)
-        with gzip.open(upload_step.input_filename, "rt") as f:
-            for line in f:
-                if line.startswith("#"):
-                    continue
-                bulk_inserter.process_vcf_line(line)
 
-            bulk_inserter.finish()  # Any leftovers
+        vcf_reader = cyvcf2.VCF(upload_step.input_filename)
+        for v in vcf_reader:
+            bulk_inserter.process_vcf_record(v)
 
+        bulk_inserter.finish()  # Any leftovers
         variant_collection.count = bulk_inserter.rows_processed
         return bulk_inserter.rows_processed
 
@@ -167,14 +156,15 @@ class InsertUnknownVariantsTask(ImportVCFStepTask):
         working_dir = os.path.join(pipeline_processing_dir, "unknown_variants", name_from_filename(input_filename))
         mk_path(working_dir)
 
-        variant_pk_lookup = VariantPKLookup.factory(upload_step.genome_build, working_dir=working_dir)
+        variant_pk_lookup = VariantPKLookup(upload_step.genome_build, working_dir=working_dir)
 
         with open(input_filename) as f:
             items_processed = 0
             # Python CSV reader dies with extremely long lines, so we just do by hand (not quoted or anything)
             for line in f:
-                chrom, position, ref, alt = line.strip().split(",")  # Not quoted, exactly 4 columns
-                variant_pk_lookup.add(chrom, position, ref, alt)
+                chrom, start, end, ref, alt = line.strip().split(",")  # Not quoted, exactly 5 columns
+                variant_coordinate = VariantCoordinate(chrom, start, end, ref, alt)
+                variant_pk_lookup.add(variant_coordinate)
                 variant_pk_lookup.batch_check(settings.SQL_BATCH_INSERT_SIZE, insert_unknown=True)
                 items_processed += 1
             # Any remaining

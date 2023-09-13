@@ -82,7 +82,7 @@ class BioCommonsHGVSVariant(HGVSVariant):
         return ref, alt
 
     def get_cdna_coords(self) -> str:
-        return str(self._sequence_variant.posedit.pos)
+        return str(self._sequence_variant.posedit.pos.start)
 
     def format(self, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH):
         conf = {"max_ref_length": max_ref_length}
@@ -137,14 +137,18 @@ class BioCommonsHGVSConverter(HGVSConverter):
         except HGVSError as e:
             raise HGVSException from e
 
-    def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
-        var_g = self.babelfish.vcf_to_g_hgvs(*vc)
+    def _variant_coordinate_to_sequence_variant(self, vc: VariantCoordinate) -> SequenceVariant:
+        chrom, position, _start, ref, alt = vc.as_external_explicit(self.genome_build)
+        return self.babelfish.vcf_to_g_hgvs(chrom, position, ref, alt)
+
+    def variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
+        var_g = self._variant_coordinate_to_sequence_variant(vc)
         return BioCommonsHGVSVariant(var_g)
 
-    def variant_coords_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
+    def variant_coordinate_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
         """ In VG we call non-coding "c.HGVS" as well - so hanve to handle that """
         try:
-            var_g = self.babelfish.vcf_to_g_hgvs(*vc)  # returns normalized (default HGVS 3')
+            var_g = self._variant_coordinate_to_sequence_variant(vc)  # returns normalized (default HGVS 3')
             # Biocommons HGVS doesn't normalize introns as it works with transcript sequences so doesn't have introns
             # workaround is to normalize on genome sequence first, so if it can't norm it's correct
             if transcript_version.strand == '-':
@@ -161,15 +165,16 @@ class BioCommonsHGVSConverter(HGVSConverter):
             var_c.gene = gene_symbol.symbol
         return BioCommonsHGVSVariant(var_c)
 
-    def hgvs_to_variant_coords_and_reference_match(self, hgvs_string: str, transcript_version=None) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
+    def hgvs_to_variant_coordinate_and_reference_match(self, hgvs_string: str, transcript_version=None) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
         var_g, matches_reference = self._hgvs_to_g_hgvs(hgvs_string)
         try:
-            (chrom, position, ref, alt, typ) = self.babelfish.hgvs_to_vcf(var_g)
+            (chrom, start, ref, alt, typ) = self.babelfish.hgvs_to_vcf(var_g)
             if alt == '.':
                 alt = ref
         except HGVSDataNotAvailableError:
             raise Contig.ContigNotInBuildError()
-        return VariantCoordinate(chrom, position, ref, alt), matches_reference
+        vc = VariantCoordinate.from_start_only(chrom, start, ref=ref, alt=alt)
+        return vc.as_internal_symbolic(), matches_reference
 
     def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
         sequence_variant = self._parser_hgvs(hgvs_string)

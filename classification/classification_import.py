@@ -27,7 +27,7 @@ MAX_VCF_FIELD_LENGTH = 1000  # while maximum is much larger than this, it indica
 
 
 def _is_safe_for_vcf(variant_coordinate: VariantCoordinate) -> bool:
-    if not all([variant_coordinate.chrom, variant_coordinate.pos, variant_coordinate.ref, variant_coordinate.alt]):
+    if not all([variant_coordinate.chrom, variant_coordinate.start, variant_coordinate.ref, variant_coordinate.alt]):
         return False
 
     if len(variant_coordinate.ref) > MAX_VCF_FIELD_LENGTH or len(variant_coordinate.alt) > MAX_VCF_FIELD_LENGTH:
@@ -44,7 +44,7 @@ def process_classification_import(classification_import: ClassificationImport, i
         @see https://github.com/SACGF/variantgrid/wiki/Variant-Classification-Import-and-Liftover
         Batch variant classification submissions are broken up into 1 ClassificationImport per GenomeBuild """
 
-    variant_pk_lookup = VariantPKLookup.factory(classification_import.genome_build)
+    variant_pk_lookup = VariantPKLookup(classification_import.genome_build)
     variant_tuples_by_hash: Dict[Any, VariantCoordinate] = {}
     allele_info_by_hash: Dict[Any, List[ImportedAlleleInfo]] = defaultdict(list)
 
@@ -55,10 +55,10 @@ def process_classification_import(classification_import: ClassificationImport, i
     allele_info: ImportedAlleleInfo
     for allele_info in no_variant_qs:
         try:
-            if variant_tuple := allele_info.variant_coordinate_obj:
-                variant_hash = variant_pk_lookup.add(*variant_tuple)
+            if variant_coordinate := allele_info.variant_coordinate_obj:
+                variant_hash = variant_pk_lookup.add(variant_coordinate)
                 if variant_hash:
-                    variant_tuples_by_hash[variant_hash] = variant_tuple
+                    variant_tuples_by_hash[variant_hash] = variant_coordinate
                     allele_info_by_hash[variant_hash].append(allele_info)
             else:
                 allele_info.set_matching_failed(message='Could not derive variant coordinates')

@@ -5,7 +5,7 @@ from django.core.exceptions import PermissionDenied
 
 from annotation.models import ManualVariantEntryType
 from annotation.models.models import ManualVariantEntryCollection, ManualVariantEntry
-from annotation.tasks.process_manual_variants_task import ManualVariantsPostInsertTask, get_manual_variant_tuples
+from annotation.tasks.process_manual_variants_task import ManualVariantsPostInsertTask, get_manual_variant_coordinates
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.genomics.vcf_utils import write_vcf_from_tuples
 from library.utils import full_class_name
@@ -50,7 +50,7 @@ def create_manual_variants(user, genome_build: GenomeBuild, variants_text: str):
 
         if entry_type != ManualVariantEntryType.UNKNOWN:
             try:
-                variants_list.extend(get_manual_variant_tuples(mve))
+                variants_list.extend(get_manual_variant_coordinates(mve))
             except Exception as ve:
                 mve.error_message = f"Error parsing {entry_type}: '{ve}'"
                 mve.save()

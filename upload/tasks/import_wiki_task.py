@@ -102,7 +102,7 @@ class VariantWikiCreateVCFTask(ImportVCFStepTask):
         variant_tuples = []
         for iw in records:
             g_hgvs = iw.match_column_value
-            if vt := matcher.get_variant_tuple(g_hgvs):
+            if vt := matcher.get_variant_coordinate(g_hgvs):
                 variant_tuples.append(vt)
 
         if variant_tuples:
@@ -123,8 +123,8 @@ class VariantWikiInsertTask(ImportVCFStepTask):
         user_matcher = UserMatcher(uploaded_file.user)
         matched_records = []
         for iw in wiki_collection.importedwiki_set.all():
-            if variant_tuple := hgvs_matcher.get_variant_tuple(iw.match_column_value):
-                variant = Variant.get_from_tuple(variant_tuple, wiki_collection.genome_build)
+            if variant_tuple := hgvs_matcher.get_variant_coordinate(iw.match_column_value):
+                variant = Variant.get_from_variant_coordinate(variant_tuple, wiki_collection.genome_build)
                 v_wiki, created = VariantWiki.objects.get_or_create(variant=variant)
                 _create_or_modify_wiki(user_matcher, iw, v_wiki, created)
                 matched_records.append(iw)

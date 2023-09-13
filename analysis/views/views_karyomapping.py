@@ -76,11 +76,10 @@ def get_variant_lookup_and_scatter_data(karyomapping_bins):
     for karyotype_code, variant_data in karyomapping_bins.items():
         x = []
         text = []
-        for variant_id, chrom, position, ref, alt in variant_data:
-
-            variant_string = Variant.format_tuple(chrom, position, ref, alt)
+        for variant_id, chrom, start, end, ref, alt in variant_data:
+            variant_string = Variant.format_tuple(chrom, start, end, ref, alt)
             variant_id_lookup[variant_string] = variant_id
-            x.append(position)
+            x.append(start)
             text.append(variant_string)
 
         collapsed_code = KaryotypeBins.COLLAPSED_BINS[karyotype_code]
@@ -127,7 +126,7 @@ def download_karyomapping_gene_csv(request, pk):
 
     karotype_bin_lookup = KaryotypeBins.get_karotype_bin_lookup()
 
-    header = ['chrom', 'position', 'ref', 'alt', 'proband_gt', 'father_gt', 'mother_gt', 'karyotype_bin']
+    header = ['chrom', 'start', 'end', 'ref', 'alt', 'proband_gt', 'father_gt', 'mother_gt', 'karyotype_bin']
     pseudo_buffer = StashFile()
     writer = csv.DictWriter(pseudo_buffer, header, dialect='excel')
 
@@ -135,7 +134,7 @@ def download_karyomapping_gene_csv(request, pk):
         writer.writeheader()
         yield pseudo_buffer.value
         for variant_data, genotype_tuple in variant_and_genotypes:
-            _, chrom, position, ref, alt = variant_data
+            _, chrom, start, end, ref, alt = variant_data
             proband_gt, father_gt, mother_gt = genotype_tuple
             try:
                 karotype_bin = karotype_bin_lookup[proband_gt][father_gt][mother_gt]
@@ -143,7 +142,8 @@ def download_karyomapping_gene_csv(request, pk):
                 karotype_bin = ''
 
             row = {'chrom': chrom,
-                   'position': position,
+                   'start': start,
+                   'end': end,
                    'ref': ref,
                    'alt': alt,
                    'proband_gt': Zygosity.get_genotype(proband_gt),

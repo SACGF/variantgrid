@@ -517,7 +517,10 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     variant = get_object_or_404(Variant, pk=variant_id)
     annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
     genome_build = annotation_version.genome_build
-    g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
+    if variant.can_make_g_hgvs:
+        g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
+    else:
+        g_hgvs = None
     latest_annotation_version = AnnotationVersion.latest(genome_build)
     variant_annotation = None
     vts = None

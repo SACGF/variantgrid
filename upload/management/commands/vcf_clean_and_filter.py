@@ -1,5 +1,11 @@
 """
 Uploaded VCFs are first passed through this command to fix things that will cause VT to die (eg bad contigs)
+
+We also rename chromosomes to the RefSeq contig IDs used in our fasta file
+
+We don't use "bcftools annotate --rename-chrs" to do this as it fails if contigs are not defined in the header
+Which we unfortunately see sometimes.
+
 """
 import re
 import sys
@@ -10,6 +16,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from vcf import Reader
 
+from library.genomics.vcf_enums import VCFColumns
 from snpdb.models import GenomeBuild, GenomeFasta
 
 
@@ -65,13 +72,12 @@ class Command(BaseCommand):
                 if defined_filters is None:
                     defined_filters = self._get_defined_vcf_filters(vcf_header_lines)
                 columns = line.split("\t")
-                chrom = columns[0]
-                contig_id = chrom_to_contig_id.get(chrom)
+                chrom = columns[VCFColumns.CHROM]
                 fasta_chrom = None
-                if contig_id:
+                if contig_id := chrom_to_contig_id.get(chrom):
                     valid_position = False
                     try:
-                        position = int(columns[1])
+                        position = int(columns[VCFColumns.POS])
                         length = contig_lengths[contig_id]
                         valid_position = 0 < position < length
                     except ValueError:
@@ -79,14 +85,13 @@ class Command(BaseCommand):
                     if not valid_position:
                         skipped_records["position out of range"] += 1
                         continue
-
                     fasta_chrom = contig_to_fasta_names.get(contig_id)
 
                 if not fasta_chrom:
                     if skipped_contigs_stats_file:
                         skipped_contigs[chrom] += 1
                     continue
-                columns[0] = fasta_chrom
+                columns[VCFColumns.CHROM] = fasta_chrom
 
                 if skip_patterns:
                     if skip_reason := self._check_skip_line(skip_patterns, line):
@@ -94,27 +99,29 @@ class Command(BaseCommand):
                         continue
 
                 # Check ref / alt bases are ok
-                if settings.VARIANT_STANDARD_BASES_ONLY:
-                    ref = columns[3]
-                    alt = columns[4]
-                    if ref_standard_bases_pattern.sub("", ref):
-                        if ref.startswith("<") and ref.endswith(">"):
-                            skip_reason = f"REF = {ref}"
-                        else:
-                            skip_reason = "non-standard bases in REF sequence"
-                        skipped_records[skip_reason] += 1
-                        continue
+                ref = columns[VCFColumns.REF]
+                alt = columns[VCFColumns.ALT]
+                if ref_standard_bases_pattern.sub("", ref):
+                    if ref.startswith("<") and ref.endswith(">"):
+                        skip_reason = f"REF = {ref}"
+                    else:
+                        skip_reason = "non-standard bases in REF sequence"
+                    skipped_records[skip_reason] += 1
+                    continue
 
-                    if alt_standard_bases_pattern.sub("", alt):
-                        if alt.startswith("<") and alt.endswith(">"):
+                if alt_standard_bases_pattern.sub("", alt):
+                    skip_reason = None
+                    if alt.startswith("<") and alt.endswith(">"):
+                        if alt not in settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES:
                             skip_reason = f"ALT = {alt}"
-                        else:
-                            skip_reason = "non-standard bases in ALT sequence"
+                    else:
+                        skip_reason = "non-standard bases in ALT sequence"
+                    if skip_reason:
                         skipped_records[skip_reason] += 1
                         continue
 
                 # Remove filters not in header
-                filter_column = columns[6]
+                filter_column = columns[VCFColumns.FILTER]
                 if filter_column not in QUICK_ACCEPT_FILTERS:
                     cleaned_filters = []
                     for fc in filter_column.split(";"):
@@ -127,14 +134,14 @@ class Command(BaseCommand):
                         filter_column = ";".join(cleaned_filters)
                     else:
                         filter_column = "."
-                    columns[6] = filter_column
+                    columns[VCFColumns.FILTER] = filter_column
 
                 if remove_info:
                     # Zero out INFO (makes file size smaller and causes bcftools issues)
-                    columns[7] = "."
+                    columns[VCFColumns.INFO] = "."
                     # If (7) INFO was the last column, we just stripped the newline - might need to add it back
                     if len(columns) == 8:
-                        columns[7] += "\n"
+                        columns[VCFColumns.INFO] += "\n"
                 sys.stdout.write("\t".join(columns))
 
         self._write_skip_counts(skipped_contigs, skipped_contigs_stats_file)
@@ -150,7 +157,7 @@ class Command(BaseCommand):
         return defined_filters
 
     @staticmethod
-    def _write_skip_counts(counts, filename):
+    def _write_skip_counts(counts, filename): #
         if counts and filename:
             with open(filename, "w") as f:
                 for name, count in counts.items():

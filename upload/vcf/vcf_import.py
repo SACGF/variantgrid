@@ -12,8 +12,8 @@ from django.urls.base import reverse
 from django.utils import timezone
 from django_messages.models import Message
 
-from library.genomics.vcf_utils import cyvcf2_header_types, cyvcf2_header_get, VCFConstant, \
-    cyvcf2_get_contig_lengths_dict
+from library.genomics.vcf_enums import VCFConstant
+from library.genomics.vcf_utils import cyvcf2_header_types, cyvcf2_header_get, cyvcf2_get_contig_lengths_dict
 from library.guardian_utils import assign_permission_to_user_and_groups
 from seqauto.models import SampleSheetCombinedVCFFile, VCFFile, VCFFromSequencingRun, \
     SampleFromSequencingSample, QCGeneList
@@ -57,7 +57,7 @@ def set_allele_depth_format_fields(vcf: VCF, vcf_formats, vcf_source, default_al
 
     if ad is None:
         msg = f"Couldn't determine allele depth format field, source: '{vcf_source}', formats: {vcf_formats}"
-        raise ValueError(msg)
+        logging.warning(msg)
 
     vcf.allele_depth_field = ad
 
@@ -186,6 +186,7 @@ def configure_vcf_from_header(vcf, vcf_reader):
     vcf.source = source
     if vcf.genotype_samples:  # Has sample format fields
         set_allele_depth_format_fields(vcf, vcf_formats, source, VCFConstant.DEFAULT_ALLELE_FIELD)
+        vcf.genotype_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_GENOTYPE_FIELD)
         vcf.read_depth_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_READ_DEPTH_FIELD)
         vcf.genotype_quality_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_GENOTYPE_QUALITY_FIELD)
         vcf.phred_likelihood_field = get_phred_likelihood_field(vcf_formats, source,
@@ -498,7 +499,7 @@ def get_genome_build_from_contig_lengths(contig_lengths: dict, min_contig_matche
         if num_matches == 1:
             return potential_genome_builds[0]
         else:
-            matches = ", ".join(potential_genome_builds)
+            matches = ", ".join([gb.name for gb in potential_genome_builds])
             raise ContigMismatchException(f"Multiple genomes: {matches} matched supplied contigs {contig_lengths}")
     else:
         differences = ", ".join([f"{gb}: {diff}" for gb, diff in build_contig_diffs.items()])

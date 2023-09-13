@@ -1,3 +1,4 @@
+import re
 from collections import Counter
 from typing import Dict
 
@@ -13,11 +14,22 @@ def key_data_func(key, data):
 
 VARIANT_ID = 'variant_id'
 VARIANT_PATH = 'variant_path'
-VARIANT_GRID_INFO_DICT = {VARIANT_ID: {'number': 1,
-                                       'type': 'Integer',
-                                       'description': 'VariantGrid primary column',
-                                       VARIANT_PATH: 'id',
-                                       'key_data_func': key_data_func}}
+VARIANT_GRID_INFO_DICT = {
+    VARIANT_ID: {
+        'type': 'Integer',
+        'description': 'VariantGrid primary column',
+        VARIANT_PATH: 'id',
+        'key_data_func': key_data_func},
+    # INFO fields for CNV
+    "END": {
+        'type': 'Integer',
+        'description': 'Stop position of the interval',
+    },
+    "SVTYPE": {
+        'type': 'String',
+        'description': 'Type of structural variant',
+    }
+}
 
 
 def qs_info_dict_field_values(qs, info_dict):
@@ -41,6 +53,8 @@ def write_qs_to_vcf_file_sort_alphabetically(qs, f, info_dict=None):
 
 
 def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict):
+    symbolic_pattern = re.compile("<(.*)>")
+
     for line in header_lines:
         line_bytes = (line + '\n').encode()
         f.write(line_bytes)
@@ -51,18 +65,25 @@ def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict):
         pos = data["locus__position"]
         ref = data["locus__ref__seq"]
         alt = data["alt__seq"]
+        end = data["end"]
+        info = {}
+
+        if m := symbolic_pattern.match(alt):
+            info["END"] = end
+            info["SVTYPE"] = m.group(1)
 
         if info_dict:
-            infos_list = []
             for info_name, info_data in info_dict.items():
-                variant_path = info_data["variant_path"]
-                func = info_data.get("key_data_func", key_data_func)
-                value = func(variant_path, data)
-                infos_list.append(f"{info_name}={value}")
-            info = ';'.join(infos_list)
+                if variant_path := info_data.get("variant_path"):
+                    func = info_data.get("key_data_func", key_data_func)
+                    value = func(variant_path, data)
+                    info[info_name] = value
+
+        if info:
+            info_str = ';'.join([f"{k}={v}" for k, v in info.items()])
         else:
-            info = '.'
-        line = '\t'.join(map(str, (chrom, pos, '.', ref, alt or ref, '.', '.', info)))
+            info_str = '.'
+        line = '\t'.join(map(str, (chrom, pos, '.', ref, alt or ref, '.', '.', info_str)))
         line_bytes = (line + '\n').encode()
         f.write(line_bytes)
         i += 1

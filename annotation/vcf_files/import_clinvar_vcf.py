@@ -6,6 +6,7 @@ from django.core.exceptions import PermissionDenied
 
 from annotation.models import ClinVarReviewStatus, Variant
 from annotation.models.models import ClinVar, ClinVarVersion
+from snpdb.models import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
@@ -57,7 +58,7 @@ class BulkClinVarInserter:
         self.items_processed = 0
         self.batch_id = 0
         self.conflicting_missing_clinsigconf = 0
-        self.variant_pk_lookup = VariantPKLookup.factory(clinvar_version.genome_build)
+        self.variant_pk_lookup = VariantPKLookup(clinvar_version.genome_build)
         review_status_vcf_mappings_dict = dict(ClinVarReviewStatus.VCF_MAPPINGS)
         self.field_formatters = {
             "clinvar_review_status": lambda x: review_status_vcf_mappings_dict[x]
@@ -65,7 +66,8 @@ class BulkClinVarInserter:
 
     def process_variant(self, v):
         alt = self.variant_single_alt(v)
-        variant_hash = self.variant_pk_lookup.add(v.CHROM, v.POS, v.REF, alt)
+        variant_coordinate = VariantCoordinate.from_start_only(v.CHROM, v.POS, v.REF, alt)
+        variant_hash = self.variant_pk_lookup.add(variant_coordinate)
         self.variant_by_variant_hash[variant_hash] = v
         if len(self.variant_by_variant_hash) >= settings.SQL_BATCH_INSERT_SIZE:
             self.bulk_insert()

@@ -53,14 +53,14 @@ class ComboCheckerHGVSConverter(HGVSConverter):
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
         return self._call_converters("create_hgvs_variant", hgvs_string)
 
-    def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
-        return self._call_converters("variant_coords_to_g_hgvs", vc)
+    def variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
+        return self._call_converters("variant_coordinate_to_g_hgvs", vc)
 
-    def variant_coords_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
-        return self._call_converters("variant_coords_to_c_hgvs", vc, transcript_version)
+    def variant_coordinate_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
+        return self._call_converters("variant_coordinate_to_c_hgvs", vc, transcript_version)
 
-    def hgvs_to_variant_coords_and_reference_match(self, hgvs_string: str, transcript_version) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
-        return self._call_converters("hgvs_to_variant_coords_and_reference_match", hgvs_string, transcript_version)
+    def hgvs_to_variant_coordinate_and_reference_match(self, hgvs_string: str, transcript_version) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
+        return self._call_converters("hgvs_to_variant_coordinate_and_reference_match", hgvs_string, transcript_version)
 
     def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
         return self._call_converters("c_hgvs_remove_gene_symbol", hgvs_string)

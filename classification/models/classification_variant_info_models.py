@@ -366,7 +366,7 @@ class ImportedAlleleInfo(TimeStampedModel):
     @property
     def variant_coordinate_obj(self) -> Optional[VariantCoordinate]:
         if variant_coordinate_str := self.variant_coordinate:
-            return VariantCoordinate.from_clean_str(variant_coordinate_str)
+            return VariantCoordinate.from_string(variant_coordinate_str)
         else:
             return None
 
@@ -626,7 +626,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         use_hgvs = self.imported_c_hgvs or self.imported_g_hgvs
         try:
             hgvs_matcher = HGVSMatcher(self.imported_genome_build_patch_version.genome_build)
-            vc_extra = hgvs_matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(use_hgvs)
+            vc_extra = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(use_hgvs)
             self.message = f"HGVS matched by '{vc_extra.method}'"
             self.variant_coordinate = str(vc_extra.variant_coordinate)
         except Exception as e:

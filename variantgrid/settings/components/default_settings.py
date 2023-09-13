@@ -12,6 +12,7 @@ import socket
 import sys
 from collections import defaultdict
 
+from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.django_utils.django_secret_key import get_or_create_django_secret_key
 from library.git import Git
 # if certain user settings are not relevant for the environment, list the columns in this
@@ -343,8 +344,11 @@ PREFER_ALLELE_LINKS = False
 # if True, CR_lab_id will be used in all instances
 VARIANT_CLASSIFICATION_ID_OVERRIDE_PREFIX = False
 
+# ClinGen Allele Registry paper - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6519371/
 CLINGEN_ALLELE_REGISTRY_DOMAIN = "http://reg.genome.network"
 CLINGEN_ALLELE_REGISTRY_MAX_RECORDS = 2000
+# From paper: The maximal nucleotide (transcript or genomic) allele size is 10,000 bp
+CLINGEN_ALLELE_REGISTRY_MAX_ALLELE_SIZE = 10_000
 CLINGEN_ALLELE_REGISTRY_LOGIN = get_secret("CLINGEN_ALLELE_REGISTRY.login")
 CLINGEN_ALLELE_REGISTRY_PASSWORD = get_secret("CLINGEN_ALLELE_REGISTRY.password")
 CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS = 10_000  # On nodes and VCFs
@@ -383,7 +387,7 @@ COMPANY = None  # Used for gene list categories
 
 GENERATED_DIR = os.path.join(MEDIA_ROOT, 'generated')
 
-HGVS_DEFAULT_METHOD = "pyhgvs"  # HGVSConverterType (any case) ie "pyhgvs", "biocommons_hgvs"
+HGVS_DEFAULT_METHOD = "pyhgvs"  # HGVSConverterType (any case) ie "pyhgvs", "biocommons_hgvs", "combo"
 HGVS_MAX_REF_ALLELE_LENGTH = 10  # Set to 0 for "del" instead of "delC" etc
 HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH = True
 
@@ -458,7 +462,6 @@ ANALYSIS_NODE_CACHE_Q = True
 ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX = 1000
 
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
-VARIANT_STANDARD_BASES_ONLY = True  # True to reject anything other than A, C, G, T
 VARIANT_SHOW_CANONICAL_HGVS = True
 
 VARIANT_CLASSIFICATION_OMNI_IMPORTER_APP_DIR = None  # location of OmniImporter (if present) to map imported classifications
@@ -957,6 +960,11 @@ VARIANT_DETAILS_NEARBY_SHOW_GENE = False
 VARIANT_VCF_DB_PREFIX = "vg"
 VARIANT_MANUAL_CREATE = True
 VARIANT_MANUAL_CREATE_BY_NON_ADMIN = True
+# Below this size, variants are stored with ref/alt sequences. Above this threshold, they become
+# structural variants and use symbolic
+VARIANT_SYMBOLIC_ALT_SIZE = 1000
+VARIANT_SYMBOLIC_ALT_VALID_TYPES = {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP,
+                                    VCFSymbolicAllele.INS, VCFSymbolicAllele.CNV}
 
 VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS = False
 VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS_PREFER_CANONICAL_WITH_DIFF_VERSION = True

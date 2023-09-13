@@ -34,7 +34,7 @@ class MatcherOutput:
     @property
     def explicit_variant_coordinate(self):
         if vc := self.variant_coordinate:
-            return vc.explicit_reference()
+            return vc.as_internal_symbolic()
 
     @property
     def is_error(self):
@@ -105,7 +105,7 @@ def hgvs_resolution_tool(request: HttpRequest):
 
             try:
                 variant_coordinate: Optional[VariantCoordinate] = None
-                if vcd := matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(hgvs_str):
+                if vcd := matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_str):
                     variant_coordinate = vcd.variant_coordinate
                     output.variant_coordinate = variant_coordinate
 
