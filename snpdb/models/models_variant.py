@@ -254,6 +254,21 @@ class VariantCoordinate(FormerTuple):
     ref: str
     alt: str
 
+    def __post_init__(self):
+        _field_types = {
+            "chrom": str,
+            "start": int,
+            "end": int,
+            "ref": str,
+            "alt": str,
+        }
+
+        for field, expected_type in _field_types.items():
+            v = getattr(self, field)
+            if not isinstance(v, expected_type):
+                raise ValueError(f"'{field}' must be of type {expected_type}, was type: {type(v)}")
+
+
     @property
     def as_tuple(self) -> Tuple:
         return self.chrom, self.start, self.end, self.ref, self.alt
@@ -274,6 +289,9 @@ class VariantCoordinate(FormerTuple):
             ref = full_match.group(3)
             alt = full_match.group(4)
             return VariantCoordinate.from_start_only(chrom, start, ref, alt)
+
+        raise ValueError(f"{variant_string=} did not match agaisnt {regex_pattern=}")
+
 
     @staticmethod
     def from_start_only(chrom: str, start: int, ref: str, alt: str):
