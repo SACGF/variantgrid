@@ -127,7 +127,7 @@ def get_secret(key: str, mandatory: bool = True) -> Optional[Any]:
     value, found = _get_nested(parts, _default_settings)
     if found:
         if key != 'DB.port':
-            logging.warning(f'Warning {key} was loaded from default_settings, migrate to settings config or env variable')
+            logging.warning(f"Warning '{key}' not present in config file '{_settings_file()}', using default value '{found}', please migrate")
         return value
 
     if not mandatory:
@@ -136,7 +136,7 @@ def get_secret(key: str, mandatory: bool = True) -> Optional[Any]:
     settings_filename = _settings_file()
     if not os.path.exists(settings_filename):
         raise FileNotFoundError(f"Secret settings file '{settings_filename}' not found")
-    raise ValueError(f"No config value found for {key} in secret settings file '{settings_filename}'")
+    raise ValueError(f"Error '{key}' not present in config file '{settings_filename}'")
 
 
 def get_secrets(prefix: str, leafs: List[str], mandatory: bool = True) -> Dict[str, Any]:
