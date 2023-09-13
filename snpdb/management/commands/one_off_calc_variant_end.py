@@ -1,6 +1,4 @@
 import logging
-from collections import Counter
-
 import numpy as np
 import pandas as pd
 from django.conf import settings
@@ -10,6 +8,7 @@ from django.db.models.functions import Abs
 
 from annotation.models import AnnotationRangeLock
 from genes.hgvs import HGVSMatcher
+from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.utils import md5sum_str
 from snpdb.models import Variant, Locus, Sequence, GenomeBuild, VariantCoordinate
 
