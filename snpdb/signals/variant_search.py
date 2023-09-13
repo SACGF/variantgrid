@@ -316,15 +316,16 @@ def _search_hgvs_using_gene_symbol(
     hgvs_variant.gene = None
 
     transcript_versions = set()
-    mane_transcripts = set()
+    mane_status_by_transcript = {}
     other_transcripts_message = None  # Want this to be after transcripts used message
 
     if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE:
-        if mane := MANE.objects.filter(symbol=gene_symbol).first():
+        # There can be multiple MANE entries (MANE Plus Clinical and MANE Select)
+        for mane in MANE.objects.filter(symbol=gene_symbol):
             for ac in AnnotationConsortium:
                 if tv := mane.get_transcript_version(ac):
                     transcript_versions.add(tv)
-                    mane_transcripts.add(tv.accession)
+                    mane_status_by_transcript[tv.accession] = mane.get_status_display()
 
     if settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
         for gene in gene_symbol.genes:
@@ -352,8 +353,8 @@ def _search_hgvs_using_gene_symbol(
                         variant_identifier = result.preview.identifier
                         results_by_variant_identifier[variant_identifier].append(result)
                         tv_message = str(transcript_version.accession)
-                        if transcript_version.accession in mane_transcripts:
-                            tv_message += " (MANE)"
+                        if mane_status := mane_status_by_transcript.get(transcript_version.accession):
+                            tv_message += f" ({mane_status})"
                         transcript_accessions_by_variant_identifier[variant_identifier].append(tv_message)
                     else:
                         # result is a ClassifyVariantHgvs or similar, yield it and only care about real variants for the rest
@@ -394,7 +395,7 @@ def _search_hgvs_using_gene_symbol(
         # In some special cases, add in special messages for no result
         messages_as_strs = [str(message) for message in search_messages]
         if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE and not settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
-            message = "\n".join(messages_as_strs + [f"Only searched MANE transcripts: {', '.join(mane_transcripts)}"])
+            message = "\n".join(messages_as_strs + [f"Only searched MANE transcripts: {', '.join(mane_status_by_transcript)}"])
             yield SearchMessageOverall(message)
 
         elif not (settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE or settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS):
