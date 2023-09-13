@@ -29,11 +29,11 @@
 
             <div class="card">
                 <div class="card-header">
-                    Review Attendance
+                    Discussion Attendance
                     {% if review.pk %}{% admin_link review %}{% endif %}
                 </div>
                 <div class="card-body">
-                    {% labelled label="Reviewing" hint="large-label" %}
+                    {% labelled label="Discussing" hint="large-label" %}
                         {% preview review.reviewing.source_object %}
                     {% endlabelled %}
 
@@ -41,12 +41,12 @@
                         {{ review.topic.name }}
                     {% endlabelled %}
 
-                    {% labelled label="Date of Review" hint="large-label" errors=form.review_date.errors %}
+                    {% labelled label="Date of Discussion" hint="large-label" errors=form.review_date.errors %}
                         {{ form.review_date }}
                     {% endlabelled %}
                     <hr class="dashed" />
 
-                    {% labelled label="Methods of Review" hint="large-label" errors=form.review_method.errors %}
+                    {% labelled label="Methods of Discussion" hint="large-label" errors=form.review_method.errors %}
                         {{ form.review_method }}
                     {% endlabelled %}
                     <hr class="dashed" />
@@ -57,7 +57,7 @@
 
                     <hr class="dashed" />
 
-                    {% labelled label="Reviewing Labs" hint="large-label" errors=form.reviewing_labs.errors %}
+                    {% labelled label="Discussing Labs" hint="large-label" errors=form.reviewing_labs.errors %}
                         {{ form.reviewing_labs }}
                     {% endlabelled %}
                 </div>
