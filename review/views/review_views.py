@@ -125,7 +125,7 @@ def _handle_review(request, review: Review, reviewing: Optional[ReviewableModelM
         discussion_form = ReviewForm(review=review, data=request.POST)
         if discussion_form.is_valid():
             discussion_form.save()
-            messages.add_message(request, level=messages.SUCCESS, message="Review saved successfully")
+            messages.add_message(request, level=messages.SUCCESS, message="Discussion saved successfully")
 
             return redirect(discussion_form.review.next_step_url())
     else:

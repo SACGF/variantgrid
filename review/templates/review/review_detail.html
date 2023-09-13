@@ -2,15 +2,15 @@
 {% load js_tags %}
 {% load user_tags %}
 <div class="card">
-    <div class="card-header">Review {% admin_link review %}</div>
+    <div class="card-header">Discussion {% admin_link review %}</div>
     <div class="card-body">
         {% if show_source_object %}
-            {% labelled label="Review Of" %}{% preview review.reviewing.source_object %}{% endlabelled %}
+            {% labelled label="Discussion Of" %}{% preview review.reviewing.source_object %}{% endlabelled %}
         {% endif %}
         {% labelled label="On The Topic Of" %}{{ review.topic.name }}{% endlabelled %}
         {% labelled label="On The Date" %}{{ review.review_date }}{% endlabelled %}
 
-        {% labelled label="Methods of Review" %}
+        {% labelled label="Methods of Discussion" %}
             {% for item in review.review_method %}
                 {% if not forloop.first %}<br/>{% endif %}
                 {{ item }}
@@ -23,13 +23,13 @@
                 {{ item }}
             {% endfor %}
         {% endlabelled %}
-        {% labelled label="Reviewing Labs" %}
+        {% labelled label="Discussing Labs" %}
             {% for lab in review.reviewing_labs.all %}
                 {% if not forloop.first %}<br/>{% endif %}
                 {{ lab }}
             {% endfor %}
         {% endlabelled %}
-        {% labelled label="Review Last Edited By" %}
+        {% labelled label="Discussion Last Edited By" %}
             {% user review.user show_group=True size="tiny" %} @ {% timestamp review.modified %}
         {% endlabelled %}
         {% labelled label="Details" %}
