@@ -127,7 +127,11 @@ def get_secret(key: str, mandatory: bool = True) -> Optional[Any]:
     value, found = _get_nested(parts, _default_settings)
     if found:
         if key != 'DB.port':
-            logging.warning(f"Warning '{key}' not present in config file '{_settings_file()}', using default value '{found}', please migrate")
+            root_json = value
+            for p in reversed(parts):
+                root_json = {p: root_json}
+            root_json_str = json.dumps(root_json)
+            logging.warning(f"Warning '{key}' not present in config file '{_settings_file()}', using default value '{found}', please migrate e.g. {root_json_str}")
         return value
 
     if not mandatory:
