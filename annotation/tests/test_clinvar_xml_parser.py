@@ -4,7 +4,7 @@ from django.test import TestCase
 
 from django.conf import settings
 
-from annotation.clinvar_xml_parser_all_records import ClinVarXmlParserViaRCVs
+from annotation.clinvar_xml_parser_via_rcvs import ClinVarXmlParserViaRCVs
 from annotation.models import ClinVarRecord, ClinVarRecordCollection
 
 TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
