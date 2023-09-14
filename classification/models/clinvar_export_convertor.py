@@ -64,11 +64,11 @@ class ClinVarExportData:
     clinvar_export: 'ClinVarExport'
     """ The record this export data is for """
 
-    grouping: Optional[ValidatedJson] = None
+    grouping: ValidatedJson
     """ The body data we'll be using (could either be as it's cached in the record or what the most up to date grouping
     header would look like"""
 
-    body: Optional[ValidatedJson] = None
+    body: ValidatedJson
     """ The body data we'll be using (could either be as it's cached in the record or what the most up to date body
     would look like"""
 
@@ -392,7 +392,9 @@ class ClinVarExportConverter:
 
         if self.classification_based_on is None:
             return ClinVarExportData(
-                clinvar_export=self.clinvar_export_record
+                clinvar_export=self.clinvar_export_record,
+                body=ValidatedJson({}, messages=JsonMessages.error("No classification is currently associated with this allele and condition")),
+                grouping=ValidatedJson({})
             )
         else:
             grouping = ValidatedJson({"assertionCriteria": self.json_assertion_criteria})
