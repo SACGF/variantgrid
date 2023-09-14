@@ -120,7 +120,7 @@
     </div>
 
     <div class="container mt-4">
-        <h4 style="margin-bottom:0">Step 1: Triages</h4>
+        <h4 {% if triages %}style="margin-bottom:0"{% endif %}>Step 1: Triages</h4>
         {% with triages=data.triage_embeds %}
             {% if triages %}
                 <div class="row equal">
@@ -145,17 +145,17 @@
                     <div class="card">
                         <div class="card-header">Discussion</div>
                         <div class="card-body">
-                            <div class="no-value">This Discordance Report has not yet been discussed</div>
+                            <div class="no-value">This Discordance Report has not yet been discussed.</div>
                         </div>
                         <div class="card-footer">
                             <a class="mt-2 btn btn-primary" href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">Start Discordance Discussion</a>
                         </div>
                     </div>
                 {% else %}
-                    <div class="no-value">This discordance isn't marked as ready for discussion - see triages. <a href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">Discuss anyway.</a></div>
+                    <div class="no-value">This discordance isn't marked as ready for discussion - see triages. <a class="hover-link" href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">Click here to discuss anyway.</a></div>
                 {% endif %}
             {% else %}
-                <div class="no-value">This Discordance Report was not discussed</div>
+                <div class="no-value">This Discordance Report was not discussed.</div>
             {% endif %}
         {% endif %}
 
@@ -171,7 +171,7 @@
         {% endif %}
 
 
-        <h4>History of this Clinical Grouping's Discordance Reports</h4>
+        <h4 class="text-secondary">History of this Clinical Grouping's Discordance Reports</h4>
         {% if data.has_history %}
             <table class="table">
                 <thead>
