@@ -276,5 +276,9 @@ class ReviewableModelMixin(models.Model):
         else:
             return Review.objects.none()
 
+    @property
+    def is_review_locked(self) -> bool:
+        return False
+
 
 review_detail_signal = django.dispatch.Signal()

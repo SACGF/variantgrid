@@ -33,7 +33,7 @@
                 </div>
             </div>
             <div class="card-footer">
-                <input type="submit" class="btn btn-primary w-100" />
+                <input type="submit" class="btn btn-primary" />
             </div>
         </form>
     {% else %}
@@ -59,7 +59,7 @@
         </div>
         {% if_user_can_edit triage %}
             <div class="card-footer">
-                <a class="btn btn-primary w-100" data-toggle="embed-content" href="{% url 'discordance_report_triage_detail' triage.pk %}?edit=true">Edit</a>
+                <a class="btn btn-primary" data-toggle="embed-content" href="{% url 'discordance_report_triage_detail' triage.pk %}?edit=true">Edit</a>
             </div>
         {% end_if_user_can_edit %}
     {% endif %}

@@ -11,7 +11,7 @@
         </thead>
         <tbody>
         {% for summary in table.summaries %}
-            {% discordance_report_row summary filter=filter %}
+            {% discordance_report_row summary filter=filter discuss=discuss %}
         {% endfor %}
         </tbody>
     </table>

@@ -27,8 +27,8 @@
                    <i title="Medically Significant" class="fa-solid fa-kit-medical fa-lg hover-detail" style="color: #dd4040;"></i>
                 {% endif %}
             {% endif %}
+            {% if discuss %}<div><a class="hover-link" href="{% url 'discordance_report_review' discordance_report_id=summary.discordance_report.pk %}" target="_blank">Discuss</a></div>{% endif %}
         </div>
-
         {% classification_lab_summaries summary.lab_significances %}
     </td>
 </tr>

@@ -230,6 +230,16 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
     def post_review_url(self, review: Review) -> str:
         return reverse('discordance_report_review_action', kwargs={"review_id": review.pk})
 
+    @property
+    def is_review_locked(self) -> bool:
+        if self.resolution:
+            return True
+
+        if self != DiscordanceReport.objects.filter(clinical_context=self.clinical_context).order_by('-report_started_date').first():
+            return True
+
+        return False
+
     @cached_property
     def discordance_report_classifications(self) -> List['DiscordanceReportClassification']:
         return list(self.discordancereportclassification_set.select_related(

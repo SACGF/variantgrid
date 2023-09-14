@@ -46,4 +46,13 @@
             {{ review.post_review_data_formatted }}
         {% endif %}
     </div>
+    {% if edit %}
+        <div class="card-footer">
+            {% comment %}FIXME this hardcodes discordance reviews into the otherwise object agnostic review page{% endcomment %}
+            <a href="{% url 'discordance_report_review' discordance_report_id=review.reviewing.source_object.pk %}" class="btn btn-primary">
+                {% if review.post_review_data.outcome == "postpone" %}Continue{% else %}Edit{% endif %}
+                {{ review.topic.name }} Discussion
+            </a>
+        </div>
+    {% endif %}
 </div>

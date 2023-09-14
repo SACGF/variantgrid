@@ -43,7 +43,7 @@ Hello Shariant User,
                                         {% endif %}
                                     {% endif %}
                                 {% else %}
-                                    <span style="color:#888">No outstanding agreed to pending changes</span>
+                                    <span style="color:#888">No outstanding pending changes</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -54,7 +54,7 @@ Hello Shariant User,
                                 {% if counts.active %}
                                     <a href="{% absolute_url 'discordance_reports' %}"><span style="{{ number_style }}">{{ counts.active }}</span> active discordance{% plural counts.active %}</a>
                                 {% else %}
-                                    <span style="color:#888">Not involved in any active discordances</span>
+                                    <span style="color:#888">No active discordances</span>
                                 {% endif %}
                             </td>
                         </tr>

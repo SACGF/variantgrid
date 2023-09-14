@@ -164,6 +164,7 @@ def view_discussion_detail(request, review_id: int):
 
     return render_ajax_view(request, 'review/review_detail.html', {
         "review": review,
+        "edit": request.GET.get("edit") == "true" and not review.reviewing.source_object.is_review_locked,
         "show_source_object": request.GET.get("show_source_object") != "false",
         "show_outcome": request.GET.get("show_outcome") != "false"
     })
