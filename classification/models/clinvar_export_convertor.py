@@ -393,7 +393,7 @@ class ClinVarExportConverter:
         if self.classification_based_on is None:
             return ClinVarExportData(
                 clinvar_export=self.clinvar_export_record,
-                body=ValidatedJson({}, messages=JsonMessages.error("No classification is currently associated with this allele and condition")),
+                body=ValidatedJson(None, messages=JsonMessages.error("No classification is currently associated with this allele and condition")),
                 grouping=ValidatedJson({})
             )
         else:
