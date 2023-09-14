@@ -33,6 +33,8 @@ from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 LOCUS_PATTERN = re.compile(r"^([^:]+)\s*:\s*(\d+)[,\s]*([GATC]+)$", re.IGNORECASE)
 LOCUS_NO_REF_PATTERN = re.compile(r"^([^:]+)\s*:\s*(\d+)$")
 VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+))\s*:\s*(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$", re.IGNORECASE)
+# This is our internal format for symbolic (ie <DEL>/<DUP> etc)
+VARIANT_SYMBOLIC_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+))\s*:\s*(\d+)\s*-\s*(\d+)\s*<(DEL|DUP|INS|INV|CNV)>$", re.IGNORECASE)
 # matches anything hgvs-like before any fixes
 HGVS_UNCLEANED_PATTERN = re.compile(r"(^(N[MC]_|ENST)\d+.*:|[cnmg]\.|[^:]:[cnmg]).*\d+", re.IGNORECASE)
 
@@ -275,24 +277,37 @@ class VariantCoordinate(FormerTuple):
         return self.chrom, self.start, self.end, self.ref, self.alt
 
     def __str__(self):
-        if self.is_symbolic():
-            s = f"{self.chrom}:{self.start}-{self.end} {self.ref}>{self.alt}"
+        return self.format()
+
+    def format(self):
+        if Sequence.allele_is_symbolic(self.alt):
+            return f"{self.chrom}:{self.start}-{self.end} {self.alt}"
         else:
-            s = f"{self.chrom}:{self.start} {self.ref}>{self.alt}"
-        return s
+            return f"{self.chrom}:{self.start} {self.ref}>{self.alt}"
 
     @staticmethod
-    def from_string(variant_string: str, regex_pattern=VARIANT_PATTERN):
-        # This will only ever match standard (non-symbolic variants)
-        if full_match := regex_pattern.fullmatch(variant_string):
+    def from_string(variant_string: str, genome_build=None):
+        """ Pass in genome build to be able to set REF from symbolic (will be N otherwise) """
+        if full_match := VARIANT_PATTERN.fullmatch(variant_string):
             chrom = full_match.group(1)
             start = int(full_match.group(2))
             ref = full_match.group(3)
             alt = full_match.group(4)
             return VariantCoordinate.from_start_only(chrom, start, ref, alt)
+        elif full_match := VARIANT_SYMBOLIC_PATTERN.fullmatch(variant_string):
+            chrom, start, end, alt = full_match.groups()
+            start = int(start)
+            end = int(end)
+            alt = "<" + alt + ">"  # captured what was inside of brackets ie <()>
+            if genome_build:
+                contig_sequence = genome_build.genome_fasta.fasta[chrom]
+                ref = contig_sequence[start:start+1].upper()
+            else:
+                ref = "N"
+            return VariantCoordinate(chrom, start, end, ref, alt)
 
-        raise ValueError(f"{variant_string=} did not match agaisnt {regex_pattern=}")
-
+        regex_patterns = ", ".join((str(s) for s in (VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN)))
+        raise ValueError(f"{variant_string=} did not match against {regex_patterns=}")
 
     @staticmethod
     def from_start_only(chrom: str, start: int, ref: str, alt: str):
@@ -494,37 +509,12 @@ class Variant(PreviewModelMixin, models.Model):
         return errors
 
     @staticmethod
-    def tuple_to_spdi(chrom, start, end, ref, alt) -> str:
-        """ SPDI: data model for variants and applications at NCBI
-            @see https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7523648/ """
-        if Sequence.allele_is_symbolic(alt):
-            length = end - start
-            if alt == VCFSymbolicAllele.DEL:
-                d_str = length
-                i_str = ""
-            elif alt == VCFSymbolicAllele.INS:
-                d_str = ""
-                i_str = length
-            else:
-                raise ValueError(f"Don't know how to handle alt={alt}")
-        else:
-            d_str = ref
-            i_str = alt
-        return f"{chrom}:{start}:{d_str}:{i_str}"
-
-    @staticmethod
     def format_tuple(chrom, start, end, ref, alt, abbreviate=False) -> str:
-        is_symbolic = Sequence.allele_is_symbolic(ref) or Sequence.allele_is_symbolic(alt)
-        if is_symbolic:
-            if alt == "<CNV>":
-                # There's not really a format for these
-                return f"CNV {chrom}:{start}-{end}"
-            return Variant.tuple_to_spdi(chrom, start, end, ref, alt)
-
-        if abbreviate:
+        if abbreviate and not Sequence.allele_is_symbolic(alt):
             ref = Sequence.abbreviate(ref)
             alt = Sequence.abbreviate(alt)
-        return f"{chrom}:{start} {ref}>{alt}"
+        vc = VariantCoordinate(chrom, start, end, ref, alt)
+        return vc.format()
 
     @staticmethod
     def get_from_string(variant_string: str, genome_build: GenomeBuild) -> Optional['Variant']:

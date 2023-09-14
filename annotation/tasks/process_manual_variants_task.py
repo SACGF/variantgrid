@@ -25,7 +25,7 @@ def get_manual_variant_coordinates(mve: ManualVariantEntry) -> List[VariantCoord
     elif mve.entry_type == ManualVariantEntryType.HGVS:
         variant_coordinates.append(get_hgvs_variant_coordinate(mve.entry_text, mve.genome_build))
     elif mve.entry_type == ManualVariantEntryType.VARIANT:
-        variant_coordinates.append(VariantCoordinate.from_string(mve.entry_text))
+        variant_coordinates.append(VariantCoordinate.from_string(mve.entry_text, mve.genome_build))
     else:
         raise ValueError(f"Could not convert entry type of {mve.entry_type}")
     return variant_coordinates

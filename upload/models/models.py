@@ -570,12 +570,22 @@ class ModifiedImportedVariant(models.Model):
         return self.import_info.upload_step.genome_build
 
     @staticmethod
+    def _to_variant_coordinate(old_variant) -> VariantCoordinate:
+        if full_match := ModifiedImportedVariant.VT_OLD_VARIANT_PATTERN.fullmatch(old_variant):
+            chrom = full_match.group(1)
+            start = int(full_match.group(2))
+            ref = full_match.group(3)
+            alt = full_match.group(4)
+            return VariantCoordinate.from_start_only(chrom, start, ref, alt)
+        raise ValueError(f"{old_variant} didn't match regex {ModifiedImportedVariant.VT_OLD_VARIANT_PATTERN}")
+
+    @staticmethod
     def format_old_variant(old_variant: str, genome_build: GenomeBuild) -> List[str]:
         """ We need consistent formatting (case and use of chrom) so we can retrieve it easily.
             May return multiple values """
         formatted_old_variants = []
         for ov in ModifiedImportedVariant._split_old_variant(old_variant):
-            vc = VariantCoordinate.from_string(ov, regex_pattern=ModifiedImportedVariant.VT_OLD_VARIANT_PATTERN)
+            vc = ModifiedImportedVariant._to_variant_coordinate(ov)
             contig = genome_build.chrom_contig_mappings[vc.chrom]
             variant_coordinate = VariantCoordinate(contig.name, vc.start, vc.end, vc.ref, vc.alt)
             formatted_old_variants.append(ModifiedImportedVariant.get_old_variant_from_variant_coordinate(variant_coordinate))

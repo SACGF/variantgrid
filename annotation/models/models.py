@@ -37,7 +37,7 @@ from library.utils import invert_dict, name_from_filename, first
 from ontology.models import OntologyVersion
 from patients.models_enums import GnomADPopulation
 from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN, \
-    HGVS_UNCLEANED_PATTERN, Allele
+    HGVS_UNCLEANED_PATTERN, Allele, VARIANT_SYMBOLIC_PATTERN
 from snpdb.models.models_enums import ImportStatus
 
 
@@ -1174,6 +1174,7 @@ class ManualVariantEntry(models.Model):
             DBSNP_PATTERN: ManualVariantEntryType.DBSNP,
             HGVS_UNCLEANED_PATTERN: ManualVariantEntryType.HGVS,
             VARIANT_PATTERN: ManualVariantEntryType.VARIANT,
+            VARIANT_SYMBOLIC_PATTERN: ManualVariantEntryType.VARIANT,
         }
         for k, v in MATCHERS.items():
             if k.match(line):

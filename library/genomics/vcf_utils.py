@@ -44,16 +44,27 @@ def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=Fal
         vcf_tuples = ((chrom, start, end, ".", ref, alt) for (chrom, start, end, ref, alt) in variant_tuples)
 
     vcf_tuples = sorted(vcf_tuples, key=operator.itemgetter(0, 1, 3, 4))
+
+    info = [
+        '##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Difference in length between REF and ALT alleles">',
+        '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">',
+    ]
     columns = "\t".join(["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"])
-    header = "\n".join(["##fileformat=VCFv4.1", "##source=VariantGrid", "#" + columns])
-    empty_columns = "\t." * 3  # QUAL/FILTER/INFO always empty
+    header = "\n".join(["##fileformat=VCFv4.1", "##source=VariantGrid"] + info + ["#" + columns])
+    empty_qual_filter_info = ('.', '.', '.')
     with open(vcf_filename, "wt", encoding="utf-8") as f:
         f.write(header + "\n")
         for vcf_record in vcf_tuples:
             (chrom, position, end, id_col, ref, alt) = vcf_record
-            if alt == Variant.REFERENCE_ALT:
-                alt = "."
-            line = "\t".join((chrom, str(position), str(id_col), ref, alt)) + empty_columns
+            if Sequence.allele_is_symbolic(alt):
+                svlen = end - position
+                svtype = alt[1:-1]  # Strip off brackets
+                qual_filter_info = (".", ".", f"SVLEN={svlen};SVTYPE={svtype}")
+            else:
+                qual_filter_info = empty_qual_filter_info
+                if alt == Variant.REFERENCE_ALT:
+                    alt = "."
+            line = "\t".join((chrom, str(position), str(id_col), ref, alt) + qual_filter_info)
             f.write(line + "\n")
 
 
