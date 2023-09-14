@@ -41,16 +41,16 @@
         {% load js_tags %}
         {% load crispy_forms_tags %}
         <div class="card-body">
-            {% labelled label="Triage status" %}
+            {% labelled label="Triage Status" %}
                 {% if triage.triage_status == "P" %}<span class="no-value">Pending</span>{% else %}
                 {{ triage.get_triage_status_display }}
                 {% endif %}
             {% endlabelled %}
             {% if triage.triage_date %}
-                {% labelled label="Triage date" %}{{ triage.triage_date | date:'Y-m-d' }}{% endlabelled %}
+                {% labelled label="Triage Date" %}{{ triage.triage_date | date:'Y-m-d' }}{% endlabelled %}
             {% endif %}
             {% if triage.user %}
-                {% labelled label="Last update by" %}{% user triage.user size="tiny" %}{% endlabelled %}
+                {% labelled label="Last Update By" %}{% user triage.user size="tiny" %}{% endlabelled %}
             {% endif %}
             {% if triage.note %}
                 {% labelled label="Note" %}{{ triage.note }}{% endlabelled %}

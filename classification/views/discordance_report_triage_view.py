@@ -9,11 +9,18 @@ from uicore.views.ajax_form_view import AjaxFormView, LazyRender
 
 
 class DiscordanceReportTriageForm(forms.ModelForm):
+
+    class Meta:
+        model = DiscordanceReportTriage
+        fields = ("triage_status", "triage_date", "note")
+
     triage_date = forms.DateField(
+        label="Triage Date",
         widget=forms.TextInput(attrs={"class": "date-picker form-control"}),
         required=True,
     )
     triage_status = forms.ChoiceField(
+        label="Triage Status",
         widget=forms.RadioSelect(),
         choices=[
             (m.value, m.label) for m in
@@ -27,10 +34,6 @@ class DiscordanceReportTriageForm(forms.ModelForm):
         ],
         help_text="Low penetrance/risk allele will be flagged as complex for future discussion"
     )
-
-    class Meta:
-        model = DiscordanceReportTriage
-        fields = ("triage_status", "triage_date", "note")
 
 
 class DiscordanceReportTriageView(AjaxFormView[DiscordanceReportTriage]):
