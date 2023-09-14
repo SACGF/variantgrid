@@ -338,8 +338,8 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         ct: ConditionText
         ct, ct_is_new = ConditionText.objects.get_or_create(normalized_text=normalized, lab=lab)
 
-        ct = ConditionText.objects.select_for_update().filter(pk=ct.pk).first()
         with transaction.atomic():
+            ct = ConditionText.objects.select_for_update().filter(pk=ct.pk).first()
 
             # ensure each step of the hierarchy is present
             root, new_root = ConditionTextMatch.objects.get_or_create(
