@@ -163,7 +163,7 @@ class InsertUnknownVariantsTask(ImportVCFStepTask):
             # Python CSV reader dies with extremely long lines, so we just do by hand (not quoted or anything)
             for line in f:
                 chrom, start, end, ref, alt = line.strip().split(",")  # Not quoted, exactly 5 columns
-                variant_coordinate = VariantCoordinate(chrom, start, end, ref, alt)
+                variant_coordinate = VariantCoordinate(chrom, int(start), int(end), ref, alt)
                 variant_pk_lookup.add(variant_coordinate)
                 variant_pk_lookup.batch_check(settings.SQL_BATCH_INSERT_SIZE, insert_unknown=True)
                 items_processed += 1
