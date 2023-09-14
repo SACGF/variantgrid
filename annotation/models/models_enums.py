@@ -204,7 +204,6 @@ class ManualVariantEntryType(models.TextChoices):
     DBSNP = "d", "dbSNP"
     HGVS = "h", "HGVS"
     VARIANT = "v", "Variant"
-    VARIANT_SYMBOLIC = "s", "Variant (Symbolic)"
     UNKNOWN = "u", "Unknown"
 
 
