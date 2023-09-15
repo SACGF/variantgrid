@@ -9,16 +9,14 @@ from django.dispatch import receiver
 from analysis.models.models_variant_tag import VariantTagsImport
 from annotation.models.models import ManualVariantEntryCollection, ClinVarVersion
 from classification.models import ClassificationImport
-from expression.models import CuffDiffFile
 from genes.models import GeneList, GeneCoverageCollection
 from library.utils.file_utils import name_from_filename
 from patients.models import PatientRecords
 from pedigree.models import PedFile
-from snpdb.models import GenomicIntervalsCollection, AnnotationLevel, ImportStatus, Sample, ImportedWikiCollection
+from snpdb.models import GenomicIntervalsCollection, ImportStatus, Sample, ImportedWikiCollection
 from snpdb.models.models_variant import Liftover
 from upload.bed_file_processing import process_bed_file
 from upload.models import UploadedFile
-from upload.models.models_enums import ExpressionType
 
 
 class UploadedGeneList(models.Model):
@@ -27,16 +25,6 @@ class UploadedGeneList(models.Model):
 
     def get_data(self):
         return self.gene_list
-
-
-class UploadedExpressionFile(models.Model):
-    uploaded_file = models.ForeignKey(UploadedFile, on_delete=CASCADE)
-    format = models.CharField(max_length=1, choices=ExpressionType.choices)
-    annotation_level = models.CharField(max_length=1, choices=AnnotationLevel.choices)
-    cuff_diff_file = models.OneToOneField(CuffDiffFile, null=True, on_delete=CASCADE)
-
-    def get_data(self):
-        return self.cuff_diff_file
 
 
 class UploadedBed(models.Model):

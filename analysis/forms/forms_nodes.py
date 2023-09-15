@@ -13,7 +13,6 @@ from analysis import models
 from analysis.models import AnalysisNode, AnalysisTemplateType, Analysis, MOINode
 from analysis.models.nodes.analysis_node import NodeVCFFilter, NodeAlleleFrequencyFilter
 from analysis.models.nodes.filters.damage_node import DamageNode
-from analysis.models.nodes.filters.expression_node import ExpressionNode
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
 from analysis.models.nodes.filters.intersection_node import IntersectionNode
 from analysis.models.nodes.filters.merge_node import MergeNode
@@ -308,27 +307,6 @@ class DamageNodeForm(BaseNodeForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["damage_predictions_min"].widget.attrs["max"] = self.instance.num_prediction_fields
-
-
-class ExpressionNodeForm(forms.Form):
-    expression_file = forms.ModelChoiceField(queryset=None)
-    comparison_type = forms.ChoiceField(choices=ExpressionNode.EXPRESSION_CHOICE, required=True)
-    comparison_op = forms.ChoiceField(choices=ExpressionNode.COMPARISON_OPERATIONS_CHOICE, required=False)
-    direction = forms.ChoiceField(choices=ExpressionNode.EXPRESSION_DIRECTION_CHOICE, required=False)
-    sample = forms.ChoiceField(choices=ExpressionNode.SAMPLE_CHOICE, required=False)
-    significant = forms.BooleanField()
-    value = forms.FloatField(required=False)
-
-    class Meta:
-        model = ExpressionNode
-        exclude = ANALYSIS_NODE_FIELDS
-
-    def __init__(self, *args, **kwargs):
-        user = kwargs.pop("user")
-        super().__init__(*args, **kwargs)
-        queryset = get_objects_for_user(user, 'expression.view_cuff_diff_file', accept_global_perms=False)
-        queryset = queryset.filter(import_status=ImportStatus.SUCCESS)
-        self.fields['expression_file'].queryset = queryset
 
 
 class FilterNodeForm(BaseNodeForm):

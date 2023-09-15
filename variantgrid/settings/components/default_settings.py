@@ -746,7 +746,7 @@ INSTALLED_APPS = [
     'annotation.apps.AnnotationConfig',
     'ontology',
     'eventlog',
-    'expression',
+    'expression',  # Empty but referenced by other migrations - can delete after squash
     'flags',
     'manual',
     'email_manager',

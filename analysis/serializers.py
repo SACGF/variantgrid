@@ -3,7 +3,7 @@ from typing import Dict
 from rest_framework import serializers
 
 from analysis.models import AnalysisVariable, FilterNode, FilterNodeItem, PhenotypeNode, BuiltInFilterNode, \
-    ClassificationsNode, DamageNode, ExpressionNode, VennNode, ZygosityNode, TrioNode, CohortNode, PedigreeNode, \
+    ClassificationsNode, DamageNode, VennNode, ZygosityNode, TrioNode, CohortNode, PedigreeNode, \
     TissueNode, SelectedInParentNode, SampleNode, PopulationNode, PopulationNodeGnomADPopulation, GeneListNode, \
     IntersectionNode, GeneListNodeGeneList, Analysis, AlleleFrequencyNode, AllVariantsNode, TagNode, MergeNode, \
     PhenotypeNodeOntologyTerm
@@ -131,12 +131,6 @@ class CohortNodeSerializer(AnalysisNodeSerializer):
 class DamageNodeSerializer(AnalysisNodeSerializer):
     class Meta(AnalysisNodeSerializer.Meta):
         model = DamageNode
-        fields = _analysis_node_fields(model)
-
-
-class ExpressionNodeSerializer(AnalysisNodeSerializer):
-    class Meta(AnalysisNodeSerializer.Meta):
-        model = ExpressionNode
         fields = _analysis_node_fields(model)
 
 

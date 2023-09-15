@@ -4,7 +4,6 @@ from django.db import models
 class UploadedFileTypes(models.TextChoices):
     BED = 'B', 'BED'
     CLINVAR = 'L', 'Clinvar'
-    CUFFDIFF = 'C', 'CuffDiff'
     GENE_LIST = 'G', 'Gene List'
     GENE_COVERAGE = 'O', 'Gene Coverage'
     LIFTOVER = 'I', 'Liftover'
@@ -32,11 +31,6 @@ class VCFPipelineStage(models.TextChoices):
     DATA_INSERTION = 'D', 'Data Insertion'
     ANNOTATION_COMPLETE = 'A', 'Annotation Complete'
     FINISH = 'F', 'Finish'
-
-
-class ExpressionType(models.TextChoices):
-    CUFFDIFF = 'C', 'CuffDiff'
-    # EDGE_R = 'E', 'EdgeR'
 
 
 class TimeFilterMethod(models.TextChoices):

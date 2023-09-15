@@ -33,8 +33,7 @@ from upload.uploaded_file_type import get_upload_data_for_uploaded_file, \
     retry_upload_pipeline, get_import_tasks_by_extension
 
 UPLOADED_FILE_CONTEXT = {UploadedFileTypes.VCF: "uploaded_vcf",
-                         UploadedFileTypes.GENE_LIST: "uploaded_gene_list",
-                         UploadedFileTypes.CUFFDIFF: 'uploaded_cuffdiff'}
+                         UploadedFileTypes.GENE_LIST: "uploaded_gene_list"}
 
 
 def get_icon_for_uploaded_file_status(status):

@@ -8,11 +8,10 @@ from library.utils import import_class, full_class_name
 from patients.models import PatientColumns
 from upload.import_task_factories.abstract_vcf_import_task_factory import AbstractVCFImportTaskFactory
 from upload.import_task_factories.import_task_factory import ImportTaskFactory
-from upload.models import UploadedFileTypes, UploadedBed, UploadedExpressionFile, \
+from upload.models import UploadedFileTypes, UploadedBed, \
     UploadedGeneList, UploadedPatientRecords, UploadedPedFile, UploadedVCF, \
     UploadedGeneCoverage, UploadStep, UploadStepTaskType, UploadedWikiCollection
 from upload.tasks.import_bedfile_task import ImportBedFileTask
-from upload.tasks.import_expression_task import ImportExpressionTask
 from upload.tasks.import_gene_coverage_task import ImportGeneCoverageTask
 from upload.tasks.import_gene_list_task import ImportGeneListTask
 from upload.tasks.import_patient_records_task import ImportPatientRecords
@@ -40,21 +39,6 @@ class BedImportTaskFactory(ImportTaskFactory):
 
     def create_import_task(self, upload_pipeline):
         return ImportBedFileTask.si(upload_pipeline.pk)
-
-
-class ExpressionImportTaskFactory(ImportTaskFactory):
-
-    def get_uploaded_file_type(self):
-        return UploadedFileTypes.CUFFDIFF
-
-    def get_possible_extensions(self):
-        return ['diff']
-
-    def get_data_classes(self):
-        return [UploadedExpressionFile]
-
-    def create_import_task(self, upload_pipeline):
-        return ImportExpressionTask.si(upload_pipeline.pk)
 
 
 class GeneListImportTaskFactory(ImportTaskFactory):

@@ -1,6 +1,6 @@
 from django.conf import settings
 
-from analysis.views.nodes import NodeView
+from analysis.views.nodes.node_view import NodeView
 
 
 class GeneCoverageNodeView(NodeView):

@@ -1,7 +1,6 @@
 from .allele_frequency_node import *
 from .built_in_filter_node import *
 from .damage_node import *
-from .expression_node import *
 from .filter_node import *
 from .gene_list_node import *
 from .intersection_node import *
