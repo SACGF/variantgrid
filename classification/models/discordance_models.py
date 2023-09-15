@@ -504,7 +504,7 @@ class DiscordanceReportRowData(ExportRow):
     def _url(self):
         return get_url_from_view_path(self.discordance_report.get_absolute_url())
 
-    @export_column(label="status")
+    @export_column(label="Status")
     def _status(self):
         return self.discordance_report.resolution_text
 
@@ -521,7 +521,7 @@ class DiscordanceReportRowData(ExportRow):
     def is_medically_significant(self):
         return self.discordance_report.is_medically_significant
 
-    @export_column(label="is_medically_significant")
+    @export_column(label="Is Medically Significant")
     def _is_medically_significant(self):
         return self.is_medically_significant
 
