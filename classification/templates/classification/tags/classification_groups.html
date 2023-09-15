@@ -18,12 +18,14 @@
                 {% if discordance_status.level != 'single_submission' %}
                     {% if discordance_status.lab_count == 1 %} <span class="text-muted mr-2">(Single Lab)</span>{% endif %}
                 {% endif %}
-                {% if ccg.latest_report and ccg.latest_report.resolution != 'C' %}
-                    <a href="{% url 'discordance_report' ccg.latest_report.id %}" class="hover-link">
-                        <i class="{{ ccg.latest_report.preview_icon }}"></i>
-                        Click for Discordance Report {{ ccg.latest_report.preview }}
-                    </a>
-                {% endif %}
+                {% with dr=ccg.latest_report %}
+                    {% if dr and dr.resolution != 'C' %}
+                        <a href="{% url 'discordance_report' dr.id %}" class="hover-link">
+                            <i class="{{ dr.preview_icon }}"></i>
+                            Click for Discordance Report (DR_{{ ccg.latest_report.id }})
+                        </a>
+                    {% endif %}
+                {% endwith %}
                 {% if discordance_status.has_ignored_clin_sigs %}
                     <div>{{ 'i'|severity_icon }} <span class="text-info">Some clinical significances do not count towards discordance calculations.</span></div>
                 {% endif %}

@@ -13,7 +13,8 @@ from termsandconditions.decorators import terms_required
 
 from classification.enums import ShareLevel
 from classification.models import classification_flag_types, ClinVarExport, DiscordanceReportClassification, \
-    DiscordanceReport, ConditionText, ConditionTextMatch, DiscordanceReportTableData, DiscordanceReportCategories
+    DiscordanceReport, ConditionText, ConditionTextMatch, DiscordanceReportTableData, DiscordanceReportCategories, \
+    DiscordanceReportRowData
 from classification.models.classification import Classification, \
     ClassificationModification
 from classification.models.clinvar_export_sync import clinvar_export_sync
@@ -78,20 +79,22 @@ class ClassificationDashboard:
     def perspective(self) -> LabPickerData:
         return self.lab_picker
 
-    # @cached_property
-    # def discordance_summaries(self) -> DiscordanceReportTableData:
-    #     # Has changed from just finding the active discordances to discordances withdrawn from and
-    #     # resolved discordances - so they can be listed in history
-    #
-    #     # FIXME DiscordanceReports should really be handled with Guardian permissions rather than looking
-    #     # at the individual labs involved
-    #     discordant_c = DiscordanceReportClassification.objects\
-    #         .filter(classification_original__classification__lab__in=self.labs)\
-    #         .order_by('report_id').values_list('report_id', flat=True)
-    #     # .filter(classification_original__classification__withdrawn=False)  used to
-    #     dr_qs = DiscordanceReport.objects.filter(pk__in=discordant_c).order_by('-created')
-    #
-    #     return DiscordanceReportTableData(perspective=self.perspective, discordance_reports=dr_qs)
+    @cached_property
+    def discordance_summaries(self) -> DiscordanceReportTableData:
+        # Has changed from just finding the active discordances to discordances withdrawn from and
+        # resolved discordances - so they can be listed in history
+
+        # FIXME DiscordanceReports should really be handled with Guardian permissions rather than looking
+        # at the individual labs involved
+        discordant_c = DiscordanceReportClassification.objects\
+            .filter(classification_original__classification__lab__in=self.labs)\
+            .order_by('report_id').values_list('report_id', flat=True)
+        # .filter(classification_original__classification__withdrawn=False)  used to
+        dr_qs = DiscordanceReport.objects.filter(pk__in=discordant_c).order_by('-created')
+
+        return DiscordanceReportTableData(perspective=self.perspective, summaries=
+            [DiscordanceReportRowData(discordance_report=dr, perspective=self.perspective) for dr in dr_qs]
+        )
 
     @cached_property
     def discordance_reports(self) -> DiscordanceReportCategories:

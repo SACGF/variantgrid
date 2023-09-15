@@ -63,9 +63,9 @@ def discordance_reports_history_detail(request: HttpRequest, lab_id: Optional[st
 
 def discordance_reports_download(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:
     lab_picker = LabPickerData.from_request(request=request, selection=lab_id)
-    all_summaries = ClassificationDashboard(lab_picker=lab_picker).discordance_summaries
+    all_summaries = ClassificationDashboard(lab_picker=lab_picker).discordance_summaries.summaries
     return DiscordanceReportRowData.streaming_csv(
-        all_summaries.summaries + all_summaries.inactive_summaries,
+        all_summaries,
         "discordance_reports"
     )
 

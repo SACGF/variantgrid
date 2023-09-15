@@ -1,5 +1,3 @@
-import logging
-import typing
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -8,7 +6,6 @@ from functools import cached_property
 from typing import Set, Optional, List, Dict, Tuple, Any, Iterable
 
 import django.dispatch
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
@@ -21,18 +18,16 @@ from frozendict import frozendict
 from lxml.html.diff import html_escape
 from more_itertools import first
 
-from classification.enums.classification_enums import SpecialEKeys, ClinicalSignificance
+from classification.enums.classification_enums import SpecialEKeys
 from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_lab_summaries import ClassificationLabSummary
 from classification.models.clinical_context_models import ClinicalContext, ClinicalContextRecalcTrigger
 from classification.models.flag_types import classification_flag_types
-from flags.models.enums import FlagStatus
-from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
 from library.django_utils import get_url_from_view_path
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
-from library.utils import invalidate_cached_property, ExportRow, export_column, ExportDataType
+from library.utils import invalidate_cached_property, ExportRow, export_column, ExportDataType, pretty_label
 from library.utils.django_utils import refresh_for_update
 from review.models import ReviewableModelMixin, Review
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -448,6 +443,49 @@ class DiscordanceReportNextStep(str, Enum):
     TO_DISCUSS = "D"
 
 
+class DiscordanceReportRowDataTriagesRowData(ExportRow):
+
+    def __init__(self, discordance_report: DiscordanceReport, perspective: LabPickerData):
+        self.discordance_report = discordance_report
+        self.perspective = perspective
+
+    @cached_property
+    def triages(self) -> List['DiscordanceReportTriage']:
+        return list(self.discordance_report.discordancereporttriage_set.order_by('lab__name'))
+
+    def formatted_triages_for_status(self, status: 'DiscordanceReportTriageStatus') -> str:
+        triages = [t for t in self.triages if t.triage_status == status]
+
+        def format_triage(t: DiscordanceReportTriage):
+            data = f"{t.lab}"
+            if note := t.note:
+                note = note.replace("\n", "; ")
+                data += f": {note}"
+            return data
+
+        return "\n".join(format_triage(t) for t in triages)
+
+    @export_column(label="Pending Triage")
+    def pending(self):
+        return self.formatted_triages_for_status(DiscordanceReportTriageStatus.PENDING)
+
+    @export_column(label="Will Amend")
+    def will_amend(self):
+        return self.formatted_triages_for_status(DiscordanceReportTriageStatus.REVIEWED_WILL_FIX)
+
+    @export_column(label="No Change")
+    def no_change(self):
+        return self.formatted_triages_for_status(DiscordanceReportTriageStatus.REVIEWED_SATISFACTORY)
+
+    @export_column(label="Wants Discussion")
+    def for_discussion(self):
+        return self.formatted_triages_for_status(DiscordanceReportTriageStatus.REVIEWED_WILL_DISCUSS)
+
+    @export_column(label="Low Penetrance etc")
+    def low_penetrance_etc(self):
+        return self.formatted_triages_for_status(DiscordanceReportTriageStatus.COMPLEX)
+
+
 class DiscordanceReportRowData(ExportRow):
 
     def __init__(self, discordance_report: DiscordanceReport, perspective: LabPickerData):
@@ -469,6 +507,11 @@ class DiscordanceReportRowData(ExportRow):
     @export_column(label="status")
     def _status(self):
         return self.discordance_report.resolution_text
+
+    @export_column(label="Next Step")
+    def _next_step(self):
+        if next_step := self.next_step:
+            return pretty_label(next_step.name.lower())
 
     @export_column(label="c.HGVS")
     def _chgvs(self):
@@ -504,6 +547,10 @@ class DiscordanceReportRowData(ExportRow):
             if condition := cm.classification.condition_resolution_obj:
                 rows.add(condition.as_plain_text)
         return "\n".join(sorted(rows))
+
+    @export_column(label="Triage", sub_data=DiscordanceReportRowDataTriagesRowData)
+    def _triage(self):
+        return DiscordanceReportRowDataTriagesRowData(discordance_report=self.discordance_report, perspective=self.perspective)
 
     @cached_property
     def all_actively_involved_labs(self):
@@ -785,6 +832,7 @@ class DiscordanceReportCategories:
         return DiscordanceReportTableData(perspective=self.perspective, summaries=self.active_by_next_step.get(DiscordanceReportNextStep.TO_DISCUSS))
 
 
+"""
 class DiscordanceAction:
 
     def __init__(self, code: int, short_description: str, long_description: str = None, no_longer_considered: bool = False):
@@ -854,7 +902,7 @@ class DiscordanceActionsLog:
 
     def __str__(self):
         return f'internal review = {self.internal_reviewed}, actions = {self.actions}'
-
+"""
 
 class DiscordanceReportClassificationRelationManager(models.Manager):
 
@@ -911,6 +959,7 @@ class DiscordanceReportClassification(TimeStampedModel):
         self.classification_final = self.classification_effective
         self.save()
 
+    """
     @cached_property
     def action_log(self) -> DiscordanceActionsLog:
         actions = DiscordanceActionsLog()
@@ -1005,6 +1054,7 @@ class DiscordanceReportClassification(TimeStampedModel):
             actions.add(DiscordanceActionsLog.CHANGE_NO_REASON_GIVEN)
 
         return actions
+"""
 
 
 class DiscordanceReportTriageStatus(TextChoices):
