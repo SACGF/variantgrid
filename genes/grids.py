@@ -18,14 +18,13 @@ from genes.models import CanonicalTranscript, GeneList, GeneSymbol, \
 from genes.models_enums import AnnotationConsortium
 from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
-from library.utils import update_dict_of_dict_values
+from library.utils import update_dict_of_dict_values, JsonDataType
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import UserSettings, Q, VariantGridColumn, Tag, ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol, variant_qs_filter_has_internal_data
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
-from uicore.json.json_types import JsonDataType
 
 
 class GeneListColumns(DatatableConfig[GeneList]):

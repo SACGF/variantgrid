@@ -11,9 +11,8 @@ from typing import Union, Any, Optional
 from django import template
 from django.utils.safestring import mark_safe, SafeString
 
-from library.utils import format_significant_digits
+from library.utils import format_significant_digits, JsonDataType
 from snpdb.user_settings_manager import UserSettingsManager
-from uicore.json.json_types import JsonDataType
 from uicore.json.validated_json import ValidatedJson
 
 register = template.Library()

@@ -25,11 +25,10 @@ from classification.views.classification_dashboard_view import ClassificationDas
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path
-from library.utils import html_to_text, export_column, ExportRow, local_date_string, ExportDataType
+from library.utils import html_to_text, export_column, ExportRow, local_date_string, ExportDataType, JsonDataType
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import ClinVarKey, Lab, Allele, GenomeBuild
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
-from uicore.json.json_types import JsonDataType
 
 
 @timed_cache(size_limit=30, ttl=60)

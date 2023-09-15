@@ -13,13 +13,12 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_lat
 from annotation.models import AnnotationVersion
 from genes.hgvs import HGVSMatcher
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
-from library.utils import update_dict_of_dict_values
+from library.utils import update_dict_of_dict_values, JsonDataType
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import Variant, VariantZygosityCountCollection, GenomeBuild, Tag, VariantWiki
 from snpdb.models.models_user_settings import UserSettings, UserGridConfig
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
-from uicore.json.json_types import JsonDataType
 from variantopedia.interesting_nearby import get_nearby_qs
 
 

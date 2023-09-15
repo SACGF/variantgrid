@@ -4,8 +4,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from typing import List, Iterator, Union, Optional, Any
 
-from library.utils import invalidate_cached_property
-from uicore.json.json_types import JsonDataType
+from library.utils import invalidate_cached_property, JsonDataType
 
 """
 ValidatedJson (with JSonMessages) is used for serializing to JSon where there's also the need to providing infos or warnings

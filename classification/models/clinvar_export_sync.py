@@ -11,7 +11,7 @@ from classification.models import ClinVarExportBatch, ClinVarExportRequest, Clin
     ClinVarExportBatchStatus, ClinVarExportSubmission, ClinVarExportSubmissionStatus
 from library.constants import MINUTE_SECS
 from library.log_utils import report_message
-from uicore.json.json_types import JsonObjType
+from library.utils import JsonObjType
 
 
 class _ClinVarExportConfigDic(TypedDict):

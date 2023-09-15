@@ -13,9 +13,8 @@ from classification.enums.classification_enums import EvidenceCategory, \
     EvidenceKeyValueType, ShareLevel
 from classification.models.evidence_mixin import VCBlobDict, VCPatchValue, VCPatch, VCDbRefDict
 from library.cache import timed_cache
-from library.utils import empty_to_none
+from library.utils import empty_to_none, strip_json
 from snpdb.models import VariantGridColumn, Lab
-from uicore.json.json_utils import strip_json
 
 CLASSIFICATION_VALUE_TOLERANCE = 0.00000001
 """

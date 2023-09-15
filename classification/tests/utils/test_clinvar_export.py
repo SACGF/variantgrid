@@ -11,9 +11,9 @@ from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.models.clinvar_export_sync import clinvar_export_sync, ClinVarResponseOutcome
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import admin_bot
+from library.utils import JsonObjType
 from snpdb.models import GenomeBuild, ClinVarKey, GenomeBuildPatchVersion
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant, create_mock_allele
-from uicore.json.json_types import JsonObjType
 
 
 def mock_send_data(

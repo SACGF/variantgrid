@@ -15,10 +15,10 @@ from classification.models.classification_utils import classification_gene_symbo
 from flags.models import FlagCollection, FlagStatus
 from genes.hgvs import CHGVS
 from genes.models import TranscriptVersion
+from library.utils import JsonDataType
 from ontology.models import OntologyTerm
 from snpdb.models import UserSettings, GenomeBuild, Variant, Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
-from uicore.json.json_types import JsonDataType
 
 ALLELE_GERMLINE_VALUES = ['germline', 'likely_germline']
 ALLELE_SOMATIC_VALUES = ['somatic', 'likely_somatic']
