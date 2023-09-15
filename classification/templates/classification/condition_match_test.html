@@ -51,7 +51,7 @@
 
         <div><a href="{% url 'condition_obsoletes' %}" class="hover-link">See Obsolete Relationships</a></div>
         <div><a href="{% url 'condition_match_test_download' %}" class="download-link type-csv">Download Auto Matching Attempts</a></div>
-        <h4>Test Single Term</h4>
+        <h4>Test Term</h4>
 
         <form method="GET">
             {% labelled label="Condition Text" %}<input class="form-control" name="condition_text" value="{{ condition_text | default_if_none:'' }}" />{% endlabelled %}
@@ -88,6 +88,7 @@
                     {% endlabelled %}
                     {% if suggestion.terms %}
                         {% labelled label="Can auto-assign (without confirmation)" %}{{ is_auto_assignable|boolean }}{% endlabelled %}
+                        {% labelled label="Multi Condition Term" %}{{ suggestion.condition_multi_operation }}{% endlabelled %}
                         {% if suggestion.messages %}
                             {% labelled label="Warnings" %}
                                 <ul class="list-group">
