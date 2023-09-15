@@ -20,6 +20,7 @@ from model_utils.managers import InheritanceManager
 
 from flags.models import FlagCollection, flag_collection_extra_info_signal, FlagInfos
 from flags.models.models import FlagsMixin, FlagTypeContext
+from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
 from library.genomics.vcf_enums import VCFSymbolicAllele
@@ -45,6 +46,11 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
         Linked against Variant with VariantAllele below """
 
     clingen_allele = models.OneToOneField(ClinGenAllele, null=True, on_delete=CASCADE)
+
+    objects = ObjectManagerCachingRequest()
+
+    class Meta:
+        base_manager_name = 'objects'
 
     @classmethod
     def preview_icon(cls) -> str:

@@ -14,6 +14,7 @@ from model_utils.models import TimeStampedModel
 from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff
 from genes.models import TranscriptVersion, GeneSymbol, Transcript
 from library.cache import timed_cache
+from library.django_utils.django_object_managers import QuerySetRequestCache, ObjectManagerCachingRequest
 from library.log_utils import report_exc_info
 from library.utils import pretty_label, IconWithTooltip, md5sum_str
 from snpdb.models import GenomeBuild, Variant, Allele, GenomeBuildPatchVersion, VariantCoordinate
@@ -89,8 +90,11 @@ class ResolvedVariantInfo(TimeStampedModel):
     error = TextField(null=True, blank=True)
     """ If there was an error generating the c.HGVS, put it here """
 
+    objects = ObjectManagerCachingRequest()
+
     class Meta:
         unique_together = ('allele_info', 'genome_build')
+        base_manager_name = 'objects'
 
     def __str__(self):
         return f"{self.c_hgvs}" if self.c_hgvs else "Could not resolve c.HGVS"

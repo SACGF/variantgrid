@@ -13,7 +13,7 @@ from django.db.models.query_utils import Q
 from genes.models_enums import AnnotationConsortium
 from library.cache import timed_cache
 from library.django_utils import SortMetaOrderingMixin
-from library.django_utils.django_object_managers import CachingObjectManager
+from library.django_utils.django_object_managers import ObjectManagerCachingImmutable, ObjectManagerCachingRequest
 from library.genomics.fasta_wrapper import FastaFileWrapper
 from library.utils import invert_dict
 from snpdb.genome.fasta_index import load_genome_fasta_index
@@ -29,7 +29,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
 
         Build & Contig are populated via migration snpdb 0006 """
 
-    objects = CachingObjectManager()
+    objects = ObjectManagerCachingImmutable()
 
     name = models.TextField(primary_key=True)
     accession = models.TextField(null=True)

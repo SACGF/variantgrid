@@ -15,6 +15,7 @@ from django.db.models.query import QuerySet
 from django_extensions.db.models import TimeStampedModel
 
 from flags.models.enums import FlagStatus
+from library.django_utils.django_object_managers import ObjectManagerCachingImmutable
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
 from library.utils import ModelUtilsMixin, ChoicesEnum
@@ -73,6 +74,11 @@ class FlagType(TimeStampedModel, ModelUtilsMixin):
     help_text = models.TextField(default='')
 
     raise_permission = models.TextField(max_length=1, choices=FlagPermissionLevel.choices(), default=FlagPermissionLevel.SYSTEM.value)
+
+    objects = ObjectManagerCachingImmutable()
+
+    class Meta:
+        base_manager_name = 'objects'
 
     def __str__(self):
         return self.label

@@ -1,8 +1,10 @@
+from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from typing import Dict, Any, Optional
 
 from django.db.models import Manager, QuerySet, Q
 from frozendict import frozendict
+from threadlocals.threadlocals import set_request_variable, get_request_variable
 
 
 @dataclass(frozen=True)
@@ -11,15 +13,23 @@ class CachedQuery:
     args: Any
     kwargs: Any
 
+    def __str__(self):
+        return f"{self.model} {self.args} {self.kwargs}"
+
 
 _CACHED_QUERIES: Dict[CachedQuery, Any] = {}
 # TODO, could make this a LRU cache so it doesn't grow infinitely for larger models
 
 
-class QuerySetCaching(QuerySet):
+class QuerySetCachingBase(QuerySet, ABC):
 
-    def __init__(self, model=None, query=None, using=None, hints=None):
-        super().__init__(model=model, query=query, using=using, hints=hints)
+    @abstractmethod
+    def store_in_cache(self, cq: CachedQuery, result: QuerySet):
+        pass
+
+    @abstractmethod
+    def retrieve_from_cache(self, cq: CachedQuery):
+        pass
 
     def get(self, *args, **kwargs):
         cq: Optional[CachedQuery] = None
@@ -34,17 +44,45 @@ class QuerySetCaching(QuerySet):
             pass
 
         if cq:
-            if existing := _CACHED_QUERIES.get(cq):
+            existing = self.retrieve_from_cache(cq)
+            if existing is not None:
                 return existing
             else:
                 result = super().get(*args, **kwargs)
-                _CACHED_QUERIES[cq] = result
+                self.store_in_cache(cq, result)
                 return result
         else:
             return super().get(*args, **kwargs)
 
 
-class CachingObjectManager(Manager):
+class QuerySetImmutable(QuerySetCachingBase):
+
+    # def __init__(self, model=None, query=None, using=None, hints=None):
+    #     super().__init__(model=model, query=query, using=using, hints=hints)
+
+    def store_in_cache(self, cq: CachedQuery, result: QuerySet):
+        _CACHED_QUERIES[cq] = result
+
+    def retrieve_from_cache(self, cq: CachedQuery):
+        return _CACHED_QUERIES.get(cq)
+
+
+class QuerySetRequestCache(QuerySetCachingBase):
+
+    def store_in_cache(self, cq: CachedQuery, result: QuerySet):
+        try:
+            set_request_variable(key=cq, val=result, use_threadlocal_if_no_request=False)
+        except RuntimeError:
+            pass
+
+    def retrieve_from_cache(self, cq: CachedQuery):
+        try:
+            return get_request_variable(key=cq, default=None, use_threadlocal_if_no_request=False)
+        except RuntimeError:
+            return None
+
+
+class ObjectManagerCachingImmutable(Manager):
     """
     Best used as both the default objects and as Meta._base_manager_name = 'objects'
     Will cache results for queries - so only do this on models that are read from but never written to.
@@ -57,4 +95,11 @@ class CachingObjectManager(Manager):
 
     def __init__(self):
         super().__init__()
-        self._queryset_class = QuerySetCaching
+        self._queryset_class = QuerySetImmutable
+
+
+class ObjectManagerCachingRequest(Manager):
+
+    def __init__(self):
+        super().__init__()
+        self._queryset_class = QuerySetRequestCache

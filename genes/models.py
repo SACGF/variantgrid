@@ -41,6 +41,7 @@ from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAlias
 from library.cache import timed_cache
 from library.constants import HOUR_SECS, WEEK_SECS, MINUTE_SECS
 from library.django_utils import SortByPKMixin
+from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission, admin_bot, \
     add_public_group_read_permission
@@ -170,6 +171,11 @@ class UniProt(models.Model):
 
 class GeneSymbol(models.Model, PreviewModelMixin):
     symbol = CITextField(primary_key=True)
+
+    objects = ObjectManagerCachingRequest()
+
+    class Meta:
+        base_manager_name = 'objects'
 
     @staticmethod
     def cast(symbol: Union[str, 'GeneSymbol']) -> Optional['GeneSymbol']:

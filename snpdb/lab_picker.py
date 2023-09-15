@@ -44,7 +44,7 @@ class LabSelection:
         :return: A LabSelection
         """
         all_labs = Lab.valid_labs_qs(user=user, admin_check=True).exclude(organization__active=False).order_by(
-            'organization__name', 'name')
+            'organization__name', 'name').select_related('organization')
         selected_labs: QuerySet[Lab]
         selected_org: Optional[Organization] = None
         selected_all = False
@@ -56,26 +56,34 @@ class LabSelection:
             except ValueError:
                 pass
 
+        # grab labs now and filter to reduce the number of SQL calls
+        all_labs_list = list(all_labs.all())
+        selected_lab_set: Set[Lab] = set()
+
         if isinstance(selection, int) and selection != 0:
             # legacy method of just passing LabID around
-            selected_labs = all_labs.filter(pk=selection)
+            selected_lab_set = set([lab for lab in all_labs_list if lab.pk == selection])
+
         elif isinstance(selection, str) and selection.startswith("org-"):
             org_pk = int(selection[4:])
             selected_org = Organization.objects.filter(pk=org_pk).get()
-            selected_labs = all_labs.filter(organization=selected_org)
+            selected_lab_set = set([lab for lab in all_labs_list if lab.organization == selected_org])
+
         elif isinstance(selection, Lab):
             # make sure the user has access to the passed in lab
-            selected_labs = all_labs.filter(pk=selection.pk)
+            selected_lab_set = set([lab for lab in all_labs_list if lab == selection])
+
         else:
             selected_labs = all_labs.filter(external=False)
+            selected_lab_set = set(all_labs_list)
             selected_all = True
 
-        if not selected_labs.exists():
+        if not selected_lab_set:
             raise ValueError(f"You do not have access to lab selection : {selection}")
 
         return LabSelection(
-            all_labs=list(all_labs),
-            selected_labs=set(selected_labs),
+            all_labs=all_labs_list,
+            selected_labs=selected_lab_set,
             selected_org=selected_org,
             selected_all=selected_all
         )

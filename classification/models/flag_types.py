@@ -9,55 +9,55 @@ class ClassificationFlagTypes:
     All flag types for classifications
     """
 
-    @cached_property
+    @property
     def classification_flag_context(self) -> FlagTypeContext:
         return FlagTypeContext.objects.get(pk='classification')
 
-    @cached_property
+    @property
     def submitted_flag(self) -> FlagType:
         return FlagType.objects.get(pk='classification_submitted')
 
-    @cached_property
+    @property
     def condition_resolution(self) -> FlagType:
         return FlagType.objects.get(pk='condition_resolution')
 
-    @cached_property
+    @property
     def unshared_flag(self) -> FlagType:
         return FlagType.objects.get(pk='classification_unshared')
 
-    @cached_property
+    @property
     def suggestion(self) -> FlagType:
         return FlagType.objects.get(pk="classification_suggestion")
 
-    @cached_property
+    @property
     def significance_change(self) -> FlagType:
         return FlagType.objects.get(pk="classification_significance_change")
 
-    @cached_property
+    @property
     def classification_outstanding_edits(self) -> FlagType:
         return FlagType.objects.get(pk="classification_outstanding_edits")
 
-    @cached_property
+    @property
     def classification_clinical_context_changed(self) -> FlagType:
         return FlagType.objects.get(pk="classification_clinical_context_change")
 
-    @cached_property
+    @property
     def classification_withdrawn(self) -> FlagType:
         return FlagType.objects.get(pk="classification_withdrawn")
 
-    @cached_property
+    @property
     def internal_review(self) -> FlagType:
         return FlagType.objects.get(pk='classification_internal_review')
 
-    @cached_property
+    @property
     def discordant(self) -> FlagType:
         return FlagType.objects.get(pk='classification_discordant')
 
-    @cached_property
+    @property
     def classification_not_public(self) -> FlagType:
         return FlagType.objects.get(pk='classification_not_public')
 
-    @cached_property
+    @property
     def classification_pending_changes(self) -> FlagType:
         return FlagType.objects.get(pk='classification_pending_changes')
 
