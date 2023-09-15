@@ -2,7 +2,7 @@ from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from typing import Dict, Any, Optional
 
-from django.db.models import Manager, QuerySet, Q
+from django.db.models import Manager, QuerySet
 from frozendict import frozendict
 from threadlocals.threadlocals import set_request_variable, get_request_variable
 
@@ -40,7 +40,7 @@ class QuerySetCachingBase(QuerySet, ABC):
         try:
             cq = CachedQuery(model=self.model, args=args, kwargs=kwargs_fd)
         except TypeError:
-            # unhashable argument
+            # un-hashable argument
             pass
 
         if cq:

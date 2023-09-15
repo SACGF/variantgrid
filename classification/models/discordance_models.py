@@ -16,6 +16,7 @@ from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
 from lxml.html.diff import html_escape
+# note pycharm says html_escape doesn't exist, it does, but it's imported with a try/catch
 from more_itertools import first
 
 from classification.enums.classification_enums import SpecialEKeys
@@ -48,7 +49,7 @@ class NotifyLevel(str, Enum):
 class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 
     resolution = models.TextField(default=DiscordanceReportResolution.ONGOING, choices=DiscordanceReportResolution.CHOICES, max_length=1, null=True, blank=True)
-    # TODO remove continued discordane reason, it should be redundant to notes
+    # TODO remove continued discordance reason, it should be redundant to notes
     continued_discordance_reason = models.TextField(choices=ContinuedDiscordanceReason.CHOICES, max_length=1, null=True, blank=True)
     notes = models.TextField(null=False, blank=True, default='')
 
@@ -433,7 +434,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         return self.clinical_context.discordance_status.pending_concordance
 
 
-# TODO all the below classes are utilites, consider moving them out
+# TODO all the below classes are utilities, consider moving them out
 
 class DiscordanceReportNextStep(str, Enum):
     UNANIMOUSLy_COMPLEX = "C"
@@ -832,78 +833,6 @@ class DiscordanceReportCategories:
         return DiscordanceReportTableData(perspective=self.perspective, summaries=self.active_by_next_step.get(DiscordanceReportNextStep.TO_DISCUSS))
 
 
-"""
-class DiscordanceAction:
-
-    def __init__(self, code: int, short_description: str, long_description: str = None, no_longer_considered: bool = False):
-        self.code = code
-        self.short_description = short_description
-        self.long_description = long_description
-        self.no_longer_considered = no_longer_considered
-        if not long_description:
-            self.long_description = self.short_description
-
-    def __eq__(self, other):
-        if isinstance(other, DiscordanceAction):
-            return self.code == other.code
-        return False
-
-    def __hash__(self):
-        return self.code
-
-    def __str__(self):
-        return f'({self.code}) {self.short_description}'
-
-
-DatedDiscordanceAction = typing.NamedTuple('DatedDiscordanceAction', [('action', DiscordanceAction), ('date', Optional[datetime])])
-
-
-class DiscordanceActionsLog:
-
-    NO_CHANGE = DiscordanceAction(0, "No change in classification")
-    NOT_REVIEWED = DiscordanceAction(1, "Not reviewed")
-
-    CHANGE_NO_REASON_GIVEN = DiscordanceAction(10, "Reclassified no reason given")
-    CHANGE_UNKNOWN = DiscordanceAction(11, "Reclassified with reason (not supported in current code)")
-
-    CHANGE_DD = DiscordanceAction(20, "Reclassified after discordance discussion")
-    CHANGE_ND = DiscordanceAction(21, "Reclassified after summation of data")
-    CHANGE_IR = DiscordanceAction(22, "Reclassified after internal review")
-
-    CLINICAL_GROUP_CHANGED = DiscordanceAction(100, "Clinical grouping changed", no_longer_considered=True)
-    CLASSIFICATION_WITHDRAWN = DiscordanceAction(101, "Classification withdrawn", no_longer_considered=True)
-
-    ALL_ACTIONS = [
-        NO_CHANGE,
-        NOT_REVIEWED,
-        CHANGE_NO_REASON_GIVEN,
-        CHANGE_UNKNOWN,
-        CHANGE_DD,
-        CHANGE_ND,
-        CHANGE_IR,
-        CLINICAL_GROUP_CHANGED,
-        CLASSIFICATION_WITHDRAWN
-    ]
-
-    def __init__(self):
-        self.actions = []
-        self.internal_reviewed = None
-
-    def add(self, action: DiscordanceAction, date: Optional[datetime] = None):
-        self.actions.append(DatedDiscordanceAction(action=action, date=date))
-        self.internal_reviewed = None
-
-    @property
-    def no_longer_considered(self):
-        for dated_action in self.actions:
-            if dated_action.action.no_longer_considered:
-                return True
-        return False
-
-    def __str__(self):
-        return f'internal review = {self.internal_reviewed}, actions = {self.actions}'
-"""
-
 class DiscordanceReportClassificationRelationManager(models.Manager):
 
     def get_queryset(self):
@@ -958,103 +887,6 @@ class DiscordanceReportClassification(TimeStampedModel):
         self.withdrawn_final = self.withdrawn_effective
         self.classification_final = self.classification_effective
         self.save()
-
-    """
-    @cached_property
-    def action_log(self) -> DiscordanceActionsLog:
-        actions = DiscordanceActionsLog()
-
-        if self.withdrawn_effective:
-            # if withdrawn, nothing else matters
-            actions.add(DiscordanceActionsLog.CLASSIFICATION_WITHDRAWN)
-            return actions
-
-        # Need to revisit this, how long do we give for flags to be updated after the discordance report has been closed
-        # Currently 1 day, should it be 1 month? (but only if the relevant flag was opened during the discordance period
-        # e.g. a significance_change flag opened on day 1, and finally filled in on day 20)
-        flag_collection = self.classification_original.classification.flag_collection_safe
-        start = self.report.created
-        end = self.report.report_completed_date
-
-        # find all flag comments from 1 minute before discordance was recorded
-        # (as we want to get specific values)
-        # but only for flags that are now closed.
-        start -= timedelta(minutes=1)
-        if end:
-            # add configurable time to get stuff that happened after discordance was completed
-            # gives time for people to fill in things
-            end += timedelta(days=settings.DISCORDANCE_REPORT_LEEWAY)
-
-        relevant_comments_qs = FlagComment.objects.filter(
-            flag__collection=flag_collection,
-            # resolution__status=FlagStatus.CLOSED,
-            # flag__resolution__status=FlagStatus.CLOSED,
-            flag__flag_type__in=[
-                classification_flag_types.internal_review,
-                classification_flag_types.significance_change,
-            ],
-        ).order_by('created')
-
-        relevant_comments_qs = relevant_comments_qs.filter(created__gte=start)
-        if end:
-            relevant_comments_qs = relevant_comments_qs.filter(created__lte=end)
-
-        # note if we had a significant change we treat it as if the record was reviewed
-        # e.g. there's no
-        had_significant_change = ClinicalSignificance.is_significant_change(
-            old_classification=self.classification_original.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
-            new_classification=self.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-        )
-
-        if self.report.clinical_context != self.clinical_context_effective:
-            actions.add(DiscordanceActionsLog.CLINICAL_GROUP_CHANGED)
-
-        # TODO
-        # flags = relevant_comments_qs.values_list('flag', flat=True).distinct() # go through in order and overwrite, so latest is most important
-
-        has_reclass_reason = False
-        internal_reviewed = False
-
-        processed_flag = set()
-        for flag_comment in relevant_comments_qs:  # : :type flag_comment: FlagComment
-            # want to update resolution to be
-            flag = flag_comment.flag  # : :type flag: Flag
-            if flag.id in processed_flag:
-                continue
-            processed_flag.add(flag.id)
-
-            if flag.flag_type == classification_flag_types.internal_review and flag.resolution.status == FlagStatus.CLOSED:
-                internal_reviewed = True  # maybe we should get more info
-
-            elif flag.flag_type == classification_flag_types.significance_change:
-                resolution = flag.resolution
-                has_reclass_reason = True
-                if resolution and resolution.status == FlagStatus.CLOSED:
-                    if resolution.id == 'sc_discordance_discussion':
-                        actions.add(DiscordanceActionsLog.CHANGE_DD, flag_comment.created)
-                    elif resolution.id == 'sc_new_data':
-                        actions.add(DiscordanceActionsLog.CHANGE_ND, flag_comment.created)
-                    elif resolution.id == 'sc_internal_review':
-                        actions.add(DiscordanceActionsLog.CHANGE_IR, flag_comment.created)
-                    else:
-                        actions.add(DiscordanceActionsLog.CHANGE_UNKNOWN, flag_comment.created)
-                else:
-                    actions.add(DiscordanceActionsLog.CHANGE_NO_REASON_GIVEN, flag_comment.created)
-
-        if internal_reviewed:
-            actions.internal_reviewed = True
-
-        if internal_reviewed and not had_significant_change:
-            actions.add(DiscordanceActionsLog.NO_CHANGE)
-
-        if not internal_reviewed and not had_significant_change:
-            actions.add(DiscordanceActionsLog.NOT_REVIEWED)
-
-        if had_significant_change and not has_reclass_reason:
-            actions.add(DiscordanceActionsLog.CHANGE_NO_REASON_GIVEN)
-
-        return actions
-"""
 
 
 class DiscordanceReportTriageStatus(TextChoices):

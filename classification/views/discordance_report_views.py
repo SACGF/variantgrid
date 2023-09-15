@@ -11,12 +11,11 @@ from django.http import HttpRequest
 from django.http.response import HttpResponse, HttpResponseBase
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from django import forms
 from classification.enums import SpecialEKeys
 from classification.enums.discordance_enums import ContinuedDiscordanceReason, DiscordanceReportResolution
 from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext, \
     EvidenceKeyMap, classification_flag_types, discordance_change_signal, \
-	DiscordanceReportRowData, ClassificationFlagTypes, DiscordanceReportTriage, ClinicalContextChangeData, ClinicalContextRecalcTrigger
+    DiscordanceReportRowData, ClassificationFlagTypes, ClinicalContextChangeData, ClinicalContextRecalcTrigger
 from classification.models.classification_groups import ClassificationGroupUtils, ClassificationGroups
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.evidence_key import EvidenceKeyOption
@@ -102,9 +101,14 @@ class _LabClinSig:
 
     @property
     def _sort_order(self):
-        return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter_value(self.clin_sig), self.lab
+        return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter_value(
+            self.clin_sig), self.lab
 
     def __lt__(self, other):
+        def sort_order(lcs: _LabClinSig):
+            return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter_value(
+                lcs.clin_sig), lcs.lab
+
         return self._sort_order < other._sort_order
 
 
@@ -116,7 +120,8 @@ class DiscordanceReportTemplateData:
         self.user = user
 
     def triage_embeds(self) -> List[LazyRender]:
-        return [DiscordanceReportTriageView.lazy_render(triage) for triage in self.report.discordancereporttriage_set.all().order_by('-lab')]
+        return [DiscordanceReportTriageView.lazy_render(triage) for triage in
+                self.report.discordancereporttriage_set.all().order_by('-lab')]
 
     def refreshed(self) -> 'DiscordanceReportTemplateData':
         return DiscordanceReportTemplateData(discordance_report_id=self.discordance_report_id, user=self.user)
@@ -143,7 +148,8 @@ class DiscordanceReportTemplateData:
 
     @property
     def report_history(self) -> QuerySet[DiscordanceReport]:
-        return DiscordanceReport.objects.filter(clinical_context=self.report.clinical_context).order_by('-report_started_date')
+        return DiscordanceReport.objects.filter(clinical_context=self.report.clinical_context).order_by(
+            '-report_started_date')
 
     @property
     def has_history(self) -> bool:
@@ -180,6 +186,7 @@ class DiscordanceReportTemplateData:
 
     @cached_property
     def _effectives_and_not_considered(self) -> Tuple[List[ClassificationModification], List[DiscordanceNoLongerConsiders]]:
+
         effectives: List[ClassificationModification] = []
         withdrawns: List[ClassificationModification] = []
         changed_context: Dict[Optional[ClinicalContext], List[ClassificationModification]] = defaultdict(list)
@@ -197,7 +204,7 @@ class DiscordanceReportTemplateData:
             no_longer_considered.append(DiscordanceNoLongerConsiders("Withdrawn", withdrawns))
         if unmatched := changed_context.pop(None, None):
             no_longer_considered.append(DiscordanceNoLongerConsiders("Un-matched", unmatched))
-        for key in sorted(changed_context.keys()):
+        for key in changed_context.keys():
             no_longer_considered.append(
                 DiscordanceNoLongerConsiders(f"Changed context to {key.name}", changed_context[key]))
 
@@ -217,7 +224,8 @@ class DiscordanceReportTemplateData:
 
         return ClassificationGroupUtils(
             modifications=self.effective_classifications + no_longer_considered_mods,
-            old_modifications=[drc.classification_original for drc in self.report.discordancereportclassification_set.all()],
+            old_modifications=[drc.classification_original for drc in
+                               self.report.discordancereportclassification_set.all()],
             calculate_pending=self.is_latest
         )
 
@@ -240,8 +248,10 @@ class DiscordanceReportTemplateData:
             lab = cm.classification.lab
             clin_sig = cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
             pending_clin_sig = clin_sig
-            if pending_change := cm.classification.flag_collection.get_open_flag_of_type(classification_flag_types.classification_pending_changes):
-                pending_clin_sig = pending_change.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY)
+            if pending_change := cm.classification.flag_collection.get_open_flag_of_type(
+                    classification_flag_types.classification_pending_changes):
+                pending_clin_sig = pending_change.data.get(
+                    ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY)
             lab_clin_sig_key = _LabClinSigKey(lab=lab, clin_sig=clin_sig)
             clin_sig_keys_to_pending[lab_clin_sig_key][pending_clin_sig] += 1
 
@@ -258,14 +268,16 @@ class DiscordanceReportTemplateData:
                 else:
                     suggested_pending_cs = pending_cs
 
-            lab_clin_sigs.append(_LabClinSig(lab_clin_sig_key=key, pending_clin_sig=suggested_pending_cs, count=total_count))
+            lab_clin_sigs.append(
+                _LabClinSig(lab_clin_sig_key=key, pending_clin_sig=suggested_pending_cs, count=total_count))
 
         lab_clin_sigs.sort()
 
         return lab_clin_sigs
 
     def classifications_for_lab_clin_sig(self, lab_clin_sig: _LabClinSig):
-        return [cm for cm in self.effective_classifications if cm.classification.lab == lab_clin_sig.lab and cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) == lab_clin_sig.clin_sig]
+        return [cm for cm in self.effective_classifications if cm.classification.lab == lab_clin_sig.lab and cm.get(
+            SpecialEKeys.CLINICAL_SIGNIFICANCE) == lab_clin_sig.clin_sig]
 
     @property
     def main_clin_sigs(self) -> List[EvidenceKeyOption]:
@@ -286,7 +298,8 @@ class DiscordanceReportTemplateData:
         report = self.report
         if report.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
             # see if latest
-            latest_report = DiscordanceReport.objects.filter(clinical_context=report.clinical_context).order_by('-report_started_date').first()
+            latest_report = DiscordanceReport.objects.filter(clinical_context=report.clinical_context).order_by(
+                '-report_started_date').first()
             if report == latest_report:
                 return True
         return False
@@ -305,7 +318,8 @@ def discordance_report_review(request: HttpRequest, discordance_report_id: int) 
         return redirect(reverse('edit_review', kwargs={"review_id": existing.pk}))
     else:
         discussed_object = data.report.reviews_safe
-        return redirect(reverse('start_review', kwargs={"reviewed_object_id": discussed_object.pk, "topic_id": "discordance_report"}))
+        return redirect(reverse('start_review',
+                                kwargs={"reviewed_object_id": discussed_object.pk, "topic_id": "discordance_report"}))
 
 
 def discordance_report_view(request: HttpRequest, discordance_report_id: int) -> HttpResponse:
@@ -389,9 +403,9 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
                     print(f"Lab {lab_clin_sig.lab} changing from {lab_clin_sig.clin_sig} to {updated_clin_sig}")
                     modifications = data.classifications_for_lab_clin_sig(lab_clin_sig)
                     classifications = [mod.classification for mod in modifications]
-                    pretty_lab_clin_sig =  EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(lab_clin_sig.clin_sig)
                     if lab_clin_sig.clin_sig != updated_clin_sig:
-                        pretty_clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(updated_clin_sig)
+                        pretty_clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(
+                            updated_clin_sig)
 
                         review_data.append({
                             "lab": lab_clin_sig.lab.group_name,
@@ -405,7 +419,8 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
                             flag, created = classification.flag_collection.get_or_create_open_flag_of_type(
                                 flag_type=classification_flag_types.classification_pending_changes,
                                 user=request.user,
-                                permission_check=False,  # raising on behalf of the user handling discordance, doesn't necessarily have permission to open this normally,
+                                permission_check=False,
+                                # raising on behalf of the user handling discordance, doesn't necessarily have permission to open this normally,
                                 comment=comment,
                                 reopen=True,
                                 add_comment_if_open=False
@@ -445,15 +460,19 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
             if resolution == "discordant":
                 report.report_closed_by = request.user
                 report.continued_discordance_reason = ContinuedDiscordanceReason.NOT_DEFINED
-                report.close(expected_resolution=DiscordanceReportResolution.CONTINUED_DISCORDANCE, cause_text="Unable to resolve")
+                report.close(expected_resolution=DiscordanceReportResolution.CONTINUED_DISCORDANCE,
+                             cause_text="Unable to resolve")
             elif data.is_pending_concordance:
                 # a bit messy to call the signal here directly
                 # was listening for the individual flags to be raised, but then since it's typically multiple flags raised at once
                 # it was hard to stop multiple notifications going out
-                clinical_context_change_data_view = ClinicalContextChangeData(cause_text="Pending Concordance", cause_code=ClinicalContextRecalcTrigger.PENDING_CS_CHANGE)
-                discordance_change_signal.send(DiscordanceReport, discordance_report=discordance_report, clinical_context_change_data=clinical_context_change_data_view)
+                clinical_context_change_data_view = ClinicalContextChangeData(cause_text="Pending Concordance",
+                                                                              cause_code=ClinicalContextRecalcTrigger.PENDING_CS_CHANGE)
+                discordance_change_signal.send(DiscordanceReport, discordance_report=discordance_report,
+                                               clinical_context_change_data=clinical_context_change_data_view)
             else:
-                raise ValueError(f"Expected resolution of {resolution} but allele {report.clinical_context.allele_id} is not pending concordance")
+                raise ValueError(
+                    f"Expected resolution of {resolution} but allele {report.clinical_context.allele_id} is not pending concordance")
 
         else:
             raise ValueError(f"Unsupported action \"{action}\"")

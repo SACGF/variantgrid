@@ -4,6 +4,7 @@ import re
 import socket
 import sys
 import traceback
+from abc import ABC, abstractmethod
 from logging import StreamHandler
 from typing import Dict, Optional, List, Tuple, Any, Union
 
@@ -17,6 +18,7 @@ from django.db.models import Model
 from django.forms import ModelForm
 from django.utils import timezone
 from markdown import markdown
+from requests import HTTPError
 from rest_framework.request import Request
 from threadlocals.threadlocals import get_current_request, get_current_user
 
@@ -54,7 +56,7 @@ def report_event(name: str, request: Request = None, extra_data: Dict = None):
         if isinstance(extra_data, dict):
             try:
                 details = json.dumps(extra_data)
-            except:
+            except TypeError:
                 details = "(error saving extra_data)"
     elif request:
         details = json.dumps({**request.POST.dict(), **request.GET.dict()})
@@ -104,7 +106,7 @@ def report_message(message: str, level: str = 'warning', request=None, extra_dat
     @param message The message to report on
     @param level The error level, error, warning, info
     @param request the web request (if available)
-    @param extra_data a JSON-isable dictionary of extra information
+    @param extra_data a JSON-able dictionary of extra information
     """
     if not extra_data:
         extra_data = {}
@@ -140,7 +142,7 @@ def report_exc_info(extra_data=None, request=None, report_externally=True):
 
 
 class NotificationBuilder:
-    # Preference is to use AdminNotificationBuilder or LabNoficationBuilder now
+    # Preference is to use AdminNotificationBuilder or LabNotificationBuilder now
 
     SLACK_EMOJI_RE = re.compile(r":[A-Z_]+:", re.IGNORECASE)
     DE_P = re.compile(r"<p>(.*?)</p>", re.IGNORECASE | re.DOTALL)
@@ -164,14 +166,17 @@ class NotificationBuilder:
 
     # Different kind of blocks
 
-    class Block:
+    class Block(ABC):
 
+        @abstractmethod
         def as_text(self) -> str:
             raise NotImplementedError(f"{self} has not implemented as_text method")
 
+        @abstractmethod
         def as_html(self) -> str:
             raise NotImplementedError(f"{self} has not implemented as_html method")
 
+        @abstractmethod
         def as_slack(self) -> Union[Dict, List]:
             raise NotImplementedError(f"{self} has not implemented as_slack method")
 
@@ -218,17 +223,17 @@ class NotificationBuilder:
         def as_slack(self):
             blocks = []
 
-            def as_field(field: Tuple[str, Any]):
+            def as_field(the_field: Tuple[str, Any]):
                 return {
                     "type": "mrkdwn",
-                    "text": f"*{field[0]}:*\n{field[1]}"
+                    "text": f"*{the_field[0]}:*\n{the_field[1]}"
                 }
 
             def add_field_list(fields: List[Tuple[str, Any]]):
                 if fields:
                     blocks.append({
                         "type": "section",
-                        "fields": [as_field(field) for field in fields]
+                        "fields": [as_field(the_field) for the_field in fields]
                     })
 
             field_list = []
@@ -426,7 +431,7 @@ def send_notification(
         )
         try:
             r.raise_for_status()
-        except:
+        except HTTPError:
             report_exc_info()
     else:
         # fallback to Rollbar if Slack isn't configured
