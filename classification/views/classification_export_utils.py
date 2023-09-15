@@ -227,8 +227,8 @@ class VariantWithChgvs:
 
     @cached_property
     def transcript_version(self) -> int:
-        if self.chgvs.transcript_parts:
-            return self.chgvs.transcript_parts or 0
+        if tp := self.chgvs.transcript_parts:
+            return tp.version or 0
         else:
             return 0
 
