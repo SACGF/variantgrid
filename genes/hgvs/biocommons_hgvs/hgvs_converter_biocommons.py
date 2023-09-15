@@ -38,7 +38,6 @@ class ParserSingleton:
         return cls.__instance._parser
 
 
-
 class BioCommonsHGVSVariant(HGVSVariant):
     def __init__(self, sequence_variant: SequenceVariant):
         self._sequence_variant = sequence_variant
@@ -268,4 +267,3 @@ class BioCommonsHGVSConverter(HGVSConverter):
             ref = var_g.posedit.edit.ref
             matches_reference = HgvsMatchRefAllele(provided_ref='', calculated_ref=ref)
         return var_g, matches_reference
-

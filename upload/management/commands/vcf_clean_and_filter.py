@@ -157,7 +157,7 @@ class Command(BaseCommand):
         return defined_filters
 
     @staticmethod
-    def _write_skip_counts(counts, filename): #
+    def _write_skip_counts(counts, filename):
         if counts and filename:
             with open(filename, "w") as f:
                 for name, count in counts.items():

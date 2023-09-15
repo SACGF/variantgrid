@@ -121,4 +121,3 @@ def hgvs_resolution_tool(request: HttpRequest):
                 output.message = str(ex)
 
     return render(request, "classification/hgvs_resolution_tool.html", context)
-

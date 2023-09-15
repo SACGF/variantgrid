@@ -448,4 +448,3 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         if self.is_default:
             return 'Default Grouping for Allele'
         return self.name
-

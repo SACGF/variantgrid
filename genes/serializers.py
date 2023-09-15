@@ -112,7 +112,6 @@ class GeneListSerializer(serializers.ModelSerializer):
         return fields
 
 
-
 class GeneAnnotationReleaseSerializer(serializers.ModelSerializer):
     __str__ = serializers.SerializerMethodField()
 

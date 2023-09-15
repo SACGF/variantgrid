@@ -260,7 +260,6 @@ class CohortHotspotGraphView(HotspotGraphView):
         return "cohort_transcript_version_hotspot_graph"
 
 
-
 @method_decorator([cache_page(MINUTE_SECS), login_not_required], name='dispatch')
 class PublicRUNX1HotspotGraphView(ClassificationsHotspotGraphView):
     """ RUNX1 would like a hotspot graph on the front page - but we don't want to expose

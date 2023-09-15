@@ -112,4 +112,3 @@ def sync_runner_for_destination(sync_destination: SyncDestination) -> SyncRunner
             return factory_requirements.factory()
 
     raise ValueError(f"None of the {len(_sync_runner_registry)} SyncRunners is configured for the config of {sync_destination}: ({json.dumps(sync_destination.config)})")
-

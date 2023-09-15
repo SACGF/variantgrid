@@ -43,7 +43,6 @@ class ClinVarRecordAdmin(TabularInline):
             return obj.c_hgvs
         return obj.variant_coordinate
 
-
     def has_change_permission(self, request, obj=None):
         return False
 
@@ -102,7 +101,6 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
             ).fetch()
         duration = datetime.now() - start
         messages.info(request, message=f"Fetching took {duration}")
-
 
     @admin_action("Refresh: Force (using RCVs)")
     def refresh_force_rcvs(self, request, queryset: QuerySet[ClinVarRecordCollection]):

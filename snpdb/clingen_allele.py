@@ -390,7 +390,6 @@ def get_clingen_allele_for_variant_coordinate(genome_build: GenomeBuild, variant
     return ca
 
 
-
 def get_clingen_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
                                    clingen_api: ClinGenAlleleRegistryAPI = None) -> ClinGenAllele:
     """ Retrieves from DB or calls API then caches in DB   """

@@ -556,7 +556,6 @@ class CohortGenotype(models.Model):
     # This stores any remaining INFO fields from VCF record not used in fields above
     info = models.JSONField(null=False, blank=True, default=dict)
 
-
     def get_sample_genotype(self, sample: Sample) -> SampleGenotype:
         sample_index = self.collection.get_array_index_for_sample_id(sample.pk)
         return SampleGenotype(self, sample, sample_index)

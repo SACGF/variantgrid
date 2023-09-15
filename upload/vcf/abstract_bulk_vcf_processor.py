@@ -103,4 +103,3 @@ class AbstractBulkVCFProcessor:
                                             items_to_process=num_modified_imported_variants)
 
         sql_job.launch_task(ImportModifiedImportedVariantSQLCopyTask)
-

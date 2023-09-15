@@ -277,7 +277,6 @@ class VariantCoordinate(FormerTuple):
             if not isinstance(v, expected_type):
                 raise ValueError(f"'{field}' must be of type {expected_type}, was type: {type(v)}")
 
-
     @property
     def as_tuple(self) -> Tuple:
         return self.chrom, self.start, self.end, self.ref, self.alt

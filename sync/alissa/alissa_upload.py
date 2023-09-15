@@ -83,7 +83,7 @@ class AlissaUploadSyncer(SyncRunner):
                 include_sources=includes,
                 min_share_level=ShareLevel.ALL_USERS,
                 since=since,
-                rows_per_file=1000, # Alissa can handle 10,000 but 1,000 at a time just seems safer
+                rows_per_file=1000,  # Alissa can handle 10,000 but 1,000 at a time just seems safer
                 row_limit=sync_run_instance.max_rows
             ),
             format_details=format_details

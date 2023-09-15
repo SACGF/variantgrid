@@ -738,7 +738,6 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
         ]
 
 
-
 class SelectedInParentNodeForm(BaseNodeForm):
     """ This doesn't do anything, just need a ModelForm for view """
 

@@ -13,7 +13,6 @@ def _one_off_create_empty_cnv_annotation_runs(apps, _schema_editor):
     VARIANT_ANNOTATION_PIPELINE_TYPE_CNV = "C"
     ANNOTATION_STATUS_FINISHED = 'F'
 
-
     now = timezone.now()
     records = []
     ar_qs = AnnotationRun.objects.filter(pipeline_type=VARIANT_ANNOTATION_PIPELINE_TYPE_STANDARD)

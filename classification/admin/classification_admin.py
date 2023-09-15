@@ -123,7 +123,6 @@ class ClassificationLatestImportFilter(admin.SimpleListFilter):
         return queryset
 
 
-
 class ClassificationModificationAdmin(admin.TabularInline):
     model = ClassificationModification
 
@@ -919,7 +918,6 @@ class DiscordanceNotificationAdmin(ModelAdminBasics):
         selected_pks = [dn.pk for dn in queryset]
         selected_notifications = DiscordanceNotification.objects.filter(pk__in=selected_pks)
         send_prepared_discordance_notifications(selected_notifications)
-
 
 
 @admin.register(UploadedClassificationsUnmapped)

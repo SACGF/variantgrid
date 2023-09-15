@@ -1313,7 +1313,6 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
                 tvi = TranscriptVersionSequenceInfo._get_and_store_from_ensembl_api(transcript_accession)
         return tvi
 
-
     @staticmethod
     def _get_kwargs_from_genbank_record(record):
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(record.id)

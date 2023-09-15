@@ -480,4 +480,3 @@ def analysis_template_clone(request, pk):
     new_analysis_template = analysis_template.clone(request.user)
     reload_analysis_nodes(new_analysis_template.analysis.pk)
     return JsonResponse({"analysis_template_id": new_analysis_template.pk})
-
