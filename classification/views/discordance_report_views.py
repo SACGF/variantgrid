@@ -15,7 +15,8 @@ from classification.enums import SpecialEKeys
 from classification.enums.discordance_enums import ContinuedDiscordanceReason, DiscordanceReportResolution
 from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext, \
     EvidenceKeyMap, classification_flag_types, discordance_change_signal, \
-    DiscordanceReportRowData, ClassificationFlagTypes, ClinicalContextChangeData, ClinicalContextRecalcTrigger
+    ClassificationFlagTypes, ClinicalContextChangeData, ClinicalContextRecalcTrigger
+from classification.models.discordance_models_utils import DiscordanceReportRowData
 from classification.models.classification_groups import ClassificationGroupUtils, ClassificationGroups
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.evidence_key import EvidenceKeyOption

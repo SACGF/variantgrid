@@ -15,8 +15,8 @@ from classification.enums.classification_enums import EvidenceCategory, SpecialE
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
     ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
-    classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
-    DiscordanceReportRowDataTriagesRowData
+    classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk
+from classification.models.discordance_models_utils import DiscordanceReportRowDataTriagesRowData
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation

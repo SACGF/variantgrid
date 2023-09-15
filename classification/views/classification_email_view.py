@@ -16,7 +16,8 @@ from django.utils.timesince import timesince
 
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import Classification, classification_flag_types, \
-    DiscordanceReportClassification, DiscordanceReport, DiscordanceReportTableData, DiscordanceReportCategories
+    DiscordanceReportClassification, DiscordanceReport
+from classification.models.discordance_models_utils import DiscordanceReportTableData, DiscordanceReportCategories
 from email_manager.models import EmailLog
 from flags.models import FlagCollection, Flag
 from library.log_utils import report_exc_info, report_message

@@ -10,7 +10,8 @@ from django.urls import reverse
 
 from classification.enums import SpecialEKeys
 from classification.models import DiscordanceReport, discordance_change_signal, EvidenceKeyMap, \
-    DiscordanceReportRowData, ClassificationLabSummary
+    ClassificationLabSummary
+from classification.models.discordance_models_utils import DiscordanceReportRowData
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
 from snpdb.lab_picker import LabPickerData

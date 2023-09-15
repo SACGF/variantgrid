@@ -13,8 +13,9 @@ from termsandconditions.decorators import terms_required
 
 from classification.enums import ShareLevel
 from classification.models import classification_flag_types, ClinVarExport, DiscordanceReportClassification, \
-    DiscordanceReport, ConditionText, ConditionTextMatch, DiscordanceReportTableData, DiscordanceReportCategories, \
-    DiscordanceReportRowData
+    DiscordanceReport, ConditionText, ConditionTextMatch
+from classification.models.discordance_models_utils import DiscordanceReportRowData, DiscordanceReportTableData, \
+    DiscordanceReportCategories
 from classification.models.classification import Classification, \
     ClassificationModification
 from classification.models.clinvar_export_sync import clinvar_export_sync

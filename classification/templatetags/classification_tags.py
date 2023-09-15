@@ -11,8 +11,8 @@ from django.utils.safestring import mark_safe
 from classification.criteria_strengths import CriteriaStrength, AcmgPointScore
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
-from classification.models import ConditionTextMatch, ConditionResolved, DiscordanceReportRowData, \
-    ClassificationLabSummary, ImportedAlleleInfo, DiscordanceReportTableData
+from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo
+from classification.models.discordance_models_utils import DiscordanceReportRowData, DiscordanceReportTableData
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
     ClassificationGroupUtils
