@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from snpdb.models import Allele, AlleleConversionTool, GenomeBuild, Variant
+from snpdb.models import GenomeBuild, Variant
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 

@@ -2,6 +2,7 @@ from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Any, List
+
 from django.core.management import BaseCommand
 from django.db.models import Max
 from django.urls import reverse

@@ -1,6 +1,5 @@
 from typing import Dict, Any
 
-from classification.enums import SpecialEKeys
 from snpdb.models import Variant, GenomeBuild
 
 

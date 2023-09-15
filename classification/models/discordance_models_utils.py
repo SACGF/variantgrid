@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property
 from typing import List, Set, Iterable, Optional, Dict
+
 from django.utils import timezone
 from frozendict import frozendict
 from more_itertools import first

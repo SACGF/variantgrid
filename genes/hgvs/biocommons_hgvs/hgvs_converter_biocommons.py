@@ -1,4 +1,3 @@
-import logging
 import os.path
 import re
 from importlib import metadata
@@ -7,7 +6,6 @@ from typing import Tuple
 from bioutils.sequences import reverse_complement
 from django.conf import settings
 from hgvs.assemblymapper import AssemblyMapper
-from hgvs.enums import ValidationLevel
 from hgvs.exceptions import HGVSDataNotAvailableError, HGVSError, HGVSInvalidVariantError
 from hgvs.extras.babelfish import Babelfish
 from hgvs.normalizer import Normalizer

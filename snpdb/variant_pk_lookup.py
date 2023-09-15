@@ -3,7 +3,6 @@ Variant table is massive, so we need a way to quickly look up a variant PK for i
 
 The original implementation RedisVariantPKLookup used Redis to store a hash, was deleted 2021-08-05
 """
-import abc
 import logging
 import os
 from collections import defaultdict

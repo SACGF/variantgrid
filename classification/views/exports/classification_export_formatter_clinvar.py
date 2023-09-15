@@ -4,8 +4,10 @@ from enum import Enum
 from functools import cached_property
 from itertools import groupby
 from typing import Set, Optional, List, Tuple, Callable
+
 from django.http import HttpRequest
 from django.urls import reverse
+
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
 from annotation.models import ClinVar, ClinVarVersion, ClinVarRecord
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE

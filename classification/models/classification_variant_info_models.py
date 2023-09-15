@@ -14,7 +14,7 @@ from model_utils.models import TimeStampedModel
 from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff
 from genes.models import TranscriptVersion, GeneSymbol, Transcript
 from library.cache import timed_cache
-from library.django_utils.django_object_managers import QuerySetRequestCache, ObjectManagerCachingRequest
+from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.log_utils import report_exc_info
 from library.utils import pretty_label, IconWithTooltip, md5sum_str
 from snpdb.models import GenomeBuild, Variant, Allele, GenomeBuildPatchVersion, VariantCoordinate

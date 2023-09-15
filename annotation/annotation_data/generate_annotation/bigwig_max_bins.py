@@ -6,10 +6,11 @@ So we'll process the file into bins
 """
 
 import os
-import pyBigWig
-import numpy as np
-
 from argparse import ArgumentParser
+
+import numpy as np
+import pyBigWig
+
 
 def name_from_filename(filename):
     """ removes path and extension"""

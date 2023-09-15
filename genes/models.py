@@ -4,7 +4,7 @@ import os
 import re
 import shutil
 import types
-from collections import namedtuple, defaultdict, Counter
+from collections import defaultdict, Counter
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import cached_property, total_ordering

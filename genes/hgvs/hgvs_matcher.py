@@ -8,7 +8,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Max, Min
 
-from genes.hgvs import HGVSVariant, CHGVS, HGVSException
+from genes.hgvs import HGVSVariant, CHGVS
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
 from genes.hgvs.hgvs_converter import HGVSConverterType, HgvsMatchRefAllele
 from genes.hgvs.hgvs_converter_combo import ComboCheckerHGVSConverter

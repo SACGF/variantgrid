@@ -13,12 +13,12 @@ from django.urls.base import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from lxml.html.diff import html_escape
-# note pycharm says html_escape doesn't exist, it does, but it's imported with a try/catch
 
 from classification.enums.classification_enums import SpecialEKeys
 from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.clinical_context_models import ClinicalContext, ClinicalContextRecalcTrigger
+from classification.models.clinical_context_models import ClinicalContextChangeData
 from classification.models.flag_types import classification_flag_types
 from genes.hgvs import CHGVS
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
@@ -27,7 +27,8 @@ from library.utils.django_utils import refresh_for_update
 from review.models import ReviewableModelMixin, Review
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, GenomeBuild
-from classification.models.clinical_context_models import ClinicalContextChangeData
+
+# note pycharm says html_escape doesn't exist, it does, but it's imported with a try/catch
 
 
 discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report", "clinical_context_change_data:ClinicalContextChangeData"

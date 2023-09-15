@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 from typing import Optional, Union
+
 from django.template import Library
 from more_itertools import first
+
 from annotation.models import ClinVar, AnnotationVersion
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from genes.hgvs import HGVSMatcher

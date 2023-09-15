@@ -1,8 +1,8 @@
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, List
-import re
 
 from annotation.models import ClinVarRecord
 from library.utils.xml_utils import XmlParser

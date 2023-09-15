@@ -1,9 +1,10 @@
 from cdot.hgvs.dataproviders import LocalDataProvider, FastaSeqFetcher, ChainedSeqFetcher
 from hgvs.exceptions import HGVSDataNotAvailableError
 
-from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo, NoTranscript
+from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo
 from genes.transcripts_utils import get_refseq_type
 from snpdb.models import Contig
+
 
 def is_contig(ac):
     if refseq_type := get_refseq_type(ac):

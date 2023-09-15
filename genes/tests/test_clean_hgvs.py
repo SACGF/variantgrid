@@ -1,6 +1,8 @@
 from django.test import TestCase, override_settings
+
 from genes.hgvs import HGVSMatcher, HGVSConverterType
 from snpdb.models import GenomeBuild
+
 
 @override_settings(HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH=False)
 class TestCleanHGVS(TestCase):

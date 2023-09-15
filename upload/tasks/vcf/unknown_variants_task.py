@@ -1,4 +1,3 @@
-import gzip
 import logging
 import os
 import subprocess
@@ -11,7 +10,7 @@ from django.core.cache import cache
 from library.genomics.vcf_utils import vcf_get_ref_alt_end
 from library.utils.file_utils import name_from_filename, mk_path
 from snpdb import variant_collection
-from snpdb.models import Variant, VariantCoordinate
+from snpdb.models import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import UploadStep, UploadStepTaskType, VCFPipelineStage
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask

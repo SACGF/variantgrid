@@ -1,24 +1,24 @@
 from collections import defaultdict
 from typing import Optional
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import QuerySet
-from django.utils import timezone
-from django.conf import settings
 from django.dispatch import receiver
 from django.urls import reverse
+from django.utils import timezone
 
 from classification.enums import SpecialEKeys
 from classification.models import DiscordanceReport, discordance_change_signal, EvidenceKeyMap, \
     ClassificationLabSummary
+from classification.models.clinical_context_models import DiscordanceNotification, ClinicalContextChangeData, \
+    ClinicalContextRecalcTrigger
 from classification.models.discordance_models_utils import DiscordanceReportRowData
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
 from snpdb.utils import LabNotificationBuilder
-from classification.models.clinical_context_models import DiscordanceNotification, ClinicalContextChangeData, \
-    ClinicalContextRecalcTrigger
 
 """
 Responsible for emailing/slacking users when a discordance is detected.

@@ -1,8 +1,8 @@
 import os
 from typing import List
-from django.test import TestCase
 
 from django.conf import settings
+from django.test import TestCase
 
 from annotation.clinvar_xml_parser_via_rcvs import ClinVarXmlParserViaRCVs
 from annotation.models import ClinVarRecord, ClinVarRecordCollection

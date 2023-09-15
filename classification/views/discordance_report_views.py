@@ -9,16 +9,17 @@ from django.db.models import QuerySet
 from django.dispatch import receiver
 from django.http import HttpRequest
 from django.http.response import HttpResponse, HttpResponseBase
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect
 from django.urls import reverse
+
 from classification.enums import SpecialEKeys
 from classification.enums.discordance_enums import ContinuedDiscordanceReason, DiscordanceReportResolution
 from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext, \
     EvidenceKeyMap, classification_flag_types, discordance_change_signal, \
     ClassificationFlagTypes, ClinicalContextChangeData, ClinicalContextRecalcTrigger
-from classification.models.discordance_models_utils import DiscordanceReportRowData
 from classification.models.classification_groups import ClassificationGroupUtils, ClassificationGroups
 from classification.models.discordance_models import DiscordanceReport
+from classification.models.discordance_models_utils import DiscordanceReportRowData
 from classification.models.evidence_key import EvidenceKeyOption
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from classification.views.discordance_report_triage_view import DiscordanceReportTriageView

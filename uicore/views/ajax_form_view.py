@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import TypeVar, Dict, Generic, Callable, Optional, Tuple
+
 from django.db.models import Model
 from django.http import HttpResponse, HttpRequest
 from django.template import loader

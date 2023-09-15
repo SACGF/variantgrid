@@ -3,22 +3,20 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import reduce
-from typing import Optional, Any
+from typing import Any
 
 from django.conf import settings
 from django.contrib import messages
 from django.db import connection
-from django.db.models import Q
 from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from analysis.models import VariantTag
-from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, ClinVar, \
+from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, \
     VariantAnnotationVersion, VariantAnnotation
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
-from classification.models import ImportedAlleleInfo
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.variant_card import AlleleCard
 from classification.views.exports import ClassificationExportFormatterCSV
@@ -28,7 +26,6 @@ from eventlog.models import create_event
 from genes.hgvs import HGVSMatcher
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
 from library.django_utils import require_superuser, highest_pk, get_field_counts
-from library.enums.log_level import LogLevel
 from library.git import Git
 from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback, report_message, slack_bot_username
@@ -40,8 +37,8 @@ from snpdb.clingen_allele import link_allele_to_existing_variants
 from snpdb.forms import TagForm, get_settings_form_features
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, \
-    AlleleConversionTool, ImportSource, AlleleOrigin, VariantAlleleSource, VariantGridColumn, Tag
+from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleConversionTool, ImportSource, AlleleOrigin, \
+    VariantAlleleSource, VariantGridColumn, Tag
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.search import search_data

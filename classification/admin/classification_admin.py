@@ -16,12 +16,12 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk
-from classification.models.discordance_models_utils import DiscordanceReportRowDataTriagesRowData
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
 from classification.models.clinical_context_models import ClinicalContextRecalcTrigger, DiscordanceNotification
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
+from classification.models.discordance_models_utils import DiscordanceReportRowDataTriagesRowData
 from classification.signals import send_prepared_discordance_notifications
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.cache import timed_cache

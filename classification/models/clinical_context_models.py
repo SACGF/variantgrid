@@ -5,11 +5,9 @@ from typing import List, Optional, Iterable, Set, Dict
 
 import django.dispatch
 from django.conf import settings
-from django.contrib.auth.models import User
 from django.db import models, transaction
 from django.db.models.deletion import CASCADE
 from django.db.models.query import QuerySet
-from django.dispatch.dispatcher import receiver
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 
@@ -17,12 +15,9 @@ from classification.enums import ShareLevel, SpecialEKeys
 from classification.enums.clinical_context_enums import ClinicalContextStatus
 from classification.models.classification import Classification, \
     ClassificationModification
-from classification.models.classification_import_run import ClassificationImportRun, \
-    classification_imports_complete_signal
-
+from classification.models.classification_import_run import ClassificationImportRun
 from flags.models import Flag, FlagStatus
-from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
-    flag_collection_extra_info_signal, FlagInfos
+from flags.models.models import FlagsMixin, FlagTypeContext
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
 from library.utils import invalidate_cached_property

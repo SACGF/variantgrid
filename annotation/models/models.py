@@ -5,6 +5,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import cached_property
 from typing import List, Optional, Dict, Callable, Tuple
+
 from Bio import Entrez
 from Bio.Data.IUPACData import protein_letters_1to3
 from django.conf import settings
@@ -16,10 +17,10 @@ from django.db.models.deletion import PROTECT, CASCADE, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.utils import timezone
-from django.utils.timezone import localtime
 from django_extensions.db.models import TimeStampedModel
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
+
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction

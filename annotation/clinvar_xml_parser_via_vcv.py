@@ -1,5 +1,7 @@
-from Bio import Entrez
 import re
+
+from Bio import Entrez
+
 from annotation.clinvar_xml_parser import ClinVarXmlParser, ClinVarXmlParserOutput, CLINVAR_REVIEW_STATUS_TO_STARS, \
     CLINVAR_TO_VG_CLIN_SIG
 from library.utils.xml_utils import parser_path, PP

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
 from typing import List, Optional, Dict, Set, Any
+
 from django.conf import settings
 from django.http import HttpRequest
 

@@ -6,7 +6,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from itertools import islice
 from typing import Iterable, Iterator, List, TypeVar, Any, Generic, Set, Callable, Tuple, Optional, Dict, Sequence, \
-    Union, Collection
+    Union
 
 from django.utils.functional import SimpleLazyObject
 

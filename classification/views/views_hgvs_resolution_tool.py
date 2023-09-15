@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, List
 
+from django import forms
 from django.http import HttpRequest
 from django.shortcuts import render
 
@@ -10,7 +11,6 @@ from genes.models import TranscriptVersion, TranscriptParts
 from library.django_utils import require_superuser
 from library.utils import all_equal
 from snpdb.models import GenomeBuild, VariantCoordinate
-from django import forms
 
 
 class HgvsResolutionForm(forms.Form):
