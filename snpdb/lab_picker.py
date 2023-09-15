@@ -9,6 +9,7 @@ from django.http import HttpRequest, HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse
 
+from library.guardian_utils import admin_bot
 from library.utils import first
 from snpdb.models import Lab, Organization, GenomeBuild, UserSettings
 
@@ -201,6 +202,10 @@ class LabPickerData:
             lab_selection=LabSelection.multi_lab(labs=labs),
             user=user
         )
+
+    @staticmethod
+    def for_admin():
+        return LabPickerData.for_user(user=admin_bot())
 
     @cached_property
     def genome_build(self) -> GenomeBuild:

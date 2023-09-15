@@ -15,7 +15,8 @@ from classification.enums.classification_enums import EvidenceCategory, SpecialE
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
     ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
-    classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk
+    classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
+    DiscordanceReportRowDataTriagesRowData
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -795,6 +796,10 @@ class DiscordanceReportAdminExport(ExportRow):
     @export_column("Certainty")
     def _certainty(self):
         return "\n".join((DiscordanceReportAdminExport._less_more_certain(summary) for summary in self.summaries))
+
+    @export_column("Triage", sub_data=DiscordanceReportRowDataTriagesRowData)
+    def _triages(self):
+        return DiscordanceReportRowDataTriagesRowData(discordance_report=self.discordance_report, perspective=LabPickerData.for_admin())
 
 
 @admin.register(DiscordanceReport)
