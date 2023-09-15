@@ -292,26 +292,35 @@ class VariantCoordinate(FormerTuple):
             return f"{self.chrom}:{self.start} {self.ref}>{self.alt}"
 
     @staticmethod
+    def from_variant_match(match, genome_build=None):
+        chrom = match.group(1)
+        if genome_build:
+            chrom = format_chrom(chrom, genome_build.reference_fasta_has_chr)
+        start = int(match.group(2))
+        ref = match.group(3).strip().upper()
+        alt = match.group(4).strip().upper()
+        return VariantCoordinate.from_start_only(chrom, start, ref, alt)
+
+    @staticmethod
+    def from_symbolic_match(match, genome_build=None):
+        chrom, start, end, alt = match.groups()
+        start = int(start)
+        end = int(end)
+        alt = "<" + alt + ">"  # captured what was inside of brackets ie <()>
+        if genome_build:
+            contig_sequence = genome_build.genome_fasta.fasta[chrom]
+            ref = contig_sequence[start:start + 1].upper()
+        else:
+            ref = "N"
+        return VariantCoordinate(chrom, start, end, ref, alt)
+
+    @staticmethod
     def from_string(variant_string: str, genome_build=None):
         """ Pass in genome build to be able to set REF from symbolic (will be N otherwise) """
         if full_match := VARIANT_PATTERN.fullmatch(variant_string):
-            chrom = full_match.group(1)
-            start = int(full_match.group(2))
-            ref = full_match.group(3)
-            alt = full_match.group(4)
-            return VariantCoordinate.from_start_only(chrom, start, ref, alt)
+            return VariantCoordinate.from_variant_match(full_match, genome_build)
         elif full_match := VARIANT_SYMBOLIC_PATTERN.fullmatch(variant_string):
-            chrom, start, end, alt = full_match.groups()
-            start = int(start)
-            end = int(end)
-            alt = "<" + alt + ">"  # captured what was inside of brackets ie <()>
-            if genome_build:
-                contig_sequence = genome_build.genome_fasta.fasta[chrom]
-                ref = contig_sequence[start:start+1].upper()
-            else:
-                ref = "N"
-            return VariantCoordinate(chrom, start, end, ref, alt)
-
+            return VariantCoordinate.from_symbolic_match(full_match, genome_build)
         regex_patterns = ", ".join((str(s) for s in (VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN)))
         raise ValueError(f"{variant_string=} did not match against {regex_patterns=}")
 
@@ -679,15 +688,6 @@ class Variant(PreviewModelMixin, models.Model):
     @staticmethod
     def calculate_end(position, ref, alt) -> int:
         return Variant.calculate_end_from_lengths(position, len(ref), len(alt))
-
-    @staticmethod
-    def clean_variant_fields(chrom, position, ref, alt, want_chr):
-        ref = ref.strip().upper()
-        alt = alt.strip().upper()
-        if Variant.is_ref_alt_reference(ref, alt):
-            alt = Variant.REFERENCE_ALT
-        chrom = format_chrom(chrom, want_chr)
-        return chrom, int(position), ref, alt
 
     @property
     def sort_string(self) -> str:

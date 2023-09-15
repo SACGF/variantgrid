@@ -3,7 +3,7 @@ import logging
 import re
 from collections import defaultdict
 from itertools import zip_longest
-from typing import Optional, List, Iterable, Union, Dict
+from typing import Optional, List, Iterable, Union, Dict, Callable
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -21,7 +21,7 @@ from library.genomics import format_chrom
 from library.preview_request import PreviewData
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import Variant, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DbSNP, DBSNP_PATTERN, VariantCoordinate, \
-    ClinGenAllele, GenomeBuild, Contig, HGVS_UNCLEANED_PATTERN
+    ClinGenAllele, GenomeBuild, Contig, HGVS_UNCLEANED_PATTERN, VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample, SearchResult, SearchMessageOverall, \
     SearchMessage, INVALID_INPUT
 from upload.models import ModifiedImportedVariant
@@ -172,14 +172,16 @@ def allele_search(search_input: SearchInputInstance):
                 yield create_manual, SearchMessage(f'"{clingen_allele}" resolved to "{variant_string_abbreviated}"', severity=LogLevel.INFO)
 
 
-def get_results_from_variant_tuples(qs: QuerySet, variant_coordinate: VariantCoordinate, any_alt: bool = False) -> QuerySet[Variant]:
+def get_results_from_variant_coordinate(genome_build: GenomeBuild, qs: QuerySet, variant_coordinate: VariantCoordinate, any_alt: bool = False) -> QuerySet[Variant]:
     """
+    :param genome_build: genome build (used for format variant_coordinate.chromosome for variant search
     :param qs: A query set that we'll be searching inside of (except for when returning ModifiedImportVariants)
     :param variant_coordinate: The variant coordinate to lookup
     :param any_alt: If true, search without using alt and return all matches
     :return: A QuerySet of variants
     """
-    results = qs.filter(Variant.get_chrom_q(variant_coordinate.chrom),
+    chrom = format_chrom(variant_coordinate.chrom, genome_build.reference_fasta_has_chr)
+    results = qs.filter(Variant.get_chrom_q(chrom),
                         locus__position=variant_coordinate.start, end=variant_coordinate.end,
                         locus__ref__seq=variant_coordinate.ref)
     if not any_alt:
@@ -195,24 +197,21 @@ def get_results_from_variant_tuples(qs: QuerySet, variant_coordinate: VariantCoo
     return results
 
 
-def yield_search_variant_match(search_input: SearchInputInstance):
+def yield_search_variant_match(search_input: SearchInputInstance, get_variant_coordinate: Callable):
     for genome_build in search_input.genome_builds:
-        chrom, position, ref, alt = search_input.match.groups()
-        chrom, position, ref, alt = Variant.clean_variant_fields(chrom, position, ref, alt,
-                                                                 want_chr=genome_build.reference_fasta_has_chr)
-        vc = VariantCoordinate.from_start_only(chrom, position, ref, alt)
-        results = get_results_from_variant_tuples(search_input.get_visible_variants(genome_build), vc)
+        variant_coordinate = get_variant_coordinate(search_input.match, genome_build).as_internal_symbolic()
+        results = get_results_from_variant_coordinate(genome_build, search_input.get_visible_variants(genome_build), variant_coordinate)
         has_results = False
         if results.exists():
             has_results = True
             yield results
 
-        if errors := Variant.validate(genome_build, chrom, position):
+        if errors := Variant.validate(genome_build, variant_coordinate.chrom, variant_coordinate.start):
             yield SearchMessageOverall(", ".join(errors), genome_builds=[genome_build])
         else:
             if not has_results:
 
-                variant_string = Variant.format_tuple(*vc)
+                variant_string = variant_coordinate.format()
                 if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build,
                                                                        variant_string=variant_string):
                     search_message = f"The variant {variant_string} does not exist in our database"
@@ -220,6 +219,7 @@ def yield_search_variant_match(search_input: SearchInputInstance):
 
 
 VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)", re.IGNORECASE)
+
 
 @search_receiver(
     search_type=Variant,
@@ -231,7 +231,7 @@ VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([G
     )
 )
 def variant_search_vcf(search_input: SearchInputInstance):
-    return yield_search_variant_match(search_input)
+    return yield_search_variant_match(search_input, VariantCoordinate.from_variant_match)
 
 
 VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)\s*-\s*(\d+)\s*-\s*([GATC]+)\s*-\s*([GATC]+)", re.IGNORECASE)
@@ -247,10 +247,7 @@ VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)\s*-\s*(\d+)\s*-\s*([GATC]+)\
     )
 )
 def search_variant_gnomad(search_input: SearchInputInstance):
-    return yield_search_variant_match(search_input)
-
-
-VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+))\s*:\s*(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$", re.IGNORECASE)
+    return yield_search_variant_match(search_input, VariantCoordinate.from_variant_match)
 
 
 @search_receiver(
@@ -263,7 +260,19 @@ VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+))\s*:\s*(\d+)[,\s]*([GA
     )
 )
 def search_variant_variant(search_input: SearchInputInstance):
-    return yield_search_variant_match(search_input)
+    return yield_search_variant_match(search_input, VariantCoordinate.from_variant_match)
+
+
+@search_receiver(
+    search_type=Variant,
+    pattern=VARIANT_SYMBOLIC_PATTERN,
+    sub_name="Variant format (symbolic)",
+    example=SearchExample(
+        examples=["1:169519049-169520049 <DEL>", "1:169519049-169520049 <DUP>"]
+    )
+)
+def search_variant_symbolic(search_input: SearchInputInstance):
+    return yield_search_variant_match(search_input, VariantCoordinate.from_symbolic_match)
 
 
 @search_receiver(
@@ -285,7 +294,7 @@ def search_variant_db_snp(search_input: SearchInputInstance):
             if hgvs_string := data.get("hgvs"):
                 dbsnp_message = SearchMessage(f'dbSNP "{search_input.search_string}" resolved to "{hgvs_string}"', severity=LogLevel.INFO)
                 variant_tuple = matcher.get_variant_coordinate(hgvs_string)
-                results = get_results_from_variant_tuples(search_input.get_visible_variants(genome_build), variant_tuple)
+                results = get_results_from_variant_coordinate(genome_build, search_input.get_visible_variants(genome_build), variant_tuple)
                 if results.exists():
                     for r in results:
                         yield r, dbsnp_message
@@ -538,7 +547,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
 
     if variant_tuple:
         try:
-            results = get_results_from_variant_tuples(variant_qs, variant_tuple)
+            results = get_results_from_variant_coordinate(genome_build, variant_qs, variant_tuple)
             variant = results.get()
             if classify:
                 yield VariantExtra.classify_variant(
@@ -561,7 +570,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 yield SearchResult(cmv, messages=search_messages + reference_message)
 
             # search for alt alts
-            alts = get_results_from_variant_tuples(variant_qs, variant_tuple, any_alt=True)
+            alts = get_results_from_variant_coordinate(genome_build, variant_qs, variant_tuple, any_alt=True)
             for alt in alts:
                 alt_messages = search_messages + [SearchMessage(f'No results for alt "{variant_tuple.alt}", but found this using alt "{alt.alt}"', severity=LogLevel.ERROR, substituted=True)]
                 yield SearchResult(alt.preview, messages=alt_messages)
