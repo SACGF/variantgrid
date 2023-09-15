@@ -21,7 +21,7 @@ dependencies:
   - cyvcf2==0.30.16
   - htseq=2.0
   - ijson=3.1
-  - ipython=8.6
+  - ipython=8.15
   - kombu=5.3  # was kombu==5.2.3
   - levenshtein==0.21  # was levenshtein==0.20.9
   - markdown=3.2  # was 3.1
@@ -38,7 +38,7 @@ dependencies:
   - pyvcf3=1.0
   - redis=3.5 # was redis==3.5.3
   - reportlab=3.6 # increased patch version from requirements.txt
-  - requests=2.27
+  - requests=2.31
   - requests-oauthlib=1.3
   - scipy=1.11  # was scipy==1.8.0
   - sqlparse=0.4
@@ -52,7 +52,7 @@ dependencies:
       - cdot==0.2.21
       - stream-zip==0.0.47
       # - bgzip==0.4.0
-      - Django==4.2.2
+      - Django==4.2.5
       - django-amazon-ses==4.0.1
       - django-storages==1.12.3
       - django_autocomplete_light==3.9.1
