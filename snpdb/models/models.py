@@ -29,6 +29,7 @@ from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
 from classification.enums.classification_enums import ShareLevel
+from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.enums.log_level import LogLevel
 from library.preview_request import PreviewModelMixin
 from library.utils import import_class, JsonObjType
@@ -186,10 +187,13 @@ class Organization(models.Model, PreviewModelMixin):
     classification_config = models.JSONField(null=True, blank=True)
     active = models.BooleanField(default=True, blank=True)
 
+    objects = ObjectManagerCachingRequest()
+
     class Meta:
         ordering = ['name']
         verbose_name = 'Organisation'
         verbose_name_plural = 'Organisations'
+        default_manager_name = 'objects'
 
     @classmethod
     def preview_icon(cls) -> str:
@@ -459,8 +463,11 @@ class Lab(models.Model, PreviewModelMixin):
             return self.organization < other.organization
         return self.name < other.name
 
+    objects = ObjectManagerCachingRequest()
+
     class Meta:
         ordering = ['name']
+        base_manager_name = 'objects'
 
     @classmethod
     def preview_category(cls) -> str:
