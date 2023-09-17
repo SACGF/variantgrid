@@ -2,6 +2,7 @@ from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from typing import Dict, Any, Optional
 
+from django.conf import settings
 from django.db.models import Manager, QuerySet
 from frozendict import frozendict
 from threadlocals.threadlocals import set_request_variable, get_request_variable
@@ -95,11 +96,13 @@ class ObjectManagerCachingImmutable(Manager):
 
     def __init__(self):
         super().__init__()
-        self._queryset_class = QuerySetImmutable
+        if not settings.UNIT_TEST:
+            self._queryset_class = QuerySetImmutable
 
 
 class ObjectManagerCachingRequest(Manager):
 
     def __init__(self):
         super().__init__()
-        self._queryset_class = QuerySetRequestCache
+        if not settings.UNIT_TEST:
+            self._queryset_class = QuerySetRequestCache
