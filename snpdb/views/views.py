@@ -1097,7 +1097,9 @@ def cohort_sample_edit(request, cohort_id):
 
 def cohort_hotspot(request, cohort_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
-    form = GeneAndTranscriptForm(genome_build=cohort.genome_build)
+    vav = VariantAnnotationVersion.latest(cohort.genome_build)
+    form = GeneAndTranscriptForm(gene_annotation_release=vav.gene_annotation_release,
+                                 has_protein_domains=True)
 
     try:
         cohort_genotype_collection = cohort.cohort_genotype_collection
@@ -1105,9 +1107,12 @@ def cohort_hotspot(request, cohort_id):
         cohort_genotype_collection = None
         logging.error(e)
 
-    context = {"cohort": cohort,
-               "cohort_genotype_collection": cohort_genotype_collection,
-               "form": form}
+    context = {
+        "cohort": cohort,
+        "cohort_genotype_collection": cohort_genotype_collection,
+        "form": form,
+        "gene_annotation_release": vav.gene_annotation_release,
+    }
     return render(request, 'snpdb/patients/cohort_hotspot.html', context)
 
 

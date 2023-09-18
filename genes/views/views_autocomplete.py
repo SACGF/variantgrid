@@ -1,6 +1,7 @@
 import abc
 
 from django.db.models.functions.text import Length
+from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
@@ -73,13 +74,26 @@ class TranscriptAutocompleteView(AutocompleteView):
 
     def get_user_queryset(self, user):
         gene_symbol = self.forwarded.get('gene_symbol', None)
-        genome_build = self.forwarded.get('genome_build', None)
-        qs = Transcript.objects.all().distinct()
+        has_protein_domains = self.forwarded.get('has_protein_domains', None)
+        gar_id = self.forwarded.get('gene_annotation_release', None)
+        gene_annotation_release = get_object_or_404(GeneAnnotationRelease, pk=gar_id)
 
+        qs = Transcript.objects.all().distinct()
         if gene_symbol:
             qs = qs.filter(transcriptversion__gene_version__gene_symbol__symbol=gene_symbol)
-        if genome_build:
-            qs = qs.filter(transcriptversion__genome_build=genome_build)
+        if gene_annotation_release:
+            qs = qs.filter(transcriptversion__releasetranscriptversion__release=gene_annotation_release)
+
+        if has_protein_domains:
+            transcripts_with_domains = set()
+            for transcript in qs:
+                tv_qs = gene_annotation_release.transcript_versions_for_transcript(transcript)
+                for tv in tv_qs:
+                    domains, domain_transcript_accession = tv.protein_domains_and_accession
+                    if domains.exists():
+                        transcripts_with_domains.add(transcript.identifier)
+                        break
+            qs = qs.filter(identifier__in=transcripts_with_domains)
         return qs
 
 
@@ -98,7 +112,7 @@ class GeneSymbolAutocompleteView(AutocompleteView):
             qs = qs.filter(geneversion__gene__annotation_consortium=annotation_consortium)
         if self.q:
             qs = qs.filter(symbol__istartswith=self.q)
-        return qs
+        return qs.distinct()
 
 
 @method_decorator(cache_page(WEEK_SECS), name='dispatch')

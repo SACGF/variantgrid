@@ -36,12 +36,18 @@ class GeneAndTranscriptForm(forms.Form):
     """ Restricts Gene to e.g. RefSeq or Ensembl """
 
     def __init__(self, *args, **kwargs):
-        genome_build = kwargs.pop("genome_build")
+        gene_annotation_release = kwargs.pop("gene_annotation_release")
+        has_protein_domains = kwargs.pop("has_protein_domains", None)
         super().__init__(*args, **kwargs)
         self.fields["gene_symbol"].widget.forward = [
-            forward.Const(genome_build.annotation_consortium, "annotation_consortium")]
-        self.fields["transcript"].widget.forward = ["gene_symbol",
-                                                    forward.Const(genome_build.pk, "genome_build")]
+            forward.Const(gene_annotation_release.annotation_consortium, "annotation_consortium")]
+        transcript_forward = [
+            "gene_symbol",
+            forward.Const(gene_annotation_release.pk, "gene_annotation_release")
+        ]
+        if has_protein_domains:
+            transcript_forward.append(forward.Const(True, "has_protein_domains"))
+        self.fields["transcript"].widget.forward = transcript_forward
 
     gene_symbol = forms.ModelChoiceField(queryset=GeneSymbol.objects.all(),
                                          required=False,

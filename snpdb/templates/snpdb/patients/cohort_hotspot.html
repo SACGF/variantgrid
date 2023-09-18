@@ -52,6 +52,7 @@
 		<h3>Cohort: {{ cohort.name }}</h3>
 		{% if cohort.import_status == 'S' %}
     		<form id="gene-and-transcript-form">
+                <p>Restricting genes/transcripts to {{ gene_annotation_release }} (what the Cohort variants are annotated against)</p>
                 {{ form.as_p }}
                 {{ form.media }}
                 <button class='btn btn-primary' id='view-cohort-hotspot'>Show Hotspots</button>

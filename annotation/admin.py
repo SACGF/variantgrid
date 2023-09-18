@@ -15,6 +15,7 @@ from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column,
 
 admin.site.register(models.AnnotationRun)
 admin.site.register(models.AnnotationVersion)
+admin.site.register(models.GeneAnnotationVersion)
 admin.site.register(models.VariantAnnotationVersion)
 
 

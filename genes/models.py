@@ -1520,7 +1520,7 @@ class GeneAnnotationRelease(models.Model):
     def genes_for_symbol(self, gene_symbol) -> QuerySet:
         return self.genes_for_symbols([gene_symbol])
 
-    def transcript_versions_for_transcript(self, transcript) -> QuerySet:
+    def transcript_versions_for_transcript(self, transcript) -> QuerySet[TranscriptVersion]:
         return TranscriptVersion.objects.filter(releasetranscriptversion__release=self,
                                                 transcript=transcript)
 
