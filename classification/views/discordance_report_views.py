@@ -310,6 +310,10 @@ class DiscordanceReportTemplateData:
     def review(self) -> Review:
         return self.report.reviews_all().first()
 
+    @cached_property
+    def row_data(self) -> DiscordanceReportRowData:
+        return DiscordanceReportRowData(discordance_report=self.report, perspective=LabPickerData.for_user(self.user))
+
 
 def discordance_report_review(request: HttpRequest, discordance_report_id: int) -> HttpResponse:
     data = DiscordanceReportTemplateData(discordance_report_id, user=request.user)

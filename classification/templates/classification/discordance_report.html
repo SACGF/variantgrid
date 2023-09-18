@@ -79,7 +79,7 @@
                          <p class="text-info">For the latest discordance report for this allele <a href="{{ data.latest_for_allele_if_not_this.get_absolute_url }}" class="hover-link">click here</a>.</p>
                     {% endif %}
                  {% endlabelled %}
-                 {% labelled label="Allele" %}<a class="hover-link" href="{% url 'view_allele' data.allele.id %}">{{ data.allele.clingen_allele }}</a>{% endlabelled %}
+                 {% labelled label="Allele" %}{% allele data.allele %}{% endlabelled %}
                 {% labelled label="c.HGVS "|add:data.genome_build.name %}
                     {% for c_hgvs in data.c_hgvses %}<div>{% c_hgvs c_hgvs %}</div>{% endfor %}
                 {% endlabelled %}
@@ -141,7 +141,7 @@
             {% if data.is_pending_concordance %}<p class="text-info mt-2">There are outstanding pending changes for this discordance. When labs re-submit with the agreed changes the discordance should be resolved. There is likely no need for further discussion.</p>{% endif %}
         {% else %}
             {% if data.is_user_editable and data.report.resolution is empty %}
-                {% if data.review.next_step == "D" %}
+                {% if data.row_data.next_step == "D" %}
                     <div class="card">
                         <div class="card-header">Discussion</div>
                         <div class="card-body">
