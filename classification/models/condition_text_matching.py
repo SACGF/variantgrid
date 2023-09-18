@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from functools import cached_property, reduce
 from operator import attrgetter
 from typing import List, Optional, Dict, Iterable, Set
+import re
 
 import requests
 from django.contrib.auth.models import User
@@ -260,6 +261,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                     if match.is_auto_assignable():
                         if not root.condition_xrefs:
                             root.condition_xrefs = match.term_str_array
+                            root.condition_multi_operation = match.condition_multi_operation
                             root.last_edited_by = admin_bot()
                             root.save()
                     else:
@@ -270,6 +272,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                         for gene_symbol_level in gene_levels_qs:
                             if match.is_auto_assignable(gene_symbol=gene_symbol_level.gene_symbol) and not gene_symbol_level.condition_xrefs:
                                 gene_symbol_level.condition_xrefs = match.term_str_array
+                                gene_symbol_level.condition_multi_operation = match.condition_multi_operation
                                 gene_symbol_level.last_edited_by = admin_bot()
                                 gene_symbol_level.save()
             update_condition_text_match_counts(condition_text)
@@ -531,7 +534,7 @@ class ConditionMatchingSuggestion:
         Or if we're top level, the ID has to be found within text.
         """
         if terms := self.terms:
-            if len(terms) != 1:
+            if len(terms) != 1 and self.condition_multi_operation == MultiCondition.NOT_DECIDED:
                 return False
 
             if self.alias_index is not None:
@@ -656,6 +659,13 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
     """
     cms = ConditionMatchingSuggestion()
 
+    # Check if text ends with "uncertain" or "cooccurring"
+    condition_check_text = text.lower().replace('-', '').strip()
+    if condition_check_text.endswith("uncertain"):
+        cms.condition_multi_operation = MultiCondition.UNCERTAIN
+    elif condition_check_text.endswith("cooccurring"):
+        cms.condition_multi_operation = MultiCondition.CO_OCCURRING
+
     db_matches = db_ref_regexes.search(text)
     detected_any_ids = bool(db_matches)  # see if we found any prefix suffix, if we do,
     db_matches = [match for match in db_matches if match.db in OntologyService.CONDITION_ONTOLOGIES]
@@ -677,11 +687,47 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
 
     if cms.terms:
         cms.ids_found_in_text = True
-        if len(cms.terms) == 1:
-            matched_term = cms.terms[0]
+        all_text_tokens = []
+        all_term_tokens = []
+        all_extra_words = []
+        all_ignore_words = []
+        condition_matching_terms = {'uncertain', 'cooccurring', 'un-certain', 'co-occurring'}
+        # Split the input string by spaces to get individual terms
+        input_terms = text.split()
+
+        # Remove terms that match any in the set
+        filtered_terms = [term for term in input_terms if term.lower() not in condition_matching_terms]
+
+        # Join the filtered terms back into a string
+        text = ' '.join(filtered_terms)
+        for matched_term in cms.terms:
             if not matched_term.is_stub:
+                ontology_prefixes = {ontology.lower() for ontology in OntologyService.CONDITION_ONTOLOGIES}
+                ontology_prefixes.add("mim")
+                found = False
+                result_text = text
+                for prefix in ontology_prefixes:
+                    # fetch text between the matched term and the next ontology ID
+                    pattern = f"{matched_term.id.lower()}(.*?)({prefix}:\d+)"
+                    match = re.search(pattern, text)
+                    if match:
+                        found = True
+                        text1 = match.group(1).strip()
+                        if len(text1) > 0:
+                            result_text = text1
+                        else:
+                            result_text = None
+                        break
+                if not found:
+                    # Find all text following the Find_id if no matching ontology found at end
+                    match2 = re.search(f"{matched_term.id.lower()}(.*)", text)
+                    if match2:
+                        text2 = match2.group(1).strip()
+                        if len(text2) > 0:
+                            result_text = text2
+
                 # work out all the words in the text, subtract any ontology IDs from the text
-                text_tokens = SearchText.tokenize_condition_text(normalize_condition_text(text),
+                text_tokens = SearchText.tokenize_condition_text(normalize_condition_text(result_text),
                                                                  deplural=True, deroman=True)
                 origin_text_tokens = set(text_tokens)
                 # remove all numbers that are the same as the OMIM or MONDO number
@@ -732,17 +778,20 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                                 SearchText.tokenize_condition_text(normalize_condition_text(included_title),
                                                                    deplural=True, deroman=True))
 
-                cms.add_message(ConditionMatchingMessage(severity="debug", text=f"TEXT words (RAW) = {json.dumps(sorted(text_tokens))}"))
-                cms.add_message(ConditionMatchingMessage(severity="debug", text=f"TERM words (RAW) = {json.dumps(sorted(term_tokens))}"))
+                if len(text_tokens) > 0:
+                    all_text_tokens.append(sorted(text_tokens))
+                if len(term_tokens) > 0:
+                    all_term_tokens.append(sorted(term_tokens))
                 extra_words = text_tokens.difference(term_tokens)
                 raw_extra_words = set(extra_words)
-                cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Diff words (RAW) = {json.dumps(sorted(extra_words))}"))
+                if len(extra_words) > 0:
+                    all_extra_words.append(sorted(extra_words))
                 extra_words = extra_words - PREFIX_SKIP_TERMS - IGNORE_TERMS
-                gene_symbols_in_text = {word for word in extra_words if GeneSymbol.objects.filter(symbol=word).exists()}
-                # cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Same words = {json.dumps(sorted(same_words))}, length = {same_word_letters}"))
+                gene_symbols_in_text = {word for word in extra_words if
+                                        GeneSymbol.objects.filter(symbol=word).exists()}
                 ignored_words = raw_extra_words - extra_words
-                cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Ignored common words/gene symbols = {json.dumps(sorted(ignored_words))}"))
-                cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Diff words (Processed) = {json.dumps(sorted(extra_words))}, count = {len(extra_words)}"))
+                if len(ignored_words) > 0:
+                    all_ignore_words.append(sorted(ignored_words))
 
                 passed = False
 
@@ -761,7 +810,21 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
 
                 if not passed and non_pr_terms:
                     cms.add_message(ConditionMatchingMessage(severity="info", text="Different terminology likely due to avoiding outdated wording in official term."))
+        count_all_extra_words = 0
+        for sublist in all_extra_words:
+            if sublist:  # checks if sublist is not empty
+                count_all_extra_words += len(sublist)
 
+        cms.add_message(
+            ConditionMatchingMessage(severity="debug", text=f"TEXT words (RAW) = {json.dumps(all_text_tokens)}"))
+        cms.add_message(
+            ConditionMatchingMessage(severity="debug", text=f"TERM words (RAW) = {json.dumps(all_term_tokens)}"))
+        cms.add_message(
+            ConditionMatchingMessage(severity="debug", text=f"Diff words (RAW) = {json.dumps(all_extra_words)}"))
+        cms.add_message(ConditionMatchingMessage(severity="debug",
+                                                 text=f"Ignored common words/gene symbols = {json.dumps(all_ignore_words)}"))
+        cms.add_message(ConditionMatchingMessage(severity="debug",
+                                                 text=f"Diff words (Processed) = {json.dumps(all_extra_words)}, count = {count_all_extra_words}"))
     cms.validate()
     return cms
 
