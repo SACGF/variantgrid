@@ -41,7 +41,7 @@ git+https://github.com/davmlaw/django-messages/#egg=django-messages
 git+https://github.com/davmlaw/django-starfield#egg=django_starfield
 git+https://github.com/davmlaw/django-js-reverse#egg=django-js-reverse
 git+https://github.com/SACGF/hgvs#egg=pyhgvs
-git+https://github.com/davmlaw/hgvs@variantgrid#egg=hgvs
+git+https://github.com/biocommons/hgvs@4efed793dad6b230feb39ff0e28f1ba16b8843ac#egg=hgvs
 HTSeq==2.0.1
 ijson==3.1.4
 ipython==8.13.0
