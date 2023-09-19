@@ -3,7 +3,7 @@ import re
 from genes.models import GeneSymbol, GeneSymbolAlias
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample, SearchResultMatchStrength
 
-GENE_SYMBOL_PATTERN = re.compile(r"^[a-zA-Z][\da-zA-Z0-9-'\.]+$")
+GENE_SYMBOL_PATTERN = re.compile(r"^[a-zA-Z][\da-zA-Z0-9\-\.]+$")
 
 
 @search_receiver(
