@@ -103,6 +103,10 @@ class MultiCondition(models.TextChoices):
     UNCERTAIN = 'U', 'Uncertain'  # aka uncertain
     CO_OCCURRING = 'C', 'Co-occurring'  # aka combined
 
+    @property
+    def clinvar_label(self):
+        return self.label
+
 
 class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
     """

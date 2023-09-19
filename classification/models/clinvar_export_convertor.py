@@ -540,8 +540,10 @@ class ClinVarExportConverter:
             if len(conditions.terms) >= 2:
                 if join := conditions.join:
                     join = MultiCondition(join)
-                    if join != MultiCondition.CO_OCCURRING:
-                        messages += JsonMessages.error("ClinVar API only supports Co-occurring for multiple messages")
+                    if join in (MultiCondition.CO_OCCURRING, MultiCondition.UNCERTAIN):
+                        data["multipleConditionExplanation"] = join.clinvar_label
+                    else:
+                        messages += JsonMessages.error("ClinVar API only supports Co-occurring or Uncertain for multiple conditions")
 
             for condition in conditions.terms:
                 condition_list.append(ClinVarExportConverter.condition_to_json(condition))
