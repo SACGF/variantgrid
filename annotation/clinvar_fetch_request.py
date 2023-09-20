@@ -90,7 +90,7 @@ class ClinVarFetchRequest:
                         if http_ex.code == 400:
                             attempt_count -= 1
                             if attempt_count > 0:
-                                logging.warning(f"400 from Entrez when fetching ClinVarRecord, waiting then trying again")
+                                logging.warning("400 from Entrez when fetching ClinVarRecord, waiting then trying again")
                                 time.sleep(10)
                                 continue
                         # out of attempts or not 400

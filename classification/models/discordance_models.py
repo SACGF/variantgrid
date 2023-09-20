@@ -1,4 +1,3 @@
-from datetime import timezone
 from enum import Enum
 from functools import cached_property
 from typing import Set, Optional, List, Dict, Tuple, Any
@@ -12,7 +11,7 @@ from django.db.models.deletion import PROTECT, CASCADE
 from django.urls.base import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
-from lxml.html.diff import html_escape
+from lxml.html.diff import html_escape  # pylint: disable=no-name-in-module
 
 from classification.enums.classification_enums import SpecialEKeys
 from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason

@@ -1,8 +1,6 @@
 import logging
 from typing import Tuple
 
-from more_itertools import all_equal
-
 from genes.hgvs import HGVSVariant, HGVSException
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele
 from library.utils import all_equal
