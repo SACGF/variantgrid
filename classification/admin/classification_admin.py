@@ -1116,7 +1116,7 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
             iavi.save()
 
     @admin_action("Mark as Completed")
-    def remove_confirmation(self, request, queryset: QuerySet[ImportedAlleleInfo]):
+    def mark_as_completed(self, request, queryset: QuerySet[ImportedAlleleInfo]):
         iai: ImportedAlleleInfo
         marked_complete = 0
         marked_failed = 0

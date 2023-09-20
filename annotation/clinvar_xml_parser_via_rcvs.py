@@ -113,15 +113,6 @@ class ClinVarXmlParserViaRCVs(ClinVarXmlParser):
         self.latest.gene_symbol = elem.text
 
     @parser_path(
-        PP("MeasureSet", Type="Variant"),
-        PP("Measure", Type="Variation"),
-        PP("MeasureRelationship", Type="variant in gene"),
-        "Symbol",
-        PP("ElementValue", Type="Preferred"))
-    def parse_gene_symbol(self, elem):
-        self.latest.gene_symbol = elem.text
-
-    @parser_path(
         "ClinicalSignificance",
         "Description")
     def parse_clinical_significance(self, elem):

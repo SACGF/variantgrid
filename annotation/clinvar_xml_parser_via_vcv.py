@@ -129,15 +129,6 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
             self.latest.variant_coordinate = f"{chr}:{start} {ref}>{alt} ({assembly})"
 
     @parser_path(
-        PP("TraitSet", Type="DrugResponse"),
-        PP("Trait", Type="DrugResponse"),
-        "Name",
-        PP("ElementValue", Type="Preferred"))
-    def parse_drug_response(self, elem):
-        if not self.latest.condition:
-            self.latest.condition = elem.text
-
-    @parser_path(
         PP("TraitSet", Type="Disease"),
         PP("Trait", Type="Disease"),
         "XRef")

@@ -591,9 +591,6 @@ class ImportedAlleleInfo(TimeStampedModel):
                 return True
         return False
 
-    def __str__(self) -> str:
-        return f"{self.imported_genome_build_patch_version} {self.imported_c_hgvs or self.imported_g_hgvs}"
-
     @staticmethod
     def __genome_build_to_attr(genome_build: GenomeBuild) -> str:
         """ for looping through the cached variant infos """
