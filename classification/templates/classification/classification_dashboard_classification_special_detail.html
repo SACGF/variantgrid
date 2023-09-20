@@ -1,4 +1,14 @@
 {% load ui_tabs_builder %}
+<script>
+ $(document).ready(() => {
+     $('a[data-toggle="tab"]').on('shown.bs.tab', function (event) {
+         Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
+     });
+     $('.dataTable').on('draw.dt', () => {
+         Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
+     });
+ });
+ </script>
 
 <a class="download-link type-csv" href="{% url 'classification_dashboard_download' dlab.lab_picker.selection %}">Download all issues requiring action</a></p>
 <p class="text-info">For instructions on how to fix the outstanding actions, click on the icons in the flag column for each classification.</p>

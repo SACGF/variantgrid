@@ -45,15 +45,6 @@
         data.labs = {{ dlab.lab_ids_str | jsonify }};
     }
 
-     $(document).ready(() => {
-         $('a[data-toggle="tab"]').on('shown.bs.tab', function (event) {
-             Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
-         });
-         $('.dataTable').on('draw.dt', () => {
-             Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
-         });
-     });
-
 </script>
 <div class="container">
     {% lab_picker data=dlab.lab_picker %}
