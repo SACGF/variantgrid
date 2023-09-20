@@ -98,7 +98,10 @@ function enhanceAndMonitor() {
         }},
 
         {test: '[data-replace]', func: (node) => {
-           $(node.attr('data-replace')).html(node);
+            let selector = node.attr('data-replace');
+            console.log(`Found replace for ${selector}`)
+            node.detach();
+           $(selector).html(node);
            node.fadeIn();
         }},
 
@@ -472,6 +475,7 @@ function enhanceAndMonitor() {
         for (let processor of processors) {
             if (node.is(processor.test)) {
                 if (processor.func) {
+                    let element = node[0];
                     processor.func(node);
                 } else {
                     return; // no function means it's some weird element type we should stay away from
@@ -517,7 +521,7 @@ function enhanceAndMonitor() {
         mutationsList.forEach((mutation) => {
             let mutatedNode = $(mutation.target);
             // leave 3rd party wigets alone
-            for (selector of ignoreSelectors) {
+            for (let selector of ignoreSelectors) {
                 if (mutatedNode.parents(selector).length) {
                     return;
                 }
@@ -559,7 +563,9 @@ function cardToModal(content) {
         console.log("DID NOT FIND modal")
     }
     if (content.find('.auto-close-modal').length) {
-        content.closest('.modal').modal('hide');
+        window.setTimeout(() => {
+            content.closest('.modal').modal('hide');
+        }, 1);
     }
 }
 

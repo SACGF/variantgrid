@@ -63,7 +63,8 @@ class LazyRender(Generic[T]):
         """
         use_context = (self.static_context or {}).copy()
         if dynamic_context := self.dynamic_context:
-            use_context.update(dynamic_context(request))
+            if dynamic_context_output := dynamic_context(request):
+                use_context.update(dynamic_context_output)
         if self.core_object_name not in use_context:
             use_context[self.core_object_name] = self.core_object
         return use_context

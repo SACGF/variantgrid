@@ -6,7 +6,9 @@ from django.contrib import messages
 from django.shortcuts import get_object_or_404
 
 from classification.models import DiscordanceReportTriage, DiscordanceReportTriageStatus
+from classification.models.discordance_models_utils import DiscordanceReportRowData
 from library.log_utils import log_saved_form
+from snpdb.lab_picker import LabPickerData
 from uicore.views.ajax_form_view import AjaxFormView, LazyRender
 
 
@@ -42,11 +44,22 @@ class DiscordanceReportTriageView(AjaxFormView[DiscordanceReportTriage]):
 
     @classmethod
     def lazy_render(cls, obj: DiscordanceReportTriage, context: Optional[Dict] = None) -> LazyRender:
+        def dynamic_context_gen(request):
+            if context and context.get("saved") == True:
+                user = request.user
+                discordance_report = obj.discordance_report
+                discordance_report_row = DiscordanceReportRowData(discordance_report=discordance_report, perspective=LabPickerData.for_user(user))
+                return {
+                    "next_step": discordance_report_row.next_step,
+                    "report": discordance_report
+                }
+
         return LazyRender(
             template_name="classification/discordance_report_triage_detail.html",
             core_object=obj,
             core_object_name="triage",
-            static_context=context
+            static_context=context,
+            dynamic_context=dynamic_context_gen
         )
 
     def get(self, request, discordance_report_triage_id: int, *args, **kwargs):
@@ -75,6 +88,7 @@ class DiscordanceReportTriageView(AjaxFormView[DiscordanceReportTriage]):
                 form.save()
                 log_saved_form(form)
                 messages.add_message(request, level=messages.SUCCESS, message="Discordance triage saved successfully")
+                context["saved"] = True
                 saved = True
             else:
                 context["form"] = form

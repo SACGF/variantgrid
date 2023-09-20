@@ -19,6 +19,11 @@
         {% end_if_user_can_edit %}
     {% endif %}
     {% include "uicore/messages/messages.html" %}
+    {% if saved %}
+        <span data-replace="#reload-info">
+            <a href="#" onclick="location.reload()" class="hover-link"><br/><i class="fa-solid fa-clock-rotate-left"></i> Click here to refresh now</a> or keep editing.
+        </span>
+    {% endif %}
 {% else %}
     <div class="card-header">{{ triage.lab }} {% admin_link triage %}</div>
     {% if form %}
@@ -58,6 +63,24 @@
                 {% labelled label="Note" %}{{ triage.note }}{% endlabelled %}
             {% endif %}
             <div class="container">{% include "uicore/messages/messages.html" %}</div>
+            {% if saved %}
+                {% comment %}Warning this is duplicated in discordance_report.html{% endcomment %}
+                <div data-replace="#discordance-report-discussion">
+                    {% if next_step == "D" %}
+                        <div class="card">
+                            <div class="card-header">Discussion</div>
+                            <div class="card-body">
+                                <div class="no-value">This Discordance Report has not yet been discussed.</div>
+                            </div>
+                            <div class="card-footer">
+                                <a class="mt-2 btn btn-primary" href="{% url 'discordance_report_review' report.pk %}">Start Discordance Discussion</a>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="no-value">This discordance isn't marked as ready for discussion - see triages. <a class="hover-link" href="{% url 'discordance_report_review' report.pk %}">Click here to discuss anyway.</a></div>
+                    {% endif %}
+                </div>
+            {% endif %}
         </div>
         {% if not read_only %}
             {% if_user_can_edit triage %}

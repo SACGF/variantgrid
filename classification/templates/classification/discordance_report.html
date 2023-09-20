@@ -141,19 +141,22 @@
             {% if data.is_pending_concordance %}<p class="text-info mt-2">There are outstanding pending changes for this discordance. When labs re-submit with the agreed changes the discordance should be resolved. There is likely no need for further discussion.</p>{% endif %}
         {% else %}
             {% if data.is_user_editable and data.report.resolution is empty %}
-                {% if data.row_data.next_step == "D" %}
-                    <div class="card">
-                        <div class="card-header">Discussion</div>
-                        <div class="card-body">
-                            <div class="no-value">This Discordance Report has not yet been discussed.</div>
+                {% comment %}Warning this is duplicated in discordance_report_triage_detail.html{% endcomment %}
+                <div id="discordance-report-discussion">
+                    {% if data.row_data.next_step == "D" %}
+                        <div class="card">
+                            <div class="card-header">Discussion</div>
+                            <div class="card-body">
+                                <div class="no-value">This Discordance Report has not yet been discussed.</div>
+                            </div>
+                            <div class="card-footer">
+                                <a class="mt-2 btn btn-primary" href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">Start Discordance Discussion</a>
+                            </div>
                         </div>
-                        <div class="card-footer">
-                            <a class="mt-2 btn btn-primary" href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">Start Discordance Discussion</a>
-                        </div>
-                    </div>
-                {% else %}
-                    <div class="no-value">This discordance isn't marked as ready for discussion - see triages. <a class="hover-link" href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">Click here to discuss anyway.</a></div>
-                {% endif %}
+                    {% else %}
+                        <div class="no-value">This discordance isn't marked as ready for discussion - see triages. <a class="hover-link" href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">Click here to discuss anyway.</a></div>
+                    {% endif %}
+                </div>
             {% else %}
                 <div class="no-value">This Discordance Report was not discussed.</div>
             {% endif %}
