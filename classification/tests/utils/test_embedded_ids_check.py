@@ -41,5 +41,3 @@ class Embedded_Ids_Check(TestCase):
         else:
             self.assertEqual(result.terms[0].id, expected_ids[0])
             self.assertEqual(result.condition_multi_operation, expected_condition)
-
-

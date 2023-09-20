@@ -113,7 +113,7 @@ def get_nearby_summaries(user, variant, annotation_version, distance=None, clini
 
 def interesting_summary(qs, user, genome_build, total=True, clinvar=True, classifications=True,
                         clinical_significance=False) -> Tuple[str, Dict[str, int]]:
-    """ returns a strin summary, and dict of tag counts (so you can format w/colors) """
+    """ returns a string summary, and dict of tag counts (so you can format w/colors) """
     counts = interesting_counts(qs, user, genome_build, clinical_significance=clinical_significance)
     summary = ""
     tag_counts = {}
