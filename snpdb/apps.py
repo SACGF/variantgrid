@@ -10,14 +10,14 @@ class SnpdbConfig(AppConfig):
 
     # noinspection PyUnresolvedReferences
     def ready(self):
-        # pylint: disable=import-outside-toplevel
+        # pylint: disable=import-outside-toplevel,unused-import
         from snpdb.models import Trio
         from django.contrib.auth.models import User, Group
         from seqauto.signals.signals_list import backend_vcf_import_success_signal
         from snpdb.signals.signal_handlers import backend_vcf_import_success_handler, trio_post_save_handler, \
             user_post_save_handler, group_post_save_handler
-        from snpdb.signals import vcf_health_check  # pylint: disable=unused-import
-        from snpdb.signals import disk_usage_health_check  # pylint: disable=unused-import
+        from snpdb.signals import vcf_health_check
+        from snpdb.signals import disk_usage_health_check
         from snpdb.signals import lab_search
         from snpdb.signals import organization_search
         from snpdb.signals import user_search
@@ -26,7 +26,7 @@ class SnpdbConfig(AppConfig):
         from snpdb.signals import vcf_search
         from snpdb.signals import variant_search
         from snpdb.signals import variant_zygosity_preview_extra
-        # pylint: enable=import-outside-toplevel
+        # pylint: enable=import-outside-toplevel,unused-import
 
         backend_vcf_import_success_signal.connect(backend_vcf_import_success_handler)
 
@@ -35,7 +35,7 @@ class SnpdbConfig(AppConfig):
             post_save.connect(user_post_save_handler, sender=User)
 
         if settings.REQUESTS_DISABLE_IPV6:
-            import requests
+            import requests  # pylint: disable=import-outside-toplevel
             requests.packages.urllib3.util.connection.HAS_IPV6 = False
 
         # Make global settings share read only with this group by default

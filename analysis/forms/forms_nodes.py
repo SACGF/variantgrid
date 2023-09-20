@@ -7,7 +7,6 @@ from django.forms.models import fields_for_model
 from django.forms.widgets import TextInput, HiddenInput
 from django.utils.text import slugify
 from django_starfield import Stars
-from guardian.shortcuts import get_objects_for_user
 
 from analysis import models
 from analysis.models import AnalysisNode, AnalysisTemplateType, Analysis, MOINode
@@ -38,7 +37,7 @@ from library.utils import md5sum_str
 from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
-from snpdb.models import GenomicInterval, ImportStatus, Sample, VCFFilter, Tag, Lab
+from snpdb.models import GenomicInterval, Sample, VCFFilter, Tag, Lab
 
 # Can use this for ModelForm.exclude to only use node specific fields
 ANALYSIS_NODE_FIELDS = fields_for_model(AnalysisNode)

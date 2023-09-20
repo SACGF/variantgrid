@@ -6,6 +6,6 @@ class PedigreeConfig(AppConfig):
 
     # noinspection PyUnresolvedReferences
     def ready(self):
-        # pylint: disable=import-outside-toplevel
+        # pylint: disable=import-outside-toplevel,unused-import
         from pedigree.signals import pedigree_search
-        # pylint: enable=import-outside-toplevel
+        # pylint: enable=import-outside-toplevel,unused-import

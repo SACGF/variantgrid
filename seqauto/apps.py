@@ -8,6 +8,6 @@ class SeqautoConfig(AppConfig):
 
     # noinspection PyUnresolvedReferences
     def ready(self):
-        from seqauto.signals import experiment_search
-        from seqauto.signals import sequencing_run_search
-        pass
+        # pylint: disable=import-outside-toplevel,unused-import
+        from seqauto.signals import experiment_search, sequencing_run_search
+        # pylint: enable=import-outside-toplevel,unused-import

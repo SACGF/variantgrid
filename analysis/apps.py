@@ -7,14 +7,13 @@ class AnalysisConfig(AppConfig):
 
     # noinspection PyUnresolvedReferences
     def ready(self):
-        # pylint: disable=import-outside-toplevel
+        # pylint: disable=import-outside-toplevel,unused-import
+        # imported to activate receivers
+        from analysis.signals import analysis_search, analysis_health_check
+
         from analysis.models import VariantTag
         from analysis.signals.signal_handlers import variant_tag_create, variant_tag_delete
-
-        # imported to activate receivers
-        from analysis.signals import analysis_health_check  # pylint: disable=unused-import
-        from analysis.signals import analysis_search
-        # pylint: enable=import-outside-toplevel
+        # pylint: enable=import-outside-toplevel,unused-import
 
         post_save.connect(variant_tag_create, sender=VariantTag)
         post_delete.connect(variant_tag_delete, sender=VariantTag)

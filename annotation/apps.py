@@ -17,17 +17,15 @@ class AnnotationConfig(AppConfig):
     name = 'annotation'
 
     def ready(self):
-        # pylint: disable=import-outside-toplevel
+        # pylint: disable=import-outside-toplevel,unused-import
+        # imported to activate receivers
+        from annotation.signals import citation_preview, citation_search, clinvar_annotation_health_check
+
         from Bio import Entrez
         from django.conf import settings
         from annotation.models import CachedWebResource
         from annotation.signals.manual_signals import clinvar_citations_post_save_handler
-
-        # imported to activate receivers
-        from annotation.signals import citation_search
-        from annotation.signals import citation_preview
-        from annotation.signals import clinvar_annotation_health_check
-        # pylint: enable=import-outside-toplevel
+        # pylint: enable=import-outside-toplevel,unused-import
 
         # Entrez wants both email and API key
         if entrez_api_key := getattr(settings, "ANNOTATION_ENTREZ_API_KEY", None):

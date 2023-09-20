@@ -7,9 +7,8 @@ class GenesConfig(AppConfig):
 
     # noinspection PyUnresolvedReferences
     def ready(self):
-        from genes.signals import gene_symbol_search
-        from genes.signals import transcript_search
-        from genes.signals import gene_search
+        # pylint: disable=import-outside-toplevel,unused-import
+        from genes.signals import gene_search, gene_symbol_search, transcript_search
 
         from annotation.models.models import CachedWebResource
         from genes.models import CachedThirdPartyGeneList
@@ -20,6 +19,7 @@ class GenesConfig(AppConfig):
             gnomad_gene_constraint_post_save_handler, cached_third_part_gene_list_pre_delete_handler, \
             refseq_gene_summary_post_save_handler, refseq_gene_info_post_save_handler, \
             refseq_sequence_info_post_save_handler, uniprot_post_save_handler
+        # pylint: enable=import-outside-toplevel,unused-import
 
         post_save.connect(gnomad_gene_constraint_post_save_handler, sender=CachedWebResource)
         post_save.connect(hgnc_post_save_handler, sender=CachedWebResource)
