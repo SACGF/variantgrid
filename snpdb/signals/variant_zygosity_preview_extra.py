@@ -26,7 +26,7 @@ def _variant_preview_zygosity_extra(variant: Variant, genome_build: GenomeBuild)
 
     context = {
         "summary": summary,
-        "tag_counts": tag_counts
+        "tag_counts_dict": tag_counts
     }
     html = render_to_string('variantopedia/tags/search_summary.html', context).strip()
     if html:
