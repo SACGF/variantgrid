@@ -118,8 +118,8 @@ def _get_build_liftover_tuples(allele_source: AlleleSource, inserted_genome_buil
                 if conversion_tool == AlleleConversionTool.SAME_CONTIG:
                     avt = (allele.pk, variant_id_or_coordinate)
                 else:
-                    chrom, position, ref, alt = variant_id_or_coordinate
-                    avt = (chrom, position, allele.pk, ref, alt)
+                    chrom, start, end, ref, alt = variant_id_or_coordinate
+                    avt = (chrom, start, end, allele.pk, ref, alt)
                 build_liftover_vcf_tuples[genome_build][conversion_tool].append(avt)
             elif settings.LIFTOVER_NCBI_REMAP_ENABLED:
                 if allele.liftovererror_set.filter(liftover__genome_build=genome_build,
