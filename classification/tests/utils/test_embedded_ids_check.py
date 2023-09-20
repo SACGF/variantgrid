@@ -35,7 +35,7 @@ class Embedded_Ids_Check(TestCase):
         self.assertTrue(result.validated)
 
         if len(result.terms) == len(expected_ids):
-            self.assertEqual(set([term.id for term in result.terms]), set(expected_ids))
+            self.assertEqual({term.id for term in result.terms}, set(expected_ids))
             self.assertEqual(result.condition_multi_operation, expected_condition)
             self.assertEqual(len(result.messages), expected_messages_length)
         else:

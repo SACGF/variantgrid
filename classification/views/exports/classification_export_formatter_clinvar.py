@@ -336,7 +336,7 @@ class ClinVarExpertCompareRow(ExportRow):
         server_cs_set = self.server_clinical_significance_set
 
         bucket_list = [bucket_map.get(cs) for cs in server_cs_set]
-        buckets = set([b for b in bucket_list if b is not None])  # Drug Response doesn't have a bucket for example
+        buckets = {b for b in bucket_list if b is not None}  # Drug Response doesn't have a bucket for example
 
         if len(buckets) > 1:
             return "Internal Discordance"

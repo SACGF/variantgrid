@@ -237,7 +237,7 @@ class DiscordanceReportTemplateData:
 
     @property
     def c_hgvses(self) -> List[CHGVS]:
-        return sorted(set([cm.c_hgvs_best(self.genome_build) for cm in self.report.all_classification_modifications]))
+        return sorted({cm.c_hgvs_best(self.genome_build) for cm in self.report.all_classification_modifications})
 
     def resolve_label(self):
         return f'{self.c_hgvses[0]}'

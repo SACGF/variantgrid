@@ -1157,7 +1157,7 @@ class SingleTermH:
 
     @cached_property
     def all_relevant_children(self):
-        all_relevant_children = set([self.term])
+        all_relevant_children = {self.term}
         for child in self.children:
             all_relevant_children.update(child.all_relevant_children)
         return all_relevant_children

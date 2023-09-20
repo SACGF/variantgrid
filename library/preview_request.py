@@ -226,7 +226,7 @@ class PreviewData:
 
         if annotation_consortia is None:
             if hasattr(obj, "annotation_consortium"):
-                annotation_consortia = set([obj.annotation_consortium])
+                annotation_consortia = {obj.annotation_consortium}
             elif hasattr(obj, "annotation_consortia"):
                 annotation_consortia = obj.annotation_consortia
 
@@ -239,7 +239,7 @@ class PreviewData:
                 else:
                     return obj
 
-            annotation_consortia = set([convert_consortium(obj) for obj in annotation_consortia])
+            annotation_consortia = {convert_consortium(obj) for obj in annotation_consortia}
 
         return PreviewData(
             obj=obj,

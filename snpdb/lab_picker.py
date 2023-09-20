@@ -62,16 +62,16 @@ class LabSelection:
 
         if isinstance(selection, int) and selection != 0:
             # legacy method of just passing LabID around
-            selected_lab_set = set([lab for lab in all_labs_list if lab.pk == selection])
+            selected_lab_set = {lab for lab in all_labs_list if lab.pk == selection}
 
         elif isinstance(selection, str) and selection.startswith("org-"):
             org_pk = int(selection[4:])
             selected_org = Organization.objects.filter(pk=org_pk).get()
-            selected_lab_set = set([lab for lab in all_labs_list if lab.organization == selected_org])
+            selected_lab_set = {lab for lab in all_labs_list if lab.organization == selected_org}
 
         elif isinstance(selection, Lab):
             # make sure the user has access to the passed in lab
-            selected_lab_set = set([lab for lab in all_labs_list if lab == selection])
+            selected_lab_set = {lab for lab in all_labs_list if lab == selection}
 
         else:
             selected_labs = all_labs.filter(external=False)

@@ -41,5 +41,5 @@ def search_transcript(search_input: SearchInputInstance):
             yield first(transcript_version_results)
         else:
             preview = transcript_version_results[0].preview
-            preview.genome_builds = set([tv.genome_build for tv in transcript_version_results])
+            preview.genome_builds = {tv.genome_build for tv in transcript_version_results}
             yield preview

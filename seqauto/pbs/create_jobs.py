@@ -34,7 +34,7 @@ def create_jobs_and_launch_script(seqauto_run, launch_file_types):
             SequencingFileType.VCF: vcfs,
             SequencingFileType.COMBINED_VCF: combined_vcfs,
             SequencingFileType.QC: qc,
-            SequencingFileType.DATA_MIGRATION: set([b.unaligned_reads.sequencing_sample.sample_sheet for b in bams])}
+            SequencingFileType.DATA_MIGRATION: {b.unaligned_reads.sequencing_sample.sample_sheet for b in bams}}
 
     job_data_by_file_type = defaultdict(dict)
     for file_type, qs in data.items():

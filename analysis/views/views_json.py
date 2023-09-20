@@ -117,7 +117,7 @@ def node_create(request, analysis_id, node_type):
 @require_POST
 def nodes_copy(request, analysis_id):
     node_ids = json.loads(request.POST["nodes"])
-    node_ids = set([int(i) for i in node_ids])
+    node_ids = {int(i) for i in node_ids}
 
     nodes = []
     edges = []
@@ -165,7 +165,7 @@ def nodes_copy(request, analysis_id):
 @require_POST
 def nodes_delete(request, analysis_id):
     node_ids = json.loads(request.POST["nodes"])
-    node_ids = set([int(i) for i in node_ids])
+    node_ids = {int(i) for i in node_ids}
 
     analysis = get_analysis_or_404(request.user, analysis_id, write=True)
     nodes_qs = analysis.analysisnode_set.filter(id__in=node_ids).select_subclasses()

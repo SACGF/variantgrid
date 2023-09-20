@@ -647,7 +647,7 @@ class DiscordanceReportAdminExport(ExportRow):
 
     @export_column("# labs")
     def _labs_involved(self):
-        return len(set([summary.lab for summary in self.summaries]))
+        return len({summary.lab for summary in self.summaries})
 
     @export_column("# classifications")
     def _classification_count(self):
@@ -685,7 +685,7 @@ class DiscordanceReportAdminExport(ExportRow):
     @export_column("Gene Symbol")
     def _gene_symbol(self):
         all_chgvs = ImportedAlleleInfo.all_chgvs(self.discordance_report.clinical_context.allele)
-        return "\n".join(sorted(set([chgvs.gene_symbol for chgvs in all_chgvs])))
+        return "\n".join(sorted({chgvs.gene_symbol for chgvs in all_chgvs}))
 
     @export_column("c.HGVS (38)")
     def _variant(self):
@@ -736,7 +736,7 @@ class DiscordanceReportAdminExport(ExportRow):
 
     @export_column("Overall Upgrade/Downgrade")
     def _overall_upgrade_downgrade(self):
-        ups_and_downs = set([DiscordanceReportAdminExport._up_down_for(summary) for summary in self.summaries])
+        ups_and_downs = {DiscordanceReportAdminExport._up_down_for(summary) for summary in self.summaries}
         ups_and_downs.discard("same")
         if not ups_and_downs:
             return "same"
@@ -753,7 +753,7 @@ class DiscordanceReportAdminExport(ExportRow):
 
     @export_column("Overall Certainty")
     def _overall_certainty(self):
-        certainties = set([DiscordanceReportAdminExport._less_more_certain(summary) for summary in self.summaries])
+        certainties = {DiscordanceReportAdminExport._less_more_certain(summary) for summary in self.summaries}
         certainties.discard("same")
         if not certainties:
             return "same"
@@ -776,7 +776,7 @@ class DiscordanceReportAdminExport(ExportRow):
     def _conditions(self):
         condition_rows = []
         for summary in self.summaries:
-            conditions = set([drc.classification_effective.condition_text or "" for drc in summary.drcs])
+            conditions = {drc.classification_effective.condition_text or "" for drc in summary.drcs}
             condition_rows.append(", ".join(sorted(conditions)))
         return "\n".join(condition_rows)
 
