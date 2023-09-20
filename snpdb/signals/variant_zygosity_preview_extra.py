@@ -20,9 +20,9 @@ def _variant_preview_zygosity_extra(variant: Variant, genome_build: GenomeBuild)
 
     # FIXME we really want clinvar to be a PreviewKeyValue instead of a plain string
     summary, tag_counts = interesting_summary(qs, get_current_logged_in_user(), genome_build, total=False,
-                               clinvar=settings.SEARCH_SUMMARY_VARIANT_SHOW_CLINVAR,
-                               classifications=False,  # handled elsewhere
-                               clinical_significance=False)
+                                              clinvar=settings.SEARCH_SUMMARY_VARIANT_SHOW_CLINVAR,
+                                              classifications=False,  # handled elsewhere
+                                              clinical_significance=False)
 
     context = {
         "summary": summary,
