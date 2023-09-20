@@ -7,11 +7,12 @@ from django.contrib.auth.models import User
 from django.db.models import Q
 from django.dispatch import receiver
 
+from annotation.models import VariantAnnotationVersion
 from classification.models import Classification, ClassificationModification
 from library.preview_request import preview_extra_signal, PreviewKeyValue
 from ontology.models import OntologyTerm
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Lab, Organization, Allele, Variant
+from snpdb.models import Lab, Organization, Allele, Variant, GenomeBuild
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 
 
@@ -72,32 +73,60 @@ def classification_search(search_input: SearchInputInstance):
     yield Classification.objects.filter(Q(pk__in=cm_ids) | Q(pk__in=cm_source_ids))
 
 
-def _allele_preview_classifications_extra(user: User, obj: Allele) -> List[PreviewKeyValue]:
+def _allele_preview_classifications_extra(user: User, obj: Allele, genome_build: GenomeBuild) -> List[PreviewKeyValue]:
     cms = ClassificationModification.latest_for_user(user=user, allele=obj)
     extras = []
+    hgvs_extras = []
     if count := cms.count():
         extras += [PreviewKeyValue.count(Classification, count)]
-    if count:
-        genome_build = GenomeBuildManager.get_current_genome_build()
         column = ClassificationModification.column_name_for_build(genome_build)
         # provide the c.HGVS for alleles
         if c_hgvs := sorted(
                 c_hgvs for c_hgvs in cms.order_by(column).values_list(column, flat=True).distinct().all() if c_hgvs):
             for hgvs in c_hgvs:
-                extras.append(PreviewKeyValue(f"{genome_build.name}", hgvs, dedicated_row=True))
+                hgvs_extras.append(PreviewKeyValue(None, hgvs, dedicated_row=True))
 
-    return extras
+    if not hgvs_extras:
+        try:
+            v = obj.variant_for_build(genome_build)
+            hgvs_extras = _variant_hgvs_extra(v, genome_build)
+        except ValueError:
+            pass
+
+    return extras + hgvs_extras
+
+
+def _variant_hgvs_extra(variant: Variant, genome_build: GenomeBuild) -> List[PreviewKeyValue]:
+    hgvs_extras = []
+    if c_hgvs := variant.get_canonical_c_hgvs(genome_build):
+        hgvs_extras.append(PreviewKeyValue(None, c_hgvs, dedicated_row=True))
+    else:
+        vav = VariantAnnotationVersion.latest(genome_build)
+        if va := variant.variantannotation_set.filter(version=vav).first():
+            variant_summary = "intergenic"
+            if va.distance:
+                for direction in ["upstream", "downstream"]:
+                    if direction in va.consequence:
+                        variant_summary = f"{va.distance}bp {direction} of {va.symbol}"
+                        break
+            hgvs_extras.append(PreviewKeyValue(None, variant_summary, dedicated_row=True))
+
+    return hgvs_extras
 
 
 @receiver(preview_extra_signal, sender=Allele)
 def allele_preview_classifications_extra(sender, user: User, obj: Allele, **kwargs):
-    return _allele_preview_classifications_extra(user, obj)
+    genome_build = GenomeBuildManager.get_current_genome_build()
+    return _allele_preview_classifications_extra(user, obj, genome_build)
 
 
 @receiver(preview_extra_signal, sender=Variant)
 def variant_preview_classifications_extra(sender, user: User, obj: Variant, **kwargs):
+    genome_build = next(iter(obj.genome_builds))
     if allele := obj.allele:
-        return _allele_preview_classifications_extra(user, allele)
+        return _allele_preview_classifications_extra(user, allele, genome_build)
+    else:
+        return _variant_hgvs_extra(obj, genome_build)
 
 
 @receiver(preview_extra_signal, sender=OntologyTerm)
