@@ -122,9 +122,9 @@ class XmlParser:
     # determine if we only save tagName
     def __init__(self, prefix: Optional[List] = None):
         self._prefix = prefix or []
-        self._stack: List = list()
-        self._candidates: List[List[Callable]] = list()
-        self._execute: List[List[Callable]] = list()
+        self._stack: List = []
+        self._candidates: List[List[Callable]] = []
+        self._execute: List[List[Callable]] = []
         self._yieldable: Optional = None
 
     def set_yieldable(self, obj):
@@ -140,9 +140,9 @@ class XmlParser:
         pass
 
     def parse(self, source):
-        self._stack = list()
+        self._stack = []
         self._candidates = [self.__class__.get_parser_methods(self._prefix)]
-        self._execute = list()
+        self._execute = []
 
         context = etree.iterparse(source, events=('start', 'end'), huge_tree=True, recover=True, encoding="utf-8")
         for event, elem in context:
@@ -163,8 +163,8 @@ class XmlParser:
 
     def _push(self, elem):
         self._stack.append(elem)
-        execute_later = list()
-        remaining_candidates = list()
+        execute_later = []
+        remaining_candidates = []
         evaluated = [cand for cand in [cand.test_and_remainder(elem) for cand in self._peek_candidates]
                      if cand]
         for candidate in evaluated:
