@@ -484,21 +484,28 @@ def discordance_report(discordance_report: DiscordanceReport):
 
 
 @register.inclusion_tag("classification/tags/discordance_report_row.html")
-def discordance_report_row(discordance_report_summary: DiscordanceReportRowData, selected: Optional[DiscordanceReport] = None, filter: bool = False, discuss: bool = False):
+def discordance_report_row(
+        discordance_report_summary: DiscordanceReportRowData,
+        selected: Optional[DiscordanceReport] = None,
+        filter: bool = False,
+        discuss: bool = False,
+        read_only: bool = False):
     return {
         "summary": discordance_report_summary,
         "filter": filter,
         "discuss": discuss,
         "is_selected": discordance_report_summary.discordance_report == selected,
+        "read_only": read_only
     }
 
 
 @register.inclusion_tag("classification/tags/discordance_report_table.html")
-def discordance_report_table(table: DiscordanceReportTableData, filter: bool = False, discuss: bool = False):
+def discordance_report_table(table: DiscordanceReportTableData, filter: bool = False, discuss: bool = False, read_only: bool = False):
     return {
         "table": table,
         "filter": filter,
-        "discuss": discuss
+        "discuss": discuss,
+        "read_only": read_only
     }
 
 
@@ -506,12 +513,14 @@ def discordance_report_table(table: DiscordanceReportTableData, filter: bool = F
 def classification_lab_summaries(
         lab_classification_summaries: Iterable[ClassificationLabSummary],
         shared: bool = True,
-        include_acmg: bool = False):
+        include_acmg: bool = False,
+        read_only: bool = False):
 
     return {
         "lab_classification_summaries": lab_classification_summaries,
         "shared": shared,
-        "include_acmg": include_acmg
+        "include_acmg": include_acmg,
+        "read_only": read_only
     }
 
 @register.inclusion_tag("classification/tags/criteria_strength.html")

@@ -32,8 +32,8 @@ Hello Shariant User,
                                 {% if lab_summary.pending_changes_count or counts.waiting_for_amend%}
                                     {% if lab_summary.pending_changes_count %}
                                         <div>
-                                            {% if lab_summary.pending_changes_count == 1 %}<span style="{{ number_style }}">1</span> outstanding classification change ( <i>agreed upon during discordance review</i> )
-                                            {% else %}<span style="{{ number_style }}">{{ lab_summary.pending_changes_count }}</span> outstanding classification changes ( <i>agreed upon during discordance review</i> )
+                                            {% if lab_summary.pending_changes_count == 1 %}<span style="{{ number_style }}">1</span> outstanding classification change ( <i>agreed upon during discordance discussion</i> )
+                                            {% else %}<span style="{{ number_style }}">{{ lab_summary.pending_changes_count }}</span> outstanding classification changes ( <i>agreed upon during discordance discussion</i> )
                                             {% endif %}
                                         </div>
                                     {% endif %}

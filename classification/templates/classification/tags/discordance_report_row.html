@@ -29,6 +29,6 @@
             {% endif %}
             {% if discuss %}<div><a class="hover-link" href="{% url 'discordance_report_review' discordance_report_id=summary.discordance_report.pk %}" target="_blank">Discuss</a></div>{% endif %}
         </div>
-        {% classification_lab_summaries summary.lab_significances %}
+        {% classification_lab_summaries summary.lab_significances read_only=read_only %}
     </td>
 </tr>

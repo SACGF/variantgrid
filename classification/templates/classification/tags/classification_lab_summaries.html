@@ -8,7 +8,7 @@
                 {% lab lab_summ.lab your_lab=lab_summ.is_internal %}
                 {% if lab_summ.count > 1 %}<span class="d-inline-block mx-1 text-muted">x</span>{{ lab_summ.count }}{% endif %}
                 {% if lab_summ.embedded %}
-                    <div class="mt-1">{% embed lab_summ.embedded mode="inline" %}</div>
+                    <div class="mt-1">{% embed lab_summ.embedded mode="inline" read_only=read_only %}</div>
                 {% endif %}
             </div>
             <div class="col-5 py-2 cs-{{ lab_summ.clinical_significance_to }}" style="border-radius:5px; padding-left: 8px">

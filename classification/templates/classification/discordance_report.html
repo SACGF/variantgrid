@@ -184,7 +184,7 @@
                 </thead>
                 <tbody>
                 {% for summary in data.report_history_summary %}
-                    {% discordance_report_row summary filter=False selected=data.report %}
+                    {% discordance_report_row summary filter=False selected=data.report read_only=True %}
                 {% endfor %}
                 </tbody>
             </table>
