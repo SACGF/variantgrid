@@ -520,7 +520,7 @@ class VCFImportInfo(models.Model):
 
     @property
     def message(self):
-        raise NotImplementedError()
+        return self.upload_step
 
     def __str__(self):
         return f"{self.get_severity_display()}: {self.message}"
