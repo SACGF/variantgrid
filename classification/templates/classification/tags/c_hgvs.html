@@ -8,7 +8,7 @@
             {% if c_hgvs.is_desired_build == False or c_hgvs.is_normalised == False %}{{ c_hgvs.genome_build }}{% endif %}
         </div>
     {% elif show_genome_build %}
-        <span class="text-info">{{ c_hgvs.genome_build }} </span>
+        <span class="text-info">{{ c_hgvs.genome_build }}</span>&#32;
     {% endif %}
     <span class="c-hgvs-body">
         <span class="c-hgvs-transcript">{{ c_hgvs.transcript }}</span>
