@@ -19,7 +19,8 @@ class Command(BaseCommand):
         vep_columns = BulkVEPVCFAnnotationInserter._get_vep_columns_from_csq(infos)
         #print(vep_columns)
 
-        ALOFT = ["Aloft_Confidence", "Aloft_pred", "Aloft_prob_Dominant", "Aloft_prob_Recessive", "Aloft_prob_Tolerant"]
+        NEW_COLUMNS = ["am_class", "am_pathogenicity",
+                       "MaveDB_nt", "MaveDB_pro", "MaveDB_score", "MaveDB_urn"]
 
         count = 0
         num_found = 0
@@ -31,12 +32,12 @@ class Command(BaseCommand):
 
             for transcript_csq in csq.split(","):
                 td = dict(zip(vep_columns, transcript_csq.split("|")))
-                for aloft_key in ALOFT:
-                    if info_val := td[aloft_key]:
+                for nk in NEW_COLUMNS:
+                    if info_val := td[nk]:
                         values = info_val.split("&")
                         if any([v and v != '.' for v in values]):
                             found_in_transcript = True
-                            print(f"{aloft_key}={info_val=}")
+                            print(f"{nk}={info_val=}")
                 if found_in_transcript:
                     print("-----")
                     found_in_variant = True
