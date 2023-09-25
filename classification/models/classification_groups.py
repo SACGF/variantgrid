@@ -371,19 +371,25 @@ class ClassificationGroup:
     def conditions(self) -> List[ConditionResolved]:
         all_terms = set()
         all_plain_texts = set()
+        all_joins = set()
         for cm in self.modifications:
             c = cm.classification
             if resolved := c.condition_resolution_obj:
                 for term in resolved.terms:
                     all_terms.add(term)
+                all_joins.add(resolved.join)
             else:
                 if text := cm.get(SpecialEKeys.CONDITION):
                     all_plain_texts.add(text)
         all_condition_resolved = []
+        shared_join = None
+        if len(all_joins) == 1:  # if there's more than one join, we can't display it
+            shared_join = all_joins.pop()
+
         for term in all_terms:
-            all_condition_resolved.append(ConditionResolved(terms=[term], join=None))
+            all_condition_resolved.append(ConditionResolved(terms=[term], join=shared_join))
         for plain_text in all_plain_texts:
-            all_condition_resolved.append(ConditionResolved(terms=[], join=None, plain_text=plain_text))
+            all_condition_resolved.append(ConditionResolved(terms=[], join=shared_join, plain_text=plain_text))
 
         all_condition_resolved.sort()
         return all_condition_resolved

@@ -60,6 +60,9 @@
             {% empty %}
             <div class="no-value">-</div>
         {% endfor %}
+    {% if group.conditions|length > 0 and group.conditions.0.join_text %}
+        <span class="font-italic">{{ group.conditions.0.join_text }}</span>
+    {% endif %}
     </td>
     <td style="width:100px;">
         {% if show_allele_origin %}

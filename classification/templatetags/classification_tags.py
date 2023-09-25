@@ -473,8 +473,8 @@ def db_ref(data: VCDbRefDict, css: Optional[str] = ''):
 
 
 @register.inclusion_tag("classification/tags/condition.html")
-def condition(condition_obj: ConditionResolved, limit: Optional[int] = 100):
-    return {"condition": condition_obj, "limit": limit}
+def condition(condition_obj: ConditionResolved, limit: Optional[int] = 100, no_links: Optional[bool] = None):
+    return {"condition": condition_obj, "limit": limit, "no_links": no_links}
 
 
 # look at removing this
