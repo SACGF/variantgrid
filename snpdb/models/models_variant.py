@@ -1,6 +1,5 @@
 import logging
 import re
-from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Tuple, Iterable, Set, Union, Dict, Any, List
 import pydantic
