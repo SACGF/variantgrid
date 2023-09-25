@@ -1,5 +1,6 @@
 import json
 import logging
+from json import JSONDecodeError
 
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -65,15 +66,17 @@ class URLTestCase(TestCase):
             if get_kwargs:
                 url += "?" + urlencode(get_kwargs)
             response = client.get(url)
-            data = json.loads(response.content)
-            found = False
-            for result in data["results"]:
-                if result["id"] == str(obj.pk):
-                    found = True
-                    break
+            self.assertEqual(response.status_code, 200, msg=f"{url} OK")
+            if response.status_code == 200:
+                data = json.loads(response.content)
+                found = False
+                for result in data["results"]:
+                    if result["id"] == str(obj.pk):
+                        found = True
+                        break
 
-            #print(f"Url '{url} obj pk={obj.pk} in results={in_results}'")
-            self.assertEqual(in_results, found, msg=f"Url '{url} obj pk={obj.pk} in results={in_results}'")
+                #print(f"Url '{url} obj pk={obj.pk} in results={in_results}'")
+                self.assertEqual(in_results, found, msg=f"Url '{url} obj pk={obj.pk} in results={in_results}'")
 
     def _test_grid_list_urls(self, names_obj, user, in_results):
         """ Also allow 403 if not expecting results

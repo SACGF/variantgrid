@@ -76,7 +76,9 @@ class TranscriptAutocompleteView(AutocompleteView):
         gene_symbol = self.forwarded.get('gene_symbol', None)
         has_protein_domains = self.forwarded.get('has_protein_domains', None)
         gar_id = self.forwarded.get('gene_annotation_release', None)
-        gene_annotation_release = get_object_or_404(GeneAnnotationRelease, pk=gar_id)
+        gene_annotation_release = None
+        if gar_id:
+            gene_annotation_release = get_object_or_404(GeneAnnotationRelease, pk=gar_id)
 
         qs = Transcript.objects.all().distinct()
         if gene_symbol:
