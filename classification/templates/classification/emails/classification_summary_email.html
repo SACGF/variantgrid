@@ -84,7 +84,7 @@ Hello Shariant User,
                                                 {% elif counts.waiting_for_triage_medical == counts.waiting_for_triage %}all
                                                 {% else %}{{ counts.waiting_for_triage_medical }}
                                                 {% endif %}
-                                                of which {% plural items=counts.waiting_for_triage_meidcal plural='are' singular='is' %} medically significant
+                                                of which {% plural items=counts.waiting_for_triage_medical plural='are' singular='is' %} medically significant
                                             {% endif %}
                                         </i> )
                                         require{% plural items=counts.waiting_for_triage singular="s" plural="" %} your lab's triage
