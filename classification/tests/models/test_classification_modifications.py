@@ -274,7 +274,6 @@ class ClassificationTestCaseModifications(TestCase):
         self.assertEqual('Big bold Toe', vc.get(SpecialEKeys.CONDITION))
         self.assertEqual('Some <i>italic</i> literature', vc.get(SpecialEKeys.LITERATURE))
 
-
     def test_regexes(self):
         """
         Basic test to make sure refs are being scanned for - there is a dedicated
