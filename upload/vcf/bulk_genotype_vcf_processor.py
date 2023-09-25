@@ -321,7 +321,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         phred_likelihood_str = self.get_phred_likelihood_str(variant)
         samples_filters_str = self.get_samples_filters_str(variant)
 
-        variant_coordinate = VariantCoordinate(variant.CHROM, variant.POS, end, ref, alt)
+        variant_coordinate = VariantCoordinate(chrom=variant.CHROM, start=variant.POS, end=end, ref=ref, alt=alt)
         alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant_coordinate)
         format_json = self._get_format_json(self.num_samples, variant)
         info_json = self._get_info_json(variant)

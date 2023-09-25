@@ -46,7 +46,8 @@ dependencies:
   - Unidecode=1.3
   - boto3=1.26
   - pyspellchecker=0.6
-
+  - pydantic=2.3.0
+  - deepdiff=6.5.0
   - gdal=3.7  # needed for geo
   - pip:
       - cdot==0.2.21

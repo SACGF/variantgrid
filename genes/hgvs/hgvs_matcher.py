@@ -114,8 +114,12 @@ class HGVSMatcher:
             variant_coord = ca.get_variant_coordinate(self.genome_build)
             # Was converted to internal, need to return raw strings so standard base validation is OK
             if variant_coord.alt == Variant.REFERENCE_ALT:
-                variant_coord = VariantCoordinate(variant_coord.chrom, variant_coord.start, variant_coord.end,
-                                                  variant_coord.ref, variant_coord.ref)  # ref == alt
+                variant_coord = VariantCoordinate(
+                    chrom=variant_coord.chrom,
+                    start=variant_coord.start,
+                    end=variant_coord.end,
+                    ref=variant_coord.ref,
+                    alt=variant_coord.ref)  # ref == alt
             return variant_coord
         except ClinGenAlleleAPIException:
             self.attempt_clingen = False

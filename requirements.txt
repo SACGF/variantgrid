@@ -78,3 +78,5 @@ django-storages==1.12.3
 django_threadlocals==0.10
 pyspellchecker==0.6.3
 frozendict==2.3.4
+pydantic==2.3.0
+deepdiff==6.5.0

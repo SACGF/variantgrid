@@ -3,7 +3,7 @@ import re
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Tuple, Iterable, Set, Union, Dict, Any, List
-
+import pydantic
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models, IntegrityError
@@ -17,7 +17,6 @@ from django.dispatch import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
-
 from flags.models import FlagCollection, flag_collection_extra_info_signal, FlagInfos
 from flags.models.models import FlagsMixin, FlagTypeContext
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
@@ -251,8 +250,7 @@ class AlleleMergeLog(TimeStampedModel):
     message = models.TextField(null=True)
 
 
-@dataclass(frozen=True)
-class VariantCoordinate(FormerTuple):
+class VariantCoordinate(FormerTuple, pydantic.BaseModel):
     """ This stores coordinates, when you want to use it, be sure to call either:
             * as_external_explicit() - if you want to interface with eg VCF
             * as_internal_symbolic() - to store in internal Database
@@ -262,20 +260,6 @@ class VariantCoordinate(FormerTuple):
     end: int
     ref: str
     alt: str
-
-    def __post_init__(self):
-        _field_types = {
-            "chrom": str,
-            "start": int,
-            "end": int,
-            "ref": str,
-            "alt": str,
-        }
-
-        for field, expected_type in _field_types.items():
-            v = getattr(self, field)
-            if not isinstance(v, expected_type):
-                raise ValueError(f"'{field}' must be of type {expected_type}, was type: {type(v)}")
 
     @property
     def as_tuple(self) -> Tuple:
@@ -311,7 +295,7 @@ class VariantCoordinate(FormerTuple):
             ref = contig_sequence[start:start + 1].upper()
         else:
             ref = "N"
-        return VariantCoordinate(chrom, start, end, ref, alt)
+        return VariantCoordinate(chrom=chrom, start=start, end=end, ref=ref, alt=alt)
 
     @staticmethod
     def from_string(variant_string: str, genome_build=None):
@@ -330,12 +314,12 @@ class VariantCoordinate(FormerTuple):
         if Sequence.allele_is_symbolic(alt):
             raise ValueError("Must pass 'end' when using symbolic alt")
         end = start + abs(len(ref) - len(alt))
-        return VariantCoordinate(chrom, start, end, ref, alt)
+        return VariantCoordinate(chrom=chrom, start=start, end=end, ref=ref, alt=alt)
 
     def is_symbolic(self):
         return Sequence.allele_is_symbolic(self.alt)
 
-    def as_external_explicit(self, genome_build):
+    def as_external_explicit(self, genome_build) -> 'VariantCoordinate':
         """ explicit ref/alt """
         if self.is_symbolic():
             contig_sequence = genome_build.genome_fasta.fasta[self.chrom]
@@ -527,7 +511,7 @@ class Variant(PreviewModelMixin, models.Model):
         if abbreviate and not Sequence.allele_is_symbolic(alt):
             ref = Sequence.abbreviate(ref)
             alt = Sequence.abbreviate(alt)
-        vc = VariantCoordinate(chrom, start, end, ref, alt)
+        vc = VariantCoordinate(chrom=chrom, start=start, end=end, ref=ref, alt=alt)
         return vc.format()
 
     @staticmethod

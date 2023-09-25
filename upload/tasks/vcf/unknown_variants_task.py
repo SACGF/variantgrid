@@ -50,7 +50,7 @@ class BulkUnknownVariantInserter:
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
         # This has been decomposed (only be 1 alt per line)
         ref, alt, end = vcf_get_ref_alt_end(variant)
-        variant_coordinate = VariantCoordinate(variant.CHROM, variant.POS, end, ref, alt)
+        variant_coordinate = VariantCoordinate(chrom=variant.CHROM, start=variant.POS, end=end, ref=ref, alt=alt)
         self.variant_pk_lookup.add(variant_coordinate)
         self.batch_process_check()
 
@@ -162,7 +162,7 @@ class InsertUnknownVariantsTask(ImportVCFStepTask):
             # Python CSV reader dies with extremely long lines, so we just do by hand (not quoted or anything)
             for line in f:
                 chrom, start, end, ref, alt = line.strip().split(",")  # Not quoted, exactly 5 columns
-                variant_coordinate = VariantCoordinate(chrom, int(start), int(end), ref, alt)
+                variant_coordinate = VariantCoordinate(chrom=chrom, start=int(start), end=int(end), ref=ref, alt=alt)
                 variant_pk_lookup.add(variant_coordinate)
                 variant_pk_lookup.batch_check(settings.SQL_BATCH_INSERT_SIZE, insert_unknown=True)
                 items_processed += 1
