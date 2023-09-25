@@ -274,20 +274,6 @@ class ClassificationTestCaseModifications(TestCase):
         self.assertEqual('Big bold Toe', vc.get(SpecialEKeys.CONDITION))
         self.assertEqual('Some <i>italic</i> literature', vc.get(SpecialEKeys.LITERATURE))
 
-    def test_test_mode(self):
-        lab, user = ClassificationTestUtils.lab_and_user()
-        vc = Classification.create(
-            user=user,
-            lab=lab,
-            lab_record_id=None,
-            data={
-                SpecialEKeys.C_HGVS: 'g.301A>C',
-                SpecialEKeys.ZYGOSITY: 'zany'
-            },
-            save=False,
-            source=SubmissionSource.API,
-            make_fields_immutable=True)
-        self.assertEqual(vc.id, None)
 
     def test_regexes(self):
         """

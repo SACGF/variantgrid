@@ -1,5 +1,8 @@
+import json
 from unittest import skip
 
+import deepdiff
+from deepdiff import DeepDiff
 from django.test import TestCase, RequestFactory, override_settings
 
 from classification.enums import EvidenceKeyValueType, SubmissionSource
@@ -36,7 +39,6 @@ class ClassificationTestCaseViews(TestCase):
         request.data = data
         return ClassificationView().post(request=request)
 
-    @skip
     @override_settings(VARIANT_CLASSIFICATION_MATCH_VARIANTS=False)
     def test_return_data(self):
         lab, _user = ClassificationTestUtils.lab_and_user()
@@ -60,54 +62,29 @@ class ClassificationTestCaseViews(TestCase):
             response.pop(pop_key)
 
         expected = {
+            "institution_name": "InstX",
+            "lab_id": "instx/labby",
+            "cr_lab_id": "test_123456",
+            "org_name": "InstX",
+            "lab_name": "Labby",
+            "publish_level": "lab",
+            "version_publish_level": "lab",
+            "version_is_published": None,
+            "is_last_published": True,
             "can_write": True,
             "can_write_latest": True,
             "clinical_context": None,
             "data": {
-                "c_hgvs": {
-                    "immutable": "variantgrid",
-                    "value": "NM_000059.3(BRCA2):c.3G>C"
-                },
-                "clinical_significance": {
-                    "immutable": "api",
-                    "value": "VUS"
-                },
-                "condition": {
-                    "immutable": "api",
-                    "value": "xxx"
-                },
-                "esp_af": {
-                    "immutable": "api",
-                    "value": 0.1
-                },
-                "gene_symbol": {
-                    "immutable": "variantgrid",
-                    "value": "BRCA2"
-                },
-                "genome_build": {
-                    "immutable": "variantgrid",
-                    "value": "GRCh37.p13"
-                },
-                "molecular_consequence": {
-                    "immutable": "api",
-                    "validation": [
-                        {
-                            "code": "invalid_value",
-                            "message": "Illegal value (oops)",
-                            "severity": "error"
-                        }
-                    ],
-                    "value": [
-                        "coding_sequence_variant",
-                        "oops"
-                    ]
-                },
                 "owner": {
                     "value": "joejoe"
                 },
-                "refseq_transcript_id": {
-                    "immutable": "variantgrid",
-                    "value": "NM_000059.3"
+                "c_hgvs": {
+                    "value": "NM_000059.3(BRCA2):c.3G>C",
+                    "immutable": "variantgrid"
+                },
+                "esp_af": {
+                    "value": 0.1,
+                    "immutable": "api"
                 },
                 "zygosity": {
                     "immutable": "api",
@@ -118,29 +95,56 @@ class ClassificationTestCaseViews(TestCase):
                             "severity": "error"
                         }
                     ]
+                },
+                "condition": {
+                    "value": "xxx",
+                    "immutable": "api"
+                },
+                "gene_symbol": {
+                    "value": "BRCA2",
+                    "immutable": "variantgrid"
+                },
+                "genome_build": {
+                    "value": "GRCh37.p13",
+                    "immutable": "variantgrid"
+                },
+                "refseq_transcript_id": {
+                    "value": "NM_000059.3",
+                    "immutable": "variantgrid"
+                },
+                "clinical_significance": {
+                    "value": "VUS",
+                    "immutable": "api"
+                },
+                "molecular_consequence": {
+                    "value": [
+                        "coding_sequence_variant",
+                        "oops"
+                    ],
+                    "immutable": "api",
+                    "validation": [
+                        {
+                            "code": "invalid_value",
+                            "message": "Illegal value (oops)",
+                            "severity": "error"
+                        }
+                    ]
                 }
             },
-            #"flag_collection": 1069,
+            "withdrawn": False,
             "has_changes": False,
-            #"id": 1068,
-            "institution_name": "InstX",
-            "lab_id": "instx/labby",
-            "lab_name": "Labby",
-            "org_name": "InstX",
-            #"lab_record_id": "test_123456",
-            #"last_edited": 1590471912.520569,
             "messages": [
                 {
                     "code": "invalid_value",
-                    "key": "molecular_consequence",
                     "message": "Illegal value (oops)",
-                    "severity": "error"
+                    "severity": "error",
+                    "key": "molecular_consequence"
                 },
                 {
                     "code": "mandatory",
-                    "key": "zygosity",
                     "message": "Missing mandatory value",
-                    "severity": "error"
+                    "severity": "error",
+                    "key": "zygosity"
                 }
             ],
             "patch_messages": [
@@ -148,21 +152,12 @@ class ClassificationTestCaseViews(TestCase):
                     "code": "share_failure",
                     "message": "Cannot share record with errors"
                 }
-            ],
-            "publish_level": "lab",
-            #"published_version": 1590471912.520569,
-            #"title": "instx/labby/test_123456",
-            #"version": 1590471912.520569,
-            'is_last_published': True,
-            "version_is_published": None,
-            "version_publish_level": "lab",
-            "withdrawn": False
+            ]
         }
 
         self.maxDiff = None
         self.assertEqual(response, expected)
 
-    @skip
     @override_settings(VARIANT_CLASSIFICATION_MATCH_VARIANTS=False)
     def test_test_mode(self):
 
@@ -178,8 +173,10 @@ class ClassificationTestCaseViews(TestCase):
         })
         # now in test mode we always return all data (for the sake of useful information when testing)
         response_json = response.data
-        response_json.pop('data')
-        response_json.pop('allele')  # allele data changes a bit, should test elsewhere
+
+        for ignore in ['data', 'allele', 'cr_lab_id']:
+            response_json.pop(ignore)
+
         expected = {
             'id': None,
             'lab_record_id': 'test_123456',
@@ -205,10 +202,9 @@ class ClassificationTestCaseViews(TestCase):
             ],
             'patch_messages': [{'code': 'test_mode', 'message': 'Test mode on, no changes have been saved'}]}
 
-        self.maxDiff = None
-        self.assertEqual(response_json, expected)
+        diffs = DeepDiff(t1=expected, t2=response_json)
+        self.assertFalse(diffs)
 
-    @skip
     @override_settings(VARIANT_CLASSIFICATION_MATCH_VARIANTS=False)
     def test_bulk(self):
         lab, _user = ClassificationTestUtils.lab_and_user()
