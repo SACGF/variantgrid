@@ -1,8 +1,8 @@
-from dataclasses import dataclass
 from typing import Optional, Union
-
 from django.template import Library
 from more_itertools import first
+import pydantic
+from pydantic import ConfigDict
 
 from annotation.models import ClinVar, AnnotationVersion
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
@@ -21,8 +21,9 @@ def clinvar_stars(stars, review_status: Optional[str] = None):
     return {"stars": star_bools, "review_status": review_status}
 
 
-@dataclass
-class ClinVarDetails:
+class ClinVarDetails(pydantic.BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True, strict=True)
+
     """
     All the data that we have from ClinVar based on the pre-loaded annotations.
     If we don't have a ClinVar instance, then we have access to the g_hgvs so we can prompt the user to search
@@ -37,7 +38,7 @@ class ClinVarDetails:
 
     genome_build: GenomeBuild
     annotation_version: AnnotationVersion
-    g_hgvs: str
+    g_hgvs: Optional[str]
 
     @property
     def is_expert_panel_or_greater(self) -> bool:

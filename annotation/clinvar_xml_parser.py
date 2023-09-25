@@ -38,7 +38,7 @@ CLINVAR_REVIEW_STATUS_TO_STARS = {
 }
 
 
-@dataclass
+@dataclass(frozen=True)
 class ClinVarXmlParserOutput:
     """
     When we retrieve from ClinVar, this is our result.

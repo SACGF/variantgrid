@@ -587,7 +587,7 @@ class ModifiedImportedVariant(models.Model):
         for ov in ModifiedImportedVariant._split_old_variant(old_variant):
             vc = ModifiedImportedVariant._to_variant_coordinate(ov)
             contig = genome_build.chrom_contig_mappings[vc.chrom]
-            variant_coordinate = VariantCoordinate(contig.name, vc.start, vc.end, vc.ref, vc.alt)
+            variant_coordinate = VariantCoordinate(chrom=contig.name, start=vc.start, end=vc.end, ref=vc.ref, alt=vc.alt)
             formatted_old_variants.append(ModifiedImportedVariant.get_old_variant_from_variant_coordinate(variant_coordinate))
         return formatted_old_variants
 
