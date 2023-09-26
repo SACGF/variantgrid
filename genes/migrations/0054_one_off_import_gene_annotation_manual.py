@@ -18,9 +18,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation(ManualOperation.operation_other([
+        ManualOperation.operation_other([
             "Download cdot data and run import_gene_annotation. " +
             "See https://github.com/SACGF/variantgrid/issues/566#issuecomment-1097543081",
             ],
-            test=_has_existing_gene_annotation_import)),
+            test=_has_existing_gene_annotation_import),
     ]

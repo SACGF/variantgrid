@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation(ManualOperation.operation_other("Download mondo.json and run ontology_import --mondo_json json_file_location",
-                                                        test=_test_has_old_ontology_import))
+        ManualOperation.operation_other("Download mondo.json and run ontology_import --mondo_json json_file_location",
+                                        test=_test_has_old_ontology_import)
     ]
