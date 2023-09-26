@@ -185,7 +185,7 @@ class HGVSMatcher:
         return self.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string)[0]
 
     @staticmethod
-    def _get_sort_key_transcript_version_and_methods(version, prefer_pyhgvs=True, closest=False):
+    def _get_sort_key_transcript_version_and_methods(version, prefer_local=True, closest=False):
         def get_sort_key(item):
             tv, method = item
 
@@ -208,7 +208,7 @@ class HGVSMatcher:
             else:
                 method_sort = 2
 
-            if prefer_pyhgvs:
+            if prefer_local:
                 sort_keys.insert(0, method_sort)
             else:
                 sort_keys.append(method_sort)
@@ -220,7 +220,7 @@ class HGVSMatcher:
     def create_hgvs_variant(self, hgvs_string) -> HGVSVariant:
         return self.hgvs_converter.create_hgvs_variant(hgvs_string)
 
-    def filter_best_transcripts_and_method_by_accession(self, transcript_accession, prefer_pyhgvs=True, closest=False) -> List[Tuple[TranscriptVersion, str]]:
+    def filter_best_transcripts_and_method_by_accession(self, transcript_accession, prefer_local=True, closest=False) -> List[Tuple[TranscriptVersion, str]]:
         """ Get the best transcripts you'd want to match a HGVS against - assuming you will try multiple in order """
 
         transcript_id: str
@@ -270,7 +270,7 @@ class HGVSMatcher:
             tv_and_method.append((transcript_version, HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY))
 
         # TODO: Maybe we should filter transcript versions that have the same length
-        sort_key = self._get_sort_key_transcript_version_and_methods(version, prefer_pyhgvs=prefer_pyhgvs, closest=closest)
+        sort_key = self._get_sort_key_transcript_version_and_methods(version, prefer_local=prefer_local, closest=closest)
         return sorted(tv_and_method, key=sort_key)
 
     def get_variant_coordinate_used_transcript_kind_method_and_matches_reference(self, hgvs_string: str) -> VariantCoordinateAndDetails:
