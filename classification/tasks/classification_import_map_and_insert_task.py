@@ -26,7 +26,7 @@ class ClassificationImportMapInsertTask(Task):
 
     @property
     def data_dir(self) -> Path:
-        if data_dir_str := settings.VARIANT_CLASSIFICATION_OMNI_IMPORTER_DATA_DIR:
+        if data_dir_str := settings.CLASSIFICATION_OMNI_IMPORTER_DATA_DIR:
             data_dir = pathlib.Path(data_dir_str)
             data_dir.mkdir(parents=True, exist_ok=True)
             if not data_dir.exists():
@@ -35,15 +35,15 @@ class ClassificationImportMapInsertTask(Task):
 
     @property
     def omni_importer_dir(self) -> Path:
-        if omni_importer_dir_str := settings.VARIANT_CLASSIFICATION_OMNI_IMPORTER_APP_DIR:
+        if omni_importer_dir_str := settings.CLASSIFICATION_OMNI_IMPORTER_APP_DIR:
             omni_importer_dir = pathlib.Path(omni_importer_dir_str)
             if not omni_importer_dir.exists():
                 raise ValueError(f"{omni_importer_dir_str} does not exist")
             if not (omni_importer_dir / "main.py").exists():
-                raise ValueError(f"main.py doesn't exist inside OMNI IMPORTER DIR {settings.VARIANT_CLASSIFICATION_OMNI_IMPORTER_APP_DIR}")
+                raise ValueError(f"main.py doesn't exist inside OMNI IMPORTER DIR {settings.CLASSIFICATION_OMNI_IMPORTER_APP_DIR}")
             return omni_importer_dir
         else:
-            raise ValueError("Require settings.VARIANT_CLASSIFICATION_OMNI_IMPORTER_APP_DIR to be set to do automated imports")
+            raise ValueError("Require settings.CLASSIFICATION_OMNI_IMPORTER_APP_DIR to be set to do automated imports")
 
     @staticmethod
     def update_status(upload_file: UploadedClassificationsUnmapped, status: UploadedClassificationsUnmappedStatus):
@@ -99,8 +99,8 @@ class ClassificationImportMapInsertTask(Task):
             # and import it
             # --file data/path_west/sharmvl_grch38molecular_variants20220326_060243.json --publish logged_in_users --org path_west --lab unit_1 --env prod
 
-            publish = settings.VARIANT_CLASSIFICATION_OMNI_IMPORTER_PUBLISH_LEVEL
-            include_source = settings.VARIANT_CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE
+            publish = settings.CLASSIFICATION_OMNI_IMPORTER_PUBLISH_LEVEL
+            include_source = settings.CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE
 
             args: List[str] = [
                 settings.PYTHON_COMMAND, "main.py",

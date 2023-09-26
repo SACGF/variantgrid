@@ -131,7 +131,7 @@ class ResolvedVariantInfo(TimeStampedModel):
             c_hgvs = hgvs_variant.format()
             c_hgvs_obj = CHGVS(c_hgvs)
             self.c_hgvs = c_hgvs
-            self.c_hgvs_full = hgvs_variant.format(max_ref_length=settings.VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH)
+            self.c_hgvs_full = hgvs_variant.format(max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH)
             self.transcript_version = c_hgvs_obj.transcript_version_model(genome_build=genome_build)
             self.gene_symbol = GeneSymbol.objects.filter(symbol=c_hgvs_obj.gene_symbol).first()
         except Exception as exception:
@@ -586,7 +586,7 @@ class ImportedAlleleInfo(TimeStampedModel):
     def is_supported_transcript(transcript_or_hgvs: str):
         if not transcript_or_hgvs:
             return False
-        for transcript_type in settings.VARIANT_CLASSIFICATION_SUPPORTED_TRANSCRIPTS:
+        for transcript_type in settings.CLASSIFICATION_SUPPORTED_TRANSCRIPTS:
             if transcript_or_hgvs.startswith(transcript_type):
                 return True
         return False

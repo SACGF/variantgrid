@@ -381,7 +381,7 @@ def get_evidence_fields_from_preferred_transcript(
         data[SpecialEKeys.P_HGVS] = clingen_allele.get_p_hgvs(transcript_version.accession, match_version=False)
 
     # If we have a synonymous protein change, but a molecular consequence of splicing, change the "=" into "?"
-    if settings.VARIANT_CLASSIFICATION_AUTO_POPULATE_P_HGVS_SYNONYMOUS_SPLICE_CHANGE_TO_UNKNOWN:
+    if settings.CLASSIFICATION_AUTO_POPULATE_P_HGVS_SYNONYMOUS_SPLICE_CHANGE_TO_UNKNOWN:
         p_hgvs = data[SpecialEKeys.P_HGVS]
         if p_hgvs and "=" in p_hgvs and "splice" in transcript_data.get("consequence", ""):
             prefix, allele = p_hgvs.split(":", 1)

@@ -17,7 +17,7 @@ def lab_card(context, lab: Lab, lab_link=True, org_link=True):
         "lab_link": lab_link,
         "org_link": org_link,
         "is_member": lab.is_member(user) or user.is_superuser,
-        "shared_classifications": settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED,
+        "shared_classifications": settings.CLASSIFICATION_STATS_USE_SHARED,
         "url_name_visible": context["url_name_visible"]
     }
 

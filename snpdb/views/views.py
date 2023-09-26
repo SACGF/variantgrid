@@ -808,7 +808,7 @@ def view_lab(request, lab_id: int):
         # we just hide the form now
         # _add_read_only_settings_message(request, [lab])
 
-    if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
+    if settings.CLASSIFICATION_STATS_USE_SHARED:
         visibility = "Shared"
     else:
         visibility = f"Created"
@@ -1403,7 +1403,7 @@ def wiki_save(request, class_name, unique_keyword, unique_value):
 
 def labs(request):
     # Use short names is available
-    show_unclassified = not settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED
+    show_unclassified = not settings.CLASSIFICATION_STATS_USE_SHARED
 
     """
     vc_state_data_json = get_grouped_classification_counts(
@@ -1415,7 +1415,7 @@ def labs(request):
     active_organizations = Organization.objects.filter(active=True).order_by('name')
     organization_labs = {}
     for org in active_organizations:
-        if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
+        if settings.CLASSIFICATION_STATS_USE_SHARED:
             org_labs = org.sharing_labs
         else:
             org_labs = org.classifying_labs
@@ -1425,7 +1425,7 @@ def labs(request):
     context = {
         "organization_labs": organization_labs,
         "labs": lab_list,
-        "shared_classifications": settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED,
+        "shared_classifications": settings.CLASSIFICATION_STATS_USE_SHARED,
         # "vc_state_data": vc_state_data_json,
         "show_unclassified": show_unclassified,
     }
@@ -1437,7 +1437,7 @@ def labs_graph_detail(request):
     short_names_qs = Organization.objects.filter(short_name__isnull=False)
     name_to_short_name = dict(short_names_qs.values_list("name", "short_name"))
     state_field = "classification__lab__state"
-    show_unclassified = not settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED
+    show_unclassified = not settings.CLASSIFICATION_STATS_USE_SHARED
     org_field = "classification__lab__organization__name"
 
     vc_org_data_json = get_grouped_classification_counts(

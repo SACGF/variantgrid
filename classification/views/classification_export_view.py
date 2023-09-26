@@ -94,7 +94,7 @@ def export_view(request: HttpRequest) -> Response:
         format_json,
         format_mvl
     ]
-    if settings.VARIANT_CLASSIFICATION_REDCAP_EXPORT:
+    if settings.CLASSIFICATION_REDCAP_EXPORT:
         formats += [format_redcap]
 
     formats += [

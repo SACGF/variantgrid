@@ -13,7 +13,7 @@ class ClassificationTestValidation(TestCase):
     def tearDown(self):
         ClassificationTestUtils.tearDown()
 
-    @override_settings(VARIANT_CLASSIFICATION_REQUIRE_OVERWRITE_NOTE=False)
+    @override_settings(CLASSIFICATION_REQUIRE_OVERWRITE_NOTE=False)
     def test_override_note_disabled(self):
         lab, user = ClassificationTestUtils.lab_and_user()
         vc = Classification.create(
@@ -30,7 +30,7 @@ class ClassificationTestValidation(TestCase):
         bp2 = vc.evidence.get('bp2')
         self.assertEqual(bp2, {'value': 'BA'})
 
-    @override_settings(VARIANT_CLASSIFICATION_REQUIRE_OVERWRITE_NOTE=True)
+    @override_settings(CLASSIFICATION_REQUIRE_OVERWRITE_NOTE=True)
     def test_override_note_enabled(self):
         lab, user = ClassificationTestUtils.lab_and_user()
         vc = Classification.create(
@@ -53,7 +53,7 @@ class ClassificationTestValidation(TestCase):
                             }]
         })
 
-    @override_settings(VARIANT_CLASSIFICATION_REQUIRE_OVERWRITE_NOTE=True)
+    @override_settings(CLASSIFICATION_REQUIRE_OVERWRITE_NOTE=True)
     def test_external(self):
         lab, user = ClassificationTestUtils.external_lab_and_user()
         vc = Classification.create(

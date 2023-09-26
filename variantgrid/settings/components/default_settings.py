@@ -341,9 +341,6 @@ VARIANT_ZYGOSITY_GLOBAL_COLLECTION = "global"
 
 PREFER_ALLELE_LINKS = False
 
-# if True, CR_lab_id will be used in all instances
-VARIANT_CLASSIFICATION_ID_OVERRIDE_PREFIX = False
-
 # ClinGen Allele Registry paper - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6519371/
 CLINGEN_ALLELE_REGISTRY_DOMAIN = "http://reg.genome.network"
 CLINGEN_ALLELE_REGISTRY_MAX_RECORDS = 2000
@@ -464,45 +461,47 @@ ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX = 1000
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
 VARIANT_SHOW_CANONICAL_HGVS = True
 
-VARIANT_CLASSIFICATION_OMNI_IMPORTER_APP_DIR = None  # location of OmniImporter (if present) to map imported classifications
-VARIANT_CLASSIFICATION_OMNI_IMPORTER_DATA_DIR = os.path.join(PRIVATE_DATA_ROOT, "lab_classification_files")  # location of directory for saving and mapping files to send to OmniImporter (can by any directory with write access)
-VARIANT_CLASSIFICATION_OMNI_IMPORTER_PUBLISH_LEVEL = "lab"  # change this to logged_in_users for prod environments
-VARIANT_CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE = False  # change this to True for dev environments (too dangerous to set to True by default)
+# if True, CR_lab_id will be used in all instances
+CLASSIFICATION_ID_OVERRIDE_PREFIX = False
+CLASSIFICATION_OMNI_IMPORTER_APP_DIR = None  # location of OmniImporter (if present) to map imported classifications
+CLASSIFICATION_OMNI_IMPORTER_DATA_DIR = os.path.join(PRIVATE_DATA_ROOT, "lab_classification_files")  # location of directory for saving and mapping files to send to OmniImporter (can by any directory with write access)
+CLASSIFICATION_OMNI_IMPORTER_PUBLISH_LEVEL = "lab"  # change this to logged_in_users for prod environments
+CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE = False  # change this to True for dev environments (too dangerous to set to True by default)
 
-VARIANT_CLASSIFICATION_SUPPORTED_TRANSCRIPTS = {"NR", "NM", "NC", "ENST", "LRG_", "XR"}
-VARIANT_CLASSIFICATION_MATCH_VARIANTS = True  # exists only so we can turn it off during testing
-VARIANT_CLASSIFICATION_REQUIRE_OVERWRITE_NOTE = True
-VARIANT_CLASSIFICATION_AUTOFUZZ_AGE = False
+CLASSIFICATION_SUPPORTED_TRANSCRIPTS = {"NR", "NM", "NC", "ENST", "LRG_", "XR"}
+CLASSIFICATION_MATCH_VARIANTS = True  # exists only so we can turn it off during testing
+CLASSIFICATION_REQUIRE_OVERWRITE_NOTE = True
+CLASSIFICATION_AUTOFUZZ_AGE = False
 
-VARIANT_CLASSIFICATION_DASHBOARD_SIZE = 50
-VARIANT_CLASSIFICATION_RECLASSIFICATION_EMAIL = True
-VARIANT_CLASSIFICATION_ID_FILTER = True
-VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME = True
-VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN = True  # Should Allele origin (e.g. germline/somatic) be shown on the grid
-VARIANT_CLASSIFICATION_STATS_USE_SHARED = False  # False=Use visible to user. True = Shared
-VARIANT_CLASSIFICATION_GRID_SHOW_PHGVS = True
-VARIANT_CLASSIFICATION_GRID_SHOW_SAMPLE = True
-VARIANT_CLASSIFICATION_GRID_MULTI_LAB_FILTER = False
-VARIANT_CLASSIFICATION_SHOW_SPECIMEN_ID = True
-VARIANT_CLASSIFICATION_NEW_GROUPING = False
+CLASSIFICATION_DASHBOARD_SIZE = 50
+CLASSIFICATION_RECLASSIFICATION_EMAIL = True
+CLASSIFICATION_ID_FILTER = True
+CLASSIFICATION_GRID_SHOW_USERNAME = True
+CLASSIFICATION_GRID_SHOW_ORIGIN = True  # Should Allele origin (e.g. germline/somatic) be shown on the grid
+CLASSIFICATION_STATS_USE_SHARED = False  # False=Use visible to user. True = Shared
+CLASSIFICATION_GRID_SHOW_PHGVS = True
+CLASSIFICATION_GRID_SHOW_SAMPLE = True
+CLASSIFICATION_GRID_MULTI_LAB_FILTER = False
+CLASSIFICATION_SHOW_SPECIMEN_ID = True
+CLASSIFICATION_NEW_GROUPING = False
 
 # Require people to click "my sample's not here" (ie encourage them to find it)
-VARIANT_CLASSIFICATION_WEB_FORM_CREATE_INITIALLY_REQUIRE_SAMPLE = True
-VARIANT_CLASSIFICATION_WEB_FORM_CREATE = True
-VARIANT_CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN = True
-VARIANT_CLASSIFICATION_WEB_FORM_CREATE_ALLOW_NO_VARIANT = True  # Can create purely from HGVS
+CLASSIFICATION_WEB_FORM_CREATE_INITIALLY_REQUIRE_SAMPLE = True
+CLASSIFICATION_WEB_FORM_CREATE = True
+CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN = True
+CLASSIFICATION_WEB_FORM_CREATE_ALLOW_NO_VARIANT = True  # Can create purely from HGVS
 
 # If change is synonymous, and molecular consequence is splicing, then change from p.= to p.?
-VARIANT_CLASSIFICATION_AUTO_POPULATE_P_HGVS_SYNONYMOUS_SPLICE_CHANGE_TO_UNKNOWN = False
+CLASSIFICATION_AUTO_POPULATE_P_HGVS_SYNONYMOUS_SPLICE_CHANGE_TO_UNKNOWN = False
 
-VARIANT_CLASSIFICATION_FILE_ATTACHMENTS = True  # allow users to attach files to classifications
+CLASSIFICATION_FILE_ATTACHMENTS = True  # allow users to attach files to classifications
 
-VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH = 100  # Used for MVL export, general display use HGVS_MAX_REF_ALLELE_LENGTH
+CLASSIFICATION_MAX_REFERENCE_LENGTH = 100  # Used for MVL export, general display use HGVS_MAX_REF_ALLELE_LENGTH
 
-VARIANT_CLASSIFICATION_REDCAP_EXPORT = True
-VARIANT_CLASSIFICATION_NON_ACMG_ASSERTION_METHOD = None  # when calculating ACMG points, even if we have ACMG criteria, are they a little too trnaslated to be useful
+CLASSIFICATION_REDCAP_EXPORT = True
+CLASSIFICATION_NON_ACMG_ASSERTION_METHOD = None  # when calculating ACMG points, even if we have ACMG criteria, are they a little too trnaslated to be useful
 
-VARIANT_CLASSIFICATION_ALLOW_DELETE = True
+CLASSIFICATION_ALLOW_DELETE = True
 """
 Is a hard-delete offered to classification owners (if false admins will have to delete from admin screen)
 """

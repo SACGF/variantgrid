@@ -39,7 +39,7 @@ class ClassificationTestCaseViews(TestCase):
         request.data = data
         return ClassificationView().post(request=request)
 
-    @override_settings(VARIANT_CLASSIFICATION_MATCH_VARIANTS=False)
+    @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
     def test_return_data(self):
         lab, _user = ClassificationTestUtils.lab_and_user()
         response = self.request_post({
@@ -158,7 +158,7 @@ class ClassificationTestCaseViews(TestCase):
         self.maxDiff = None
         self.assertEqual(response, expected)
 
-    @override_settings(VARIANT_CLASSIFICATION_MATCH_VARIANTS=False)
+    @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
     def test_test_mode(self):
 
         lab, _user = ClassificationTestUtils.lab_and_user()
@@ -205,7 +205,7 @@ class ClassificationTestCaseViews(TestCase):
         diffs = DeepDiff(t1=expected, t2=response_json)
         self.assertFalse(diffs)
 
-    @override_settings(VARIANT_CLASSIFICATION_MATCH_VARIANTS=False)
+    @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
     def test_bulk(self):
         lab, _user = ClassificationTestUtils.lab_and_user()
         response = self.request_post({"records": [{
@@ -229,7 +229,7 @@ class ClassificationTestCaseViews(TestCase):
         self.assertEqual(results[0]['lab_record_id'], "test_1")
         self.assertEqual(results[1]['lab_record_id'], "test_2")
 
-    @override_settings(VARIANT_CLASSIFICATION_MATCH_VARIANTS=False)
+    @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
     def test_basic_update(self):
         lab, _user = ClassificationTestUtils.lab_and_user()
         # all test that aliases work re foo BAAA -> bar

@@ -24,7 +24,7 @@ def validate_variant_fields(sender, **kwargs) -> Optional[ValidationMerger]:  # 
     """
     vm = ValidationMerger()
 
-    if not settings.VARIANT_CLASSIFICATION_MATCH_VARIANTS:
+    if not settings.CLASSIFICATION_MATCH_VARIANTS:
         # while this technically isn't about matching a variant, much of the work in get_variant_tuple -> pyhgvs
         # requires
         return vm

@@ -86,7 +86,7 @@ class RowID(ExportRow):
 
     @export_column(categories={"transient": True})
     def id(self):
-        if settings.VARIANT_CLASSIFICATION_ID_OVERRIDE_PREFIX:
+        if settings.CLASSIFICATION_ID_OVERRIDE_PREFIX:
             return self.vc.cr_lab_id
         return self.vc.id
 

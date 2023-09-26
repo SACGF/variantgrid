@@ -122,7 +122,7 @@ class EvidenceMixin:
 
     @property
     def is_likely_acmg(self) -> bool:
-        if non_standard_res := settings.VARIANT_CLASSIFICATION_NON_ACMG_ASSERTION_METHOD:
+        if non_standard_res := settings.CLASSIFICATION_NON_ACMG_ASSERTION_METHOD:
             if assertion_method := self.get(SpecialEKeys.ASSERTION_METHOD):
                 for non_standard_re in non_standard_res:
                     if non_standard_re.match(assertion_method):

@@ -577,8 +577,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @staticmethod
     def can_create_via_web_form(user: User):
-        can_create = settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE
-        return can_create and (user.is_superuser or settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN)
+        can_create = settings.CLASSIFICATION_WEB_FORM_CREATE
+        return can_create and (user.is_superuser or settings.CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN)
 
     @staticmethod
     def dashboard_report_new_classifications(since) -> int:
@@ -691,7 +691,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @property
     def cr_lab_id(self):
-        if settings.VARIANT_CLASSIFICATION_ID_OVERRIDE_PREFIX:
+        if settings.CLASSIFICATION_ID_OVERRIDE_PREFIX:
             return f"CR_{self.id}"
         return self.lab_record_id
 
@@ -1033,7 +1033,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             matched_option = Classification.match_option(options, check_value)
             if matched_option:
                 results.append(matched_option.get('key'))
-                if settings.VARIANT_CLASSIFICATION_REQUIRE_OVERWRITE_NOTE and \
+                if settings.CLASSIFICATION_REQUIRE_OVERWRITE_NOTE and \
                         matched_option.get('override') and cell.note is None and cell.explain is None:
                     cell.add_validation(
                         code=ValidationCode.REQUIRES_NOTE,
@@ -1246,7 +1246,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                         message='Transcript should include version e.g. NM_001256799.1')
 
         elif e_key.key == SpecialEKeys.AGE:
-            if settings.VARIANT_CLASSIFICATION_AUTOFUZZ_AGE:
+            if settings.CLASSIFICATION_AUTOFUZZ_AGE:
                 cell.value = patch_fuzzy_age(value)
 
         # ensure we have one non None value before returning the structure
@@ -2200,7 +2200,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @staticmethod
     def check_can_create_no_classification_via_web_form(_user: User):
-        if not settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE_ALLOW_NO_VARIANT:
+        if not settings.CLASSIFICATION_WEB_FORM_CREATE_ALLOW_NO_VARIANT:
             raise CreateNoClassificationForbidden()
 
 
@@ -2289,7 +2289,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
 
     @property
     def cr_lab_id(self) -> str:
-        if settings.VARIANT_CLASSIFICATION_ID_OVERRIDE_PREFIX:
+        if settings.CLASSIFICATION_ID_OVERRIDE_PREFIX:
             return f"CR_{self.classification.id_str}"
         return self.classification.lab_record_id
 

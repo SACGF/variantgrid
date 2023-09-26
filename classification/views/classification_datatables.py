@@ -45,7 +45,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             return json_data
 
         response = get_preferred_chgvs_json()
-        if settings.VARIANT_CLASSIFICATION_GRID_SHOW_PHGVS:
+        if settings.CLASSIFICATION_GRID_SHOW_PHGVS:
             if p_hgvs := row.get('published_evidence__p_hgvs__value'):
                 p_dot = p_hgvs.find('p.')
                 if p_dot != -1:
@@ -79,7 +79,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                     value = str(value)
                     if id_filter.lower() in value.lower():
                         matches[key] = value
-        if settings.VARIANT_CLASSIFICATION_ID_OVERRIDE_PREFIX:
+        if settings.CLASSIFICATION_ID_OVERRIDE_PREFIX:
             cr_lab_id = f"CR_{row.get('classification__id')}"
         else:
             cr_lab_id = row.get('classification__lab_record_id')
@@ -168,7 +168,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 key='classification__sample_id',
                 name='sample_id',
                 visible=False,  # Only used to build links
-                enabled=settings.VARIANT_CLASSIFICATION_GRID_SHOW_SAMPLE,
+                enabled=settings.CLASSIFICATION_GRID_SHOW_SAMPLE,
                 orderable=True
             ),
             RichColumn(
@@ -176,7 +176,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 name='sample_name',
                 label='Sample',
                 client_renderer=f'VCTable.sample',
-                enabled=settings.VARIANT_CLASSIFICATION_GRID_SHOW_SAMPLE,
+                enabled=settings.CLASSIFICATION_GRID_SHOW_SAMPLE,
                 orderable=True
             ),
             RichColumn(
@@ -184,7 +184,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 name='allele_origin',
                 label='Allele Origin',
                 client_renderer=f'VCTable.evidence_key.bind(null, "{ SpecialEKeys.ALLELE_ORIGIN }")',
-                enabled=settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
+                enabled=settings.CLASSIFICATION_GRID_SHOW_ORIGIN,
                 orderable=True
             ),
             RichColumn(
@@ -201,7 +201,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 key='classification__user__username',
                 name='user',
                 label='User',
-                enabled=settings.VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME,
+                enabled=settings.CLASSIFICATION_GRID_SHOW_USERNAME,
                 orderable=True
             ),
             RichColumn(
@@ -304,7 +304,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
     def filter_queryset(self, qs: QuerySet[ClassificationModification]) -> QuerySet[ClassificationModification]:
         filters: List[Q] = []
-        if settings.VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME:
+        if settings.CLASSIFICATION_GRID_SHOW_USERNAME:
             if user_id := self.get_query_param('user'):
                 filters.append(Q(classification__user__pk=user_id))
 
@@ -350,7 +350,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             else:
                 return qs.none()
 
-        if settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN:
+        if settings.CLASSIFICATION_GRID_SHOW_ORIGIN:
             if allele_origin := self.get_query_param("allele_origin"):
                 if allele_origin == 'germline':
                     filters.append(Q(published_evidence__allele_origin__value__in=ALLELE_GERMLINE_VALUES))

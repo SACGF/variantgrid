@@ -58,7 +58,7 @@ def get_classification_counts_allele(qs: QuerySet[ClassificationModification], f
 def get_visible_classifications_qs(user: User) -> QuerySet[ClassificationModification]:
     # now excludes external labs (don't want to report on Shariant only data within SA Path for example)
 
-    shared = settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED
+    shared = settings.CLASSIFICATION_STATS_USE_SHARED
     kwargs = {"classification__lab__external": False}
     if shared:
         kwargs["clinical_significance__isnull"] = False

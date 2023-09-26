@@ -26,7 +26,7 @@ class VariantResolver:
 
     def queue_resolve(self, imported_allele_info: ImportedAlleleInfo) -> bool:
         actually_queued = False
-        if settings.VARIANT_CLASSIFICATION_MATCH_VARIANTS:
+        if settings.CLASSIFICATION_MATCH_VARIANTS:
             if imported_allele_info.status == ImportedAlleleInfoStatus.PROCESSING and imported_allele_info.classification_import is None:
                 if genome_build_version := imported_allele_info.imported_genome_build_patch_version:
                     self.all_count += 1

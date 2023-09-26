@@ -150,10 +150,10 @@
 </script>
 {% endblock %}
 {% block content %}
-    {% settings_value 'VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME' as VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME %}
-    {% settings_value 'VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN' as VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN %}
-    {% settings_value 'VARIANT_CLASSIFICATION_ID_FILTER' as VARIANT_CLASSIFICATION_ID_FILTER %}
-    {% settings_value 'VARIANT_CLASSIFICATION_REDCAP_EXPORT' as VARIANT_CLASSIFICATION_REDCAP_EXPORT %}
+    {% settings_value 'CLASSIFICATION_GRID_SHOW_USERNAME' as CLASSIFICATION_GRID_SHOW_USERNAME %}
+    {% settings_value 'CLASSIFICATION_GRID_SHOW_ORIGIN' as CLASSIFICATION_GRID_SHOW_ORIGIN %}
+    {% settings_value 'CLASSIFICATION_ID_FILTER' as CLASSIFICATION_ID_FILTER %}
+    {% settings_value 'CLASSIFICATION_REDCAP_EXPORT' as CLASSIFICATION_REDCAP_EXPORT %}
 
     <div class="container">
         {% if labs.count > 0 and can_create_classification %}
@@ -177,10 +177,10 @@
                 </p>
             {% endif %}
             <p>
-            Export the grid below by clicking the CSV {% if VARIANT_CLASSIFICATION_REDCAP_EXPORT %} or Redcap {% endif %}buttons on the bottom left of the grid.<br/>
+            Export the grid below by clicking the CSV {% if CLASSIFICATION_REDCAP_EXPORT %} or Redcap {% endif %}buttons on the bottom left of the grid.<br/>
             The export will be using your default genome build.<br/>
             </p>
-            {% if VARIANT_CLASSIFICATION_REDCAP_EXPORT %}
+            {% if CLASSIFICATION_REDCAP_EXPORT %}
                 <p>
                 You can import into REDCap using this  <a href="/classification/redcap_data_dictionary.csv">data definition</a>.<br/>
                 Records will only be included in REDCap downloads if they have a value for <b>redcap_record_id</b>.
@@ -200,19 +200,19 @@
                 {% endif %}
                 {% crispy lab_form form_helper.horizontal_no_labels %}
             </div>
-            {% if VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME %}
+            {% if CLASSIFICATION_GRID_SHOW_USERNAME %}
             <div class="col-md-4 col-lg-2">
                 <a class="hover-link" onclick="filterDefaultUser()">Filter : My Classifications</a>
                 {% crispy user_form form_helper.horizontal_no_labels %}
             </div>
             {% endif %}
-            {% if VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN %}
+            {% if CLASSIFICATION_GRID_SHOW_ORIGIN %}
             <div class="col-md-4 col-lg-2">
                 <br />
                 {% crispy allele_origin_form form_helper.horizontal_no_labels %}
             </div>
             {% endif %}
-            {% if VARIANT_CLASSIFICATION_ID_FILTER %}
+            {% if CLASSIFICATION_ID_FILTER %}
             <div class="col-md-4 col-lg-2">
                 <br/>
                 <input type="text" id="id_filter" placeholder="IDs filter" class="form-control" title="Filters on various ID evidence fields" />
@@ -241,7 +241,7 @@
                 <div>
                 Download as
                     <a class='hover-link download-link' href="javascript:downloadAs('csv')">CSV</a>
-                    {% if VARIANT_CLASSIFICATION_REDCAP_EXPORT %},
+                    {% if CLASSIFICATION_REDCAP_EXPORT %},
                     <a class='hover-link download-link' href="javascript:downloadAs('redcap')">REDCap</a>
                     {% endif %}
                 </div>

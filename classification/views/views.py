@@ -112,7 +112,7 @@ def activity(request, user_id: Optional[int] = None, lab_id: Optional[int] = Non
     context = {
         'changes': changes,
         'load_older_url': load_older_url,
-        'can_create_classifications': settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN,
+        'can_create_classifications': settings.CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN,
         'now': latest_timestamp if latest_timestamp else now(),
         'page_title': page_title
     }
@@ -145,7 +145,7 @@ def classifications(request):
     for ft in flag_types:
         flag_type_json.append({'id': ft.pk, 'label': ft.label, 'description': ft.description})
 
-    if settings.VARIANT_CLASSIFICATION_GRID_MULTI_LAB_FILTER:
+    if settings.CLASSIFICATION_GRID_MULTI_LAB_FILTER:
         lab_form = LabMultiSelectForm()
     else:
         lab_form = LabSelectForm()
@@ -341,8 +341,8 @@ def view_classification(request: HttpRequest, classification_id: str):
         'existing_files': existing_files,
         'other_classifications_summary': other_classifications_summary,
         'report_enabled': ClassificationReportTemplate.objects.filter(name=ReportNames.DEFAULT_REPORT).exclude(template__iexact='').exists(),
-        'attachments_enabled': settings.VARIANT_CLASSIFICATION_FILE_ATTACHMENTS,
-        'delete_enabled': settings.VARIANT_CLASSIFICATION_ALLOW_DELETE
+        'attachments_enabled': settings.CLASSIFICATION_FILE_ATTACHMENTS,
+        'delete_enabled': settings.CLASSIFICATION_ALLOW_DELETE
     }
     return render(request, 'classification/classification.html', context)
 
@@ -633,7 +633,7 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
                'sample_autocomplete_form': sample_autocomplete_form,
                "lab": lab,
                "lab_error": lab_error,
-               "initially_require_sample": settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE_INITIALLY_REQUIRE_SAMPLE}
+               "initially_require_sample": settings.CLASSIFICATION_WEB_FORM_CREATE_INITIALLY_REQUIRE_SAMPLE}
     return render(request, 'classification/create_classification_from_hgvs.html', context)
 
 
@@ -648,7 +648,7 @@ def evidence_keys(request: HttpRequest) -> HttpResponse:
 
 
 def classification_graphs(request):
-    if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
+    if settings.CLASSIFICATION_STATS_USE_SHARED:
         show_unclassified = False
         visibility = "shared & matched to an allele"
     else:
@@ -678,7 +678,7 @@ def classification_graphs(request):
 
 
 def lab_gene_classification_counts(request):
-    if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
+    if settings.CLASSIFICATION_STATS_USE_SHARED:
         visibility = "Shared"
     else:
         visibility = f"Visible to user"

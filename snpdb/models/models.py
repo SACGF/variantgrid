@@ -525,8 +525,8 @@ class Lab(models.Model, PreviewModelMixin):
 
     @cached_property
     def classifications(self) -> QuerySet['Classification']:
-        """ Shared or all classifications based on settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED """
-        if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
+        """ Shared or all classifications based on settings.CLASSIFICATION_STATS_USE_SHARED """
+        if settings.CLASSIFICATION_STATS_USE_SHARED:
             qs = self.shared_classifications
         else:
             qs = self.classification_set.all()

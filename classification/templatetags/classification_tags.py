@@ -102,7 +102,7 @@ def classification_groups(
         "user": context.request.user,
         "genome_build": groups.genome_build,
         "table_id": str(uuid.uuid4()).replace("-", "_"),
-        "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
+        "show_allele_origin": settings.CLASSIFICATION_GRID_SHOW_ORIGIN,
         "sort_order_index": sort_order_index
     }
     ordered_classifications = list(groups.modifications)
@@ -338,7 +338,7 @@ def classification_table(
         "show_variant_link": show_variant_link,
         "show_clinical_context": show_clinical_context,
         "edit_clinical_groupings": edit_clinical_groupings,
-        "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
+        "show_allele_origin": settings.CLASSIFICATION_GRID_SHOW_ORIGIN,
         "user": user,
         "discordance_enabled": settings.DISCORDANCE_ENABLED
     }
@@ -410,7 +410,7 @@ def classification_row(
 
     c_hgvs = vc.c_hgvs_best(preferred_genome_build=genome_build)
     p_hgvs = None
-    if settings.VARIANT_CLASSIFICATION_GRID_SHOW_PHGVS:
+    if settings.CLASSIFICATION_GRID_SHOW_PHGVS:
         p_hgvs = record.get(SpecialEKeys.P_HGVS)
         if p_hgvs:
             p_dot = p_hgvs.find('p.')
@@ -431,8 +431,8 @@ def classification_row(
         "show_variant_link": show_variant_link,
         "show_clinical_context": show_clinical_context,
         "edit_clinical_context": edit_clinical_context,
-        "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
-        "show_specimen_id": settings.VARIANT_CLASSIFICATION_SHOW_SPECIMEN_ID
+        "show_allele_origin": settings.CLASSIFICATION_GRID_SHOW_ORIGIN,
+        "show_specimen_id": settings.CLASSIFICATION_SHOW_SPECIMEN_ID
     }
 
 

@@ -193,7 +193,7 @@ def classification_dashboard(request: HttpRequest, lab_id: Optional[int] = None)
 
     return render(request, "classification/classification_dashboard.html", {
         "dlab": dlab,
-        "use_shared": settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED,
+        "use_shared": settings.CLASSIFICATION_STATS_USE_SHARED,
         "clinvar_export_enabled": clinvar_export_sync.is_enabled,
         "genome_build": GenomeBuildManager.get_current_genome_build(),
     })
