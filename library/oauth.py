@@ -14,7 +14,7 @@ class ServerAuth:
     """
     Previously called OAuth but handles a URL to a server with:
     BASIC_AUTH
-    OAUTH
+    OAUTH and
     OAUTH where you need BASIC_AUTH first
     """
 

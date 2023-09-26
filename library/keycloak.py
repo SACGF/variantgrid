@@ -64,9 +64,9 @@ class Keycloak:
         group_array = json.loads(response.text)
         group_dict = {}
 
-        def recurse_subgroups(groups: List[dict]):
-            if groups:
-                for g in groups:
+        def recurse_subgroups(sub_groups: List[dict]):
+            if sub_groups:
+                for g in sub_groups:
                     group_dict[g.get('path')] = g.get('id')
                     recurse_subgroups(g.get('subGroups'))
 

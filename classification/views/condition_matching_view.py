@@ -57,7 +57,7 @@ class ConditionTextColumns(DatatableConfig):
         return qs
 
 
-def condition_matchings_view(request, lab_id: Optional[Union[str,int]] = None):
+def condition_matchings_view(request, lab_id: Optional[Union[str, int]] = None):
     lab_picker = LabPickerData.from_request(request, lab_id, 'condition_matchings_lab')
     if redirect_response := lab_picker.check_redirect():
         return redirect_response

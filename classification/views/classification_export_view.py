@@ -161,7 +161,7 @@ def export_view_redirector(request: HttpRequest) -> Response:
     elif exclude_list:
         include_details = f'Exclude {", ".join(exclude_list)}'
 
-    format = all_params.pop('type', None)
+    format_val = all_params.pop('type', None)
     the_rest = all_params
 
     context = {
@@ -169,7 +169,7 @@ def export_view_redirector(request: HttpRequest) -> Response:
         'share_level': share_level,
         'build': build,
         'include_details': include_details,
-        'format': format,
+        'format': format_val,
         'since': since_str,
         'the_rest': the_rest
     }

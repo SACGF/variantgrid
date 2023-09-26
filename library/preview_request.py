@@ -1,3 +1,4 @@
+from abc import ABC
 from datetime import datetime
 from functools import cached_property
 from typing import Optional, Union, Any, Set, List, Callable, Type
@@ -146,9 +147,8 @@ class PreviewModelMixin:
         Utility function to provide PreviewData for an instance with all the defaults
         provided by the mixin and the ones that PreviewData.for_object calculate.
         """
-        # TODO maybe get rid of this method and have PreviewData.for_object check all the defaults here
         return PreviewData.for_object(
-            self,
+            obj=self,
             category=category or self.preview_category(),
             identifier=identifier,
             title=title,
@@ -184,7 +184,7 @@ class PreviewData:
 
     @staticmethod
     def for_object(
-            obj: Model,
+            obj: Union[Model, PreviewModelMixin],
             category: Optional[str] = None,
             identifier: Optional[str] = None,
             title: Optional[str] = None,
@@ -220,7 +220,7 @@ class PreviewData:
 
         if genome_builds is None:
             if hasattr(obj, "genome_build") and (genome_build := obj.genome_build):
-                genome_builds = {obj.genome_build}
+                genome_builds = {genome_build}
             elif hasattr(obj, "genome_builds"):
                 genome_builds = obj.genome_builds
 
@@ -232,12 +232,12 @@ class PreviewData:
 
         # make sure we're dealing with AnnotationConsortium and not pure string (easy to do when dealing with TextChoices)
         if annotation_consortia:
-            def convert_consortium(obj: Any):
-                if isinstance(obj, str):
+            def convert_consortium(obj_c: Any):
+                if isinstance(obj_c, str):
                     from genes.models_enums import AnnotationConsortium
-                    return AnnotationConsortium(obj)
+                    return AnnotationConsortium(obj_c)
                 else:
-                    return obj
+                    return obj_c
 
             annotation_consortia = {convert_consortium(obj) for obj in annotation_consortia}
 
@@ -320,7 +320,7 @@ class PreviewRequest:
             return results[0]
 
 
-def preview_view(request, db: str, idx: str):
+def preview_view(request, db: str, idx: str) -> JsonResponse:
     if preview_data := PreviewRequest(db, idx).preview_data():
         return JsonResponse(preview_data.as_json())
     else:

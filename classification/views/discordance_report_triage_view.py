@@ -45,7 +45,7 @@ class DiscordanceReportTriageView(AjaxFormView[DiscordanceReportTriage]):
     @classmethod
     def lazy_render(cls, obj: DiscordanceReportTriage, context: Optional[Dict] = None) -> LazyRender:
         def dynamic_context_gen(request):
-            if context and context.get("saved") == True:
+            if context and context.get("saved") is True:
                 user = request.user
                 discordance_report = obj.discordance_report
                 discordance_report_row = DiscordanceReportRowData(discordance_report=discordance_report, perspective=LabPickerData.for_user(user))

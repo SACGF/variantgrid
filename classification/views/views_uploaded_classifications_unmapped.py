@@ -87,6 +87,7 @@ def upload_classification_unmapped_download_validation(request: HttpRequest, upl
     response['Content-Disposition'] = f'attachment; filename="{filename}_validation.csv"'
     return response
 
+
 def view_uploaded_classification_unmapped_detail(request: HttpRequest, uploaded_classification_unmapped_id: int):
     user = request.user
     record = UploadedClassificationsUnmapped.objects.filter(pk=uploaded_classification_unmapped_id).filter(

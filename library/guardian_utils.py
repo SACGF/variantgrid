@@ -24,6 +24,7 @@ def public_group():
     g, _ = Group.objects.get_or_create(name=settings.PUBLIC_GROUP_NAME)
     return g
 
+
 @lru_cache()
 def _cached_admin_bot():
     return User.objects.get(username='admin_bot')
@@ -106,7 +107,7 @@ def assign_permission_to_user_and_groups(user: User, obj):
 
     from snpdb.models import UserSettings
 
-    # Read permission to use and non public groups
+    # Read permission to use and non-public groups
     read_perm = DjangoPermission.perm(obj, DjangoPermission.READ)
     write_perm = DjangoPermission.perm(obj, DjangoPermission.WRITE)
 

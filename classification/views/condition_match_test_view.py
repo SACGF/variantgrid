@@ -150,6 +150,7 @@ class _SuggestionDetail:
 
 _TRUNCATE_DESCENDANTS_TO = 10
 
+
 def condition_match_test_view(request):
     condition_text = request.GET.get("condition_text")
     gene_symbol_str = request.GET.get("gene_symbol")

@@ -470,7 +470,7 @@ def clinvar_export_summary(request: HttpRequest, clinvar_key_id: Optional[str] =
 def clinvar_export_refresh(request: HttpRequest, clinvar_key_id: str) -> HttpResponseBase:
     clinvar_key = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
     clinvar_key.check_user_can_access(request.user)
-    logs = ClinvarExportPrepare.update_export_records_for_keys(clinvar_keys={clinvar_key,})
+    logs = ClinvarExportPrepare.update_export_records_for_keys(clinvar_keys={clinvar_key, })
     messages.add_message(request, level=messages.INFO, message="Prepare complete")
     # TODO, actually store or display the logs somewhere - against the ClinVarAlleles?
     return redirect(reverse('clinvar_key_summary', kwargs={'clinvar_key_id': clinvar_key_id}))
@@ -547,7 +547,7 @@ class ClinVarMatchView(View):
 
         clinvar_legacy_rows: List[ClinVarLegacyRow] = []
         try:
-            file_obj = io_string = io.StringIO(request.FILES.get('file').read().decode("utf-8"))
+            file_obj = io.StringIO(request.FILES.get('file').read().decode("utf-8"))
             clinvar_legacy_rows = list(ClinVarLegacyRow.load_file(file_obj, clinvar_key))
         except ValueError as ve:
             messages.error(request, str(ve))

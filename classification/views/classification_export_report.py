@@ -12,7 +12,7 @@ from snpdb.models import GenomeBuild
 class ClassificationReport:
     """
     Formats using report for the corresponding lab.
-    Typically you'd only use for a single record
+    Typically, you'd only use for a single record
     """
 
     def __init__(self, classification: ClassificationModification, user: User):
@@ -33,7 +33,6 @@ class ClassificationReport:
         content = template.render({'record': row_datas[0]})
 
         response = HttpResponse(content=content, content_type='text/html')
-        # response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
         return response
 
     def row_data(self, record: ClassificationModification) -> dict:
@@ -44,21 +43,23 @@ class ClassificationReport:
         for e_key in e_keys.all_keys:
             blob = evidence.get(e_key.key) or {}
 
-            report_blob = {}
-            report_blob['value'] = blob.get('value', None)
-            report_blob['note'] = blob.get('note', None)
-            report_blob['formatted'] = e_key.pretty_value(blob)
-            report_blob['label'] = e_key.pretty_label
+            report_blob = {
+                'value': blob.get('value', None),
+                'note': blob.get('note', None),
+                'formatted': e_key.pretty_value(blob),
+                'label': e_key.pretty_label
+            }
             context[e_key.key] = report_blob
 
         for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
             c_hgvs = record.classification.get_c_hgvs(genome_build)
             key = "c_hgvs_" + genome_build.pk.lower()
-            report_blob = {}
-            report_blob['value'] = c_hgvs
-            report_blob['note'] = None
-            report_blob['formatted'] = c_hgvs
-            report_blob['label'] = "c.HGVS"
+            report_blob = {
+                'value': c_hgvs,
+                'note': None,
+                'formatted': c_hgvs,
+                'label': "c.HGVS"
+            }
             context[key] = report_blob
 
         context['condition_resolved'] = record.classification.condition_resolution

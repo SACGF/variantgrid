@@ -1,7 +1,5 @@
 import collections
-import datetime
 import unicodedata
-from datetime import timezone
 from functools import cached_property
 from typing import List, Optional
 
@@ -85,12 +83,6 @@ class EmailLabSummaryData:
     @property
     def pending_changes_count(self) -> int:
         return self.pending_changes.count()
-
-    @cached_property
-    def imported_30_days_count(self):
-        since = timezone.now() - datetime.timedelta(days=30)
-        vcgs = Classification.objects.filter(lab=self.lab).filter(created__gte=since)
-        return vcgs.count()
 
 
 class EmailSummaryData:

@@ -74,9 +74,6 @@ def hgvs_resolution_tool(request: HttpRequest):
 
     context = {"form": hgvs_form}
 
-    genome_build: Optional[GenomeBuild] = None
-    hgvs_str: Optional[str] = None
-
     if hgvs_form.is_valid():
         data = hgvs_form.clean()
         genome_build = GenomeBuild.get_name_or_alias(data.get("genome_build"))

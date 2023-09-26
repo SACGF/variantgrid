@@ -14,8 +14,7 @@ from termsandconditions.decorators import terms_required
 from classification.enums import ShareLevel
 from classification.models import classification_flag_types, ClinVarExport, DiscordanceReportClassification, \
     DiscordanceReport, ConditionText, ConditionTextMatch
-from classification.models.classification import Classification, \
-    ClassificationModification
+from classification.models.classification import Classification
 from classification.models.clinvar_export_sync import clinvar_export_sync
 from classification.models.discordance_models_utils import DiscordanceReportRowData, DiscordanceReportTableData, \
     DiscordanceReportCategories
@@ -173,30 +172,15 @@ class ClassificationDashboard:
 
 
 def issues_download(request: HttpRequest, lab_id: Union[int, str] = 0):
-    qs = ClassificationModification.objects.filter(
-        is_last_edited=True,
-        classification__in=Subquery(
-            Classification.filter_for_user(user=request.user).exclude(withdrawn=True).values_list('pk',
-                                                                                                  flat=True))
-    ).select_related('classification', 'classification__lab')
-
     lab_picker = LabPickerData.from_request(request, lab_id)
-    qs = qs.filter(classification__lab_id__in=lab_picker.lab_ids)
 
-    filter = ClassificationFilter(
+    flag_filter = ClassificationFilter(
         user=request.user,
         genome_build=GenomeBuild.grch38(),  # note that genome build for ExportFormatterFlags has no effect
         include_sources=lab_picker.selected_labs
     )
-    exporter = ClassificationExportFormatterFlags(filter)
+    exporter = ClassificationExportFormatterFlags(flag_filter)
     return exporter.serve()
-    #
-    # exporter = ExportFormatterFlags(
-    #     genome_build=GenomeBuild.grch38(),  # note that genome build for ExportFormatterFlags has no effect
-    #     qs=qs,
-    #     user=request.user
-    # )
-    # return exporter.export()
 
 
 @terms_required

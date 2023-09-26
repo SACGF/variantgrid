@@ -8,6 +8,7 @@ class DiscordanceReportResolution:
         (CONTINUED_DISCORDANCE, 'Continued Discordance')
     )
 
+
 class ContinuedDiscordanceReason:
     UNRESPONSIVE = 'U'
     DIFFERENT_CURATION_METHODS = 'D'

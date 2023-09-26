@@ -1,13 +1,12 @@
 import re
 from datetime import datetime
 from typing import Optional, Union
-
+from django.db.models import Model
 from django.conf import settings
 from django.db import transaction
 from django.http.request import HttpRequest
 from django.http.response import HttpResponseBase
 from django.shortcuts import render, redirect, get_object_or_404
-
 from classification.models import ClassificationRef
 from classification.models.allele_overlaps import OverlapsCalculator
 from classification.models.classification import Classification
@@ -40,7 +39,7 @@ def post_clinical_context(request: HttpRequest) -> HttpResponseBase:
 
     came_from_variant_id = request.POST.get('variant')
     came_from_allele_id = request.POST.get('allele')
-    came_from_obj = None
+    came_from_obj: Model
     if came_from_variant_id:
         came_from_obj = Variant.objects.get(pk=came_from_variant_id)
     else:

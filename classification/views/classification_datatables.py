@@ -240,7 +240,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 lab_ids = [int(lab_id.strip()) for lab_id in labs.split(',')]
                 initial_qs = initial_qs.filter(classification__lab_id__in=lab_ids)
 
-        # Make an annotated column c_hgvs which is the first non null value of
+        # Make an annotated column c_hgvs which is the first non-null value of
         # user's normalised preference (e.g. 37), the alternative normalised (e.g. 38) the imported c.hgvs
         whens = []
         for genome_build in self.genome_build_prefs:

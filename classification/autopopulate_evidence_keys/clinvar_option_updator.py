@@ -1,4 +1,7 @@
 class ClinVarOptionUpdator:
+    """
+    Used in migration scripts to link a value to export to ClinVar to an evidence key option
+    """
 
     def __init__(self, apps, key: str):
         self.apps = apps

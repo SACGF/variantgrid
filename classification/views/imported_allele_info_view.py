@@ -23,8 +23,8 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
 
     @staticmethod
     def render_c_hgvs(data: CellData):
-        c_hgvs_str: Optional[str] = None
-        c_hgvs: Optional[CHGVS] = None
+        c_hgvs_str: Optional[str]
+        c_hgvs: Optional[CHGVS]
         variant_id: Optional[int] = None
         error: Optional[str] = None
 
@@ -143,7 +143,6 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         ]
 
     def get_initial_queryset(self) -> QuerySet[ImportedAlleleInfo]:
-        ae: ImportedAlleleInfo = ImportedAlleleInfo.objects.first()
         return ImportedAlleleInfo.objects.all().annotate(
             classification_count=Count('classification', filter=Q(classification__withdrawn=False))
         )
@@ -198,11 +197,12 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
 def view_imported_allele_info(request: HttpRequest) -> Response:
     return render(request, "classification/imported_allele_info.html", {})
 
+
 def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
     allele_info = get_object_or_404(ImportedAlleleInfo, pk=allele_info_id)
     # just split up c.hgvs into logical parts, and then the diff will reset with each new group (treat it as different words)
 
-    HGVS_BASE_REGEX_STR = '^(?P<transcript>[^.]+?)(?P<transcript_version>\.[0-9]+)?(?P<gene_symbol>[(].*[)])?(?P<c_dot>:[cng]\.)'
+    HGVS_BASE_REGEX_STR = r'^(?P<transcript>[^.]+?)(?P<transcript_version>\.[0-9]+)?(?P<gene_symbol>[(].*[)])?(?P<c_dot>:[cng]\.)'
 
     HGVS_REGEX_BASIC = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_full>.*?)$')
     HGVS_REGEX_REF_ALT = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<ref>[ACTG]+)(?P<operation>>)(?P<alt>[ACTG]+)$')

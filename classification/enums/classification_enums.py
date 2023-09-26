@@ -12,6 +12,7 @@ CRITERIA_NOT_MET = 'NM'
 CRITERIA_NOT_APPLICABLE = 'NA'
 CRITERIA_NEUTRAL = 'N'
 
+
 class SpecialEKeys:
     AUTOPOPULATE = 'autopopulate'
     VARIANT_COORDINATE = 'variant_coordinate'
@@ -254,7 +255,7 @@ class ShareLevel(ChoicesEnum):
 
     @staticmethod
     def same_and_higher(level: 'ShareLevel') -> List['ShareLevel']:
-        return [l for l in ShareLevel.ALL_LEVELS if l.index >= level.index]
+        return [iter_level for iter_level in ShareLevel.ALL_LEVELS if iter_level.index >= level.index]
 
     @staticmethod
     def from_key(source: Optional[Union['ShareLevel', str, int]]) -> Optional['ShareLevel']:
