@@ -1,3 +1,5 @@
+import sys
+
 from captcha.fields import ReCaptchaField
 from captcha.widgets import ReCaptchaV3
 from django import forms
@@ -128,7 +130,8 @@ def version(request):
     context = {
         "git": git,
         "deployment_history": deployments,
-        "weekly_update_users": weekly_update_users
+        "weekly_update_users": weekly_update_users,
+        "python_version": sys.version
     }
     return render(request, 'version.html', context)
 
