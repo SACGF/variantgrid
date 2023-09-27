@@ -8,5 +8,5 @@
             <span> {{ term.id }} {{ term.name }}</span>
         {% endif %}
     {% endfor %}
-    {% if condition.join_text %}&#32;<span class="font-italic">{{ condition.join_text }}</span>{% endif %}
+    {% if condition.join_text %}&#32;<span style="font-style: italic">{{ condition.join_text }}</span>{% endif %}
 {% else %}{{ condition.plain_text | limit_length:limit }}{% endif %}
