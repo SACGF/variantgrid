@@ -1,5 +1,6 @@
 {% load classification_tags %}
 <br/>
+{% spaceless %}
 <table style="max-width:1200px">
     <thead>
         <tr style='border-bottom:1px solid gray;border-top:1px solid gray'>
@@ -22,7 +23,13 @@
                     <del>{{ group.clinical_significance | ekey:'clinical_significance' }}</del><br/>{{ group.clinical_significance_pending | ekey:'clinical_significance' }} (PENDING)
                 {% else %}{{ group.clinical_significance | ekey:'clinical_significance' }}{% endif %}
             </td>
-            <td style='padding:8px'>{% for condition in group.conditions %}<div>{% condition condition_obj=condition limit=None %}</div>{% empty %}-{% endfor %}</td>
+            <td style='padding:8px'>
+                {% if group.conditions %}
+                    <div>{% condition condition_obj=group.conditions limit=None show_link=False %}</div>
+                    {% else %}
+                    <div class="no-value">-</div>
+                {% endif %}
+            </td>
             <td style='padding:8px'>{{ group.zygosities | ekey:'zygosity' }}</td>
             <td style='font-family:monospace;padding:8px'>{% for acmg in group.acmg_criteria %}{% if not forloop.first %}, {% endif %}{{ acmg }}{% empty %}-{% endfor %}</td>
             <td style='font-family:monospace;padding:8px'><div style='white-space: nowrap'>{% with curated_date=group.most_recent_curated %}{% if curated_date.name %}{{ curated_date.name }} {% endif %}{{ curated_date.date | date:'Y-m-d' }}{% endwith %}</div></td>
@@ -30,3 +37,4 @@
     {% endfor %}
     </tbody>
 </table>
+{% endspaceless %}

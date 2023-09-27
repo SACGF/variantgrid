@@ -55,11 +55,11 @@
         {% endif %}
     </td>
     <td style="width:186px;">
-        {% for condition in group.conditions %}
-            <div class="mb-1">{% condition condition %}</div>
-            {% empty %}
+        {% if group.conditions %}
+            <div class="mb-1">{% condition group.conditions %}</div>
+        {% else %}
             <div class="no-value">-</div>
-        {% endfor %}
+        {% endif %}
     </td>
     <td style="width:100px;">
         {% if show_allele_origin %}

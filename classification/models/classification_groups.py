@@ -4,6 +4,7 @@ from itertools import groupby
 from typing import Optional, List, Iterable, TypeVar, Generic, Set, Dict
 
 from django.contrib.auth.models import User
+from more_itertools import first
 
 from classification.criteria_strengths import CriteriaStrength
 from classification.enums import SpecialEKeys, CriteriaEvaluation, ShareLevel
@@ -368,25 +369,26 @@ class ClassificationGroup:
                 return my_curated < other_curated
         return self.most_recent.classification.created < other.most_recent.classification.created
 
-    def conditions(self) -> List[ConditionResolved]:
+    def conditions(self) -> ConditionResolved:
         all_terms = set()
         all_plain_texts = set()
+        all_condition_resolutions = set()
+
         for cm in self.modifications:
             c = cm.classification
             if resolved := c.condition_resolution_obj:
+                all_condition_resolutions.add(resolved)
                 for term in resolved.terms:
                     all_terms.add(term)
             else:
                 if text := cm.get(SpecialEKeys.CONDITION):
                     all_plain_texts.add(text)
-        all_condition_resolved = []
-        for term in all_terms:
-            all_condition_resolved.append(ConditionResolved(terms=[term], join=None))
-        for plain_text in all_plain_texts:
-            all_condition_resolved.append(ConditionResolved(terms=[], join=None, plain_text=plain_text))
 
-        all_condition_resolved.sort()
-        return all_condition_resolved
+        if len(all_condition_resolutions) == 1:
+            return first(all_condition_resolutions)
+
+        plain_text_combined = ", ".join(all_plain_texts) if all_plain_texts else None
+        return ConditionResolved(terms=list(all_terms), join=None, plain_text=plain_text_combined)
 
     # def sub_groups(self) -> Optional[List['ClassificationGroup']]:
     #     if len(self.modifications) > 1:

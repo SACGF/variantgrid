@@ -229,6 +229,15 @@ class ConditionResolved:
     join: Optional['MultiCondition'] = None
     plain_text: Optional[str] = field(default=None)  # fallback, not populated in all contexts
 
+    def __hash__(self):
+        hash_total = 0
+        if terms := self.terms:
+            for t in terms:
+                hash_total += hash(t)
+        hash_total += hash(self.join,)
+        hash_total += hash(self.plain_text)
+        return hash_total
+
     @property
     def summary(self) -> str:
         text = ", ".join([term.id for term in self.terms])
