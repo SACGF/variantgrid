@@ -13,7 +13,7 @@ from snpdb.search import search_receiver, SearchInputInstance, SearchExample, HA
 def validate_ontology(term: OntologyTerm, preview_proxy: Optional[PreviewProxyModel] = None) -> SearchResult:
     messages: List[SearchMessage] = []
     if term.ontology_service not in OntologyService.LOCAL_ONTOLOGY_PREFIXES:
-        messages = [SearchMessage(f"We do not store {term.ontology_service} locally. Ontology page will only provide external links.")]
+        messages = [SearchMessage(f"We do not store {term.ontology_service} locally. The ontology resulting page will only provide external links.")]
     elif term.is_stub:
         messages = [SearchMessage("We do not have this term in our database")]
     elif term.status == OntologyTermStatus.DEPRECATED:
