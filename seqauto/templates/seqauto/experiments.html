@@ -4,7 +4,6 @@
         {% page_help page_id='seqauto/experiments_help' title='Experiments' show_title=False %}
     </div>
     <div>
-        {% load jqgrid_tags %}
-        {% jqgrid 'experiments_grid' 'Experiments' search=False template_name='seqauto/grids/experiments_grid.html' delete=True %}
+        <table id="experiments-datatable" data-datatable-url="{% url 'experiments_datatable' %}" class="sticky-header responsive"></table>
     </div>
 </div>

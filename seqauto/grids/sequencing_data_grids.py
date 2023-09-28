@@ -1,5 +1,5 @@
 from django.contrib.postgres.aggregates.general import StringAgg
-from django.db.models import TextField
+from django.db.models import TextField, QuerySet
 from django.db.models.aggregates import Count
 from django.db.models.functions import Cast
 from django.db.models.query_utils import Q
@@ -7,35 +7,26 @@ from django.db.models.query_utils import Q
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from seqauto.models import SequencingRun, BamFile, UnalignedReads, VCFFile, QC, Experiment, EnrichmentKit
 from snpdb.models import UserGridConfig, DataState
+from snpdb.views.datatable_view import DatatableConfig, RichColumn
 
 
-class ExperimentsListGrid(JqGridUserRowConfig):
-    model = Experiment
-    caption = 'Experiment'
-    fields = ["name", "created"]
-    colmodel_overrides = {
-        'name': {'key': True, 'width': 180, 'formatter': 'viewExperimentLink'},
-        "created": {"width": 150},
-    }
+class ExperimentColumns(DatatableConfig[Experiment]):
 
-    def __init__(self, **kwargs):
-        user = kwargs.get("user")
-        super().__init__(user)
-        queryset = self.model.objects.all()
+    def __init__(self, request):
+        super().__init__(request)
+        self.user = request.user
 
-        # Add sample_count to queryset
-#        queryset = queryset.annotate(sequencing_runs=Count("sequencingrun"))
-        queryset = queryset.annotate(sequencing_runs=StringAgg("sequencingrun", ',', output_field=TextField()))
-        field_names = self.get_field_names() + ["sequencing_runs"]
-        self.queryset = queryset.values(*field_names)
-        self.extra_config.update({'sortname': 'created',
-                                  'sortorder': 'desc'})
+        self.rich_columns = [
+            RichColumn(key="name", label="Name", orderable=True,
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="sequencing_runs", orderable=True),
+            RichColumn(key="created", client_renderer='TableFormat.timestamp', orderable=True),
+        ]
 
-    def get_colmodels(self, *args, **kwargs):
-        colmodels = super().get_colmodels(*args, **kwargs)
-        sequencing_runs_colmodel = {'index': 'sequencing_runs', 'name': 'sequencing_runs', 'label': 'Sequencing Runs', 'width': 230}
-        colmodels = colmodels[:1] + [sequencing_runs_colmodel] + colmodels[1:]
-        return colmodels
+    def get_initial_queryset(self) -> QuerySet[Experiment]:
+        queryset = Experiment.objects.all()
+        return queryset.annotate(sequencing_runs=StringAgg("sequencingrun", ',', output_field=TextField()))
 
 
 class SequencingRunListGrid(JqGridUserRowConfig):
