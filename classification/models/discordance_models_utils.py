@@ -311,6 +311,12 @@ class DiscordanceReportCategoriesCounts:
     ready_to_discuss: int = 0
 
 
+@dataclass
+class DiscordanceReportPreview:
+    awaiting_triage_count: int
+    medically_significant_awaiting_triage: List[DiscordanceReport]
+
+
 class DiscordanceReportCategories:
 
     def __init__(self, perspective: LabPickerData):
@@ -321,6 +327,7 @@ class DiscordanceReportCategories:
             .values_list('report_id', flat=True)
         # .filter(classification_original__classification__withdrawn=False)  used to
         self.dr_qs = DiscordanceReport.objects.filter(pk__in=discordant_c)\
+            .order_by('-created')\
             .prefetch_related('discordancereporttriage_set')\
             .prefetch_related('discordancereportclassification_set')\
             .select_related('clinical_context')
@@ -383,6 +390,23 @@ class DiscordanceReportCategories:
             by_step[row_data.next_step].append(row_data)
 
         return frozendict(by_step)
+
+    @cached_property
+    def triage_preview(self) -> DiscordanceReportPreview:
+        all_active = [drd.discordance_report for drd in self.active]
+        count = DiscordanceReportTriage.objects.filter(
+            discordance_report__in=all_active,
+            lab__in=self.labs(),
+            triage_status=DiscordanceReportTriageStatus.PENDING,
+            closed=False).order_by('discordance_report_id').distinct('discordance_report_id').count()
+
+        preview_drs = []
+        for drd in self.active:
+            if drd.is_medically_significant and drd.next_step == DiscordanceReportNextStep.AWAITING_YOUR_TRIAGE:
+                preview_drs.append(drd)
+                if len(preview_drs) >= 3:
+                    break
+        return DiscordanceReportPreview(awaiting_triage_count=count, medically_significant_awaiting_triage=preview_drs)
 
     @cached_property
     def to_historic_table(self) -> DiscordanceReportTableData:
