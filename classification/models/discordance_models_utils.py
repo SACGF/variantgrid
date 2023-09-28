@@ -320,7 +320,10 @@ class DiscordanceReportCategories:
             .filter(classification_original__classification__lab__in=perspective.selected_labs) \
             .values_list('report_id', flat=True)
         # .filter(classification_original__classification__withdrawn=False)  used to
-        self.dr_qs = DiscordanceReport.objects.filter(pk__in=discordant_c)
+        self.dr_qs = DiscordanceReport.objects.filter(pk__in=discordant_c)\
+            .prefetch_related('discordancereporttriage_set')\
+            .prefetch_related('discordancereportclassification_set')\
+            .select_related('clinical_context')
 
     def labs(self) -> List[Lab]:
         return sorted(self.perspective.your_labs)
