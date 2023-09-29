@@ -115,13 +115,13 @@
             <p>Below is a list of all outstanding discordances where your lab is involved.</p>
         {% end_page_help_embedded %}
 
-        {% with triage_table=dlab.discordance_reports.to_triage_table %}
-            {% if not triage_table.summaries %}
-                <div class="no-value">There are no outstanding discordances for this lab {{ 'S' | severity_icon }}</div>
+        {% with preview=dlab.discordance_reports.triage_preview %}
+            {% if not preview.awaiting_triage_count %}
+                <div class="no-value">There are no outstanding triages for this lab {{ 'S' | severity_icon }}</div>
             {% else %}
                 {% labelled label="Discordances Awaiting Triage" hint="tiny" %}
-                    <div>{{ triage_table.summaries|length| number:'W' }}</div>
-                    {% if triage_table.summaries|length > 3 %}<div>Showing most recent 3</div>{% endif %}
+                    <div>{{ preview.awaiting_triage_count| number:'W' }}</div>
+                    {% if preview.awaiting_triage_count > 3 %}<div>Showing most recent 3</div>{% endif %}
                     <div><a class="hover-link" href="{% url 'discordance_reports' dlab.lab_picker.selection %}"><small class="form-text">Review all discordances here</small></a></div>
                 {% endlabelled %}
                 <table class="table">
@@ -134,7 +134,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                    {% for summary in triage_table.summaries|slice:":3" %}
+                    {% for summary in preview.medically_significant_awaiting_triage %}
                         {% discordance_report_row summary filter=False %}
                     {% endfor %}
                     </tbody>

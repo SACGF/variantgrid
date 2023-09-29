@@ -26,7 +26,13 @@
 {% for field in form %}
     <div class="form-group row user-overrides" style="align-items: center">
         {{ field.errors }}
-        <label class="col-12 col-md-3 text-left text-md-right mt-2 mt-md-0">{{ field.label_tag }}</label>
+        {% if field.help_text %}
+            <label class="col-12 col-md-3 text-left text-md-right mt-2 mt-md-0 hover-detail" data-help="{{ field.help_text|safe }}">{{ field.label_tag }}</label>
+        {% else %}
+            <label class="col-12 col-md-3 text-left text-md-right mt-2 mt-md-0">{{ field.label_tag }}</label>
+        {% endif %}
+
+
         <div class="col-6 col-md-4">
         {% if override_source %}
             {% if override_source|get_item:field.name %}
@@ -40,9 +46,6 @@
         </div>
         <div class="col-6 col-md-5">
             {% crispy_field field %}
-            {% if field.help_text %}
-                <p class="help">{{ field.help_text|safe }}</p>
-            {% endif %}
         </div>
     </div>
 {% endfor %}

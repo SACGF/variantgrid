@@ -306,7 +306,7 @@ class CustomColumnsCollectionColumns(DatatableConfig[CustomColumnsCollection]):
                        default_sort=SortOrder.DESC),
         ]
 
-    def get_initial_queryset(self) -> QuerySet[TagColorsCollection]:
+    def get_initial_queryset(self) -> QuerySet[CustomColumnsCollection]:
         return CustomColumnsCollection.filter_for_user(self.user)
 
 

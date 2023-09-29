@@ -6,9 +6,9 @@ from seqauto.grids.qc_data_grids import IlluminaFlowcellQCGrid, FastQCGrid, Flag
     QCExecSummaryGrid
 from seqauto.grids.seqauto_grids import SeqAutoRunsGrid, EnrichmentKitGeneCoverageGrid, \
     GoldCoverageSummaryGrid, SequencingSamplesGrid, SequencingSamplesHistoricalGrid
-from seqauto.grids.sequencing_data_grids import ExperimentsListGrid, SequencingRunListGrid, \
+from seqauto.grids.sequencing_data_grids import SequencingRunListGrid, \
     UnalignedReadsListGrid, BamFileListGrid, VCFFileListGrid, QCFileListGrid, \
-    EnrichmentKitColumns
+    EnrichmentKitColumns, ExperimentColumns
 from seqauto.grids.sequencing_software_versions_grids import LibraryGrid, SequencerGrid, \
     AssayGrid, AlignerGrid, VariantCallerGrid, VariantCallingPipelineGrid
 from seqauto.views import SequencerUpdate, LibraryUpdate, AssayUpdate, VariantCallerUpdate, \
@@ -65,7 +65,8 @@ urlpatterns = [
 
     # Grids
     perm_path('seqauto_runs/grid/<slug:op>/', JQGridView.as_view(grid=SeqAutoRunsGrid), name='seqauto_runs_grid'),
-    perm_path('experiments/grid/<slug:op>/', JQGridView.as_view(grid=ExperimentsListGrid, delete_row=True), name='experiments_grid'),
+    perm_path('experiments/grid/', DatabaseTableView.as_view(column_class=ExperimentColumns),
+              name='experiments_datatable'),
     perm_path('sequencing_run/grid/<slug:op>/', JQGridView.as_view(grid=SequencingRunListGrid), name='sequencing_run_grid'),
     perm_path('unaligned_reads/grid/<slug:op>/', JQGridView.as_view(grid=UnalignedReadsListGrid), name='unaligned_reads_grid'),
     perm_path('bam_file/grid/<slug:op>/', JQGridView.as_view(grid=BamFileListGrid), name='bam_file_grid'),

@@ -403,7 +403,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
     def all_classification_modifications(self) -> List[ClassificationModification]:
         return [drc.classification_effective for drc in self.discordance_report_classifications]
 
-    @property
+    @cached_property
     def is_medically_significant(self):
         ds = self.clinical_context.discordance_status
 
