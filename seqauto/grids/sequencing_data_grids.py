@@ -7,7 +7,7 @@ from django.db.models.query_utils import Q
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from seqauto.models import SequencingRun, BamFile, UnalignedReads, VCFFile, QC, Experiment, EnrichmentKit
 from snpdb.models import UserGridConfig, DataState
-from snpdb.views.datatable_view import DatatableConfig, RichColumn
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 
 class ExperimentColumns(DatatableConfig[Experiment]):
@@ -184,18 +184,24 @@ class QCFileListGrid(JqGridUserRowConfig):
                                   'sortorder': 'desc'})
 
 
-class EnrichmentKitListGrid(JqGridUserRowConfig):
-    model = EnrichmentKit
-    caption = 'EnrichmentKit'
-    fields = ["id", "name", "version", "enrichment_kit_type", "obsolete"]
-    colmodel_overrides = {'id': {'width': 20, 'formatter': 'viewEnrichmentKit'}}
+# class EnrichmentKitListGrid(JqGridUserRowConfig):
+class EnrichmentKitColumns(DatatableConfig[EnrichmentKit]):
+    def __init__(self, request, **kwargs):
+        super().__init__(request)
+        self.user = request.user
 
-    # manufacturer__name causes join cast error?
-    # ProgrammingError: operator does not exist: text = integer
-    # LINE 1: ...urer" ON ("snpdb_enrichmentkit"."manufacturer_id" = "snpdb_m...
-    def __init__(self, user, **kwargs):
-        super().__init__(user)
-        queryset = self.model.objects.all()
-        self.queryset = queryset.values(*self.get_field_names())
-        self.extra_config.update({'sortname': 'id',
-                                  'sortorder': 'desc'})
+        self.rich_columns = [
+            RichColumn(key="id", orderable=True, default_sort=SortOrder.DESC),
+            RichColumn(key="name", label="Name", orderable=True,
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="version", label="Version", orderable=True),
+            RichColumn(key="enrichment_kit_type",
+                       label="Enrichment Kit Type", orderable=True),
+            RichColumn(key="obsolete",
+                       label="Obsolete", orderable=True)
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[EnrichmentKit]:
+        queryset = EnrichmentKit.objects.all()
+        return queryset  # not sure if this is the most appropriate translation

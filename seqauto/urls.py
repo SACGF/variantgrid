@@ -8,7 +8,7 @@ from seqauto.grids.seqauto_grids import SeqAutoRunsGrid, EnrichmentKitGeneCovera
     GoldCoverageSummaryGrid, SequencingSamplesGrid, SequencingSamplesHistoricalGrid
 from seqauto.grids.sequencing_data_grids import SequencingRunListGrid, \
     UnalignedReadsListGrid, BamFileListGrid, VCFFileListGrid, QCFileListGrid, \
-    EnrichmentKitListGrid, ExperimentColumns
+    EnrichmentKitColumns, ExperimentColumns
 from seqauto.grids.sequencing_software_versions_grids import LibraryGrid, SequencerGrid, \
     AssayGrid, AlignerGrid, VariantCallerGrid, VariantCallingPipelineGrid
 from seqauto.views import SequencerUpdate, LibraryUpdate, AssayUpdate, VariantCallerUpdate, \
@@ -72,7 +72,7 @@ urlpatterns = [
     perm_path('bam_file/grid/<slug:op>/', JQGridView.as_view(grid=BamFileListGrid), name='bam_file_grid'),
     perm_path('vcf_file/grid/<slug:op>/', JQGridView.as_view(grid=VCFFileListGrid), name='vcf_file_grid'),
     perm_path('qc/grid/<slug:op>/', JQGridView.as_view(grid=QCFileListGrid), name='qc_grid'),
-    perm_path('enrichment_kit/grid/<slug:op>/', JQGridView.as_view(grid=EnrichmentKitListGrid), name='enrichment_kit_list_grid'),
+    perm_path('enrichment_kit/grid/', DatabaseTableView.as_view(column_class=EnrichmentKitColumns), name='enrichment_kit_datatable'),
     perm_path('enrichment_kit/gene/grid/<int:enrichment_kit_id>/<genome_build_name>/<gene_symbol>/<slug:op>/', JQGridView.as_view(grid=EnrichmentKitGeneCoverageGrid), name='enrichment_kit_gene_coverage_grid'),
     perm_path('gold_coverage_summary/grid/<pk>/<slug:op>/', JQGridView.as_view(grid=GoldCoverageSummaryGrid), name='gold_coverage_summary_grid'),
     perm_path('sequencing_stats/sequencing_samples/grid/<slug:op>/', JQGridView.as_view(grid=SequencingSamplesGrid, csv_download=True), name='sequencing_samples_grid'),
