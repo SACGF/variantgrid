@@ -183,8 +183,6 @@ class QCFileListGrid(JqGridUserRowConfig):
         self.extra_config.update({'sortname': 'id',
                                   'sortorder': 'desc'})
 
-
-# class EnrichmentKitListGrid(JqGridUserRowConfig):
 class EnrichmentKitColumns(DatatableConfig[EnrichmentKit]):
     def __init__(self, request, **kwargs):
         super().__init__(request)
@@ -203,5 +201,4 @@ class EnrichmentKitColumns(DatatableConfig[EnrichmentKit]):
         ]
 
     def get_initial_queryset(self) -> QuerySet[EnrichmentKit]:
-        queryset = EnrichmentKit.objects.all()
-        return queryset  # not sure if this is the most appropriate translation
+        return EnrichmentKit.objects.all()
