@@ -184,6 +184,13 @@
                 </div>
                 <div class="card-body">
                     <table class='annotations-table table'>
+                    <tr>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>VEP field</th>
+                        <th>VEP custom/plugin</th>
+                        <th>Details</th>
+                    </tr>
                     {% for v, columnvepfield in columns_and_vep.items %}
                         <tr class='annotation-row'>
                             <th>{{ v.pk }}
