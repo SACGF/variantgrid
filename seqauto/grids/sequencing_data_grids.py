@@ -1,3 +1,5 @@
+from typing import Dict, Any
+
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.db.models import TextField, QuerySet
 from django.db.models.aggregates import Count
@@ -5,7 +7,9 @@ from django.db.models.functions import Cast
 from django.db.models.query_utils import Q
 
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
-from seqauto.models import SequencingRun, BamFile, UnalignedReads, VCFFile, QC, Experiment, EnrichmentKit
+from library.utils import JsonDataType
+from seqauto.models import SequencingRun, BamFile, UnalignedReads, VCFFile, QC, Experiment, EnrichmentKit, \
+    EnrichmentKitType
 from snpdb.models import UserGridConfig, DataState
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
@@ -183,6 +187,7 @@ class QCFileListGrid(JqGridUserRowConfig):
         self.extra_config.update({'sortname': 'id',
                                   'sortorder': 'desc'})
 
+
 class EnrichmentKitColumns(DatatableConfig[EnrichmentKit]):
     def __init__(self, request, **kwargs):
         super().__init__(request)
@@ -194,11 +199,18 @@ class EnrichmentKitColumns(DatatableConfig[EnrichmentKit]):
                        renderer=self.view_primary_key,
                        client_renderer='TableFormat.linkUrl'),
             RichColumn(key="version", label="Version", orderable=True),
-            RichColumn(key="enrichment_kit_type",
+            RichColumn(key="enrichment_kit_type", renderer=self.render_enrichment_kit_type,
                        label="Enrichment Kit Type", orderable=True),
             RichColumn(key="obsolete",
                        label="Obsolete", orderable=True)
         ]
+
+    def render_enrichment_kit_type(self, row: Dict[str, Any]) -> JsonDataType:
+        label = ""
+        if enrichment_kit_type := row['enrichment_kit_type']:
+            ekt = EnrichmentKitType(enrichment_kit_type)
+            label = ekt.label
+        return label
 
     def get_initial_queryset(self) -> QuerySet[EnrichmentKit]:
         return EnrichmentKit.objects.all()
