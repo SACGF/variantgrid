@@ -150,18 +150,30 @@ class SettingsOverride(models.Model):
         Where the later levels override if they are non-null """
     objects = InheritanceManager()
 
-    email_weekly_updates = models.BooleanField(null=True, blank=True)
-    email_discordance_updates = models.BooleanField(null=True, blank=True)
-    columns = models.ForeignKey(CustomColumnsCollection, on_delete=SET_NULL, null=True, blank=True)
-    default_sort_by_column = models.ForeignKey(CustomColumn, on_delete=SET_NULL, null=True, blank=True)
-    tag_colors = models.ForeignKey(TagColorsCollection, on_delete=SET_NULL, null=True, blank=True)
-    variant_link_in_analysis_opens_new_tab = models.BooleanField(null=True)
-    tool_tips = models.BooleanField(null=True, blank=True)
-    node_debug_tab = models.BooleanField(null=True, blank=True)
-    import_messages = models.BooleanField(null=True, blank=True)  # Get a message once import is done
-    igv_port = models.IntegerField(null=True, blank=True)
-    default_genome_build = models.ForeignKey(GenomeBuild, on_delete=SET_NULL, null=True, blank=True)
-    timezone = models.TextField(null=True, blank=True)
+    email_weekly_updates = models.BooleanField(null=True, blank=True,
+                                               help_text="Opt in to email list")
+    email_discordance_updates = models.BooleanField(null=True, blank=True,
+                                                    help_text="Opt into discordance email updates")
+    columns = models.ForeignKey(CustomColumnsCollection, on_delete=SET_NULL, null=True, blank=True,
+                                help_text="Initial custom columns when creating analysis")
+    default_sort_by_column = models.ForeignKey(CustomColumn, on_delete=SET_NULL, null=True, blank=True,
+                                               help_text="Initial sort by column for analysis variant grid")
+    tag_colors = models.ForeignKey(TagColorsCollection, on_delete=SET_NULL, null=True, blank=True,
+                                   help_text="Custom tag colors used in analyis and variant grids")
+    variant_link_in_analysis_opens_new_tab = models.BooleanField(null=True,
+                                                                 help_text="Whether left click by default opens up variant details in new window. Default is open where node editor is. You can always open in new window via right click then new window")
+    tool_tips = models.BooleanField(null=True, blank=True,
+                                    help_text="Show/hide help popups on mouse hover")
+    node_debug_tab = models.BooleanField(null=True, blank=True,
+                                         help_text="If true, an extra tab appears in analysis node editor, with details about node settings + SQL query.")
+    import_messages = models.BooleanField(null=True, blank=True,
+                                          help_text="Get internal notification (message icon top left) when imports done (eg VCF finished processing and annotating)")
+    igv_port = models.IntegerField(null=True, blank=True,
+                                   help_text="Port to connect to IGV on your machine")
+    default_genome_build = models.ForeignKey(GenomeBuild, on_delete=SET_NULL, null=True, blank=True,
+                                             help_text="Used for search (jump if 1 result for this build) and populating defaults everywhere")
+    timezone = models.TextField(null=True, blank=True,
+                                help_text="Time/date used in classification download")
 
 
 class GlobalSettings(SettingsOverride):
@@ -197,7 +209,8 @@ class LabUserSettingsOverride(SettingsOverride):
 class UserSettingsOverride(SettingsOverride):
     user = models.OneToOneField(User, on_delete=CASCADE)
     # records created by this user will also be associated to this lab by default
-    default_lab = models.ForeignKey(Lab, null=True, blank=True, on_delete=SET_NULL)
+    default_lab = models.ForeignKey(Lab, null=True, blank=True, on_delete=SET_NULL,
+                                    help_text="Lab used for creating classifications (you can belong to more than 1 lab)")
     # Allows us to store OAuth sub against the user
     oauth_sub = models.TextField(null=True, blank=True)
 
