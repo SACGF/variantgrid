@@ -1,0 +1,35 @@
+{% load ui_help %}
+{% load ui_utils %}
+{% load classification_tags %}
+
+
+{% page_help_embedded title="Total Discordances Awaiting Triage" %}
+    <p>Below is a list of all outstanding discordances where your lab is involved.</p>
+{% end_page_help_embedded %}
+
+{% with preview=dlab.discordance_reports.triage_preview %}
+    {% if not preview.awaiting_triage_count %}
+        <div class="no-value">There are no outstanding triages for this lab {{ 'S' | severity_icon }}</div>
+    {% else %}
+        {% labelled label="Discordances Awaiting Triage" hint="tiny" %}
+            <div>{{ preview.awaiting_triage_count| number:'W' }}</div>
+            {% if preview.awaiting_triage_count > 3 %}<div>Showing most recent 3</div>{% endif %}
+            <div><a class="hover-link" href="{% url 'discordance_reports' dlab.lab_picker.selection %}"><small class="form-text">Review all discordances here</small></a></div>
+        {% endlabelled %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width:100px" class="text-center">ID</th>
+                    <th class="text-left">Discordance Detected</th>
+                    <th class="text-left">c.HGVS ({{ genome_build.name }})</th>
+                    <th class="text-center" style="width:50%">Lab / Clinical Significances</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for summary in preview.medically_significant_awaiting_triage %}
+                {% discordance_report_row summary filter=False %}
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endwith %}

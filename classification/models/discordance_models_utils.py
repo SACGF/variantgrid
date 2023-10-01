@@ -394,18 +394,19 @@ class DiscordanceReportCategories:
     @cached_property
     def triage_preview(self) -> DiscordanceReportPreview:
         all_active = [drd.discordance_report for drd in self.active]
-        count = DiscordanceReportTriage.objects.filter(
-            discordance_report__in=all_active,
-            lab__in=self.labs(),
-            triage_status=DiscordanceReportTriageStatus.PENDING,
-            closed=False).order_by('discordance_report_id').distinct('discordance_report_id').count()
+        # count = DiscordanceReportTriage.objects.filter(
+        #     discordance_report__in=all_active,
+        #     lab__in=self.labs(),
+        #     triage_status=DiscordanceReportTriageStatus.PENDING,
+        #     closed=False).order_by('discordance_report_id').distinct('discordance_report_id').count()
 
+        count = 0
         preview_drs = []
         for drd in self.active:
             if drd.is_medically_significant and drd.next_step == DiscordanceReportNextStep.AWAITING_YOUR_TRIAGE:
                 preview_drs.append(drd)
-                if len(preview_drs) >= 3:
-                    break
+                count += 1
+
         return DiscordanceReportPreview(awaiting_triage_count=count, medically_significant_awaiting_triage=preview_drs)
 
     @cached_property

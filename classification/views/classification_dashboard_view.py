@@ -193,7 +193,6 @@ def classification_dashboard(request: HttpRequest, lab_id: Optional[int] = None)
 
     return render(request, "classification/classification_dashboard.html", {
         "dlab": dlab,
-        "use_shared": settings.CLASSIFICATION_STATS_USE_SHARED,
         "clinvar_export_enabled": clinvar_export_sync.is_enabled,
         "genome_build": GenomeBuildManager.get_current_genome_build(),
     })
@@ -206,8 +205,15 @@ def classification_dashboard_graph_detail(request: HttpRequest, lab_id: Optional
     })
 
 
-def classification_dashboard_classification_special_detail(request: HttpRequest, lab_id: Optional[Union[int, str]] = None) -> HttpResponse:
+def classification_dashboard_special_detail(request: HttpRequest, lab_id: Optional[Union[int, str]] = None) -> HttpResponse:
     dlab = ClassificationDashboard(LabPickerData.from_request(request, lab_id))
-    return render(request, "classification/classification_dashboard_classification_special_detail.html", {
+    return render(request, "classification/classification_dashboard_special_detail.html", {
+        "dlab": dlab
+    })
+
+
+def classification_dashboard_classification_discordance_detail(request: HttpRequest, lab_id: Optional[Union[int, str]] = None) -> HttpResponse:
+    dlab = ClassificationDashboard(LabPickerData.from_request(request, lab_id))
+    return render(request, "classification/classification_dashboard_discordance_detail.html", {
         "dlab": dlab
     })

@@ -10,6 +10,7 @@
 {% load ui_tabs_builder %}
 {% load lab_tags %}
 {% load classification_tags %}
+{% load settings_tags %}
 {% block title %}Classification Dashboard{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
@@ -59,6 +60,7 @@
         {% endlabelled %}
     {% endif %}
 
+    {% settings_value 'CLASSIFICATION_STATS_USE_SHARED' as use_shared %}
     {% if use_shared %}
         {% page_help_embedded title="Shared Classifications Over Time" %}
             This graphs shows how many shared classifications your lab has submitted over time.
@@ -111,37 +113,9 @@
     {% endif %}
 
     {% if 'discordance_report'|is_view_enabled %}
-        {% page_help_embedded title="Total Discordances Awaiting Triage" %}
-            <p>Below is a list of all outstanding discordances where your lab is involved.</p>
-        {% end_page_help_embedded %}
-
-        {% with preview=dlab.discordance_reports.triage_preview %}
-            {% if not preview.awaiting_triage_count %}
-                <div class="no-value">There are no outstanding triages for this lab {{ 'S' | severity_icon }}</div>
-            {% else %}
-                {% labelled label="Discordances Awaiting Triage" hint="tiny" %}
-                    <div>{{ preview.awaiting_triage_count| number:'W' }}</div>
-                    {% if preview.awaiting_triage_count > 3 %}<div>Showing most recent 3</div>{% endif %}
-                    <div><a class="hover-link" href="{% url 'discordance_reports' dlab.lab_picker.selection %}"><small class="form-text">Review all discordances here</small></a></div>
-                {% endlabelled %}
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th style="width:100px" class="text-center">ID</th>
-                            <th class="text-left">Discordance Detected</th>
-                            <th class="text-left">c.HGVS ({{ genome_build.name }})</th>
-                            <th class="text-center" style="width:50%">Lab / Clinical Significances</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% for summary in preview.medically_significant_awaiting_triage %}
-                        {% discordance_report_row summary filter=False %}
-                    {% endfor %}
-                    </tbody>
-                </table>
-            {% endif %}
-        {% endwith %}
-
+        <div data-toggle="ajax" href="{% url 'classification_dashboard_discordance_detail' dlab.lab_picker.selection %}">
+            <div class="loading-message" style="height:381px">Loading...</div>
+        </div>
     {% endif %}
 
 
@@ -166,7 +140,7 @@
         <p class="text-info">Classifications waiting on Variant Matching Review require an admin to action</p>
     {% endlabelled %}
 
-    <p><a href="{% url 'classification_dashboard_classification_special_detail' dlab.lab_picker.selection %}" class="toggle-link" data-toggle="ajax-collapse" title="Flagged Classification Records"></a></p>
+    <p><a href="{% url 'classification_dashboard_special_detail' dlab.lab_picker.selection %}" class="toggle-link" data-toggle="ajax-collapse" title="Flagged Classification Records"></a></p>
 
 </div>
 {% endblock content %}
