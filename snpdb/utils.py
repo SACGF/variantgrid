@@ -30,11 +30,11 @@ class LabNotificationBuilder(NotificationBuilder):
 
     def as_html(self):
         base_html = super().as_html()
-        return f"<p>Hello {settings.SITE_NAME} User,</p>{base_html}<p>Thanks,<br/>The {settings.SITE_NAME} Team.</p>"
+        return f"<p>Hello {settings.SITE_NAME} User from {self.lab},</p>{base_html}<p>Thanks,<br/>The {settings.SITE_NAME} Team.</p>"
 
     def as_text(self):
         base_text = super().as_text()
-        return f"Hello {settings.SITE_NAME} User,\n\n{base_text}\n\nThanks,\nThe {settings.SITE_NAME} Team."
+        return f"Hello {settings.SITE_NAME} User from {self.lab},\n\n{base_text}\n\nThanks,\nThe {settings.SITE_NAME} Team."
 
     def send(self):
         self.sent = True

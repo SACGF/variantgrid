@@ -6,6 +6,7 @@ import sys
 import traceback
 from abc import ABC, abstractmethod
 from logging import StreamHandler
+from re import Match
 from typing import Dict, Optional, List, Tuple, Any, Union
 
 import markdown
@@ -146,6 +147,7 @@ class NotificationBuilder:
 
     SLACK_EMOJI_RE = re.compile(r":[A-Z_]+:", re.IGNORECASE)
     DE_P = re.compile(r"<p>(.*?)</p>", re.IGNORECASE | re.DOTALL)
+    LINK_RE = re.compile(r"<(?P<link>http.*)\|(?P<name>.*)>")
 
     @staticmethod
     def slack_markdown_to_html(markdown_txt: str, surround_with_div: bool = False):
@@ -153,6 +155,13 @@ class NotificationBuilder:
             if not isinstance(markdown_txt, str):
                 raise TypeError(f"Expected string or bytes-like object, got {markdown_txt}")
             markdown_txt = re.sub(NotificationBuilder.SLACK_EMOJI_RE, "", markdown_txt)
+
+            # convert Slack links <http://foobar.com|FooBar> to proper Markdown links [FooBar](http://foobar.com)
+            def link_fixer(match: Match):
+                return f"[{match.group('name')}]({match.group('link')})"
+
+            markdown_txt = re.sub(NotificationBuilder.LINK_RE, link_fixer, markdown_txt)
+
             markdown_html = markdown(markdown_txt)
             if surround_with_div:
                 markdown_html = f"<div>{markdown_html}</div>"

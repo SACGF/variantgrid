@@ -72,15 +72,20 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
             if dr_count > 6:
                 subject = f"Discordance Update for {dr_count} Discordances"
             else:
-                subject = ", ".join([f"DR_{dr_id}" for dr_id in dr_ids])
+                subject = "Discordance Update for (" + ", ".join([f"DR_{dr_id}" for dr_id in dr_ids]) + ")"
 
             lab_notification = LabNotificationBuilder(lab=lab, message=subject)
+
+            def report_url_for_id(the_id):
+                return get_url_from_view_path(
+                    reverse('discordance_report', kwargs={'discordance_report_id': the_id}),
+                )
 
             # Admin Notification
             admin_notification = NotificationBuilder("Discordance notifications")\
                 .add_markdown(":email: Sending Discordance Notifications")\
                 .add_field("Lab", str(lab))\
-                .add_field("Discordance IDs", ", ".join(str(dr_id) for dr_id in dr_ids))
+                .add_field("Discordance IDs", ", ".join(f"<{report_url_for_id(dr_id)}|DR_{dr_id}>" for dr_id in dr_ids))
 
             is_first = True
             for dr_id in dr_ids:
@@ -89,9 +94,7 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
                 else:
                     lab_notification.add_divider()
 
-                report_url = get_url_from_view_path(
-                    reverse('discordance_report', kwargs={'discordance_report_id': dr_id}),
-                )
+                report_url = report_url_for_id(dr_id)
                 clin_sig_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
                 report_summary = DiscordanceReportRowData(discordance_report=outstanding_notification.discordance_report,
@@ -99,6 +102,8 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
                 if resolution_text := outstanding_notification.discordance_report.resolution_text:
                     lab_notification.add_markdown(f"The below overlap is now marked as *{resolution_text}*")
                 # notification.add_markdown(f"The labs {all_lab_names} are involved in the following discordance:")
+
+                lab_notification.add_field(label="Discordance Report", value=f"<{report_url}|DR_{dr_id}>")
 
                 lab_notification.add_field(label="Discordance Detected On", value=report_summary.date_detected_str)
 
@@ -122,9 +127,6 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
                         lab_notification.add_field(
                             f"{sig_lab.lab}{count_text}",
                             f"{clin_sig_key.pretty_value(sig_lab.clinical_significance_from)}")
-
-                # don't want to include notes in email as the text might be too sensitive
-                lab_notification.add_markdown(f"Full details of the overlap can be seen here : <{report_url}|(DR_{dr_id})>")
 
             admin_notification.send()
             lab_notification.send()
