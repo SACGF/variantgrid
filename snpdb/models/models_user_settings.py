@@ -157,11 +157,11 @@ class SettingsOverride(models.Model):
     columns = models.ForeignKey(CustomColumnsCollection, on_delete=SET_NULL, null=True, blank=True,
                                 help_text="Initial custom columns when creating analysis")
     default_sort_by_column = models.ForeignKey(CustomColumn, on_delete=SET_NULL, null=True, blank=True,
-                                               help_text="Initial sort by column for analysis variant grid")
+                                               help_text="Default value to sort analysis grids (can be changed per analysis)")
     tag_colors = models.ForeignKey(TagColorsCollection, on_delete=SET_NULL, null=True, blank=True,
-                                   help_text="Custom tag colors used in analyis and variant grids")
+                                   help_text="Set of colors assigned to tags")
     variant_link_in_analysis_opens_new_tab = models.BooleanField(null=True,
-                                                                 help_text="Whether left click by default opens up variant details in new window. Default is open where node editor is. You can always open in new window via right click then new window")
+                                                                 help_text="Whether left click by default opens up variant details in new tab. No is to open details in the node editor location. It's always possible to right click and select 'open in new tab'")
     tool_tips = models.BooleanField(null=True, blank=True,
                                     help_text="Show/hide help popups on mouse hover")
     node_debug_tab = models.BooleanField(null=True, blank=True,
@@ -171,7 +171,7 @@ class SettingsOverride(models.Model):
     igv_port = models.IntegerField(null=True, blank=True,
                                    help_text="Port to connect to IGV on your machine")
     default_genome_build = models.ForeignKey(GenomeBuild, on_delete=SET_NULL, null=True, blank=True,
-                                             help_text="Used for search (jump if 1 result for this build) and populating defaults everywhere")
+                                             help_text="Used for search (jump to result if that is the only one for this build) and populating defaults everywhere")
     timezone = models.TextField(null=True, blank=True,
                                 help_text="Time/date used in classification download")
 
