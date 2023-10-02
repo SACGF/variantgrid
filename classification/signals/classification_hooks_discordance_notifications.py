@@ -1,13 +1,10 @@
-from collections import defaultdict
-from typing import Optional
-
+from typing import Optional, List, Set
 from django.conf import settings
 from django.db import transaction
 from django.db.models import QuerySet
 from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
-
 from classification.enums import SpecialEKeys
 from classification.models import DiscordanceReport, discordance_change_signal, EvidenceKeyMap, \
     ClassificationLabSummary
@@ -50,46 +47,40 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
         outstanding_notifications = DiscordanceNotification.objects.filter(notification_sent_date__isnull=True).order_by('pk')
 
     with transaction.atomic():
-        labs_to_notify = outstanding_notifications.values('lab').distinct()
+        labs_to_notify = outstanding_notifications.order_by('lab').values_list('lab', flat=True).distinct()
         outstanding_notifications = outstanding_notifications.select_for_update()
-        lab_notifications = defaultdict(list)
 
-        for lab_info in labs_to_notify:
-            lab_id = lab_info['lab']
-            lab_obj = Lab.objects.get(pk=lab_id)
+        for lab_id in labs_to_notify:
+            lab = Lab.objects.get(pk=lab_id)
+            dr_ids: Set[int] = set()
 
-            discordance_entries = outstanding_notifications.filter(lab=lab_obj)
+            outstanding_lab_discordance_notifications: List[DiscordanceNotification] = list(outstanding_notifications.filter(lab=lab))
+            combined_notifications: List[LabNotificationBuilder] = []
 
-            for entry in discordance_entries:
-                all_labs = entry.discordance_report.involved_labs.keys()
-                # all_lab_names = ", ".join(lab.name for lab in all_labs)
+            for outstanding_notification in outstanding_lab_discordance_notifications:
+                dr_ids.add(outstanding_notification.discordance_report.pk)
+
                 report_url = get_url_from_view_path(
-                    reverse('discordance_report', kwargs={'discordance_report_id': entry.discordance_report.id}),
+                    reverse('discordance_report', kwargs={'discordance_report_id': outstanding_notification.discordance_report.id}),
                 )
                 clin_sig_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
-                labs_str = "\n".join(f"* {lab}" for lab in sorted(all_labs))
-                nb = NotificationBuilder("Discordance notifications")
-                nb.add_markdown(
-                    f":fire_engine: :email: Sending Discordance Report <{report_url}|(DR_{entry.discordance_report.pk})> notification to {entry.lab}")
-                # nb.add_field("Labs", labs_str)
-                # nb.add_field("Trigger for notification", entry.cause)
-                nb.send()
+                lab_notification = LabNotificationBuilder(
+                    lab=lab,
+                    message=f"Discordance Update (DR_{outstanding_notification.discordance_report.id})"
+                )
 
-                notification = LabNotificationBuilder(lab=entry.lab,
-                                                      message=f"Discordance Update (DR_{entry.discordance_report.id})")
-
-                user_perspective = LabPickerData.for_lab(lab=entry.lab)
-                report_summary = DiscordanceReportRowData(discordance_report=entry.discordance_report,
+                user_perspective = LabPickerData.for_lab(lab=outstanding_notification.lab)
+                report_summary = DiscordanceReportRowData(discordance_report=outstanding_notification.discordance_report,
                                                           perspective=user_perspective)
-                if resolution_text := entry.discordance_report.resolution_text:
-                    notification.add_markdown(f"The below overlap is now marked as *{resolution_text}*")
+                if resolution_text := outstanding_notification.discordance_report.resolution_text:
+                    lab_notification.add_markdown(f"The below overlap is now marked as *{resolution_text}*")
                 # notification.add_markdown(f"The labs {all_lab_names} are involved in the following discordance:")
 
-                notification.add_field(label="Discordance Detected On", value=report_summary.date_detected_str)
+                lab_notification.add_field(label="Discordance Detected On", value=report_summary.date_detected_str)
 
                 c_hgvs_str = "\n".join((str(chgvs) for chgvs in report_summary.c_hgvses))
-                notification.add_field(label="c.HGVS", value=c_hgvs_str)
+                lab_notification.add_field(label="c.HGVS", value=c_hgvs_str)
 
                 sig_lab: ClassificationLabSummary
                 for sig_lab in report_summary.lab_significances:
@@ -101,34 +92,42 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
                         pending_text = " (PENDING)"
 
                     if sig_lab.changed:
-                        notification.add_field(f"{sig_lab.lab}{count_text}",
-                                               f"{clin_sig_key.pretty_value(sig_lab.clinical_significance_from)} -> {clin_sig_key.pretty_value(sig_lab.clinical_significance_to)}{pending_text}")
+                        lab_notification.add_field(
+                            f"{sig_lab.lab}{count_text}",
+                            f"{clin_sig_key.pretty_value(sig_lab.clinical_significance_from)} -> {clin_sig_key.pretty_value(sig_lab.clinical_significance_to)}{pending_text}")
                     else:
-                        notification.add_field(f"{sig_lab.lab}{count_text}",
-                                               f"{clin_sig_key.pretty_value(sig_lab.clinical_significance_from)}")
+                        lab_notification.add_field(
+                            f"{sig_lab.lab}{count_text}",
+                            f"{clin_sig_key.pretty_value(sig_lab.clinical_significance_from)}")
+
                 # don't want to include notes in email as the text might be too sensitive
-                notification.add_markdown(f"Full details of the overlap can be seen here : <{report_url}>")
-                lab_notifications[lab_obj].append(notification)
+                lab_notification.add_markdown(f"Full details of the overlap can be seen here : <{report_url}|(DR_{outstanding_notification.discordance_report.id})>")
+                combined_notifications.append(lab_notification)
 
-    for lab, notifications in lab_notifications.items():
-        report_ids = [f"DR_{notification.message.split('_')[1][:-1]}" for notification in notifications]
-        num_report_ids = len(report_ids)  # Count of report IDs
+            # end loop
+            # we now have combined_notifications to send
+            dr_ids = list(sorted(dr_ids))
+            current_date = timezone.now()
+            subject: str
 
-        if num_report_ids > 6:
-            combined_message = f"{num_report_ids} Discordance Updates"
-        else:
-            combined_message = f"Discordance Update for ({', '.join(report_ids)})"
+            # Admin Notification
+            admin_notification = NotificationBuilder("Discordance notifications")
+            for dr_id in dr_ids:
+                report_url = get_url_from_view_path(reverse('discordance_report', kwargs={'discordance_report_id': dr_id}),)
+                admin_notification.add_markdown(f":fire_engine: :email: {outstanding_notification.lab} - Sending Discordance Report <{report_url}|(DR_{outstanding_notification.discordance_report.pk})>")
+            admin_notification.send()
 
-        combined_notification = LabNotificationBuilder(
-            lab=lab,
-            message=combined_message
-        )
+            dr_count = len(dr_ids)
+            if dr_count > 6:
+                subject = f"Discordance Update for {dr_count} Discordances"
+            else:
+                subject = ", ".join([f"DR_{dr_id}" for dr_id in sorted(dr_ids)])
 
-        for notification in notifications:
-            notification.sent = True
-            combined_notification.merge(notification)
-        combined_notification.send()
-        current_date = timezone.now()
-        # Updating the notification_sent_date for the DiscordanceNotification records
-        DiscordanceNotification.objects.filter(lab=lab, notification_sent_date=None).update(
-            notification_sent_date=current_date)
+            LabNotificationBuilder(
+                lab=lab,
+                message=subject
+            ).merge(*combined_notifications).send()
+
+            for outstanding_notification in outstanding_lab_discordance_notifications:
+                outstanding_notification.notification_sent_date = current_date
+            DiscordanceNotification.objects.bulk_update(outstanding_lab_discordance_notifications, fields=['notification_sent_date'])

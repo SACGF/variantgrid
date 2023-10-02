@@ -8,7 +8,7 @@
     {% else %}
         {% labelled label="Discordances Awaiting Triage" hint="tiny" %}
             <div>{{ preview.awaiting_triage_count| number:'W' }}</div>
-            {% if preview.awaiting_triage_count > 3 %}<div>Showing most recent 3</div>{% endif %}
+            {% if preview.awaiting_triage_count > 3 %}<div>Showing most relevant 3</div>{% endif %}
             <div><a class="hover-link" href="{% url 'discordance_reports' dlab.lab_picker.selection %}"><small class="form-text">Review all discordances here</small></a></div>
         {% endlabelled %}
         <table class="table">

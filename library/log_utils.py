@@ -320,12 +320,19 @@ class NotificationBuilder:
 
     def merge(self, *bulk_notifications: 'NotificationBuilder') -> 'NotificationBuilder':
         for bulk_notification in bulk_notifications:
-            if bulk_notification.blocks and isinstance(bulk_notification.blocks[0], NotificationBuilder.HeaderBlock):
-                self.blocks.append(bulk_notification.blocks[0])
+            if bulk_notification == self:
+                raise ValueError("Can't merge NotificationBuilder with itself")
+            bulk_notification.sent = True
+            self.blocks.extend(bulk_notification.blocks)
 
-            for block in bulk_notification.blocks:
-                if isinstance(block, (NotificationBuilder.FieldsBlock, NotificationBuilder.MarkdownBlock)):
-                    self.blocks.append(block)
+            # Not sure what the logic of the below was, only include a header if it's the first row?
+
+            # if bulk_notification.blocks and isinstance(bulk_notification.blocks[0], NotificationBuilder.HeaderBlock):
+            #     self.blocks.append(bulk_notification.blocks[0])
+            #
+            # for block in bulk_notification.blocks:
+            #     if isinstance(block, (NotificationBuilder.FieldsBlock, NotificationBuilder.MarkdownBlock)):
+            #         self.blocks.append(block)
         return self
 
     @property
