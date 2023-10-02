@@ -348,6 +348,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         is_significance_change = old_status != new_status
         is_simple_new = old_status is None and new_status == ClinicalContextStatus.CONCORDANT
         allele_url = get_url_from_view_path(self.allele.get_absolute_url())
+        allele_str = str(self.allele)
 
         ongoing_import = ClassificationImportRun.ongoing_imports()
 
@@ -379,12 +380,12 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
                     if new_status != old_status:
                         nb = NotificationBuilder("PENDING: ClinicalContext changed)")
                         nb.add_markdown(
-                            f":clock1: ClinicalGrouping for allele <{allele_url}|{allele_url}> would change from {old_status} -> {new_status} but marked as pending due to {ongoing_import}")
+                            f":clock1: ClinicalGrouping for allele <{allele_url}|{allele_str}> would change from {old_status} -> {new_status} but marked as pending due to {ongoing_import}")
                         nb.send()
                     else:
                         nb = NotificationBuilder("PENDING: ClinicalContext changed-back")
                         nb.add_markdown(
-                            f":clock430: ClinicalGrouping for allele <{allele_url}|{allele_url}> changed back from {self.pending_status} -> {new_status} within {ongoing_import}, no notifications sent")
+                            f":clock430: ClinicalGrouping for allele <{allele_url}|{allele_str}> changed back from {self.pending_status} -> {new_status} within {ongoing_import}, no notifications sent")
                         nb.send()
 
             self.save()
@@ -394,7 +395,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
             if settings.DISCORDANCE_ENABLED and is_significance_change and not is_simple_new:
                 nb = NotificationBuilder("ClinicalContext changed")
                 nb.add_markdown(
-                    f":fire_engine: ClinicalGrouping for allele <{allele_url}|{allele_url}> changed from {old_status} -> {new_status} "
+                    f":fire_engine: ClinicalGrouping for allele <{allele_url}|{allele_str}> changed from {old_status} -> {new_status} "
                     f"\nLab notifications should follow")
                 nb.send()
 

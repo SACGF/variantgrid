@@ -58,16 +58,23 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
             combined_notifications: List[LabNotificationBuilder] = []
 
             for outstanding_notification in outstanding_lab_discordance_notifications:
-                dr_ids.add(outstanding_notification.discordance_report.pk)
+                dr_id = outstanding_notification.discordance_report.pk
+
+                if dr_id in dr_ids:
+                    # don't notify about the same discordance report twice if somehow we have several pending notifications
+                    # for the same discordance
+                    continue
+
+                dr_ids.add(dr_id)
 
                 report_url = get_url_from_view_path(
-                    reverse('discordance_report', kwargs={'discordance_report_id': outstanding_notification.discordance_report.id}),
+                    reverse('discordance_report', kwargs={'discordance_report_id': dr_id}),
                 )
                 clin_sig_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
                 lab_notification = LabNotificationBuilder(
                     lab=lab,
-                    message=f"Discordance Update (DR_{outstanding_notification.discordance_report.id})"
+                    message=f"Discordance Update (DR_{dr_id})"
                 )
 
                 user_perspective = LabPickerData.for_lab(lab=outstanding_notification.lab)
@@ -101,7 +108,7 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
                             f"{clin_sig_key.pretty_value(sig_lab.clinical_significance_from)}")
 
                 # don't want to include notes in email as the text might be too sensitive
-                lab_notification.add_markdown(f"Full details of the overlap can be seen here : <{report_url}|(DR_{outstanding_notification.discordance_report.id})>")
+                lab_notification.add_markdown(f"Full details of the overlap can be seen here : <{report_url}|(DR_{dr_id})>")
                 combined_notifications.append(lab_notification)
 
             # end loop
@@ -112,16 +119,22 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
 
             # Admin Notification
             admin_notification = NotificationBuilder("Discordance notifications")
+            admin_notification.add_markdown(":email: Sending Discordance Notifications")
             for dr_id in dr_ids:
-                report_url = get_url_from_view_path(reverse('discordance_report', kwargs={'discordance_report_id': dr_id}),)
-                admin_notification.add_markdown(f":fire_engine: :email: {outstanding_notification.lab} - Sending Discordance Report <{report_url}|(DR_{outstanding_notification.discordance_report.pk})>")
+                admin_notification.add_field("Lab", str(lab))
+                link_text = []
+                for dr_id in dr_ids:
+                    report_url = get_url_from_view_path(reverse('discordance_report', kwargs={'discordance_report_id': dr_id}))
+                    link_text.append(f"<{report_url}|(DR_{dr_id})>")
+
+            admin_notification.add_field("Discordances", ", ".join(link_text))
             admin_notification.send()
 
             dr_count = len(dr_ids)
             if dr_count > 6:
                 subject = f"Discordance Update for {dr_count} Discordances"
             else:
-                subject = ", ".join([f"DR_{dr_id}" for dr_id in sorted(dr_ids)])
+                subject = ", ".join([f"DR_{dr_id}" for dr_id in dr_ids])
 
             LabNotificationBuilder(
                 lab=lab,
