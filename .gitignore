@@ -35,3 +35,4 @@ pip-delete-this-directory.txt
 .cache
 .pytest_cache/
 cover/
+/variant_symbolic_alt_changes.csv
