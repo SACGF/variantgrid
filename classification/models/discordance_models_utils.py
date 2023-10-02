@@ -400,7 +400,7 @@ class DiscordanceReportCategories:
                 preview_drs.append(drd)
                 count += 1
 
-        preview_drs.sort()
+        preview_drs.sort(reverse=True)
         return DiscordanceReportPreview(awaiting_triage_count=count, medically_significant_awaiting_triage=preview_drs[0:3])
 
     @cached_property
