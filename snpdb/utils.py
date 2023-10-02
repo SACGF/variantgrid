@@ -30,7 +30,7 @@ class LabNotificationBuilder(NotificationBuilder):
 
     def as_html(self):
         base_html = super().as_html()
-        return f"<p>Hello {settings.SITE_NAME} User from {self.lab},</p>{base_html}<p>Thanks,<br/>The {settings.SITE_NAME} Team.</p>"
+        return f"<p>Hello {settings.SITE_NAME} User <span style=\"font-size:0.8rem\">from {self.lab}</span>,</p>{base_html}<p>Thanks,<br/>The {settings.SITE_NAME} Team.</p>"
 
     def as_text(self):
         base_text = super().as_text()
