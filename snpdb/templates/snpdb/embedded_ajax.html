@@ -4,6 +4,10 @@
 {% block submenu %}
     {% if menubar == 'classification' %}
         {% menu_bar_classifications %}
+    {% elif menubar == 'settings' %}
+        {% menu_bar_settings %}
+    {% elif menubar %}
+        Menubar {{ menubar }} not supported, developer to fix in embedded_ajax.html
     {% endif %}
 {% endblock submenu %}
 {% block content %}

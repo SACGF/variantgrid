@@ -3,6 +3,7 @@ from typing import List, Optional
 from django.conf import settings
 from django.core.mail import send_mail, get_connection, EmailMultiAlternatives
 from django.db import models
+from django.urls import reverse
 from model_utils.models import TimeStampedModel
 
 
@@ -14,6 +15,9 @@ class EmailLog(TimeStampedModel):
     recipient_list = models.TextField()
     probably_sent = models.BooleanField()
     single_email = models.BooleanField()
+
+    def get_absolute_url(self):
+        return reverse('email_detail', kwargs={"email_id": self.pk})
 
     @staticmethod
     def send_mail(subject: str,

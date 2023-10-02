@@ -1,0 +1,22 @@
+{% load user_tags %}
+{% load ui_utils %}
+{% load js_tags %}
+{% if render_mode == "embedded" %}
+    {% labelled label="Created" %}{% timestamp email.created %}{% endlabelled %}
+    {% labelled label="Subject" %}{{ email.subject }}{% endlabelled %}
+{% else %}
+    {% admin_link email %}<br/>
+{% endif %}
+<label class="mb-4 mt-2">Recipients</label>:
+<div>
+    {% for email_address in unrecognised %}
+        <div class="text-dark" style="font-size:9pt"><i class="fa-regular fa-envelope mx-1"></i> {{ email_address }}</div>
+    {% endfor %}
+    {% for email_user in users %}
+        <div class="mt-1">{% user email_user show_avatar=True show_email=True show_group=True size='tiny' %}</div>
+    {% endfor %}
+</div>
+<label class="my-4">Content</label>:
+<div class="border rounded p-4" style="background-color:#fdfdfd">
+{{ email.html | safe }}
+</div>

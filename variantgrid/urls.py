@@ -16,6 +16,7 @@ APPS_WITH_URLS = [
     "analysis",
     "annotation",
     "eventlog",
+    "email_manager",
     "flags",
     "genes",
     "pathtests",
