@@ -131,10 +131,10 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         return ''
 
     @transaction.atomic
-    def close(self, expected_resolution: Optional[str] = None, cause_text: str = ''):
+    def close(self, clinical_context_change_data: ClinicalContextChangeData, expected_resolution: Optional[str] = None):
         """
         @param expected_resolution will be calculated, but if provided a ValueError will be raised if it doesn't match
-        @param cause_text reason this discordance is being closed
+        @param clinical_context_change_data reason this discordance is being closed
         """
         if self.clinical_context.discordance_status.is_discordant:
             self.resolution = DiscordanceReportResolution.CONTINUED_DISCORDANCE
@@ -144,15 +144,14 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         if expected_resolution and expected_resolution != self.resolution:
             raise ValueError(f'Expected to close Discordance Report as {expected_resolution} but was {self.resolution}')
 
-        self.resolved_text = cause_text
+        self.resolved_text = clinical_context_change_data.cause_text
         self.report_completed_date = timezone.now()
         self.save()
 
         for drc in DiscordanceReportClassification.objects.filter(report=self):  # type: DiscordanceReportClassification
             drc.close()
 
-        clinical_context_change_data_close = ClinicalContextChangeData(cause_text=cause_text, cause_code=ClinicalContextRecalcTrigger.WITHDRAW_DELETE)
-        discordance_change_signal.send(DiscordanceReport, discordance_report=self, clinical_context_change_data=clinical_context_change_data_close)
+        discordance_change_signal.send(DiscordanceReport, discordance_report=self, clinical_context_change_data=clinical_context_change_data)
 
     @transaction.atomic
     def update(self, clinical_context_change_data: ClinicalContextChangeData, notify_level: NotifyLevel = NotifyLevel.NOTIFY_IF_CHANGE):
@@ -190,7 +189,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         if not self.clinical_context.discordance_status.is_discordant:
             # hey we've reached concordance, let's close this
             # close will fire off a notification event
-            self.close(expected_resolution=DiscordanceReportResolution.CONCORDANT, cause_text=clinical_context_change_data.cause_text)
+            self.close(clinical_context_change_data=clinical_context_change_data, expected_resolution=DiscordanceReportResolution.CONCORDANT)
         else:
             if notify_level == NotifyLevel.NEVER_NOTIFY:
                 pass

@@ -264,6 +264,7 @@ class ClinicalContextRecalcTrigger(Enum):
     OTHER = "other"
     PENDING_CS_CHANGE = "pending_cs_change"
     RE_OPEN = "reopen"
+    CONTINUED_DISCORDANCE = "continued_discordance"
 
 
 @dataclass(frozen=True)

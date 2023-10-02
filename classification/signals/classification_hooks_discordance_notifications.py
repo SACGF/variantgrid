@@ -29,6 +29,9 @@ def notify_discordance_change(discordance_report: DiscordanceReport, clinical_co
     if settings.DISCORDANCE_ENABLED and clinical_context_change_data.notify_worthy:
         prepare_discordance_notification(discordance_report=discordance_report, cause=clinical_context_change_data.cause_text)
         if clinical_context_change_data.cause_code != ClinicalContextRecalcTrigger.DELAYED:
+            NotificationBuilder("Send Notifications Triggered")\
+                .add_markdown(f"Detected un-delayed discordance change for DR_{discordance_report.pk} *{clinical_context_change_data.cause_code.value}* - will send out notifications now.")\
+                .send()
             send_prepared_discordance_notifications()
 
 
@@ -52,32 +55,45 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
 
         for lab_id in labs_to_notify:
             lab = Lab.objects.get(pk=lab_id)
-            dr_ids: Set[int] = set()
+            user_perspective = LabPickerData.for_lab(lab=lab)
 
             outstanding_lab_discordance_notifications: List[DiscordanceNotification] = list(outstanding_notifications.filter(lab=lab))
-            combined_notifications: List[LabNotificationBuilder] = []
+            current_date = timezone.now()
 
+            unique_ids: Set[int] = set()
             for outstanding_notification in outstanding_lab_discordance_notifications:
+                outstanding_notification.notification_sent_date = current_date
                 dr_id = outstanding_notification.discordance_report.pk
+                unique_ids.add(dr_id)
 
-                if dr_id in dr_ids:
-                    # don't notify about the same discordance report twice if somehow we have several pending notifications
-                    # for the same discordance
-                    continue
+            dr_ids: List[int] = list(sorted(unique_ids))
 
-                dr_ids.add(dr_id)
+            dr_count = len(dr_ids)
+            if dr_count > 6:
+                subject = f"Discordance Update for {dr_count} Discordances"
+            else:
+                subject = ", ".join([f"DR_{dr_id}" for dr_id in dr_ids])
+
+            lab_notification = LabNotificationBuilder(lab=lab, message=subject)
+
+            # Admin Notification
+            admin_notification = NotificationBuilder("Discordance notifications")\
+                .add_markdown(":email: Sending Discordance Notifications")\
+                .add_field("Lab", str(lab))\
+                .add_field("Discordance IDs", ", ".join(str(dr_id) for dr_id in dr_ids))
+
+            is_first = True
+            for dr_id in dr_ids:
+                if is_first:
+                    is_first = False
+                else:
+                    lab_notification.add_divider()
 
                 report_url = get_url_from_view_path(
                     reverse('discordance_report', kwargs={'discordance_report_id': dr_id}),
                 )
                 clin_sig_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
-                lab_notification = LabNotificationBuilder(
-                    lab=lab,
-                    message=f"Discordance Update (DR_{dr_id})"
-                )
-
-                user_perspective = LabPickerData.for_lab(lab=outstanding_notification.lab)
                 report_summary = DiscordanceReportRowData(discordance_report=outstanding_notification.discordance_report,
                                                           perspective=user_perspective)
                 if resolution_text := outstanding_notification.discordance_report.resolution_text:
@@ -109,38 +125,7 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
 
                 # don't want to include notes in email as the text might be too sensitive
                 lab_notification.add_markdown(f"Full details of the overlap can be seen here : <{report_url}|(DR_{dr_id})>")
-                combined_notifications.append(lab_notification)
 
-            # end loop
-            # we now have combined_notifications to send
-            dr_ids = list(sorted(dr_ids))
-            current_date = timezone.now()
-            subject: str
-
-            # Admin Notification
-            admin_notification = NotificationBuilder("Discordance notifications")
-            admin_notification.add_markdown(":email: Sending Discordance Notifications")
-            for dr_id in dr_ids:
-                admin_notification.add_field("Lab", str(lab))
-                link_text = []
-                for dr_id in dr_ids:
-                    report_url = get_url_from_view_path(reverse('discordance_report', kwargs={'discordance_report_id': dr_id}))
-                    link_text.append(f"<{report_url}|(DR_{dr_id})>")
-
-            admin_notification.add_field("Discordances", ", ".join(link_text))
             admin_notification.send()
-
-            dr_count = len(dr_ids)
-            if dr_count > 6:
-                subject = f"Discordance Update for {dr_count} Discordances"
-            else:
-                subject = ", ".join([f"DR_{dr_id}" for dr_id in dr_ids])
-
-            LabNotificationBuilder(
-                lab=lab,
-                message=subject
-            ).merge(*combined_notifications).send()
-
-            for outstanding_notification in outstanding_lab_discordance_notifications:
-                outstanding_notification.notification_sent_date = current_date
+            lab_notification.send()
             DiscordanceNotification.objects.bulk_update(outstanding_lab_discordance_notifications, fields=['notification_sent_date'])

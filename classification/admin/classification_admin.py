@@ -867,12 +867,6 @@ class DiscordanceReportAdmin(ModelAdminBasics):
     def has_add_permission(self, request):
         return False
 
-    @admin_action("Send discordance notification")
-    def send_notification(self, request, queryset):
-        ds: DiscordanceReport
-        for ds in queryset:
-            send_prepared_discordance_notifications(ds, cause="Admin Send discordance notification")
-
     @admin_action("Re-calculate latest")
     def re_calculate(self, request, queryset):
         ds: DiscordanceReport
@@ -915,9 +909,7 @@ class DiscordanceNotificationAdmin(ModelAdminBasics):
 
     @admin_action("Send Notification")
     def send_lab_discordance_notification(self, request, queryset):
-        selected_pks = [dn.pk for dn in queryset]
-        selected_notifications = DiscordanceNotification.objects.filter(pk__in=selected_pks)
-        send_prepared_discordance_notifications(selected_notifications)
+        send_prepared_discordance_notifications(queryset)
 
 
 @admin.register(UploadedClassificationsUnmapped)

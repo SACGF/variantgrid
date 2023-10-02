@@ -397,7 +397,7 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
         elif action == "change":
             review.user = request.user
             notes = request.POST.get('notes')
-            report = data.report
+            report: DiscordanceReport = data.report
             report.notes = notes or ''
             report.save()
 
@@ -466,8 +466,10 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
             if resolution == "discordant":
                 report.report_closed_by = request.user
                 report.continued_discordance_reason = ContinuedDiscordanceReason.NOT_DEFINED
-                report.close(expected_resolution=DiscordanceReportResolution.CONTINUED_DISCORDANCE,
-                             cause_text="Unable to resolve")
+                report.close(
+                    expected_resolution=DiscordanceReportResolution.CONTINUED_DISCORDANCE,
+                    clinical_context_change_data=ClinicalContextChangeData(cause_text="Unable to resolve", cause_code=ClinicalContextRecalcTrigger.CONTINUED_DISCORDANCE)
+                )
             elif data.is_pending_concordance:
                 # a bit messy to call the signal here directly
                 # was listening for the individual flags to be raised, but then since it's typically multiple flags raised at once
