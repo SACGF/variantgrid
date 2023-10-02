@@ -113,11 +113,13 @@
     {% endif %}
 
     {% if 'discordance_report'|is_view_enabled %}
+        {% page_help_embedded title="Discordances Awaiting Triage" %}
+            <p>Below is a sample of discordances where your lab has a triage pending.</p>
+        {% end_page_help_embedded %}
         <div data-toggle="ajax" href="{% url 'classification_dashboard_discordance_detail' dlab.lab_picker.selection %}">
             <div class="loading-message" style="height:381px">Loading...</div>
         </div>
     {% endif %}
-
 
 
     {% page_help_embedded title="Flagged Classifications" %}

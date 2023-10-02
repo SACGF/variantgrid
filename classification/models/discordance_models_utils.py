@@ -396,12 +396,12 @@ class DiscordanceReportCategories:
         count = 0
         preview_drs = []
         for drd in self.active:
-            if drd.is_medically_significant and drd.next_step == DiscordanceReportNextStep.AWAITING_YOUR_TRIAGE:
-                if len(preview_drs) < 3:
-                    preview_drs.append(drd)
+            if drd.next_step == DiscordanceReportNextStep.AWAITING_YOUR_TRIAGE:
+                preview_drs.append(drd)
                 count += 1
 
-        return DiscordanceReportPreview(awaiting_triage_count=count, medically_significant_awaiting_triage=preview_drs)
+        preview_drs.sort()
+        return DiscordanceReportPreview(awaiting_triage_count=count, medically_significant_awaiting_triage=preview_drs[0:3])
 
     @cached_property
     def to_historic_table(self) -> DiscordanceReportTableData:

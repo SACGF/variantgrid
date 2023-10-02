@@ -215,5 +215,6 @@ def classification_dashboard_special_detail(request: HttpRequest, lab_id: Option
 def classification_dashboard_classification_discordance_detail(request: HttpRequest, lab_id: Optional[Union[int, str]] = None) -> HttpResponse:
     dlab = ClassificationDashboard(LabPickerData.from_request(request, lab_id))
     return render(request, "classification/classification_dashboard_discordance_detail.html", {
-        "dlab": dlab
+        "dlab": dlab,
+        "genome_build": GenomeBuildManager.get_current_genome_build()
     })

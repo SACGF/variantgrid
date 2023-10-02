@@ -2,11 +2,6 @@
 {% load ui_utils %}
 {% load classification_tags %}
 
-
-{% page_help_embedded title="Total Discordances Awaiting Triage" %}
-    <p>Below is a list of all outstanding discordances where your lab is involved.</p>
-{% end_page_help_embedded %}
-
 {% with preview=dlab.discordance_reports.triage_preview %}
     {% if not preview.awaiting_triage_count %}
         <div class="no-value">There are no outstanding triages for this lab {{ 'S' | severity_icon }}</div>
