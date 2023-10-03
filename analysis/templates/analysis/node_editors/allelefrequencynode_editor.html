@@ -3,6 +3,7 @@
 {% block docreadyjs %}
     var alleleFrequencyForm = $("form#allele-frequency-node-form");
     ajaxForm(alleleFrequencyForm);
+	$("#slider-group-operation").hide(); // Only 1 sample so we don't use this
 {% endblock docreadyjs %}
 
 {% block content %}
