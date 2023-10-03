@@ -6,6 +6,7 @@
 {% load user_tag_color_tags %}
 {% load settings_tags %}
 {% load js_tags %}
+{% load classification_tags %}
 
 {% block submenu %}{% menu_bar_data %}{% endblock %}
 
@@ -227,9 +228,16 @@
                                             <label class="search-identifier">{{ preview.identifier }}</label>&nbsp;{% if preview.title %}<span class="search-title">{{ preview.title }}</span>{% endif %}
                                             {% if preview.summary_all %}<div class="d-block text-small text-secondary extra-summary">
                                                 {% for extra in preview.summary_all %}
-                                                    <span class="extra {% if extra.dedicated_row %}important d-block{% else %}normal d-inline-block{% endif %}">{% if extra.icon %}<i class="{{ extra.icon }} text-success mr-1"></i>{% endif %}{% if extra.key %}<label>{{ extra.key }} </label> {% endif %}
-                                                        {{ extra.value|format_value:200 }}
-                                                    </span>
+                                                    {% if not extra.link %}{% comment %}Don't show links in search results as they're just confusing{% endcomment %}
+                                                        <span class="extra {% if extra.dedicated_row %}important d-block{% else %}normal d-inline-block{% endif %}">{% if extra.icon %}<i class="{{ extra.icon }} text-success mr-1"></i>{% endif %}
+                                                        {% if "c.HGVS" in extra.key %}
+                                                            <label style="text-transform: inherit">{{ extra.key }}</label>{% c_hgvs extra.value %}
+                                                        {% else %}
+                                                            {% if extra.key %}<label>{{ extra.key }} </label> {% endif %}
+                                                            {{ extra.value|format_value:200 }}
+                                                        {% endif %}
+                                                        </span>
+                                                    {% endif %}
                                                 {% endfor %}
                                             </div>{% endif %}
                                         </div>

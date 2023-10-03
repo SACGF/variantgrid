@@ -515,10 +515,14 @@ def discordance_preview_extra(sender, user: User, obj: DiscordanceReport, **kwar
         old_cs = group.clinical_significance_old or group.clinical_significance
         new_cs = group.clinical_significance_pending or group.clinical_significance
 
-        parts = [group.most_recent.criteria_strength_summary(only_acmg=False), ":"]
+        parts = []
+        if criteria_strengths := group.most_recent.criteria_strength_summary(only_acmg=False):
+            parts.append(criteria_strengths)
+            parts.append(":")
+
         if old_cs != new_cs:
             parts += [e_key.pretty_value(old_cs, dash_for_none=True), " -> "]
         parts += [e_key.pretty_value(new_cs, dash_for_none=True)]
-        extras += [PreviewKeyValue(key=str(group.lab), value=" ".join(parts))]
+        extras += [PreviewKeyValue(key=str(group.lab), value=" ".join(parts), dedicated_row=True)]
 
     return extras

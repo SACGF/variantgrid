@@ -3,6 +3,7 @@ from functools import cached_property
 from typing import Set, Optional, List, Dict, Tuple, Any
 
 import django.dispatch
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
@@ -68,6 +69,11 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
     def preview_icon(cls) -> str:
         return "fa-solid fa-arrow-down-up-across-line"
 
+    @classmethod
+    def preview_enabled(cls) -> bool:
+        return settings.DISCORDANCE_ENABLED
+
+    @property
     def preview(self) -> 'PreviewData':
         from classification.models import ImportedAlleleInfo
         all_chgvs = ImportedAlleleInfo.all_chgvs(self.clinical_context.allele)
@@ -79,15 +85,15 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         c_hgvs_key_values = []
         for c_hgvs in desired_builds:
             c_hgvs_key_values.append(
-                PreviewKeyValue(key=f"{c_hgvs.genome_build} c.HGVS", value=str(c_hgvs))
+                PreviewKeyValue(key=f"{c_hgvs.genome_build} c.HGVS", value=str(c_hgvs), dedicated_row=True)
             )
 
         return self.preview_with(
             identifier=f"DR_{self.pk}",
             summary_extra=
-                [PreviewKeyValue(key="Allele", value=f"{self.clinical_context.allele:CA}")] +
+                [PreviewKeyValue(key="Allele", value=f"{self.clinical_context.allele:CA}", dedicated_row=True)] +
                 c_hgvs_key_values +
-                [PreviewKeyValue(key="Status", value=f"{self.get_resolution_display() or 'Discordant'}")]
+                [PreviewKeyValue(key="Status", value=f"{self.get_resolution_display() or 'Discordant'}", dedicated_row=True)]
         )
 
     class LabInvolvement(int, Enum):
