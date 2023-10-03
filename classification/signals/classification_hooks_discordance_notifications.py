@@ -63,10 +63,11 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
             unique_ids: Set[int] = set()
             for outstanding_notification in outstanding_lab_discordance_notifications:
                 outstanding_notification.notification_sent_date = current_date
-                dr_id = outstanding_notification.discordance_report.pk
+                dr_id = outstanding_notification.discordance_report_id
                 unique_ids.add(dr_id)
 
             dr_ids: List[int] = list(sorted(unique_ids))
+            drs: List[DiscordanceReport] = DiscordanceReport.objects.filter(pk__in=dr_ids).order_by('pk')
 
             dr_count = len(dr_ids)
             if dr_count > 6:
@@ -88,18 +89,19 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
                 .add_field("Discordance IDs", ", ".join(f"<{report_url_for_id(dr_id)}|DR_{dr_id}>" for dr_id in dr_ids))
 
             is_first = True
-            for dr_id in dr_ids:
+            for dr in drs:
                 if is_first:
                     is_first = False
                 else:
                     lab_notification.add_divider()
 
+                dr_id = dr.pk
                 report_url = report_url_for_id(dr_id)
                 clin_sig_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
-                report_summary = DiscordanceReportRowData(discordance_report=outstanding_notification.discordance_report,
+                report_summary = DiscordanceReportRowData(discordance_report=dr,
                                                           perspective=user_perspective)
-                if resolution_text := outstanding_notification.discordance_report.resolution_text:
+                if resolution_text := dr.resolution_text:
                     lab_notification.add_markdown(f"The below overlap is now marked as *{resolution_text}*")
                 # notification.add_markdown(f"The labs {all_lab_names} are involved in the following discordance:")
 
