@@ -55,6 +55,11 @@
             color: #444!important;
             margin-top: 4px;
         }
+        .extra-summary label.c-hgvs {
+            text-transform: inherit;
+            color: #777!important;
+            font-size: 0.8rem;
+        }
         .extra.normal + .extra.normal {
             margin-left: 8px;
         }
@@ -231,7 +236,7 @@
                                                     {% if not extra.link %}{% comment %}Don't show links in search results as they're just confusing{% endcomment %}
                                                         <span class="extra {% if extra.dedicated_row %}important d-block{% else %}normal d-inline-block{% endif %}">{% if extra.icon %}<i class="{{ extra.icon }} text-success mr-1"></i>{% endif %}
                                                         {% if "c.HGVS" in extra.key %}
-                                                            <label style="text-transform: inherit">{{ extra.key }}</label>{% c_hgvs extra.value %}
+                                                            <label class="c-hgvs">{{ extra.key }}</label>{% c_hgvs extra.value %}
                                                         {% else %}
                                                             {% if extra.key %}<label>{{ extra.key }} </label> {% endif %}
                                                             {{ extra.value|format_value:200 }}

@@ -84,7 +84,7 @@ def _allele_preview_classifications_extra(user: User, obj: Allele, genome_build:
         if c_hgvs := sorted(
                 c_hgvs for c_hgvs in cms.order_by(column).values_list(column, flat=True).distinct().all() if c_hgvs):
             for hgvs in c_hgvs:
-                hgvs_extras.append(PreviewKeyValue(None, hgvs, dedicated_row=True))
+                hgvs_extras.append(PreviewKeyValue(f"{genome_build} c.HGVS", hgvs, dedicated_row=True))
 
     if not hgvs_extras:
         try:
