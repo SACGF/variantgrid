@@ -159,7 +159,7 @@ class SettingsOverride(models.Model):
     default_sort_by_column = models.ForeignKey(CustomColumn, on_delete=SET_NULL, null=True, blank=True,
                                                help_text="Default value to sort analysis grids (can be changed per analysis)")
     tag_colors = models.ForeignKey(TagColorsCollection, on_delete=SET_NULL, null=True, blank=True,
-                                   help_text="Set of colors assigned to tags")
+                                   help_text="Set of colors assigned to tags (modify/create these in 'Tag settings')")
     variant_link_in_analysis_opens_new_tab = models.BooleanField(null=True,
                                                                  help_text="Whether left click by default opens up variant details in new tab. No is to open details in the node editor location. It's always possible to right click and select 'open in new tab'")
     tool_tips = models.BooleanField(null=True, blank=True,

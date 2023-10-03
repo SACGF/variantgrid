@@ -37,7 +37,7 @@ class Migration(migrations.Migration):
             name="tag_colors",
             field=models.ForeignKey(
                 blank=True,
-                help_text="Set of colors assigned to tags",
+                help_text="Set of colors assigned to tags (modify/create these in 'Tag settings')",
                 null=True,
                 on_delete=django.db.models.deletion.SET_NULL,
                 to="snpdb.tagcolorscollection",

@@ -42,8 +42,8 @@ function getAnalysisWindow() {
             // Error: Uncaught SecurityError: Blocked a frame with origin "X" from accessing a cross-origin frame.
             aWin = _getAnalysisWindow();
         } catch(e) {
-            if (typeof RAISED_GET_ANALYIS_WINDOW_JS_ERROR == "undefined") {
-                RAISED_GET_ANALYIS_WINDOW_JS_ERROR = true;
+            if (typeof RAISED_GET_ANALYSIS_WINDOW_JS_ERROR == "undefined") {
+                RAISED_GET_ANALYSIS_WINDOW_JS_ERROR = true;
                 console.log(e);
                 const exception_string = e.message + '\n' + e.stack;
                 createJSEvent(exception_string, 'W', true); // log to server
