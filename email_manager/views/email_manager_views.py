@@ -26,7 +26,6 @@ def email_detail(request, email_id: int):
     for check_user in users:
         unrecognised_emails.discard(check_user.email)
     unrecognised_email_list = list(sorted(unrecognised_emails))
-    unrecognised_email_list += ["foo@bar", "cat@dog", "what#ddfd"]
 
     return render_ajax_view(
         request,
