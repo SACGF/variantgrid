@@ -71,7 +71,7 @@ class Migration(migrations.Migration):
             name="import_messages",
             field=models.BooleanField(
                 blank=True,
-                help_text="Get internal notification (message icon top left) when imports done (eg VCF finished processing and annotating)",
+                help_text="Get internal notification (message icon top left) when imports are done (eg VCF finished processing and annotating)",
                 null=True,
             ),
         ),

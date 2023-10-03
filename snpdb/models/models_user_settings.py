@@ -167,7 +167,7 @@ class SettingsOverride(models.Model):
     node_debug_tab = models.BooleanField(null=True, blank=True,
                                          help_text="If true, an extra tab appears in analysis node editor, with details about node settings + SQL query.")
     import_messages = models.BooleanField(null=True, blank=True,
-                                          help_text="Get internal notification (message icon top left) when imports done (eg VCF finished processing and annotating)")
+                                          help_text="Get internal notification (message icon top left) when imports are done (eg VCF finished processing and annotating)")
     igv_port = models.IntegerField(null=True, blank=True,
                                    help_text="Port to connect to IGV on your machine")
     default_genome_build = models.ForeignKey(GenomeBuild, on_delete=SET_NULL, null=True, blank=True,
