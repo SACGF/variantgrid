@@ -54,9 +54,10 @@ def stream_report_rows(interval) -> Iterator[ReportDataRow]:
         if interval != 1:
             the_date = week_start_date(the_date)
 
-        user = ve.user.username if hasattr(ve, 'user') else 'Unknown'
-        report_data[the_date]['users'].add(user)
-        report_data[the_date]['count'] += 1
+        if user := ve.user:
+            report_dict = report_data[the_date]
+            report_dict["users"].add(user.username)
+            report_dict["count"] += 1
 
     for report_date, data in report_data.items():
         user_list = len(data['users'])
