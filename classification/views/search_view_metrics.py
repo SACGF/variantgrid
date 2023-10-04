@@ -54,9 +54,9 @@ def stream_report_rows(interval) -> Iterator[ReportDataRow]:
         if interval != 1:
             the_date = week_start_date(the_date)
 
-        if user := ve.user:
+        if user_id := ve.user_id:
             report_dict = report_data[the_date]
-            report_dict["users"].add(user.username)
+            report_dict["users"].add(user_id)
             report_dict["count"] += 1
 
     for report_date, data in report_data.items():
