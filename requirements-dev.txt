@@ -7,6 +7,7 @@ cdot
 celery
 ConfigArgParse
 coreapi
+crispy-bootstrap4
 cyvcf2>=0.30.14
 Django
 django-amazon-ses
