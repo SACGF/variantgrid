@@ -46,7 +46,7 @@ ipython
 kombu
 levenshtein
 Markdown
-matplotlib
+matplotlib==3.5.1
 more_itertools
 mozilla_django_oidc
 nameparser
