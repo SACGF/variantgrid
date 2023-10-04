@@ -26,6 +26,7 @@ from snpdb.models import Allele
 class FormatDetailsMVLFileFormat(str, Enum):
     TSV = "tsv"
     JSON = "json"
+    HTML = "html"
 
 
 class FormatDetailsMVL:
@@ -361,6 +362,8 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
 
             # can't juse simple JSON because we don't want to close this off yet
             return ['{"molecularVariants":[']
+        elif self.file_format == FormatDetailsMVLFileFormat.HTML:
+            return ["<html><body>"]
         else:
             raise ValueError(f"Unexpected file format {self.format_details.format}")
 
@@ -374,13 +377,30 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
     def footer(self) -> List[str]:
         if self.file_format == FormatDetailsMVLFileFormat.JSON:
             return ["]}"]
+        elif self.file_format == FormatDetailsMVLFileFormat.HTML:
+            return ["</body></html>"]
         else:
             return []
 
     def row(self, allele_data: AlleleData) -> List[str]:
         c_datas = CHGVSData.split_into_c_hgvs(allele_data, use_full=True)
 
-        if self.file_format == FormatDetailsMVLFileFormat.TSV:
+        if self.file_format == FormatDetailsMVLFileFormat.HTML:
+            output = []
+            for c_data in c_datas:
+                mvl_data = MVLCHGVSData(
+                    c_data,
+                    self.format_details,
+                    self.grouping_utils
+                )
+                mvl_entry = MVLEntry(mvl_data)
+
+                html_data = render_to_string('classification/mvl_html_export.html', {"mvl_entry": mvl_entry})
+                output.append(html_data)
+
+            return ["".join(output)]
+
+        elif self.file_format == FormatDetailsMVLFileFormat.TSV:
             return list(MVLEntry.csv_generator(
                 (MVLCHGVSData(
                     c_data,
@@ -408,9 +428,13 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
             return "tsv"
         elif self.file_format == FormatDetailsMVLFileFormat.JSON:
             return "json"
+        elif self.file_format == FormatDetailsMVLFileFormat.HTML:
+            return "html"
 
     def content_type(self) -> str:
         if self.file_format == FormatDetailsMVLFileFormat.TSV:
             return "text/tab-separated-values"
         elif self.file_format == FormatDetailsMVLFileFormat.JSON:
             return "application/json"
+        elif self.file_format == FormatDetailsMVLFileFormat.HTML:
+            return "text/html"

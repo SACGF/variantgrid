@@ -93,7 +93,8 @@ class ClassificationExportFormatter(ABC):
         else:
             self.file_count = 1
             # can stream in single file
-            response = StreamingHttpResponse(self._yield_single_file(), self.content_type())
+            response = StreamingHttpResponse(streaming_content=self._yield_single_file(), content_type=self.content_type())
+            response.minify_response = False
             response['Last-Modified'] = self.classification_filter.last_modified_header
             response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
             return response

@@ -1,0 +1,12 @@
+<div style="margin:10px; border: 1px solid #666; border-radius: 10px; padding: 16px">
+    {{ mvl_entry.transcript }}<span style="color:#777">({{ mvl_entry.gene }})</span>{{ mvl_entry.c_nomen_tsv }}
+
+    <h4 style="font-family: monospace; color: #666; border-bottom: 1px dashed #ccc">Classification</h4>
+    {{ mvl_entry.classification }}
+
+    <h4 style="font-family: monospace; color: #666; border-bottom: 1px dashed #ccc">Variant Info</h4>
+    {{ mvl_entry.variant_information_tsv | safe }}
+
+    <h4 style="font-family: monospace; color: #666; border-bottom: 1px dashed #ccc">Report Abstract</h4>
+    {{ mvl_entry.report_abstract_tsv | safe }}
+</div>
