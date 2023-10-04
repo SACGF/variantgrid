@@ -35,6 +35,11 @@ def email_detail(request, email_id: int):
     )
 
 
+def email_pure(request, email_id: int):
+    email_log = EmailLog.objects.get(pk=email_id)
+    return render(request, 'email_pure.html', context={"email": email_log})
+
+
 class EmailColumns(DatatableConfig[EmailLog]):
 
     def power_search(self, qs: QuerySet[EmailLog], search_string: str) -> QuerySet[EmailLog]:

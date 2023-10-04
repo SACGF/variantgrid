@@ -1,0 +1,9 @@
+<div style="padding:30px">
+    Sent : {{ email.created }}<br/>
+    To: {{ email.recipient_list }}<br/>
+    Subject: {{ email.subject }}<br/>
+
+    <div style="padding:30px; margin-top: 20px; border: 1px solid #444; border-radius: 10px;">
+        {{ email.html | safe }}
+    </div>
+</div>

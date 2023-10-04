@@ -198,7 +198,7 @@ class NotificationBuilder:
             return self.header_text
 
         def as_html(self):
-            return f"<h4>{self.header_text}</h4>"
+            return f"<h4>{NotificationBuilder.slack_markdown_to_html(self.header_text)}</h4>"
 
         def as_slack(self):
             return {

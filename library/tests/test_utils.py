@@ -1,5 +1,6 @@
 from django.test import TestCase
 
+from library.log_utils import NotificationBuilder
 from library.utils import format_significant_digits
 
 
@@ -17,3 +18,8 @@ class TestUtils(TestCase):
         self.assertEqual("1.12", format_significant_digits(1.116))
         self.assertEqual("0.0000015", format_significant_digits(0.00000150002))
         self.assertEqual("-0.0000015", format_significant_digits(-0.00000150002))
+
+    def test_markdown(self):
+        markdown_text = ":hospital: This is **bold**"
+        html = NotificationBuilder.slack_markdown_to_html(markdown_text)
+        self.assertEqual("This is <strong>bold</strong>", html)
