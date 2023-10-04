@@ -11,6 +11,11 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
 <div class="container">
+<h3>Metrics</h3>
+    <div class="my-4">
+    <a class="download-link admin-only d-block my-1" href="{% url 'export_search_data' %}">Stats over time Daily</a>
+    <a class="download-link admin-only d-block my-1" href="{% url 'export_search_data' %}?frequency=7">Stats over time Weekly</a>
+    </div>
 
     <div class="d-flex justify-content-between align-items-center">
         <div class="btn-group mb-4" role="group" aria-label="Days Old">

@@ -1,7 +1,7 @@
 from rest_framework import routers
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from classification.views import clinvar_export_view
+from classification.views import clinvar_export_view, search_view_metrics
 from classification.views import views, classification_dashboard_view, \
     classification_export_view, views_autocomplete, \
     classification_accumulation_graph
@@ -147,6 +147,7 @@ urlpatterns = [
 
     perm_path('discordance_report_triage/<int:discordance_report_triage_id>', DiscordanceReportTriageView.as_view(), name='discordance_report_triage_detail'),
 
+    perm_path('export_search_data', search_view_metrics.download_search_data, name='export_search_data'),
     perm_path('export', classification_export_view.export_view, name='classification_export'),
     perm_path('export_redirect', classification_export_view.export_view_redirector, name='classification_export_redirect'),
     perm_path('import', classification_import_tool, name='classification_import_tool'),
