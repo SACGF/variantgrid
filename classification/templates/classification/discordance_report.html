@@ -1,5 +1,6 @@
 {% extends "uicore/page/base.html" %}
 {% load guardian_tags %}
+{% load clinvar_tags %}
 {% load crispy_forms_tags %}
 {% load static %}
 {% load js_tags %}
@@ -117,6 +118,10 @@
                 {% endfor %}
             </div>
         </div>
+    </div>
+
+    <div class="container mt-4">
+        {% clinvar allele=data.allele expert_panel_only=True %}
     </div>
 
     <div class="container mt-4">
