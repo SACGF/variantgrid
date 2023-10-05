@@ -297,6 +297,7 @@ class HGVSMatcher:
 
             variant_coordinate = None
             hgvs_methods = []
+            error_message = None
             for tv, method in self.filter_best_transcripts_and_method_by_accession(transcript_accession):
                 used_transcript_accession = tv.accession
                 hgvs_variant.transcript = tv.accession
@@ -317,13 +318,17 @@ class HGVSMatcher:
                                 self._set_clingen_allele_registry_missing_transcript(tv.accession)
                             else:
                                 logging.error(error_message, cga_se)
+                                error_message = str(cga_se)
                         except ClinGenAllele.ClinGenAlleleRegistryException as cgare:
                             # API or other recoverable error - try again w/another transcript
                             logging.error(error_message, cgare)
+                            error_message = str(cga_se)
 
                 if method:
                     if hgvs_string != hgvs_string_for_version:
-                        method += f" as '{hgvs_string_for_version}'"
+                        method += f" as \"{hgvs_string_for_version}\""
+                    if error_message:
+                        method += f" {error_message}"
                     hgvs_methods.append(method)
 
                 if variant_coordinate:
