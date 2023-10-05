@@ -608,7 +608,7 @@ class HGVSMatcher:
         # pyhgvs sets to gene, Biocommons always uses as transcript
         hgvs_variant = self.create_hgvs_variant(hgvs_string)
         if hgvs_variant.transcript and hgvs_variant.gene:
-            return None  # only return symbol if transcript is not used
+            return None, None  # only return symbol if transcript is not used
         symbol = hgvs_variant.transcript or hgvs_variant.gene
         if gene_symbol := GeneSymbol.objects.filter(pk=symbol).first():
             alias = None
