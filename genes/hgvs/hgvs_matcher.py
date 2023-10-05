@@ -57,12 +57,15 @@ class HGVSConverterFactory:
     """
 
     @staticmethod
-    def factory(genome_build: GenomeBuild, hgvs_converter_type: HGVSConverterType = None):
+    def factory(genome_build: GenomeBuild, hgvs_converter_type: Optional[HGVSConverterType] = None):
         if hgvs_converter_type is None:
-            if settings.DEBUG:  # TODO: Disabled
-                hgvs_converter_type = HGVSConverterType.COMBO
-            else:
-                hgvs_converter_type = HGVSConverterType[settings.HGVS_DEFAULT_METHOD.upper()]
+            # if settings.DEBUG:  # TODO: Disabled
+            #     hgvs_converter_type = HGVSConverterType.COMBO
+            # else:
+            hgvs_converter_type = settings.HGVS_DEFAULT_METHOD
+
+        if isinstance(hgvs_converter_type, str):
+            hgvs_converter_type = HGVSConverterType[hgvs_converter_type.upper()]
 
         logging.debug("Using HGVSConverter = %s", hgvs_converter_type.name)
 
