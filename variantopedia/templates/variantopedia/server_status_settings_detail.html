@@ -54,6 +54,17 @@
                 </div>
             </div>
         </div>
+
+        <div class="col-6">
+            <div class="card mb-4">
+                <div class="card-header">Variant Matching</div>
+                <div class="card-body">
+                    {% labelled hint="tiny" label="Variant Matching Method" %}{{ settings.HGVS_DEFAULT_METHOD }}{% endlabelled %}
+                    {% labelled hint="tiny" label="Matcher Version" %}{{ hgvs_matcher.hgvs_converter.description }}{% endlabelled %}
+                    {% labelled hint="tiny" label="Attempt ClinGen" %}{{ hgvs_matcher.attempt_clingen }}{% endlabelled %}
+                </div>
+            </div>
+        </div>
     </div>
 
     <h4>Debug</h4>
