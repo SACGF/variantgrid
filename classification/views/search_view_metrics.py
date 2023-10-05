@@ -8,6 +8,8 @@ from django.contrib.auth.models import User
 from eventlog.models import ViewEvent
 from dataclasses import dataclass
 from datetime import timedelta, datetime, date
+
+from library.django_utils import require_superuser
 from library.utils import ExportRow, export_column
 
 
@@ -65,6 +67,7 @@ def stream_report_rows(interval) -> Iterator[ReportDataRow]:
         yield ReportDataRow(date=report_date, user=user_list, search_counts=searches)
 
 
+@require_superuser
 def download_search_data(request):
     frequency = 1
     if frequency_param := request.GET.get('frequency'):

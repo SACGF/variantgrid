@@ -21,6 +21,7 @@ from ontology.models import OntologySnake, OntologyVersion, OntologyTermStatus, 
 from ontology.ontology_matching import OntologyMatching, SearchText, normalize_condition_text
 
 
+@require_superuser
 def condition_match_test_download_view(request: HttpRequest) -> HttpResponseBase:
 
     def result_iterator():
@@ -151,6 +152,7 @@ class _SuggestionDetail:
 _TRUNCATE_DESCENDANTS_TO = 10
 
 
+@require_superuser
 def condition_match_test_view(request):
     condition_text = request.GET.get("condition_text")
     gene_symbol_str = request.GET.get("gene_symbol")
