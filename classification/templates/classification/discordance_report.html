@@ -121,10 +121,6 @@
     </div>
 
     <div class="container mt-4">
-        {% clinvar allele=data.allele expert_panel_only=True %}
-    </div>
-
-    <div class="container mt-4">
         <h4 {% if triages %}style="margin-bottom:0"{% endif %}>Step 1: Triages</h4>
         {% with triages=data.triage_embeds %}
             {% if triages %}
@@ -178,6 +174,9 @@
             </div>
         {% endif %}
 
+        <div class="container mt-4">
+            {% clinvar allele=data.allele expert_panel_only=True %}
+        </div>
 
         <h4 class="text-secondary">History of this Clinical Grouping's Discordance Reports</h4>
         {% if data.has_history %}
