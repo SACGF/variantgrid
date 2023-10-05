@@ -242,6 +242,10 @@ class ConditionResolved:
     def summary(self) -> str:
         text = ", ".join([term.id for term in self.terms])
         if join := self.join:
+            try:
+                join = join.value
+            except Exception:
+                pass
             text = f"{text} {join}"
         return text
 

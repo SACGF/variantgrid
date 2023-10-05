@@ -1135,8 +1135,8 @@ def apply_condition_resolution(classification: Classification, new_condition_res
         classification_data = Classification.objects.filter(id=classification.id
                                                             ).select_for_update().values('condition_resolution').first()
         old_condition_resolution = classification_data['condition_resolution']
-        condition_text_old = "No Condition"
-        condition_text = "No Condition"
+        condition_text_old = "No Matched Condition"
+        condition_text = "No Matched Condition"
         if old_condition_resolution:
             condition_text_old = ConditionResolved.from_dict(old_condition_resolution)
             condition_text_old = condition_text_old.summary
