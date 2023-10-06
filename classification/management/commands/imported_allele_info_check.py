@@ -208,7 +208,12 @@ class Command(BaseCommand):
         data = qs.aggregate(Max("modified"))
         return data["modified__max"]
 
+    def add_arguments(self, parser):
+        parser.add_argument('--hgvs_method', type="str", default="BIOCOMMONS_HGVS")
+
     def handle(self, *args, **options):
+        hgvs_converter_type = args["hgvs_method"]
+
         start_last_modified = self._get_last_modified()
 
         variant_diff_count = Counter()
@@ -218,7 +223,7 @@ class Command(BaseCommand):
         iai: ImportedAlleleInfo
         hgvs_matchers_by_build = {}
         for genome_build in GenomeBuild.builds_with_annotation():
-            matcher = HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS)
+            matcher = HGVSMatcher(genome_build, hgvs_converter_type=hgvs_converter_type)
             hgvs_matchers_by_build[genome_build] = matcher
 
         filename = "classification_match_diff.csv"
