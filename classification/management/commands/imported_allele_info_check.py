@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.utils.http import urlencode
 
 from classification.models import ImportedAlleleInfo
-from genes.hgvs import HGVSMatcher, HGVSConverterType
+from genes.hgvs import HGVSMatcher, HGVSConverterType, VariantResolvingError
 from genes.models import TranscriptVersion, TranscriptParts
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column, delimited_row
@@ -212,7 +212,10 @@ class Command(BaseCommand):
         parser.add_argument('--hgvs_method', type=str, default="BIOCOMMONS_HGVS")
 
     def handle(self, *args, **options):
-        hgvs_converter_type = options.get("hgvs_method")
+        hgvs_converter_type_str = options.get("hgvs_method")
+        hgvs_converter_type = HGVSConverterType[hgvs_converter_type_str.upper()]
+
+        print(f"Using conversion type = {hgvs_converter_type}")
 
         start_last_modified = self._get_last_modified()
 
@@ -280,6 +283,9 @@ class Command(BaseCommand):
                         stage = "Resolving c.HGVS"
                         if hgvs_variant := matcher.variant_coordinate_to_hgvs_variant(updated.variant_coordinate, str(updated.transcript)):
                             updated.c_hgvs = hgvs_variant.format()
+
+                except VariantResolvingError as vre:
+                    updated.error_str = stage + ": " + ex.__class__.__name__ + ": " + str(vre) + " " + str(vre.technical_message)
 
                 except Exception as ex:
                     updated.error_str = stage + ": " + ex.__class__.__name__ + ": " + str(ex)
