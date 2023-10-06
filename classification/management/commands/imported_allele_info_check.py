@@ -209,7 +209,7 @@ class Command(BaseCommand):
         return data["modified__max"]
 
     def add_arguments(self, parser):
-        parser.add_argument('--hgvs_method', type="str", default="BIOCOMMONS_HGVS")
+        parser.add_argument('--hgvs_method', type=str, default="BIOCOMMONS_HGVS")
 
     def handle(self, *args, **options):
         hgvs_converter_type = options.get("hgvs_method")
