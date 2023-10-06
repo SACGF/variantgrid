@@ -1048,6 +1048,7 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
         Soft remwatch will leave everything linked while attempting to match again
         """
         for allele_info in queryset:
+            allele_info.update_variant_coordinate()
             allele_info.refresh_and_save(force_update=True)
             allele_info.classification_import = None
             allele_info.status = ImportedAlleleInfoStatus.PROCESSING
