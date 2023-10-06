@@ -45,9 +45,11 @@ class VariantCoordinateAndDetails(FormerTuple):
     kind: str
     method: str
     matches_reference: Union[bool, HgvsMatchRefAllele]
+    error_message: Optional[str] = None
 
     @property
     def as_tuple(self) -> Tuple:
+        # don't include error in tuple as it's new and the tuple is only for backward compatibility
         return self.variant_coordinate, self.transcript_accession, self.kind, self.method, self.matches_reference
 
 
@@ -185,7 +187,7 @@ class HGVSMatcher:
         cache.set(key, True, timeout=WEEK_SECS)
 
     def get_variant_coordinate(self, hgvs_string: str) -> VariantCoordinate:
-        return self.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string)[0]
+        return self.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string).variant_coordinate
 
     @staticmethod
     def _get_sort_key_transcript_version_and_methods(version, prefer_local=True, closest=False):
@@ -282,6 +284,7 @@ class HGVSMatcher:
         transcript_accession = self.hgvs_converter.get_transcript_accession(hgvs_string)
         used_transcript_accession = None
         method = None
+        error_message = None
         matches_reference = None
         hgvs_variant = self.create_hgvs_variant(hgvs_string)
         kind = hgvs_variant.kind
@@ -297,7 +300,6 @@ class HGVSMatcher:
 
             variant_coordinate = None
             hgvs_methods = []
-            error_message = None
             for tv, method in self.filter_best_transcripts_and_method_by_accession(transcript_accession):
                 used_transcript_accession = tv.accession
                 hgvs_variant.transcript = tv.accession
@@ -308,7 +310,7 @@ class HGVSMatcher:
                     variant_coordinate, matches_reference = self.hgvs_converter.hgvs_to_variant_coordinate_and_reference_match(hgvs_string_for_version, tv)
                 elif method == self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY:
                     if self._clingen_allele_registry_ok(tv.accession):
-                        error_message = f"Could not convert \"{hgvs_string}\" using ClinGenAllele Registry: %s"
+                        error_message = f"Could not convert \"{hgvs_string}\" using ClinGenAllele Registry"
                         try:
                             matches_reference = True  # ClnGen fails if different
                             variant_coordinate = self._clingen_get_variant_coordinate(hgvs_string_for_version)
@@ -327,8 +329,6 @@ class HGVSMatcher:
                 if method:
                     if hgvs_string != hgvs_string_for_version:
                         method += f" as \"{hgvs_string_for_version}\""
-                    if error_message:
-                        method += f" {error_message}"
                     hgvs_methods.append(method)
 
                 if variant_coordinate:
@@ -350,7 +350,8 @@ class HGVSMatcher:
             transcript_accession=used_transcript_accession,
             kind=kind,
             method=method,
-            matches_reference=matches_reference
+            matches_reference=matches_reference,
+            error_message=error_message
         )
 
     def get_transcript_accession(self, hgvs_string: str) -> str:
