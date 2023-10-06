@@ -45,11 +45,9 @@ class VariantCoordinateAndDetails(FormerTuple):
     kind: str
     method: str
     matches_reference: Union[bool, HgvsMatchRefAllele]
-    error_message: Optional[str] = None
 
     @property
     def as_tuple(self) -> Tuple:
-        # don't include error in tuple as it's new and the tuple is only for backward compatibility
         return self.variant_coordinate, self.transcript_accession, self.kind, self.method, self.matches_reference
 
 
@@ -78,6 +76,13 @@ class HGVSConverterFactory:
         elif hgvs_converter_type == HGVSConverterType.COMBO:
             converters = [BioCommonsHGVSConverter(genome_build), PyHGVSConverter(genome_build)]
             return ComboCheckerHGVSConverter(genome_build, converters, die_on_error=False)
+
+
+class VariantResolvingError(ValueError):
+
+    def __init__(self, message: str, technical_message: str):
+        self.technical_message = technical_message
+        super().__init__(message)
 
 
 class HGVSMatcher:
@@ -284,10 +289,11 @@ class HGVSMatcher:
         transcript_accession = self.hgvs_converter.get_transcript_accession(hgvs_string)
         used_transcript_accession = None
         method = None
-        error_message = None
         matches_reference = None
         hgvs_variant = self.create_hgvs_variant(hgvs_string)
         kind = hgvs_variant.kind
+        error_messages: List[str] = []
+        combined_error_messgae = None
 
         if transcript_is_lrg(transcript_accession):
             variant_coordinate, used_transcript_accession, method, matches_reference = self._lrg_get_variant_tuple_used_transcript_method_and_matches_reference(hgvs_variant)
@@ -320,11 +326,11 @@ class HGVSMatcher:
                                 self._set_clingen_allele_registry_missing_transcript(tv.accession)
                             else:
                                 logging.error(error_message, cga_se)
-                                error_message = str(cga_se)
+                                error_messages.append(f"{error_message} : {cga_se}")
                         except ClinGenAllele.ClinGenAlleleRegistryException as cgare:
                             # API or other recoverable error - try again w/another transcript
                             logging.error(error_message, cgare)
-                            error_message = str(cga_se)
+                            error_messages.append(f"{error_message} : {cga_se}")
 
                 if method:
                     if hgvs_string != hgvs_string_for_version:
@@ -335,9 +341,12 @@ class HGVSMatcher:
                     break
 
             if variant_coordinate is None:
+                if error_messages:
+                    combined_error_messgae = "\n".join(error_messages)
+
                 if hgvs_methods:
                     attempts = "\n".join(hgvs_methods)
-                    raise ValueError(f"Could not convert \"{hgvs_string}\" - tried:\n{attempts}")
+                    raise VariantResolvingError(f"Could not convert \"{hgvs_string}\" - tried:\n{attempts}", technical_message=combined_error_messgae)
                 else:
                     raise ValueError(f"\"{transcript_accession}\": No transcripts found")
         else:
@@ -350,8 +359,7 @@ class HGVSMatcher:
             transcript_accession=used_transcript_accession,
             kind=kind,
             method=method,
-            matches_reference=matches_reference,
-            error_message=error_message
+            matches_reference=matches_reference
         )
 
     def get_transcript_accession(self, hgvs_string: str) -> str:

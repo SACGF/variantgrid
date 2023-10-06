@@ -52,7 +52,7 @@
                             <td>{% c_hgvs output.hgvs %}</td>
                             <td>
                                 {% if output.is_error %}
-                                    {{ 'E' | severity_icon }} {{ output.message }}
+                                    {{ 'E' | severity_icon }} <span style="white-space: pre-line">{{ output.message }}</span>
                                 {% elif output.message %}
                                     <span class="text-secondary">{{ output.message }}</span>
                                 {% endif %}

@@ -6,7 +6,7 @@ from django.http import HttpRequest
 from django.shortcuts import render
 
 from classification.models import ImportedAlleleInfo
-from genes.hgvs import HGVSConverterType, HGVSMatcher
+from genes.hgvs import HGVSConverterType, HGVSMatcher, VariantResolvingError
 from genes.models import TranscriptVersion, TranscriptParts
 from library.django_utils import require_superuser
 from library.utils import all_equal
@@ -113,6 +113,9 @@ def hgvs_resolution_tool(request: HttpRequest):
                         if variant_details := matcher.variant_coordinate_to_hgvs_variant(variant_coordinate,
                                                                                          vcd.transcript_accession):
                             output.hgvs = variant_details.format()
+
+            except VariantResolvingError as vre:
+                output.message = vre.technical_message if vre.technical_message else str(vre)
 
             except Exception as ex:
                 output.message = str(ex)
