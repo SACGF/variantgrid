@@ -140,7 +140,7 @@ SHARIANT_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/shariant_t
 TEMPLATES[0]["DIRS"].insert(0, SHARIANT_TEMPLATES_DIR)
 SITE_NAME = "Shariant"
 
-HGVS_DEFAULT_METHOD = "biocommons_hgvs"
+HGVS_DEFAULT_METHOD = "pyhgvs"
 
 # SITE_MESSAGE = "Shariant is currently in pre-BETA. Please excuse bugs and missing features, and the site may be shut down for upgrades"
 
