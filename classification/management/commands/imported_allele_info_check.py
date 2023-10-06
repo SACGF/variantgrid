@@ -285,7 +285,7 @@ class Command(BaseCommand):
                             updated.c_hgvs = hgvs_variant.format()
 
                 except VariantResolvingError as vre:
-                    updated.error_str = stage + ": " + ex.__class__.__name__ + ": " + str(vre) + " " + str(vre.technical_message)
+                    updated.error_str = stage + ": " + vre.__class__.__name__ + ": " + str(vre) + " " + str(vre.technical_message)
 
                 except Exception as ex:
                     updated.error_str = stage + ": " + ex.__class__.__name__ + ": " + str(ex)
