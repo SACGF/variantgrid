@@ -1,9 +1,7 @@
-from abc import ABC
 from datetime import datetime
 from functools import cached_property
 from typing import Optional, Union, Any, Set, List, Callable, Type
 
-from attr import dataclass
 from django.db.models import Model
 from django.dispatch import Signal
 from django.http import JsonResponse
