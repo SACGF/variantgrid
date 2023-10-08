@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
 from typing import Optional, Union, Any, Set, List, Callable, Type
