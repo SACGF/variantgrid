@@ -36,14 +36,14 @@ def week_start_date(freq: datetime.date) -> datetime.date:
 
 def stream_report_rows(interval) -> Iterator[ReportDataRow]:
 
-    end_of_time_period = datetime.now() - timedelta(days=180)
-    end_of_time_period = end_of_time_period.date()
+    start_of_time_period = datetime.now() - timedelta(days=365)
+    start_of_time_period = start_of_time_period.date()
     report_data = defaultdict(lambda: {'users': set(), 'count': 0})
     admins = User.objects.filter(is_superuser=True)
     testers_and_bots = User.objects.filter(groups__name__in={'variantgrid/tester', 'variantgrid/bot'})
 
     search_metric_data = ViewEvent.objects.filter(
-            created__gte=end_of_time_period,
+            created__gte=start_of_time_period,
             view_name='variantopedia:search',
     ).exclude(args__search="").exclude(user__in=admins).exclude(user__in=testers_and_bots)
 
@@ -59,10 +59,15 @@ def stream_report_rows(interval) -> Iterator[ReportDataRow]:
             report_dict["users"].add(user_id)
             report_dict["count"] += 1
 
-    for report_date, data in report_data.items():
+    current_date = week_start_date(start_of_time_period)
+    today = datetime.now().date()
+
+    while current_date <= today:
+        data = report_data.get(current_date, {'users': set(), 'count': 0})
         user_list = len(data['users'])
         searches = data['count']
-        yield ReportDataRow(date=report_date, user=user_list, search_counts=searches)
+        yield ReportDataRow(date=current_date, user=user_list, search_counts=searches)
+        current_date += timedelta(days=(1 if interval == 1 else 7))
 
 
 def download_search_data(request):
