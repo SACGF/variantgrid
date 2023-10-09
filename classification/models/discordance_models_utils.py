@@ -239,7 +239,7 @@ class DiscordanceReportRowData(ExportRow):
 
     def __lt__(self, other):
         def sort_value(x: DiscordanceReportRowData):
-            return x.is_medically_significant and x.is_requiring_attention, x.discordance_report.pk
+            return x.is_medically_significant and x.is_requiring_attention, x.is_pending_concordance, x.discordance_report.pk
         return sort_value(self) < sort_value(other)
 
 
@@ -380,6 +380,7 @@ class DiscordanceReportCategories:
             summary = DiscordanceReportRowData(discordance_report=dr, perspective=self.perspective)
             if summary.is_valid_including_withdraws:
                 historic.append(summary)
+
         historic.sort(reverse=True)
         return historic
 
