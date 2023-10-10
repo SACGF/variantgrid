@@ -549,8 +549,8 @@ class ClinVarMatchView(View):
         try:
             file_obj = io.StringIO(request.FILES.get('file').read().decode("utf-8"))
             clinvar_legacy_rows = list(ClinVarLegacyRow.load_file(file_obj, clinvar_key))
-        except ValueError as ve:
-            messages.error(request, str(ve))
+        except AttributeError as ve:
+            messages.error(request, f"File is missing or in the wrong format ({ve})")
 
         return render(request, 'classification/clinvar_match.html', {
             'all_keys': ClinVarKey.clinvar_keys_for_user(request.user),

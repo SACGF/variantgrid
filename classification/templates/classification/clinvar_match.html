@@ -93,6 +93,9 @@
                 </tbody>
             </table>
             <script>
+                function noOp() {
+
+                }
                 function loadNext() {
                     let first_data_dom = $('[data-clinvar-row]').first();
                     if (first_data_dom.length == 0) {
@@ -115,7 +118,16 @@
                             loadNext();
                         },
                         error: (call, status, text) => {
-                            first_data_dom.replaceWith($('<div>', {class: 'ajax-error', html:[severityIcon('C'), "Error Loading Data"]}));
+                            // sometimes if the client browser goes to sleep we get errors and want to be able to retry
+                            // if it's going to take a long time
+                            first_data_dom.replaceWith(
+                                $('<a>', {
+                                    onClick: "loadNext()",
+                                    href: '#',
+                                    class: 'ajax-error',
+                                    html:[severityIcon('C'), "Error Loading Data, Retry?"],
+                                    'data-clinvar-row': data
+                            }));
                         },
                         complete: (jqXHR, textStatus) => {}
                     });
