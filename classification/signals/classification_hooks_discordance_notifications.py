@@ -30,7 +30,7 @@ def notify_discordance_change(discordance_report: DiscordanceReport, clinical_co
         prepare_discordance_notification(discordance_report=discordance_report, cause=clinical_context_change_data.cause_text)
         if clinical_context_change_data.cause_code != ClinicalContextRecalcTrigger.DELAYED:
             NotificationBuilder("Send Notifications Triggered")\
-                .add_markdown(f"Detected discordance change outside of import for DR_{discordance_report.pk} casued by *{clinical_context_change_data.cause_code.value}* - will send out notifications now.")\
+                .add_markdown(f"Detected discordance change outside of an import for DR_{discordance_report.pk} casued by *{clinical_context_change_data.cause_code.value}* - will send out notifications now.")\
                 .send()
             send_prepared_discordance_notifications()
 

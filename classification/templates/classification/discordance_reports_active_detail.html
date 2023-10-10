@@ -81,11 +81,10 @@
                                         {% with contact=lab_count.lab.contact_details %}
                                             {% if contact %}
                                                 <div class="float-right text-secondary">
-                                                    (Click to expand and see contact details
-                                                    {% if contact.website %}<i class="fas fa-globe" title="There is a contact website"></i>{% endif %}
-                                                    {% if contact.email %}<i class="fas fa-envelope" title="The is a contact email address"></i>{% endif %}
-                                                    {% if contact.phone %}<i class="fas fa-phone" title="There is a contact phone number"></i>{% endif %}
-                                                    )
+                                                    {% if contact.website %}<i class="fas fa-globe "></i>{% endif %}
+                                                    {% if contact.email %}<i class="fas fa-envelope"></i>{% endif %}
+                                                    {% if contact.phone %}<i class="fas fa-phone"></i>{% endif %}
+                                                    Click to expand and see contact details
                                                 </div>
                                             {% endif %}
                                         {% endwith %}
@@ -112,7 +111,7 @@
                                                 {% labelled label="Contact Phone" %}{{ contact.phone }}{% endlabelled %}
                                             {% endif %}
                                             {% if contact.email %}
-                                                {% labelled label="Contact Email" %}<a href="mailto:{{ contact.email }}?subject=Discordance for our labs to discuss" class="mail-link">{{ contact.email }}</a>{% endlabelled %}
+                                                {% labelled label="Contact Email" %}<a href="mailto:{{ contact.email }}?subject=Shariant discordances for discussion" class="mail-link">{{ contact.email }}</a>{% endlabelled %}
                                             {% endif %}
                                         {% endif %}
                                     </div>
