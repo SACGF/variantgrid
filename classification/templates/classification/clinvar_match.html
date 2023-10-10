@@ -99,6 +99,7 @@
                         return;
                     }
                     let data = first_data_dom.attr('data-clinvar-row');
+                    first_data_dom.removeAttr('data-clinvar-row');
                     let url = Urls.clinvar_match_detail('{{ clinvar_key.pk }}');
                     first_data_dom.html($('<i class="fa fa-spinner"></i>'));
 
@@ -118,8 +119,8 @@
                         },
                         complete: (jqXHR, textStatus) => {}
                     });
-
                 }
+                loadNext();
                 loadNext();
             </script>
         {% endif %}
