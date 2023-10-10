@@ -20,7 +20,7 @@ from classification.enums import SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
     EvidenceKeyMap, ClinVarExportStatus, ClinVarExportSubmission
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
-from classification.utils.clinvar_matcher import ClinVarLegacyRow
+from classification.utils.clinvar_matcher import ClinVarLegacyRow, ClinVarLegacyMatches, ClinVarLegacyExportMatchType
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
@@ -565,7 +565,24 @@ def clinvar_match_detail(request, clinvar_key_id: str):
 
     # TODO should this be a post?
     data_str = request.GET.get('data_str')
+    if not data_str:
+        print("Why no data_str?? that's weird")
+
+    legacy_row = ClinVarLegacyRow.from_data_str(clinvar_key, data_str)
+    matches: List[ClinVarLegacyMatches] = legacy_row.find_variant_grid_allele() if data_str else []
+
+    # see if we match to a ClinVarExport, but not using SCV
+    # implying that the SCV might need to be copied over
+    has_clinvar_export = False
+    has_scv_match = False
+    for legacy_match in matches:
+        for clinvar_export_match in legacy_match.clinvar_export_matches:
+            has_clinvar_export = has_clinvar_export or bool(clinvar_export_match.clinvar_export)
+            has_scv_match = has_scv_match or ClinVarLegacyExportMatchType.SCV_MATCHES in clinvar_export_match.match_types
+
+    action_required = has_clinvar_export and not has_scv_match
 
     return render(request, 'classification/clinvar_match_detail.html', {
-        'matches': ClinVarLegacyRow.from_data_str(clinvar_key, data_str).find_variant_grid_allele() if data_str else []
+        'matches': matches,
+        'action_required': action_required
     })

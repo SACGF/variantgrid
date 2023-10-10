@@ -95,6 +95,9 @@
             <script>
                 function loadNext() {
                     let first_data_dom = $('[data-clinvar-row]').first();
+                    if (first_data_dom.length == 0) {
+                        return;
+                    }
                     let data = first_data_dom.attr('data-clinvar-row');
                     let url = Urls.clinvar_match_detail('{{ clinvar_key.pk }}');
                     first_data_dom.html($('<i class="fa fa-spinner"></i>'));
@@ -107,7 +110,6 @@
                             data_str: data
                         },
                         success: (results, textStatus, jqXHR) => {
-                            // TODO provide the ability for a cache token, so we only reload data if something's changed
                             first_data_dom.replaceWith(results);
                             loadNext();
                         },

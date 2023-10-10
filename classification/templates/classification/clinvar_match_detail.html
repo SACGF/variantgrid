@@ -27,6 +27,9 @@
                     {% if clinvar_export_match.clinvar_export.scv %}<div class="text-monospace">SCV:{{ clinvar_export_match.clinvar_export.scv }}</div>{% endif %}
                 </div>
             {% endfor %}
+            {% if action_required %}
+                <i class="fa-solid fa-star"></i> <strong>Good candidate to copy the SCV to.</strong>
+            {% endif %}
         </div>
         <div style="flex-grow:1"></div>
     </div>
