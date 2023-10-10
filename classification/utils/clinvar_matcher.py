@@ -18,7 +18,7 @@ from enum import Enum
 from functools import cached_property
 from typing import Dict, List, Optional, Set, Iterator
 
-from annotation.models import ClinVar
+from annotation.models import ClinVar, AnnotationVersion
 from classification.enums import SpecialEKeys
 from classification.models import Classification, ClinVarExport, ClinVarAllele, EvidenceKeyMap, \
     ConditionResolved
@@ -257,11 +257,19 @@ class ClinVarLegacyRow:
                         pass
         return terms
 
-    def find_variant_grid_allele(self) -> List[ClinVarLegacyMatches]:
+    def find_variant_grid_allele(self, force_variant_search: bool = False) -> List[ClinVarLegacyMatches]:
 
         allele_to_match_types: Dict[Allele, Set[ClinVarLegacyAlleleMatchType]] = defaultdict(set)
+        found_variant_id_match = False
 
-        if clinvar_annotation := ClinVar.objects.filter(clinvar_variation_id=self.variant_clinvar_id).order_by('-version').first():
+        # TODO need to change this to some kind of default genome build
+        # TODO, can we cache this? It's going to be recalculated every turn
+        annotation_version = AnnotationVersion.latest(GenomeBuild.grch38())
+
+        if clinvar_annotation := ClinVar.objects.filter(
+                clinvar_variation_id=self.variant_clinvar_id,
+                version=annotation_version.clinvar_version
+        ).first():
             if allele := clinvar_annotation.variant.allele:
                 allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.CLINVAR_VARIANT_ID)
 
@@ -271,14 +279,13 @@ class ClinVarLegacyRow:
                 try:
                     response = search_hgvs(sender=None, search_input=search_input)
                     for result_entry in response.results:
-                        # FIXME test this
                         result = result_entry.preview.obj
-                        variant: Optional[Variant] = None
                         if isinstance(result, Variant):
-                            variant = result
-                        if variant:
-                            if allele := variant.allele:
+                            if allele := result.allele:
                                 allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_VARIANT)
+                        elif isinstance(result, Allele):
+                            allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_VARIANT)
+
                 except:
                     report_exc_info()
                     pass

@@ -563,10 +563,7 @@ def clinvar_match_detail(request, clinvar_key_id: str):
     clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
     clinvar_key.check_user_can_access(request.user)
 
-    # TODO should this be a post?
     data_str = request.GET.get('data_str')
-    if not data_str:
-        print("Why no data_str?? that's weird")
 
     legacy_row = ClinVarLegacyRow.from_data_str(clinvar_key, data_str)
     matches: List[ClinVarLegacyMatches] = legacy_row.find_variant_grid_allele() if data_str else []
