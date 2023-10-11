@@ -23,7 +23,7 @@ from snpdb.models import GenomeBuild, ImportSource, Sample, UserSettings, Varian
 
 def create_classification_for_sample_and_variant_objects(
         user: User,
-        sample: Sample,
+        sample: Optional[Sample],
         variant: Variant,
         genome_build: GenomeBuild,
         refseq_transcript_accession: str = None,

@@ -12,6 +12,11 @@ from snpdb.models import GenomeBuild, Variant, ClinGenAllele, Allele, VariantAll
 
 
 class Test(URLTestCase):
+    lab = None
+    other_lab = None
+    user_non_owner = None
+    user_owner = None
+
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
@@ -110,6 +115,20 @@ class Test(URLTestCase):
     @prevent_request_warnings
     def testNoPermission(self):
         self._test_urls(self.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS, self.user_non_owner, expected_code_override=403)
+
+    def testDataGridUrls(self):
+        """ Grids w/o permissions """
+
+        GRID_LIST_URLS = [
+            ("classification_datatables", {}, 200),
+            ("classification_upload_unmapped_datatable", {"GET_PARAMS": {"lab_id": self.lab.pk}}, 200),
+            ("clinvar_export_batch_datatables", {}, 200),
+            ("clinvar_exports_datatables", {}, 200),
+            ("condition_text_datatable", {"lab_id": self.lab.pk}, 200),
+            ("imported_allele_info_datatables", {}, 200),
+        ]
+        self._test_urls(GRID_LIST_URLS, self.user_owner)
+
 
 
 # TODO: Still need to test below

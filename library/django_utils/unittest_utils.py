@@ -78,6 +78,21 @@ class URLTestCase(TestCase):
                 #print(f"Url '{url} obj pk={obj.pk} in results={in_results}'")
                 self.assertEqual(in_results, found, msg=f"Url '{url} obj pk={obj.pk} in results={in_results}'")
 
+    def _test_datatables_grid_list_urls(self, names_obj, user, in_results):
+        client = Client()
+        client.force_login(user)
+
+        for name, kwargs, obj in names_obj:
+            kwargs = kwargs.copy()  # In case client shared them
+            definition_url = reverse(name, kwargs=kwargs) + "?dataTableDefinition=1"
+            response = client.get(definition_url)
+            try:
+                definition_data = response.json()
+            except ValueError:  # Not JSON
+                definition_data = {}
+            print(f"{definition_url=} => {definition_data=}")
+
+
     def _test_jqgrid_list_urls(self, names_obj, user, in_results):
         """ Also allow 403 if not expecting results
             TODO: Load grid properly call URL with sidx params etc, currently get UnorderedObjectListWarning """
