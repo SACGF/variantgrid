@@ -19,6 +19,15 @@ from snpdb.tests.test_data import create_fake_trio
 
 
 class Test(URLTestCase):
+    cohort = None
+    gene_list = None
+    gene_list_category = None
+    gene_symbol = None
+    grch37 = None
+    transcript = None
+    transcript_version = None
+    user_owner = None
+
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
