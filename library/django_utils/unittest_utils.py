@@ -78,7 +78,7 @@ class URLTestCase(TestCase):
                 #print(f"Url '{url} obj pk={obj.pk} in results={in_results}'")
                 self.assertEqual(in_results, found, msg=f"Url '{url} obj pk={obj.pk} in results={in_results}'")
 
-    def _test_grid_list_urls(self, names_obj, user, in_results):
+    def _test_jqgrid_list_urls(self, names_obj, user, in_results):
         """ Also allow 403 if not expecting results
             TODO: Load grid properly call URL with sidx params etc, currently get UnorderedObjectListWarning """
         client = Client()

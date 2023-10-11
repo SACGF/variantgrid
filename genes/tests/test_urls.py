@@ -187,11 +187,11 @@ class Test(URLTestCase):
         self._test_autocomplete_urls(self.PRIVATE_AUTOCOMPLETE_URLS, self.user_non_owner, False)
 
     def testGridListPermission(self):
-        self._test_grid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
+        self._test_jqgrid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
 
     @prevent_request_warnings
     def testGridListNoPermission(self):
-        self._test_grid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
+        self._test_jqgrid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
 
 # TODO: Still to test
 # commented out PRIVATE_GRID_LIST_URLS
