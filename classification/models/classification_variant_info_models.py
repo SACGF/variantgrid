@@ -369,10 +369,11 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     @property
     def variant_coordinate_obj(self) -> Optional[VariantCoordinate]:
+        vc: Optional[VariantCoordinate] = None
         if variant_coordinate_str := self.variant_coordinate:
-            return VariantCoordinate.from_string(variant_coordinate_str)
-        else:
-            return None
+            # Pass in genome build to be able to populate reference if not provided
+            vc = VariantCoordinate.from_string(variant_coordinate_str, self.imported_genome_build)
+        return vc
 
     matched_variant = ForeignKey(Variant, null=True, blank=True, on_delete=SET_NULL)
     """ not used for any logic other than storing the variant that was matched (so we can later find allele, and
