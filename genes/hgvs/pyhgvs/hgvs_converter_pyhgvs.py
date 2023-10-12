@@ -119,7 +119,7 @@ class PyHGVSConverter(HGVSConverter):
         try:
             return HGVSName(hgvs_string)
         except pyhgvs.InvalidHGVSName as e:
-            raise HGVSException from e
+            raise HGVSException(str(e)) from e
 
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
         return PyHGVSVariant(self._hgvs_name(hgvs_string))
