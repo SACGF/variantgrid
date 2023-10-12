@@ -76,7 +76,8 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
     def render_validation(data: CellData):
         return {
             "include": data.get('latest_validation__include') is True,
-            "tags": [tag.as_json() for tag in ImportedAlleleInfoValidation.validation_tags_list_from_dict(data.get('latest_validation__validation_tags'))]
+            "tags": [tag.as_json() for tag in ImportedAlleleInfoValidation.validation_tags_list_from_dict(data.get('latest_validation__validation_tags'))],
+            "message": data.get('message')
         }
 
     def __init__(self, request: HttpRequest):
@@ -130,13 +131,13 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 key='latest_validation__include',
                 label="Include",
                 orderable=True,
-                extra_columns=['latest_validation__validation_tags'],
+                extra_columns=['latest_validation__validation_tags', 'message'],
                 renderer=ImportedAlleleInfoColumns.render_validation,
                 client_renderer='render_validation'
             ),
             RichColumn(
                 key='classification_count',
-                label="Classification<br/>Count",
+                label="<span style=\"font-size:10px\">Classification</span><br/>Count",
                 orderable=True
             ),
             RichColumn('id', visible=False)  # just used for the expand

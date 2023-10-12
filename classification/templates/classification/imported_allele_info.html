@@ -11,7 +11,10 @@
 {% block content %}
     <style>
         .dt-imported_c_hgvs, .dt-grch37__c_hgvs, .dt-grch38__c_hgvs {
-            width: 20%;
+            width: 18%;
+        }
+        .dt-classification_count {
+            width: 60px;
         }
     </style>
     <script>
@@ -26,6 +29,7 @@
         }
         function render_validation(data, type, row) {
             let dom = $('<div>');
+            let mainIncludeLine = $('<div>')
             if (data.include) {
                 $('<i>', {class: 'fas fa-check-circle text-success'}).appendTo(dom);
             } else {
@@ -34,6 +38,9 @@
             for (let tag of data.tags) {
                 let color = tag.severity == "E" ? "text-danger" : "text-warning"
                 $('<div>', {text: tag.label, style: 'font-weight: bold', class: 'mt-1 ' + color}).appendTo(dom);
+            }
+            if (data.message) {
+                $('<div>', {text: data.message, class: 'text-secondary'}).appendTo(dom);
             }
             return dom.prop('outerHTML');
         }
