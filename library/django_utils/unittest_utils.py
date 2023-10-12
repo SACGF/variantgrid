@@ -102,13 +102,15 @@ class URLTestCase(TestCase):
             url = reverse(name, kwargs=kwargs)
             definition_url = url + "?dataTableDefinition=1"
             response = client.get(definition_url)
-            response.json()  # Just need to verify that
-            self.assertEqual(200, response.status_code)
+            if in_results:
+                response.json()  # Just need to verify that
+                self.assertEqual(200, response.status_code)
 
             response = client.get(url)
-            if response.status_code == 403 and in_results is False:
-                return
-            self.assertEqual(200, response.status_code)
+            if in_results:
+                self.assertEqual(200, response.status_code)
+            elif response.status_code == 403:
+                continue  # No need to check
 
             data = json.loads(response.content)
             if obj is not None:
@@ -123,6 +125,7 @@ class URLTestCase(TestCase):
                             found = True
                             break
 
+                # print(f"{data=}")
                 # print(f"Url '{url} obj pk={obj.pk} in results={in_results}'")
                 self.assertEqual(in_results, found, msg=f"Url '{url} obj {key}={obj.pk} in results={in_results}'")
 
@@ -138,7 +141,8 @@ class URLTestCase(TestCase):
             kwargs["op"] = "config"
             config_url = reverse(name, kwargs=kwargs)
             response = client.get(config_url)
-            self.assertEqual(200, response.status_code)
+            if in_results:
+                self.assertEqual(200, response.status_code)
             try:
                 config_data = response.json()
             except ValueError:  # Not JSON
@@ -149,9 +153,10 @@ class URLTestCase(TestCase):
             if sortname := config_data.get("sortname"):
                 url += f"?sidx={sortname}"
             response = client.get(url)
-            if response.status_code == 403 and in_results is False:
-                return
-            self.assertEqual(200, response.status_code)
+            if in_results:
+                self.assertEqual(200, response.status_code)
+            elif response.status_code == 403:
+                continue  # No need to check
 
             data = json.loads(response.content)
             if obj is not None:
@@ -165,5 +170,5 @@ class URLTestCase(TestCase):
                         found = True
                         break
 
-                #print(f"Url '{url} obj pk={obj.pk} in results={in_results}'")
+                # print(f"Url '{url} obj pk={obj.pk} in results={in_results}'")
                 self.assertEqual(in_results, found, msg=f"Url '{url} obj {key}={obj.pk} in results={in_results}'")
