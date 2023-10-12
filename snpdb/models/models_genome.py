@@ -390,8 +390,11 @@ class GenomeFasta(models.Model):
         return chrom_contig_id, contig_id_to_name
 
     @property
-    def fasta(self):
-        return FastaFileWrapper(self.filename, convert_chrom_func=self.convert_chrom_to_fasta_sequence)
+    def fasta(self) -> FastaFileWrapper:
+        ffw = FastaFileWrapper(self.filename, convert_chrom_func=self.convert_chrom_to_fasta_sequence)
+        contig_1 = self.convert_chrom_to_fasta_sequence("1")  # Should be in all human genome builds
+        assert contig_1 in ffw, f"Genome fasta '{self.filename}' does not contain contig '{contig_1}'"
+        return ffw
 
 
 class GenomeFastaContig(models.Model):
