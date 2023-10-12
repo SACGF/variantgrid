@@ -136,11 +136,11 @@ class VCF(models.Model, PreviewModelMixin):
             raise PermissionDenied()
         return vcf
 
-    def can_view(self, user):
+    def can_view(self, user) -> bool:
         read_perm = DjangoPermission.perm(VCF, DjangoPermission.READ)
         return user.has_perm(read_perm, self)
 
-    def can_write(self, user):
+    def can_write(self, user) -> bool:
         write_perm = DjangoPermission.perm(VCF, DjangoPermission.WRITE)
         return user.has_perm(write_perm, self)
 
@@ -324,7 +324,7 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
                 return self.enrichment_kit.min_coverage
         return settings.SEQAUTO_MIN_COVERAGE
 
-    def can_view(self, user):
+    def can_view(self, user) -> bool:
         vcf_read_perm = DjangoPermission.perm(self.vcf, DjangoPermission.READ)
         sample_read_perm = DjangoPermission.perm(self, DjangoPermission.READ)
         return user.has_perm(vcf_read_perm, self.vcf) or user.has_perm(sample_read_perm, self)
@@ -334,7 +334,7 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
             msg = f"You do not have permission to access sample {self.pk} (vcf {self.vcf.pk})"
             raise PermissionDenied(msg)
 
-    def can_write(self, user):
+    def can_write(self, user) -> bool:
         write_perm = DjangoPermission.perm(self, DjangoPermission.WRITE)
         return self.vcf.can_write(user) or user.has_perm(write_perm, self)
 

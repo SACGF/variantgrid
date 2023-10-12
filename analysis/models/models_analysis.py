@@ -101,7 +101,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
             return self.analysistemplateversion.template.analysis
         return self
 
-    def can_write(self, user):
+    def can_write(self, user) -> bool:
         """ Disable modification when locked """
         if super().can_write(user):
             return not self.is_locked()

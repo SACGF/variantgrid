@@ -283,7 +283,7 @@ class VariantTagDetailColumns(DatatableConfig[VariantTag]):
             RichColumn('created', name='time_ago', client_renderer='TableFormat.timeAgo'),
         ]
 
-    def can_write(self, row: Dict[str, Any]):
+    def can_write(self, row: Dict[str, Any]) -> bool:
         """ This is really inefficient as it instantiates an object per row that has already had values() called on
             it. Perhaps it would be more efficient to be able to swap in a serializer to produce each row
             however that takes a lot of messing around with DatabaseTableView/DatatableConfig """

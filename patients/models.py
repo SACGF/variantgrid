@@ -85,7 +85,7 @@ class ExternallyManagedModel(TimeStampedModel):
             em = self.external_pk.external_manager
         return em
 
-    def can_write(self, _user):
+    def can_write(self, _user) -> bool:
         cw = True
         if self.external_manager:
             cw &= self.external_manager.can_modify
@@ -166,7 +166,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
             summary_extra=parts
         )
 
-    def can_write(self, user):
+    def can_write(self, user) -> bool:
         return ExternallyManagedModel.can_write(self, user) and GuardianPermissionsMixin.can_write(self, user)
 
     @property

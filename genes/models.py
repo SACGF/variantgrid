@@ -1724,11 +1724,11 @@ class GeneList(TimeStampedModel):
             # logging.info("GeneList: assign_permission_to_user_and_groups")
             assign_permission_to_user_and_groups(self.user, self)
 
-    def can_view(self, user):
+    def can_view(self, user) -> bool:
         read_perm = DjangoPermission.perm(self, DjangoPermission.READ)
         return user.has_perm(read_perm, self)
 
-    def can_write(self, user):
+    def can_write(self, user) -> bool:
         write_perm = DjangoPermission.perm(self, DjangoPermission.WRITE)
         return user.has_perm(write_perm, self) and not self.locked
 

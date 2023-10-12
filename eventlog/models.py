@@ -35,7 +35,7 @@ class Event(models.Model):
     severity = models.CharField(max_length=1, choices=LogLevel.CHOICES, default=LogLevel.INFO)
     filename = models.TextField(null=True)
 
-    def can_write(self, user):
+    def can_write(self, user) -> bool:
         return user.is_superuser
 
     def __str__(self):

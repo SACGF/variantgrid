@@ -254,7 +254,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
             lab_status[lab] = max(lab_status.get(lab, 0), status)
         return lab_status
 
-    def can_view(self, user: User):
+    def can_view(self, user: User) -> bool:
         return self.user_is_involved(user)
 
     def check_can_view(self, user):
@@ -517,7 +517,7 @@ class DiscordanceReportTriage(TimeStampedModel):
     These tags are more dynamic, so keep it configurable in JSON rather than a database schema for now
     """
 
-    def can_write(self, user: User):
+    def can_write(self, user: User) -> bool:
         return self.lab.is_member(user, admin_check=True) and not self.closed
 
     @property

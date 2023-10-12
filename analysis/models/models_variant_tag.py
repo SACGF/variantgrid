@@ -50,13 +50,13 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     node = models.ForeignKey(AnalysisNode, null=True, on_delete=SET_NULL)  # Keep even if node deleted
     user = models.ForeignKey(User, on_delete=CASCADE)
 
-    def can_view(self, user):
+    def can_view(self, user) -> bool:
         """ Delegate to Analysis if set """
         if self.analysis:
             return self.analysis.can_view(user)
         return super().can_view(user)
 
-    def can_write(self, user):
+    def can_write(self, user) -> bool:
         """ Delegate to Analysis if set """
         if self.analysis:
             return self.analysis.can_write(user)

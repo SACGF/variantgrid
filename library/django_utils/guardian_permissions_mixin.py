@@ -33,7 +33,7 @@ class GuardianPermissionsMixin:
         """ Object can use another objects permissions """
         return queryset
 
-    def can_view(self, user):
+    def can_view(self, user) -> bool:
         """ @param user User or group """
 
         if not user:
@@ -43,7 +43,7 @@ class GuardianPermissionsMixin:
             return self.get_read_perm() in get_group_perms(user, perm_obj)
         return user.has_perm(self.get_read_perm(), perm_obj)
 
-    def can_write(self, user):
+    def can_write(self, user) -> bool:
         if not user:
             return False
         perm_obj = self.get_permission_object()

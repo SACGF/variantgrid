@@ -22,7 +22,7 @@ class PathologyTest(TimeStampedModel):
     deleted = models.BooleanField(default=False)
     empty_test = models.BooleanField(default=False)  # For custom tests
 
-    def can_write(self, user):
+    def can_write(self, user) -> bool:
         return self.is_curator(user)
 
     def is_curator(self, user):

@@ -194,7 +194,7 @@ class Experiment(PreviewModelMixin, models.Model):
         self.name = Experiment.clean_experiment_name(old_name)
         return super().save(**kwargs)
 
-    def can_write(self, user):
+    def can_write(self, user) -> bool:
         """ can't delete once you've linked to SequencingRun """
         return user.is_superuser and not self.sequencingrun_set.exists()
 

@@ -133,7 +133,7 @@ class Wiki(TimeStampedModel):
     def _get_restricted_object(self):
         return None
 
-    def can_write(self, user):
+    def can_write(self, user) -> bool:
         obj = self._get_restricted_object()
         if obj and not obj.can_write(user):
             return False
@@ -220,10 +220,10 @@ class Organization(models.Model, PreviewModelMixin):
     def sharing_labs(self) -> List['Lab']:
         return [lab for lab in self.lab_set.all().order_by('name') if lab.total_shared_classifications > 0]
 
-    def is_member(self, user: User):
+    def is_member(self, user: User) -> bool:
         return Lab.valid_labs_qs(user).filter(organization=self).exists()
 
-    def can_write(self, user: User):
+    def can_write(self, user: User) -> bool:
         return user.is_superuser or self.lab_set.filter(labhead__user=user).exists()
 
     def check_can_write(self, user):
