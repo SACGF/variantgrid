@@ -12,6 +12,7 @@ from snpdb.models import GenomeBuild, Variant, ClinGenAllele, Allele, VariantAll
 
 
 class Test(URLTestCase):
+    classification = None
     lab = None
     other_lab = None
     user_non_owner = None
@@ -74,6 +75,11 @@ class Test(URLTestCase):
             # ('discordance_export', report_kwargs, 200),
         ]
 
+        cls.PRIVATE_GRID_LIST_URLS = [
+            ("classification_datatables", {}, classification),
+        ]
+
+
     def testAdminUrls(self):
         ADMIN_URL_NAMES_AND_KWARGS = [
             ("activity", {}, 200),
@@ -127,8 +133,14 @@ class Test(URLTestCase):
             ("condition_text_datatable", {"lab_id": self.lab.pk}, 200),
             ("imported_allele_info_datatables", {}, 200),
         ]
-        self._test_urls(GRID_LIST_URLS, self.user_owner)
+        self._test_datatable_urls(GRID_LIST_URLS, self.user_owner)
 
+    def testDataTablesGridListPermission(self):
+        self._test_datatables_grid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
+
+    @prevent_request_warnings
+    def testDataTablesGridListNoPermission(self):
+        self._test_datatables_grid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
 
 
 # TODO: Still need to test below

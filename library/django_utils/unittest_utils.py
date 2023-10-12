@@ -1,6 +1,5 @@
 import json
 import logging
-from json import JSONDecodeError
 
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -49,11 +48,12 @@ class URLTestCase(TestCase):
         for name, kwargs, expected_code in names_and_kwargs:
             with self.subTest(url_name=name):
                 expected_code = expected_code_override or expected_code
+                kwargs = kwargs.copy() # As we'll pop next
                 get_params = kwargs.pop("GET_PARAMS", {})
                 url = reverse(name, kwargs=kwargs)
                 if get_params:
                     url += "?" + "&".join([f"{k}={v}" for k, v in get_params.items()])
-                    print(f"url: {url}")
+                # print(f"url: {url}")
                 response = client.get(url)
                 self.assertEqual(response.status_code, expected_code, msg=f"Url '{url}'")
 
@@ -78,19 +78,53 @@ class URLTestCase(TestCase):
                 #print(f"Url '{url} obj pk={obj.pk} in results={in_results}'")
                 self.assertEqual(in_results, found, msg=f"Url '{url} obj pk={obj.pk} in results={in_results}'")
 
+    def _test_datatable_urls(self, names_and_kwargs, user=None, expected_code_override=None):
+        """ This calls both the URL and "?dataTableDefinition=1" """
+
+        self._test_urls(names_and_kwargs, user=user, expected_code_override=expected_code_override)
+
+        datatable_definition_names_and_kwargs = []
+        for name, kwargs, expected_code in names_and_kwargs:
+            new_kwargs = kwargs.copy()
+            get_params = new_kwargs.get("GET_PARAMS", {})
+            get_params["dataTableDefinition"] = 1
+            new_kwargs["GET_PARAMS"] = get_params
+            datatable_definition_names_and_kwargs.append((name, new_kwargs, expected_code))
+
+        self._test_urls(datatable_definition_names_and_kwargs, user=user, expected_code_override=expected_code_override)
+
     def _test_datatables_grid_list_urls(self, names_obj, user, in_results):
         client = Client()
         client.force_login(user)
 
         for name, kwargs, obj in names_obj:
             kwargs = kwargs.copy()  # In case client shared them
-            definition_url = reverse(name, kwargs=kwargs) + "?dataTableDefinition=1"
+            url = reverse(name, kwargs=kwargs)
+            definition_url = url + "?dataTableDefinition=1"
             response = client.get(definition_url)
-            try:
-                definition_data = response.json()
-            except ValueError:  # Not JSON
-                definition_data = {}
-            print(f"{definition_url=} => {definition_data=}")
+            response.json()  # Just need to verify that
+            self.assertEqual(200, response.status_code)
+
+            response = client.get(url)
+            if response.status_code == 403 and in_results is False:
+                return
+            self.assertEqual(200, response.status_code)
+
+            data = json.loads(response.content)
+            if obj is not None:
+                found = False
+                key = "id"
+                if isinstance(obj, tuple):
+                    key, obj = obj
+
+                for row in data["data"]:
+                    if value := row.get("id"):
+                        if value.get(key) == obj.pk:
+                            found = True
+                            break
+
+                # print(f"Url '{url} obj pk={obj.pk} in results={in_results}'")
+                self.assertEqual(in_results, found, msg=f"Url '{url} obj {key}={obj.pk} in results={in_results}'")
 
 
     def _test_jqgrid_list_urls(self, names_obj, user, in_results):
@@ -104,6 +138,7 @@ class URLTestCase(TestCase):
             kwargs["op"] = "config"
             config_url = reverse(name, kwargs=kwargs)
             response = client.get(config_url)
+            self.assertEqual(200, response.status_code)
             try:
                 config_data = response.json()
             except ValueError:  # Not JSON
