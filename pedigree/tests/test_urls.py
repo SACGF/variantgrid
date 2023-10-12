@@ -8,6 +8,10 @@ from snpdb.tests.test_data import create_fake_pedigree
 
 
 class Test(URLTestCase):
+    ped_file = None
+    pedigree = None
+    user_owner = None
+
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
@@ -54,11 +58,11 @@ class Test(URLTestCase):
     def testAutocompleteNoPermission(self):
         self._test_autocomplete_urls(self.PRIVATE_AUTOCOMPLETE_URLS, self.user_non_owner, False)
 
-    def testGridListPermission(self):
+    def testJqGridListPermission(self):
         self._test_jqgrid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
 
     @prevent_request_warnings
-    def testGridListNoPermission(self):
+    def testJqGridListNoPermission(self):
         self._test_jqgrid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
 
 if __name__ == "__main__":

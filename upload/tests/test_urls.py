@@ -62,11 +62,11 @@ class Test(URLTestCase):
     def testNoPermission(self):
         self._test_urls(self.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS, self.user_non_owner, expected_code_override=403)
 
-    def testGridListPermission(self):
+    def testJqGridListPermission(self):
         self._test_jqgrid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
 
     @prevent_request_warnings
-    def testGridListNoPermission(self):
+    def testJqGridListNoPermission(self):
         self._test_jqgrid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
 
 
