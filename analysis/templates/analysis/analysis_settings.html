@@ -29,7 +29,8 @@
 		    url: "{% url 'analysis_settings_lock' analysis.pk %}",
             data: 'lock=' + encodeURIComponent(JSON.stringify(lock)),
 		    success: function(data) {
-                window.location = "{% url 'analysis' analysis.pk %}";
+                // force a reload of the page - either analysis or analyses listing
+                window.location.reload();
 		    }
 		});
     }
