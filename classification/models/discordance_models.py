@@ -86,11 +86,17 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
                 PreviewKeyValue(key=f"{c_hgvs.genome_build} c.HGVS", value=str(c_hgvs), dedicated_row=True)
             )
 
+        status_text: str
+        if self.is_pending_concordance and self.is_latest:
+            status_text = "Pending Concordance"
+        else:
+            status_text = self.get_resolution_display() or 'Active Discordance'
+
         # note there's also preview_extra_signal that provides the lab data
         return self.preview_with(
             identifier=f"DR_{self.pk}",
             summary_extra=
-                [PreviewKeyValue(key="Status", value=f"{self.get_resolution_display() or 'Active Discordance'}", dedicated_row=True)] +
+                [PreviewKeyValue(key="Status", value=status_text, dedicated_row=True)] +
                 [PreviewKeyValue(key="Allele", value=f"{self.clinical_context.allele:CA}", dedicated_row=True)] +
                 c_hgvs_key_values
         )
