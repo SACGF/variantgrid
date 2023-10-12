@@ -42,6 +42,7 @@ git+https://github.com/davmlaw/django-js-reverse#egg=django-js-reverse
 git+https://github.com/SACGF/hgvs#egg=pyhgvs
 git+https://github.com/davmlaw/hgvs@f3701a44b389ebad3f4cc7da8dbe672d9ae4e6cb#egg=hgvs
 git+https://github.com/davmlaw/PyVCF3@f7ba4b4adb8a79ac13e99470d013af6a8fe1363b#egg=pyvcf3
+gunicorn
 HTSeq
 ijson
 ipython
