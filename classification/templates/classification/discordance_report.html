@@ -58,7 +58,7 @@
                 <h5>Discordance Report (<i class="{{ data.report.preview.icon }} preview-icon"></i> DR_{{ data.report.id }}) {% admin_link data.report %}</h5>
             </div>
              <div class="card-body">
-                 {% labelled label="Resolution" %}
+                 {% labelled label="Status" %}
                     {% if data.report.resolution %}
                         {% if data.report.resolution == "C" %}
                             <span class="text-success font-weight-bold">{{ data.report.get_resolution_display }}</span>

@@ -21,6 +21,7 @@ from classification.models.clinical_context_models import ClinicalContext, Clini
 from classification.models.clinical_context_models import ClinicalContextChangeData
 from classification.models.flag_types import classification_flag_types
 from genes.hgvs import CHGVS
+from library.guardian_utils import admin_bot
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import invalidate_cached_property
 from library.utils.django_utils import refresh_for_update
@@ -75,15 +76,12 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
 
     @property
     def preview(self) -> 'PreviewData':
-        from classification.models import ImportedAlleleInfo
-        all_chgvs = ImportedAlleleInfo.all_chgvs(self.clinical_context.allele)
-        preferred_genome_build = GenomeBuildManager.get_current_genome_build()
-        desired_builds = [c_hgvs for c_hgvs in all_chgvs if c_hgvs.genome_build == preferred_genome_build]
-        if not desired_builds:
-            desired_builds = all_chgvs
+
+        from classification.views.discordance_report_views import DiscordanceReportTemplateData
+        drtd = DiscordanceReportTemplateData(self.pk, user=admin_bot())
 
         c_hgvs_key_values = []
-        for c_hgvs in desired_builds:
+        for c_hgvs in drtd.c_hgvses:
             c_hgvs_key_values.append(
                 PreviewKeyValue(key=f"{c_hgvs.genome_build} c.HGVS", value=str(c_hgvs), dedicated_row=True)
             )
@@ -93,7 +91,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
             summary_extra=
                 [PreviewKeyValue(key="Allele", value=f"{self.clinical_context.allele:CA}", dedicated_row=True)] +
                 c_hgvs_key_values +
-                [PreviewKeyValue(key="Status", value=f"{self.get_resolution_display() or 'Discordant'}", dedicated_row=True)]
+                [PreviewKeyValue(key="Status", value=f"{self.get_resolution_display() or 'Active Discordance'}", dedicated_row=True)]
         )
 
     class LabInvolvement(int, Enum):

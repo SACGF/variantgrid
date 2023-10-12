@@ -27,7 +27,7 @@
                    <i title="Medically Significant" class="fa-solid fa-kit-medical fa-lg hover-detail" style="color: #dd4040;"></i>
                 {% endif %}
             {% endif %}
-            {% if discuss %}<div><a class="hover-link" href="{% url 'discordance_report_review' discordance_report_id=summary.discordance_report.pk %}" target="_blank"><i class="fa-solid fa-comments mr-2"></i> Discuss Now</a></div>{% endif %}
+            {% if discuss %}<div><a class="hover-link" href="{% url 'discordance_report_review' discordance_report_id=summary.discordance_report.pk %}" target="_blank" title="Click this if you and the other labs are ready to talk about this discordance right now"><i class="fa-solid fa-comments mr-2"></i> Discuss Now</a></div>{% endif %}
         </div>
         {% classification_lab_summaries summary.lab_significances read_only=read_only %}
     </td>
