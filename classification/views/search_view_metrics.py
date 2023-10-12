@@ -4,6 +4,7 @@ from typing import Iterator
 from dateutil.tz import gettz
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.db.models import Q
 
 from eventlog.models import ViewEvent
 from dataclasses import dataclass
@@ -16,6 +17,9 @@ class ReportDataRow(ExportRow):
     date: date
     user: int
     search_counts: int
+    allele_counts: int
+    gene_symbols_counts: int
+    classification_counts: int
 
     @export_column(label="Date")
     def date_column(self) -> date:
@@ -29,6 +33,18 @@ class ReportDataRow(ExportRow):
     def searches_column(self) -> int:
         return self.search_counts
 
+    @export_column(label="Alleles Viewed")
+    def alleles_viewed_column(self) -> int:
+        return self.allele_counts
+
+    @export_column(label="Gene Symbols Viewed")
+    def gene_symbols_viewed_column(self) -> int:
+        return self.gene_symbols_counts
+
+    @export_column(label="Classifications Viewed")
+    def classifications_viewed_column(self) -> int:
+        return self.classification_counts
+
 
 def week_start_date(freq: datetime.date) -> datetime.date:
     return freq - timedelta(days=date.weekday(freq))
@@ -38,35 +54,52 @@ def stream_report_rows(interval) -> Iterator[ReportDataRow]:
 
     start_of_time_period = datetime.now() - timedelta(days=365)
     start_of_time_period = start_of_time_period.date()
-    report_data = defaultdict(lambda: {'users': set(), 'count': 0})
-    admins = User.objects.filter(is_superuser=True)
-    testers_and_bots = User.objects.filter(groups__name__in={'variantgrid/tester', 'variantgrid/bot'})
+    report_data = defaultdict(lambda: {'users': set(), 'search_count': 0, 'allele_count': 0,
+                                       'gene_symbol_count': 0, 'classification_count': 0})
+    excluded_users = User.objects.filter(
+        Q(is_superuser=True) | Q(groups__name__in={'variantgrid/tester', 'variantgrid/bot'}))
 
-    search_metric_data = ViewEvent.objects.filter(
-            created__gte=start_of_time_period,
-            view_name='variantopedia:search',
-    ).exclude(args__search="").exclude(user__in=admins).exclude(user__in=testers_and_bots)
+    metrics_definitions = [
+        ('variantopedia:search', 'search_count', ~Q(args__search="")),
+        ('variantopedia:view_allele', 'allele_count'),
+        ('genes:view_gene_symbol', 'gene_symbol_count', ~Q(args__gene_symbol="")),
+        ('classification:view_classification', 'classification_count')
+    ]
 
     ve: ViewEvent
-    for ve in search_metric_data.iterator():
-        created_dt: datetime = ve.created
-        the_date = created_dt.astimezone(gettz(settings.TIME_ZONE)).date()
-        if interval != 1:
-            the_date = week_start_date(the_date)
+    for view_name, key, *extra_filters in metrics_definitions:
+        metric_data = ViewEvent.objects.filter(
+            created__gte=start_of_time_period,
+            view_name=view_name
+        ).exclude(user__in=excluded_users)
 
-        if user_id := ve.user_id:
-            report_dict = report_data[the_date]
-            report_dict["users"].add(user_id)
-            report_dict["count"] += 1
+        if extra_filters:
+            metric_data = metric_data.filter(*extra_filters)
+        for ve in metric_data.iterator():
+            created_dt: datetime = ve.created
+            the_date = created_dt.astimezone(gettz(settings.TIME_ZONE)).date()
+            if interval != 1:
+                the_date = week_start_date(the_date)
+
+            if user_id := ve.user_id:
+                report_dict = report_data[the_date]
+                report_dict["users"].add(user_id)
+                report_dict[key] += 1
 
     current_date = week_start_date(start_of_time_period)
     today = datetime.now().date()
 
     while current_date <= today:
-        data = report_data.get(current_date, {'users': set(), 'count': 0})
+        data = report_data.get(current_date, {'users': set(), 'search_count': 0, 'allele_count': 0,
+                                              'gene_symbol_count': 0, 'classification_count': 0})
         user_list = len(data['users'])
-        searches = data['count']
-        yield ReportDataRow(date=current_date, user=user_list, search_counts=searches)
+        searches = data['search_count']
+        allele_count = data['allele_count']
+        gene_symbol_count = data['gene_symbol_count']
+        classification_count = data['classification_count']
+        yield ReportDataRow(date=current_date, user=user_list, search_counts=searches,
+                            allele_counts=allele_count, gene_symbols_counts=gene_symbol_count,
+                            classification_counts=classification_count)
         current_date += timedelta(days=(1 if interval == 1 else 7))
 
 
