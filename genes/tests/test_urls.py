@@ -125,8 +125,12 @@ class Test(URLTestCase):
             ('gene_list_autocomplete', cls.gene_list, {"q": cls.gene_list.name}),
         ]
 
-        cls.PRIVATE_GRID_LIST_URLS = [
+        cls.PRIVATE_JQGRID_LIST_URLS = [
             ("gene_list_genes_grid", {"gene_list_id": cls.gene_list.pk}, ("gene_symbol__symbol", cls.gene_symbol)),
+        ]
+
+        cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
+            ("gene_lists_datatable", {}, ("text", cls.gene_list)),  # id uses view_primary_key - renders it as "text"
         ]
 
     def testUrls(self):
@@ -196,11 +200,30 @@ class Test(URLTestCase):
         self._test_autocomplete_urls(self.PRIVATE_AUTOCOMPLETE_URLS, self.user_non_owner, False)
 
     def testJqGridListPermission(self):
-        self._test_jqgrid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
+        self._test_jqgrid_list_urls(self.PRIVATE_JQGRID_LIST_URLS, self.user_owner, True)
 
     @prevent_request_warnings
     def testJqGridListNoPermission(self):
-        self._test_jqgrid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
+        self._test_jqgrid_list_urls(self.PRIVATE_JQGRID_LIST_URLS, self.user_non_owner, False)
+
+    def testDataGridUrls(self):
+        """ Grids w/o permissions """
+
+        GRID_LIST_URLS = [
+            ("gene_wiki_datatable", {}, 200),
+            ("gene_lists_datatable", {}, 200),
+            ("canonical_transcript_collections_datatable", {}, 200),
+            ("canonical_transcript_datatable", {}, 200),
+        ]
+        self._test_datatable_urls(GRID_LIST_URLS, self.user_owner)
+
+    def testDataTablesGridListPermission(self):
+        self._test_datatables_grid_list_urls(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_owner, True)
+
+    @prevent_request_warnings
+    def testDataTablesGridListNoPermission(self):
+        self._test_datatables_grid_list_urls(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_non_owner, False)
+
 
 # TODO: Still to test
 # commented out PRIVATE_GRID_LIST_URLS
