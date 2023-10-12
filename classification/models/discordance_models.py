@@ -86,12 +86,13 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
                 PreviewKeyValue(key=f"{c_hgvs.genome_build} c.HGVS", value=str(c_hgvs), dedicated_row=True)
             )
 
+        # note there's also preview_extra_signal that provides the lab data
         return self.preview_with(
             identifier=f"DR_{self.pk}",
             summary_extra=
+                [PreviewKeyValue(key="Status", value=f"{self.get_resolution_display() or 'Active Discordance'}", dedicated_row=True)] +
                 [PreviewKeyValue(key="Allele", value=f"{self.clinical_context.allele:CA}", dedicated_row=True)] +
-                c_hgvs_key_values +
-                [PreviewKeyValue(key="Status", value=f"{self.get_resolution_display() or 'Active Discordance'}", dedicated_row=True)]
+                c_hgvs_key_values
         )
 
     class LabInvolvement(int, Enum):
