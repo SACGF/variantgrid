@@ -45,6 +45,9 @@
             {% endfor %}
         {% else %}<span class="no-value">None</span>{% endif %}
     {% endlabelled %}
+    {% labelled admin_only=True label="Test pyhgvs/biocommons" %}
+        <a class="hover-link" href="{% url 'hgvs_resolution_tool' %}?genome_build={{ allele_info.imported_genome_build|urlencode }}&hgvs={{ allele_info.imported_c_hgvs|urlencode }}">Click here to test</a>
+    {% endlabelled %}
     {% labelled label="Can Include in Exports" %}{{ allele_info.latest_validation.include | boolean }} {% admin_link allele_info %}{% endlabelled %}
     {% if allele_info.latest_validation.confirmed %}
         {% labelled label="Manually Confirmed" %}{{ True | boolean }} by {{ allele_info.latest_validation.confirmed_by }}{% endlabelled %}
