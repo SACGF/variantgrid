@@ -293,7 +293,7 @@ class HGVSMatcher:
         hgvs_variant = self.create_hgvs_variant(hgvs_string)
         kind = hgvs_variant.kind
         error_messages: List[str] = []
-        combined_error_messgae = None
+        combined_error_message = None
 
         if transcript_is_lrg(transcript_accession):
             variant_coordinate, used_transcript_accession, method, matches_reference = self._lrg_get_variant_tuple_used_transcript_method_and_matches_reference(hgvs_variant)
@@ -342,11 +342,11 @@ class HGVSMatcher:
 
             if variant_coordinate is None:
                 if error_messages:
-                    combined_error_messgae = "\n".join(error_messages)
+                    combined_error_message = "\n".join(sorted(set(error_messages)))
 
                 if hgvs_methods:
                     attempts = "\n".join(hgvs_methods)
-                    raise VariantResolvingError(f"Could not convert \"{hgvs_string}\" - tried:\n{attempts}", technical_message=combined_error_messgae)
+                    raise VariantResolvingError(f"Could not convert \"{hgvs_string}\" - tried:\n{attempts}", technical_message=combined_error_message)
                 else:
                     raise ValueError(f"\"{transcript_accession}\": No transcripts found")
         else:
