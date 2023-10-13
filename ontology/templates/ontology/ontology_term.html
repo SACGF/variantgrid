@@ -69,7 +69,7 @@
                     <a href="{{ term.external_url }}" class="hover-link" target="_blank">{{ term.external_url }}</a>
                 {% endlabelled %}
                 {% labelled label="Cross Ontology URL" %}
-                    <a href="https://www.ebi.ac.uk/spot/oxo/terms/{{ term.id }}" target="_blank">https://www.ebi.ac.uk/spot/oxo/terms/{{ term.id }}</a>
+                    <a href="https://www.ebi.ac.uk/spot/oxo/terms/{{ term.id }}" target="_blank">https://www.ebi.ac.uk/spot/oxo/terms/{{ term.oxo_suffix }}</a>
                 {% endlabelled %}
                 {% if term.ontology_service == "MONDO" %}
                     {% labelled label="Hierarchy URL" %}

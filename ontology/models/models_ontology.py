@@ -300,6 +300,14 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
 
     move_to_re = re.compile(r"MOVED TO (\d+)")
 
+    @property
+    def oxo_suffix(self):
+        if self.ontology_service == OntologyService.MEDGEN:
+            lower_id = self.id.lower()
+            if ":c" in lower_id:
+                return lower_id[lower_id.index(":") + 1:]
+        return self.id
+
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-disease"
@@ -308,7 +316,7 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
     def preview(self) -> PreviewData:
         name: str
         if self.is_stub:
-            name = "Term Not Found"
+            name = ""
         elif not self.name:
             name = "No Name Provided"
         else:
