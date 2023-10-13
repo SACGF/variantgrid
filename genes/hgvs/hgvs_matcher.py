@@ -330,7 +330,7 @@ class HGVSMatcher:
                         except ClinGenAllele.ClinGenAlleleRegistryException as cgare:
                             # API or other recoverable error - try again w/another transcript
                             logging.error(error_message, cgare)
-                            error_messages.append(f"{error_message} : {cga_se}")
+                            error_messages.append(f"{error_message} : {cgare}")
 
                 if method:
                     if hgvs_string != hgvs_string_for_version:
