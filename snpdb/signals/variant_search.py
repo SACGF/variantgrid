@@ -479,7 +479,8 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                     if isinstance(result, SearchResult):
                         # don't count SearchMessageOverall as a result
                         has_results = True
-                        result.messages.append(SearchMessage(str(alias)))
+                        # FIXME - not sure what a SearchMessage of the alias is meant to accomplish by itself?
+                        # result.messages.append(SearchMessage(str(alias)))
                         yield result
                 if has_results:
                     return

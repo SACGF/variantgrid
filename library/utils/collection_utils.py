@@ -304,6 +304,19 @@ def flatten_nested_lists(iterable) -> List:
     return list(_flatten_generator(iterable))
 
 
+ListItem = TypeVar("ListItem")
+
+
+def remove_duplicates_from_list(source_list: List[ListItem]) -> List[ListItem]:
+    seen: Set[ListItem] = set()
+    output: List[ListItem] = []
+    for item in source_list:
+        if item not in seen:
+            seen.add(item)
+            output.append(item)
+    return output
+
+
 class VarsDict:
 
     def get(self, key, default=None):

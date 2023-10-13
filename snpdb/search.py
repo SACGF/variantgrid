@@ -18,7 +18,7 @@ from more_itertools import take
 from library.enums.log_level import LogLevel
 from library.log_utils import report_exc_info, report_message, log_level_to_int, log_level_to_bootstrap
 from library.preview_request import PreviewCoordinator, PreviewData
-from library.utils import clean_string, first
+from library.utils import clean_string, first, remove_duplicates_from_list
 from snpdb.models import UserSettings, GenomeBuild, Variant, Allele
 
 search_signal = Signal()
@@ -153,7 +153,7 @@ class SearchInputInstance:
 
     @cached_property
     def results(self):
-        return SearchResponse(self.expected_type)
+        return SearchResponse(search_input=self.search_input, search_type=self.expected_type)
 
     @property
     def user(self):
@@ -340,12 +340,11 @@ class SearchResult:
         38 (ignoring any associated to 37)
         """
         preferred_gb = self.parent.search_input.genome_build_preferred
-        if not self.genome_builds:
-            return self.messages
-        elif preferred_gb not in self.genome_builds:
-            return self.messages
+        if not self.genome_builds or preferred_gb not in self.genome_builds:
+            return remove_duplicates_from_list(self.messages)
         else:
-            return [message for message in self.messages if message.genome_build is None or message.genome_build == preferred_gb]
+            filtered_list = [message for message in self.messages if message.genome_build is None or message.genome_build == preferred_gb]
+            return remove_duplicates_from_list(filtered_list)
 
     @property
     def genome_builds_with_messages(self) -> List[SearchResultGenomeBuildMessages]:
@@ -355,6 +354,7 @@ class SearchResult:
         all_results = []
         for genome_build in sorted(self.genome_builds):
             messages = [message for message in self.messages if message.genome_build == genome_build]
+            messages = remove_duplicates_from_list(messages)
             all_results.append(SearchResultGenomeBuildMessages(genome_build=genome_build, messages=messages))
         return all_results
 
