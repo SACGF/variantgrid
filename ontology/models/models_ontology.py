@@ -306,6 +306,8 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
             lower_id = self.id.lower()
             if ":c" in lower_id:
                 return lower_id[lower_id.index(":") + 1:]
+        elif self.ontology_service == OntologyService.ORPHANET:
+            return f"orphanet:{self.index}"
         return self.id
 
     @classmethod
