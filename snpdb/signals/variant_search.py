@@ -474,7 +474,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 gene_symbol = alias.gene_symbol
             if gene_symbol:
                 has_results = False
-                if settings.SEARCH_HGVS_GENE_SMYBOL:
+                if settings.SEARCH_HGVS_GENE_SYMBOL:
                     for result in _search_hgvs_using_gene_symbol(hgvs_matcher, gene_symbol, search_messages,
                                                                  hgvs_string, user, genome_build, variant_qs):
                         if isinstance(result, SearchResult):
@@ -483,6 +483,8 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                             # FIXME - not sure what a SearchMessage of the alias is meant to accomplish by itself?
                             # result.messages.append(SearchMessage(str(alias)))
                             yield result
+                else:
+                    yield SearchMessageOverall(f'HGVS requires transcript, given symbol "{gene_symbol}"')
 
                 if has_results:
                     return
