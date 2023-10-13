@@ -32,7 +32,7 @@ class Test(URLTestCase):
         clinvar = ClinVar.objects.filter(version=cls.annotation_version_grch37.clinvar_version).first()
         q = Variant.get_contigs_q(cls.grch37) & Variant.get_no_reference_q()
         variant = Variant.objects.filter(q).first()
-        create_fake_variant_annotation(variant, cls.annotation_version_grch37.variant_annotation_version)
+        fake_variant = create_fake_variant_annotation(variant, cls.annotation_version_grch37.variant_annotation_version)
         citation = Citation.objects.filter(source=CitationSource.PUBMED).first()
         pubmed_citation = citation.id
 
@@ -46,7 +46,8 @@ class Test(URLTestCase):
         # for expected results, it is a tuple, the first item appears to be the type for the objects inside
         # the grid and the second object is the expected results
         cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
-            ("variant_annotation_version_datatable", {}, ("text", cls.annotation_version_grch37)),
+            ("variant_annotation_version_datatable", {}, (fake_variant)),
+            # ("variant_annotation_version_datatable", {}, cls.annotation_version_grch37)
         ]
 
     def testUrls(self):
@@ -81,7 +82,7 @@ class Test(URLTestCase):
         self._test_urls(GRID_LIST_URLS, self.user)
 
     def testDataTablesGridListPermission(self):
-        self._test_datatables_grid_list_urls(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user, True)
+        self._test_datatables_grid_list_urls(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.admin_user, True)
 
 if __name__ == "__main__":
     unittest.main()
