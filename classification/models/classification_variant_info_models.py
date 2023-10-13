@@ -190,7 +190,8 @@ _VALIDATION_TO_SEVERITY: [str, ALLELE_INFO_VALIDATION_SEVERITY] = {
     'c_nomen_change': "E",
     'missing_37': "E",
     'missing_38': "E",
-    'hgvs_issue': "E"
+    'cant_resolve_to_variant_coordinate': "E",
+    'hgvs_issue': "E"  # deprecated as too generic
 }
 
 
@@ -208,6 +209,7 @@ class ImportedAlleleValidationTagsBuilds(TypedDict, total=False):
 
 class ImportedAlleleValidationTagsGeneral(TypedDict, total=False):
     transcript_type_not_supported: ALLELE_INFO_VALIDATION_SEVERITY
+    cant_resolve_to_variant_coordinate: ALLELE_INFO_VALIDATION_SEVERITY
     hgvs_issue: ALLELE_INFO_VALIDATION_SEVERITY
 
 
@@ -464,7 +466,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             general["transcript_type_not_supported"] = _VALIDATION_TO_SEVERITY.get("transcript_type_not_supported", "E")
         if not self.variant_coordinate:
             # we couldn't derive a variant coordinate, should be the end of it
-            general["hgvs_issue"] = _VALIDATION_TO_SEVERITY.get("hgvs_issue", "E")
+            general["cant_resolve_to_variant_coordinate"] = _VALIDATION_TO_SEVERITY.get("cant_resolve_to_variant_coordinate", "E")
         if general:
             validation_dict["general"] = general
 
