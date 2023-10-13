@@ -234,6 +234,8 @@ class SearchMessage:
     def __post_init__(self):
         if not isinstance(self.message, str):
             raise ValueError(f"Created a Search Message with something other than string {self.message}")
+        if self.message == "" or self.message == "None":
+            raise ValueError(f"Created SearchMessage with message of ({self.message})")
 
     def __str__(self):
         return self.message
