@@ -286,6 +286,8 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
     @staticmethod
     def from_symbolic_match(match, genome_build=None):
         chrom, start, end, alt = match.groups()
+        if genome_build:
+            chrom = format_chrom(chrom, genome_build.reference_fasta_has_chr)
         start = int(start)
         end = int(end)
         alt = "<" + alt + ">"  # captured what was inside of brackets ie <()>
