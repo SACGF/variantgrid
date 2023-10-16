@@ -252,7 +252,8 @@ class AnalysesGrid(JqGridUserRowConfig):
         "genome_build__name": {"label": "Genome Build"},
         "analysis_type": {"label": "Type"},
         "user__username": {'label': 'Created by'},
-        "tags": {"label": "Tags", "model_field": False, "formatter": "tagsFormatter"},  # This formatter counts multiple tags
+        "tags": {"label": "Tags", "model_field": False,
+                 "name": "tags", "formatter": "tagsFormatter"},  # This formatter counts multiple tags
         "analysislock__locked": {"hidden": True},
     }
 
