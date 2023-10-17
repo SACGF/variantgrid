@@ -257,14 +257,17 @@ class OntologyIdNormalized:
             raise ValueError(f"Can not convert {dirty_id} to a proper id")
 
         prefix = parts[0].strip().upper()
-        if prefix == "ORPHA":  # Orphanet is the one ontology (so far) where the standard is sentance case
+        postfix = parts[1].strip()
+
+        if prefix in ("ORPHA", "ORPHANET"):  # Orphanet is the one ontology (so far) where the standard is sentance case
             prefix = "ORPHA"
         elif prefix.upper() == "MIM":
             prefix = "OMIM"
         elif prefix.upper() == "MEDGEN":
             prefix = "MedGen"
+            postfix = postfix.upper()
         prefix = OntologyService(prefix)
-        postfix = parts[1].strip()
+
         try:
             num_part = str(postfix)
             clean_id: str
@@ -305,7 +308,7 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
         if self.ontology_service == OntologyService.MEDGEN:
             lower_id = self.id.lower()
             if ":c" in lower_id:
-                return lower_id[lower_id.index(":") + 1:]
+                return "UMLS:" + lower_id[lower_id.index(":") + 1:].upper()
         elif self.ontology_service == OntologyService.ORPHANET:
             return f"orphanet:{self.index}"
         return self.id

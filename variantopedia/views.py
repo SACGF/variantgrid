@@ -15,7 +15,7 @@ from django.views.decorators.http import require_POST
 
 from analysis.models import VariantTag
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, \
-    VariantAnnotationVersion, VariantAnnotation
+    VariantAnnotationVersion, VariantAnnotation, AnnotationStatus
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.variant_card import AlleleCard
@@ -184,9 +184,11 @@ def server_status(request):
             highest_variant_annotated["message"] = "OK"
         else:
             try:
-                ar = AnnotationRun.objects.get(annotation_range_lock__version=vav,
+                ar = AnnotationRun.objects.filter(annotation_range_lock__version=vav,
                                                annotation_range_lock__min_variant__lte=highest_variant.pk,
-                                               annotation_range_lock__max_variant__gte=highest_variant.pk)
+                                               annotation_range_lock__max_variant__gte=highest_variant.pk)\
+                    .exclude(status=AnnotationStatus.ERROR).get()
+
                 highest_variant_annotated["status"] = "warning"
                 highest_variant_annotated["message"] = f"AnnotationRun: {ar}"
             except AnnotationRun.DoesNotExist:
