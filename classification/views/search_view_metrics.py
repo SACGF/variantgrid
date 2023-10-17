@@ -9,6 +9,8 @@ from django.db.models import Q
 from eventlog.models import ViewEvent
 from dataclasses import dataclass
 from datetime import timedelta, datetime, date
+
+from library.django_utils import require_superuser
 from library.utils import ExportRow, export_column
 
 
@@ -103,6 +105,7 @@ def stream_report_rows(interval) -> Iterator[ReportDataRow]:
         current_date += timedelta(days=(1 if interval == 1 else 7))
 
 
+@require_superuser
 def download_search_data(request):
     frequency = 1
     if frequency_param := request.GET.get('frequency'):

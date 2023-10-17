@@ -17,6 +17,7 @@ from library.utils.django_utils import render_ajax_view
 from snpdb.admin_utils import get_admin_url
 from snpdb.models import GenomeBuild, Lab, Allele
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData, SortOrder
+from library.django_utils import require_superuser
 
 
 class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
@@ -195,6 +196,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         return qs.filter(reduce(operator.or_, ors))
 
 
+@require_superuser
 def view_imported_allele_info(request: HttpRequest) -> Response:
     return render(request, "classification/imported_allele_info.html", {})
 
@@ -339,6 +341,7 @@ class ImportedAlleleInfoDownload(ExportRow):
         return ", ".join([str(lab) for lab in sorted(Lab.objects.filter(pk__in=Classification.objects.filter(allele_info=self.allele_info, withdrawn=False).values_list('lab', flat=True)).select_related('organization'))])
 
 
+@require_superuser
 def download_allele_info(request: HttpRequest):
     return ImportedAlleleInfoDownload.streaming_csv(
         ImportedAlleleInfo.objects.order_by('id').iterator(chunk_size=2000),

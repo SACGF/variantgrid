@@ -423,6 +423,7 @@ def view_classification_diff(request):
     return render(request, 'classification/classification_diff.html', context)
 
 
+@require_superuser
 def classification_import_tool(request: HttpRequest) -> Response:
     """
     This page allows you to upload a file, the fact that the file is probably to do with classifications
