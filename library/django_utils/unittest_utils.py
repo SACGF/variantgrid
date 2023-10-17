@@ -1,5 +1,6 @@
 import json
 import logging
+from collections.abc import Mapping
 
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -93,7 +94,7 @@ class URLTestCase(TestCase):
 
         self._test_urls(datatable_definition_names_and_kwargs, user=user, expected_code_override=expected_code_override)
 
-    def _test_datatables_grid_list_urls(self, names_obj, user, in_results):
+    def _test_datatables_grid_urls_contains_objs(self, names_obj, user, in_results):
         client = Client()
         client.force_login(user)
 
@@ -121,7 +122,10 @@ class URLTestCase(TestCase):
 
                 for row in data["data"]:
                     if value := row.get("id"):
-                        if value.get(key) == obj.pk:
+                        # If the "id" object is JSON, pull out the key - otherwise just use the value
+                        if isinstance(value, Mapping):
+                            value = value.get(key)
+                        if value == obj.pk:
                             found = True
                             break
 
@@ -130,7 +134,7 @@ class URLTestCase(TestCase):
                 self.assertEqual(in_results, found, msg=f"Url '{url} obj {key}={obj.pk} in results={in_results}'")
 
 
-    def _test_jqgrid_list_urls(self, names_obj, user, in_results):
+    def _test_jqgrid_urls_contains_objs(self, names_obj, user, in_results):
         """ Also allow 403 if not expecting results
             TODO: Load grid properly call URL with sidx params etc, currently get UnorderedObjectListWarning """
         client = Client()

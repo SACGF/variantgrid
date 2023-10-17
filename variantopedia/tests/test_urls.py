@@ -81,7 +81,7 @@ class Test(URLTestCase):
             ("variant_tags_grid", build_name_kwargs, self.variant_tag),
             ("tagged_variant_grid", build_name_kwargs, self.variant),
         ]
-        self._test_jqgrid_list_urls(GRID_LIST_URLS, self.user, True)
+        self._test_jqgrid_urls_contains_objs(GRID_LIST_URLS, self.user, True)
 
 
 if __name__ == "__main__":

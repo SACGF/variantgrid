@@ -6,7 +6,7 @@ from annotation.fake_annotation import get_fake_annotation_version, create_fake_
     create_fake_variant_annotation
 from annotation.models import HumanProteinAtlasTissueSample, ClinVar, Citation
 from annotation.models.models_citations import CitationSource
-from library.django_utils.unittest_utils import URLTestCase
+from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 
@@ -32,7 +32,8 @@ class Test(URLTestCase):
         clinvar = ClinVar.objects.filter(version=cls.annotation_version_grch37.clinvar_version).first()
         q = Variant.get_contigs_q(cls.grch37) & Variant.get_no_reference_q()
         variant = Variant.objects.filter(q).first()
-        fake_variant = create_fake_variant_annotation(variant, cls.annotation_version_grch37.variant_annotation_version)
+        # below seems to raise an exception because a non superuser is apparently calling it
+        create_fake_variant_annotation(variant, cls.annotation_version_grch37.variant_annotation_version)
         citation = Citation.objects.filter(source=CitationSource.PUBMED).first()
         pubmed_citation = citation.id
 
@@ -46,7 +47,7 @@ class Test(URLTestCase):
         # for expected results, it is a tuple, the first item appears to be the type for the objects inside
         # the grid and the second object is the expected results
         cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
-            ("variant_annotation_version_datatable", {}, (fake_variant)),
+            ("variant_annotation_version_datatable", {"genome_build_name": cls.grch37.name}, cls.annotation_version_grch37.variant_annotation_version),
             # ("variant_annotation_version_datatable", {}, cls.annotation_version_grch37)
         ]
 
@@ -81,8 +82,9 @@ class Test(URLTestCase):
         ]
         self._test_urls(GRID_LIST_URLS, self.user)
 
-    def testDataTablesGridListPermission(self):
-        self._test_datatables_grid_list_urls(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.admin_user, True)
+    @prevent_request_warnings
+    def testDataTablesGridListNoPermission(self):
+        self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user, True)
 
 if __name__ == "__main__":
     unittest.main()
