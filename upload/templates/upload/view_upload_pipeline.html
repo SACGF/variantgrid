@@ -37,58 +37,58 @@
             function plotIntervalsGraph(selector, title, step_order, step_start_end_lines) {
                 // There's no way to put shapes in the legend, so we'll make fake
                 // traces, then only show the legend for them
-                var data = [];
-                var shapes = [];
+                const data = [];
+                const shapes = [];
 
-                var color_index = 0;
-                var y = 0;
-                var y_step = -1;
-                for (var i=0 ; i<step_order.length ; ++i) {
-                    var color = COLORS[color_index];
+                let color_index = 0;
+                let y = 0;
+                const y_step = -1;
+                for (let i=0 ; i<step_order.length ; ++i) {
+                    const color = COLORS[color_index];
                     ++color_index;
-                    var step = step_order[i];
-                    var step_lines = step_start_end_lines[step];
+                    const step = step_order[i];
+                    const step_lines = step_start_end_lines[step];
 
-                    var fake_trace = {
+                    const fake_trace = {
                         x: [null],
                         y: [null],
                         mode: 'markers',
                         name: step,
-                        marker: {'color' : color},
+                        marker: {'color': color},
                         visible: 'legendonly',
                     };
                     data.push(fake_trace);
 
-                    var running_markers = {
+                    const running_markers = {
                         x: [],
                         y: [],
                         type: 'scatter',
                         mode: 'markers',
-                        marker: {'color' : color, symbol: 'triangle-right'},
+                        marker: {'color': color, symbol: 'triangle-right'},
                         showlegend: false,
                     };
                     data.push(running_markers);
 
-                    var crash_markers = {
+                    const crash_markers = {
                         x: [],
                         y: [],
                         type: 'scatter',
                         mode: 'markers',
-                        marker: {'color' : color, symbol: 'x'},
+                        marker: {'color': color, symbol: 'x'},
                         showlegend: false,
                     };
                     data.push(crash_markers);
 
-                    for (var j=0 ; j<step_lines.length ; ++j) {
-                        var step_line = step_lines[j];
+                    for (let j=0 ; j<step_lines.length ; ++j) {
+                        const step_line = step_lines[j];
 
-                        for (var s=0 ; s<step_line.length ; s++) {
-                            var start_stop = step_line[s];
-                            var x_start = start_stop[0];
-                            var x_end = start_stop[1];
-                            var status = start_stop[2];
+                        for (let s=0 ; s<step_line.length ; s++) {
+                            const start_stop = step_line[s];
+                            const x_start = start_stop[0];
+                            const x_end = start_stop[1];
+                            const status = start_stop[2];
 
-                            var shape = {
+                            const shape = {
                                 x0: x_start,
                                 x1: x_end,
                                 y0: y,
@@ -114,18 +114,22 @@
                 }
 
 
-                var layout = {
-                  'title': title,
-                  'xaxis' : { showgrid: false,
-                              zeroline: false,
-                              title: 'seconds'},
-                  'yaxis' : { showgrid: false,
-                              showticklabels: false,
-                              linewidth: 0,
-                              zeroline: false,
-                              showline: false, },
-                  'showlegend': true,
-                  'shapes': shapes,
+                const layout = {
+                    'title': title,
+                    'xaxis': {
+                        showgrid: false,
+                        zeroline: false,
+                        title: 'seconds'
+                    },
+                    'yaxis': {
+                        showgrid: false,
+                        showticklabels: false,
+                        linewidth: 0,
+                        zeroline: false,
+                        showline: false,
+                    },
+                    'showlegend': true,
+                    'shapes': shapes,
                 };
 
                 Plotly.newPlot(selector, data, layout);
@@ -133,9 +137,27 @@
             }
 
             $(document).ready(function() {
-                var step_order = {{ step_order | jsonify }};
-                var step_start_end_lines = {{ step_start_end_lines | jsonify }};
+                $("button#delete-button").click(function() {
+                    let delete_obj_url = "{% url 'group_permissions_object_delete' 'upload.models.models.UploadedFile' upload_pipeline.uploaded_file_id %}";
+                    $.ajax({
+                        type: "POST",
+                        url: delete_obj_url,
+                        success: function(data) {
+                            window.location = "{% url 'upload' %}";
+                        },
+                        error: function(data) {
+                            console.log("Error: ");
+                            console.log(data);
+                            let errorMessageUl = createMessage("error", data.responseText);
+                            $("#delete-container").empty().append(errorMessageUl);
+                        }
+                    });
 
+                });
+
+
+                const step_order = {{ step_order | jsonify }};
+                const step_start_end_lines = {{ step_start_end_lines | jsonify }};
                 plotIntervalsGraph('upload-steps-graph', "Job Times", step_order, step_start_end_lines);
             });
         </script>
@@ -156,12 +178,8 @@
 	<div class="container">
         <h3>Upload Pipeline</h3>
 	    <fieldset class="form-fields">
-        {% comment %}
-        <!-- todo convert this to bootstrap, but crispy_forms can't accept a model, only forms -->
-        {% endcomment %}
 		{{ upload_pipeline | as_p }}
-
-		<p><label>file type</label><span>{{ upload_pipeline.get_file_type_display }}</span></p>
+        </fieldset>
 
 	{% if upload_pipeline.file_type == 'V' %}
 		{% if uploaded_vcf %}
@@ -221,34 +239,22 @@
 		{% else %}
             <p>GeneList for this file has been deleted.</p>
 		{% endif %}
-	{% elif upload_pipeline.file_type == 'C' %}
-		{% if uploaded_cuffdiff %}
-			<p>
-                <label>UploadedCuffDiff</label>
-                <span>{{ uploaded_cuffdiff.pk }}</span>
-			</p>
-            <p>
-                <label>GeneList</label>
-                {% if uploaded_cuffdiff.cuff_diff_file %}
-			        <a href="{% url 'view_expression_file' uploaded_cuffdiff.cuff_diff_file.pk %}">{{ uploaded_cuffdiff.cuff_diff_file }}</a>
-			    {% else %}
-			        <span>CuffDiff file is still being imported</span>
-                {% endif %}
-            </p>
-		{% else %}
-            <p>CuffDiff File for this file has been deleted.</p>
-		{% endif %}
 	{% endif %}
 
-		{% if allow_retry_import %}
-			<div class="buttons">
-			  <form id="retry-upload-form" action={% url 'upload_retry_import' upload_pipeline.pk %} method="post">
-				{% csrf_token %}
-				<button class="btn btn-primary" id='retry-import-button' type='submit'>Retry Import</button>
-			  </form>
+        <div class="buttons">
+            <form id="retry-upload-form" action={% url 'upload_retry_import' upload_pipeline.pk %} method="post">
+            {% csrf_token %}
+                  <div class="btn-toolbar">
+    		{% if allow_retry_import %}
+                    <button class="btn btn-primary" id='retry-import-button' type='submit'>Retry Import</button>
+    		{% endif %}
+                    <button class="btn btn-danger" id='delete-button' type='button'>Delete</button>
+                    <div id="delete-container">
+                    <!-- error messages set in JSON -->
+                    </div>
+                  </div>
+              </form>
 			</div>
-		{% endif %}
-	    </fieldset>
 
         {% if step_total_stats %}
             <h3>Steps</h3>

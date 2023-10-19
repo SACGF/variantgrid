@@ -149,11 +149,6 @@ def jfu_upload_delete(request, pk):
             raise PermissionDenied(msg)
 
         data = {'uploaded_file_id': instance.pk}
-        try:
-            if os.path.exists(instance.uploaded_file.path):
-                os.unlink(instance.uploaded_file.path)
-        except:  # Someone may have deleted MEDIA_ROOT file already - causing uploaded_file to error here
-            pass
         instance.delete()
     except UploadedFile.DoesNotExist:
         data = False
@@ -241,11 +236,6 @@ def view_upload_pipeline(request, upload_pipeline_id):
     if not file_exists:
         status = messages.WARNING
         messages.add_message(request, status, "File does not exist on disk, cannot reload", extra_tags='import-message')
-
-    if upload_pipeline.status == ProcessingStatus.ERROR:
-        msg = f"Import Error: This file failed to import due to: {upload_pipeline.progress_status}. "
-        status = messages.ERROR
-        messages.add_message(request, status, msg, extra_tags='import-message')
 
     step_order, step_start_end_lines = upload_stats.get_step_order_and_step_start_end_lines(upload_pipeline)
     more_warning_or_error_details = False

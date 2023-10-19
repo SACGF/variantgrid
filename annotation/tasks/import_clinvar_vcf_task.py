@@ -31,9 +31,8 @@ class ImportCreateVersionForClinVarVCFTask(ImportVCFStepTask):
             clinvar_version.delete_related_objects()
             clinvar_version.create_partition()  # Put it back...
 
-        defaults = {"uploaded_file": upload_step.uploaded_file}
-        UploadedClinVarVersion.objects.get_or_create(clinvar_version=clinvar_version,
-                                                     defaults=defaults)
+        UploadedClinVarVersion.objects.create(uploaded_file=upload_step.uploaded_file,
+                                              clinvar_version=clinvar_version)
         return 0
 
 

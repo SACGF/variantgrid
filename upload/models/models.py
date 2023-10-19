@@ -66,6 +66,9 @@ class UploadedFile(TimeStampedModel):
             msg = f"You do not have permission to access UploadedFile pk={self.pk}"
             raise PermissionDenied(msg)
 
+    def can_write(self, user) -> bool:
+        return user.is_superuser or self.user == user
+
     def get_file(self):
         return open(self.get_filename(), "rb")
 
@@ -79,6 +82,14 @@ class UploadedFile(TimeStampedModel):
     def store_md5_hash(self):
         self.md5_hash = file_md5sum(self.get_filename())
         self.save()
+
+    def delete(self, using=None, keep_parents=False):
+        super().delete(using=using, keep_parents=keep_parents)
+        try:
+            if os.path.exists(self.uploaded_file.path):
+                os.unlink(self.uploaded_file.path)
+        except:  # Someone may have deleted MEDIA_ROOT file already - causing uploaded_file to error here
+            pass
 
     def __str__(self):
         description = f"{self.name} ({self.created.astimezone(UserSettingsManager.get_user_timezone())})"
@@ -198,7 +209,7 @@ class UploadPipeline(models.Model):
 
     def get_errors(self, hide_accepted=True) -> List:
         errors = []
-        if self.status == 'E':
+        if self.status == ProcessingStatus.ERROR:
             # Make a fake one for template
             VCFImportError = namedtuple('VCFImportError', ['message', 'has_more_details'])
             vii = VCFImportError(message=f"This file failed to import due to: {self.progress_status}.",
@@ -229,7 +240,7 @@ class UploadPipeline(models.Model):
     @property
     def genome_build(self) -> GenomeBuild:
         """ returns GenomeBuild based on uploaded file type
-            throws ValueError if can't retrieve it """
+            throws ValueError if it can't retrieve it """
 
         # TODO: bit of a hack - do this more OO?
         uploaded_file = self.uploaded_file

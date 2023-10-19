@@ -118,7 +118,8 @@ def uploaded_gene_coverage_post_delete_handler(sender, instance, **kwargs):  # p
 
 class UploadedClinVarVersion(models.Model):
     uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
-    clinvar_version = models.OneToOneField(ClinVarVersion, null=True, on_delete=CASCADE)
+    # It's possible someone could upload the same clinvar VCF again
+    clinvar_version = models.ForeignKey(ClinVarVersion, null=True, on_delete=CASCADE)
 
 
 class UploadedVariantTags(models.Model):
