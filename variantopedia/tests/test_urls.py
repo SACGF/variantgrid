@@ -6,9 +6,9 @@ from django.contrib.auth.models import User
 from analysis.models import VariantTag
 from annotation.fake_annotation import get_fake_annotation_version, create_fake_variants, create_fake_variant_annotation
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
-from library.django_utils.unittest_utils import URLTestCase
+from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from snpdb.models import Variant, ClinGenAllele, Allele, VariantAllele, AlleleOrigin, Tag, \
-    VariantZygosityCountCollection, VariantZygosityCount
+    VariantZygosityCountCollection, VariantZygosityCount, VariantWiki
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.mock_clingen_api import MockClinGenAlleleRegistryAPI
 
@@ -50,6 +50,15 @@ class Test(URLTestCase):
         vzcc = VariantZygosityCountCollection.objects.get_or_create(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)[0]
         VariantZygosityCount.objects.get_or_create(variant=cls.variant, collection=vzcc, het_count=1)
 
+        # not sure how to test this properly
+        cls.variant_wiki_obj = VariantWiki.objects.create(variant=cls.variant)
+        cls.PRIVATE_DATATABLES_GRID_LIST_URLS= [
+            ("variant_wiki_datatable", {}, cls.variant_wiki_obj),
+            ("variant_tag_counts_datatable", {"variant_id": cls.variant.id}, cls.variant_tag),
+            ("variant_tag_detail_datatable", {"variant_id": cls.variant.id, "tag": cls.variant_tag.id}, cls.variant_tag)
+            # ("variant_annotation_version_datatable", {}, cls.annotation_version_grch37)
+        ]
+
     def testUrls(self):
         # Don't test 'server_status' as it polls Celery worker queues etc
         variant_kwargs = {"variant_id": self.variant.pk}
@@ -83,6 +92,9 @@ class Test(URLTestCase):
         ]
         self._test_jqgrid_urls_contains_objs(GRID_LIST_URLS, self.user, True)
 
+    @prevent_request_warnings
+    def testDataTablesGridListNoPermission(self):
+        self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user, True)
 
 if __name__ == "__main__":
     unittest.main()

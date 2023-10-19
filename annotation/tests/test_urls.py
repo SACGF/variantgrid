@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 
 from annotation.fake_annotation import get_fake_annotation_version, create_fake_clinvar_data, \
     create_fake_variant_annotation
-from annotation.models import HumanProteinAtlasTissueSample, ClinVar, Citation
+from annotation.models import HumanProteinAtlasTissueSample, ClinVar, Citation, AnnotationRun
 from annotation.models.models_citations import CitationSource
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from snpdb.models import Variant
@@ -27,6 +27,7 @@ class Test(URLTestCase):
         cls.annotation_version_grch38 = get_fake_annotation_version(cls.grch38)
 
         cls.human_protein_atlas_tissue_sample = HumanProteinAtlasTissueSample.objects.get_or_create(name="foo")[0]
+        cls.annotation_run_column = AnnotationRun.objects.create(status="Complete")
 
         create_fake_clinvar_data(cls.annotation_version_grch37.clinvar_version)
         clinvar = ClinVar.objects.filter(version=cls.annotation_version_grch37.clinvar_version).first()
@@ -48,6 +49,7 @@ class Test(URLTestCase):
         # the grid and the second object is the expected results
         cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
             ("variant_annotation_version_datatable", {"genome_build_name": cls.grch37.name}, cls.annotation_version_grch37.variant_annotation_version),
+            ("annotation_run_datatable", {} , cls.annotation_run_column),
             # ("variant_annotation_version_datatable", {}, cls.annotation_version_grch37)
         ]
 
