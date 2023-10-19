@@ -70,6 +70,8 @@ class UploadedClassificationsUnmapped(TimeStampedModel):
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
     comment = models.TextField(default="", blank=True)
+    file_type_override = models.TextField(default="", blank=True)
+
     validation_summary = models.JSONField(null=True, blank=True)
     validation_list = models.JSONField(null=True, blank=True)
     status = models.CharField(max_length=2, choices=UploadedClassificationsUnmappedStatus.choices, default=UploadedClassificationsUnmappedStatus.Pending)

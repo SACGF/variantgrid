@@ -927,6 +927,14 @@ class UploadedClassificationsUnmappedAdmin(ModelAdminBasics):
     def process(self, request, queryset: QuerySet[UploadedClassificationsUnmapped]):
         for ufl in queryset:
             ClassificationImportMapInsertTask.run(upload_classifications_unmapped_id=ufl.pk, import_records=False)
+            ufl.refresh_from_db()
+            if validation_summary := ufl.validation_summary:
+                if fatal_error := validation_summary.get("fatal_error"):
+                    self.message_user(request, message=f"Fatal error: {fatal_error}", level=messages.ERROR)
+                else:
+                    records_mapped = validation_summary.get("records_mapped") or 0
+                    self.message_user(request, message=f"{records_mapped} records mapped")
+
 
     @admin_action("Process (Async)")
     def process_async(self, request, queryset: QuerySet[UploadedClassificationsUnmapped]):

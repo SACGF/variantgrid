@@ -103,8 +103,8 @@ class ClassificationImportMapInsertTask(Task):
             include_source = settings.CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE
 
             args: List[str] = [
-                settings.PYTHON_COMMAND, "main.py",
-                "--dir", working_sub_folder.absolute(),
+                settings.CLASSIFICATION_OMNI_IMPORTER_PYTHON_COMMAND, "main.py",
+                "--dir", str(working_sub_folder.absolute()),
                 "--publish", publish,
                 "--org", upload_file.lab.organization.group_name,
                 "--lab", upload_file.lab.group_name.split("/")[1],
@@ -112,6 +112,10 @@ class ClassificationImportMapInsertTask(Task):
             ]
             if include_source:
                 args.append("--include_source")
+            if file_type_override := upload_file.file_type_override:
+                args += ["--file_type", file_type_override]
+
+            print(" ".join(args))
 
             # could make it returned the mapped file to stdout
             # but it's handy having the mapped file present

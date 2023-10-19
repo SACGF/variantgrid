@@ -55,6 +55,9 @@
                         {% labelled label="Upload File" %}
                             <input type="file" name="file">
                         {% endlabelled %}
+                        {% labelled label="File Type Override" hint="Only need to provide this if not using the default import method" admin_only=True %}
+                            <input type="text" name="file-type-override" class="form-field">
+                        {% endlabelled %}
                         {% if user.is_superuser and server_files %}
                             <hr/>
                             <div class="text-center">OR</div>

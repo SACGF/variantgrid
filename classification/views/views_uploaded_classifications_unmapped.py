@@ -40,6 +40,7 @@ class UploadedClassificationsUnmappedColumns(DatatableConfig[UploadedClassificat
             RichColumn(key="effective_modified", label='Modified', orderable=True, client_renderer='TableFormat.timestamp', extra_columns=['created'], sort_keys=['created'], renderer=self.effective_date_set),
             RichColumn(key="file_size", label='Size', orderable=True, client_renderer='TableFormat.sizeBytes'),
             RichColumn(key="status", label="Status", orderable=True, renderer=lambda x: UploadedClassificationsUnmappedStatus(x["status"]).label),
+            RichColumn(key="file_type_override", label="File Type", orderable=True),
             RichColumn(key="comment", client_renderer='TableFormat.text')
         ]
 
@@ -220,6 +221,7 @@ class UploadedClassificationsUnmappedView(View):
                 uploaded_file = UploadedClassificationsUnmapped.objects.create(
                     url=sub_file.clean_url,
                     filename=sub_file.filename,
+                    file_type_override=request.POST.get('file-type-override') or "",
                     user=request.user,
                     lab=lab,
                     status=status,
