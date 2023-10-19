@@ -51,13 +51,7 @@ class Test(URLTestCase):
         VariantZygosityCount.objects.get_or_create(variant=cls.variant, collection=vzcc, het_count=1)
 
         # not sure how to test this properly
-        cls.variant_wiki_obj = VariantWiki.objects.create(variant=cls.variant)
-        cls.PRIVATE_DATATABLES_GRID_LIST_URLS= [
-            ("variant_wiki_datatable", {}, cls.variant_wiki_obj),
-            ("variant_tag_counts_datatable", {"variant_id": cls.variant.id}, cls.variant_tag),
-            ("variant_tag_detail_datatable", {"variant_id": cls.variant.id, "tag": cls.variant_tag.id}, cls.variant_tag)
-            # ("variant_annotation_version_datatable", {}, cls.annotation_version_grch37)
-        ]
+        cls.variant_wiki_obj = VariantWiki.objects.get_or_create(variant=cls.variant)
 
     def testUrls(self):
         # Don't test 'server_status' as it polls Celery worker queues etc
@@ -92,9 +86,13 @@ class Test(URLTestCase):
         ]
         self._test_jqgrid_urls_contains_objs(GRID_LIST_URLS, self.user, True)
 
-    @prevent_request_warnings
-    def testDataTablesGridListNoPermission(self):
-        self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user, True)
+    def testDataGridUrls(self):
+        DATATABLE_GRID_LIST_URLS = [
+            ("variant_wiki_datatable", {}, 200),
+            ("variant_tag_counts_datatable", {"variant_id": self.variant.id}, 200),
+            ("variant_tag_detail_datatable", {"variant_id": self.variant.id, "tag": self.variant_tag.tag}, 200)
+        ]
+        self._test_datatable_urls(DATATABLE_GRID_LIST_URLS, self.user)
 
 if __name__ == "__main__":
     unittest.main()

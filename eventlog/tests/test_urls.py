@@ -19,6 +19,12 @@ class Test(URLTestCase):
             ("event_log_datatable", {}, cls.event)
         ]
 
+    def testDataGridUrls(self):
+        DATATABLE_GRID_LIST_URLS = [
+            ("event_log_datatable", {}, 200),
+        ]
+        self._test_datatable_urls(DATATABLE_GRID_LIST_URLS, self.user)
+
     @prevent_request_warnings
     def testDataTablesGridListNoPermission(self):
         self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user, True)

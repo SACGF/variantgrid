@@ -124,6 +124,13 @@ class Test(URLTestCase):
         # Make sure that GlobalLoginRequiredMiddleware bounces unauth users
         self._test_urls(URL_NAMES_AND_KWARGS, expected_code_override=302)
 
+    def testDataGridUrls(self):
+        DATATABLE_GRID_LIST_URLS = [
+            ("tag_color_collections_datatable", {}, 200),
+            ("custom_columns_collections_datatable", {}, 200)
+        ]
+        self._test_datatable_urls(DATATABLE_GRID_LIST_URLS, self.user_owner)
+
     def testPermission(self):
         self._test_urls(self.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS, self.user_owner)
 

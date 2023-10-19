@@ -19,13 +19,11 @@ class Test(URLTestCase):
         cls.manual_migration_task = ManualMigrationTask.objects.create(id="a*test*migartion")
         cls.manual_migration_event = ManualMigrationAttempt.objects.create(task=cls.manual_migration_task)
 
-        cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
-            ("manual_migrations_datatable", {}, cls.manual_migration_event)
+    def testDataGridUrls(self):
+        DATATABLE_GRID_LIST_URLS = [
+            ("manual_migrations_datatable", {}, 200),
         ]
-
-    @prevent_request_warnings
-    def testDataTablesGridListNoPermission(self):
-        self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user, True)
+        self._test_datatable_urls(DATATABLE_GRID_LIST_URLS, self.user)
 
 if __name__ == "__main__":
     unittest.main()
