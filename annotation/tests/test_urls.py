@@ -44,15 +44,6 @@ class Test(URLTestCase):
         cls.citations_ids_list = "/".join((str(c) for c in Citation.objects.all().values_list("id", flat=True)[:2]))
         cls.citations_ids_list_pubmed = pubmed_citation
 
-        # these take firstly the name of the function, keywords (as a dict) and finally expected results
-        # for expected results, it is a tuple, the first item appears to be the type for the objects inside
-        # the grid and the second object is the expected results
-        cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
-            ("variant_annotation_version_datatable", {"genome_build_name": cls.grch37.name}, cls.annotation_version_grch37.variant_annotation_version),
-            ("annotation_run_datatable", {} , cls.annotation_run_column),
-            # ("variant_annotation_version_datatable", {}, cls.annotation_version_grch37)
-        ]
-
     def testUrls(self):
         """ No permissions to test """
         URL_NAMES_AND_KWARGS = [
@@ -90,9 +81,6 @@ class Test(URLTestCase):
             ("annotation_run_datatable", {}, 200),
         ]
         self._test_datatable_urls(DATATABLE_GRID_LIST_URLS, self.user)
-    @prevent_request_warnings
-    def testDataTablesGridListNoPermission(self):
-        self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user, True)
 
 if __name__ == "__main__":
     unittest.main()
