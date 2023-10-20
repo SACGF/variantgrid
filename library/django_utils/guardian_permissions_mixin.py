@@ -39,15 +39,22 @@ class GuardianPermissionsMixin:
         if not user:
             return False
         perm_obj = self.get_permission_object()
+        if perm_obj != self:
+            return perm_obj.can_view(user)
+
         if isinstance(user, Group):
-            return self.get_read_perm() in get_group_perms(user, perm_obj)
-        return user.has_perm(self.get_read_perm(), perm_obj)
+            return self.get_read_perm() in get_group_perms(user, self)
+        return user.has_perm(self.get_read_perm(), self)
 
     def can_write(self, user) -> bool:
         if not user:
             return False
         perm_obj = self.get_permission_object()
-        return user.has_perm(self.get_write_perm(), perm_obj)
+        if perm_obj != self:
+            return perm_obj.can_write(user)
+        if isinstance(user, Group):
+            return self.get_write_perm() in get_group_perms(user, self)
+        return user.has_perm(self.get_write_perm(), self)
 
     def check_can_write(self, user):
         if not self.can_write(user):
