@@ -6,8 +6,10 @@ from django.db import models
 from django.urls import reverse
 from model_utils.models import TimeStampedModel
 
+from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 
-class EmailLog(TimeStampedModel):
+
+class EmailLog(PreviewModelMixin, TimeStampedModel):
     subject = models.TextField()
     html = models.TextField()
     text = models.TextField()
@@ -65,3 +67,27 @@ class EmailLog(TimeStampedModel):
             single_email=allow_users_to_see_others
         )
         return maybe_sent
+
+    @classmethod
+    def preview_category(cls) -> str:
+        return "Emails"
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-envelope"
+
+    @property
+    def preview(self) -> 'PreviewData':
+        title = self.subject
+        extras = [
+            PreviewKeyValue(key="To", value=self.recipient_list)
+        ]
+        return PreviewData.for_object(
+            obj=self,
+            category="Email",
+            title=title,
+            icon=self.preview_icon(),
+            internal_url=self.get_absolute_url(),
+            summary_extra=extras
+
+        )

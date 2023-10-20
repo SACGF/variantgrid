@@ -14,6 +14,7 @@ urlpatterns = [
     perm_path('server_status_activity/detail/<int:days_ago>', views.server_status_activity,
               name='server_status_activity_detail'),
     perm_path('server_status_settings/detail', views.server_status_settings, name='server_status_settings_detail'),
+    perm_path('health_check_details', views.health_check_details, name='health_check_details'),
     perm_path('database_statistics/detail', views.database_statistics, name='database_statistics_detail'),
     # Tagging
     perm_path('variant_tags/', views.variant_tags, name='variant_tags'),

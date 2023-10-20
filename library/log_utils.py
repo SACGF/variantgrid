@@ -23,7 +23,6 @@ from requests import HTTPError
 from rest_framework.request import Request
 from threadlocals.threadlocals import get_current_request, get_current_user
 
-from email_manager.models import EmailLog
 from eventlog.models import Event
 from library.constants import MINUTE_SECS
 from library.enums.log_level import LogLevel
@@ -386,6 +385,7 @@ class AdminNotificationBuilder(NotificationBuilder):
         super().__init__(message=message)
 
     def send(self):
+        from email_manager.models import EmailLog
         super().send()
         email_recipients = [user.email for user in User.objects.filter(is_superuser=True) if user.email]
 

@@ -9,6 +9,7 @@ from django.db.models import Model, Q
 from django.utils.timezone import localtime
 
 from library.log_utils import NotificationBuilder
+from library.preview_request import PreviewData
 from library.utils import flatten_nested_lists, model_has_field
 
 """
@@ -57,6 +58,7 @@ class HealthCheckRecentActivity(HealthCheckStat):
     sub_type: Optional[str] = None   # if we're talking about created/updated or deleted
     extra: Optional[str] = None   # extra text (not used for grouping)
     stand_alone: bool = False  # should this always be reported on in its own line
+    preview: Optional[List[PreviewData]] = None
 
     # Consider this taking a QuerySet of the objects instead
     # that way Server Status web page could use them
@@ -73,7 +75,7 @@ class HealthCheckRecentActivity(HealthCheckStat):
     def __str__(self):
         amount_str = self.amount
         if self.amount:
-            amount_str = f"*{amount_str}*"
+            amount_str = f"**{amount_str}**"
         result = f"{self.emoji} {amount_str} : {self.name}"
         if self.sub_type:
             result = f"{result} {self.sub_type}"
@@ -180,7 +182,7 @@ class HealthCheckTotalAmount(HealthCheckStat):
     def __str__(self):
         amount_str = self.amount
         if self.amount:
-            amount_str = f"*{amount_str:,}*"
+            amount_str = f"**{amount_str:,}**"
         result = f"{self.emoji} {amount_str} : {self.name}"
         if self.extra:
             result = f"{result} - {self.extra}"

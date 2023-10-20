@@ -1,16 +1,20 @@
+import itertools
 import operator
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import timedelta
 from functools import reduce
-from typing import Any
+from typing import Any, List
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.models import User
 from django.db import connection
 from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
+from django.utils.timezone import localtime
 from django.views.decorators.http import require_POST
 
 from analysis.models import VariantTag
@@ -28,7 +32,9 @@ from genes.models import CanonicalTranscriptCollection, GeneSymbol
 from library.django_utils import require_superuser, highest_pk, get_field_counts
 from library.git import Git
 from library.guardian_utils import admin_bot
-from library.log_utils import log_traceback, report_message, slack_bot_username
+from library.health_check import health_check_signal, HealthCheckRequest, HealthCheckStat, HealthCheckRecentActivity
+from library.log_utils import log_traceback, report_message, slack_bot_username, NotificationBuilder
+from library.utils import flatten_nested_lists
 from pathtests.models import cases_for_user
 from patients.models import Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
@@ -40,7 +46,7 @@ from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleConversionTool, ImportSource, AlleleOrigin, \
     VariantAlleleSource, VariantGridColumn, Tag
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.models.models_user_settings import UserSettings
+from snpdb.models.models_user_settings import UserSettings, UserPreview
 from snpdb.search import search_data
 from snpdb.serializers import VariantAlleleSerializer
 from snpdb.variant_sample_information import VariantSampleInformation
@@ -244,6 +250,48 @@ def server_status_settings(request):
         "ongoing_imports": ClassificationImportRun.ongoing_imports(),
         "hgvs_matcher": hgvs_matcher
     })
+
+
+@require_superuser
+def health_check_details(request):
+    now = localtime()
+    since = now - timedelta(days=1)
+    health_request = HealthCheckRequest(since=since, now=now)
+
+    results = []
+    previews = {}
+    for _, result in health_check_signal.send_robust(sender=None, health_request=health_request):
+        if not isinstance(result, Exception):
+            results.append(result)
+            if isinstance(result, HealthCheckRecentActivity):
+                previews[result.name] = previews.get(result.name, []) + result.preview
+
+    checks: List[HealthCheckStat] = flatten_nested_lists(results)
+    checks = sorted(checks, key=lambda hc: hc.sort_order())
+    grouped_checks = [(key, list(values)) for key, values in itertools.groupby(checks, type)]
+    grouped_checks = sorted(grouped_checks, key=lambda gc: gc[0].sort_order())
+
+    recent_lines = []
+    overall_lines = []
+    for check_type, checks_typed in grouped_checks:
+        section_lines = check_type.to_lines(checks_typed, health_request=health_request)
+        if check_type.is_recent_activity():
+            recent_lines.extend(section_lines)
+        else:
+            overall_lines.extend(section_lines)
+
+    for i in range(len(recent_lines)):
+        recent_lines[i] = NotificationBuilder.slack_markdown_to_html(recent_lines[i])
+    for i in range(len(overall_lines)):
+        overall_lines[i] = NotificationBuilder.slack_markdown_to_html(overall_lines[i])
+
+    context = {
+        'recent_lines': recent_lines,
+        'overall_lines': overall_lines,
+        'previews': previews
+    }
+
+    return render(request, "variantopedia/health_check_details.html", context)
 
 
 @dataclass
