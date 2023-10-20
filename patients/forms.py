@@ -4,6 +4,7 @@ from django.forms.models import inlineformset_factory, ALL_FIELDS
 from django.forms.widgets import TextInput
 
 from library.django_utils.autocomplete_utils import ModelSelect2
+from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import Patient, Specimen, ExternalPK, PatientModification, \
     PatientRecordOriginType
 from patients.models_enums import PopulationGroup
@@ -51,7 +52,11 @@ class PatientForm(forms.ModelForm):
     def save(self, commit=True):
         patient = super().save(commit=False)
         if commit:
+            created = patient.pk is None
             patient.save(phenotype_approval_user=self.user)
+            if created:
+                assign_permission_to_user_and_groups(self.user, patient)
+
             pop_set = patient.patientpopulation_set
             old_populations = set(pop_set.all().values_list("population", flat=True))
 

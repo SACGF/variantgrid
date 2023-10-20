@@ -237,7 +237,6 @@ def view_vcf(request, vcf_id):
         if valid:
             vcf = vcf_form.save()
             reload_vcf = requires_user_input and vcf.genome_build
-
             samples_form.save()
 
         add_save_message(request, valid, "VCF")
@@ -260,6 +259,9 @@ def view_vcf(request, vcf_id):
 
     has_write_permission = vcf.can_write(request.user)
     if not has_write_permission:
+        set_form_read_only(vcf_form)
+        for form in samples_form.forms:
+            set_form_read_only(form)
         messages.add_message(request, messages.WARNING, "You can view but not modify this data.")
 
     variant_zygosity_count_collections = {}

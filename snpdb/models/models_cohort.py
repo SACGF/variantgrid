@@ -23,6 +23,7 @@ from library.django_utils import SortByPKMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.django_postgres import PostgresRealField
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
+from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import invert_dict
 from patients.models_enums import Zygosity
@@ -52,6 +53,18 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
     # Deal with parent_cohort delete in snpdb.signals.signal_handlers.pre_delete_cohort
     parent_cohort = models.ForeignKey("self", null=True, related_name="sub_cohort_set", on_delete=DO_NOTHING)
     sample_count = models.IntegerField(null=True)
+
+    def can_view(self, user) -> bool:
+        """ Also uses VCF permission """
+        if self.vcf and self.vcf.can_view(user):
+            return True
+        return super().can_view(user)
+
+    def can_write(self, user) -> bool:
+        """ Also uses VCF permission """
+        if self.vcf and self.vcf.can_write(user):
+            return True
+        return super().can_write(user)
 
     @classmethod
     def preview_icon(cls) -> str:

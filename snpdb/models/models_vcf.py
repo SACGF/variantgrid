@@ -325,9 +325,8 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
         return settings.SEQAUTO_MIN_COVERAGE
 
     def can_view(self, user) -> bool:
-        vcf_read_perm = DjangoPermission.perm(self.vcf, DjangoPermission.READ)
-        sample_read_perm = DjangoPermission.perm(self, DjangoPermission.READ)
-        return user.has_perm(vcf_read_perm, self.vcf) or user.has_perm(sample_read_perm, self)
+        read_perm = DjangoPermission.perm(self, DjangoPermission.READ)
+        return self.vcf.can_view(user) or user.has_perm(read_perm, self)
 
     def check_can_view(self, user):
         if not self.can_view(user):
