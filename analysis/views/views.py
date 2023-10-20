@@ -632,7 +632,7 @@ def cohort_zygosity_filters(request, analysis_id, node_id, cohort_id):
 def vcf_locus_filters(request, analysis_id, node_id, vcf_id):
     node = get_node_subclass_or_404(request.user, node_id)
     if vcf_id:
-        vcf = VCF.get_for_user(request.user, vcf_id)
+        vcf = VCF.get_for_user(node.analysis.user, vcf_id)
     else:
         vcf = None
 
