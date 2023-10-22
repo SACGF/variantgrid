@@ -6,6 +6,7 @@ from annotation.fake_annotation import get_fake_annotation_version
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from library.django_utils.unittest_utils import prevent_request_warnings, URLTestCase
 from library.guardian_utils import assign_permission_to_user_and_groups
+from snpdb.models import TagColorsCollection
 from snpdb.models.models_cohort import Cohort
 from snpdb.models.models_columns import CustomColumnsCollection
 from snpdb.models.models_enums import ImportStatus
@@ -48,7 +49,8 @@ class Test(URLTestCase):
         transcript_version = create_fake_transcript_version(grch37)
         gene_symbol = transcript_version.gene_version.gene_symbol
 
-        cls.custom_columns_collection = CustomColumnsCollection.objects.create(name="blah", user=cls.user_owner)
+        cls.test_tag = TagColorsCollection.objects.create(user=cls.user_owner, name="TagA", version_id=1)
+        cls.custom_columns_collection = CustomColumnsCollection.objects.create(name="Test Column Collections", user=cls.user_owner, version_id=1)
 
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
             ('view_vcf', {"vcf_id": cls.vcf.pk}, 200),
@@ -95,6 +97,11 @@ class Test(URLTestCase):
             ("genomic_intervals_grid", {}, cls.genomic_intervals_collection),
         ]
 
+        cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
+            ("tag_color_collections_datatable", {}, cls.test_tag),
+            ("custom_columns_collections_datatable", {}, cls.custom_columns_collection)
+        ]
+
     def testUrls(self):
         URL_NAMES_AND_KWARGS = [
             ("data", {}, 200),
@@ -117,6 +124,13 @@ class Test(URLTestCase):
         # Make sure that GlobalLoginRequiredMiddleware bounces unauth users
         self._test_urls(URL_NAMES_AND_KWARGS, expected_code_override=302)
 
+    def testDataGridUrls(self):
+        DATATABLE_GRID_LIST_URLS = [
+            ("tag_color_collections_datatable", {}, 200),
+            ("custom_columns_collections_datatable", {}, 200)
+        ]
+        self._test_datatable_urls(DATATABLE_GRID_LIST_URLS, self.user_owner)
+
     def testPermission(self):
         self._test_urls(self.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS, self.user_owner)
 
@@ -132,11 +146,18 @@ class Test(URLTestCase):
         self._test_autocomplete_urls(self.PRIVATE_AUTOCOMPLETE_URLS, self.user_non_owner, False)
 
     def testJqGridListPermission(self):
-        self._test_jqgrid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
+        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
 
     @prevent_request_warnings
     def testJqGridListNoPermission(self):
-        self._test_jqgrid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
+        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
+
+    def testDataTablesGridListPermission(self):
+        self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_owner, True)
+
+    @prevent_request_warnings
+    def testDataTablesGridListNoPermission(self):
+        self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_non_owner, False)
 
 
 if __name__ == "__main__":

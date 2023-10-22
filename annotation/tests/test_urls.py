@@ -4,9 +4,9 @@ from django.contrib.auth.models import User
 
 from annotation.fake_annotation import get_fake_annotation_version, create_fake_clinvar_data, \
     create_fake_variant_annotation
-from annotation.models import HumanProteinAtlasTissueSample, ClinVar, Citation
+from annotation.models import HumanProteinAtlasTissueSample, ClinVar, Citation, AnnotationRun
 from annotation.models.models_citations import CitationSource
-from library.django_utils.unittest_utils import URLTestCase
+from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 
@@ -27,11 +27,13 @@ class Test(URLTestCase):
         cls.annotation_version_grch38 = get_fake_annotation_version(cls.grch38)
 
         cls.human_protein_atlas_tissue_sample = HumanProteinAtlasTissueSample.objects.get_or_create(name="foo")[0]
+        cls.annotation_run_column = AnnotationRun.objects.create(status="Complete")
 
         create_fake_clinvar_data(cls.annotation_version_grch37.clinvar_version)
         clinvar = ClinVar.objects.filter(version=cls.annotation_version_grch37.clinvar_version).first()
         q = Variant.get_contigs_q(cls.grch37) & Variant.get_no_reference_q()
         variant = Variant.objects.filter(q).first()
+        # below seems to raise an exception because a non superuser is apparently calling it
         create_fake_variant_annotation(variant, cls.annotation_version_grch37.variant_annotation_version)
         citation = Citation.objects.filter(source=CitationSource.PUBMED).first()
         pubmed_citation = citation.id
@@ -73,6 +75,12 @@ class Test(URLTestCase):
         ]
         self._test_urls(GRID_LIST_URLS, self.user)
 
+    def testDataGridUrls(self):
+        DATATABLE_GRID_LIST_URLS = [
+            ("variant_annotation_version_datatable", {"genome_build_name": self.grch37.name}, 200),
+            ("annotation_run_datatable", {}, 200),
+        ]
+        self._test_datatable_urls(DATATABLE_GRID_LIST_URLS, self.user)
 
 if __name__ == "__main__":
     unittest.main()

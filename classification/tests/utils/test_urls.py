@@ -136,11 +136,11 @@ class Test(URLTestCase):
         self._test_datatable_urls(GRID_LIST_URLS, self.user_owner)
 
     def testDataTablesGridListPermission(self):
-        self._test_datatables_grid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
+        self._test_datatables_grid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
 
     @prevent_request_warnings
     def testDataTablesGridListNoPermission(self):
-        self._test_datatables_grid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
+        self._test_datatables_grid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
 
 
 # TODO: Still need to test below

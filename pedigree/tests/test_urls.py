@@ -59,11 +59,11 @@ class Test(URLTestCase):
         self._test_autocomplete_urls(self.PRIVATE_AUTOCOMPLETE_URLS, self.user_non_owner, False)
 
     def testJqGridListPermission(self):
-        self._test_jqgrid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
+        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_owner, True)
 
     @prevent_request_warnings
     def testJqGridListNoPermission(self):
-        self._test_jqgrid_list_urls(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
+        self._test_jqgrid_urls_contains_objs(self.PRIVATE_GRID_LIST_URLS, self.user_non_owner, False)
 
 if __name__ == "__main__":
     unittest.main()

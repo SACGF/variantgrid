@@ -200,11 +200,11 @@ class Test(URLTestCase):
         self._test_autocomplete_urls(self.PRIVATE_AUTOCOMPLETE_URLS, self.user_non_owner, False)
 
     def testJqGridListPermission(self):
-        self._test_jqgrid_list_urls(self.PRIVATE_JQGRID_LIST_URLS, self.user_owner, True)
+        self._test_jqgrid_urls_contains_objs(self.PRIVATE_JQGRID_LIST_URLS, self.user_owner, True)
 
     @prevent_request_warnings
     def testJqGridListNoPermission(self):
-        self._test_jqgrid_list_urls(self.PRIVATE_JQGRID_LIST_URLS, self.user_non_owner, False)
+        self._test_jqgrid_urls_contains_objs(self.PRIVATE_JQGRID_LIST_URLS, self.user_non_owner, False)
 
     def testDataGridUrls(self):
         """ Grids w/o permissions """
@@ -218,11 +218,11 @@ class Test(URLTestCase):
         self._test_datatable_urls(GRID_LIST_URLS, self.user_owner)
 
     def testDataTablesGridListPermission(self):
-        self._test_datatables_grid_list_urls(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_owner, True)
+        self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_owner, True)
 
     @prevent_request_warnings
     def testDataTablesGridListNoPermission(self):
-        self._test_datatables_grid_list_urls(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_non_owner, False)
+        self._test_datatables_grid_urls_contains_objs(self.PRIVATE_DATATABLES_GRID_LIST_URLS, self.user_non_owner, False)
 
 
 # TODO: Still to test

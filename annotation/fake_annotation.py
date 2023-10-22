@@ -118,7 +118,7 @@ def create_fake_clinvar_data(clinvar_version: ClinVarVersion):
                                           citation=citation)
 
 
-def create_fake_variant_annotation(variant, variant_annotation_version: VariantAnnotationVersion):
+def create_fake_variant_annotation(variant, variant_annotation_version: VariantAnnotationVersion) -> VariantAnnotation:
     defaults = {
         # ??
     }
@@ -127,6 +127,6 @@ def create_fake_variant_annotation(variant, variant_annotation_version: VariantA
                                                                          max_variant=variant,
                                                                          count=1)
     annotation_run, _ = AnnotationRun.objects.get_or_create(annotation_range_lock=annotation_range_lock)
-    vav, _ = VariantAnnotation.objects.get_or_create(variant=variant, version=variant_annotation_version,
-                                                     annotation_run=annotation_run, defaults=defaults)
-    return vav
+    va, _ = VariantAnnotation.objects.get_or_create(variant=variant, version=variant_annotation_version,
+                                                    annotation_run=annotation_run, defaults=defaults)
+    return va
