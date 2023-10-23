@@ -1,10 +1,12 @@
 from typing import Optional, List, Set
+
 from django.conf import settings
 from django.db import transaction
 from django.db.models import QuerySet
 from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
+
 from classification.enums import SpecialEKeys
 from classification.models import DiscordanceReport, discordance_change_signal, EvidenceKeyMap, \
     ClassificationLabSummary

@@ -1,7 +1,3 @@
-import json
-from unittest import skip
-
-import deepdiff
 from deepdiff import DeepDiff
 from django.test import TestCase, RequestFactory, override_settings
 

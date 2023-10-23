@@ -1,6 +1,7 @@
+import re
+
 from classification.models import DiscordanceReport
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample
-import re
 
 
 @search_receiver(

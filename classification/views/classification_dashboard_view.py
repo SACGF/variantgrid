@@ -2,7 +2,6 @@ from functools import cached_property
 from typing import Optional, List, Union
 from urllib.parse import urlencode
 
-from django.conf import settings
 from django.db.models import QuerySet, Sum
 from django.db.models.expressions import Subquery
 from django.http import HttpResponse

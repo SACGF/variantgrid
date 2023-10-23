@@ -1,9 +1,11 @@
 from typing import List
+
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from django.shortcuts import render
+
 from email_manager.models import EmailLog
 from library.django_utils import require_superuser
 from library.utils.django_utils import render_ajax_view

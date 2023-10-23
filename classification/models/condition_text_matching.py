@@ -1,10 +1,10 @@
 import json
 import operator
+import re
 from dataclasses import dataclass
 from functools import cached_property, reduce
 from operator import attrgetter
 from typing import List, Optional, Dict, Iterable, Set
-import re
 
 import requests
 from django.contrib.auth.models import User

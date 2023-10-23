@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 
 from snpdb.models.models import Lab, Organization
-from snpdb.models.models_user_settings import UserSettings, UserSettingsOverride
+from snpdb.models.models_user_settings import UserSettingsOverride
 
 module_dir = os.path.dirname(__file__)  # get current directory
 lab_path = os.path.join(module_dir, 'labs.csv')

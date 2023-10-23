@@ -12,12 +12,12 @@ from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus, 
 from classification.models.classification_variant_info_models import ImportedAlleleInfoValidation
 from genes.hgvs import CHGVS, CHGVSDiff, chgvs_diff_description
 from library.django_utils import get_url_from_view_path
+from library.django_utils import require_superuser
 from library.utils import MultiDiff, MultiDiffInput, ExportRow, export_column
 from library.utils.django_utils import render_ajax_view
 from snpdb.admin_utils import get_admin_url
 from snpdb.models import GenomeBuild, Lab, Allele
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData, SortOrder
-from library.django_utils import require_superuser
 
 
 class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):

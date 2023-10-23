@@ -6,6 +6,7 @@ from django.db import migrations
 
 from manual.operations.manual_operations import ManualOperation
 
+
 def _check_settings_for_variant_classification(apps):
     has_old_settings = False
     for x in dir(settings):

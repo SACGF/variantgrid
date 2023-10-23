@@ -18,7 +18,6 @@ from library.log_utils import report_exc_info
 from library.utils import pretty_label, JsonDataType, JsonObjType
 from snpdb.views.datatable_mixins import JSONResponseView
 
-
 logger = logging.getLogger(__name__)
 
 

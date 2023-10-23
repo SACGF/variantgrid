@@ -2,6 +2,7 @@ import logging
 import re
 from functools import cached_property
 from typing import Optional, Tuple, Iterable, Set, Union, Dict, Any, List
+
 import pydantic
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -16,6 +17,7 @@ from django.dispatch import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
+
 from flags.models import FlagCollection, flag_collection_extra_info_signal, FlagInfos
 from flags.models.models import FlagsMixin, FlagTypeContext
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest

@@ -1,7 +1,8 @@
 from typing import Optional, Union
+
+import pydantic
 from django.template import Library
 from more_itertools import first
-import pydantic
 from pydantic import ConfigDict
 
 from annotation.models import ClinVar, AnnotationVersion
