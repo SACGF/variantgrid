@@ -75,7 +75,7 @@ class HealthCheckRecentActivity(HealthCheckStat):
     def __str__(self):
         amount_str = self.amount
         if self.amount:
-            amount_str = f"**{amount_str}**"
+            amount_str = f"*{amount_str}*"
         result = f"{self.emoji} {amount_str} : {self.name}"
         if self.sub_type:
             result = f"{result} {self.sub_type}"
@@ -182,7 +182,7 @@ class HealthCheckTotalAmount(HealthCheckStat):
     def __str__(self):
         amount_str = self.amount
         if self.amount:
-            amount_str = f"**{amount_str:,}**"
+            amount_str = f"*{amount_str:,}*"
         result = f"{self.emoji} {amount_str} : {self.name}"
         if self.extra:
             result = f"{result} - {self.extra}"

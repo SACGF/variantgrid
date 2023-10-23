@@ -27,7 +27,7 @@
                         </div>
                         {% if name == 'Active Users' %}
                             <div class="col-5">
-                                <a class="toggle-link" data-toggle="collapse" href="#active-users{{ preview.obj }}">View Events</a>
+                                <a class="toggle-link" data-toggle="collapse" href="#active-users{{ preview.obj | id_safe }}">View Events</a>
                             </div>
                             {% user_view_events preview.obj as user_views %}
                         {% else %}
@@ -40,10 +40,10 @@
                             </div>
                         {% endif %}
                     </div>
-                    <ul class="list-group collapse" id="active-users{{ preview.obj }}">
+                    <ul class="list-group collapse" id="active-users{{ preview.obj | id_safe }}">
                         {% for events in user_views %}
                             <li class='list-group-item list-group-item-success'>
-                                {{ events.created }}<strong>{{ events.view_name }}</strong>: {{ events.args }}
+                                {% timestamp events.created time_ago=True %}<strong>{{ events.view_name }}</strong>: {{ events.args }}
                             </li>
                         {% endfor %}
                     </ul>

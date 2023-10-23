@@ -43,8 +43,8 @@ def active_users_health_check(sender, health_request: HealthCheckRequest, **kwar
 def email_health_check(sender, health_request: HealthCheckRequest, **kwargs):
     from email_manager.models import EmailLog
     recent_emails = EmailLog.objects.filter(created__gte=health_request.since, created__lt=health_request.now)
-    count = recent_emails.count()
-    if count:
+
+    if count := recent_emails.count():
         return HealthCheckRecentActivity(
             emoji=":email:",
             name="Emails Sent",
@@ -59,9 +59,9 @@ def email_health_check(sender, health_request: HealthCheckRequest, **kwargs):
 def discordance_triage_health_check(sender, health_request: HealthCheckRequest, **kwargs):
     recent_reports = DiscordanceReportTriage.objects.filter(
         modified__gte=health_request.since,
-        modified__lt=health_request.now)
-    count = recent_reports.count()
-    if count:
+        modified__lt=health_request.now, user__isnull=False)
+
+    if count := recent_reports.count():
         return HealthCheckRecentActivity(
             emoji=":triangular_ruler:",
             name="Discordance Triage Reports",
