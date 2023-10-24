@@ -1,6 +1,9 @@
+import json
 import uuid
+from datetime import timedelta
 from html import escape
 from typing import Union, Optional, Iterable, Any, Collection
+from django.utils.timezone import localtime
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -22,8 +25,10 @@ from classification.models.discordance_models import DiscordanceReport
 from classification.models.discordance_models_utils import DiscordanceReportRowData, DiscordanceReportTableData
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
+from eventlog.models import ViewEvent
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
+from library.health_check import HealthCheckRequest
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab
 from snpdb.models.models_genome import GenomeBuild
@@ -567,3 +572,25 @@ def imported_allele_info(imported_allele_info: ImportedAlleleInfo, on_allele_pag
         "imported_allele_info": imported_allele_info,
         "on_allele_page":  on_allele_page
     }
+
+
+@register.simple_tag
+def user_view_events(user: User):
+    if isinstance(user, str):
+        try:
+            user = User.objects.get(username=user)
+        except User.DoesNotExist:
+            return {}
+    now = localtime()
+    since = now - timedelta(days=1)
+    health_request = HealthCheckRequest(since=since, now=now)
+    view_events = ViewEvent.objects.filter(user=user, created__gte=health_request.since,
+                                           created__lt=health_request.now).order_by('created')
+    view_event_data = []
+    for event in view_events:
+        view_event_data.append({
+            'created': event.created,
+            'view_name': event.view_name,
+            'args': json.dumps(event.args)
+        })
+    return view_event_data

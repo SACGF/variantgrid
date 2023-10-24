@@ -22,7 +22,7 @@ from classification.models.clinical_context_models import ClinicalContextChangeD
 from classification.models.flag_types import classification_flag_types
 from genes.hgvs import CHGVS
 from library.guardian_utils import admin_bot
-from library.preview_request import PreviewModelMixin, PreviewKeyValue
+from library.preview_request import PreviewModelMixin, PreviewKeyValue, PreviewData
 from library.utils import invalidate_cached_property
 from library.utils.django_utils import refresh_for_update
 from review.models import ReviewableModelMixin, Review
@@ -511,7 +511,7 @@ class DiscordanceReportTriageStatus(TextChoices):
     COMPLEX = "X", "Low Penetrance/Risk Allele etc"
 
 
-class DiscordanceReportTriage(TimeStampedModel):
+class DiscordanceReportTriage(PreviewModelMixin, TimeStampedModel):
     discordance_report = models.ForeignKey(DiscordanceReport, on_delete=CASCADE)
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
     triage_status = models.TextField(max_length=1, choices=DiscordanceReportTriageStatus.choices, default=DiscordanceReportTriageStatus.PENDING)
@@ -549,6 +549,36 @@ class DiscordanceReportTriage(TimeStampedModel):
             parts.append("Note: " + html_escape(note))
         if parts:
             return "<br/>".join(parts)
+
+    @classmethod
+    def preview_category(cls) -> str:
+        return "Discordance Report Triage"
+
+    def get_absolute_url(self):
+        return reverse('discordance_report', kwargs={"discordance_report_id": self.discordance_report.pk})
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-arrow-down-up-across-line"
+
+    @property
+    def preview(self) -> 'PreviewData':
+        title = f"Discordance ID {self.discordance_report.pk}"
+
+        extras = [
+            PreviewKeyValue(key="Status", value=self.get_triage_status_display()),
+            PreviewKeyValue(key="Modified", value=self.modified),
+            PreviewKeyValue(key="Lab", value=self.lab),
+        ]
+
+        return PreviewData.for_object(
+            obj=self,
+            category="Discordance Report Triage",
+            title=title,
+            icon=self.preview_icon(),
+            internal_url=self.get_absolute_url(),
+            summary_extra=extras
+        )
 
     class Meta:
         unique_together = ('discordance_report', 'lab')

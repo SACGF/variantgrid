@@ -14,6 +14,7 @@ def html_id_safe(text: str) -> str:
     """
     if not text:
         return str(uuid.uuid4())
+    text = str(text)
     text = re.sub("[^0-9A-Za-z]", "-", text)
     text = re.sub("_{2,}", "-", text)
     if not text[0].isalpha():
