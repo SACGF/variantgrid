@@ -4,6 +4,7 @@ from functools import total_ordering
 from typing import List, Optional, Union
 
 from django.contrib.auth.models import User
+from django.db.models import TextChoices
 
 from library.guardian_utils import public_group, all_users_group
 from library.utils import ChoicesEnum
@@ -437,3 +438,10 @@ class CriteriaEvaluation:
     @staticmethod
     def is_met(criteria):
         return criteria and criteria not in {CriteriaEvaluation.NOT_MET, CriteriaEvaluation.NOT_APPLICABLE, CriteriaEvaluation.NEUTRAL}
+
+
+class WithdrawReason(TextChoices):
+    SHARED_BY_MISTAKE = 'SHARED_BY_MISTAKE', 'This record was shared by mistake'
+    DUPLICATE = 'DUPLICATE', 'This record has an exact duplicate'
+    SENSITIVE_DATA = 'SENSITIVE_DATA', 'This record contains sensitive data'
+    OTHER = 'OTHER', 'Other'

@@ -63,6 +63,7 @@ const VCForm = (function() {
         delta: {},
         publish_level: null,
         deleteRequest: false,
+        delete_reason: null,
         undeleteRequest: false,
         messages: [],
         delayedPatch: {},
@@ -202,28 +203,102 @@ const VCForm = (function() {
             
             return wrapper;
         },
-        
+        createModal(headerText, bodyText, confirmButtonText, confirmCallback, cancelCallback, isWithdrawal = false) {
+            let dialogContent = createModalShell('confirmation-modal', headerText, 'lg');
+            let dialogBody = dialogContent.find('.modal-body');
+            let dialogFooter = dialogContent.find('.modal-footer');
+
+            if (isWithdrawal) {
+                let withdrawReasonDropdown = $('<select class="form-control" id="withdrawReasonDropdown" required></select>');
+                    withdrawReasonDropdown.append('<option value="">Select Withdrawal Reason</option>');
+
+                    for (const [value, display] of this.withdrawReasons) {
+                        withdrawReasonDropdown.append(`<option value="${value}">${display}</option>`);
+                    }
+
+                dialogBody.append(bodyText, '<br>', withdrawReasonDropdown);
+                    if (!this.deleteEnabled){
+                        dialogBody.append('<br><p>Withdrawing a record is intended for a limited set of circumstances, ' +
+                        'listed as available reasons for withdrawal above. If this record was uploaded from your system, ' +
+                        'and you believe the data to be incorrect or incomplete, please note this is considered a ' +
+                        'normal circumstance, and it is preferred that you update the classification within your ' +
+                        'curation system and then resubmit the classification in your next upload, rather than withdraw it.</p>');
+                    }
+
+            } else {
+                dialogBody.html(bodyText);
+            }
+
+            dialogFooter.html([
+                $('<button>', {
+                    type: "button",
+                    class: "btn btn-secondary",
+                    'data-dismiss': "modal",
+                    text: 'Cancel',
+                    click: cancelCallback
+                }),
+                $('<button>', {
+                    type: "button",
+                    class: "btn btn-primary",
+                    text: confirmButtonText,
+                    click: function () {
+                        if (isWithdrawal && !$('#withdrawReasonDropdown').val()) {
+                            alert('Please select a withdrawal reason.');
+                            return;
+                        }
+                        dialogBody.LoadingOverlay('show', {zIndex: 9999});
+                        confirmCallback();
+                    }
+                })
+            ]);
+
+            dialogContent.modal();
+
+            dialogContent.on('hidden.bs.modal', function () {
+                dialogContent.modal('dispose');
+                dialogContent.remove();
+            });
+        },
+
         trash() {
+            let confirmAction, cancelAction;
             if (this.record.withdrawn) {
-                let confirmed = window.prompt('Are you sure you wish to un-withdraw this record? Please type "unwithdraw" to confirm');
-                if (confirmed) {
+                confirmAction = () => {
+                    this.delete_reason = null;
                     this.undeleteRequest = true;
                     this.dataUpdated();
-                } else {
-                    window.alert(`Unwithdraw aborted`);
-                }
+                };
+                this.createModal(
+                    'Un-withdraw Record',
+                    'Are you sure you wish to un-withdraw this record?',
+                    'Un-withdraw',
+                    confirmAction
+                );
             } else {
-                let is_withdraw = this.record.publish_level === 'logged_in_users' || this.record.publish_level === 'public' || !this.deleteEnabled;
+                let is_withdraw = this.record.publish_level === 'logged_in_users' ||
+                    this.record.publish_level === 'public' || !this.deleteEnabled;
                 let mode = is_withdraw ? "withdraw" : "delete";
-                let confirmed = false;
-                confirmed = window.prompt(`Are you sure you wish to ${mode} this record? Please type "${mode}" to confirm.`);
-                
-                if (confirmed && confirmed.toLowerCase() === mode) {
-                    this.deleteRequest = is_withdraw ? "withdraw" : true;
+                confirmAction = () => {
+                    if (is_withdraw) {
+                        this.delete_reason = $('#withdrawReasonDropdown').val();
+                        this.deleteRequest = "withdraw";
+                    } else {
+                        this.deleteRequest = true;
+                    }
                     this.dataUpdated();
-                } else {
-                    window.alert(`${mode} aborted`);
-                }
+                };
+
+                cancelAction = () => {
+                };
+
+                this.createModal(
+                    `${mode.charAt(0).toUpperCase() + mode.slice(1)} Record`,
+                    `Are you sure you wish to ${mode} this record?`,
+                    mode.charAt(0).toUpperCase() + mode.slice(1),
+                    confirmAction,
+                    cancelAction,
+                    is_withdraw
+                );
             }
         },
         
@@ -684,8 +759,10 @@ const VCForm = (function() {
             }
             if (this.deleteRequest) {
                 envelope['delete'] = this.deleteRequest;
+                envelope['delete_reason'] = this.delete_reason;
             } else if (this.undeleteRequest) {
                 envelope['delete'] = false;
+                envelope['delete_reason'] = null;
             }
             
             $.ajax({
@@ -1151,6 +1228,7 @@ const VCForm = (function() {
             this.otherClassificationsSummary = params.otherClassificationsSummary;
             this.reportEnabled = params.reportEnabled;
             this.deleteEnabled = params.deleteEnabled;
+            this.withdrawReasons = params.withdrawReasons;
 
             this.initData(record);
             // Create the sections

@@ -29,7 +29,7 @@ from guardian.shortcuts import assign_perm, get_objects_for_user
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
 from annotation.regexes import db_ref_regexes, DbRegexes
 from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
-    CRITERIA_NOT_MET, ValidationCode, CriteriaEvaluation
+    CRITERIA_NOT_MET, ValidationCode, CriteriaEvaluation, WithdrawReason
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_patcher import patch_fuzzy_age
 from classification.models.classification_utils import \
@@ -477,6 +477,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     withdrawn = models.BooleanField(default=False)
     """ Soft delete, if withdrawn classification should not appear in most places """
 
+    withdraw_reason = models.CharField(max_length=50, choices=WithdrawReason.choices, null=True, blank=True)
+    """ Reason for withdrawing the classification """
+
     clinical_significance = models.CharField(max_length=1, choices=ClinicalSignificance.CHOICES, null=True, blank=True)
     """ Used as an optimisation for queries """
 
@@ -718,7 +721,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return datetime.strptime(date_str, '%Y-%m-%d')
         return None
 
-    def set_withdrawn(self, user: User, withdraw: bool = False) -> bool:
+    def set_withdrawn(self, user: User, withdraw: bool = False, reason: str = 'OTHER') -> bool:
         if not self.id and withdraw:
             raise ValueError('Cannot withdrawn new classification record - use delete instead')
 
@@ -726,13 +729,15 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return False  # no change
 
         self.withdrawn = withdraw
+        self.withdraw_reason = reason if withdraw else None
         self.save()
         if withdraw:
             self.flag_collection_safe.get_or_create_open_flag_of_type(
                 flag_type=classification_flag_types.classification_withdrawn,
                 user=user,
                 permission_check=False,
-                reopen=True
+                reopen=True,
+                comment=reason
             )
         else:
             self.flag_collection_safe.close_open_flags_of_type(
