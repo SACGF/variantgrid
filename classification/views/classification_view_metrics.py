@@ -60,6 +60,7 @@ class ViewEventCounts:
     def from_request(request: HttpRequest):
         time_ago = timedelta(days=30)
         if days_old_str := request.GET.get('days'):
+            days_old_str = 7  # default to 7 days
             time_ago = timedelta(days=int(days_old_str))
 
         # default to exclude admin
@@ -75,6 +76,7 @@ class ViewEventCounts:
         qs: List[Q] = []
         if self.exclude_admin:
             qs.append(Q(user__is_superuser=False))
+            qs.append(~Q(user__groups__name__in=['variantgrid/tester', 'variantgrid/bot']))
         qs.append(Q(created__gte=self.as_of))
         return reduce(operator.and_, qs)
 
