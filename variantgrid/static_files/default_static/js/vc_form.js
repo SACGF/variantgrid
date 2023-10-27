@@ -218,8 +218,8 @@ const VCForm = (function() {
 
                 dialogBody.append(bodyText, '<br>', withdrawReasonDropdown);
                     if (!this.deleteEnabled){
-                        dialogBody.append('<br><p>Withdrawing a record is intended for a limited set of circumstances, ' +
-                        'listed as available reasons for withdrawal above. If this record was uploaded from your system, ' +
+                        dialogBody.append('<p style="padding:16px 4px 0 4px"><i class="fas fa-exclamation-triangle text-warning"></i> Withdrawing a record is intended for a limited set of circumstances, ' +
+                        'listed as available reasons for withdrawal above.<br/><br/>If this record was uploaded from your system, ' +
                         'and you believe the data to be incorrect or incomplete, please note this is considered a ' +
                         'normal circumstance, and it is preferred that you update the classification within your ' +
                         'curation system and then resubmit the classification in your next upload, rather than withdraw it.</p>');
