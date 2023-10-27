@@ -59,37 +59,31 @@ class GeneListColumns(DatatableConfig[GeneList]):
         return qs
 
 
-class GeneListGenesGrid(JqGridUserRowConfig):
-    model = GeneListGeneSymbol
-    caption = 'Gene List Genes'
-    colmodel_overrides = {
-        'gene_symbol_alias__source': {"label": "Alias"},
-    }
-    fields = ["original_name", "gene_symbol__symbol", "gene_symbol_alias__source"]
+class GeneListGenesColumns(DatatableConfig[GeneListGeneSymbol]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn('original_name', orderable=True),
+            RichColumn('gene_symbol__symbol', orderable=True),
+            RichColumn('gene_symbol_alias__source', orderable=True, name='Alias'),
+        ]
 
-    def __init__(self, user, gene_list_id):
-        super().__init__(user)
-        gene_list = GeneList.get_for_user(user, gene_list_id, success_only=False)
-        queryset = self.model.objects.filter(gene_list=gene_list)
-
-        annotation_kwargs = {}
-        self.annotation_field_labels = {}
+        self.annotation_releases = {}
         for release in GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds():
             field_name = f"release_{release.pk}"
-            self.annotation_field_labels[field_name] = str(release)
-            annotation_kwargs[field_name] = GeneListGeneSymbol.get_joined_genes_qs_annotation_for_release(release)
-        queryset = queryset.annotate(**annotation_kwargs).order_by("original_name")
-        field_names = self.get_field_names() + list(sorted(self.annotation_field_labels))
-        self.queryset = queryset.values(*field_names)
-        self.extra_config.update({'sortname': 'original_name',
-                                  'sortorder': 'asc'})
+            self.annotation_releases[field_name] = release
+            self.rich_columns.append(RichColumn(field_name, name=str(release), orderable=True))
 
-    def get_colmodels(self, remove_server_side_only=False):
-        colmodels = super().get_colmodels(remove_server_side_only=False)
-        for field_name, label in self.annotation_field_labels.items():
-            cm = {'index': field_name, 'name': field_name, 'label': label, "width": 400}
-            colmodels.append(cm)
-        return colmodels
+    def get_initial_queryset(self) -> QuerySet[GeneList]:
+        gene_list_id = self.get_query_param("gene_list_id")
+        gene_list = GeneList.get_for_user(self.user, gene_list_id, success_only=False)
+        queryset = GeneListGeneSymbol.objects.filter(gene_list=gene_list)
+
+        annotation_kwargs = {}
+        for field_name, release in self.annotation_releases.items():
+            annotation_kwargs[field_name] = GeneListGeneSymbol.get_joined_genes_qs_annotation_for_release(release)
+
+        return queryset.annotate(**annotation_kwargs)
 
 
 class GeneSymbolVariantsGrid(AbstractVariantGrid):

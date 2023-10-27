@@ -1,6 +1,6 @@
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from genes.grids import GeneListGenesGrid, GenesGrid, QCGeneCoverageGrid, \
+from genes.grids import GeneListGenesColumns, GenesGrid, QCGeneCoverageGrid, \
     UncoveredGenesGrid, GeneSymbolVariantsGrid, GeneSymbolWikiColumns, \
     GeneListColumns, CanonicalTranscriptCollectionColumns, CanonicalTranscriptColumns
 from genes.views import views, views_autocomplete, views_rest
@@ -65,8 +65,7 @@ urlpatterns = [
 
     perm_path('gene_lists/datatable/', DatabaseTableView.as_view(column_class=GeneListColumns),
               name='gene_lists_datatable'),
-    perm_path('gene_list_genes/grid/<int:gene_list_id>/<slug:op>/', JQGridView.as_view(grid=GeneListGenesGrid, delete_row=True, csv_download=True), name='gene_list_genes_grid'),
-
+    perm_path('gene_list_genes/grid/<int:gene_list_id>', DatabaseTableView.as_view(column_class=GeneListGenesColumns), name='gene_list_genes_datatable'),
 
     perm_path('canonical_transcript_collections/datatable/',
               DatabaseTableView.as_view(column_class=CanonicalTranscriptCollectionColumns),
