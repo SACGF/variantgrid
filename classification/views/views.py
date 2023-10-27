@@ -32,7 +32,7 @@ from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import
 from classification.classification_changes import ClassificationChanges
 from classification.classification_stats import get_grouped_classification_counts, \
     get_classification_counts, get_criteria_counts
-from classification.enums import SubmissionSource, SpecialEKeys
+from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel, WithdrawReason
 from classification.forms import ClassificationAlleleOriginForm
 from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
@@ -310,6 +310,19 @@ def classification_history(request, classification_id: Any):
 
 
 def view_classification(request: HttpRequest, classification_id: str):
+    withdraw_reasons = WithdrawReason.choices
+    classification_record_id = Classification.objects.get(pk=classification_id)
+
+    duplicate_records = []
+    if classification_record_id.withdraw_reason == 'DUPLICATE':
+        all_class_ids = Classification.objects.filter(allele=classification_record_id.allele_object,
+                                                      withdrawn=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
+                                                      lab=classification_record_id.lab).values_list('id', flat=True)
+
+        if len(all_class_ids) > 1:
+            duplicate_records.append(('view_allele', classification_record_id.allele_object))
+        elif len(all_class_ids) == 1:
+            duplicate_records.append(('Classifications', all_class_ids))
     ref = ClassificationRef.init_from_str(request.user, str(classification_id))
     ref.check_exists()
     ref.check_security()
@@ -342,7 +355,9 @@ def view_classification(request: HttpRequest, classification_id: str):
         'other_classifications_summary': other_classifications_summary,
         'report_enabled': ClassificationReportTemplate.objects.filter(name=ReportNames.DEFAULT_REPORT).exclude(template__iexact='').exists(),
         'attachments_enabled': settings.CLASSIFICATION_FILE_ATTACHMENTS,
-        'delete_enabled': settings.CLASSIFICATION_ALLOW_DELETE
+        'delete_enabled': settings.CLASSIFICATION_ALLOW_DELETE,
+        'duplicate_records': duplicate_records,
+        'withdraw_reasons': withdraw_reasons,
     }
     return render(request, 'classification/classification.html', context)
 
@@ -425,6 +440,7 @@ def view_classification_diff(request):
 
 @require_superuser
 def classification_import_tool(request: HttpRequest) -> Response:
+    reasons = WithdrawReason.choices
     """
     This page allows you to upload a file, the fact that the file is probably to do with classifications
     doesn't really matter, there's not logic to process it here, just to upload it
@@ -442,7 +458,8 @@ def classification_import_tool(request: HttpRequest) -> Response:
 
     context = {
         "labs": all_labs,
-        "selected_lab": selected_lab
+        "selected_lab": selected_lab,
+        "reasons": reasons,
     }
     return render(request, 'classification/classification_import_tool.html', context)
 

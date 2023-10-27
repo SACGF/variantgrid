@@ -39,7 +39,8 @@
                     otherClassificationsSummary: "{{ other_classifications_summary | default_if_none:'' }}",
                     reportEnabled: {{ report_enabled | jsonify }},
                     deleteEnabled: {{ delete_enabled | jsonify }},
-                    attachmentsEnabled: {{ attachments_enabled | jsonify }}
+                    attachmentsEnabled: {{ attachments_enabled | jsonify }},
+                    withdrawReasons: {{ withdraw_reasons | jsonify }}
                 },
                 keys,
                 record,
@@ -128,6 +129,28 @@
                 <div class="card-header">{{ record.org_name }} / {{ record.lab_name }} / {{ record.cr_lab_id }}</div>
                 <div class="card-body"></div>
             </div>
+        {% if duplicate_records %}
+            <div class="card m-2">
+                <div class="card-header">Possible Duplicate Record</div>
+                <div class="card-body">
+                This record has been marked as being an exact duplicate and will no longer be updated.
+                    Please follow the below link to find the more up-to-date copy of this data.
+                <div class="mt-2">
+                    {% for record, value in duplicate_records %}
+                        {% if record == 'view_allele' %}
+                            <a href="{% url 'view_allele' allele_id=value.id %}">{{ value }}</a>
+                        {% elif record == 'Classifications' %}
+                            {% for class_id in value %}
+                                <a href="{% url 'view_classification' classification_id=class_id %}">CR_{{ class_id }}</a>
+                            {% endfor %}
+                        {% else %}
+                            No record found
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                </div>
+            </div>
+        {% endif %}
             <div id="vcform-flags" class="card m-2">
                 <div class="card-header">Flags</div>
                 <div class="card-body">

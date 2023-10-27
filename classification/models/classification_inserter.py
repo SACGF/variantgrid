@@ -95,6 +95,7 @@ class BulkClassificationInserter:
                 share_level = None
 
             delete_value = data.pop('delete', None)
+            delete_reason = data.pop('delete_reason', None)
             # delete can be
             # True : delete (or withdraw if shared)
             # False : unwithdraw
@@ -255,7 +256,7 @@ class BulkClassificationInserter:
                     if record.share_level_enum >= ShareLevel.ALL_USERS or requested_withdraw:
                         # withdraw if shared or if only asking for withdraw
                         patch_response.status = ClassificationPatchStatus.WITHDRAWN if not record.withdrawn else ClassificationPatchStatus.NO_CHANGE
-                        record.set_withdrawn(user=user, withdraw=True)
+                        record.set_withdrawn(user=user, withdraw=True, reason=delete_reason)
                         patch_response.withdrawn = True
                     else:
                         patch_response.status = ClassificationPatchStatus.DELETED

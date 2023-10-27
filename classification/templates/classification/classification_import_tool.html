@@ -20,6 +20,7 @@
         let operation = $('#operation').val();
         let record_id = $('#record_id').val();
         let delete_mode = $('#delete').prop('checked');
+        let delete_reason = $('#delete_reason').val();
         let publish = $('#publish').val();
         let data = $('#data').val().trim();
         if (data.length === 0) {
@@ -64,6 +65,7 @@
         }
         if (delete_mode) {
             envelope["delete"] = true;
+            envelope["delete_reason"] = delete_reason;
         } else {
             try {
                 let special_values = {
@@ -238,6 +240,26 @@ div.json {
                     Delete
                 </label>
             </div>
+            <div>
+                <label class="form-check-label">
+                    <select id="delete_reason" class="form-control">
+                        {% for value, display in reasons %}
+                            <option value="{{ value }}">{{ display }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+            <script>
+                $('#delete_reason').hide();
+                    $('#delete').change(() => {
+                        if ($('#delete').prop('checked')) {
+                            $('#delete_reason').show();
+                        } else {
+                            $('#delete_reason').hide();
+                            $('#delete_reason').val('OTHER');
+                        }
+                    });
+            </script>
         {% endlabelled %}
         {% labelled label="Operation" %}
             <select id="operation" class="form-control">
