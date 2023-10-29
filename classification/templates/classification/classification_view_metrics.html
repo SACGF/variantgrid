@@ -11,6 +11,11 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
 <div class="container">
+<style>
+    .thicker-border {
+        border-top: 2px solid #666;
+    }
+</style>
 <h3>Metrics</h3>
     <div class="my-4">
     <a class="download-link admin-only d-block my-1" href="{% url 'export_search_data' %}">Stats over time Daily</a>
@@ -18,13 +23,13 @@
     </div>
 
     <div class="d-flex justify-content-between align-items-center">
-        <div class="btn-group mb-4" role="group" aria-label="Days Old">
-            {% for days_option in days_options %}
-                <button onclick="window.open('{% url 'classification_view_metrics' %}?days={{ days_option }}&exclude_admin={{ exclude_admin | jsonify }}', '_self')"
-                class="btn {% if days == days_option %}btn-secondary font-weight-bold{% else %}btn-outline-secondary{% endif %}">{{ days_option }} days
-                </button>
-            {% endfor %}
-        </div>
+{#        <div class="btn-group mb-4" role="group" aria-label="Days Old">#}
+{#            {% for days_option in days_options %}#}
+{#                <button onclick="window.open('{% url 'classification_view_metrics' %}?days={{ days_option }}&exclude_admin={{ exclude_admin | jsonify }}', '_self')"#}
+{#                class="btn {% if days == days_option %}btn-secondary font-weight-bold{% else %}btn-outline-secondary{% endif %}">{{ days_option }} days#}
+{#                </button>#}
+{#            {% endfor %}#}
+{#        </div>#}
 
         <div class="btn-group mb-4" role="group" aria-label="Days Old">
             <button onclick="window.open('{% url 'classification_view_metrics' %}?days={{ days }}&exclude_admin=true', '_self')"
@@ -36,35 +41,35 @@
         </div>
     </div>
     {% page_help_embedded title="Views "|append:page_suffix %}
-        <p>Most Viewed Xs count unique users accessing the data across the last 30 days</p>
-        <p>Most Active Users count how many pages the user viewed across the last 30 days</p>
+{#        <p>Most Viewed Xs count unique users accessing the data across the last 30 days</p>#}
+{#        <p>Most Active Users count how many pages the user viewed across the last 30 days</p>#}
     {% end_page_help_embedded %}
 
-    {% for view_metrics in counts.view_metrics %}
-        <div class="card mt-4">
-            <div class="card-header">Most Viewed {{ view_metrics.name }} <span class="float-right">unique viewers</span></div>
-            <ul class="list-group">
-            {% for ccount in view_metrics.counts|slice:"10" %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    {% with object=ccount.resolve %}
-                        {% if object.get_absolute_url %}
-                        <a class="hover-link" href="{{ object.get_absolute_url }}">{{ object }}</a>
-                        {% else %}
-                            <span class="no-value">{{ ccount.resolve }}</span>
-                        {% endif %}
-                        <span>
-                            <a class="mr-1"
-                                data-toggle="ajax-modal"
-                                data-title="All views of {{ view_metrics.name }} ({{ ccount.pk }}) {{ page_suffix }}"
-                                data-href="{% url 'classification_view_metrics_detail' %}?days={{ days }}&exclude_admin={{ exclude_admin|jsonify }}&{{ view_metrics.model_id }}={{ ccount.pk }}">Show Views</a>
-                            <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
-                        </span>
-                    {% endwith %}
-                </li>
-            {% endfor %}
-            </ul>
-        </div>
-    {% endfor %}
+{#    {% for view_metrics in counts.view_metrics %}#}
+{#        <div class="card mt-4">#}
+{#            <div class="card-header">Most Viewed {{ view_metrics.name }} <span class="float-right">unique viewers</span></div>#}
+{#            <ul class="list-group">#}
+{#            {% for ccount in view_metrics.counts|slice:"10" %}#}
+{#                <li class="list-group-item d-flex justify-content-between align-items-center">#}
+{#                    {% with object=ccount.resolve %}#}
+{#                        {% if object.get_absolute_url %}#}
+{#                        <a class="hover-link" href="{{ object.get_absolute_url }}">{{ object }}</a>#}
+{#                        {% else %}#}
+{#                            <span class="no-value">{{ ccount.resolve }}</span>#}
+{#                        {% endif %}#}
+{#                        <span>#}
+{#                            <a class="mr-1"#}
+{#                                data-toggle="ajax-modal"#}
+{#                                data-title="All views of {{ view_metrics.name }} ({{ ccount.pk }}) {{ page_suffix }}"#}
+{#                                data-href="{% url 'classification_view_metrics_detail' %}?days={{ days }}&exclude_admin={{ exclude_admin|jsonify }}&{{ view_metrics.model_id }}={{ ccount.pk }}">Show Views</a>#}
+{#                            <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>#}
+{#                        </span>#}
+{#                    {% endwith %}#}
+{#                </li>#}
+{#            {% endfor %}#}
+{#            </ul>#}
+{#        </div>#}
+{#    {% endfor %}#}
 
     <div class="card mt-4">
         <div class="card-header">Most Viewed Pages <span class="float-right">unique viewers</span></div>
@@ -111,9 +116,9 @@
                 <tr><th>View Date</th><th>User</th><th>View Name</th><th>Parameters</th></tr>
             </thead>
             <tbody>
-                {% for view_event in counts.recent_views|slice:10 %}
-                    <tr>
-                        <td style="min-width:140px">{% timestamp view_event.created %}</td>
+                {% for view_event in counts.recent_views|slice:30 %}
+                    <tr {% ifchanged view_event.created|date:"Y-m-d" %} {% if not forloop.first %} class="thicker-border" {% endif %}  {% endifchanged %}>
+                        <td style="min-width:140px">{% timestamp view_event.created time_ago=True %}</td>
                         <td>{% user view_event.user show_group=True size="tiny" %}</td>
                         <td>{{ view_event.view_name }}</td>
                         <td>
