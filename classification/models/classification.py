@@ -1825,7 +1825,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if not last_published_version:
             last_published_version = self.last_published_version
 
-        can_write = self.can_write(user=current_user)
+        can_write = self.can_write(user_or_group=current_user)
 
         if self.share_level == ShareLevel.CURRENT_USER.key:
             last_published_version = None

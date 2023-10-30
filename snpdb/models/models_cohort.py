@@ -1,9 +1,9 @@
 import logging
 from functools import cached_property
-from typing import List, Dict
+from typing import List, Dict, Union
 
 import celery
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.contrib.postgres.fields.array import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models
@@ -53,17 +53,17 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
     parent_cohort = models.ForeignKey("self", null=True, related_name="sub_cohort_set", on_delete=DO_NOTHING)
     sample_count = models.IntegerField(null=True)
 
-    def can_view(self, user) -> bool:
+    def can_view(self, user_or_group: Union[User, Group]) -> bool:
         """ Also uses VCF permission """
-        if self.vcf and self.vcf.can_view(user):
+        if self.vcf and self.vcf.can_view(user_or_group):
             return True
-        return super().can_view(user)
+        return super().can_view(user_or_group)
 
-    def can_write(self, user) -> bool:
+    def can_write(self, user_or_group: Union[User, Group]) -> bool:
         """ Also uses VCF permission """
-        if self.vcf and self.vcf.can_write(user):
+        if self.vcf and self.vcf.can_write(user_or_group):
             return True
-        return super().can_write(user)
+        return super().can_write(user_or_group)
 
     @classmethod
     def preview_icon(cls) -> str:

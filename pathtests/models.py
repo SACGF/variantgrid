@@ -1,8 +1,9 @@
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.db import models
 from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
+from typing import Union
 
 from genes.models import GeneList, GeneSymbol
 from library.enums import ModificationOperation
@@ -22,11 +23,11 @@ class PathologyTest(TimeStampedModel):
     deleted = models.BooleanField(default=False)
     empty_test = models.BooleanField(default=False)  # For custom tests
 
-    def can_write(self, user) -> bool:
-        return self.is_curator(user)
+    def can_write(self, user_or_group: Union[User, Group]) -> bool:
+        return self.is_curator(user_or_group)
 
-    def is_curator(self, user):
-        return self.curator == user
+    def is_curator(self, user_or_group: Union[User, Group]):
+        return self.curator == user_or_group
 
     def get_active_test_version(self):
         active_test_version = None
@@ -85,8 +86,8 @@ class PathologyTestVersion(TimeStampedModel):
         manager.update_or_create(pathology_test=self.pathology_test,
                                  defaults={"pathology_test_version": self})
 
-    def is_curator(self, user):
-        return self.pathology_test.is_curator(user)
+    def is_curator(self, user_or_group: Union[User, Group]):
+        return self.pathology_test.is_curator(user_or_group)
 
     def next_version(self):
         """ Clones w/new version """

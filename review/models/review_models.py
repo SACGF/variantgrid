@@ -4,7 +4,7 @@ from functools import cached_property
 from typing import Union, List, Set, Type, Dict
 
 import django.dispatch
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.db.models import TextField, ForeignKey, JSONField, IntegerField, CASCADE, TextChoices, \
@@ -178,10 +178,10 @@ class Review(TimeStampedModel):
             "post_review_data": self.post_review_data
         }
 
-    def can_view(self, user: User) -> bool:
+    def can_view(self, user_or_group: Union[User, Group]) -> bool:
         source_object = self.reviewing.source_object
         if hasattr(source_object, "can_view"):
-            return source_object.can_view(user)
+            return source_object.can_view(user_or_group)
         return True
 
     def check_can_view(self, user):

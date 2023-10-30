@@ -1,6 +1,6 @@
-from typing import List
+from typing import List, Union
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.db import models
 from django.db.models import CASCADE, SET_NULL, PROTECT, Q
 from django_extensions.db.models import TimeStampedModel
@@ -50,17 +50,17 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     node = models.ForeignKey(AnalysisNode, null=True, on_delete=SET_NULL)  # Keep even if node deleted
     user = models.ForeignKey(User, on_delete=CASCADE)
 
-    def can_view(self, user) -> bool:
+    def can_view(self, user_or_group: Union[User, Group]) -> bool:
         """ Delegate to Analysis if set """
         if self.analysis:
-            return self.analysis.can_view(user)
-        return super().can_view(user)
+            return self.analysis.can_view(user_or_group)
+        return super().can_view(user_or_group)
 
-    def can_write(self, user) -> bool:
+    def can_write(self, user_or_group: Union[User, Group]) -> bool:
         """ Delegate to Analysis if set """
         if self.analysis:
-            return self.analysis.can_write(user)
-        return super().can_write(user)
+            return self.analysis.can_write(user_or_group)
+        return super().can_write(user_or_group)
 
     @property
     def canonical_c_hgvs(self):

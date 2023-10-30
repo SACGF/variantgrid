@@ -1,8 +1,9 @@
 from django.conf import settings
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404
 from guardian.shortcuts import get_objects_for_user, get_objects_for_group, get_group_perms
+from typing import Union
 
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission
 
@@ -33,36 +34,34 @@ class GuardianPermissionsMixin:
         """ Object can use another objects permissions """
         return queryset
 
-    def can_view(self, user) -> bool:
-        """ @param user User or group """
-
-        if not user:
+    def can_view(self, user_or_group: Union[User, Group]) -> bool:
+        if not user_or_group:
             return False
         perm_obj = self.get_permission_object()
         if perm_obj != self:
-            return perm_obj.can_view(user)
+            return perm_obj.can_view(user_or_group)
 
-        if isinstance(user, Group):
-            return self.get_read_perm() in get_group_perms(user, self)
-        return user.has_perm(self.get_read_perm(), self)
+        if isinstance(user_or_group, Group):
+            return self.get_read_perm() in get_group_perms(user_or_group, self)
+        return user_or_group.has_perm(self.get_read_perm(), self)
 
-    def can_write(self, user) -> bool:
-        if not user:
+    def can_write(self, user_or_group: Union[User, Group]) -> bool:
+        if not user_or_group:
             return False
         perm_obj = self.get_permission_object()
         if perm_obj != self:
-            return perm_obj.can_write(user)
-        if isinstance(user, Group):
-            return self.get_write_perm() in get_group_perms(user, self)
-        return user.has_perm(self.get_write_perm(), self)
+            return perm_obj.can_write(user_or_group)
+        if isinstance(user_or_group, Group):
+            return self.get_write_perm() in get_group_perms(user_or_group, self)
+        return user_or_group.has_perm(self.get_write_perm(), self)
 
-    def check_can_write(self, user):
-        if not self.can_write(user):
+    def check_can_write(self, user_or_group: Union[User, Group]):
+        if not self.can_write(user_or_group):
             msg = f"You do not have WRITE permission for {self.pk}"
             raise PermissionDenied(msg)
 
-    def check_can_view(self, user):
-        if not self.can_view(user):
+    def check_can_view(self, user_or_group: Union[User, Group]):
+        if not self.can_view(user_or_group):
             msg = f"You do not have READ permission to view {self.pk}"
             raise PermissionDenied(msg)
 

@@ -411,7 +411,7 @@ def classification_row(
 
     can_write = False
     if user:
-        can_write = vc.can_write(user=user)
+        can_write = vc.can_write(user_or_group=user)
 
     c_hgvs = vc.c_hgvs_best(preferred_genome_build=genome_build)
     p_hgvs = None

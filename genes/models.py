@@ -16,7 +16,7 @@ import requests
 from Bio import Entrez, SeqIO
 from cdot.pyhgvs.pyhgvs_transcript import PyHGVSTranscriptFactory
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.contrib.postgres.aggregates import StringAgg
 from django.contrib.postgres.fields import CITextField
 from django.core.cache import cache
@@ -1724,13 +1724,13 @@ class GeneList(TimeStampedModel):
             # logging.info("GeneList: assign_permission_to_user_and_groups")
             assign_permission_to_user_and_groups(self.user, self)
 
-    def can_view(self, user) -> bool:
+    def can_view(self, user_or_group: Union[User, Group]) -> bool:
         read_perm = DjangoPermission.perm(self, DjangoPermission.READ)
-        return user.has_perm(read_perm, self)
+        return user_or_group.has_perm(read_perm, self)
 
-    def can_write(self, user) -> bool:
+    def can_write(self, user_or_group: Union[User, Group]) -> bool:
         write_perm = DjangoPermission.perm(self, DjangoPermission.WRITE)
-        return user.has_perm(write_perm, self) and not self.locked
+        return user_or_group.has_perm(write_perm, self) and not self.locked
 
     def get_warnings(self, release: GeneAnnotationRelease) -> List[str]:
         counts = {"unmatched symbols": self.unmatched_gene_symbols.count(),

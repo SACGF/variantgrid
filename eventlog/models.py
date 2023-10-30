@@ -1,8 +1,8 @@
 import inspect
 import logging
-from typing import Optional
+from typing import Optional, Union
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.contrib.auth.signals import user_logged_in
 from django.db import models
 from django.db.models.deletion import SET_NULL
@@ -35,8 +35,8 @@ class Event(models.Model):
     severity = models.CharField(max_length=1, choices=LogLevel.CHOICES, default=LogLevel.INFO)
     filename = models.TextField(null=True)
 
-    def can_write(self, user) -> bool:
-        return user.is_superuser
+    def can_write(self, user_or_group: Union[User, Group]) -> bool:
+        return isinstance(User) and user_or_group.is_superuser
 
     def __str__(self):
         MAX_DETAILS_LENGTH = 200

@@ -4,10 +4,10 @@ import re
 import shutil
 from collections import namedtuple
 from functools import cached_property
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Union
 
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models, transaction
 from django.db.models.aggregates import Max
@@ -58,16 +58,20 @@ class UploadedFile(TimeStampedModel):
             return self.uploaded_file.size
         return os.stat(self.get_filename()).st_size
 
-    def can_view(self, user) -> bool:
-        return user.is_superuser or self.user == user
+    def can_view(self, user_or_group: Union[User, Group]) -> bool:
+        if isinstance(user_or_group, User):
+            return user_or_group.is_superuser or self.user == user_or_group
+        return False
 
-    def check_can_view(self, user):
-        if not self.can_view(user):
+    def check_can_view(self, user_or_group: Union[User, Group]):
+        if not self.can_view(user_or_group):
             msg = f"You do not have permission to access UploadedFile pk={self.pk}"
             raise PermissionDenied(msg)
 
-    def can_write(self, user) -> bool:
-        return user.is_superuser or self.user == user
+    def can_write(self, user_or_group: Union[User, Group]) -> bool:
+        if isinstance(user_or_group, User):
+            return user_or_group.is_superuser or self.user == user_or_group
+        return False
 
     def get_file(self):
         return open(self.get_filename(), "rb")

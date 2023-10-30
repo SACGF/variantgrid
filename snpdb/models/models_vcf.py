@@ -2,10 +2,10 @@ import logging
 import operator
 from collections import namedtuple
 from functools import cached_property, reduce
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Union
 
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.core.exceptions import PermissionDenied, ObjectDoesNotExist
 from django.db import models
 from django.db.models import Lookup, Field
@@ -136,13 +136,13 @@ class VCF(models.Model, PreviewModelMixin):
             raise PermissionDenied()
         return vcf
 
-    def can_view(self, user) -> bool:
+    def can_view(self, user_or_group: Union[User, Group]) -> bool:
         read_perm = DjangoPermission.perm(VCF, DjangoPermission.READ)
-        return user.has_perm(read_perm, self)
+        return user_or_group.has_perm(read_perm, self)
 
-    def can_write(self, user) -> bool:
+    def can_write(self, user_or_group: Union[User, Group]) -> bool:
         write_perm = DjangoPermission.perm(VCF, DjangoPermission.WRITE)
-        return user.has_perm(write_perm, self)
+        return user_or_group.has_perm(write_perm, self)
 
     def save(self, **kwargs):
         super().save(**kwargs)
@@ -324,21 +324,21 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
                 return self.enrichment_kit.min_coverage
         return settings.SEQAUTO_MIN_COVERAGE
 
-    def can_view(self, user) -> bool:
+    def can_view(self, user_or_group: Union[User, Group]) -> bool:
         read_perm = DjangoPermission.perm(self, DjangoPermission.READ)
-        return self.vcf.can_view(user) or user.has_perm(read_perm, self)
+        return self.vcf.can_view(user_or_group) or user_or_group.has_perm(read_perm, self)
 
-    def check_can_view(self, user):
-        if not self.can_view(user):
+    def check_can_view(self, user_or_group: Union[User, Group]):
+        if not self.can_view(user_or_group):
             msg = f"You do not have permission to access sample {self.pk} (vcf {self.vcf.pk})"
             raise PermissionDenied(msg)
 
-    def can_write(self, user) -> bool:
+    def can_write(self, user_or_group: Union[User, Group]) -> bool:
         write_perm = DjangoPermission.perm(self, DjangoPermission.WRITE)
-        return self.vcf.can_write(user) or user.has_perm(write_perm, self)
+        return self.vcf.can_write(user_or_group) or user_or_group.has_perm(write_perm, self)
 
-    def check_can_write(self, user):
-        if not self.can_write(user):
+    def check_can_write(self, user_or_group: Union[User, Group]):
+        if not self.can_write(user_or_group):
             msg = f"You do not have permission to modify sample {self.pk} (vcf {self.vcf.pk})"
             raise PermissionDenied(msg)
 

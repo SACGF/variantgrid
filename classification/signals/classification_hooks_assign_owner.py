@@ -29,7 +29,7 @@ def assign_classification_user(sender, **kwargs) -> ValidationMerger:  # pylint:
         if user:
             # this check might be done before the record permissions have been set
             # so check for lab or ability to write to the record
-            if not (user.groups.filter(id=record.lab.group.id).exists() or record.can_write(user=user)):
+            if not (user.groups.filter(id=record.lab.group.id).exists() or record.can_write(user_or_group=user)):
                 message = f"User does not belong to lab {record.lab.name} so can't be owner of this record"
                 vm.add_message(
                     key=SpecialEKeys.OWNER,

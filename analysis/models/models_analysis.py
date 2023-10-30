@@ -1,10 +1,10 @@
 from collections import defaultdict
 from functools import cached_property
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict, List, Union
 
 from django.apps import apps
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.db import models
 from django.db.models import Model, Q, Count
 from django.db.models.deletion import SET_NULL, CASCADE, SET_DEFAULT, PROTECT, ProtectedError
@@ -87,10 +87,10 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         is_snapshot = AnalysisTemplateVersion.objects.filter(analysis_snapshot=self).exists()
         return is_snapshot or (self.last_lock and self.last_lock.locked)
 
-    def can_unlock(self, user):
+    def can_unlock(self, user_or_group: Union[User, Group]):
         """ Use parent to see if we have Guardian permissions to write """
         is_snapshot = AnalysisTemplateVersion.objects.filter(analysis_snapshot=self).exists()
-        return (not is_snapshot) and super().can_write(user)
+        return (not is_snapshot) and super().can_write(user_or_group)
 
     def lock_history(self):
         return self.analysislock_set.order_by("pk")
@@ -101,9 +101,9 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
             return self.analysistemplateversion.template.analysis
         return self
 
-    def can_write(self, user) -> bool:
+    def can_write(self, user_or_group: Union[User, Group]) -> bool:
         """ Disable modification when locked """
-        if super().can_write(user):
+        if super().can_write(user_or_group):
             return not self.is_locked()
         return False
 
@@ -158,7 +158,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
     def is_valid(self):
         return not self.get_errors()
 
-    def set_defaults_and_save(self, user):
+    def set_defaults_and_save(self, user: User):
         self.user = user
         self.annotation_version = AnnotationVersion.latest(self.genome_build)
 

@@ -1,10 +1,10 @@
 from enum import Enum
 from functools import cached_property
-from typing import Set, Optional, List, Dict, Tuple, Any
+from typing import Set, Optional, List, Dict, Tuple, Any, Union
 
 import django.dispatch
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
 from django.db.models import TextChoices
@@ -260,11 +260,11 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
             lab_status[lab] = max(lab_status.get(lab, 0), status)
         return lab_status
 
-    def can_view(self, user: User) -> bool:
-        return self.user_is_involved(user)
+    def can_view(self, user_or_group: Union[User, Group]) -> bool:
+        return self.user_is_involved(user_or_group)
 
-    def check_can_view(self, user):
-        if not self.can_view(user):
+    def check_can_view(self, user_or_group: Union[User, Group]):
+        if not self.can_view(user_or_group):
             msg = f"You do not have READ permission to view {self.pk}"
             raise PermissionDenied(msg)
 
