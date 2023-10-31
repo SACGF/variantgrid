@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied
 from django.db.models import Max, F, Q, QuerySet
+from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 from django.utils.functional import SimpleLazyObject
 
@@ -14,7 +15,8 @@ from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.models.nodes.analysis_node import get_extra_filters_q, NodeColumnSummaryCacheCollection
 from analysis.views.analysis_permissions import get_node_subclass_or_404
 from annotation.models import HumanProteinAtlasAnnotation
-from genes.models import HGNC
+from genes.grids import GeneListGenesColumns
+from genes.models import HGNC, GeneList
 from library.jqgrid.jqgrid_sql import get_overrides
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
@@ -496,3 +498,30 @@ class NodeTissueUniProtTissueSpecificityGenesGrid(JqGridUserRowConfig):
         q = GroupOperation.reduce(filters, node.group_operation)
         queryset = self.model.objects.filter(q)
         self.queryset = queryset.values(*self.get_field_names())
+
+
+class NodeGeneListGenesColumns(GeneListGenesColumns):
+    """ This shows internals of gene lists, using permission of analysis instead of request.user for gene list
+        It's assumed that if someone added the gene list via auto-complete then they give people who can see
+        that analysis permissions (according to analysis not gene list) """
+
+    def _get_gene_annotation_releases(self) -> List['GeneAnnotationRelease']:
+        analysis_id = self.get_query_param("analysis_id")
+        analysis = Analysis.get_for_user(self.user, pk=analysis_id)
+        return [analysis.gene_annotation_release]
+
+    def _get_gene_list(self):
+        gene_list_id = self.get_query_param("gene_list_id")
+        node_id = self.get_query_param("node_id")
+        version = self.get_query_param("version")
+
+        gene_list = get_object_or_404(GeneList, pk=gene_list_id)
+        node = get_node_subclass_or_404(self.user, node_id, version=version)
+        gene_list_in_node = False
+        for gl in node.get_gene_lists():
+            if gl == gene_list:
+                gene_list_in_node = True
+                break
+        if not gene_list_in_node:
+            raise PermissionDenied(f"GeneList {gene_list_id} not part of GeneListNode gene lists")
+        return gene_list

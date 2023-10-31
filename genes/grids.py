@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
@@ -69,14 +69,21 @@ class GeneListGenesColumns(DatatableConfig[GeneListGeneSymbol]):
         ]
 
         self.annotation_releases = {}
-        for release in GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds():
+        for release in self._get_gene_annotation_releases():
             field_name = f"release_{release.pk}"
             self.annotation_releases[field_name] = release
             self.rich_columns.append(RichColumn(field_name, name=str(release), orderable=True))
 
-    def get_initial_queryset(self) -> QuerySet[GeneList]:
+    def _get_gene_annotation_releases(self) -> List['GeneAnnotationRelease']:
+        return GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds()
+
+    def _get_gene_list(self):
+        """ Default is to get list, doing security check against request.user """
         gene_list_id = self.get_query_param("gene_list_id")
-        gene_list = GeneList.get_for_user(self.user, gene_list_id, success_only=False)
+        return GeneList.get_for_user(self.user, gene_list_id, success_only=False)
+
+    def get_initial_queryset(self) -> QuerySet[GeneList]:
+        gene_list = self._get_gene_list()
         queryset = GeneListGeneSymbol.objects.filter(gene_list=gene_list)
 
         annotation_kwargs = {}

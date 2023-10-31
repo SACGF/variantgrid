@@ -1,8 +1,9 @@
 from analysis.grids import AnalysesGrid, NodeColumnSummaryGrid, KaromappingAnalysesGrid, AnalysisTemplatesGrid, \
     AnalysisNodeIssuesGrid, NodeOntologyGenesGrid, NodeGeneDiseaseClassificationGenesGrid, \
-    NodeTissueExpressionGenesGrid, NodeTissueUniProtTissueSpecificityGenesGrid
+    NodeTissueExpressionGenesGrid, NodeTissueUniProtTissueSpecificityGenesGrid, NodeGeneListGenesColumns
 from analysis.views import views, views_json, views_grid, views_karyomapping, views_autocomplete
 from library.django_utils.jqgrid_view import JQGridView
+from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
 
 urlpatterns = [
@@ -110,6 +111,10 @@ urlpatterns = [
               JQGridView.as_view(grid=NodeTissueExpressionGenesGrid), name='node_tissue_expression_genes_grid'),
     perm_path('<int:analysis_id>/node/tissue_uniprot/genes/grid/<int:node_id>/<int:version>/<slug:op>/',
               JQGridView.as_view(grid=NodeTissueUniProtTissueSpecificityGenesGrid), name='node_tissue_uniprot_genes_grid'),
+
+    perm_path('<int:analysis_id>/node/<int:node_id>/<int:version>/gene_list_genes/<int:gene_list_id>',
+              DatabaseTableView.as_view(column_class=NodeGeneListGenesColumns),
+              name='analysis_node_gene_list_genes_datatable'),
 
     perm_path('analysis_issues', views.view_analysis_issues, name='analysis_issues'),
 
