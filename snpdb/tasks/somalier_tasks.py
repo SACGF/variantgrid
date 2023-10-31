@@ -54,7 +54,7 @@ def somalier_vcf_id(vcf_id: int):
         log_traceback()
         logging.info("Somalier failed - carrying on with rest of pipeline")
 
-    if settings.VCF_IMPORT_DELETE_TEMP_FILES_ON_SUCCESS:
+    if settings.IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS:
         shutil.rmtree(processing_dir)
 
 

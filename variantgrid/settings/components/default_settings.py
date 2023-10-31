@@ -331,7 +331,6 @@ ANNOTATION_CACHED_WEB_RESOURCES = [
 ]
 
 VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES = ['lrg_identifier', 'refseq_transcript_accession', 'ensembl_transcript_accession']
-VARIANT_ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS = True  # not DEBUG
 # If true, then if we don't have a specific transcript version, we'll match it to the closest one we can
 VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT = True
 # Use highest TranscriptVersion canonical, set False to use representative transcript (ie VEP pick = variant annotation)
@@ -354,7 +353,6 @@ CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE = True
 NO_DNA_CONTROL_REGEX = "(^|[^a-zA-Z])NDC([^a-zA-Z]|$)"  # No DNA Control - e.g. _NDC_ or -NDC_
 
 VCF_DOWNLOAD_ADMIN_ONLY = False
-VCF_IMPORT_DELETE_TEMP_FILES_ON_SUCCESS = not DEBUG
 VCF_IMPORT_CREATE_COHORT_FROM_MULTISAMPLE_VCFS = True
 VCF_IMPORT_NO_DNA_CONTROL_SAMPLE_REGEX = None
 VCF_IMPORT_FILE_SPLIT_ROWS = 50000
@@ -390,6 +388,7 @@ HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH = True
 
 PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
 IMPORT_PROCESSING_DIR = os.path.join(PRIVATE_DATA_ROOT, 'import_processing')
+IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS = not DEBUG
 
 # @see https://github.com/SACGF/variantgrid/wiki/Liftover
 LIFTOVER_CLASSIFICATIONS = True

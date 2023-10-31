@@ -167,9 +167,8 @@ class UploadPipeline(models.Model):
         self.progress_percent = 100.0
         self.save()
 
-        user = self.uploaded_file.user
-        create_event(user, f"import_{self.file_type}_success")
-        if settings.VCF_IMPORT_DELETE_TEMP_FILES_ON_SUCCESS:
+        create_event(self.uploaded_file.user, f"import_{self.get_file_type_display()}_success")
+        if settings.IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS:
             self.remove_processing_files()
 
     def error(self, error_message):
