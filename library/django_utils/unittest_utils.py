@@ -122,17 +122,19 @@ class URLTestCase(TestCase):
 
                 for row in data["data"]:
                     if value := row.get("id"):
-                        # If the "id" object is JSON, pull out the key - otherwise just use the value
+                        # If what we retrieved was JSON, pull out the key - otherwise just use the value
                         if isinstance(value, Mapping):
                             value = value.get(key)
-                        if value == obj.pk:
-                            found = True
-                            break
+                    else:
+                        value = row.get(key)
+
+                    if value == obj.pk:
+                        found = True
+                        break
 
                 # print(f"{data=}")
                 # print(f"Url '{url} obj pk={obj.pk} in results={in_results}'")
                 self.assertEqual(in_results, found, msg=f"Url '{url} obj {key}={obj.pk} in results={in_results}'")
-
 
     def _test_jqgrid_urls_contains_objs(self, names_obj, user, in_results):
         """ Also allow 403 if not expecting results
