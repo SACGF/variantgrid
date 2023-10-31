@@ -166,13 +166,17 @@ class AnalysisOutputNodeChoiceForm(forms.Form):
 class AllVariantsNodeForm(BaseNodeForm):
     class Meta:
         model = AllVariantsNode
-        fields = ('max_variant', "gene_symbol", "reference", "minimum_count", "maximum_count",
-                  "min_ref_count", "max_ref_count", "min_hom_count", "max_hom_count", "min_het_count", "max_het_count")
+        fields = ('max_variant', "gene_symbol", "reference",
+                  "min_het_or_hom_count", "max_het_or_hom_count",
+                  "min_unk_count", "max_unk_count", "min_ref_count", "max_ref_count",
+                  "min_hom_count", "max_hom_count", "min_het_count", "max_het_count")
         widgets = {'max_variant': HiddenInput(),
                    'gene_symbol': ModelSelect2(url='gene_symbol_autocomplete',
                                                attrs={'data-placeholder': 'Gene...'}),
-                   'minimum_count': WIDGET_INTEGER_MIN_0,
-                   'maximum_count': WIDGET_INTEGER_MIN_1,
+                   'min_het_or_hom_count': WIDGET_INTEGER_MIN_0,
+                   'max_het_or_hom_count': WIDGET_INTEGER_MIN_1,
+                   'min_unk_count': WIDGET_INTEGER_MIN_0,
+                   'max_unk_count': WIDGET_INTEGER_MIN_1,
                    'min_ref_count': WIDGET_INTEGER_MIN_0,
                    'max_ref_count': WIDGET_INTEGER_MIN_1,
                    'min_het_count': WIDGET_INTEGER_MIN_0,
@@ -226,8 +230,10 @@ class CohortNodeForm(VCFSourceNodeForm):
         exclude = ANALYSIS_NODE_FIELDS
         widgets = {'cohort': ModelSelect2(url='cohort_autocomplete',
                                           attrs={'data-placeholder': 'Cohort...'}),
-                   'minimum_count': WIDGET_INTEGER_MIN_0,
-                   'maximum_count': WIDGET_INTEGER_MIN_1,
+                   'min_het_or_hom_count': WIDGET_INTEGER_MIN_0,
+                   'max_het_or_hom_count': WIDGET_INTEGER_MIN_1,
+                   'min_unk_count': WIDGET_INTEGER_MIN_0,
+                   'max_unk_count': WIDGET_INTEGER_MIN_1,
                    'min_ref_count': WIDGET_INTEGER_MIN_0,
                    'max_ref_count': WIDGET_INTEGER_MIN_1,
                    'min_het_count': WIDGET_INTEGER_MIN_0,

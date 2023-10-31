@@ -114,14 +114,6 @@
 	        </li>
 		</ul>
 
-        {% if node_warnings %}
-            <div>
-            {% for w in node_warnings %}
-                <div class='warning'>{{ w }}</div>
-            {% endfor %}
-            </div>
-        {% endif %}
-
         {% if has_write_permission %}
 	    	<button id='phenotype-save' class="btn btn-primary">save</button>
         {% endif %}

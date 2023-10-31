@@ -240,6 +240,14 @@
 
 				{% endblock node_filter_info %}
 				{% block content %}{% endblock content %}
+                {% if node_warnings %}
+                    <div>
+                    {% for w in node_warnings %}
+                        <div class='warning'>{{ w }}</div>
+                    {% endfor %}
+                    </div>
+                {% endif %}
+
 			</div>
 			{% if node.visible %}
 			{% block node_editor_tabs_second %}{% endblock node_editor_tabs_second %}

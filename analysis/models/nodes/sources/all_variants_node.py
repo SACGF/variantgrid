@@ -18,6 +18,12 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
     min_inputs = 0
     max_inputs = 0
 
+    def get_warnings(self) -> List[str]:
+        warnings = super().get_warnings()
+        if msg := self.get_min_above_max_warning_message(self.num_samples_for_build):
+            warnings.append(msg)
+        return warnings
+
     def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
         annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
         if self.get_zygosity_count_arg_q_dict():

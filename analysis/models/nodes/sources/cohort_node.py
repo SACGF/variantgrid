@@ -65,6 +65,13 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
     min_inputs = 0
     max_inputs = 0
 
+    def get_warnings(self) -> List[str]:
+        warnings = super().get_warnings()
+        if self.cohort and self.accordion_panel == self.COUNT:
+            if msg := self.get_min_above_max_warning_message(self.cohort.sample_count):
+                warnings.append(msg)
+        return warnings
+
     def _get_cohort(self):
         return self.cohort
 

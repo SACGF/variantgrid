@@ -20,18 +20,18 @@
     function constrainFormForCohortCount(sample_count) {
 		$(".num_samples").text(sample_count);
 
-		var minimum_count_select = $("#id_minimum_count");
-		var maximum_count_select = $("#id_maximum_count");
+		var min_het_or_hom_count_select = $("#id_min_het_or_hom_count");
+		var max_het_or_hom_count_select = $("#id_max_het_or_hom_count");
 		
 		if (sample_count) {
-			var minimum_count = Math.min(minimum_count_select.val(), sample_count);
-			minimum_count_select.val(minimum_count);
-			var maximum_count = maximum_count_select.val() || sample_count;
-			maximum_count_select.val(maximum_count);
-			minimum_count_select.attr("max", sample_count);
-			maximum_count_select.attr("max", sample_count);
+			var min_het_or_hom_count = Math.min(min_het_or_hom_count_select.val(), sample_count);
+			min_het_or_hom_count_select.val(min_het_or_hom_count);
+			var max_het_or_hom_count = max_het_or_hom_count_select.val() || sample_count;
+			max_het_or_hom_count_select.val(max_het_or_hom_count);
+			min_het_or_hom_count_select.attr("max", sample_count);
+			max_het_or_hom_count_select.attr("max", sample_count);
 		} else {
-			maximum_count_select.val(null);
+			max_het_or_hom_count_select.val(null);
 		}
 
 	}
@@ -112,17 +112,17 @@
 	$("button#cohort-save").button();
 	$("#id_cohort").change(changeCohort);
 
-	$("#id_minimum_count").change(function() {
-		var currentMax = $("#id_maximum_count").val();
+	$("#id_min_het_or_hom_count").change(function() {
+		var currentMax = $("#id_max_het_or_hom_count").val();
 		if (currentMax) {
-			var maximum_count = Math.max(currentMax, $(this).val());
-			$("#id_maximum_count").val(maximum_count);
+			var max_het_or_hom_count = Math.max(currentMax, $(this).val());
+			$("#id_max_het_or_hom_count").val(max_het_or_hom_count);
 		}
 	});
 	
-	$("#id_maximum_count").change(function() {
-		var minimum_count = Math.min($("#id_minimum_count").val(), $(this).val());
-		$("#id_minimum_count").val(minimum_count);
+	$("#id_max_het_or_hom_count").change(function() {
+		var min_het_or_hom_count = Math.min($("#id_min_het_or_hom_count").val(), $(this).val());
+		$("#id_min_het_or_hom_count").val(min_het_or_hom_count);
 	});
 
     var cohortForm = $('form#cohort-form');
@@ -179,9 +179,22 @@
                             <th>Max</th>
                         </tr>
                         <tr>
-                            <th>Any zygosity</th>
-                            <td>{{ form.minimum_count }}</td>
-                            <td>{{ form.maximum_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
+                            <th>Het or Hom</th>
+                            <td>{{ form.min_het_or_hom_count }}</td>
+                            <td>{{ form.max_het_or_hom_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
+                        </tr>
+                    </table>
+
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th>Min</th>
+                            <th>Max</th>
+                        </tr>
+                        <tr>
+                            <th>Unknown</th>
+                            <td>{{ form.min_unk_count }}</td>
+                            <td>{{ form.max_unk_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
                         </tr>
                         <tr>
                             <th>Ref</th>

@@ -37,10 +37,6 @@ class PopulationNode(AnalysisNode):
 
     POPULATION_DATABASE_FIELDS = ["gnomad_af", "gnomad_popmax_af", "af_1kg", "af_uk10k", "topmed_af"]
 
-    @cached_property
-    def num_samples_for_build(self) -> int:
-        return Sample.objects.filter(vcf__genome_build=self.analysis.genome_build).count()
-
     @property
     def filtering_by_population(self):
         return self.percent != self.EVERYTHING

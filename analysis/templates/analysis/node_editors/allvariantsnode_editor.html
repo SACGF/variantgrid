@@ -43,24 +43,37 @@ input.narrow {
 				<th>Max</th>
 			</tr>
 			<tr>
-				<th>Any zygosity</th>
-				<td>{{ form.minimum_count }}</td>
-				<td>{{ form.maximum_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
+				<th>Het or Hom</th>
+				<td>{{ form.min_het_or_hom_count }}</td>
+				<td>{{ form.max_het_or_hom_count }} of <span class='num_samples'>{{ num_samples_for_build }}</span> samples.</td>
+			</tr>
+        </table>
+
+        <table>
+			<tr>
+				<th></th>
+				<th>Min</th>
+				<th>Max</th>
+			</tr>
+			<tr>
+				<th>Unknown</th>
+				<td>{{ form.min_unk_count }}</td>
+				<td>{{ form.max_unk_count }} of <span class='num_samples'>{{ num_samples_for_build }}</span> samples.</td>
 			</tr>
 			<tr>
 				<th>Ref</th>
 				<td>{{ form.min_ref_count }}</td>
-				<td>{{ form.max_ref_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
+				<td>{{ form.max_ref_count }} of <span class='num_samples'>{{ num_samples_for_build }}</span> samples.</td>
 			</tr>
 			<tr>
 				<th>Het</th>
 				<td>{{ form.min_het_count }}</td>
-				<td>{{ form.max_het_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
+				<td>{{ form.max_het_count }} of <span class='num_samples'>{{ num_samples_for_build }}</span> samples.</td>
 			</tr>
 			<tr>
 				<th>Hom Alt</th>
 				<td>{{ form.min_hom_count }}</td>
-				<td>{{ form.max_hom_count }} of <span class='num_samples'>{{ num_samples }}</span> samples.</td>
+				<td>{{ form.max_hom_count }} of <span class='num_samples'>{{ num_samples_for_build }}</span> samples.</td>
 			</tr>
 		</table>
 

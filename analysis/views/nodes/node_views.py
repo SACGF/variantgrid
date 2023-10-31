@@ -54,6 +54,7 @@ class AllVariantsNodeView(NodeView):
         else:
             out_of_date_message = "Please press save."
 
+        context['num_samples_for_build'] = self.object.num_samples_for_build
         context["out_of_date_message"] = out_of_date_message
         context["max_variant_id"] = self.object.max_variant_id
         return context
@@ -64,7 +65,7 @@ class AllVariantsNodeView(NodeView):
         form_initial["max_variant"] = Variant(pk=max_variant_id)
         # Set initial count to 1 (so it only shows variants from samples)
         if self.object.version == 0:
-            form_initial["minimum_count"] = 1
+            form_initial["min_het_or_hom_count"] = 1
         return form_initial
 
 
@@ -116,6 +117,7 @@ class CohortNodeView(NodeView):
         form_kwargs = super().get_form_kwargs()
         form_kwargs["genome_build"] = self.object.analysis.genome_build
         return form_kwargs
+
 
 class DamageNodeView(NodeView):
     model = DamageNode
@@ -250,32 +252,8 @@ class PhenotypeNodeView(NodeView):
 
         context.update({
             'has_patients': has_patients,
-            "node_warnings": self._get_node_warnings(),
         })
         return context
-
-    def _get_no_gene_warnings(self, label: str, terms) -> Optional[str]:
-        terms_without_genes = set()
-        ontology_version = self.object.analysis.annotation_version.ontology_version
-        for ontology_term in terms:
-            if not ontology_version.cached_gene_symbols_for_terms_tuple((ontology_term,)).exists():
-                terms_without_genes.add(str(ontology_term))
-        warning = None
-        if terms_without_genes:
-            sorted_terms = ', '.join([f"'{ot}'" for ot in sorted(terms_without_genes)])
-            warning = f"{label} terms: {sorted_terms} have no associated genes, and will not affect node filtering."
-        return warning
-
-    def _get_node_warnings(self) -> List[str]:
-        node_warnings = []
-
-        # This uses the same method as gene filter (special_case_gene_symbols_for_hpo_and_omim) though with individual
-        # calls per term so that it matches what gene filters is doing
-        terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(self.object.get_ontology_term_ids())
-        for label, terms in terms_dict.items():
-            if w := self._get_no_gene_warnings(label, terms):
-                node_warnings.append(w)
-        return node_warnings
 
 
 class PopulationNodeView(NodeView):
@@ -284,7 +262,7 @@ class PopulationNodeView(NodeView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['num_samples'] = self.object.num_samples_for_build
+        context['num_samples_for_build'] = self.object.num_samples_for_build
         return context
 
     def _get_form_initial(self):

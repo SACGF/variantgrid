@@ -18,15 +18,18 @@ class NodeView(UpdateView):
         context = super().get_context_data(**kwargs)
         extra_filters = self.kwargs.get("extra_filters")
         user_tag_colors = get_all_tags_and_user_colors(self.request.user)
-        context.update({"node": self.object,
-                        "node_id": self.object.pk,
-                        "version_id": self.object.version,
-                        "user_tag_colors": user_tag_colors,
-                        "analysis_id": self.object.analysis_id,
-                        "annotation_version": self.object.analysis.annotation_version,
-                        "extra_filters": extra_filters,
-                        "extra_filters_label": dict(BuiltInFilters.CHOICES).get(extra_filters),
-                        'has_write_permission': self.object.analysis.can_write(self.request.user)})
+        context.update({
+            "node": self.object,
+            "node_id": self.object.pk,
+            "version_id": self.object.version,
+            "user_tag_colors": user_tag_colors,
+            "analysis_id": self.object.analysis_id,
+            "annotation_version": self.object.analysis.annotation_version,
+            "extra_filters": extra_filters,
+            "extra_filters_label": dict(BuiltInFilters.CHOICES).get(extra_filters),
+            'has_write_permission': self.object.analysis.can_write(self.request.user),
+            "node_warnings": self.object.get_warnings(),
+        })
 
         try:
             grid = VariantGrid(self.request.user, self.object, extra_filters)

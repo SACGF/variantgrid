@@ -102,6 +102,10 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     def __lt__(self, other):
         return self.pk < other.pk
 
+    @cached_property
+    def num_samples_for_build(self) -> int:
+        return Sample.objects.filter(vcf__genome_build=self.analysis.genome_build).count()
+
     def get_subclass(self):
         """ Returns the node loaded as a subclass """
         return AnalysisNode.objects.get_subclass(pk=self.pk)
@@ -639,6 +643,9 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         if self._cached_analysis_errors is None:
             self._cached_analysis_errors = self.analysis.get_errors()
         return self._cached_analysis_errors
+
+    def get_warnings(self) -> List[str]:
+        return []
 
     def get_errors(self, include_parent_errors=True, flat=False):
         """ returns a tuple of (NodeError, str) unless flat=True where it's only string """

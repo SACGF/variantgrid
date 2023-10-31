@@ -201,6 +201,29 @@ class PhenotypeNode(AnalysisNode):
             copy.phenotypenodeontologyterm_set.create(ontology_term=phenotype_ot.ontology_term)
         return copy
 
+    def get_warnings(self) -> List[str]:
+        node_warnings = []
+
+        # This uses the same method as gene filter (special_case_gene_symbols_for_hpo_and_omim) though with individual
+        # calls per term so that it matches what gene filters is doing
+        terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(self.get_ontology_term_ids())
+        for label, terms in terms_dict.items():
+            if w := self._get_no_gene_warnings(label, terms):
+                node_warnings.append(w)
+        return node_warnings
+
+    def _get_no_gene_warnings(self, label: str, terms) -> Optional[str]:
+        terms_without_genes = set()
+        ontology_version = self.analysis.annotation_version.ontology_version
+        for ontology_term in terms:
+            if not ontology_version.cached_gene_symbols_for_terms_tuple((ontology_term,)).exists():
+                terms_without_genes.add(str(ontology_term))
+        warning = None
+        if terms_without_genes:
+            sorted_terms = ', '.join([f"'{ot}'" for ot in sorted(terms_without_genes)])
+            warning = f"{label} terms: {sorted_terms} have no associated genes, and will not affect node filtering."
+        return warning
+
     @staticmethod
     def get_node_class_label():
         return "Phenotype"
