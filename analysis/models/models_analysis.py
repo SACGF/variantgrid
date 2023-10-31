@@ -79,7 +79,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
             except AnalysisTemplateVersion.DoesNotExist:
                 return None
 
-    @cached_property
+    @property
     def last_lock(self):
         return self.analysislock_set.order_by("pk").last()
 

@@ -36,7 +36,7 @@ class Event(models.Model):
     filename = models.TextField(null=True)
 
     def can_write(self, user_or_group: Union[User, Group]) -> bool:
-        return isinstance(User) and user_or_group.is_superuser
+        return isinstance(user_or_group, User) and (user_or_group.is_superuser or self.user == user_or_group)
 
     def __str__(self):
         MAX_DETAILS_LENGTH = 200
@@ -65,7 +65,7 @@ def create_event(
         filename: Optional[str] = None,
         severity=LogLevel.INFO,
         app_name: Optional[str] = None,
-        log=True):
+        log=True) -> Event:
 
     if app_name is None:
         frm = inspect.stack()[1]
@@ -84,6 +84,8 @@ def create_event(
         severity_display = dict(LogLevel.CHOICES).get(severity, "INFO")
         level = logging.getLevelName(severity_display)
         logging.log(level, e)
+
+    return e
 
 
 user_logged_in.connect(create_login_event)
