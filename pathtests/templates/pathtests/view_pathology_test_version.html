@@ -101,8 +101,7 @@ $("button#confirm-test").click(function() {
     {% endwith %}
     </div>
 
-	{% load jqgrid_tags %}
-	{% jqgrid 'gene_list_genes_grid' 'gene_list' False None 'jqgrid/jqgrid.html' download_grid_json_as_csv=True gene_list_id=pathology_test_version.gene_list.pk %}
+    <table id="gene-lists-genes-datatable-{{ pathology_test_version.gene_list.pk }}" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'gene_list_genes_datatable' gene_list_id=pathology_test_version.gene_list.pk %}"></table>
 {% endif %}
 
 

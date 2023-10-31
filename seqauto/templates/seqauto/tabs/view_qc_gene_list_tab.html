@@ -1,4 +1,3 @@
-{% load jqgrid_tags %}
 {% load help_tags %}
 <div id="qc-gene-list">
     {% page_help user 'seqauto/sample_qc_gene_list' 'Sample QC Gene List' %}
@@ -8,7 +7,7 @@
         {% if qc_gene_list.custom_text_gene_list.gene_list.import_status == 'S' %}
             <h3>QC Gene List</h3>
 
-            {% jqgrid 'gene_list_genes_grid' qc_gene_list.custom_text_gene_list.gene_list.pk search=False download_grid_json_as_csv=True gene_list_id=qc_gene_list.custom_text_gene_list.gene_list.pk %}
+            <table id="gene-lists-genes-datatable-{{ qc_gene_list.custom_text_gene_list.gene_list.pk }}" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'gene_list_genes_datatable' gene_list_id=qc_gene_list.custom_text_gene_list.gene_list.pk %}"></table>
         {% else %}
             <b>Error:</b>
             {% if qc_gene_list.custom_text_gene_list.gene_list.import_status == 'E' %}

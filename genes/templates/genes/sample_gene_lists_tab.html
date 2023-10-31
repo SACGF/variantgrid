@@ -1,6 +1,5 @@
 {% load tz %}
 {% load js_tags %}
-{% load jqgrid_tags %}
 {% load related_analyses_tags %}
 
 <div id="sample-gene-list-tab-container">
@@ -150,7 +149,7 @@ $(document).ready(function() {
                     </ul>
                 {% endif %}
 
-                {% jqgrid 'gene_list_genes_grid' sample_gene_list.gene_list.pk search=False download_grid_json_as_csv=True gene_list_id=sample_gene_list.gene_list.pk %}
+                <table id="sample-gene-lists-genes-datatable-{{ sample_gene_list.gene_list.pk }}" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'gene_list_genes_datatable' gene_list_id=sample_gene_list.gene_list.pk %}"></table>
             </div>
         </div>
     </div>
