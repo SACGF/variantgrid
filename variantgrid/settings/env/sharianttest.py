@@ -36,7 +36,6 @@ _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded an
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'test_annotation_scratch')
 
 SEARCH_HGVS_GENE_SYMBOL_USE_MANE = True
-LIFTOVER_NCBI_REMAP_ENABLED = True
 
 SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
 SHARIANT_TEST_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_test_static")

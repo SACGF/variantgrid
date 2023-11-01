@@ -127,9 +127,6 @@ ANNOTATION[BUILD_GRCH37]["annotation_consortium"] = "RefSeq"
 ANNOTATION[BUILD_GRCH38]["enabled"] = True
 ANNOTATION[BUILD_GRCH38]["annotation_consortium"] = "RefSeq"
 
-LIFTOVER_NCBI_REMAP_ENABLED = True
-LIFTOVER_NCBI_REMAP_PERLBREW_RUNNER_SCRIPT = os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
-
 LOGIN_REDIRECT_URL = '/classification/dashboard'
 LOGO_VIEW_NAME = "classification_dashboard"
 
