@@ -773,8 +773,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             try:
                 genome_build_patch_version = self.get_genome_build_patch_version()
             except Exception:
+                raise
                 # no allele info if we can't derive a genome build
-                return None, False
+                # return None, False
 
             fields = {"imported_genome_build_patch_version": genome_build_patch_version}
             if c_hgvs := self.imported_c_hgvs:
@@ -785,8 +786,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 fields["imported_md5_hash"] = md5sum_str(g_hgvs)
                 fields["imported_transcript"] = self.transcript
             else:
+                raise ValueError("Classification does not have imported_c_hgvs or imported_g_hgvs")
                 # need either c.hgvs, g.hgvs (in future, re-support variant_coordinate)
-                return None, False
+                # return None, False
 
             allele_info = ImportedAlleleInfo.get_or_create(**fields)
             if self.allele_info == allele_info:
@@ -812,7 +814,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             allele_info.apply_validation()
             allele_info.save()
             if not force_update and self.allele_info.status == ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS:
-                return
+                return False
             if matched_variant := self.variant:
                 allele_info.set_variant_and_save(matched_variant, force_update=force_update)
             return True
