@@ -11,12 +11,15 @@ class CustomUserAdmin(UserAdmin):
     def email_discordance(self, request, queryset):
         count = 0
         for user in queryset:
-            result = send_summary_email_to_user(user)
+            try:
+                result = send_summary_email_to_user(user)
+            except Exception as ex:
+                self.message_user(request, f"Error for sending {user.username} at {user.email} an email", messages.ERROR)
             if result:
-                count = count + 1
+                count += 1
             else:
                 print(result)
-                self.message_user(request, f"Error (or e-mail disabled) for sending {user.username} at {user.email} an email", messages.ERROR)
+                self.message_user(request, f"Email Server Issue or Emails disabled for sending {user.username} at {user.email} an email", messages.WARNING)
 
         self.message_user(request, 'Emailed %i users' % count)
 
