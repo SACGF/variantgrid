@@ -310,8 +310,11 @@ def classification_history(request, classification_id: Any):
 
 
 def view_classification(request: HttpRequest, classification_id: str):
+    ref = ClassificationRef.init_from_str(request.user, str(classification_id))
+    ref.check_exists()
+    ref.check_security()
     withdraw_reasons = WithdrawReason.choices
-    classification_record_id = Classification.objects.get(pk=classification_id)
+    classification_record_id = Classification.objects.get(pk=ref.record.id)
 
     duplicate_records = []
     if classification_record_id.withdraw_reason == 'DUPLICATE':
@@ -323,9 +326,6 @@ def view_classification(request: HttpRequest, classification_id: str):
             duplicate_records.append(('view_allele', classification_record_id.allele_object))
         elif len(all_class_ids) == 1:
             duplicate_records.append(('Classifications', all_class_ids))
-    ref = ClassificationRef.init_from_str(request.user, str(classification_id))
-    ref.check_exists()
-    ref.check_security()
 
     existing_files = get_classification_attachment_file_dicts(ref.record)
     other_classifications_summary = ref.record.get_other_classifications_summary_for_variant(request.user)
