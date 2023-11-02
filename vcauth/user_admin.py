@@ -14,7 +14,7 @@ class CustomUserAdmin(UserAdmin):
             try:
                 result = send_summary_email_to_user(user)
             except Exception as ex:
-                self.message_user(request, f"Error for sending {user.username} at {user.email} an email", messages.ERROR)
+                self.message_user(request, f"Error {ex} when sending {user.username} at {user.email} an email", messages.ERROR)
             if result:
                 count += 1
             else:
