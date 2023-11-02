@@ -12,14 +12,15 @@ class CustomUserAdmin(UserAdmin):
         count = 0
         for user in queryset:
             try:
-                result = send_summary_email_to_user(user)
+                if send_summary_email_to_user(user):
+                    count += 1
+                else:
+                    self.message_user(request,
+                                      f"Email Server Issue or Emails disabled for sending {user.username} at {user.email} an email",
+                                      messages.WARNING)
+
             except Exception as ex:
                 self.message_user(request, f"Error {ex} when sending {user.username} at {user.email} an email", messages.ERROR)
-            if result:
-                count += 1
-            else:
-                print(result)
-                self.message_user(request, f"Email Server Issue or Emails disabled for sending {user.username} at {user.email} an email", messages.WARNING)
 
         self.message_user(request, 'Emailed %i users' % count)
 
