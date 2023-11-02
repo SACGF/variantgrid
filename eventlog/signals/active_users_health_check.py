@@ -1,3 +1,4 @@
+from collections import Counter
 from random import randint
 
 from django.contrib.auth.models import User
@@ -45,11 +46,17 @@ def email_health_check(sender, health_request: HealthCheckRequest, **kwargs):
     recent_emails = EmailLog.objects.filter(created__gte=health_request.since, created__lt=health_request.now)
 
     if count := recent_emails.count():
+        subject_counts = Counter(email.subject for email in recent_emails)
+
+        email_subj = ", ".join(
+            f"{subject} x *{count}*" if count > 1 else subject for subject, count in subject_counts.items()
+        )
+        
         return HealthCheckRecentActivity(
             emoji=":email:",
             name="Emails Sent",
             amount=count,
-            extra=", ".join([email.subject for email in recent_emails]),
+            extra=email_subj,
             stand_alone=True,
             preview=[email.preview for email in recent_emails]
         )
