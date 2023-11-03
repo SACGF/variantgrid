@@ -12,6 +12,7 @@ from django.http import StreamingHttpResponse, HttpResponseRedirect
 from django.http.response import HttpResponseBase
 from django.urls import path, NoReverseMatch, reverse
 from django.utils.encoding import smart_str
+from django.utils.safestring import SafeString
 from django_json_widget.widgets import JSONEditorWidget
 from guardian.admin import GuardedModelAdminMixin
 
@@ -133,9 +134,11 @@ def admin_list_column(
             # empty wrapper, we just want to modify short_description and mark as is_action
             result = method(*args, **kwargs)
             if result and limit:
-                text = str(result)
-                if len(text) > limit:
-                    result = text[0:limit] + "..."
+                if not isinstance(result, SafeString):
+                    # don't truncate SafeStrings as would include HTML that could easily break
+                    text = str(result)
+                    if len(text) > limit:
+                        result = text[0:limit] + "..."
             return result
 
         if short_description:

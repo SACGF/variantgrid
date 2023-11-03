@@ -7,6 +7,7 @@ from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter,
 from django.db.models import QuerySet, Q
 from django.forms import Widget
 from django.utils import timezone
+from django.utils.safestring import SafeString
 
 from annotation.models.models import AnnotationVersion
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
@@ -31,7 +32,7 @@ from library.guardian_utils import admin_bot
 from library.utils import ExportRow, export_column, ExportDataType, first
 from ontology.models import OntologyTerm, AncestorCalculator
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter, \
-    admin_model_action
+    admin_model_action, get_admin_url
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import GenomeBuild, Lab
 
@@ -912,7 +913,10 @@ class DiscordanceReportTriageAdmin(ModelAdminBasics):
         dr = obj.discordance_report
         total_triages = dr.discordancereporttriage_set.count()
         completed_triages = dr.discordancereporttriage_set.exclude(triage_status=DiscordanceReportTriageStatus.PENDING).count()
-        return f"({dr.pk} {dr.get_resolution_display()}) Triages Completed {completed_triages} of {total_triages}"
+        url = get_admin_url(dr)
+        return SafeString(
+            f'(<a href="{url}">DR_{dr.pk}</a>) {dr.get_resolution_display() or "Discordant"} - <span style="font-size:0.6rem">triages complete {completed_triages} <i>of</i> {total_triages}</span>'
+        )
 
     @admin_list_column("Triage Status", order_field="triage_status", limit=100)
     def triage_status_extra(self, obj: DiscordanceReportTriage):
