@@ -895,8 +895,8 @@ class TriageStatusFilter(admin.SimpleListFilter):
 
 @admin.register(DiscordanceReportTriage)
 class DiscordanceReportTriageAdmin(ModelAdminBasics):
-    list_display = ("pk", "lab", "triage_status", "discordance_report", "modified")
-    list_filter = (TriageStatusFilter, )
+    list_display = ("pk", "lab", "triage_status_extra", "discordance_report_extra", "user", "modified")
+    list_filter = (TriageStatusFilter, "closed")
 
     def is_readonly_field(self, f) -> bool:
         if f.name == "user":
@@ -906,6 +906,20 @@ class DiscordanceReportTriageAdmin(ModelAdminBasics):
     @admin_model_action(url_slug="ensure_bulk/", short_description="Ensure Bulk", icon="fa-solid fa-dolly")
     def ensure_bulk(self, request):
         ensure_discordance_report_triages_bulk()
+
+    @admin_list_column("Discordance Report", order_field="discordance_report", limit=100)
+    def discordance_report_extra(self, obj: DiscordanceReportTriage):
+        dr = obj.discordance_report
+        total_triages = dr.discordancereporttriage_set.count()
+        completed_triages = dr.discordancereporttriage_set.exclude(triage_status=DiscordanceReportTriageStatus.PENDING).count()
+        return f"({dr.pk} {dr.get_resolution_display()}) Triages Completed {completed_triages} of {total_triages}"
+
+    @admin_list_column("Triage Status", order_field="triage_status", limit=100)
+    def triage_status_extra(self, obj: DiscordanceReportTriage):
+        report = obj.get_triage_status_display()
+        if obj.closed:
+            report += " CLOSED"
+        return report
 
 
 @admin.register(DiscordanceNotification)
