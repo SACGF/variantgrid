@@ -72,13 +72,18 @@ class ViewEventCounts:
         return now() - self.time_ago
 
     @property
-    def base_filter(self) -> Q:
-        qs: List[Q] = []
+    def base_filter_any_date(self) -> Q:
         if self.exclude_admin:
+            qs: List[Q] = []
             qs.append(Q(user__is_superuser=False))
             qs.append(~Q(user__groups__name__in=['variantgrid/tester', 'variantgrid/bot']))
-        qs.append(Q(created__gte=self.as_of))
-        return reduce(operator.and_, qs)
+            return reduce(operator.and_, qs)
+        else:
+            return Q(pk__isnull=False)
+
+    @property
+    def base_filter(self) -> Q:
+        return self.base_filter_any_date & Q(created__gte=self.as_of)
 
     def count_field(self, field_name: str, resolver: Optional[Callable]) -> List[Counted]:
         id_to_count = defaultdict(int)
@@ -173,7 +178,9 @@ class ViewEventCounts:
         ]
 
     def recent_views(self) -> QuerySet[ViewEvent]:
-        return ViewEvent.objects.filter(self.base_filter).order_by('-created')
+        # warning this will return a QuerySet with everything in it
+        # make sure to splice it
+        return ViewEvent.objects.filter(self.base_filter_any_date).order_by('-created')
 
     def all_views_for(self, request: HttpRequest) -> QuerySet[ViewEvent]:
         views = ViewEvent.objects \
