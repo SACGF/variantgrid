@@ -10,16 +10,21 @@
 {% block title %}Classification View Metrics{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
-<div class="container">
 <style>
     .thicker-border {
         border-top: 2px solid #666;
     }
 </style>
-<h3>View Metrics</h3>
-    <div class="my-4">
-    <a class="download-link admin-only d-block my-1" href="{% url 'export_search_data' %}">Stats over time Daily</a>
-    <a class="download-link admin-only d-block my-1" href="{% url 'export_search_data' %}?frequency=7">Stats over time Weekly</a>
+
+<div class="container">
+    <div class="d-flex flex-row">
+        <h3 class="align-self-baseline">View Metrics</h3>
+        <div class="ml-2 align-self-baseline"><a href="{{ admin_url }}" target="_blank" class="admin-link">MANAGE</a></div>
+    </div>
+
+    <div class="mb-4">
+        <a class="download-link admin-only d-block my-1" href="{% url 'export_search_data' %}">Stats over time Daily</a>
+        <a class="download-link admin-only d-block my-1" href="{% url 'export_search_data' %}?frequency=7">Stats over time Weekly</a>
     </div>
 
     <div class="d-flex justify-content-between align-items-center">
@@ -31,7 +36,7 @@
 {#            {% endfor %}#}
 {#        </div>#}
 
-        <div class="btn-group mb-4" role="group" aria-label="Days Old">
+        <div class="btn-group mb-2" role="group" aria-label="Filter">
             <button onclick="window.open('{% url 'classification_view_metrics' %}?days={{ days }}&exclude_admin=true', '_self')"
             class="btn {% if exclude_admin %}btn-secondary font-weight-bold{% else %}btn-outline-secondary{% endif %}">Exclude Admins
             </button>

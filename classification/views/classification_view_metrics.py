@@ -17,6 +17,7 @@ from classification.models import Classification, DiscordanceReport
 from eventlog.models import ViewEvent
 from genes.models import GeneSymbol
 from library.django_utils import require_superuser
+from snpdb.admin_utils import get_admin_model_url
 from snpdb.models import Allele
 
 T = TypeVar("T")
@@ -217,8 +218,9 @@ def view_classification_metrics(request: HttpRequest) -> HttpResponseBase:
         "counts": vec,
         "days": vec.time_ago.days,
         "exclude_admin": vec.exclude_admin,
-        "days_options": [1, 7, 30, 60, 90],
-        "page_suffix": vec.page_suffix
+        # "days_options": [1, 7, 30, 60, 90],
+        "page_suffix": vec.page_suffix,
+        "admin_url": get_admin_model_url(ViewEvent)
     }
     return render(request, "classification/classification_view_metrics.html", context)
 
