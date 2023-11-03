@@ -16,6 +16,7 @@ from django.urls.exceptions import Resolver404
 from django.views.generic import FormView
 from global_login_required import login_not_required
 
+from library.django_utils import require_superuser
 from library.email import Email
 from library.git import Git
 from library.keycloak import Keycloak, KeycloakError, KeycloakNewUser
@@ -149,11 +150,8 @@ def external_help(request):
     return render(request, 'external_help.html', context)
 
 
+@require_superuser
 def keycloak_admin(request):
-    if not request.user.is_superuser:
-        return HttpResponseForbidden()
-
-    response = ''
     if request.method == "POST":
         form = KeycloakUserForm(request.POST)
         if form.is_valid():

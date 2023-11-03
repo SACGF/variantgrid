@@ -333,6 +333,7 @@ def long_running_sql(min_age_in_seconds: int = 30):
         return [to_obj(result) for result in cursor.fetchall()]
 
 
+@require_superuser
 def database_statistics(request):
     max_variant_id = highest_pk(Variant)
     num_vcfs = VCF.objects.count()

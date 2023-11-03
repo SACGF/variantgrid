@@ -18,6 +18,7 @@ from django.db.models.query_utils import Q
 from django.urls.base import reverse_lazy
 from django.utils import timezone
 from django.utils.timezone import localtime
+from django.views import View
 from redis import Redis
 from threadlocals.threadlocals import get_current_request
 
@@ -60,6 +61,14 @@ def require_superuser(f):
         raise PermissionDenied("You must be a super user to view this page")
 
     return wrapper
+
+
+class RequireSuperUserView(View):
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_superuser:
+            raise PermissionDenied("You must be a super user to view this page")
+        return super().dispatch(request, *args, **kwargs)
 
 
 def get_model_fields(model, ignore_fields=None) -> List[str]:
