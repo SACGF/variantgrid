@@ -1,6 +1,4 @@
 {% extends menu_settings_base %}
-
-{% load avatar_tags %}
 {% load ui_utils %}
 {% block title %}{{ other_user }} user page.{% endblock %}
 
@@ -9,7 +7,6 @@
         <div class="card">
             <div class="card-header">View User {% admin_link other_user %}</div>
             <div class="card-body">
-                {% labelled label="Avatar" %}{% avatar user  %}{% endlabelled %}
                 {% labelled label="Username" %}{{ other_user }}{% endlabelled %}
                 {% labelled label="Email" %}{{ email }}{% endlabelled %}
                 {% labelled label="Phone: #" %}{{ user_contact.phone_number }}{% endlabelled %}
@@ -21,7 +18,7 @@
                 <a href="{% url 'activity_user' user_id=other_user.pk %}">View Classification Edits</a>
             </div>
         </div>
-        <div class="card">
+        <div class="card mt-4">
             <div class="card-header">Shared groups</div>
             <div class="card-body">
                 {% if common_groups %}
