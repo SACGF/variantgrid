@@ -58,9 +58,8 @@ class ViewEventCounts:
 
     @staticmethod
     def from_request(request: HttpRequest):
-        time_ago = timedelta(days=30)
+        time_ago = timedelta(days=7)
         if days_old_str := request.GET.get('days'):
-            days_old_str = 7  # default to 7 days
             time_ago = timedelta(days=int(days_old_str))
 
         # default to exclude admin
@@ -74,10 +73,7 @@ class ViewEventCounts:
     @property
     def base_filter_any_date(self) -> Q:
         if self.exclude_admin:
-            qs: List[Q] = []
-            qs.append(Q(user__is_superuser=False))
-            qs.append(~Q(user__groups__name__in=['variantgrid/tester', 'variantgrid/bot']))
-            return reduce(operator.and_, qs)
+            return Q(user__is_superuser=False) & ~Q(user__groups__name__in=['variantgrid/tester', 'variantgrid/bot'])
         else:
             return Q(pk__isnull=False)
 
