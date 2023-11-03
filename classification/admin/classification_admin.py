@@ -15,7 +15,8 @@ from classification.enums.classification_enums import EvidenceCategory, SpecialE
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
     ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
-    classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk
+    classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
+    DiscordanceReportTriageStatus
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -879,9 +880,23 @@ class DiscordanceReportAdmin(ModelAdminBasics):
         return DiscordanceReportAdminExport.streaming(request, (DiscordanceReportAdminExport(dr, perspective) for dr in queryset), filename="discordance_admin_report")
 
 
+class TriageStatusFilter(admin.SimpleListFilter):
+    title = "Status"
+    parameter_name = "status"
+
+    def lookups(self, request, model_admin):
+        return [("not_pending", "Not Pending")]
+
+    def queryset(self, request, queryset: QuerySet[DiscordanceReportTriage]):
+        if self.value() == "not_pending":
+            queryset = queryset.exclude(triage_status=DiscordanceReportTriageStatus.PENDING)
+        return queryset
+
+
 @admin.register(DiscordanceReportTriage)
 class DiscordanceReportTriageAdmin(ModelAdminBasics):
-    list_display = ("pk", "lab", "triage_status", "discordance_report")
+    list_display = ("pk", "lab", "triage_status", "discordance_report", "modified")
+    list_filter = (TriageStatusFilter, )
 
     def is_readonly_field(self, f) -> bool:
         if f.name == "user":
