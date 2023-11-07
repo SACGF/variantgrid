@@ -175,13 +175,21 @@ def export_as_csv(modeladmin, request, queryset) -> HttpResponseBase:
     if related_fields := [field.name for field in meta.fields if isinstance(field, ForeignKey)]:
         queryset = queryset.select_related(*related_fields)
 
+    def get_formatted_attr(qs_obj2, field):
+        display_name = f"get_{field}_display"
+        if hasattr(qs_obj2, display_name):
+            return getattr(qs_obj2, display_name)()
+        else:
+            return getattr(qs_obj2, field)
+
     def data_generator() -> Iterator[str]:
         nonlocal field_names
         nonlocal queryset
 
         yield delimited_row(field_names)
+
         for qs_obj in queryset:
-            yield delimited_row([getattr(qs_obj, field) for field in field_names])
+            yield delimited_row([get_formatted_attr(qs_obj, field) for field in field_names])
 
     response = StreamingHttpResponse(data_generator(), content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename={meta}.csv'
