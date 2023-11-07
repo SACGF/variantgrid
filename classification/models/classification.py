@@ -737,7 +737,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 user=user,
                 permission_check=False,
                 reopen=True,
-                comment=reason
+                comment=self.get_withdraw_reason_display()
             )
         else:
             self.flag_collection_safe.close_open_flags_of_type(

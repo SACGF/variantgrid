@@ -317,7 +317,7 @@ def view_classification(request: HttpRequest, classification_id: str):
     classification_record_id = Classification.objects.get(pk=ref.record.id)
 
     duplicate_records = []
-    if classification_record_id.withdraw_reason == 'DUPLICATE':
+    if classification_record_id.withdraw_reason == WithdrawReason.DUPLICATE:
         all_class_ids = Classification.objects.filter(allele=classification_record_id.allele_object,
                                                       withdrawn=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
                                                       lab=classification_record_id.lab).values_list('id', flat=True)
