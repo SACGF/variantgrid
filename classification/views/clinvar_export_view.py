@@ -24,7 +24,7 @@ from classification.utils.clinvar_matcher import ClinVarLegacyRow, ClinVarLegacy
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
-from library.django_utils import add_save_message, get_url_from_view_path
+from library.django_utils import add_save_message, get_url_from_view_path, require_superuser, RequireSuperUserView
 from library.utils import html_to_text, export_column, ExportRow, local_date_string, ExportDataType, JsonDataType
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import ClinVarKey, Lab, Allele, GenomeBuild
@@ -520,7 +520,7 @@ def clinvar_export_detail(request: HttpRequest, clinvar_export_id: int) -> HttpR
     })
 
 
-class ClinVarMatchView(View):
+class ClinVarMatchView(RequireSuperUserView, View):
 
     def get(self, request, **kwargs):
         clinvar_key_id = kwargs.get('clinvar_key_id')
@@ -559,6 +559,7 @@ class ClinVarMatchView(View):
         })
 
 
+@require_superuser
 def clinvar_match_detail(request, clinvar_key_id: str):
     clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
     clinvar_key.check_user_can_access(request.user)

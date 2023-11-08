@@ -204,7 +204,7 @@ class DiscordanceReportRowData(ExportRow):
         return DiscordanceLabSummary.for_discordance_report(discordance_report=self.discordance_report, perspective=self.perspective)
 
     @cached_property
-    def next_step(self):
+    def next_step(self) -> DiscordanceReportNextStep:
         if not self.is_requiring_attention:
             return None
 

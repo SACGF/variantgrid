@@ -104,7 +104,7 @@ def send_summary_emails():
             report_exc_info({"user": user.username})
 
 
-def send_summary_email_to_user(user: User):
+def send_summary_email_to_user(user: User) -> bool:
     discordance_email = settings.DISCORDANCE_EMAIL
     if discordance_email:
         content = summary_email_content(LabPickerData.for_user(user))
@@ -114,6 +114,8 @@ def send_summary_email_to_user(user: User):
                                   text=content.text,
                                   from_email=discordance_email,
                                   recipient_list=[user.email])
+    else:
+        return False
 
 
 def summary_email_preview_html(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponse:

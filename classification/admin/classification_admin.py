@@ -7,6 +7,7 @@ from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter,
 from django.db.models import QuerySet, Q
 from django.forms import Widget
 from django.utils import timezone
+from django.utils.safestring import SafeString
 
 from annotation.models.models import AnnotationVersion
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
@@ -15,7 +16,8 @@ from classification.enums.classification_enums import EvidenceCategory, SpecialE
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
     ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
-    classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk
+    classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
+    DiscordanceReportTriageStatus
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -30,7 +32,7 @@ from library.guardian_utils import admin_bot
 from library.utils import ExportRow, export_column, ExportDataType, first
 from ontology.models import OntologyTerm, AncestorCalculator
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter, \
-    admin_model_action
+    admin_model_action, get_admin_url
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import GenomeBuild, Lab
 
@@ -879,9 +881,23 @@ class DiscordanceReportAdmin(ModelAdminBasics):
         return DiscordanceReportAdminExport.streaming(request, (DiscordanceReportAdminExport(dr, perspective) for dr in queryset), filename="discordance_admin_report")
 
 
+class TriageStatusFilter(admin.SimpleListFilter):
+    title = "Status"
+    parameter_name = "status"
+
+    def lookups(self, request, model_admin):
+        return [("not_pending", "Not Pending")]
+
+    def queryset(self, request, queryset: QuerySet[DiscordanceReportTriage]):
+        if self.value() == "not_pending":
+            queryset = queryset.exclude(triage_status=DiscordanceReportTriageStatus.PENDING)
+        return queryset
+
+
 @admin.register(DiscordanceReportTriage)
 class DiscordanceReportTriageAdmin(ModelAdminBasics):
-    list_display = ("pk", "lab", "triage_status", "discordance_report")
+    list_display = ("pk", "lab", "triage_status_extra", "discordance_report_extra", "user", "modified")
+    list_filter = (TriageStatusFilter, "closed")
 
     def is_readonly_field(self, f) -> bool:
         if f.name == "user":
@@ -891,6 +907,23 @@ class DiscordanceReportTriageAdmin(ModelAdminBasics):
     @admin_model_action(url_slug="ensure_bulk/", short_description="Ensure Bulk", icon="fa-solid fa-dolly")
     def ensure_bulk(self, request):
         ensure_discordance_report_triages_bulk()
+
+    @admin_list_column("Discordance Report", order_field="discordance_report", limit=100)
+    def discordance_report_extra(self, obj: DiscordanceReportTriage):
+        dr = obj.discordance_report
+        total_triages = dr.discordancereporttriage_set.count()
+        completed_triages = dr.discordancereporttriage_set.exclude(triage_status=DiscordanceReportTriageStatus.PENDING).count()
+        url = get_admin_url(dr)
+        return SafeString(
+            f'(<a href="{url}">DR_{dr.pk}</a>) {dr.get_resolution_display() or "Discordant"} - <span style="font-size:0.6rem">triages complete {completed_triages} <i>of</i> {total_triages}</span>'
+        )
+
+    @admin_list_column("Triage Status", order_field="triage_status", limit=100)
+    def triage_status_extra(self, obj: DiscordanceReportTriage):
+        report = obj.get_triage_status_display()
+        if obj.closed:
+            report += " CLOSED"
+        return report
 
 
 @admin.register(DiscordanceNotification)

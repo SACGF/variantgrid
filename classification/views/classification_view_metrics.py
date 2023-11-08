@@ -17,6 +17,7 @@ from classification.models import Classification, DiscordanceReport
 from eventlog.models import ViewEvent
 from genes.models import GeneSymbol
 from library.django_utils import require_superuser
+from snpdb.admin_utils import get_admin_model_url
 from snpdb.models import Allele
 
 T = TypeVar("T")
@@ -58,9 +59,8 @@ class ViewEventCounts:
 
     @staticmethod
     def from_request(request: HttpRequest):
-        time_ago = timedelta(days=30)
+        time_ago = timedelta(days=7)
         if days_old_str := request.GET.get('days'):
-            days_old_str = 7  # default to 7 days
             time_ago = timedelta(days=int(days_old_str))
 
         # default to exclude admin
@@ -72,13 +72,15 @@ class ViewEventCounts:
         return now() - self.time_ago
 
     @property
-    def base_filter(self) -> Q:
-        qs: List[Q] = []
+    def base_filter_any_date(self) -> Q:
         if self.exclude_admin:
-            qs.append(Q(user__is_superuser=False))
-            qs.append(~Q(user__groups__name__in=['variantgrid/tester', 'variantgrid/bot']))
-        qs.append(Q(created__gte=self.as_of))
-        return reduce(operator.and_, qs)
+            return Q(user__is_superuser=False) & ~Q(user__groups__name__in=['variantgrid/tester', 'variantgrid/bot'])
+        else:
+            return Q(pk__isnull=False)
+
+    @property
+    def base_filter(self) -> Q:
+        return self.base_filter_any_date & Q(created__gte=self.as_of)
 
     def count_field(self, field_name: str, resolver: Optional[Callable]) -> List[Counted]:
         id_to_count = defaultdict(int)
@@ -173,7 +175,9 @@ class ViewEventCounts:
         ]
 
     def recent_views(self) -> QuerySet[ViewEvent]:
-        return ViewEvent.objects.filter(self.base_filter).order_by('-created')
+        # warning this will return a QuerySet with everything in it
+        # make sure to splice it
+        return ViewEvent.objects.filter(self.base_filter_any_date).order_by('-created')
 
     def all_views_for(self, request: HttpRequest) -> QuerySet[ViewEvent]:
         views = ViewEvent.objects \
@@ -214,8 +218,9 @@ def view_classification_metrics(request: HttpRequest) -> HttpResponseBase:
         "counts": vec,
         "days": vec.time_ago.days,
         "exclude_admin": vec.exclude_admin,
-        "days_options": [1, 7, 30, 60, 90],
-        "page_suffix": vec.page_suffix
+        # "days_options": [1, 7, 30, 60, 90],
+        "page_suffix": vec.page_suffix,
+        "admin_url": get_admin_model_url(ViewEvent)
     }
     return render(request, "classification/classification_view_metrics.html", context)
 

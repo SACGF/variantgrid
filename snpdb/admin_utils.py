@@ -1,6 +1,6 @@
 import inspect
 from functools import cached_property
-from typing import Optional, List, Iterator, Dict
+from typing import Optional, List, Iterator, Dict, Type
 
 from dateutil.tz import gettz
 from django.conf import settings
@@ -12,6 +12,7 @@ from django.http import StreamingHttpResponse, HttpResponseRedirect
 from django.http.response import HttpResponseBase
 from django.urls import path, NoReverseMatch, reverse
 from django.utils.encoding import smart_str
+from django.utils.safestring import SafeString
 from django_json_widget.widgets import JSONEditorWidget
 from guardian.admin import GuardedModelAdminMixin
 
@@ -133,9 +134,11 @@ def admin_list_column(
             # empty wrapper, we just want to modify short_description and mark as is_action
             result = method(*args, **kwargs)
             if result and limit:
-                text = str(result)
-                if len(text) > limit:
-                    result = text[0:limit] + "..."
+                if not isinstance(result, SafeString):
+                    # don't truncate SafeStrings as would include HTML that could easily break
+                    text = str(result)
+                    if len(text) > limit:
+                        result = text[0:limit] + "..."
             return result
 
         if short_description:
@@ -172,13 +175,21 @@ def export_as_csv(modeladmin, request, queryset) -> HttpResponseBase:
     if related_fields := [field.name for field in meta.fields if isinstance(field, ForeignKey)]:
         queryset = queryset.select_related(*related_fields)
 
+    def get_formatted_attr(qs_obj2, field):
+        display_name = f"get_{field}_display"
+        if hasattr(qs_obj2, display_name):
+            return getattr(qs_obj2, display_name)()
+        else:
+            return getattr(qs_obj2, field)
+
     def data_generator() -> Iterator[str]:
         nonlocal field_names
         nonlocal queryset
 
         yield delimited_row(field_names)
+
         for qs_obj in queryset:
-            yield delimited_row([getattr(qs_obj, field) for field in field_names])
+            yield delimited_row([get_formatted_attr(qs_obj, field) for field in field_names])
 
     response = StreamingHttpResponse(data_generator(), content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename={meta}.csv'
@@ -338,5 +349,13 @@ def get_admin_url(obj: Model):
         meta = model._meta
         path = f"admin:{meta.app_label}_{meta.model_name}_change"
         return reverse(path, kwargs={"object_id": obj.pk})
+    except NoReverseMatch:
+        return None
+
+def get_admin_model_url(model_type: Type[Model]):
+    try:
+        meta = model_type._meta
+        path = f"admin:{meta.app_label}_{meta.model_name}_changelist"
+        return reverse(path)
     except NoReverseMatch:
         return None

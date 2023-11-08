@@ -10,16 +10,21 @@
 {% block title %}Classification View Metrics{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
-<div class="container">
 <style>
     .thicker-border {
         border-top: 2px solid #666;
     }
 </style>
-<h3>Metrics</h3>
-    <div class="my-4">
-    <a class="download-link admin-only d-block my-1" href="{% url 'export_search_data' %}">Stats over time Daily</a>
-    <a class="download-link admin-only d-block my-1" href="{% url 'export_search_data' %}?frequency=7">Stats over time Weekly</a>
+
+<div class="container">
+    <div class="d-flex flex-row">
+        <h3 class="align-self-baseline">View Metrics</h3>
+        <div class="ml-2 align-self-baseline"><a href="{{ admin_url }}" target="_blank" class="admin-link">MANAGE</a></div>
+    </div>
+
+    <div class="mb-4">
+        <a class="download-link admin-only d-block my-1" href="{% url 'export_search_data' %}">Stats over time Daily</a>
+        <a class="download-link admin-only d-block my-1" href="{% url 'export_search_data' %}?frequency=7">Stats over time Weekly</a>
     </div>
 
     <div class="d-flex justify-content-between align-items-center">
@@ -31,7 +36,7 @@
 {#            {% endfor %}#}
 {#        </div>#}
 
-        <div class="btn-group mb-4" role="group" aria-label="Days Old">
+        <div class="btn-group mb-2" role="group" aria-label="Filter">
             <button onclick="window.open('{% url 'classification_view_metrics' %}?days={{ days }}&exclude_admin=true', '_self')"
             class="btn {% if exclude_admin %}btn-secondary font-weight-bold{% else %}btn-outline-secondary{% endif %}">Exclude Admins
             </button>
@@ -40,11 +45,6 @@
             </button>
         </div>
     </div>
-    {% page_help_embedded title="Views "|append:page_suffix %}
-{#        <p>Most Viewed Xs count unique users accessing the data across the last 30 days</p>#}
-{#        <p>Most Active Users count how many pages the user viewed across the last 30 days</p>#}
-    {% end_page_help_embedded %}
-
 {#    {% for view_metrics in counts.view_metrics %}#}
 {#        <div class="card mt-4">#}
 {#            <div class="card-header">Most Viewed {{ view_metrics.name }} <span class="float-right">unique viewers</span></div>#}
@@ -72,9 +72,9 @@
 {#    {% endfor %}#}
 
     <div class="card mt-4">
-        <div class="card-header">Most Viewed Pages <span class="float-right">unique viewers</span></div>
+        <div class="card-header">Top 10 Pages Viewed - by most unique users {{ page_suffix }}<span class="float-right">unique viewers</span></div>
         <ul class="list-group">
-        {% for ccount in counts.page_views|slice:20 %}
+        {% for ccount in counts.page_views|slice:10 %}
             <li class="list-group-item d-flex justify-content-between align-items-center">
                 <span>
                     {{ ccount.pk | segmented_text }}
@@ -92,7 +92,7 @@
     </div>
 
     <div class="card mt-4">
-        <div class="card-header">Most Active Users <span class="float-right">pages viewed</span></div>
+        <div class="card-header">Most Active Users - {{ page_suffix }}<span class="float-right">pages viewed</span></div>
         <ul class="list-group">
         {% for ccount in counts.active_users|slice:"10" %}
             <li class="list-group-item d-flex justify-content-between align-items-center">
@@ -110,13 +110,13 @@
     </div>
 
     <div class="card mt-4">
-        <div class="card-header">Recently Viewed Pages</div>
+        <div class="card-header">Recent Activity - last 50 views</div>
         <table class="table">
             <thead>
                 <tr><th>View Date</th><th>User</th><th>View Name</th><th>Parameters</th></tr>
             </thead>
             <tbody>
-                {% for view_event in counts.recent_views|slice:30 %}
+                {% for view_event in counts.recent_views|slice:50 %}
                     <tr {% ifchanged view_event.created|date:"Y-m-d" %} {% if not forloop.first %} class="thicker-border" {% endif %}  {% endifchanged %}>
                         <td style="min-width:140px">{% timestamp view_event.created time_ago=True %}</td>
                         <td>{% user view_event.user show_group=True size="tiny" %}</td>

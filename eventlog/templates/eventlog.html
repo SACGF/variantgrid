@@ -62,7 +62,7 @@
 {% endblock %}
 {% block content %}
     <div class="container">
-        <h3>Event Log</h3>
+        <h3>Event Log{% if not user.is_superuser %} for {{ user }}{% endif %}</h3>
 
         <form class="form-inline">
             <div class="form-group">
@@ -76,11 +76,12 @@
                 <option value='warnings_and_errors'>Warnings and Errors</option>
             </select>
             </div>
+            {% if user.is_superuser %}
             <div class="form-check ml-4">
                 <input class="form-check-input" type="checkbox" id="exclude-admin">
                 <label class="form-check-label ml-1" for="exclude-admin">Exclude admin users, bots</label>
             </div>
-
+            {% endif %}
         </form>
 
         <table id="event-datatable" class="event-table sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'event_log_datatable' %}" data-datatable-data="datatableFilter"></table>
