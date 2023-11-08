@@ -563,7 +563,7 @@ class DiscordanceReportTriage(PreviewModelMixin, TimeStampedModel):
 
     @property
     def preview(self) -> 'PreviewData':
-        title = f"Discordance ID {self.discordance_report.pk}"
+        title = f"DR_ {self.discordance_report.pk}"
 
         extras = [
             PreviewKeyValue(key="Status", value=self.get_triage_status_display()),

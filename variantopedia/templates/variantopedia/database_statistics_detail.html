@@ -3,13 +3,6 @@
 {% load js_tags %}
 {% load ui_utils %}
 <div class="container">
-    {% labelled label="Max Variant" %}{{ max_variant_id|intcomma }}{% endlabelled %}
-    {%  if num_samples %}
-        {% labelled label="# VCFS" %}{{ num_vcfs|intcomma }}{% endlabelled %}
-        {% labelled label="# Samples" %}{{ num_vcfs|intcomma }}{% endlabelled %}
-    {%  else %}
-         {% labelled label="# VCFS" %}No VCFs or samples have been uploaded.{% endlabelled %}
-    {%  endif %}
 
     <div id='variant-totals-graph'></div>
     <div id='variant-genotypes-graph'></div>

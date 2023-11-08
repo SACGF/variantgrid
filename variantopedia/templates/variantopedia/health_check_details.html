@@ -1,58 +1,10 @@
 {% load js_tags %}
 {% load static %}
+{% load humanize %}
 {% load classification_tags %}
 {% load ui_utils %}
 <div class="container">
-    <div class="card">
-        <div class="card-header">Recent Activity</div>
-        <div class="card-body">
-            {% for line in recent_lines %}
-            <span>{{ line|safe }}</span>
-                {% if not forloop.last %}<hr>{% endif %}
-            {% endfor %}
-        </div>
-    </div>
-
-    {% for name, previews_list in previews.items %}
-        <div class="card mt-4">
-            <div class="card-header">{{ name }}</div>
-            <div class="card-body">
-                {% for preview in previews_list %}
-                    <div class="row">
-                        <div class="col-3">
-                            <p><i class="{{ preview.icon }}"></i> {{ preview.category }}</p>
-                        </div>
-                        <div class="col-4">
-                            <p><a href="{{ preview.internal_url }}">{% if name == 'Active Users' %}{{ preview.identifier }} {% else %}{{ preview.title }}{% endif %}</a></p>
-                        </div>
-                        {% if name == 'Active Users' %}
-                            <div class="col-5">
-                                <a class="toggle-link" data-toggle="collapse" href="#active-users{{ preview.obj | id_safe }}">View Events</a>
-                            </div>
-                            {% user_view_events preview.obj as user_views %}
-                        {% else %}
-                            <div class="col-5">
-                            {% for extra in preview.summary_extra %}
-                                {% if extra.key %}<strong>{{ extra.key }}:</strong> {% endif %}
-                                    {{ extra.value }}
-                                    <br>
-                            {% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-                    <ul class="list-group collapse" id="active-users{{ preview.obj | id_safe }}">
-                        {% for events in user_views %}
-                            <li class='list-group-item list-group-item-success'>
-                                {% timestamp events.created time_ago=True %}<strong>{{ events.view_name }}</strong>: {{ events.args }}
-                            </li>
-                        {% endfor %}
-                    </ul>
-                    {% if not forloop.last %}<hr>{% endif %}
-                {% endfor %}
-            </div>
-        </div>
-    {% endfor %}
-    <div class="card mt-4">
+     <div class="card mt-4">
         <div class="card-header">Overall</div>
         <div class="card-body">
             {% for line in overall_lines %}

@@ -8,7 +8,8 @@ from classification.models import Classification, classification_flag_types, Imp
 from flags.models import FlagType
 from flags.models.flag_health_check import flag_chanced_since
 from library.health_check import health_check_signal, \
-    HealthCheckRequest, HealthCheckTotalAmount, HealthCheckRecentActivity, HealthCheckStat
+    HealthCheckRequest, HealthCheckTotalAmount, HealthCheckRecentActivity, HealthCheckStat, \
+    health_check_overall_stats_signal
 
 """
 Reports information about classifications to the Slack health report
@@ -18,15 +19,6 @@ Reports information about classifications to the Slack health report
 @receiver(signal=health_check_signal)
 def allele_info_health_check(sender, health_request: HealthCheckRequest, **kwargs):
     output: List[HealthCheckStat] = []
-
-    for status in [ImportedAlleleInfoStatus.PROCESSING, ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD]:
-        not_complete = ImportedAlleleInfo.objects.filter(status=status).count()
-        if not_complete:
-            output.append(HealthCheckTotalAmount(
-                emoji=":hourglass_flowing_sand:",
-                amount=not_complete,
-                name=f"Imported Allele Matching in status of \"{status.label}\""
-            ))
 
     last_failures = ImportedAlleleInfo.objects.filter(
         latest_validation__created__gte=health_request.since,
@@ -52,7 +44,23 @@ def allele_info_health_check(sender, health_request: HealthCheckRequest, **kwarg
     return output
 
 
-@receiver(signal=health_check_signal)
+@receiver(signal=health_check_overall_stats_signal)
+def allele_info_overall_stats(sender, **kwargs):
+    output: List[HealthCheckStat] = []
+
+    for status in [ImportedAlleleInfoStatus.PROCESSING, ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD]:
+        not_complete = ImportedAlleleInfo.objects.filter(status=status).count()
+        if not_complete:
+            output.append(HealthCheckTotalAmount(
+                emoji=":hourglass_flowing_sand:",
+                amount=not_complete,
+                name=f"Imported Allele Matching in status of \"{status.label}\""
+            ))
+
+    return output
+
+
+@receiver(signal=health_check_overall_stats_signal)
 def classifications_health_check_count(sender, health_request: HealthCheckRequest, **kwargs):
     total_classification_qs = Classification.objects.filter(lab__external=False, withdrawn=False, created__lte=health_request.now).exclude(lab__name__icontains='legacy')
     total = total_classification_qs.count()
@@ -74,12 +82,15 @@ def classification_health_check_activity(sender, health_request: HealthCheckRequ
     classifications_of_interest = Classification.dashboard_report_classifications_of_interest(since=health_request.since)
     new_classification_count = Classification.dashboard_report_new_classifications(since=health_request.since)
 
+    classification_new = Classification.objects.filter(created__gte=health_request.since)
+
     return [
         HealthCheckRecentActivity(
             emoji=":blue_book:",
             amount=new_classification_count,
             name="Classifications",
-            sub_type="Created"
+            sub_type="Created",
+            preview=[classification.preview for classification in classification_new],
         ),
         HealthCheckRecentActivity(
             emoji=":blue_book:",
