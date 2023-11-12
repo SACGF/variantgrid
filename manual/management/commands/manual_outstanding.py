@@ -5,6 +5,8 @@ from django.core.management.base import BaseCommand
 
 from manual.models import ManualMigrationOutstanding
 
+from variantgrid.settings.components.secret_settings import get_secret
+
 
 class Command(BaseCommand):
     """
@@ -15,9 +17,11 @@ class Command(BaseCommand):
         pass
 
     def handle(self, *args, **options):
+        rollbar_token = get_secret("ROLLBAR.access_token")
         outstanding_tasks = ManualMigrationOutstanding.outstanding_tasks()
         task_list = []
         for outstanding_task in outstanding_tasks:
             task_list.append(outstanding_task.to_json())
-        envelope = {"tasks": task_list}
+        envelope = {"tasks": task_list,
+                    "ROLLBAR_ACCESS_TOKEN": rollbar_token}
         print(json.dumps(envelope))
