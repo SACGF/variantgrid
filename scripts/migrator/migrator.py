@@ -1,4 +1,6 @@
 import json
+import os
+import socket
 import subprocess
 import sys
 import traceback
@@ -6,6 +8,8 @@ from enum import Enum, auto
 from functools import partial
 from subprocess import Popen
 from typing import List, Optional, Dict, Callable
+
+import requests
 
 from library.git import Git
 
@@ -75,6 +79,19 @@ class SubMigration:
 
     def run(self) -> MigrationResult:
         return MigrationResult.skip()
+
+
+class PythonSubMigration(SubMigration):
+
+    def __init__(self, the_method: Callable[[], MigrationResult]):
+        super().__init__()
+        self.the_method = the_method
+
+    def run(self):
+        return self.the_method()
+
+    def __str__(self):
+        return self.the_method.__name__
 
 
 class ManualSubMigration(SubMigration):
@@ -168,8 +185,43 @@ class CommandSubMigration(SubMigration):
         args[0] = f"./scripts/{args[0]}"
         return CommandSubMigration(args)
 
+    @staticmethod
+    def python(the_method: Callable):
+        return PythonSubMigration(the_method)
+
 
 class Migrator:
+
+    def notify_deployed(self):
+        if not self.rollbar_token:
+            print_red("No rollbar token found")
+            return MigrationResult.failure()
+
+        environment = socket.gethostname().lower().split('.')[0].replace('-', '')
+        local_username = os.getenv("USER", "")
+        revision = subprocess.check_output(["git", "rev-parse", "--verify", "HEAD"]).decode("utf-8").strip()
+
+        data = {
+            "access_token": self.rollbar_token,
+            "environment": environment,
+            "revision": revision,
+            "local_username": local_username,
+        }
+
+        try:
+            response = requests.post("https://api.rollbar.com/api/1/deploy/", data=data)
+            response_data = json.loads(response.text)
+
+            if response.status_code == 200 and response_data.get("result") == "success":
+                print("Deployment recorded in Rollbar.")
+                subprocess.run(["python", "manage.py", "deployed"])
+            else:
+                print(f"Failed to record deployment in Rollbar. Response: {response.text}")
+        except Exception as e:
+            print(f"Error recording deployment in Rollbar: {str(e)}")
+
+        return MigrationResult.success()
+
 
     STANDARD_MIGRATIONS: List[SubMigration] = [
         CommandSubMigration.git(["pull"]).using(key="g", task_id="git*pull"),
@@ -181,26 +233,30 @@ class Migrator:
         # a problem) just turn off all verbosity
         CommandSubMigration.manage_py(["collectstatic", "-v", "0", "--noinput"]).using(key="c",
                                                                                        task_id="manage*collectstatic"),
-        CommandSubMigration.script(["deployed.sh"]).using(key="d")
     ]
 
+    @property
+    def standard_migrations(self):
+        return Migrator.STANDARD_MIGRATIONS + [CommandSubMigration.python(self.notify_deployed).using(key="d")]
+
     def __init__(self):
-        self.migrations = Migrator.STANDARD_MIGRATIONS
+        self.migrations = self.standard_migrations
         self.has_custom_migrations = False
         self.git_version = Migrator.get_git_ver()
+        self.rollbar_token = None
 
     def refresh_migrations(self):
         try:
-            migrations: List[SubMigration] = []
-            migrations.extend(Migrator.STANDARD_MIGRATIONS)
+            migrations: List[SubMigration] = self.standard_migrations
 
             command = substitute_aliases(["python", "manage.py", "manual_outstanding"])
             self.has_custom_migrations = False
             with Popen(command, stdout=subprocess.PIPE) as proc:
                 # stdout_text = proc.stdout.read()
-                task_json = json.load(proc.stdout)["tasks"]
+                task_json = json.load(proc.stdout)
+                self.rollbar_token = task_json['ROLLBAR_ACCESS_TOKEN']
                 command = 1
-                for task in task_json:
+                for task in task_json["tasks"]:
                     self.has_custom_migrations = True
                     migrations.append(Migrator.subcommand_for_json(task).using(key=f"{command}"))
                     command += 1
@@ -257,7 +313,7 @@ class Migrator:
             selection = selection.strip()
 
             if selection == "a":
-                self.run_and_re_prompt(list(Migrator.STANDARD_MIGRATIONS))
+                self.run_and_re_prompt(self.standard_migrations)
                 return
 
             if selection == "q":
@@ -281,7 +337,7 @@ class Migrator:
 
             self.prompt(refresh=False)
 
-        self.run_and_callback(migrations=list(Migrator.STANDARD_MIGRATIONS), callback=on_complete)
+        self.run_and_callback(migrations=self.standard_migrations, callback=on_complete)
 
     def run_and_re_prompt(self, migrations: List[SubMigration]):
         self.run_and_callback(migrations, lambda _: self.prompt())
