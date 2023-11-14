@@ -3,11 +3,12 @@ from typing import Optional
 
 from django.dispatch import receiver
 
-from library.health_check import health_check_signal, HealthCheckRequest, HealthCheckAge
+from library.health_check import HealthCheckRequest, HealthCheckAge, \
+    health_check_overall_stats_signal
 from ontology.models import OntologyImport
 
 
-@receiver(signal=health_check_signal)
+@receiver(signal=health_check_overall_stats_signal)
 def ontology_health_check(sender, health_request: HealthCheckRequest, **kwargs):
     checks = []
     warning_age = timedelta(days=60)

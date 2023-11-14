@@ -1,5 +1,4 @@
 from collections import Counter
-from random import randint
 
 from django.contrib.auth.models import User
 from django.db.models import Q
@@ -17,27 +16,51 @@ def active_users_health_check(sender, health_request: HealthCheckRequest, **kwar
     event_log_activity = Event.objects.filter(date__gte=health_request.since, date__lt=health_request.now).values_list('user', flat=True).distinct()
     view_event_activity = ViewEvent.objects.filter(created__gte=health_request.since, created__lt=health_request.now).values_list('user', flat=True).distinct()
 
-    active_users_queryset = User.objects.filter(Q(pk__in=event_log_activity) | Q(pk__in=view_event_activity)).exclude(groups=bot_group()).order_by('username')
-    active_users = active_users_queryset.values_list('username', flat=True)
+    superusers_queryset = User.objects.filter(
+        Q(is_superuser=True) | Q(groups__name='bot'),
+        Q(pk__in=event_log_activity) | Q(pk__in=view_event_activity)
+    ).distinct().order_by('username')
 
-    count = active_users.count()
-    emoji: str
-    if count == 0:
-        emoji = ":ghost:"
-    else:
-        emojis = [":nerd_face:", ":thinking_face:", ":face_with_monocle:", ":face_with_cowboy_hat:"]
-        emoji = emojis[randint(0, len(emojis) - 1)]
+    non_admin_queryset = User.objects.filter(Q(pk__in=event_log_activity) | Q(pk__in=view_event_activity)).exclude(is_superuser=True).exclude(groups=bot_group()).order_by('username')
 
-    user_previews = [UserPreview(user).preview for user in active_users_queryset]
+    superusers = superusers_queryset.values_list('username', flat=True)
+    non_admin_users = non_admin_queryset.values_list('username', flat=True)
 
-    return HealthCheckRecentActivity(
-        emoji=emoji,
-        name="Active Users",
-        amount=count,
-        extra=", ".join(list(active_users)),
-        preview=user_previews,
-        stand_alone=True  # always give active users its own line
-    )
+    superusers_count = superusers.count()
+    non_admin_count = non_admin_users.count()
+
+    superusers_emoji = ":crown:" if superusers_count > 0 else ":ghost:"
+    non_admin_emoji = ":nerd_face:" if non_admin_count > 0 else ":ghost:"
+
+    superusers_previews = [UserPreview(user).preview for user in superusers_queryset]
+    non_admin_previews = [UserPreview(user).preview for user in non_admin_queryset]
+
+    health_checks = []
+
+    if superusers_count > 0:
+        health_checks.append(
+            HealthCheckRecentActivity(
+                emoji=superusers_emoji,
+                name="Active Admin Users",
+                amount=superusers_count,
+                extra=", ".join(list(superusers)),
+                preview=superusers_previews,
+                stand_alone=True  # always give superusers their own line
+            )
+        )
+
+    if non_admin_count > 0:
+        health_checks.append(
+            HealthCheckRecentActivity(
+                emoji=non_admin_emoji,
+                name="Active Users",
+                amount=non_admin_count,
+                extra=", ".join(list(non_admin_users)),
+                preview=non_admin_previews,
+                stand_alone=True
+            )
+        )
+    return health_checks
 
 
 @receiver(signal=health_check_signal)
@@ -51,7 +74,7 @@ def email_health_check(sender, health_request: HealthCheckRequest, **kwargs):
         email_subj = ", ".join(
             f"{subject} x *{count}*" if count > 1 else subject for subject, count in subject_counts.items()
         )
-        
+
         return HealthCheckRecentActivity(
             emoji=":email:",
             name="Emails Sent",

@@ -575,19 +575,19 @@ def imported_allele_info(imported_allele_info: ImportedAlleleInfo, on_allele_pag
 
 
 @register.simple_tag
-def user_view_events(user: User):
+def user_view_events(user: User, days: int = 1):
     if isinstance(user, str):
         try:
             user = User.objects.get(username=user)
         except User.DoesNotExist:
             return {}
     now = localtime()
-    since = now - timedelta(days=1)
+    since = now - timedelta(days=days)
     health_request = HealthCheckRequest(since=since, now=now)
     view_events = ViewEvent.objects.filter(user=user, created__gte=health_request.since,
-                                           created__lt=health_request.now).order_by('created')
+                                           created__lt=health_request.now).order_by('-created')
     view_event_data = []
-    for event in view_events:
+    for event in view_events[:20]:
         view_event_data.append({
             'created': event.created,
             'view_name': event.view_name,

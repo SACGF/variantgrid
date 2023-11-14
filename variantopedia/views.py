@@ -32,7 +32,8 @@ from genes.models import CanonicalTranscriptCollection, GeneSymbol
 from library.django_utils import require_superuser, highest_pk, get_field_counts
 from library.git import Git
 from library.guardian_utils import admin_bot
-from library.health_check import health_check_signal, HealthCheckRequest, HealthCheckStat, HealthCheckRecentActivity
+from library.health_check import health_check_signal, HealthCheckRequest, HealthCheckStat, HealthCheckRecentActivity, \
+    health_check_overall_stats_signal
 from library.log_utils import log_traceback, report_message, slack_bot_username, NotificationBuilder
 from library.utils import flatten_nested_lists
 from pathtests.models import cases_for_user
@@ -261,38 +262,20 @@ def health_check_details(request):
     health_request = HealthCheckRequest(since=since, now=now)
 
     results = []
-    previews = {}
-    for _, result in health_check_signal.send_robust(sender=None, health_request=health_request):
+    for _, result in health_check_overall_stats_signal.send_robust(sender=None, health_request=health_request):
         if not isinstance(result, Exception):
             results.append(result)
-            if isinstance(result, HealthCheckRecentActivity):
-                previews[result.name] = previews.get(result.name, []) + result.preview
 
-    checks: List[HealthCheckStat] = flatten_nested_lists(results)
+    checks = flatten_nested_lists(results)
     checks = sorted(checks, key=lambda hc: hc.sort_order())
-    grouped_checks = [(key, list(values)) for key, values in itertools.groupby(checks, type)]
-    grouped_checks = sorted(grouped_checks, key=lambda gc: gc[0].sort_order())
-
-    recent_lines = []
     overall_lines = []
-    for check_type, checks_typed in grouped_checks:
-        section_lines = check_type.to_lines(checks_typed, health_request=health_request)
-        if check_type.is_recent_activity():
-            recent_lines.extend(section_lines)
-        else:
-            overall_lines.extend(section_lines)
-
-    for i in range(len(recent_lines)):
-        recent_lines[i] = NotificationBuilder.slack_markdown_to_html(recent_lines[i])
-    for i in range(len(overall_lines)):
-        overall_lines[i] = NotificationBuilder.slack_markdown_to_html(overall_lines[i])
+    for check in checks:
+        line_content = check.as_html()
+        overall_lines.append(line_content)
 
     context = {
-        'recent_lines': recent_lines,
         'overall_lines': overall_lines,
-        'previews': previews
     }
-
     return render(request, "variantopedia/health_check_details.html", context)
 
 

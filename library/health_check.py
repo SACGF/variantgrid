@@ -72,11 +72,22 @@ class HealthCheckRecentActivity(HealthCheckStat):
         # if is_zero (and not stand_alone) then the record can be summarised
         return self.amount == 0 or self.amount is None or self.amount == ""
 
-    def __str__(self):
+    def as_markdown(self):
         amount_str = self.amount
         if self.amount:
             amount_str = f"*{amount_str}*"
         result = f"{self.emoji} {amount_str} : {self.name}"
+        if self.sub_type:
+            result = f"{result} {self.sub_type}"
+        if self.extra:
+            result = f"{result} : {self.extra}"
+        return result
+
+    def as_html(self):
+        amount_str = self.amount
+        if self.amount:
+            amount_str = f"<b>{amount_str}</b>"
+        result = f"{amount_str} : {self.name}"
         if self.sub_type:
             result = f"{result} {self.sub_type}"
         if self.extra:
@@ -179,11 +190,20 @@ class HealthCheckTotalAmount(HealthCheckStat):
     amount: int
     extra: Optional[str] = None
 
-    def __str__(self):
+    def as_markdown(self):
         amount_str = self.amount
         if self.amount:
             amount_str = f"*{amount_str:,}*"
         result = f"{self.emoji} {amount_str} : {self.name}"
+        if self.extra:
+            result = f"{result} - {self.extra}"
+        return result
+
+    def as_html(self):
+        amount_str = self.amount
+        if self.amount:
+            amount_str = f"<b>{amount_str:,}</b>"
+        result = f"{amount_str} : {self.name}"
         if self.extra:
             result = f"{result} - {self.extra}"
         return result
@@ -201,9 +221,12 @@ class HealthCheckCapacity(HealthCheckStat):
     available: str
     warning: bool = False
 
-    def __str__(self):
+    def as_markdown(self):
         emoji = ":floppy_disk:" if not self.warning else ":fire:"
         return f"{emoji} {self.name} ({self.used} used, {self.available} available)"
+
+    def as_html(self):
+        return f"{self.name} ({self.used} used, {self.available} available)"
 
     @classmethod
     def sort_order(cls):
@@ -238,11 +261,16 @@ class HealthCheckAge(HealthCheckStat):
             return age.days
         return HealthCheckAge._NEVER_RUN_AGE
 
-    def __str__(self):
+    def as_markdown(self):
         if not self.last_performed_tz:
             return f":dizzy_face: Never Run : {self.name}"
         emoji = HealthCheckAge._face_for_age(self.age_in_days, self.warning_age)
         return f"{emoji} {self.age_in_days} days old : {self.name}"
+
+    def as_html(self):
+        if not self.last_performed_tz:
+            return f"<b> Never Run </b> : {self.name}"
+        return f"<b> {self.age_in_days} </b> days old : {self.name}"
 
     _MULTIPLIER_TO_FACE = {
         0: ":simple_smile:",
@@ -281,19 +309,8 @@ class HealthCheckAge(HealthCheckStat):
         return lines
 
 
-@dataclass
-class HealthCheckCustom(HealthCheckStat):
-    text: str
-
-    def __str__(self):
-        return self.text
-
-    @classmethod
-    def sort_order(cls):
-        return 5
-
-
 health_check_signal = django.dispatch.Signal()
+health_check_overall_stats_signal = django.dispatch.Signal()
 
 
 def populate_health_check(notification: NotificationBuilder, since: Optional[datetime] = None):
@@ -311,20 +328,34 @@ def populate_health_check(notification: NotificationBuilder, since: Optional[dat
         if isinstance(result, Exception):
             notification.add_markdown(f"Exception generating health check by {caller}: {result}")
         else:
-            results.append(result)
-    checks: List[HealthCheckStat] = flatten_nested_lists(results)
+            results.extend(result if isinstance(result, list) else [result])
 
-    checks = sorted(checks, key=lambda hc: hc.sort_order())
-    grouped_checks = [(key, list(values)) for key, values in itertools.groupby(checks, type)]
-    grouped_checks = sorted(grouped_checks, key=lambda gc: gc[0].sort_order())
+    for caller, result in health_check_overall_stats_signal.send_robust(sender=None, health_request=health_request):
+        if isinstance(result, Exception):
+            notification.add_markdown(f"Exception generating health check by {caller}: {result}")
+        else:
+            results.extend(result if isinstance(result, list) else [result])
+
+    checks: List[HealthCheckStat] = flatten_nested_lists(results)
+    checks.sort(key=lambda hc: hc.sort_order())
+
     recent_lines = []
     overall_lines = []
-    for check_type, checks_typed in grouped_checks:
-        section_lines = check_type.to_lines(checks_typed, health_request=health_request)
-        if check_type.is_recent_activity():
-            recent_lines.extend(section_lines)
+    for check_type, checks_typed in itertools.groupby(checks, key=lambda hc: type(hc)):
+        checks_typed_list = list(checks_typed)
+
+        if issubclass(check_type, HealthCheckAge):
+            age_lines = HealthCheckAge.to_lines(checks_typed_list, health_request)
+            if check_type.is_recent_activity():
+                recent_lines.extend(age_lines)
+            else:
+                overall_lines.extend(age_lines)
         else:
-            overall_lines.extend(section_lines)
+            section_lines = [check.as_markdown() for check in checks_typed_list]
+            if check_type.is_recent_activity():
+                recent_lines.extend(section_lines)
+            else:
+                overall_lines.extend(section_lines)
 
     if recent_lines:
         notification.add_markdown("\n".join(recent_lines), indented=True)
