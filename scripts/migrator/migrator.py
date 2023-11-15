@@ -210,9 +210,8 @@ class Migrator:
 
         try:
             response = requests.post("https://api.rollbar.com/api/1/deploy/", data=data)
-            response_data = json.loads(response.text)
 
-            if response.status_code == 200 and response_data.get("result") == "success":
+            if response.status_code == 200:
                 print("Deployment recorded in Rollbar.")
                 subprocess.run(["python", "manage.py", "deployed"])
             else:
@@ -221,7 +220,6 @@ class Migrator:
             print(f"Error recording deployment in Rollbar: {str(e)}")
 
         return MigrationResult.success()
-
 
     STANDARD_MIGRATIONS: List[SubMigration] = [
         CommandSubMigration.git(["pull"]).using(key="g", task_id="git*pull"),
@@ -254,7 +252,8 @@ class Migrator:
             with Popen(command, stdout=subprocess.PIPE) as proc:
                 # stdout_text = proc.stdout.read()
                 task_json = json.load(proc.stdout)
-                self.rollbar_token = task_json['ROLLBAR_ACCESS_TOKEN']
+                if token := task_json.get('ROLLBAR_ACCESS_TOKEN'):
+                    self.rollbar_token = token
                 command = 1
                 for task in task_json["tasks"]:
                     self.has_custom_migrations = True
