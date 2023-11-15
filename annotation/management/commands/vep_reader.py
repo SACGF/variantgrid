@@ -1,3 +1,4 @@
+from collections import Counter, defaultdict
 from cyvcf2 import Reader
 from django.core.management.base import BaseCommand
 
@@ -22,6 +23,8 @@ class Command(BaseCommand):
         NEW_COLUMNS = ["am_class", "am_pathogenicity",
                        "MaveDB_nt", "MaveDB_pro", "MaveDB_score", "MaveDB_urn"]
 
+        field_values = defaultdict(Counter)
+
         count = 0
         num_found = 0
         for v in reader:
@@ -35,9 +38,13 @@ class Command(BaseCommand):
                 for nk in NEW_COLUMNS:
                     if info_val := td[nk]:
                         values = info_val.split("&")
-                        if any([v and v != '.' for v in values]):
+                        values = [v for v in values if v and v != '.']
+                        if any(values):
                             found_in_transcript = True
                             print(f"{nk}={info_val=}")
+                            for v in values:
+                                field_values[nk][v] += 1
+
                 if found_in_transcript:
                     print("-----")
                     found_in_variant = True
@@ -54,3 +61,12 @@ class Command(BaseCommand):
                 #    print(f'{td["SYMBOL"]} {td["HGVSc"]}, impact: {td["IMPACT"]}, revel: {td["REVEL_score"]}')
 
         print(f"{count=} variants, {num_found=}")
+
+        for field, counts in field_values.items():
+            print("---------------")
+            print(f"{field=}")
+            if len(counts) > 20:
+                print(f"counts = {len(counts)} distinct values")
+            else:
+                for v, count in counts.most_common():
+                    print(f"{v} = {count}")
