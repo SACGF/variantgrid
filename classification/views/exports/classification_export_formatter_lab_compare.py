@@ -74,6 +74,9 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
         rows: List[str] = []
         lab1 = set()
         lab2 = set()
+
+        if not allele_data.allele_id:
+            return []
         if self.classification_filter.include_sources:
             lab_name1, lab_name2 = sorted(self.classification_filter.include_sources)
             for cm in allele_data.cms_regardless_of_issues:
