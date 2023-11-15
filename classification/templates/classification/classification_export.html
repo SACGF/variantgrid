@@ -101,6 +101,11 @@
         } else if (labSelectionMode === 'include') {
             inputError = 'You must include at least 1 lab';
         }
+        if (format === 'lab_compare'){
+            if (selectedLabs.length !== 2) {
+                inputError = 'You must select 2 labs';
+            }
+        }
 
         let selectedOrgs = $("input[name='org_selection']:checked");
         if (selectedOrgs.length) {
