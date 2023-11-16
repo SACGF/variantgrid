@@ -124,15 +124,18 @@ class ColumnAnnotationCategory(models.TextChoices):
 
 
 class VEPPlugin(models.TextChoices):
+    ALPHAMISSENSE = 'A', 'AlphaMissense'
     DBNSFP = 'd', 'dbNSFP'
     DBSCSNV = 'v', 'dbscSNV'
     GRANTHAM = 'g', 'Grantham'
     LOFTOOL = 'l', 'LoFtool'
     MASTERMIND = 'n', 'Mastermind'
+    MAVEDB = 'V', "MaveDb"
     MAXENTSCAN = 'm', 'MaxEntScan'
     NMD = "N", 'NMD'
     SPLICEAI = 'a', 'SpliceAI'
     SPLICEREGION = 's', 'SpliceRegion'
+    STRUCTURALVARIANTOVERLAP = 'o', 'StructuralVariantOverlap'
 
 
 class VEPCustom(models.TextChoices):

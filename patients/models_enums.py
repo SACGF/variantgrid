@@ -109,6 +109,7 @@ class GnomADPopulation(models.TextChoices):
     EAST_ASIAN = 'EAS', 'East Asian'
     FINNISH = 'FIN', 'Finnish'
     LATINO = 'AMR', 'Latino / Mixed Amerindian'
+    MIDDLE_EASTERN = 'MID', 'Middle Eastern'
     NON_FINNISH_EUROPEAN = 'NFE', 'Non-Finnish European'
     OTHER = 'OTH', 'Other'
     SOUTH_ASIAN = 'SAS', 'South Asian'

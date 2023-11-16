@@ -23,7 +23,7 @@ from psqlextra.types import PostgresPartitioningMethod
 
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
-    SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction
+    SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction, AlphaMissensePrediction
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
 from annotation.models.models_enums import AnnotationStatus, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
@@ -896,6 +896,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
     gnomad_asj_af = models.FloatField(null=True, blank=True)
     gnomad_eas_af = models.FloatField(null=True, blank=True)
     gnomad_fin_af = models.FloatField(null=True, blank=True)
+    gnomad_mid_af = models.FloatField(null=True, blank=True)  # Middle East - added in gnomADv4
     gnomad_nfe_af = models.FloatField(null=True, blank=True)
     gnomad_oth_af = models.FloatField(null=True, blank=True)
     gnomad_sas_af = models.FloatField(null=True, blank=True)
@@ -957,6 +958,13 @@ class VariantAnnotation(AbstractVariantAnnotation):
     spliceai_pred_ds_dg = models.FloatField(null=True, blank=True)
     spliceai_pred_ds_dl = models.FloatField(null=True, blank=True)
     spliceai_gene_symbol = models.TextField(null=True, blank=True)
+
+    alphamissense_class  = models.CharField(max_length=1, choices=AlphaMissensePrediction.choices, null=True, blank=True)
+    alphamissense_pathogenicity = models.FloatField(null=True, blank=True)
+
+    mavedb_score = models.FloatField(null=True, blank=True)
+    mavedb_urn = models.TextField(null=True, blank=True)
+
     repeat_masker = models.TextField(null=True, blank=True)
     overlapping_symbols = models.TextField(null=True, blank=True)
     # Summary of most_damaging fields for faster DamageNode queries
@@ -973,6 +981,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
         GnomADPopulation.ASHKENAZI_JEWISH: 'gnomad_asj_af',
         GnomADPopulation.EAST_ASIAN: 'gnomad_eas_af',
         GnomADPopulation.FINNISH: 'gnomad_fin_af',
+        GnomADPopulation.MIDDLE_EASTERN: 'gnomad_mid_af',
         GnomADPopulation.NON_FINNISH_EUROPEAN: 'gnomad_nfe_af',
         GnomADPopulation.OTHER: 'gnomad_oth_af',
         GnomADPopulation.SOUTH_ASIAN: 'gnomad_sas_af',
