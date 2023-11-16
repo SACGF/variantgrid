@@ -1,12 +1,6 @@
 #!/usr/bin/env python3
 """
-We want to do this per-chrom so we can process in parallel
-
-Steps are:
-    1. Download exomes.vcf + genome.vcf, removing most INFO fields before writing to disk (to reduce disk space)
-    2. Merge exome + genome, summing counts
-    3. Run through this script with --af to calculate allele frequency, write TSV (more efficient than VCF)
-    4. Cat them all together again
+    The gnomAD v3.1.2 data set contains 76,156 whole genomes (and no exomes), all mapped to the GRCh38 reference sequence.
 """
 
 from argparse import ArgumentParser
@@ -51,6 +45,7 @@ def main(args):
         chrom_scripts.append(chrom_script)
         with open(chrom_script, "w") as cs:
             cs.write(bash_header)
+            # gnomAD3.1 only has genomes, no exomes
             url = f"https://storage.googleapis.com/gcp-public-data--gnomad/release/3.1.2/vcf/genomes/gnomad.genomes.v3.1.3.sites.chr{chrom}.vcf.bgz"
             output_vcf = f"{prefix}.filtered_info.vcf.gz"
             if args.chrom_mapping_file:
