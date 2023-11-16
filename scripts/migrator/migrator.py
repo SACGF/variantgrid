@@ -214,7 +214,6 @@ class Migrator:
             response = requests.post("https://api.rollbar.com/api/1/deploy/", data=data)
 
             if response.status_code == 200:
-                print("Deployment recorded in Rollbar.")
                 subprocess.run(substitute_aliases(["python", "manage.py", "deployed"]))
             else:
                 print(f"Failed to record deployment in Rollbar. Response: {response.text}")
