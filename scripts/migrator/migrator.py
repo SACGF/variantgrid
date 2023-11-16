@@ -194,8 +194,10 @@ class Migrator:
 
     def notify_deployed(self):
         if not self.rollbar_token:
-            print_red("No rollbar token found")
-            return MigrationResult.failure()
+            self.refresh_migrations()
+            if not self.rollbar_token:
+                print_red("No rollbar token found")
+                return MigrationResult.failure()
 
         environment = socket.gethostname().lower().split('.')[0].replace('-', '')
         local_username = os.getenv("USER", "")
