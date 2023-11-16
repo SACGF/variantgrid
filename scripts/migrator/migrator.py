@@ -215,7 +215,7 @@ class Migrator:
 
             if response.status_code == 200:
                 print("Deployment recorded in Rollbar.")
-                subprocess.run(["python", "manage.py", "deployed"])
+                subprocess.run(substitute_aliases(["python", "manage.py", "deployed"]))
             else:
                 print(f"Failed to record deployment in Rollbar. Response: {response.text}")
         except Exception as e:
