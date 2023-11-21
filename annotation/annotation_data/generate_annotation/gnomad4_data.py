@@ -17,8 +17,8 @@ from datetime import datetime
 GRCh38 = "GRCh38"
 
 COUNTS = ['AC', 'AN', 'AF']
-# We deliberately leave out "AF_grpmax", "grpmax" as we recalculate that later in 'calculate_allele_frequency'
-OTHER_INFOS = ["AC_grpmax", "AN_grpmax", "nhomalt", "nhomalt_grpmax", "non_par"]
+# We deliberately leave out "grpmax" stuff as we recalculate that later in 'calculate_allele_frequency'
+OTHER_INFOS = ["nhomalt", "non_par"]
 GNOMAD_SUB_POPS = ["afr", "amr", "asj", "eas", "fin", "mid", "nfe", "oth", "sas"]  # Will get AF for each
 
 def get_args():
@@ -102,7 +102,9 @@ def write_scripts(args):
 
                 # Merge - adding them together...
                 renamed_columns = [f"{c}_count" if c in ['AC', 'AN'] else c for c in columns]
-                info_rules = [f"{c}:sum" for c in renamed_columns]
+                # if we leave it out, will take from 1st file which is ok as they will be the same
+                skip_columns = {"non_par"}
+                info_rules = [f"{c}:sum" for c in renamed_columns if c not in skip_columns]
                 info_rules_arg = ','.join(info_rules)
                 cs.write("\n\necho Merging VCFs - will keep flags from genomes.\n")
                 cs.write(f"bcftools merge --merge none --info-rules '{info_rules_arg}' '{output_vcfs[0]}' '{output_vcfs[1]}' -O z -o {combined_vcf}\n")
@@ -142,6 +144,10 @@ def get_columns():
     for g in GNOMAD_SUB_POPS:
         for f in ["AC", "AN"]:
             columns.append(f"{f}_{g.lower()}")
+
+    # These aren't present in the exomes/genomes
+    columns.remove("AC_oth")
+    columns.remove("AN_oth")
     return columns
 
 
@@ -164,6 +170,8 @@ def write_vcf_header():
 ##fileDate=%(file_date)s
 ##source=%(source)s
 ##INFO=<ID=AF_grpmax,Number=1,Type=Float,Description="Allele Frequency for highest population">
+##INFO=<ID=AC_grpmax,Number=1,Type=Integer,Description="Allele Count for highest population">
+##INFO=<ID=AN_grpmax,Number=1,Type=Integer,Description="Allele Number for highest population">
 ##INFO=<ID=grpmax,Number=1,Type=String,Description="Ancestral group with highest allele frequency (stored as AF_grpmax)">
 ##INFO=<ID=nhomalt,Number=1,Type=Integer,Description="Total number of homozygotest (exomes + genomes)">
 ##INFO=<ID=gnomad_filtered,Number=1,Type=Integer,Description="Exomes or genomes had a filter entry (potential QC issues)">
@@ -192,7 +200,7 @@ def calculate_allele_frequency(gnomad_input_vcf, af_output_vcf):
 
     # We have to re-calculate POPMAX as we can't merge it
     af_info = get_af_info()
-    info_names = [ai[0] for ai in af_info] + OTHER_INFOS + ["AF_grpmax", "grpmax", "gnomad_filtered"]
+    info_names = [ai[0] for ai in af_info] + OTHER_INFOS + ["AF_grpmax", "AC_grpmax", "AN_grpmax", "grpmax", "gnomad_filtered"]
 
     with gzip.open(af_output_vcf, "wt") as f:
         for variant in VCF(gnomad_input_vcf):
@@ -203,6 +211,8 @@ def calculate_allele_frequency(gnomad_input_vcf, af_output_vcf):
             alt = variant.ALT[0]  # no multi-alts
 
             af_popmax = 0
+            ac_popmax = 0
+            an_popmax = 0
             popmax = '.'
             infos = []
             for _, pop_name, ac_name, an_name in af_info:
@@ -213,6 +223,8 @@ def calculate_allele_frequency(gnomad_input_vcf, af_output_vcf):
                     af = ac / an
                     if pop_name and af > af_popmax:  # Only use subpops
                         af_popmax = af
+                        ac_popmax = ac
+                        an_popmax = an
                         popmax = pop_name
                     af = f'{af:.6f}'
                 else:
@@ -222,7 +234,7 @@ def calculate_allele_frequency(gnomad_input_vcf, af_output_vcf):
             for o in OTHER_INFOS:
                 infos.append(str(variant.INFO.get(o, '.')))
             gnomad_filtered = '0' if variant.FILTER is None else '1'
-            infos.extend([str(af_popmax), popmax, gnomad_filtered])
+            infos.extend([str(af_popmax), str(ac_popmax), str(an_popmax), popmax, gnomad_filtered])
             info_str = ";".join([i + "=" + v for i, v in zip(info_names, infos)])
             columns = [chrom, pos, variant_id, ref, alt, '.', '.', info_str]
             f.write("\t".join(columns) + "\n")
