@@ -16,23 +16,19 @@ from datetime import datetime
 
 from cyvcf2 import VCF
 
-GRCh37 = "GRCh37"
 GRCh38 = "GRCh38"
-BUILDS = [GRCh37, GRCh38]
 
-COUNTS = ['AC', 'AN']
-OTHER_INFOS = ["nhomalt"]
-GNOMAD_SUB_POPS = ["afr", "amr", "asj", "eas", "fin", "nfe", "oth", "sas"]  # Will get AN/AC for these
-CHROMOSOMES = list(map(str, range(1, 23))) + ['X', 'Y']
-
+COUNTS = ['AC', 'AN', 'AF']
+OTHER_INFOS = ["AC_grpmax", "AN_grpmax", "AF_grpmax", "grpmax", "nhomalt", "nhomalt_grpmax", "non_par"]
+GNOMAD_SUB_POPS = ["afr", "amr", "asj", "eas", "fin", "mid", "nfe", "oth", "sas"]  # Will get AF for each
 
 def get_args():
     parser = ArgumentParser(description="Merge exome+genome VCFs for VariantGrid VEP pipeline")
     parser.add_argument("--test", action='store_true', help="Only download 5k of each file.")
-    parser.add_argument("--genome-build", help='GRCh37 or GRCh38')
     parser.add_argument("--genome-fasta", help='Fasta (correct for build)')
-    parser.add_argument("--genome-fasta-has-chr", type=bool, help='GnomAD has "chr1", set to false if ref uses "1"')
-    parser.add_argument("--version", help='gnomAD version (default: 2.1.1)', default='2.1.1')
+    parser.add_argument("--chrom-mapping-file", required=True, help='bcftools chromosome conversion')
+    parser.add_argument("--version", help='gnomAD version (default: 4.0)', default='4.0')
+    parser.add_argument("--path", help='Colon separated paths for tabix/bgzip/vt/bcftools')
     parser.add_argument("--gnomad-input-vcf")
     parser.add_argument("--af-output-vcf")
 
@@ -42,8 +38,6 @@ def get_args():
 
     args = parser.parse_args()
     if args.scripts:
-        if args.genome_build is None or args.genome_build not in BUILDS:
-            parser.error(f"--genome-build must be one of {','.join(BUILDS)}")
         if args.genome_fasta is None:
             parser.error("--genome-fasta required for --scripts")
     else:
@@ -63,27 +57,22 @@ def main(args):
 
 
 def write_scripts(args):
-    genome_build = args.genome_build
-    version = args.version
     genome_fasta = args.genome_fasta
     if args.test:
-        # only download 5k lines of file
-        extra_filters = "| bgzip -d | head -5000 | bcftools view -O z"
+        CHROMOSOMES = ["Y"]  # Just do Y
     else:
-        extra_filters = ""  # nothing
-
-    if not args.genome_fasta_has_chr:
-        chrom_mapping_file = None
-    else:
-        chrom_mapping_file = write_chrom_mapping_file()
+        CHROMOSOMES = list(map(str, range(1, 23))) + ['X', 'Y']
 
     columns = get_columns()
     bash_header = "#!/bin/bash\nset -e # fail on error\n"
 
+    if args.path:
+        bash_header += "PATH=${PATH}:${args.path}\n"
+
     chrom_scripts = []
     af_vcfs = []
     for chrom in CHROMOSOMES:
-        prefix = f"gnomad_{genome_build}_chr{chrom}"
+        prefix = f"gnomad4_chr{chrom}"
         chrom_script = f"{prefix}.sh"
         chrom_scripts.append(chrom_script)
         with open(chrom_script, "w") as cs:
@@ -91,33 +80,21 @@ def write_scripts(args):
 
             output_vcfs = []
             for vcf_type in ["exomes", "genomes"]:
-                if genome_build == GRCh37:
-                    url = f"https://storage.googleapis.com/gnomad-public/release/{version}/vcf/{vcf_type}/gnomad.{vcf_type}.r{version}.sites.{chrom}.vcf.bgz"
-                else:
-                    url = f"https://storage.googleapis.com/gnomad-public/release/{version}/liftover_grch38/vcf/{vcf_type}/gnomad.{vcf_type}.r{version}.sites.{chrom}.liftover_grch38.vcf.bgz"
-
                 # To remove all INFO tags except "FOO" and "BAR", use "^INFO/FOO,INFO/BAR"
                 # @see https://samtools.github.io/bcftools/bcftools.html#annotate """
                 my_columns = columns.copy()
-                if vcf_type == "genomes":  # No SAS in genomes
-                    if chrom == 'Y':
-                        continue  # No Y in genomes
-                    my_columns.remove("AC_sas")
-                    my_columns.remove("AN_sas")
 
                 info_columns = [f"INFO/{i}" for i in my_columns]
                 keep_columns = ','.join(info_columns)  # AC/AN are special format fields
                 output_vcf = f"{prefix}_{vcf_type}.filtered_info.vcf.gz"
-                if chrom_mapping_file:
-                    annotate_args = f"--rename-chrs={chrom_mapping_file}"
-                else:
-                    annotate_args = ""
+                annotate_args = f"--rename-chrs={args.chrom_mapping_file}"
+
+                gnomad_vcf_filename = f"gnomad.{vcf_type}.v4.0.sites.chr{chrom}.vcf.bgz"
 
                 # bcftools merge doesn't work with type='A' or special AC/AN INFO fields w/o a FORMAT (which gnomAD doesn't have)
                 modify_fields = "sed -e 's/,Number=A,/,Number=1,/' -e 's/ID=AC,/ID=AC_count,/' -e 's/ID=AN,/ID=AN_count,/' -e 's/AC=/AC_count=/' -e 's/AN=/AN_count=/'"
                 # gnomAD appears to already be decomposed - vt decompose + -s -o +
-                cs.write("\necho Download and clean as we go to save disk\n")
-                cs.write(f"wget --quiet -O - {url} {extra_filters} | bcftools annotate --exclude 'AC=0' --remove '^{keep_columns}' {annotate_args} | {modify_fields} | vt normalize - -r {genome_fasta} -o + | vt uniq + -o {output_vcf}\n")
+                cs.write(f"bcftools annotate --exclude 'AC=0' --remove '^{keep_columns}' {annotate_args} {gnomad_vcf_filename} | {modify_fields} | vt normalize - -r {genome_fasta} -o + | vt uniq + -o {output_vcf}\n")
                 output_vcfs.append(output_vcf)
 
             combined_vcf = f"{prefix}.combined.vcf.gz"
@@ -142,21 +119,18 @@ def write_scripts(args):
             cs.write(f"{script_filename} --af --gnomad-input-vcf={combined_vcf} --af-output-vcf={allele_frequency_vcf}\n")
             af_vcfs.append(allele_frequency_vcf)
 
-        if args.test:
-            break  # Only do 1 chrom
-
     # Write merge script
-    merge_script_filename = f"gnomad_{genome_build}_merge.sh"
+    merge_script_filename = f"gnomad4_merge.sh"
     vcf_header = write_vcf_header()
 
     with open(merge_script_filename, "w") as ms:
         ms.write(bash_header)
         quoted_files = ' '.join([f"'{f}'" for f in af_vcfs])
-        gnomad_combined_af_vcf = f"gnomad_{genome_build}_combined_af.vcf.bgz"
-        ms.write(f"gzcat {vcf_header} {quoted_files} | bgzip > {gnomad_combined_af_vcf}\n")
+        gnomad_combined_af_vcf = f"gnomad4_combined_af.vcf.bgz"
+        ms.write(f"zcat {vcf_header} {quoted_files} | bgzip > {gnomad_combined_af_vcf}\n")
         ms.write(f"tabix {gnomad_combined_af_vcf}\n")
 
-    launch_script_filename = f"gnomad_{genome_build}_launch.sh"
+    launch_script_filename = f"gnomad4_launch.sh"
     with open(launch_script_filename, "w") as ms:
         ms.write(bash_header)
         ms.write('SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")\n')
@@ -194,8 +168,8 @@ def write_vcf_header():
     meta = """##fileformat=VCFv4.2
 ##fileDate=%(file_date)s
 ##source=%(source)s
-##INFO=<ID=AF_popmax,Number=1,Type=Float,Description="Allele Frequency for highest population">
-##INFO=<ID=popmax,Number=1,Type=String,Description="Population with highest allele frequency (stored as AF_popmax)">
+##INFO=<ID=AF_grpmax,Number=1,Type=Float,Description="Allele Frequency for highest population">
+##INFO=<ID=grpmax,Number=1,Type=String,Description="Ancestral group with highest allele frequency (stored as AF_grpmax)">
 ##INFO=<ID=nhomalt,Number=1,Type=Integer,Description="Total number of homozygotest (exomes + genomes)">
 ##INFO=<ID=gnomad_filtered,Number=1,Type=Integer,Description="Exomes or genomes had a filter entry (potential QC issues)">
 """ % {"file_date": file_date, "source": source}
@@ -218,18 +192,10 @@ def write_vcf_header():
     return vcf_header
 
 
-def write_chrom_mapping_file():
-    chrom_mapping_file = "chrom_mapping.txt"
-    with open(chrom_mapping_file, "w") as f:
-        for c in CHROMOSOMES:
-            f.write(f"chr{c}\t{c}\n")
-    return chrom_mapping_file
-
-
 def calculate_allele_frequency(gnomad_input_vcf, af_output_vcf):
     # We have to re-calculate POPMAX as we can't merge it
     af_info = get_af_info()
-    info_names = [ai[0] for ai in af_info] + OTHER_INFOS + ["AF_popmax", "popmax", "gnomad_filtered"]
+    info_names = [ai[0] for ai in af_info] + OTHER_INFOS + ["AF_grpmax", "grpmax", "gnomad_filtered"]
 
     with gzip.open(af_output_vcf, "wt") as f:
         for variant in VCF(gnomad_input_vcf):
