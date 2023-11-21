@@ -14,18 +14,17 @@ import os
 from argparse import ArgumentParser
 from datetime import datetime
 
-from cyvcf2 import VCF
-
 GRCh38 = "GRCh38"
 
 COUNTS = ['AC', 'AN', 'AF']
-OTHER_INFOS = ["AC_grpmax", "AN_grpmax", "AF_grpmax", "grpmax", "nhomalt", "nhomalt_grpmax", "non_par"]
+# We deliberately leave out "AF_grpmax", "grpmax" as we recalculate that later in 'calculate_allele_frequency'
+OTHER_INFOS = ["AC_grpmax", "AN_grpmax", "nhomalt", "nhomalt_grpmax", "non_par"]
 GNOMAD_SUB_POPS = ["afr", "amr", "asj", "eas", "fin", "mid", "nfe", "oth", "sas"]  # Will get AF for each
 
 def get_args():
     parser = ArgumentParser(description="Merge exome+genome VCFs for VariantGrid VEP pipeline")
     parser.add_argument("--test", action='store_true', help="Only download 5k of each file.")
-    parser.add_argument("--genome-fasta", help='Fasta (correct for build)')
+    # parser.add_argument("--genome-fasta", help='Fasta (correct for build)')
     parser.add_argument("--chrom-mapping-file", required=True, help='bcftools chromosome conversion')
     parser.add_argument("--version", help='gnomAD version (default: 4.0)', default='4.0')
     parser.add_argument("--path", help='Colon separated paths for tabix/bgzip/vt/bcftools')
@@ -37,10 +36,7 @@ def get_args():
     group.add_argument('--af', action='store_true', help="Calculate allele frequency from VCF")
 
     args = parser.parse_args()
-    if args.scripts:
-        if args.genome_fasta is None:
-            parser.error("--genome-fasta required for --scripts")
-    else:
+    if not args.scripts:
         if args.gnomad_input_vcf is None:
             parser.error("--gnomad-input-vcf required for --af")
         if args.af_output_vcf is None:
@@ -57,7 +53,6 @@ def main(args):
 
 
 def write_scripts(args):
-    genome_fasta = args.genome_fasta
     if args.test:
         CHROMOSOMES = ["Y"]  # Just do Y
     else:
@@ -67,7 +62,7 @@ def write_scripts(args):
     bash_header = "#!/bin/bash\nset -e # fail on error\n"
 
     if args.path:
-        bash_header += "PATH=${PATH}:${args.path}\n"
+        bash_header += "PATH=${PATH}:" + args.path + "\n"
 
     chrom_scripts = []
     af_vcfs = []
@@ -94,7 +89,7 @@ def write_scripts(args):
                 # bcftools merge doesn't work with type='A' or special AC/AN INFO fields w/o a FORMAT (which gnomAD doesn't have)
                 modify_fields = "sed -e 's/,Number=A,/,Number=1,/' -e 's/ID=AC,/ID=AC_count,/' -e 's/ID=AN,/ID=AN_count,/' -e 's/AC=/AC_count=/' -e 's/AN=/AN_count=/'"
                 # gnomAD appears to already be decomposed - vt decompose + -s -o +
-                cs.write(f"bcftools annotate --exclude 'AC=0' --remove '^{keep_columns}' {annotate_args} {gnomad_vcf_filename} | {modify_fields} | vt normalize - -r {genome_fasta} -o + | vt uniq + -o {output_vcf}\n")
+                cs.write(f"bcftools annotate --exclude 'AC=0' --remove '^{keep_columns}' {annotate_args} {gnomad_vcf_filename} | {modify_fields} | vt uniq + -o {output_vcf}\n")
                 output_vcfs.append(output_vcf)
 
             combined_vcf = f"{prefix}.combined.vcf.gz"
@@ -193,6 +188,8 @@ def write_vcf_header():
 
 
 def calculate_allele_frequency(gnomad_input_vcf, af_output_vcf):
+    from cyvcf2 import VCF  # Import here, so that rest of script can run on HPC easier
+
     # We have to re-calculate POPMAX as we can't merge it
     af_info = get_af_info()
     info_names = [ai[0] for ai in af_info] + OTHER_INFOS + ["AF_grpmax", "grpmax", "gnomad_filtered"]
