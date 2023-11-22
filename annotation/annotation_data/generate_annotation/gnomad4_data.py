@@ -93,11 +93,13 @@ def write_scripts(args):
 
                 gnomad_vcf_filename = f"gnomad.{vcf_type}.v4.0.sites.chr{chrom}.vcf.bgz"
 
+                modify_fields1 = "sed -e 's/ID=AF_remaining,/ID=AF_oth,/' -e 's/ID=AC_remaining,/ID=AC_oth,/' -e 's/ID=AN_remaining,/ID=AN_oth,/' -e 's/AF_remaining=/AF_oth=/' -e 's/AN_remaining=/AN_oth=/' -e 's/AC_remaining=/AC_oth=/'"
+
                 # bcftools merge doesn't work with type='A' or special AC/AN INFO fields w/o a FORMAT (which gnomAD doesn't have)
-                modify_fields = "sed -e 's/,Number=A,/,Number=1,/' -e 's/ID=AC,/ID=AC_count,/' -e 's/ID=AN,/ID=AN_count,/' -e 's/AC=/AC_count=/' -e 's/AN=/AN_count=/'"
+                modify_fields2 = "sed -e 's/,Number=A,/,Number=1,/' -e 's/ID=AC,/ID=AC_count,/' -e 's/ID=AN,/ID=AN_count,/' -e 's/AC=/AC_count=/' -e 's/AN=/AN_count=/'"
                 # gnomAD appears to already be decomposed - vt decompose + -s -o +
                 # We no longer remove AC=0 as we want to keep AN (total counts) for pops for later AF calculations
-                cs.write(f"bcftools annotate --remove '^{keep_columns}' {annotate_args} {gnomad_vcf_filename} | {modify_fields} | vt uniq + -o {output_vcf}\n")
+                cs.write(f"zcat {gnomad_vcf_filename} | {modify_fields1} | bcftools annotate --remove '^{keep_columns}' {annotate_args} | {modify_fields2} | vt uniq + -o {output_vcf}\n")
                 output_vcfs.append(output_vcf)
 
             combined_vcf = f"{prefix}.combined.vcf.gz"
@@ -160,10 +162,6 @@ def get_columns():
     for g in GNOMAD_SUB_POPS:
         for f in ["AC", "AN"]:
             columns.append(f"{f}_{g.lower()}")
-
-    # These aren't present in the exomes/genomes
-    columns.remove("AC_oth")
-    columns.remove("AN_oth")
     return columns
 
 
