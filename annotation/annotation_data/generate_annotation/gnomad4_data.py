@@ -16,16 +16,20 @@ from datetime import datetime
 
 GRCh38 = "GRCh38"
 
-COUNTS = ['AC', 'AN', 'AF']
-# We deliberately leave out "grpmax" stuff as we recalculate that later in 'calculate_allele_frequency'
-OTHER_INFOS = ["nhomalt", "non_par"]
+# We deliberately leave out AF and "grpmax" stuff as we recalculate that later in 'calculate_allele_frequency'
+COUNTS = ['AC', 'AN']
+OTHER_INFOS = ["nhomalt", "non_par", "AF_oth"]  # We don't have AC_oth and AN_oth so need to just take the existing one
 GNOMAD_SUB_POPS = ["afr", "amr", "asj", "eas", "fin", "mid", "nfe", "oth", "sas"]  # Will get AF for each
+
+# popmax/grpmax is calculated using non-bottlenecked genetic ancestry groups
+BOTTLENECKED_SUB_POPS = ["asj", "fin", "mid", "oth"]
+
 
 def get_args():
     parser = ArgumentParser(description="Merge exome+genome VCFs for VariantGrid VEP pipeline")
     parser.add_argument("--test", action='store_true', help="Only download 5k of each file.")
     # parser.add_argument("--genome-fasta", help='Fasta (correct for build)')
-    parser.add_argument("--chrom-mapping-file", required=True, help='bcftools chromosome conversion')
+    parser.add_argument("--chrom-mapping-file", help='bcftools chromosome conversion')
     parser.add_argument("--version", help='gnomAD version (default: 4.0)', default='4.0')
     parser.add_argument("--path", help='Colon separated paths for tabix/bgzip/vt/bcftools')
     parser.add_argument("--gnomad-input-vcf")
@@ -53,6 +57,9 @@ def main(args):
 
 
 def write_scripts(args):
+    if not args.chrom_mapping_file:
+        raise ValueError("--chrom-mapping-file is required for write scripts step")
+
     if args.test:
         CHROMOSOMES = ["Y"]  # Just do Y
     else:
@@ -89,7 +96,8 @@ def write_scripts(args):
                 # bcftools merge doesn't work with type='A' or special AC/AN INFO fields w/o a FORMAT (which gnomAD doesn't have)
                 modify_fields = "sed -e 's/,Number=A,/,Number=1,/' -e 's/ID=AC,/ID=AC_count,/' -e 's/ID=AN,/ID=AN_count,/' -e 's/AC=/AC_count=/' -e 's/AN=/AN_count=/'"
                 # gnomAD appears to already be decomposed - vt decompose + -s -o +
-                cs.write(f"bcftools annotate --exclude 'AC=0' --remove '^{keep_columns}' {annotate_args} {gnomad_vcf_filename} | {modify_fields} | vt uniq + -o {output_vcf}\n")
+                # We no longer remove AC=0 as we want to keep AN (total counts) for pops for later AF calculations
+                cs.write(f"bcftools annotate --remove '^{keep_columns}' {annotate_args} {gnomad_vcf_filename} | {modify_fields} | vt uniq + -o {output_vcf}\n")
                 output_vcfs.append(output_vcf)
 
             combined_vcf = f"{prefix}.combined.vcf.gz"
@@ -100,11 +108,19 @@ def write_scripts(args):
                 for ov in output_vcfs:
                     cs.write(f"tabix {ov}\n")
 
-                # Merge - adding them together...
+                # Merge exomes/genome VCFs
                 renamed_columns = [f"{c}_count" if c in ['AC', 'AN'] else c for c in columns]
-                # if we leave it out, will take from 1st file which is ok as they will be the same
+                # if we leave out rule, will take from 1st file which is ok for PAR as will be the same
                 skip_columns = {"non_par"}
-                info_rules = [f"{c}:sum" for c in renamed_columns if c not in skip_columns]
+                rule_ops = {
+                    # VCFs don't have AC_oth / AN_oth, so we take AF_oth from both and take the highest
+                    "AF_oth": "max"
+                }
+                info_rules = []
+                for c in renamed_columns:
+                    if c not in skip_columns:
+                        op = rule_ops.get(c, "sum")
+                        info_rules.append(f"{c}:{op}")
                 info_rules_arg = ','.join(info_rules)
                 cs.write("\n\necho Merging VCFs - will keep flags from genomes.\n")
                 cs.write(f"bcftools merge --merge none --info-rules '{info_rules_arg}' '{output_vcfs[0]}' '{output_vcfs[1]}' -O z -o {combined_vcf}\n")
@@ -221,7 +237,7 @@ def calculate_allele_frequency(gnomad_input_vcf, af_output_vcf):
                 #print(f"{ac_name}/{an_name} {ac}/{an}")
                 if an:
                     af = ac / an
-                    if pop_name and af > af_popmax:  # Only use subpops
+                    if pop_name and (pop_name not in BOTTLENECKED_SUB_POPS) and af > af_popmax:
                         af_popmax = af
                         ac_popmax = ac
                         an_popmax = an
