@@ -185,10 +185,10 @@ def write_vcf_header():
     meta = """##fileformat=VCFv4.2
 ##fileDate=%(file_date)s
 ##source=%(source)s
-##INFO=<ID=AF_grpmax,Number=1,Type=Float,Description="Allele Frequency for highest population">
-##INFO=<ID=AC_grpmax,Number=1,Type=Integer,Description="Allele Count for highest population">
-##INFO=<ID=AN_grpmax,Number=1,Type=Integer,Description="Allele Number for highest population">
-##INFO=<ID=grpmax,Number=1,Type=String,Description="Ancestral group with highest allele frequency (stored as AF_grpmax)">
+##INFO=<ID=AF_popmax,Number=1,Type=Float,Description="Allele Frequency for highest population">
+##INFO=<ID=AC_popmax,Number=1,Type=Integer,Description="Allele Count for highest population">
+##INFO=<ID=AN_popmax,Number=1,Type=Integer,Description="Allele Number for highest population">
+##INFO=<ID=popmax,Number=1,Type=String,Description="Ancestral group with highest allele frequency (stored as AF_popmax)">
 ##INFO=<ID=nhomalt,Number=1,Type=Integer,Description="Total number of homozygotest (exomes + genomes)">
 ##INFO=<ID=gnomad_filtered,Number=1,Type=Integer,Description="Exomes or genomes had a filter entry (potential QC issues)">
 """ % {"file_date": file_date, "source": source}
@@ -215,8 +215,9 @@ def calculate_allele_frequency(gnomad_input_vcf, af_output_vcf):
     from cyvcf2 import VCF  # Import here, so that rest of script can run on HPC easier
 
     # We have to re-calculate POPMAX as we can't merge it
+    # Even though it's called "grpmax" in gnomADv4 we want it popmax for our old config to remain consistent with v2/v3
     af_info = get_af_info()
-    info_names = [ai[0] for ai in af_info] + OTHER_INFOS + ["AF_grpmax", "AC_grpmax", "AN_grpmax", "grpmax", "gnomad_filtered"]
+    info_names = [ai[0] for ai in af_info] + OTHER_INFOS + ["AF_popmax", "AC_popmax", "AN_popmax", "popmax", "gnomad_filtered"]
 
     with gzip.open(af_output_vcf, "wt") as f:
         for variant in VCF(gnomad_input_vcf):
