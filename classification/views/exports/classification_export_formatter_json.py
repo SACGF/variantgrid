@@ -6,7 +6,8 @@ from django.http import HttpRequest
 
 from classification.models import ClassificationJsonParams, ClassificationModification
 from classification.views.exports.classification_export_decorator import register_classification_exporter
-from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
+from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData, \
+    DiscordanceReportStatus
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
 
 
@@ -47,13 +48,26 @@ class ClassificationExportFormatterJSON(ClassificationExportFormatter):
     def footer(self) -> List[str]:
         return ["]}"]
 
+    def get_discordant_status(self, discordant_status):
+        if not discordant_status:
+            return ''
+        elif discordant_status == DiscordanceReportStatus.ON_GOING:
+            return "active discordance"
+        elif discordant_status == DiscordanceReportStatus.CONTINUED:
+            return "continued discordance"
+        elif discordant_status == DiscordanceReportStatus.PENDING_CONCORDANCE:
+            return "pending concordance"
+        else:
+            return discordant_status
+
     def to_row(self, vcm: ClassificationModification, withdrawn: bool) -> Optional[str]:
         json_values = vcm.as_json(self.json_params)
         if 'fatal_error' in json_values:
             return None
 
-        if self.classification_filter.is_discordant(vcm):
+        if discordant_status := self.classification_filter.is_discordant(vcm):
             json_values['discordant'] = True
+            json_values['discordant_status'] = self.get_discordant_status(discordant_status)
         if withdrawn:
             json_values = {
                 "id": json_values["id"],
