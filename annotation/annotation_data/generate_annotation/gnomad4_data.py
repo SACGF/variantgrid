@@ -95,8 +95,9 @@ def write_scripts(args):
 
                 modify_fields1 = "sed -e 's/ID=AF_remaining,/ID=AF_oth,/' -e 's/ID=AC_remaining,/ID=AC_oth,/' -e 's/ID=AN_remaining,/ID=AN_oth,/' -e 's/AF_remaining=/AF_oth=/' -e 's/AN_remaining=/AN_oth=/' -e 's/AC_remaining=/AC_oth=/'"
 
-                # bcftools merge doesn't work with type='A' or special AC/AN INFO fields w/o a FORMAT (which gnomAD doesn't have)
-                modify_fields2 = "sed -e 's/,Number=A,/,Number=1,/' -e 's/ID=AC,/ID=AC_count,/' -e 's/ID=AN,/ID=AN_count,/' -e 's/AC=/AC_count=/' -e 's/AN=/AN_count=/'"
+                # bcftools merge doesn't work with type='A'
+                # bcftools now works with AC/AN etc - see https://github.com/samtools/bcftools/issues/1394
+                modify_fields2 = "sed -e 's/,Number=A,/,Number=1,/'"
                 # gnomAD appears to already be decomposed - vt decompose + -s -o +
                 # We no longer remove AC=0 as we want to keep AN (total counts) for pops for later AF calculations
                 cs.write(f"zcat {gnomad_vcf_filename} | {modify_fields1} | bcftools annotate --remove '^{keep_columns}' {annotate_args} | {modify_fields2} | vt uniq + -o {output_vcf}\n")
@@ -111,7 +112,6 @@ def write_scripts(args):
                     cs.write(f"tabix {ov}\n")
 
                 # Merge exomes/genome VCFs
-                renamed_columns = [f"{c}_count" if c in ['AC', 'AN'] else c for c in columns]
                 # if we leave out rule, will take from 1st file which is ok for PAR as will be the same
                 skip_columns = {"non_par"}
                 rule_ops = {
@@ -119,16 +119,20 @@ def write_scripts(args):
                     "AF_oth": "max"
                 }
                 info_rules = []
-                for c in renamed_columns:
+                for c in columns:
                     if c not in skip_columns:
                         op = rule_ops.get(c, "sum")
                         info_rules.append(f"{c}:{op}")
                 info_rules_arg = ','.join(info_rules)
                 cs.write("\n\necho Merging VCFs - will keep flags from genomes.\n")
-                cs.write(f"bcftools merge --merge none --info-rules '{info_rules_arg}' '{output_vcfs[0]}' '{output_vcfs[1]}' -O z -o {combined_vcf}\n")
+                # Throw away anything that has AC=0
+                cs.write(f"bcftools merge --merge none --info-rules '{info_rules_arg}' '{output_vcfs[0]}' '{output_vcfs[1]}' | bcftools view -i 'AC>0' -O z -o {combined_vcf}\n")
 
             # Now process them with this script
             cs.write("\n\necho Calculate Allele Frequency\n")
+            # Lines for Phoenix HPC
+            # cs.write("\nmodule load Python/3.9.6-GCCcore-11.2.0\n")
+            # cs.write("source /home/a1059391/venv/dave_venv/bin/activate\n")
             script_filename = os.path.realpath(__file__)
             allele_frequency_vcf = f"{prefix}.af.vcf.gz"
             cs.write(f"{script_filename} --af --gnomad-input-vcf={combined_vcf} --af-output-vcf={allele_frequency_vcf}\n")
@@ -167,7 +171,7 @@ def get_columns():
 
 def get_af_info():
     af_info = [
-        ("AF", None, "AC_count", "AN_count"),
+        ("AF", None, "AC", "AN"),
     ]
     for g in GNOMAD_SUB_POPS:
         af_info.append((f'AF_{g}', g, f'AC_{g}', f'AN_{g}'))
