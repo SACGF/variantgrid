@@ -18,11 +18,11 @@ GRCh38 = "GRCh38"
 
 # We deliberately leave out AF and "grpmax" stuff as we recalculate that later in 'calculate_allele_frequency'
 COUNTS = ['AC', 'AN']
-OTHER_INFOS = ["nhomalt", "non_par"]
-GNOMAD_SUB_POPS = ["afr", "amr", "asj", "eas", "fin", "mid", "nfe", "oth", "sas"]  # Will get AF for each
+OTHER_INFOS = ["nhomalt", "non_par", "faf95", "faf99", "fafmax_faf95_max", "fafmax_faf99_max"]
+GNOMAD_SUB_POPS = ["afr", "amr", "asj", "eas", "fin", "mid", "nfe", "remaining", "sas"]  # Will get AF for each
 
 # popmax/grpmax is calculated using non-bottlenecked genetic ancestry groups
-BOTTLENECKED_SUB_POPS = ["asj", "fin", "mid", "oth"]
+BOTTLENECKED_SUB_POPS = ["asj", "fin", "mid", "remaining"]
 
 
 def get_args():
@@ -93,14 +93,12 @@ def write_scripts(args):
 
                 gnomad_vcf_filename = f"gnomad.{vcf_type}.v4.0.sites.chr{chrom}.vcf.bgz"
 
-                modify_fields1 = "sed -e 's/ID=AF_remaining,/ID=AF_oth,/' -e 's/ID=AC_remaining,/ID=AC_oth,/' -e 's/ID=AN_remaining,/ID=AN_oth,/' -e 's/AF_remaining=/AF_oth=/' -e 's/AN_remaining=/AN_oth=/' -e 's/AC_remaining=/AC_oth=/'"
-
                 # bcftools merge doesn't work with type='A'
                 # bcftools now works with AC/AN etc - see https://github.com/samtools/bcftools/issues/1394
                 modify_fields2 = "sed -e 's/,Number=A,/,Number=1,/'"
                 # gnomAD appears to already be decomposed - vt decompose + -s -o +
                 # We no longer remove AC=0 as we want to keep AN (total counts) for pops for later AF calculations
-                cs.write(f"zcat {gnomad_vcf_filename} | {modify_fields1} | bcftools annotate --remove '^{keep_columns}' {annotate_args} | {modify_fields2} | vt uniq + -o {output_vcf}\n")
+                cs.write(f"bcftools annotate --remove '^{keep_columns}' {annotate_args} {gnomad_vcf_filename} | {modify_fields2} | vt uniq + -o {output_vcf}\n")
                 output_vcfs.append(output_vcf)
 
             combined_vcf = f"{prefix}.combined.vcf.gz"
@@ -115,8 +113,11 @@ def write_scripts(args):
                 # if we leave out rule, will take from 1st file which is ok for PAR as will be the same
                 skip_columns = {"non_par"}
                 rule_ops = {
-                    # VCFs don't have AC_oth / AN_oth, so we take AF_oth from both and take the highest
-                    "AF_oth": "max"
+                    # Will take higher of whatever is there in genomes/exomes
+                    "faf95": "max",
+                    "faf99": "max",
+                    "fafmax_faf95_max": "max",
+                    "fafmax_faf99_max": "max",
                 }
                 info_rules = []
                 for c in columns:
@@ -192,6 +193,10 @@ def write_vcf_header():
 ##INFO=<ID=AN_grpmax,Number=1,Type=Integer,Description="Allele Number for highest population">
 ##INFO=<ID=AC,Number=1,Type=Integer,Description="Alternate allele count (exomes + genomes)">
 ##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles  (exomes + genomes)">
+##INFO=<ID=faf95,Number=1,Type=Float,Description="Filtering allele frequency (using Poisson 95%% CI) (max of exomes/genomes)">
+##INFO=<ID=faf99,Number=1,Type=Float,Description="Filtering allele frequency (using Poisson 99%% CI) (max of exomes/genomes)">
+##INFO=<ID=fafmax_faf95_max,Number=1,Type=Float,Description="Maximum filtering allele frequency (using Poisson 95%% CI) across genetic_ancestry groups (max of exomes/genomes)">
+##INFO=<ID=fafmax_faf99_max,Number=1,Type=Float,Description="Maximum filtering allele frequency (using Poisson 99%% CI) across genetic_ancestry groups (max of exomes/genomes)">
 ##INFO=<ID=grpmax,Number=1,Type=String,Description="Ancestral group with highest allele frequency (stored as AF_grpmax)">
 ##INFO=<ID=nhomalt,Number=1,Type=Integer,Description="Total number of homozygotest (exomes + genomes)">
 ##INFO=<ID=gnomad_filtered,Number=1,Type=Integer,Description="Exomes or genomes had a filter entry (potential QC issues)">

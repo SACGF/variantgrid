@@ -447,6 +447,8 @@ class ColumnVEPField(models.Model):
     column = models.TextField(unique=True)
     variant_grid_column = models.ForeignKey(VariantGridColumn, on_delete=CASCADE)
     genome_build = models.ForeignKey(GenomeBuild, null=True, on_delete=CASCADE)  # null = all builds
+    pipeline_type = models.CharField(max_length=1, choices=VariantAnnotationPipelineType.choices,
+                                     default=VariantAnnotationPipelineType.STANDARD)
     category = models.CharField(max_length=1, choices=ColumnAnnotationCategory.choices)
     source_field = models.TextField(null=True)  # @see use vep_info_field
     source_field_processing_description = models.TextField(null=True)
@@ -900,6 +902,11 @@ class VariantAnnotation(AbstractVariantAnnotation):
     gnomad_nfe_af = models.FloatField(null=True, blank=True)
     gnomad_oth_af = models.FloatField(null=True, blank=True)
     gnomad_sas_af = models.FloatField(null=True, blank=True)
+    # filtering allele frequencies (new in gnomADv4)
+    faf95 = models.FloatField(null=True, blank=True)
+    faf99 = models.FloatField(null=True, blank=True)
+    fafmax_faf95_max = models.FloatField(null=True, blank=True)
+    fafmax_faf99_max = models.FloatField(null=True, blank=True)
     gnomad_popmax_af = models.FloatField(null=True, blank=True)
     gnomad_popmax_ac = models.IntegerField(null=True, blank=True)
     gnomad_popmax_an = models.IntegerField(null=True, blank=True)
