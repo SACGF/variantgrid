@@ -20,10 +20,12 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--test', action='store_true')
+        parser.add_argument('--cnv', action='store_true')
         parser.add_argument('--genome-build', required=True)
 
     def handle(self, *args, **options):
         test = options["test"]
+        cnv = options["cnv"]
         build_name = options["genome_build"]
         genome_build = GenomeBuild.get_name_or_alias(build_name)
 
@@ -47,9 +49,14 @@ class Command(BaseCommand):
                 vcf_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, f"{base_name}.vcf")
 
         output_filename = os.path.join(output_dir, f"{base_name}.{vep_suffix}.vcf.gz")
+        if cnv:
+            pipeline_type = VariantAnnotationPipelineType.CNV
+        else:
+            pipeline_type = VariantAnnotationPipelineType.STANDARD
+
         return_code, std_out, std_err = run_vep(vcf_filename, output_filename,
                                                 genome_build, genome_build.annotation_consortium,
-                                                VariantAnnotationPipelineType.STANDARD)
+                                                pipeline_type)
         if return_code != 0:
             logging.info(std_out)
             logging.error(std_err)
