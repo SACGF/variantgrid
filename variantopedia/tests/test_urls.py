@@ -17,7 +17,10 @@ class Test(URLTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+
         cls.user = User.objects.get_or_create(username='testuser')[0]
+        cls.admin_user = User.objects.create_superuser(f"test_user_{__file__}_admin")
+
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         cls.annotation_version = get_fake_annotation_version(cls.grch37)
         create_fake_variants(cls.grch37)
@@ -60,7 +63,7 @@ class Test(URLTestCase):
         URL_NAMES_AND_KWARGS = [
             ("variants", {}, 200),
             ("dashboard", {}, 200),
-            ("database_statistics_detail", {}, 200),
+            ("database_statistics_detail", {}, 403),  # Admin only
             ("search", {}, 200),
             ("variant_wiki", {}, 200),
             ("view_variant", {"variant_id": self.variant.pk}, 200),
@@ -74,6 +77,13 @@ class Test(URLTestCase):
                                             "genome_build_name": self.grch37.name}, 200),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user)
+
+    def testAdminUrls(self):
+        ADMIN_URL_NAMES_AND_KWARGS = [
+            ("database_statistics_detail", {}, 200),
+        ]
+        self._test_urls(ADMIN_URL_NAMES_AND_KWARGS, self.admin_user)
+
 
     def testGridUrls(self):
         """ Grids w/o permissions """
