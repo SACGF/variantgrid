@@ -20,6 +20,7 @@ GRCh38 = "GRCh38"
 COUNTS = ['AC', 'AN']
 OTHER_INFOS = ["nhomalt", "non_par", "faf95", "faf99", "fafmax_faf95_max", "fafmax_faf99_max"]
 GNOMAD_SUB_POPS = ["afr", "amr", "asj", "eas", "fin", "mid", "nfe", "remaining", "sas"]  # Will get AF for each
+CHR_X_ONLY = ["AC_XY", "AN_XY", "AF_XY"]
 
 # popmax/grpmax is calculated using non-bottlenecked genetic ancestry groups
 BOTTLENECKED_SUB_POPS = ["asj", "fin", "mid", "remaining"]
@@ -85,6 +86,8 @@ def write_scripts(args):
                 # To remove all INFO tags except "FOO" and "BAR", use "^INFO/FOO,INFO/BAR"
                 # @see https://samtools.github.io/bcftools/bcftools.html#annotate """
                 my_columns = columns.copy()
+                if chrom == "X":
+                    my_columns.extend(CHR_X_ONLY)
 
                 info_columns = [f"INFO/{i}" for i in my_columns]
                 keep_columns = ','.join(info_columns)  # AC/AN are special format fields
@@ -112,6 +115,7 @@ def write_scripts(args):
                 # Merge exomes/genome VCFs
                 # if we leave out rule, will take from 1st file which is ok for PAR as will be the same
                 skip_columns = {"non_par"}
+                # Default rule = "sum" if not below (or skipped)
                 rule_ops = {
                     # Will take higher of whatever is there in genomes/exomes
                     "faf95": "max",
@@ -120,7 +124,7 @@ def write_scripts(args):
                     "fafmax_faf99_max": "max",
                 }
                 info_rules = []
-                for c in columns:
+                for c in my_columns:
                     if c not in skip_columns:
                         op = rule_ops.get(c, "sum")
                         info_rules.append(f"{c}:{op}")
@@ -193,6 +197,9 @@ def write_vcf_header():
 ##INFO=<ID=AN_grpmax,Number=1,Type=Integer,Description="Allele Number for highest population">
 ##INFO=<ID=AC,Number=1,Type=Integer,Description="Alternate allele count (exomes + genomes)">
 ##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles  (exomes + genomes)">
+##INFO=<ID=AC_XY,Number=1,Type=Integer,Description="Alternate allele count for XY samples">
+##INFO=<ID=AF_XY,Number=1,Type=Float,Description="Alternate allele frequency in XY samples">
+##INFO=<ID=AN_XY,Number=1,Type=Integer,Description="Total number of alleles in XY samples">
 ##INFO=<ID=faf95,Number=1,Type=Float,Description="Filtering allele frequency (using Poisson 95%% CI) (max of exomes/genomes)">
 ##INFO=<ID=faf99,Number=1,Type=Float,Description="Filtering allele frequency (using Poisson 99%% CI) (max of exomes/genomes)">
 ##INFO=<ID=fafmax_faf95_max,Number=1,Type=Float,Description="Maximum filtering allele frequency (using Poisson 95%% CI) across genetic_ancestry groups (max of exomes/genomes)">
