@@ -1,4 +1,5 @@
 import copy
+import json
 import re
 import uuid
 from collections import Counter, namedtuple
@@ -25,6 +26,7 @@ from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
+from unidecode import unidecode
 
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
 from annotation.regexes import db_ref_regexes, DbRegexes
@@ -1088,6 +1090,21 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         value = cell.value
         e_key = cell.e_key
         note = cell.note
+        # unidecode converts non ascii characters to ascii examples Æ Ö
+
+        def ensure_string(data):
+            if isinstance(data, (dict, list)):
+                data = json.dumps(data)
+                data = unidecode(data)
+                data = json.loads(data)
+                return data
+            elif isinstance(data, str):
+                return unidecode(data)
+            else:
+                return data
+
+        value = ensure_string(value)
+        note = ensure_string(note)
 
         if self.lab.external:
             cell.validate = False
