@@ -19,11 +19,12 @@ def vcf_health_check_activity(sender, health_request: HealthCheckRequest, **kwar
 
 @receiver(signal=health_check_overall_stats_signal)
 def vcf_health_check_overall_stats(sender, **kwargs):
-    return HealthCheckTotalAmount(
-        emoji=":green_book:",
-        amount=VCF.objects.count(),
-        name="VCFs"
-    )
+    if get_visible_url_names().get('analyses'):
+        return HealthCheckTotalAmount(
+            emoji=":green_book:",
+            amount=VCF.objects.count(),
+            name="VCFs"
+        )
 
 
 @receiver(signal=health_check_overall_stats_signal)
@@ -38,8 +39,9 @@ def max_variants_overall_check(sender, **kwargs):
 
 @receiver(signal=health_check_overall_stats_signal)
 def sample_overall_check(sender, **kwargs):
-    return HealthCheckTotalAmount(
-        emoji=":green_book:",
-        amount=Sample.objects.count(),
-        name="Samples"
-    )
+    if get_visible_url_names().get('analyses'):
+        return HealthCheckTotalAmount(
+            emoji=":green_book:",
+            amount=Sample.objects.count(),
+            name="Samples"
+        )
