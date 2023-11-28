@@ -14,6 +14,7 @@ import os
 from argparse import ArgumentParser
 from datetime import datetime
 
+GNOMAD_VERSION="4.0"
 GRCh38 = "GRCh38"
 
 # We deliberately leave out AF and "grpmax" stuff as we recalculate that later in 'calculate_allele_frequency'
@@ -31,7 +32,7 @@ def get_args():
     parser.add_argument("--test", action='store_true', help="Only download 5k of each file.")
     # parser.add_argument("--genome-fasta", help='Fasta (correct for build)')
     parser.add_argument("--chrom-mapping-file", help='bcftools chromosome conversion')
-    parser.add_argument("--version", help='gnomAD version (default: 4.0)', default='4.0')
+    parser.add_argument("--version", help=f'gnomAD version (default: {GNOMAD_VERSION})', default=GNOMAD_VERSION)
     parser.add_argument("--path", help='Colon separated paths for tabix/bgzip/vt/bcftools')
     parser.add_argument("--gnomad-input-vcf")
     parser.add_argument("--af-output-vcf")
@@ -75,7 +76,7 @@ def write_scripts(args):
     chrom_scripts = []
     af_vcfs = []
     for chrom in CHROMOSOMES:
-        prefix = f"gnomad4_chr{chrom}"
+        prefix = f"gnomad{GNOMAD_VERSION}_{GRCh38}_chr{chrom}"
         chrom_script = f"{prefix}.sh"
         chrom_scripts.append(chrom_script)
         with open(chrom_script, "w") as cs:
@@ -94,7 +95,7 @@ def write_scripts(args):
                 output_vcf = f"{prefix}_{vcf_type}.filtered_info.vcf.gz"
                 annotate_args = f"--rename-chrs={args.chrom_mapping_file}"
 
-                gnomad_vcf_filename = f"gnomad.{vcf_type}.v4.0.sites.chr{chrom}.vcf.bgz"
+                gnomad_vcf_filename = f"gnomad.{vcf_type}.{GNOMAD_VERSION}_{GRCh38}.sites.chr{chrom}.vcf.bgz"
 
                 # bcftools merge doesn't work with type='A'
                 # bcftools now works with AC/AN etc - see https://github.com/samtools/bcftools/issues/1394
@@ -150,8 +151,8 @@ def write_scripts(args):
     with open(merge_script_filename, "w") as ms:
         ms.write(bash_header)
         quoted_files = ' '.join([f"'{f}'" for f in af_vcfs])
-        gnomad_combined_af_vcf = f"gnomad4_combined_af.vcf.bgz"
-        ms.write(f"zcat {vcf_header} {quoted_files} | bgzip > {gnomad_combined_af_vcf}\n")
+        gnomad_combined_af_vcf = f"gnomad{GNOMAD_VERSION}_{GRCh38}_combined_af.vcf.bgz"
+        ms.write(f"cat {vcf_header} {quoted_files} > {gnomad_combined_af_vcf}\n")
         ms.write(f"tabix {gnomad_combined_af_vcf}\n")
 
     launch_script_filename = f"gnomad4_launch.sh"
