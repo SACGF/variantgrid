@@ -835,6 +835,12 @@ class AbstractVariantAnnotation(models.Model):
     splice_region = models.TextField(null=True, blank=True)
     symbol = models.TextField(null=True, blank=True)
 
+    alphamissense_class  = models.CharField(max_length=1, choices=AlphaMissensePrediction.choices, null=True, blank=True)
+    alphamissense_pathogenicity = models.FloatField(null=True, blank=True)
+
+    mavedb_score = models.FloatField(null=True, blank=True)
+    mavedb_urn = models.TextField(null=True, blank=True)
+
     class Meta:
         abstract = True
 
@@ -888,6 +894,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
     # Population frequency
     af_1kg = models.FloatField(null=True, blank=True)
     af_uk10k = models.FloatField(null=True, blank=True)
+    topmed_af = models.FloatField(null=True, blank=True)
     gnomad_af = models.FloatField(null=True, blank=True)
     gnomad2_liftover_af = models.FloatField(null=True, blank=True)
     gnomad_ac = models.IntegerField(null=True, blank=True)
@@ -903,16 +910,20 @@ class VariantAnnotation(AbstractVariantAnnotation):
     gnomad_oth_af = models.FloatField(null=True, blank=True)
     gnomad_sas_af = models.FloatField(null=True, blank=True)
     # filtering allele frequencies (new in gnomADv4)
-    faf95 = models.FloatField(null=True, blank=True)
-    faf99 = models.FloatField(null=True, blank=True)
-    fafmax_faf95_max = models.FloatField(null=True, blank=True)
-    fafmax_faf99_max = models.FloatField(null=True, blank=True)
+    gnomad_faf95 = models.FloatField(null=True, blank=True)
+    gnomad_faf99 = models.FloatField(null=True, blank=True)
+    gnomad_fafmax_faf95_max = models.FloatField(null=True, blank=True)
+    gnomad_fafmax_faf99_max = models.FloatField(null=True, blank=True)
+    gnomad_xy_af = models.FloatField(null=True, blank=True)
+    gnomad_xy_ac = models.IntegerField(null=True, blank=True)
+    gnomad_xy_an = models.IntegerField(null=True, blank=True)
+    gnomad_hemi_count = models.IntegerField(null=True, blank=True)  # This is set from gnomad_xy_ac if gnomad_non_par
     gnomad_popmax_af = models.FloatField(null=True, blank=True)
     gnomad_popmax_ac = models.IntegerField(null=True, blank=True)
     gnomad_popmax_an = models.IntegerField(null=True, blank=True)
     gnomad_popmax_hom_alt = models.IntegerField(null=True, blank=True)
-    topmed_af = models.FloatField(null=True, blank=True)
     gnomad_filtered = models.BooleanField(null=True, blank=True)
+    gnomad_non_par = models.BooleanField(null=True, blank=True)  # Not pseudoautosomal regions
     gnomad_popmax = models.CharField(max_length=3, choices=GnomADPopulation.choices, null=True, blank=True)
 
     # From https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4267638/
@@ -965,12 +976,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
     spliceai_pred_ds_dg = models.FloatField(null=True, blank=True)
     spliceai_pred_ds_dl = models.FloatField(null=True, blank=True)
     spliceai_gene_symbol = models.TextField(null=True, blank=True)
-
-    alphamissense_class  = models.CharField(max_length=1, choices=AlphaMissensePrediction.choices, null=True, blank=True)
-    alphamissense_pathogenicity = models.FloatField(null=True, blank=True)
-
-    mavedb_score = models.FloatField(null=True, blank=True)
-    mavedb_urn = models.TextField(null=True, blank=True)
 
     repeat_masker = models.TextField(null=True, blank=True)
     overlapping_symbols = models.TextField(null=True, blank=True)

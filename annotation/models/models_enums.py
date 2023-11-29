@@ -111,6 +111,7 @@ class ColumnAnnotationCategory(models.TextChoices):
     CONSERVATION = 'C', "Conservation"
     EXTERNAL_ID = 'E', "External ID"
     FREQUENCY_DATA = 'F', "Frequency Data"
+    FUNCTIONAL_EFFECT = 'f', "Functional Effect"
     GENE_ANNOTATIONS = 'G', 'Gene Annotations'
     HGVS = 'H', "HGVS"
     LITERATURE = 'L', 'Literature'

@@ -281,7 +281,8 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
         kwargs["dbnsfp"] = 'n/a'
 
     # we use our own gnomAD custom annotation, not the default VEP one
-    if cvf := ColumnVEPField.objects.filter(variant_grid_column='gnomad_af', genome_build=genome_build).first():
+    q_cvf = ColumnVEPField.get_columns_version_q(vep_config.columns_version)
+    if cvf := ColumnVEPField.objects.filter(q_cvf, variant_grid_column='gnomad_af', genome_build=genome_build).first():
         try:
             # annotation_data/GRCh37/gnomad2.1.1_GRCh37_combined_af.vcf.bgz
             # gnomad3.1_GRCh38_merged.vcf.bgz
