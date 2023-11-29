@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('snpdb', '0107_set_default_allele_origin_filter'),
+        ('snpdb', '0104_alter_settingsoverride_columns_and_more'),
     ]
 
     operations = [
