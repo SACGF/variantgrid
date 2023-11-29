@@ -79,7 +79,12 @@ def get_args():
     group.add_argument('--af', action='store_true', help="Calculate allele frequency from VCF")
 
     args = parser.parse_args()
-    if not args.scripts:
+    if args.scripts:
+        if args.genome_build is None:
+            parser.error("--genome-build required for --scripts")
+        if args.genome_build not in GENOME_BUILDS:
+            parser.error(f"--genome-build must be one of {', '.join(GENOME_BUILDS)}")
+    else:
         if args.gnomad_input_vcf is None:
             parser.error("--gnomad-input-vcf required for --af")
         if args.af_output_vcf is None:
@@ -189,7 +194,7 @@ def write_scripts(args):
             # cs.write("source /home/a1059391/venv/dave_venv/bin/activate\n")
             script_filename = os.path.realpath(__file__)
             allele_frequency_vcf = f"{prefix}.af.vcf.gz"
-            cs.write(f"{script_filename} --af --gnomad-input-vcf={combined_vcf} --af-output-vcf={allele_frequency_vcf}\n")
+            cs.write(f"{script_filename} --af --gnomad-input-vcf={combined_vcf} --af-output-vcf={allele_frequency_vcf} --version={args.version}\n")
             af_vcfs.append(allele_frequency_vcf)
 
     # Write merge script
