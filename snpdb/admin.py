@@ -296,6 +296,13 @@ class LabHeadAdmin(ModelAdminBasics):
     )
 
 
+@admin.register(models.UserAward)
+class UserAwardAdmin(ModelAdminBasics):
+    autocomplete_fields = (
+        "user",
+    )
+
+
 @admin.register(models.Country)
 class CountryAdmin(ModelAdminBasics):
 

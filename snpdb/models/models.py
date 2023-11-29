@@ -633,6 +633,15 @@ class LabHead(models.Model):
         return f"{self.lab}: {self.user}"
 
 
+class UserAward(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=CASCADE)
+    award_text = models.TextField(null=False, blank=False)
+    active = models.BooleanField(null=False, blank=True, default=True)
+
+    def __str__(self):
+        return f"{self.user}: {self.award_text}"
+
+
 class LabProject(models.Model):
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
     leader = models.TextField()
