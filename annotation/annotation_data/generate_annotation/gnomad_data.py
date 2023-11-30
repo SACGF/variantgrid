@@ -248,11 +248,14 @@ def write_vcf_header(version, info_fields, popmax_fields, sub_pops):
         'AC_XY': '##INFO=<ID=AC_XY,Number=1,Type=Integer,Description="Alternate allele count for XY samples">',
         'AF_XY': '##INFO=<ID=AF_XY,Number=1,Type=Float,Description="Alternate allele frequency in XY samples">',
         'AN_XY': '##INFO=<ID=AN_XY,Number=1,Type=Integer,Description="Total number of alleles in XY samples">',
+        'AC_male': '##INFO=<ID=AC_male,Number=1,Type=Integer,Description="Alternate allele count for male samples">',
+        'AN_male': '##INFO=<ID=AN_male,Number=1,Type=Integer,Description="Total number of alleles in male samples">',
+        'AF_male': '##INFO=<ID=AF_male,Number=1,Type=Float,Description="Alternate allele frequency in male samples">',
         'faf95': '##INFO=<ID=faf95,Number=1,Type=Float,Description="Filtering allele frequency (using Poisson 95% CI) (max of exomes/genomes)">',
         'faf99': '##INFO=<ID=faf99,Number=1,Type=Float,Description="Filtering allele frequency (using Poisson 99% CI) (max of exomes/genomes)">',
         'fafmax_faf95_max': '##INFO=<ID=fafmax_faf95_max,Number=1,Type=Float,Description="Maximum filtering allele frequency (using Poisson 95% CI) across genetic_ancestry groups (max of exomes/genomes)">',
         'fafmax_faf99_max': '##INFO=<ID=fafmax_faf99_max,Number=1,Type=Float,Description="Maximum filtering allele frequency (using Poisson 99% CI) across genetic_ancestry groups (max of exomes/genomes)">',
-        'AF_popmax': '##INFO=<ID=AF_popmax,Number=1,Type=Float,Description="Allele Frequency for highest population">"',
+        'AF_popmax': '##INFO=<ID=AF_popmax,Number=1,Type=Float,Description="Allele Frequency for highest population">',
         'AC_popmax': '##INFO=<ID=AC_popmax,Number=1,Type=Integer,Description="Allele Count for highest population">',
         'AN_popmax': '##INFO=<ID=AN_popmax,Number=1,Type=Integer,Description="Allele Number for highest population">',
         'popmax': '##INFO=<ID=popmax,Number=1,Type=String,Description="Ancestral group with highest allele frequency (stored as AF_popmax)">',
@@ -277,8 +280,7 @@ def write_vcf_header(version, info_fields, popmax_fields, sub_pops):
     meta = """##fileformat=VCFv4.2
 ##fileDate=%(file_date)s
 ##source=%(source)s
-%(info_headers)s
-""" % {"file_date": file_date, "source": source, "info_headers": info_headers}
+%(info_headers)s""" % {"file_date": file_date, "source": source, "info_headers": info_headers}
 
     af_info = get_af_info(sub_pops)
     for info_id, pop_name, ac_name, an_name in af_info:
@@ -303,7 +305,7 @@ def calculate_allele_frequency(version, gnomad_input_vcf, af_output_vcf):
 
     from cyvcf2 import VCF  # Import here, so that rest of script can run on HPC easier
 
-    info_fields, _, popmax_fields, sub_pops = get_infos_for_version(version)
+    info_fields, chr_x_male, popmax_fields, sub_pops = get_infos_for_version(version)
     af_info = get_af_info(sub_pops)
 
     with gzip.open(af_output_vcf, "wt") as f:
@@ -319,10 +321,10 @@ def calculate_allele_frequency(version, gnomad_input_vcf, af_output_vcf):
             an_popmax = 0
             popmax = '.'
             infos = {}
-            for _, pop_name, ac_name, an_name in af_info:
+            for af_name, pop_name, ac_name, an_name in af_info:
                 ac = variant.INFO.get(ac_name, 0)
                 an = variant.INFO.get(an_name)
-                #print(f"{ac_name}/{an_name} {ac}/{an}")
+                # print(f"{pop_name=},{ac_name=},{an_name=} {ac=}/{an=}")
                 if an:
                     af = ac / an
                     if pop_name and (pop_name not in BOTTLENECKED_SUB_POPS) and af > af_popmax:
@@ -333,9 +335,12 @@ def calculate_allele_frequency(version, gnomad_input_vcf, af_output_vcf):
                     af = f'{af:.6f}'
                 else:
                     af = '.'
-                infos["AF"] = af
 
-            for o in info_fields:
+                infos[af_name] = af
+                infos[ac_name] = ac
+                infos[an_name] = an
+
+            for o in info_fields + chr_x_male:
                 infos[o] = str(variant.INFO.get(o, '.'))
             gnomad_filtered = '0' if variant.FILTER is None else '1'
             infos["gnomad_filtered"] = gnomad_filtered
