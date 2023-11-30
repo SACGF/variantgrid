@@ -21,6 +21,7 @@ class ReportDataRow(ExportRow):
     allele_counts: int
     gene_symbols_counts: int
     classification_counts: int
+    overall_activity: int
 
     @export_column(label="Date")
     def date_column(self) -> date:
@@ -46,6 +47,10 @@ class ReportDataRow(ExportRow):
     def classifications_viewed_column(self) -> int:
         return self.classification_counts
 
+    @export_column(label="Overall Activity")
+    def overall_activity_column(self) -> int:
+        return self.overall_activity
+
 
 def week_start_date(freq: datetime.date) -> datetime.date:
     return freq - timedelta(days=date.weekday(freq))
@@ -56,7 +61,8 @@ def stream_report_rows(interval) -> Iterator[ReportDataRow]:
     start_of_time_period = datetime.now() - timedelta(days=365)
     start_of_time_period = start_of_time_period.date()
     report_data = defaultdict(lambda: {'users': set(), 'search_count': 0, 'allele_count': 0,
-                                       'gene_symbol_count': 0, 'classification_count': 0})
+                                       'gene_symbol_count': 0, 'classification_count': 0,
+                                       'overall_activity': 0})
     excluded_users = User.objects.filter(
         Q(is_superuser=True) | Q(groups__name__in={'variantgrid/tester', 'variantgrid/bot'}))
 
@@ -64,15 +70,21 @@ def stream_report_rows(interval) -> Iterator[ReportDataRow]:
         ('variantopedia:search', 'search_count', ~Q(args__search="")),
         ('variantopedia:view_allele', 'allele_count'),
         ('genes:view_gene_symbol', 'gene_symbol_count', ~Q(args__gene_symbol="")),
-        ('classification:view_classification', 'classification_count')
+        ('classification:view_classification', 'classification_count'),
+        ('', 'overall_activity'),
     ]
 
     ve: ViewEvent
     for view_name, key, *extra_filters in metrics_definitions:
-        metric_data = ViewEvent.objects.filter(
-            created__gte=start_of_time_period,
-            view_name=view_name
-        ).exclude(user__in=excluded_users)
+        if view_name == '':
+            metric_data = ViewEvent.objects.filter(
+                created__gte=start_of_time_period
+            ).exclude(user__in=excluded_users)
+        else:
+            metric_data = ViewEvent.objects.filter(
+                created__gte=start_of_time_period,
+                view_name=view_name
+            ).exclude(user__in=excluded_users)
 
         if extra_filters:
             metric_data = metric_data.filter(*extra_filters)
@@ -92,15 +104,18 @@ def stream_report_rows(interval) -> Iterator[ReportDataRow]:
 
     while current_date <= today:
         data = report_data.get(current_date, {'users': set(), 'search_count': 0, 'allele_count': 0,
-                                              'gene_symbol_count': 0, 'classification_count': 0})
+                                              'gene_symbol_count': 0, 'classification_count': 0,
+                                              'overall_activity': 0})
         user_list = len(data['users'])
         searches = data['search_count']
         allele_count = data['allele_count']
         gene_symbol_count = data['gene_symbol_count']
         classification_count = data['classification_count']
+        overall_activity = data['overall_activity']
         yield ReportDataRow(date=current_date, user=user_list, search_counts=searches,
                             allele_counts=allele_count, gene_symbols_counts=gene_symbol_count,
-                            classification_counts=classification_count)
+                            classification_counts=classification_count,
+                            overall_activity=overall_activity)
         current_date += timedelta(days=(1 if interval == 1 else 7))
 
 
