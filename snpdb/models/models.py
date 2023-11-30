@@ -644,10 +644,7 @@ class UserAward(TimeStampedModel):
 
     @property
     def icon_class(self):
-        icon = "fa-trophy"
-        if self.award_level == UserAwardLevel.BRONZE:
-            icon = "fa-award"
-        return SafeString(f"fa-solid {icon} user-award user-award-{self.get_award_level_display().lower()}")
+        return SafeString(f"fa-solid fa-trophy user-award user-award-{self.get_award_level_display().lower()}")
 
     @property
     def icon(self):
