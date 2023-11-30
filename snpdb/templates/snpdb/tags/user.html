@@ -5,7 +5,7 @@
     <div class="avatar-frame avatar-frame-{{ user_details.size }}">
         {% avatar2 user_details.avatar size=user_details.size %}
         {% if user_details.avatar.awards %}
-            <div class="user-award" title="{{ user_details.avatar.award_text }}"><i class="fa-solid fa-trophy"></i></div>
+            {{ user_details.avatar.awards.html }}
         {% endif %}
     </div>
 

@@ -302,6 +302,8 @@ class UserAwardAdmin(ModelAdminBasics):
         "user",
     )
 
+    list_display = "user", "award_level", "award_text", "active"
+
 
 @admin.register(models.Country)
 class CountryAdmin(ModelAdminBasics):

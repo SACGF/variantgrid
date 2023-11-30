@@ -76,7 +76,7 @@
                     <div class="list-group">
                         {% for award in avatar_details.awards %}
                         <div class="list-group-item list-group-item-success">
-                            <i class="fa-solid fa-trophy"></i> {{ award.award_text }}
+                            {{ award.icon }} {{ award.award_text }}
                         </div>
                         {% endfor %}
                     </div>

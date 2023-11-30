@@ -20,7 +20,7 @@ from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.preview_request import PreviewData, PreviewModelMixin, PreviewKeyValue
 from library.utils import string_deterministic_hash, rgb_invert
-from snpdb.models import UserAward
+from snpdb.models import UserAward, UserAwards
 from snpdb.models.models import Tag, Lab, Organization
 from snpdb.models.models_columns import CustomColumnsCollection, CustomColumn
 from snpdb.models.models_enums import BuiltInFilters
@@ -293,12 +293,8 @@ class AvatarDetails:
         return AvatarDetails(user=user)
 
     @cached_property
-    def awards(self) -> List[UserAward]:
-        return list(UserAward.objects.filter(user=self.user, active=True).all())
-
-    @cached_property
-    def award_text(self) -> str:
-        return "\n".join(award.award_text for award in self.awards)
+    def awards(self) -> UserAwards:
+        return UserAwards(user=self.user)
 
     @cached_property
     def preferred_label(self) -> str:

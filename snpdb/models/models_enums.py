@@ -6,6 +6,23 @@ from django.db import models
 from library.utils import Constant
 
 
+class UserAwardLevel(models.TextChoices):
+    GOLD = "G", "Gold"
+    SILVER = "S", "Silver"
+    BRONZE = "B", "Bronze"
+
+    @property
+    def int_value(self) -> int:
+        if self == UserAwardLevel.GOLD:
+            return 3
+        elif self == UserAwardLevel.SILVER:
+            return 2
+        elif self == UserAwardLevel.BRONZE:
+            return 1
+
+    def __lt__(self, other):
+        return self.int_value < other.int_value
+
 class ImportSource(models.TextChoices):
     """ Keeps track of where uploaded files came from """
 

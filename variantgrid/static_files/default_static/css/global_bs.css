@@ -16,8 +16,16 @@
     transform: translateY(0);
   }
 }
+.list-group-item .user-award {
+  text-shadow: #fff 0px 0 4px;
+}
+
 .avatar-frame {
   position: relative;
+}
+.avatar-frame .user-award {
+  animation: animationDrop ease-in 0.5s;
+  text-shadow: #fff 0px 0 2px;
 }
 
 .avatar-frame.avatar-frame-tiny .user-award {
@@ -30,14 +38,21 @@
 .avatar-frame.avatar-frame-normal .user-award {
   position: absolute;
   right: 2px;
-  top: -4px;
+  top: -2px;
   font-size: 16pt;
 }
 
-.user-award {
-  color: #ff7f00;
-  text-shadow: #fff 0px 0 2px;
-  animation: animationDrop ease-in 0.5s;
+.user-award-gold {
+  color: #ff8000;
+}
+
+.user-award-silver {
+  color: rgba(180, 180, 185, 0.8);
+  transform: scale(0.8);
+}
+
+.user-award-bronze {
+  color: rgba(235, 157, 80, 0.5);
 }
 
 h3:not(.popover-header), h4:not(.popover-header) {
