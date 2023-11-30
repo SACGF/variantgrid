@@ -13,15 +13,23 @@ def _new_vep_110_annotation(apps, _schema_editor):
     raise ValueError("This is not complete yet!")
 
 
+
     NEW_VARIANT_GRID_COLUMNS = [
-        {'grid_column_name': 'gnomad_mid_af',
-         'variant_column': 'variantannotation__gnomad_mid_af',
-         'annotation_level': VARIANT_LEVEL,
+        {'grid_column_name': 'alphamissense_class',
+         'variant_column': 'variantannotation__alphamissense_class',
+         'annotation_level': TRANSCRIPT_LEVEL,
          'width': None,
-         'label': 'gnomAD MID AF',
-         'description': "Allele Frequency (0-1) among Middle Eastern genotypes (exome+genome) (GRCh38/gnomad4 only)",
+         'label': 'AlphaMissense Class',
          'model_field': True,
          'queryset_field': True},
+        {'grid_column_name': 'alphamissense_pathogenicity',
+         'variant_column': 'variantannotation__alphamissense_pathogenicity',
+         'annotation_level': TRANSCRIPT_LEVEL,
+         'width': None,
+         'label': 'AlphaMissense Pathogenicity',
+         'model_field': True,
+         'queryset_field': True},
+
         {'grid_column_name': 'gnomad_faf95',
          'variant_column': 'variantannotation__gnomad_faf95',
          'annotation_level': VARIANT_LEVEL,
@@ -55,6 +63,49 @@ def _new_vep_110_annotation(apps, _schema_editor):
          'model_field': True,
          'queryset_field': True},
 
+        {'grid_column_name': 'gnomad_mid_af',
+         'variant_column': 'variantannotation__gnomad_mid_af',
+         'annotation_level': VARIANT_LEVEL,
+         'width': None,
+         'label': 'gnomAD MID AF',
+         'description': "Allele Frequency (0-1) among Middle Eastern genotypes (exome+genome) (GRCh38/gnomad4 only)",
+         'model_field': True,
+         'queryset_field': True},
+
+        {'grid_column_name': 'gnomad_non_par',
+         'variant_column': 'variantannotation__gnomad_non_par',
+         'annotation_level': VARIANT_LEVEL,
+         'width': None,
+         'label': 'gnomAD non-PAR',
+         'description': "non_par in genomes or exomes",
+         'model_field': True,
+         'queryset_field': True},
+
+        {'grid_column_name': 'gnomad_xy_ac',
+         'variant_column': 'variantannotation__gnomad_xy_ac',
+         'annotation_level': VARIANT_LEVEL,
+         'width': None,
+         'label': 'gnomAD XY AC',
+         'description': "Allele Count in XY",
+         'model_field': True,
+         'queryset_field': True},
+        {'grid_column_name': 'gnomad_xy_af',
+         'variant_column': 'variantannotation__gnomad_xy_af',
+         'annotation_level': VARIANT_LEVEL,
+         'width': None,
+         'label': 'gnomAD XY AF',
+         'description': "Allele Frequency in XY",
+         'model_field': True,
+         'queryset_field': True},
+        {'grid_column_name': 'gnomad_xy_an',
+         'variant_column': 'variantannotation__gnomad_xy_an',
+         'annotation_level': VARIANT_LEVEL,
+         'width': None,
+         'label': 'gnomAD XY AN',
+         'description': "Allele Number in XY",
+         'model_field': True,
+         'queryset_field': True},
+
         {'grid_column_name': 'gnomad_hemi_count',
          'variant_column': 'variantannotation__gnomad_hemi_count',
          'annotation_level': VARIANT_LEVEL,
@@ -64,12 +115,21 @@ def _new_vep_110_annotation(apps, _schema_editor):
          'model_field': True,
          'queryset_field': True},
 
-        # TODO:
-        #     alphamissense_class
-        #     alphamissense_pathogenicity
-        #     mavedb_score
-        #     mavedb_urn
+        {'grid_column_name': 'mavedb_score',
+         'variant_column': 'variantannotation__mavedb_score',
+         'annotation_level': TRANSCRIPT_LEVEL,
+         'width': None,
+         'label': 'MAVEdb score',
+         'model_field': True,
+         'queryset_field': True},
 
+        {'grid_column_name': 'mavedb_urn',
+         'variant_column': 'variantannotation__mavedb_urn',
+         'annotation_level': TRANSCRIPT_LEVEL,
+         'width': None,
+         'label': 'MAVEdb urn',
+         'model_field': True,
+         'queryset_field': True},
     ]
 
     NEW_COLUMN_VCF_INFO = [
@@ -103,7 +163,12 @@ def _new_vep_110_annotation(apps, _schema_editor):
          'number': None,
          'type': 'F',
          'description': "gnomAD: Allele Frequency from gnomAD2 liftover (GRCh38 only)"},
+
+         # TODO:
+
     ]
+
+    raise ValueError("Huge amount of NEW_COLUMN_VCF_INFO to do")
 
     bulk_insert_class_data(apps, "snpdb", [("VariantGridColumn", NEW_VARIANT_GRID_COLUMNS)])
     bulk_insert_class_data(apps, "snpdb", [("ColumnVCFInfo", NEW_COLUMN_VCF_INFO)])
