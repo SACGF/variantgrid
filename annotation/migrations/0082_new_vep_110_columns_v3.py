@@ -82,7 +82,7 @@ def _new_vep_110_annotation(apps, _schema_editor):
          'vep_custom': VEP_CUSTOM_GNOMAD_4, 'variant_grid_column_id': 'gnomad_sas_af', 'source_field': 'AF_sas',
          'category': FREQUENCY_DATA, 'genome_build_id': 'GRCh38'},
 
-        {'column': 'gnomad4_nonpar', 'variant_grid_column_id': 'gnomad_non_par',
+        {'column': 'gnomad4_nonpar', 'variant_grid_column_id': 'gnomad_non_par', 'min_vep_columns_version': 3,
          'genome_build_id': 'GRCh38', 'pipeline_type': 'S', 'category': 'F', 'source_field': 'non_par',
          'source_field_processing_description': 'nonpar from genomes',
          'vep_custom': VEP_CUSTOM_GNOMAD_4, 'source_field_has_custom_prefix': True},

@@ -10,7 +10,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from annotation.models import VariantAnnotationPipelineType
-from annotation.vep_annotation import run_vep
+from annotation.vep_annotation import run_vep, VEPConfig
 from snpdb.models.models_genome import GenomeBuild
 
 DO_SMALL = False
@@ -28,6 +28,8 @@ class Command(BaseCommand):
         cnv = options["cnv"]
         build_name = options["genome_build"]
         genome_build = GenomeBuild.get_name_or_alias(build_name)
+        vc = VEPConfig(genome_build)
+
 
         if test:
             print("Re-generating VCF for unit test")
@@ -36,6 +38,7 @@ class Command(BaseCommand):
             unit_test_dir = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
             vcf_filename = os.path.join(unit_test_dir, f"{base_name}.vcf")
             output_dir = unit_test_dir
+            base_name = f"test_columns_version_{vc.columns_version}_{genome_build.name.lower()}"
         else:
             vep_suffix = f"vep_annotated_{genome_build.name}"
             output_dir = settings.ANNOTATION_VCF_DUMP_DIR

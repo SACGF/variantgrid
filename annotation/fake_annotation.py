@@ -87,7 +87,7 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
 
 def create_fake_variants(genome_build: GenomeBuild):
     build_lc = genome_build.name.lower()
-    vcf_filename = os.path.join(settings.BASE_DIR, f"annotation/tests/test_data/test_{build_lc}.vep_annotated.vcf")
+    vcf_filename = os.path.join(settings.BASE_DIR, f"annotation/tests/test_data/test_columns_version1_{build_lc}.vep_annotated.vcf")
     slowly_create_loci_and_variants_for_vcf(genome_build, vcf_filename, get_variant_id_from_info=True)
 
 

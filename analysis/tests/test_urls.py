@@ -69,7 +69,7 @@ class Test(URLTestCase):
                                        father=father_cs,
                                        father_affected=False,
                                        proband=proband_cs)
-        vcf_filename = os.path.join(settings.BASE_DIR, "annotation/tests/test_data/test_grch37.vep_annotated.vcf")
+        vcf_filename = os.path.join(settings.BASE_DIR, "annotation/tests/test_data/test_columns_version1_grch37.vep_annotated.vcf")
         slowly_create_loci_and_variants_for_vcf(grch37, vcf_filename, get_variant_id_from_info=True)
         variant = Variant.objects.filter(Variant.get_no_reference_q()).first()
         CohortGenotype.objects.create(collection=collection,

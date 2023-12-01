@@ -188,13 +188,16 @@ class BulkVEPVCFAnnotationInserter:
             "topmed_af": format_pick_highest_float,
             "variant_class": get_choice_formatter_func(VariantClass.choices),
         }
-        if self.genome_build == GenomeBuild.grch38():
+
+        vc = VEPConfig(self.genome_build)
+        # gnomad3 wasn't combined using gnomad_data.py so just uses FILTER
+        # while combined exome/genomes use "gnomad_filtered=1" (which should auto-convert bool)
+        if self.genome_build == GenomeBuild.grch38() and vc.columns_version <= 2:
             self.field_formatters["gnomad_filtered"] = gnomad_filtered_func
 
         self.source_field_to_columns = defaultdict(set)
         self.ignored_vep_fields = self.VEP_NOT_COPIED_FIELDS.copy()
 
-        vc = VEPConfig(self.genome_build)
         cvf_filters = [ColumnVEPField.get_columns_version_q(vc.columns_version)]
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.CNV:
             cvf_filters.extend([
@@ -582,7 +585,10 @@ def empty_to_none(it):
 
 # Field formatters
 def gnomad_filtered_func(raw_value):
-    """ We use FILTER in Gnomad3 (GRCh38 only) - need to convert back to bool """
+    """ We use FILTER in Gnomad3 (GRCh38 only) - need to convert back to bool
+        In the combined exomes/genomes (gnomad2, gnomad4) we use gnomad_filtered=1
+        So don't need to format this etc
+    """
     return raw_value not in (None, "PASS")
 
 
