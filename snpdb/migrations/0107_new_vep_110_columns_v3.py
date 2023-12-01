@@ -5,14 +5,9 @@ from django.db import migrations
 from library.django_utils import bulk_insert_class_data
 
 
-
 def _new_vep_110_annotation(apps, _schema_editor):
     TRANSCRIPT_LEVEL = 'T'
     VARIANT_LEVEL = 'V'
-
-    raise ValueError("This is not complete yet!")
-
-
 
     NEW_VARIANT_GRID_COLUMNS = [
         {'grid_column_name': 'alphamissense_class',
@@ -133,49 +128,83 @@ def _new_vep_110_annotation(apps, _schema_editor):
     ]
 
     NEW_COLUMN_VCF_INFO = [
-        {'info_id': 'GNOMAD3_AC',
-         'column_id': 'gnomad_ac',
-         'number': None,
+        {'info_id': 'ALPHAMISSENSE_class',
+         'column_id': 'alphamissense_class',
+         'number': 1,
+         'type': 'S',
+         'description': 'AlphaMissense pathogenicity prediction'},
+        {'info_id': 'ALPHAMISSENSE_pathogenicity',
+         'column_id': 'alphamissense_pathogenicity',
+         'number': 1,
          'type': 'F',
-         'description': "gnomAD: Alternate Allele Count  (GRCh38 only)"},
-        {'info_id': 'GNOMAD3_AN',
-         'column_id': 'gnomad_an',
-         'number': None,
-         'type': 'I',
-         'description': "gnomAD: Total number of alleles  (GRCh38 only)"},
-        {'info_id': 'GNOMAD3_POPMAX_AC',
-         'column_id': 'gnomad_popmax_ac',
-         'number': None,
-         'type': 'I',
-         'description': "gnomAD: Allele count in the population with the maximum AF  (GRCh38 only)"},
-        {'info_id': 'GNOMAD3_POPMAX_AN',
-         'column_id': 'gnomad_popmax_an',
-         'number': None,
-         'type': 'I',
-         'description': "gnomAD: Total number of alleles in the population with the maximum AF  (GRCh38 only)"},
-        {'info_id': 'GNOMAD3_POPMAX_HOM_ALT',
-         'column_id': 'gnomad_popmax_hom_alt',
-         'number': None,
-         'type': 'I',
-         'description': "gnomAD: Count of homozygous individuals in the population with the maximum allele frequency (GRCh38 only)"},
-        {'info_id': 'GNOMAD2_LIFTOVER_AF',
-         'column_id': 'gnomad2_liftover_af',
-         'number': None,
+         'description': 'AlphaMissense pathogenicity prediction score'},
+        {'info_id': 'GNOMAD_faf95',
+         'column_id': 'gnomad_faf95',
+         'number': 1,
          'type': 'F',
-         'description': "gnomAD: Allele Frequency from gnomAD2 liftover (GRCh38 only)"},
-
-         # TODO:
-
+         'description': 'Filtering allele frequency (using Poisson 95% CI) (max of exomes/genomes) (GRCh38/gnomad4 only)'},
+        {'info_id': 'GNOMAD_faf99',
+         'column_id': 'gnomad_faf99',
+         'number': 1,
+         'type': 'F',
+         'description': 'Filtering allele frequency (using Poisson 99% CI) (max of exomes/genomes) (GRCh38/gnomad4 only)'},
+        {'info_id': 'GNOMAD_fafmax_faf95_max',
+         'column_id': 'gnomad_fafmax_faf95_max',
+         'number': 1,
+         'type': 'F',
+         'description': 'Maximum filtering allele frequency (using Poisson 95% CI) across genetic_ancestry groups (max of exomes/genomes) (GRCh38/gnomad4 only)'},
+        {'info_id': 'GNOMAD_fafmax_faf99_max',
+         'column_id': 'gnomad_fafmax_faf99_max',
+         'number': 1,
+         'type': 'F',
+         'description': 'Maximum filtering allele frequency (using Poisson 99% CI) across genetic_ancestry groups (max of exomes/genomes) (GRCh38/gnomad4 only)'},
+        {'info_id': 'GNOMAD_AF_mid',
+         'column_id': 'gnomad_mid_af',
+         'number': 1,
+         'type': 'F',
+         'description': 'Allele Frequency (0-1) among Middle Eastern genotypes (exome+genome) (GRCh38/gnomad4 only)'},
+        {'info_id': 'GNOMAD_non_par',
+         'column_id': 'gnomad_non_par',
+         'number': 1,
+         'type': 'F',
+         'description': 'non_par in genomes or exomes'},
+        {'info_id': 'GNOMAD_AC_XY',
+         'column_id': 'gnomad_xy_ac',
+         'number': 1,
+         'type': 'I',
+         'description': 'Allele Count in XY'},
+        {'info_id': 'GNOMAD_AF_XY',
+         'column_id': 'gnomad_xy_af',
+         'number': 1,
+         'type': 'F',
+         'description': 'Allele Frequency in XY'},
+        {'info_id': 'GNOMAD_AN_XY',
+         'column_id': 'gnomad_xy_an',
+         'number': 1,
+         'type': 'I',
+         'description': 'Allele Number in XY'},
+        {'info_id': 'GNOMAD_HEMI_COUNT',
+         'column_id': 'gnomad_hemi_count',
+         'number': 1,
+         'type': 'I',
+         'description': 'XY count (in non-PAR regions) - only on chrX'},
+        {'info_id': 'MaveDB_score',
+         'column_id': 'mavedb_score',
+         'number': 1,
+         'type': 'F',
+         'description': 'MaveDB score - see MaveDB for interpretation of scores'},
+        {'info_id': 'MaveDB_urn',
+         'column_id': 'mavedb_urn',
+         'number': 1,
+         'type': 'S',
+         'description': 'MaveDB database identifier'}
     ]
-
-    raise ValueError("Huge amount of NEW_COLUMN_VCF_INFO to do")
 
     bulk_insert_class_data(apps, "snpdb", [("VariantGridColumn", NEW_VARIANT_GRID_COLUMNS)])
     bulk_insert_class_data(apps, "snpdb", [("ColumnVCFInfo", NEW_COLUMN_VCF_INFO)])
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('snpdb', '0106_alter_allelemergelog_allele_linking_tool_and_more'),
     ]
