@@ -7,7 +7,7 @@ from library.guardian_utils import admin_bot
 
 
 def has_invisible_characters(text):
-    pattern = re.compile(r'[^\u0000-\u007F]')
+    pattern = "\u00a0"
     return re.search(pattern, text)
 
 

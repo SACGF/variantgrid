@@ -1090,21 +1090,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         value = cell.value
         e_key = cell.e_key
         note = cell.note
-        # unidecode converts non ascii characters to ascii examples Æ Ö
 
-        def ensure_string(data):
-            if isinstance(data, (dict, list)):
-                data = json.dumps(data)
-                data = unidecode(data)
-                data = json.loads(data)
-                return data
-            elif isinstance(data, str):
-                return unidecode(data)
-            else:
-                return data
-
-        value = ensure_string(value)
-        note = ensure_string(note)
+        if value and '\u00a0' in value:
+            value = value.replace('\u00a0', ' ')
+        if note and '\u00a0' in note:
+            note = note.replace('\u00a0', ' ')
 
         if self.lab.external:
             cell.validate = False
