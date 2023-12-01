@@ -10,7 +10,7 @@ from django.db.models import Q
 
 from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     MutationAssessorPrediction, MutationTasterPrediction, Polyphen2Prediction, \
-    PathogenicityImpact, ALoFTPrediction
+    PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction
 from annotation.models.models import ColumnVEPField, VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap
 from annotation.models.models_enums import VariantClass, VariantAnnotationPipelineType
@@ -156,6 +156,7 @@ class BulkVEPVCFAnnotationInserter:
             "aloft_pred": get_choice_formatter_func(ALoFTPrediction.choices, empty_values=["."]),
             "aloft_high_confidence": format_aloft_high_confidence,
             "aloft_ensembl_transcript": format_empty_as_none,
+            "alphamissense_class": get_format_alphamissense_class_func(),
             "canonical": format_canonical,
             "cosmic_count": format_pick_highest_int,
             "cosmic_id": extract_cosmic,
@@ -598,6 +599,16 @@ def format_vep_sift_to_choice(vep_sift):
         return SIFTPrediction.TOLERATED
     raise ValueError(f"Unknown SIFT value: '{vep_sift}'")
 
+def get_format_alphamissense_class_func():
+    """ GRCh37 has 'benign' while GRCh38 has 'likely_benign'
+        @see https://github.com/Ensembl/VEP_plugins/issues/668
+    """
+    cff = get_choice_formatter_func(AlphaMissensePrediction.CHOICES)
+    def _format_alphamissense_class(alphamissense_class):
+        if alphamissense_class == "benign":
+            alphamissense_class = "likely_benign"
+        return cff(alphamissense_class)
+    return _format_alphamissense_class
 
 def get_extract_existing_variation(prefix):
     def format_vep_existing_variation(vep_existing_variation):
