@@ -156,8 +156,16 @@ class ALoFTPrediction(models.TextChoices):
     DOMINANT = "d", "Dominant"
 
 
-class AlphaMissensePrediction(models.TextChoices):
+class AlphaMissensePrediction(AbstractPathogenicity):
     """ @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_plugins.html#alphamissense """
-    LIKELY_BENIGN = 'b', "likely_benign"
-    AMBIGUOUS = "a", "ambiguous"
-    LIKELY_PATHOGENIC = "p", "likely_pathogenic"
+    LIKELY_BENIGN = 'b'
+    AMBIGUOUS = "a"
+    LIKELY_PATHOGENIC = "p"
+
+    CHOICES = [
+        (LIKELY_BENIGN, 'likely_benign'),
+        (AMBIGUOUS, 'ambiguous'),
+        (LIKELY_PATHOGENIC, 'likely_pathogenic'),
+    ]
+    MINIMUM_FLAG_DAMAGE_LEVEL = LIKELY_PATHOGENIC
+    VARIANT_PATH = "variantannotation__alphamissense_class"

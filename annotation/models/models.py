@@ -459,6 +459,9 @@ class ColumnVEPField(models.Model):
     min_vep_columns_version = models.IntegerField(null=True)
     max_vep_columns_version = models.IntegerField(null=True)
 
+    def __str__(self) -> str:
+        return self.column
+
     @property
     def vep_info_field(self):
         """ For VCFs, be sure to set source_field_has_custom_prefix=True
@@ -467,7 +470,7 @@ class ColumnVEPField(models.Model):
             We need to adjust for this in BulkVEPVCFAnnotationInserter """
 
         vif = self.source_field
-        if self.source_field_has_custom_prefix:
+        if self.vep_custom and self.source_field_has_custom_prefix:
             vif = self.get_vep_custom_display() + "_" + vif
         return vif
 
@@ -550,11 +553,15 @@ class VariantAnnotationVersion(SubVersionPartition):
                 'mutation_taster_pred_most_damaging': lambda d: d in MutationTasterPrediction.get_damage_or_greater_levels(),
                 'polyphen2_hvar_pred_most_damaging': lambda d: d in Polyphen2Prediction.get_damage_or_greater_levels(),
             }
-        elif self.columns_version == 2:
+        elif self.columns_version in (2, 3):
             pathogenic_rankscore = settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE
             pathogenic_prediction_columns = ['bayesdel_noaf_rankscore', 'cadd_raw_rankscore', 'clinpred_rankscore',
                                              'revel_rankscore', 'metalr_rankscore', 'vest4_rankscore']
-            return {c: lambda d: float(d) >= pathogenic_rankscore for c in pathogenic_prediction_columns}
+            pp_funcs = {c: lambda d: float(d) >= pathogenic_rankscore for c in pathogenic_prediction_columns}
+            if self.columns_version == 3:
+                pp_funcs["alphamissense_class"] = lambda d: d in AlphaMissensePrediction.get_damage_or_greater_levels()
+            return pp_funcs
+
         raise ValueError(f"Don't know fields for {self.columns_version=}")
 
     @cached_property
@@ -835,7 +842,7 @@ class AbstractVariantAnnotation(models.Model):
     splice_region = models.TextField(null=True, blank=True)
     symbol = models.TextField(null=True, blank=True)
 
-    alphamissense_class  = models.CharField(max_length=1, choices=AlphaMissensePrediction.choices, null=True, blank=True)
+    alphamissense_class  = models.CharField(max_length=1, choices=AlphaMissensePrediction.CHOICES, null=True, blank=True)
     alphamissense_pathogenicity = models.FloatField(null=True, blank=True)
 
     mavedb_score = models.FloatField(null=True, blank=True)

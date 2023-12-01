@@ -133,12 +133,12 @@ def _new_vep_110_annotation(apps, _schema_editor):
         #         'vep_custom': GNOMAD_4, 'variant_grid_column_id': 'gnomad_popmax_hom_alt', 'source_field': 'nhomalt_grpmax', 'category': FREQUENCY_DATA},
 
         # MAVE
-        {'column': 'mavedb_score', 'source_field_has_custom_prefix': True, 'min_vep_columns_version': 3,
+        {'column': 'mavedb_score', 'min_vep_columns_version': 3,
          'vep_plugin': VEP_PLUGIN_MAVEDB, 'variant_grid_column_id': 'mavedb_score',
-         'source_field': 'score', 'category': FUNCTIONAL_EFFECT, 'genome_build_id': 'GRCh38'},
-        {'column': 'mavedb_urn', 'source_field_has_custom_prefix': True, 'min_vep_columns_version': 3,
+         'source_field': 'MaveDB_score', 'category': FUNCTIONAL_EFFECT, 'genome_build_id': 'GRCh38'},
+        {'column': 'mavedb_urn', 'min_vep_columns_version': 3,
          'vep_plugin': VEP_PLUGIN_MAVEDB, 'variant_grid_column_id': 'mavedb_urn',
-         'source_field': 'urn', 'category': FUNCTIONAL_EFFECT, 'genome_build_id': 'GRCh38'},
+         'source_field': 'MaveDB_urn', 'category': FUNCTIONAL_EFFECT, 'genome_build_id': 'GRCh38'},
 
         # AlphaMissense
         {'column': 'alphamissense_class', 'min_vep_columns_version': 3,
