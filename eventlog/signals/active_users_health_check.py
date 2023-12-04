@@ -7,7 +7,8 @@ from django.dispatch import receiver
 from classification.models import DiscordanceReportTriage, ClinVarExportBatch, ClinVarExportBatchStatus
 from eventlog.models import Event, ViewEvent
 from library.guardian_utils import bot_group
-from library.health_check import health_check_signal, HealthCheckRequest, HealthCheckRecentActivity
+from library.health_check import health_check_signal, HealthCheckRequest, HealthCheckRecentActivity, \
+    health_check_overall_stats_signal, HealthCheckTotalAmount
 from snpdb.models import UserPreview
 
 
@@ -102,19 +103,17 @@ def discordance_triage_health_check(sender, health_request: HealthCheckRequest, 
         )
 
 
-@receiver(signal=health_check_signal)
+@receiver(signal=health_check_overall_stats_signal)
 def clinvar_export_batch_healthcheck(sender, health_request: HealthCheckRequest, **kwargs):
 
-    accepted_statuses = [ClinVarExportBatchStatus.AWAITING_UPLOAD, ClinVarExportBatchStatus.UPLOADING]
-    recent_batches = ClinVarExportBatch.objects.filter(status__in=accepted_statuses,
-                                                       created__gte=health_request.since,
-                                                       created__lt=health_request.now)
+    accepted_statuses = (ClinVarExportBatchStatus.AWAITING_UPLOAD, ClinVarExportBatchStatus.UPLOADING)
+    recent_batches = ClinVarExportBatch.objects.filter(status__in=accepted_statuses)
 
     if count := recent_batches.count():
-        return HealthCheckRecentActivity(
+        return HealthCheckTotalAmount(
             emoji=":package:",
-            name="ClinVar Export Batches",
+            name="Pending ClinVar Export Batches",
             amount=count,
-            extra=", ".join([f'{batch.clinvar_key.name} - *{batch.get_status_display()}*' for batch in recent_batches]),
-            stand_alone=True,
+            extra=", ".join([f'{batch.clinvar_key.name} *{batch.get_status_display()}*' for batch in recent_batches])
         )
+
