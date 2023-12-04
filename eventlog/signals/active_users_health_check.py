@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.db.models import Q
 from django.dispatch import receiver
 
-from classification.models import DiscordanceReportTriage
+from classification.models import DiscordanceReportTriage, ClinVarExportBatch, ClinVarExportBatchStatus
 from eventlog.models import Event, ViewEvent
 from library.guardian_utils import bot_group
 from library.health_check import health_check_signal, HealthCheckRequest, HealthCheckRecentActivity
@@ -99,4 +99,22 @@ def discordance_triage_health_check(sender, health_request: HealthCheckRequest, 
             extra=", ".join([f'DR_{report.discordance_report.pk}' for report in recent_reports]),
             stand_alone=True,
             preview=[report.preview for report in recent_reports]
+        )
+
+
+@receiver(signal=health_check_signal)
+def clinvar_export_batch_healthcheck(sender, health_request: HealthCheckRequest, **kwargs):
+
+    accepted_statuses = [ClinVarExportBatchStatus.AWAITING_UPLOAD, ClinVarExportBatchStatus.UPLOADING]
+    recent_batches = ClinVarExportBatch.objects.filter(status__in=accepted_statuses,
+                                                       created__gte=health_request.since,
+                                                       created__lt=health_request.now)
+
+    if count := recent_batches.count():
+        return HealthCheckRecentActivity(
+            emoji=":package:",
+            name="ClinVar Export Batches",
+            amount=count,
+            extra=", ".join([f'{batch.clinvar_key.name} - *{batch.get_status_display()}*' for batch in recent_batches]),
+            stand_alone=True,
         )
