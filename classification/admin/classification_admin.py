@@ -12,6 +12,7 @@ from django.utils.safestring import SafeString
 from annotation.models.models import AnnotationVersion
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
 from classification.classification_import import reattempt_variant_matching
+from classification.enums import WithdrawReason
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
     ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
@@ -385,21 +386,26 @@ class ClassificationAdmin(ModelAdminBasics):
         for vc in queryset:
             vc.patch_value(patch={}, user=request.user, source=SubmissionSource.VARIANT_GRID, remove_api_immutable=True, save=True)
 
-    def set_withdraw(self, request, queryset: QuerySet[Classification], withdraw: bool) -> int:
+    def set_withdraw(self, request, queryset: QuerySet[Classification], withdraw: bool, reason: WithdrawReason.OTHER) -> int:
         count = 0
         for vc in queryset:
             try:
-                actioned = vc.set_withdrawn(user=request.user, withdraw=withdraw)
+                actioned = vc.set_withdrawn(user=request.user, withdraw=withdraw, reason=reason)
                 if actioned:
                     count += 1
             except BaseException:
                 pass
         return count
 
-    @admin_action("State: Withdraw")
-    def withdraw_true(self, request, queryset: QuerySet[Classification]):
+    @admin_action("State: Withdraw (Other)")
+    def withdraw_true_other(self, request, queryset: QuerySet[Classification]):
         count = self.set_withdraw(request, queryset, True)
         self.message_user(request, f"{count} records now newly set to withdrawn")
+
+    @admin_action("State: Withdraw (Duplicate)")
+    def withdraw_true_duplicate(self, request, queryset: QuerySet[Classification]):
+        count = self.set_withdraw(request, queryset, True, reason=WithdrawReason.DUPLICATE)
+        self.message_user(request, f"{count} records now newly set to withdrawn as duplicate")
 
     @admin_action("State: Un-Withdraw")
     def withdraw_false(self, request, queryset):
