@@ -2,34 +2,35 @@
 
 set -e
 
+# Download 4.5 from https://sites.google.com/site/jpopgen/dbNSFP
+
+# https://m.ensembl.org/info/docs/tools/vep/script/vep_plugins.html#dbnsfp
+
+# zcat dbNSFP4.5a_variant.chr1.gz | head -n1 > header.txt
+# mkdir /tmp/dbsnp38
+# zgrep -h -v ^#chr dbNSFP4.5a_variant.chr* | sort -T /tmp/dbsnp38 -k1,1 -k2,2n - | cat header.txt - | bgzip -c > dbNSFP4.5a_grch38.gz
+# tabix -s 1 -b 2 -e 2 dbNSFP4.5a_grch38.gz
+
+
 # All of this python is just to get the columns used in cut and tabix args
 
 # Get dbNSFP fields used by VariantGrid - run python3 manage.py shell
 # In [12]: ",".join(ColumnVEPField.get_source_fields(vep_plugin='d'))                                                                                                                                     
 
 # Get column names from dbNSFP data file
-# df = pd.read_csv("./dbNSFP4.3a.grch38.gz", sep='\t', index_col=None, nrows=0)
-# vep_fields = 'GERP++_RS,Interpro_domain,CADD_raw_rankscore,REVEL_rankscore,BayesDel_noAF_rankscore,ClinPred_rankscore,VEST4_rankscore,MetaLR_rankscore,Aloft_prob_Tolerant,Aloft_prob_Recessive,Aloft_prob_Dominant,Aloft_pred,Aloft_Confidence'
+# df = pd.read_csv("header.txt", sep='\t', index_col=None, nrows=0)
+# vep_fields = 'GERP++_RS,Interpro_domain,CADD_raw_rankscore,REVEL_rankscore,BayesDel_noAF_rankscore,ClinPred_rankscore,VEST4_rankscore,MetaLR_rankscore,Aloft_prob_Tolerant,Aloft_prob_Recessive,Aloft_prob_Dominant,Aloft_pred,Aloft_Confidence,AlphaMissense_rankscore,AlphaMissense_pred'
 # columns = ['#chr', 'pos(1-based)', 'ref', 'alt', 'aaref', 'aaalt', 'Ensembl_transcriptid'] + vep_fields.split(",")
 # cols = []
 # for i in columns:
 #    cols.append(list(df.columns).index(i) + 1)
-# ",".join([str(c) for c in sorted(cols)])
-# columns are: '1,2,3,4,5,6,15,69,74,84,104,107,113,114,115,116,117,119,156,640'
+# print(",".join([str(c) for c in sorted(cols)]))
+# columns are: '1,2,3,4,5,6,15,69,74,84,106,109,139,140,142,143,144,145,146,148,185,705'
 
-# Download 4.3 from https://sites.google.com/site/jpopgen/dbNSFP
-
-# https://m.ensembl.org/info/docs/tools/vep/script/vep_plugins.html#dbnsfp
-
-# zcat dbNSFP4.3a_variant.chr1.gz | head -n1 > h
-# zgrep -h -v ^#chr dbNSFP4.3a_variant.chr* | sort -T /path/to/tmp_folder -k1,1 -k2,2n - | cat h - | bgzip -c > dbNSFP4.3a_grch38.gz
-# tabix -s 1 -b 2 -e 2 dbNSFP4.3a_grch38.gz
-
-
-IN_FILE=dbNSFP4.3a.grch38.gz
-OUT_FILE=dbNSFP4.3a.grch38.stripped.gz
+IN_FILE=dbNSFP4.5a.grch38.gz
+OUT_FILE=dbNSFP4.5a.grch38.stripped.gz
 
 # Header needs to start with #
-(echo -n "#" ; zcat ${IN_FILE} | cut -f 1,2,3,4,5,6,15,69,74,84,104,107,113,114,115,116,117,119,156,640 ) | bgzip > ${OUT_FILE}
+(echo -n "#" ; zcat ${IN_FILE} | cut -f 1,2,3,4,5,6,15,69,74,84,106,109,139,140,142,143,144,145,146,148,185,705 ) | bgzip > ${OUT_FILE}
 tabix -s 1 -b 2 -e 2 ${OUT_FILE} # cols are: 1=chr, 2=pos
 
