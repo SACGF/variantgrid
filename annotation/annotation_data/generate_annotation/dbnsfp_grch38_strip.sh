@@ -28,14 +28,15 @@ set -e
 # columns are: '1,2,3,4,5,6,15,69,74,84,106,109,139,140,142,143,144,145,146,148,185,705'
 
 CUT_COLUMNS="1,2,3,4,5,6,15,69,74,84,106,109,139,140,142,143,144,145,146,148,185,705"
-OUT_FILE=dbNSFP4.5a.grch38.stripped.gz
+OUT_FILE=dbNSFP4.5a.grch38.stripped
 TMP_DIR=/tmp # /hpcfs/groups/phoenix-hpc-sacgf/scratch/dbnsfp4.5_GRCh38
 mkdir -p ${TMP_DIR}
 
 # Sort chromosomes individually as that's much more efficient
-cat header.txt | cut -f ${CUT_COLUMNS} | bgzip > ${OUT_FILE}
+cat header.txt | cut -f ${CUT_COLUMNS} > ${OUT_FILE}
 for chrom in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y; do
-    zgrep -h -v ^#chr dbNSFP4.5a_variant.chr${chrom}.gz | cut -f ${CUT_COLUMNS} | sort -T ${TMP_DIR} -k1,1 -k2,2n - | bgzip >> ${OUT_FILE}
+    zgrep -h -v ^#chr dbNSFP4.5a_variant.chr${chrom}.gz | cut -f ${CUT_COLUMNS} | sort -T ${TMP_DIR} -k1,1 -k2,2n - >> ${OUT_FILE}
 done
 
-tabix -s 1 -b 2 -e 2 ${OUT_FILE} # cols are: 1=chr, 2=pos
+bgzip ${OUT_FILE}
+tabix -s 1 -b 2 -e 2 ${OUT_FILE}.gz # cols are: 1=chr, 2=pos
