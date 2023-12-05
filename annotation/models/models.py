@@ -281,9 +281,13 @@ class ClinVarCitation(models.Model):
 
 
 class DBNSFPGeneAnnotationVersion(TimeStampedModel):
-    """ @see https://sites.google.com/site/jpopgen/dbNSFP """
+    """ @see https://sites.google.com/site/jpopgen/dbNSFP
+        This isn't updated every release, so can have same hash across diff versions """
     version = models.TextField(primary_key=True)
-    md5_hash = models.CharField(max_length=32, unique=True)
+    md5_hash = models.CharField(max_length=32)
+
+    class Meta:
+        unique_together = ('version', 'md5_hash')
 
     def save(self, **kwargs):
         created = not self.pk

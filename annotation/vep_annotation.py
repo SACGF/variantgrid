@@ -144,7 +144,6 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
 
         if vc.columns_version >= 3:
             plugin_data_func.update({
-                VEPPlugin.ALPHAMISSENSE: lambda: f"AlphaMissense,file={vc['alphamissense']}",
                 VEPPlugin.MAVEDB: lambda: f"MaveDB,file={vc['mave']},single_aminoacid_changes=0,transcript_match=0 ",
             })
 
