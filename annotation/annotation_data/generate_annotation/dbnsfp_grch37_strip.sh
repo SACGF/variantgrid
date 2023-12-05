@@ -27,12 +27,15 @@ set -e
 # print(",".join([str(c) for c in sorted(cols)]))
 # columns are: '3,4,5,6,8,9,15,69,74,84,106,109,139,140,142,143,144,145,146,148,185,705'
 
-
-
-IN_FILE=dbNSFP4.5a.grch37.gz
+CUT_COLUMNS="3,4,5,6,8,9,15,69,74,84,106,109,139,140,142,143,144,145,146,148,185,705"
 OUT_FILE=dbNSFP4.5a.grch37.stripped.gz
+TMP_DIR=/tmp # /hpcfs/groups/phoenix-hpc-sacgf/scratch/dbnsfp_GRCh37
+mkdir -p ${TMP_DIR}
 
-# Header needs to start with #
-(echo -n "#" ; zcat ${IN_FILE} | cut -f 3,4,5,6,8,9,15,69,74,84,106,109,139,140,142,143,144,145,146,148,185,705 ) | bgzip > ${OUT_FILE}
+# Sort chromosomes individually as that's much more efficient
+cat header.txt | cut -f ${CUT_COLUMNS} | bgzip > ${OUT_FILE}
+for chrom in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y; do
+    zgrep -h -v ^#chr dbNSFP4.5a_variant.chr${chrom}.gz | awk '$8 != "." ' | cut -f ${CUT_COLUMNS} | sort -T ${TMP_DIR} -k8,8 -k9,9n - | bgzip >> ${OUT_FILE}
+done
+
 tabix -s 5 -b 6 -e 6 ${OUT_FILE} # cols are: 1=ref, 2=alt, 3=chr, 4=pos
-
