@@ -104,16 +104,18 @@ def discordance_triage_health_check(sender, health_request: HealthCheckRequest, 
 
 
 @receiver(signal=health_check_overall_stats_signal)
-def clinvar_export_batch_healthcheck(sender, health_request: HealthCheckRequest, **kwargs):
+def clinvar_export_batch_health_check(sender, health_request: HealthCheckRequest, **kwargs):
 
-    accepted_statuses = (ClinVarExportBatchStatus.AWAITING_UPLOAD, ClinVarExportBatchStatus.UPLOADING)
-    recent_batches = ClinVarExportBatch.objects.filter(status__in=accepted_statuses)
+    results: list[HealthCheckTotalAmount] = []
 
-    if count := recent_batches.count():
-        return HealthCheckTotalAmount(
-            emoji=":package:",
-            name="Pending ClinVar Export Batches",
-            amount=count,
-            extra=", ".join([f'{batch.clinvar_key.name} *{batch.get_status_display()}*' for batch in recent_batches])
-        )
+    for status in (ClinVarExportBatchStatus.AWAITING_UPLOAD, ClinVarExportBatchStatus.UPLOADING):
+        recent_batches = ClinVarExportBatch.objects.filter(status=status)
 
+        if count := recent_batches.count():
+            results.append(HealthCheckTotalAmount(
+                emoji=":package:",
+                name=f"ClinVar Export Batches in status of \"{status.label}\"",
+                amount=count,
+                extra=", ".join([f'{batch.clinvar_key.name} ({batch.pk})' for batch in recent_batches])
+            ))
+    return results
