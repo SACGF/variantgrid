@@ -557,10 +557,10 @@ class VariantAnnotationVersion(SubVersionPartition):
             pathogenic_rankscore = settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE
             pathogenic_prediction_columns = ['bayesdel_noaf_rankscore', 'cadd_raw_rankscore', 'clinpred_rankscore',
                                              'revel_rankscore', 'metalr_rankscore', 'vest4_rankscore']
-            pp_funcs = {c: lambda d: float(d) >= pathogenic_rankscore for c in pathogenic_prediction_columns}
             if self.columns_version == 3:
-                pp_funcs["alphamissense_class"] = lambda d: d in AlphaMissensePrediction.get_damage_or_greater_levels()
-            return pp_funcs
+                pathogenic_prediction_columns.append("alphamissense_rankscore")
+
+            return {c: lambda d: float(d) >= pathogenic_rankscore for c in pathogenic_prediction_columns}
 
         raise ValueError(f"Don't know fields for {self.columns_version=}")
 
@@ -842,9 +842,6 @@ class AbstractVariantAnnotation(models.Model):
     splice_region = models.TextField(null=True, blank=True)
     symbol = models.TextField(null=True, blank=True)
 
-    alphamissense_class  = models.CharField(max_length=1, choices=AlphaMissensePrediction.CHOICES, null=True, blank=True)
-    alphamissense_pathogenicity = models.FloatField(null=True, blank=True)
-
     mavedb_score = models.FloatField(null=True, blank=True)
     mavedb_urn = models.TextField(null=True, blank=True)
 
@@ -955,6 +952,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
     clinpred_rankscore = models.FloatField(null=True, blank=True)
     vest4_rankscore = models.FloatField(null=True, blank=True)
     metalr_rankscore = models.FloatField(null=True, blank=True)
+    alphamissense_rankscore = models.FloatField(null=True, blank=True)
+
     # ALoFT (from dbNSFP)
     aloft_prob_tolerant = models.FloatField(null=True, blank=True)
     aloft_prob_recessive = models.FloatField(null=True, blank=True)

@@ -125,7 +125,6 @@ class ColumnAnnotationCategory(models.TextChoices):
 
 
 class VEPPlugin(models.TextChoices):
-    ALPHAMISSENSE = 'A', 'AlphaMissense'
     DBNSFP = 'd', 'dbNSFP'
     DBSCSNV = 'v', 'dbscSNV'
     GRANTHAM = 'g', 'Grantham'
