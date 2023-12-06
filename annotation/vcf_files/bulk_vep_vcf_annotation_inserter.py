@@ -136,6 +136,7 @@ class BulkVEPVCFAnnotationInserter:
 
     def _add_vep_field_handlers(self):
         # TOPMED and 1k genomes can return multiple values - take highest
+        format_pick_lowest_float = get_clean_and_pick_single_value_func(min, float)
         format_pick_highest_float = get_clean_and_pick_single_value_func(max, float)
         format_pick_highest_int = get_clean_and_pick_single_value_func(max, int)
         remove_empty_multiples = get_clean_and_pick_single_value_func(join_uniq)
@@ -173,6 +174,7 @@ class BulkVEPVCFAnnotationInserter:
             "mastermind_count_3_aa_change": get_clean_and_pick_single_value_func(operator.itemgetter(2), int),
             "mutation_assessor_pred_most_damaging": get_most_damaging_func(MutationAssessorPrediction),
             "mutation_taster_pred_most_damaging": get_most_damaging_func(MutationTasterPrediction),
+            "mavedb_score": format_pick_lowest_float,
             "nmd_escaping_variant": format_nmd_escaping_variant,
             # conservation fields are from BigWig, which can return multiple entries
             # for deletions. Higher = more conserved, so for rare disease filtering taking max makes sense
