@@ -27,19 +27,19 @@ set -e
 # print(",".join([str(c) for c in sorted(cols)]))
 # columns are: '3,4,5,6,8,9,15,69,74,84,106,109,139,140,142,143,144,145,146,148,185,705'
 
+# Note: We can't do this per-contig then join them, as some variants switch contigs between builds
 CUT_COLUMNS="3,4,5,6,8,9,15,69,74,84,106,109,139,140,142,143,144,145,146,148,185,705"
-SEQ_COL=5 # hg19_chr
-POS_COL=6 # hg19_pos(1-based)
-OUT_FILE=dbNSFP4.5a.grch37.stripped
-TMP_DIR=/tmp # /hpcfs/groups/phoenix-hpc-sacgf/scratch/dbnsfp_GRCh37
-mkdir -p ${TMP_DIR}
+SEQ_COL=3  # hg19_chr was col 5 (but 3rd after cut)
+POS_COL=4  # hg19_pos(1-based) was 6 (but 4th after cut)
 
-# Sort chromosomes individually as that's much more efficient
-cat header.txt | cut -f ${CUT_COLUMNS} > ${OUT_FILE}
-for chrom in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y; do
-    zgrep -h -v ^#chr dbNSFP4.5a_variant.chr${chrom}.gz | awk '$8 != "." ' | cut -f ${CUT_COLUMNS} | sort -T ${TMP_DIR} -k${SEQ_COL},${SEQ_COL} -k${POS_COL},${POS_COL}n - >> ${OUT_FILE}
-done
+version=4.5a
+out_vcf=dbNSFP${version}_grch37.gz
 
-bgzip ${OUT_FILE}
-tabix -s ${SEQ_COL} -b ${POS_COL} -e ${POS_COL} ${OUT_FILE}.gz
+# cd /hpcfs/groups/phoenix-hpc-sacgf/reference/annotation/dbnsfp/dbnsfp4.5
 
+zcat dbNSFP${version}_variant.chr1.gz | head -n1 > h
+zgrep -h -v ^#chr dbNSFP${version}_variant.chr* | awk '$8 != "." ' | sort -T ${TMP_DIR} -k8,8 -k9,9n - | cat h - | bgzip -c > ${out_vcf}
+zcat ${out_vcf} | cut -f  ${CUT_COLUMNS}  > dbNSFP${version}_grch37.stripped
+bgzip dbNSFP${version}_grch37.stripped
+
+tabix -s ${SEQ_COL} -b ${POS_COL} -e ${POS_COL} dbNSFP${version}_grch37.stripped.gz
