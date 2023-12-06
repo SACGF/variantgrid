@@ -289,7 +289,9 @@ def write_vcf_header(version, info_fields, popmax_fields, sub_pops):
         else:
             af_desc = ""
         af_desc += f" made from (exomes_{ac_name} + genomes_{ac_name}) / (exomes_{an_name} + genomes_{an_name})"
-        meta += f'##INFO=<ID={info_id},Number=1,Type=Float,Description="Allele Frequency {af_desc}">\n'
+        meta += f'##INFO=<ID={info_id},Number=1,Type=Float,Description="Allele Frequency for {af_desc}">\n'
+        meta += f'##INFO=<ID={ac_name},Number=1,Type=Integer,Description="Allele Count for {af_desc}">\n'
+        meta += f'##INFO=<ID={an_name},Number=1,Type=Integer,Description="Allele Number for {af_desc}">\n'
 
     vcf_header = f"gnomad_{version}_vcf_header.txt.gz"
     with gzip.open(vcf_header, "wt") as f:
