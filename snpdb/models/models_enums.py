@@ -138,7 +138,9 @@ class AlleleConversionTool(models.TextChoices):
     SAME_CONTIG = "SC", "Identical Contig/Version"
     CLINGEN_ALLELE_REGISTRY = 'CA', "ClinGen Allele Registry"
     DBSNP = 'DB', "dbSNP API"
-    NCBI_REMAP = 'NR', "NCBI Remap"
+    NCBI_REMAP = 'NR', "NCBI Remap"  # This is obsolete as of November 2023
+    PICARD = "PC", "Picard LiftoverVCF"
+    CROSSMAP = "CM", "CrossMap"
 
     @classmethod
     def vcf_tuples_in_destination_build(cls, conversion_tool):

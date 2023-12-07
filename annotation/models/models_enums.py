@@ -111,6 +111,7 @@ class ColumnAnnotationCategory(models.TextChoices):
     CONSERVATION = 'C', "Conservation"
     EXTERNAL_ID = 'E', "External ID"
     FREQUENCY_DATA = 'F', "Frequency Data"
+    FUNCTIONAL_EFFECT = 'f', "Functional Effect"
     GENE_ANNOTATIONS = 'G', 'Gene Annotations'
     HGVS = 'H', "HGVS"
     LITERATURE = 'L', 'Literature'
@@ -124,7 +125,6 @@ class ColumnAnnotationCategory(models.TextChoices):
 
 
 class VEPPlugin(models.TextChoices):
-    ALPHAMISSENSE = 'A', 'AlphaMissense'
     DBNSFP = 'd', 'dbNSFP'
     DBSCSNV = 'v', 'dbscSNV'
     GRANTHAM = 'g', 'Grantham'

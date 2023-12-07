@@ -74,8 +74,8 @@
             {% labelled hint="chunky" label="VCF Dump Filename" %}{% code_shell annotation_run.vcf_dump_filename %}{% endlabelled %}
             {% labelled hint="chunky" label="VCF Annotated Filename" %}{% code_shell annotation_run.vcf_annotated_filename %}{% endlabelled %}
             {% labelled hint="chunky" label="Pipeline Command" %}{% code_shell annotation_run.pipeline_command %}{% endlabelled %}
-            {% labelled hint="chunky" label="Pipeline StdOut" %}{% code_shell annotation_run.pipeline_stdout %}{% endlabelled %}
-            {% labelled hint="chunky" label="Pipeline StdErr" %}{% code_shell annotation_run.pipeline_stderr %}{% endlabelled %}
+            {% labelled hint="chunky" label="Pipeline StdOut" %}{% code_shell annotation_run.pipeline_stdout|truncatechars:10000 %}{% endlabelled %}
+            {% labelled hint="chunky" label="Pipeline StdErr" %}{% code_shell annotation_run.pipeline_stderr|truncatechars:10000 %}{% endlabelled %}
             {% labelled hint="chunky" label="Error Exception" %}{% code_shell annotation_run.error_exceptionr %}{% endlabelled %}
         </div>
     </div>

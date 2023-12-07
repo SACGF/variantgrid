@@ -131,26 +131,27 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         ])
 
         # Plugins that require data - ok for these to fail when retrieving vep config
-        PLUGINS = {VEPPlugin.MASTERMIND: lambda: f"Mastermind,{vc['mastermind']},1",  # 1 to not filter
-                   VEPPlugin.MAXENTSCAN: lambda: f"MaxEntScan,{vc['maxentscan']}",
-                   VEPPlugin.DBNSFP: lambda: _get_dbnsfp_plugin_command(genome_build, vc),
-                   VEPPlugin.DBSCSNV: lambda: f"dbscSNV,{vc['dbscsnv']}",
-                   VEPPlugin.SPLICEAI: lambda: f"SpliceAI,snv={vc['spliceai_snv']},indel={vc['spliceai_indel']}"}
+        plugin_data_func = {
+            VEPPlugin.MASTERMIND: lambda: f"Mastermind,{vc['mastermind']},1",  # 1 to not filter
+            VEPPlugin.MAXENTSCAN: lambda: f"MaxEntScan,{vc['maxentscan']}",
+            VEPPlugin.DBNSFP: lambda: _get_dbnsfp_plugin_command(genome_build, vc),
+            VEPPlugin.DBSCSNV: lambda: f"dbscSNV,{vc['dbscsnv']}",
+            VEPPlugin.SPLICEAI: lambda: f"SpliceAI,snv={vc['spliceai_snv']},indel={vc['spliceai_indel']}"
+        }
 
         if vc.columns_version >= 2:
             cmd.extend(["--plugin", "NMD"])
 
-        for vep_plugin, plugin_arg_func in PLUGINS.items():
-            try:
-                cmd.extend(["--plugin", plugin_arg_func()])
-            except Exception as e:
-                logging.warning(e)
-                logging.warning("No annotation set for plugin: %s", vep_plugin)
+        if vc.columns_version >= 3:
+            plugin_data_func.update({
+                VEPPlugin.MAVEDB: lambda: f"MaveDB,file={vc['mave']},single_aminoacid_changes=0,transcript_match=0 ",
+            })
 
         # Custom
         for vep_custom, prefix in dict(VEPCustom.choices).items():
             try:
-                if fields := ColumnVEPField.get_source_fields(genome_build, vep_custom=vep_custom):
+                q = ColumnVEPField.get_columns_version_q(vc.columns_version)
+                if fields := ColumnVEPField.get_source_fields(genome_build, q, vep_custom=vep_custom):
                     prefix_lc = prefix.lower()
                     if cfg := vc[prefix_lc]:  # annotation settings are lower case
                         cmd.extend(_get_custom_params_list(fields, prefix, cfg))
@@ -161,6 +162,29 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
                 logging.warning(e)
                 # Not all annotations available for all builds - ok to just warn
                 logging.warning("Skipped custom annotation: %s", prefix)
+
+    else:
+        plugin_data_func = {
+            # TODO: Need to decide on overlap criteria
+            # percentage : percentage overlap between SVs (default: 80)
+            # reciprocal : calculate reciprocal overlap, options: 0 or 1. (default: 0)
+            # (overlap is expressed as % of input SV by default)
+            # cols : colon delimited list of data types to return from the INFO fields (only AF by default)
+            # same_type : 1/0 only report SV of the same type (eg deletions for deletions, off by default)
+            # distance : the distance the ends of the overlapping SVs should be within.
+            # match_type : only report reference SV which lie within or completely surround the input SV
+            # options: within, surrounding
+            VEPPlugin.STRUCTURALVARIANTOVERLAP: lambda: f"StructuralVariantOverlap,file={vc['structuralvariantoverlap']}",
+        }
+
+    for vep_plugin, plugin_arg_func in plugin_data_func.items():
+        try:
+            cmd.extend(["--plugin", plugin_arg_func()])
+        except Exception as e:
+            logging.warning(e)
+            logging.warning("No annotation set for plugin: %s", vep_plugin)
+
+
 
     return cmd
 
@@ -256,7 +280,8 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
         kwargs["dbnsfp"] = 'n/a'
 
     # we use our own gnomAD custom annotation, not the default VEP one
-    if cvf := ColumnVEPField.objects.filter(variant_grid_column='gnomad_af', genome_build=genome_build).first():
+    q_cvf = ColumnVEPField.get_columns_version_q(vep_config.columns_version)
+    if cvf := ColumnVEPField.objects.filter(q_cvf, variant_grid_column='gnomad_af', genome_build=genome_build).first():
         try:
             # annotation_data/GRCh37/gnomad2.1.1_GRCh37_combined_af.vcf.bgz
             # gnomad3.1_GRCh38_merged.vcf.bgz

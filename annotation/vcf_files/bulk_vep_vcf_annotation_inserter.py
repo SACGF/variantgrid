@@ -10,7 +10,7 @@ from django.db.models import Q
 
 from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     MutationAssessorPrediction, MutationTasterPrediction, Polyphen2Prediction, \
-    PathogenicityImpact, ALoFTPrediction
+    PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction
 from annotation.models.models import ColumnVEPField, VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap
 from annotation.models.models_enums import VariantClass, VariantAnnotationPipelineType
@@ -136,6 +136,9 @@ class BulkVEPVCFAnnotationInserter:
 
     def _add_vep_field_handlers(self):
         # TOPMED and 1k genomes can return multiple values - take highest
+        empty_mave_float_values = EMPTY_VALUES | {"NA"}
+        format_pick_lowest_float = get_clean_and_pick_single_value_func(min, float,
+                                                                        empty_values=empty_mave_float_values)
         format_pick_highest_float = get_clean_and_pick_single_value_func(max, float)
         format_pick_highest_int = get_clean_and_pick_single_value_func(max, int)
         remove_empty_multiples = get_clean_and_pick_single_value_func(join_uniq)
@@ -156,6 +159,7 @@ class BulkVEPVCFAnnotationInserter:
             "aloft_pred": get_choice_formatter_func(ALoFTPrediction.choices, empty_values=["."]),
             "aloft_high_confidence": format_aloft_high_confidence,
             "aloft_ensembl_transcript": format_empty_as_none,
+            "alphamissense_class": get_format_alphamissense_class_func(),
             "canonical": format_canonical,
             "cosmic_count": format_pick_highest_int,
             "cosmic_id": extract_cosmic,
@@ -172,6 +176,7 @@ class BulkVEPVCFAnnotationInserter:
             "mastermind_count_3_aa_change": get_clean_and_pick_single_value_func(operator.itemgetter(2), int),
             "mutation_assessor_pred_most_damaging": get_most_damaging_func(MutationAssessorPrediction),
             "mutation_taster_pred_most_damaging": get_most_damaging_func(MutationTasterPrediction),
+            "mavedb_score": format_pick_lowest_float,
             "nmd_escaping_variant": format_nmd_escaping_variant,
             # conservation fields are from BigWig, which can return multiple entries
             # for deletions. Higher = more conserved, so for rare disease filtering taking max makes sense
@@ -187,13 +192,16 @@ class BulkVEPVCFAnnotationInserter:
             "topmed_af": format_pick_highest_float,
             "variant_class": get_choice_formatter_func(VariantClass.choices),
         }
-        if self.genome_build == GenomeBuild.grch38():
+
+        vc = VEPConfig(self.genome_build)
+        # gnomad3 wasn't combined using gnomad_data.py so just uses FILTER
+        # while combined exome/genomes use "gnomad_filtered=1" (which should auto-convert bool)
+        if self.genome_build == GenomeBuild.grch38() and vc.columns_version <= 2:
             self.field_formatters["gnomad_filtered"] = gnomad_filtered_func
 
         self.source_field_to_columns = defaultdict(set)
         self.ignored_vep_fields = self.VEP_NOT_COPIED_FIELDS.copy()
 
-        vc = VEPConfig(self.genome_build)
         cvf_filters = [ColumnVEPField.get_columns_version_q(vc.columns_version)]
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.CNV:
             cvf_filters.extend([
@@ -581,7 +589,10 @@ def empty_to_none(it):
 
 # Field formatters
 def gnomad_filtered_func(raw_value):
-    """ We use FILTER in Gnomad3 (GRCh38 only) - need to convert back to bool """
+    """ We use FILTER in Gnomad3 (GRCh38 only) - need to convert back to bool
+        In the combined exomes/genomes (gnomad2, gnomad4) we use gnomad_filtered=1
+        So don't need to format this etc
+    """
     return raw_value not in (None, "PASS")
 
 
@@ -598,6 +609,16 @@ def format_vep_sift_to_choice(vep_sift):
         return SIFTPrediction.TOLERATED
     raise ValueError(f"Unknown SIFT value: '{vep_sift}'")
 
+def get_format_alphamissense_class_func():
+    """ GRCh37 has 'benign' while GRCh38 has 'likely_benign'
+        @see https://github.com/Ensembl/VEP_plugins/issues/668
+    """
+    cff = get_choice_formatter_func(AlphaMissensePrediction.choices)
+    def _format_alphamissense_class(alphamissense_class):
+        if alphamissense_class == "benign":
+            alphamissense_class = "likely_benign"
+        return cff(alphamissense_class)
+    return _format_alphamissense_class
 
 def get_extract_existing_variation(prefix):
     def format_vep_existing_variation(vep_existing_variation):
@@ -624,17 +645,20 @@ def get_choice_formatter_func(choices, empty_values=None):
     return format_choice
 
 
-def get_clean_and_pick_single_value_func(pick_single_value_func, cast_func=None):
+def get_clean_and_pick_single_value_func(pick_single_value_func, cast_func=None, empty_values=None):
     """ Returns a function to clean and pick single value.
         casting is performed before calling pick_single_value_func so you can call min/max """
+
+    if empty_values is None:
+        empty_values = EMPTY_VALUES
 
     def _clean_and_pick_single_value_func(raw_value):
         it = (tm for tm in raw_value.split(VEP_SEPARATOR) if tm != '')
         # Handle '.'
         if cast_func:
-            values = [cast_func(v) for v in it if v not in EMPTY_VALUES]
+            values = [cast_func(v) for v in it if v not in empty_values]
         else:
-            values = [v for v in it if v not in EMPTY_VALUES]
+            values = [v for v in it if v not in empty_values]
         value = None
         if values:
             value = pick_single_value_func(values)

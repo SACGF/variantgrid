@@ -394,8 +394,10 @@ def view_annotation_run(request, annotation_run_id):
     can_retry_annotation_run = False
     can_retry_annotation_run_upload = False
     if annotation_run.status == AnnotationStatus.ERROR:
+        # There may be other runs of different types (don't care about them)
         other_annotation_runs_qs = AnnotationRun.objects.filter(
-            annotation_range_lock=annotation_run.annotation_range_lock)
+            annotation_range_lock=annotation_run.annotation_range_lock,
+            pipeline_type=annotation_run.pipeline_type)
         other_annotation_runs_qs = other_annotation_runs_qs.exclude(status=AnnotationStatus.ERROR)
         can_retry_annotation_run = not other_annotation_runs_qs.exists()
         can_retry_annotation_run_upload = can_retry_annotation_run and annotation_run.vcf_annotated_filename

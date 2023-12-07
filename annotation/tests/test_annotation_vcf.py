@@ -48,8 +48,8 @@ ANNOTATION_COLUMNS_V1[settings.BUILD_GRCH38]["columns_version"] = 1
                    ANNOTATION=ANNOTATION_COLUMNS_V1)
 class TestAnnotationVCF(TestCase):
     TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
-    TEST_ANNOTATION_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_grch37.vep_annotated.vcf")
-    TEST_ANNOTATION_VCF_GRCH38 = os.path.join(TEST_DATA_DIR, "test_grch38.vep_annotated.vcf")
+    TEST_ANNOTATION_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_columns_version1_grch37.vep_annotated.vcf")
+    TEST_ANNOTATION_VCF_GRCH38 = os.path.join(TEST_DATA_DIR, "test_columns_version1_grch38.vep_annotated.vcf")
 
     @classmethod
     def setUpTestData(cls):
@@ -128,6 +128,10 @@ class TestAnnotationVCF(TestCase):
         self.assertEqual(va.predictions_num_pathogenic, 1)
         self.assertEqual(va.predictions_num_benign, 0)
 
+    def _test_24601_gnomad_grch38(self, va):
+        # This is from gnomAD v3
+        self.assertAlmostEqual(va.gnomad_af, 0.000354913)
+
     def test_import_variant_annotations_grch38(self):
         genome_build = GenomeBuild.get_name_or_alias('GRCh38')
         vav = self.variant_annotation_versions_by_build[genome_build.name]
@@ -147,7 +151,7 @@ class TestAnnotationVCF(TestCase):
         self.assertEqual(va.impact, PathogenicityImpact.MODERATE)
         self.assertEqual(va.dbsnp_rs_id, "rs145886106")
         self.assertEqual(va.cosmic_legacy_id, "COSM7286401")  # Test it has collapsed dupes
-        self.assertAlmostEqual(va.gnomad_af, 0.000354913)
+        self._test_24601_gnomad_grch38(va)
         self.assertEqual(va.gnomad_filtered, False)  # Test it converted FILTER properly to bool
 
         va = VariantAnnotation.objects.get(variant_id=42)
@@ -228,6 +232,51 @@ class TestAnnotationVCF2(TestAnnotationVCF):
 
         vta = VariantTranscriptAnnotation.objects.get(variant_id=42, hgvs_c='NM_199357.3:c.1417C>T')
         self.assertTrue(vta.nmd_escaping_variant)
+
+
+ANNOTATION_COLUMNS_V3 = copy.deepcopy(TEST_ANNOTATION)
+ANNOTATION_COLUMNS_V3[settings.BUILD_GRCH37]["columns_version"] = 3
+ANNOTATION_COLUMNS_V3[settings.BUILD_GRCH38]["columns_version"] = 3
+
+
+@override_settings(IMPORT_PROCESSING_DIR=TEST_IMPORT_PROCESSING_DIR,
+                   VARIANT_ZYGOSITY_GLOBAL_COLLECTION="global",
+                   ANNOTATION_VEP_FAKE_VERSION=True,
+                   ANNOTATION=ANNOTATION_COLUMNS_V3)
+class TestAnnotationVCF3(TestAnnotationVCF):
+    TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
+    TEST_ANNOTATION_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_columns_version3_grch37.vep_annotated.vcf")
+    TEST_ANNOTATION_VCF_GRCH38 = os.path.join(TEST_DATA_DIR, "test_columns_version3_grch38.vep_annotated.vcf")
+
+    def _test_extra_grch37(self):
+        # This is testing columns_version 2
+        pass
+
+    def _test_24601_gnomad_grch38(self, va):
+        """ gnomAD v4 """
+        # AF total copied from https://gnomad.broadinstitute.org/variant/13-95186748-C-T?dataset=gnomad_r4
+        self.assertAlmostEqual(va.gnomad_af, 0.00006753, places=6)
+
+    def _test_extra_grch38(self):
+        # This is testing columns_version 2
+        va = VariantAnnotation.objects.get(variant_id=24601)
+        self.assertAlmostEqual(va.metalr_rankscore, 0.80456)
+        self.assertAlmostEqual(va.revel_rankscore, 0.69527)
+        self.assertAlmostEqual(va.vest4_rankscore, 0.56662)
+        self.assertAlmostEqual(va.bayesdel_noaf_rankscore, 0.63287)
+        self.assertAlmostEqual(va.cadd_raw_rankscore, 0.41304)
+        self.assertAlmostEqual(va.clinpred_rankscore, 0.15198)
+
+        va = VariantAnnotation.objects.get(variant_id=42)
+        self.assertEqual(va.aloft_high_confidence, True)
+        self.assertEqual(va.aloft_pred, ALoFTPrediction.RECESSIVE)
+        self.assertAlmostEqual(va.aloft_prob_dominant, 0.13585)
+        self.assertAlmostEqual(va.aloft_prob_recessive, 0.81255)
+        self.assertAlmostEqual(va.aloft_prob_tolerant, 0.0516)
+
+        vta = VariantTranscriptAnnotation.objects.get(variant_id=42, hgvs_c='NM_199357.3:c.1417C>T')
+        self.assertTrue(vta.nmd_escaping_variant)
+
 
 
 class TestVEP(TestCase):

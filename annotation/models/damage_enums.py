@@ -158,6 +158,6 @@ class ALoFTPrediction(models.TextChoices):
 
 class AlphaMissensePrediction(models.TextChoices):
     """ @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_plugins.html#alphamissense """
-    LIKELY_BENIGN = 'b', "likely_benign"
-    AMBIGUOUS = "a", "ambiguous"
-    LIKELY_PATHOGENIC = "p", "likely_pathogenic"
+    LIKELY_BENIGN = 'b', 'likely_benign'
+    AMBIGUOUS = "a", 'ambiguous'
+    LIKELY_PATHOGENIC = "p", 'likely_pathogenic'

@@ -281,9 +281,13 @@ class ClinVarCitation(models.Model):
 
 
 class DBNSFPGeneAnnotationVersion(TimeStampedModel):
-    """ @see https://sites.google.com/site/jpopgen/dbNSFP """
+    """ @see https://sites.google.com/site/jpopgen/dbNSFP
+        This isn't updated every release, so can have same hash across diff versions """
     version = models.TextField(primary_key=True)
-    md5_hash = models.CharField(max_length=32, unique=True)
+    md5_hash = models.CharField(max_length=32)
+
+    class Meta:
+        unique_together = ('version', 'md5_hash')
 
     def save(self, **kwargs):
         created = not self.pk
@@ -459,6 +463,9 @@ class ColumnVEPField(models.Model):
     min_vep_columns_version = models.IntegerField(null=True)
     max_vep_columns_version = models.IntegerField(null=True)
 
+    def __str__(self) -> str:
+        return self.column
+
     @property
     def vep_info_field(self):
         """ For VCFs, be sure to set source_field_has_custom_prefix=True
@@ -467,7 +474,7 @@ class ColumnVEPField(models.Model):
             We need to adjust for this in BulkVEPVCFAnnotationInserter """
 
         vif = self.source_field
-        if self.source_field_has_custom_prefix:
+        if self.vep_custom and self.source_field_has_custom_prefix:
             vif = self.get_vep_custom_display() + "_" + vif
         return vif
 
@@ -550,11 +557,15 @@ class VariantAnnotationVersion(SubVersionPartition):
                 'mutation_taster_pred_most_damaging': lambda d: d in MutationTasterPrediction.get_damage_or_greater_levels(),
                 'polyphen2_hvar_pred_most_damaging': lambda d: d in Polyphen2Prediction.get_damage_or_greater_levels(),
             }
-        elif self.columns_version == 2:
+        elif self.columns_version in (2, 3):
             pathogenic_rankscore = settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE
             pathogenic_prediction_columns = ['bayesdel_noaf_rankscore', 'cadd_raw_rankscore', 'clinpred_rankscore',
                                              'revel_rankscore', 'metalr_rankscore', 'vest4_rankscore']
+            if self.columns_version == 3:
+                pathogenic_prediction_columns.append("alphamissense_rankscore")
+
             return {c: lambda d: float(d) >= pathogenic_rankscore for c in pathogenic_prediction_columns}
+
         raise ValueError(f"Don't know fields for {self.columns_version=}")
 
     @cached_property
@@ -835,6 +846,9 @@ class AbstractVariantAnnotation(models.Model):
     splice_region = models.TextField(null=True, blank=True)
     symbol = models.TextField(null=True, blank=True)
 
+    mavedb_score = models.FloatField(null=True, blank=True)
+    mavedb_urn = models.TextField(null=True, blank=True)
+
     class Meta:
         abstract = True
 
@@ -888,6 +902,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
     # Population frequency
     af_1kg = models.FloatField(null=True, blank=True)
     af_uk10k = models.FloatField(null=True, blank=True)
+    topmed_af = models.FloatField(null=True, blank=True)
     gnomad_af = models.FloatField(null=True, blank=True)
     gnomad2_liftover_af = models.FloatField(null=True, blank=True)
     gnomad_ac = models.IntegerField(null=True, blank=True)
@@ -903,16 +918,20 @@ class VariantAnnotation(AbstractVariantAnnotation):
     gnomad_oth_af = models.FloatField(null=True, blank=True)
     gnomad_sas_af = models.FloatField(null=True, blank=True)
     # filtering allele frequencies (new in gnomADv4)
-    faf95 = models.FloatField(null=True, blank=True)
-    faf99 = models.FloatField(null=True, blank=True)
-    fafmax_faf95_max = models.FloatField(null=True, blank=True)
-    fafmax_faf99_max = models.FloatField(null=True, blank=True)
+    gnomad_faf95 = models.FloatField(null=True, blank=True)
+    gnomad_faf99 = models.FloatField(null=True, blank=True)
+    gnomad_fafmax_faf95_max = models.FloatField(null=True, blank=True)
+    gnomad_fafmax_faf99_max = models.FloatField(null=True, blank=True)
+    gnomad_xy_af = models.FloatField(null=True, blank=True)
+    gnomad_xy_ac = models.IntegerField(null=True, blank=True)
+    gnomad_xy_an = models.IntegerField(null=True, blank=True)
+    gnomad_hemi_count = models.IntegerField(null=True, blank=True)  # This is set from gnomad_xy_ac if gnomad_non_par
     gnomad_popmax_af = models.FloatField(null=True, blank=True)
     gnomad_popmax_ac = models.IntegerField(null=True, blank=True)
     gnomad_popmax_an = models.IntegerField(null=True, blank=True)
     gnomad_popmax_hom_alt = models.IntegerField(null=True, blank=True)
-    topmed_af = models.FloatField(null=True, blank=True)
     gnomad_filtered = models.BooleanField(null=True, blank=True)
+    gnomad_non_par = models.BooleanField(null=True, blank=True)  # Not pseudoautosomal regions
     gnomad_popmax = models.CharField(max_length=3, choices=GnomADPopulation.choices, null=True, blank=True)
 
     # From https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4267638/
@@ -937,6 +956,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
     clinpred_rankscore = models.FloatField(null=True, blank=True)
     vest4_rankscore = models.FloatField(null=True, blank=True)
     metalr_rankscore = models.FloatField(null=True, blank=True)
+    alphamissense_rankscore = models.FloatField(null=True, blank=True)
+
     # ALoFT (from dbNSFP)
     aloft_prob_tolerant = models.FloatField(null=True, blank=True)
     aloft_prob_recessive = models.FloatField(null=True, blank=True)
@@ -965,12 +986,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
     spliceai_pred_ds_dg = models.FloatField(null=True, blank=True)
     spliceai_pred_ds_dl = models.FloatField(null=True, blank=True)
     spliceai_gene_symbol = models.TextField(null=True, blank=True)
-
-    alphamissense_class  = models.CharField(max_length=1, choices=AlphaMissensePrediction.choices, null=True, blank=True)
-    alphamissense_pathogenicity = models.FloatField(null=True, blank=True)
-
-    mavedb_score = models.FloatField(null=True, blank=True)
-    mavedb_urn = models.TextField(null=True, blank=True)
 
     repeat_masker = models.TextField(null=True, blank=True)
     overlapping_symbols = models.TextField(null=True, blank=True)
