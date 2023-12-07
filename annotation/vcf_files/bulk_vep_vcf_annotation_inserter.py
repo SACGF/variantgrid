@@ -136,7 +136,9 @@ class BulkVEPVCFAnnotationInserter:
 
     def _add_vep_field_handlers(self):
         # TOPMED and 1k genomes can return multiple values - take highest
-        format_pick_lowest_float = get_clean_and_pick_single_value_func(min, float)
+        empty_mave_float_values = EMPTY_VALUES | {"NA"}
+        format_pick_lowest_float = get_clean_and_pick_single_value_func(min, float,
+                                                                        empty_values=empty_mave_float_values)
         format_pick_highest_float = get_clean_and_pick_single_value_func(max, float)
         format_pick_highest_int = get_clean_and_pick_single_value_func(max, int)
         remove_empty_multiples = get_clean_and_pick_single_value_func(join_uniq)
@@ -643,17 +645,20 @@ def get_choice_formatter_func(choices, empty_values=None):
     return format_choice
 
 
-def get_clean_and_pick_single_value_func(pick_single_value_func, cast_func=None):
+def get_clean_and_pick_single_value_func(pick_single_value_func, cast_func=None, empty_values=None):
     """ Returns a function to clean and pick single value.
         casting is performed before calling pick_single_value_func so you can call min/max """
+
+    if empty_values is None:
+        empty_values = EMPTY_VALUES
 
     def _clean_and_pick_single_value_func(raw_value):
         it = (tm for tm in raw_value.split(VEP_SEPARATOR) if tm != '')
         # Handle '.'
         if cast_func:
-            values = [cast_func(v) for v in it if v not in EMPTY_VALUES]
+            values = [cast_func(v) for v in it if v not in empty_values]
         else:
-            values = [v for v in it if v not in EMPTY_VALUES]
+            values = [v for v in it if v not in empty_values]
         value = None
         if values:
             value = pick_single_value_func(values)
