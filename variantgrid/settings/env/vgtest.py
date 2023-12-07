@@ -28,21 +28,26 @@ _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "fasta"
 
 
 ANNOTATION[BUILD_GRCH37].update({
-    "columns_version": 2,
+    "columns_version": 3,
     "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.25_GRCh37.p13_genomic.fna.gz"),
 })
 
 ANNOTATION[BUILD_GRCH38].update({
-    "columns_version": 2,
+    "columns_version": 3,
     "enabled": True,
     "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.39_GRCh38.p13_genomic.fna.gz"),
 })
 
+
 ANNOTATION[BUILD_GRCH37]["vep_config"].update({
-    "dbnsfp": "annotation_data/GRCh37/dbNSFP4.3a.grch37.stripped.gz",
+    "cosmic": "annotation_data/GRCh37/Cosmic_GenomeScreensMutant_v99_GRCh37.vcf.gz",
+    "dbnsfp": "annotation_data/GRCh37/dbNSFP4.5a.grch37.stripped.gz",
+    "mastermind": "annotation_data/GRCh37/mastermind_cited_variants_reference-2023.10.02-grch37.vcf.gz",
 })
 ANNOTATION[BUILD_GRCH38]["vep_config"].update({
-    "dbnsfp": "annotation_data/GRCh38/dbNSFP4.3a.grch38.stripped.gz",
+    "cosmic": "annotation_data/GRCh38/Cosmic_GenomeScreensMutant_v99_GRCh38.vcf.gz",
+    "dbnsfp": "annotation_data/GRCh38/dbNSFP4.5a.grch38.stripped.gz",
+    "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2023.10.02-grch38.vcf.gz",
 })
 
 ANNOTATION_VCF_DUMP_DIR = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, 'scratch')

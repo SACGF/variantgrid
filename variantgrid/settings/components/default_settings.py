@@ -271,7 +271,7 @@ ANNOTATION = {
             "dbscsnv": "annotation_data/GRCh38/dbscSNV1.1_GRCh38.txt.gz",
             "gnomad2": "annotation_data/GRCh38/gnomad2.1.1_GRCh38_combined_af.vcf.bgz",
             "gnomad3": "annotation_data/GRCh38/gnomad3.1_GRCh38_merged.vcf.bgz",
-            "gnomad4": "annotation_data/GRCh38/gnomad4.0_GRCh38_combined_af.vcf.bgz",
+            "gnomad4": "annotation_data/GRCh38/gnomad4.0.GRCh38.combined_af.vcf.bgz",
             "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2022.04.02-grch38.vcf.gz",
             "mave": "annotation_data/GRCh38/MaveDB_variants.tsv.gz",
             "maxentscan": "annotation_data/all_builds/maxentscan",

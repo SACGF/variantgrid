@@ -6,6 +6,7 @@ from library.django_utils import bulk_insert_class_data
 
 
 def _new_vep_110_annotation(apps, _schema_editor):
+    VEP_CUSTOM_GNOMAD_2 = 'g'
     VEP_CUSTOM_GNOMAD_3 = 'n'
     VEP_CUSTOM_GNOMAD_4 = 'o'
 
@@ -26,23 +27,23 @@ def _new_vep_110_annotation(apps, _schema_editor):
         {'column': 'gnomad2_ac', 'variant_grid_column_id': 'gnomad_ac',
          'genome_build_id': 'GRCh37', 'pipeline_type': 'S', 'category': 'F', 'source_field': 'AC',
          'source_field_processing_description': 'Sum of exome AC + genome AC',
-         'vep_custom': 'g', 'source_field_has_custom_prefix': True},
+         'vep_custom': VEP_CUSTOM_GNOMAD_2, 'source_field_has_custom_prefix': True},
         {'column': 'gnomad2_popmax_ac', 'variant_grid_column_id': 'gnomad_popmax_ac',
          'genome_build_id': 'GRCh37', 'pipeline_type': 'S', 'category': 'F', 'source_field': 'AC_popmax',
          'source_field_processing_description': 'Sum of exome AC_popmax + genome AC_popmax',
-         'vep_custom': 'g', 'source_field_has_custom_prefix': True},
+         'vep_custom': VEP_CUSTOM_GNOMAD_2, 'source_field_has_custom_prefix': True},
         {'column': 'gnomad2_an', 'variant_grid_column_id': 'gnomad_an',
          'genome_build_id': 'GRCh37', 'pipeline_type': 'S', 'category': 'F', 'source_field': 'AN',
          'source_field_processing_description': 'Sum of exome AN + genome AN',
-         'vep_custom': 'g', 'source_field_has_custom_prefix': True},
+         'vep_custom': VEP_CUSTOM_GNOMAD_2, 'source_field_has_custom_prefix': True},
         {'column': 'gnomad2_popmax_an', 'variant_grid_column_id': 'gnomad_popmax_an',
          'genome_build_id': 'GRCh37', 'pipeline_type': 'S', 'category': 'F', 'source_field': 'AN_popmax',
          'source_field_processing_description': 'Sum of exome AN_popmax + genome AN_popmax',
-         'vep_custom': 'g', 'source_field_has_custom_prefix': True},
+         'vep_custom': VEP_CUSTOM_GNOMAD_2, 'source_field_has_custom_prefix': True},
         {'column': 'gnomad2_nonpar', 'variant_grid_column_id': 'gnomad_non_par',
          'genome_build_id': 'GRCh37', 'pipeline_type': 'S', 'category': 'F', 'source_field': 'nonpar',
          'source_field_processing_description': 'nonpar from genomes',
-         'vep_custom': 'g', 'source_field_has_custom_prefix': True},
+         'vep_custom': VEP_CUSTOM_GNOMAD_2, 'source_field_has_custom_prefix': True},
 
         # gnomAD 4 - issue #938
         {'column': 'gnomad4_ac', 'source_field_has_custom_prefix': True, 'min_vep_columns_version': 3,
