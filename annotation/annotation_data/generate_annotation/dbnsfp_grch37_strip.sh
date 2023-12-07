@@ -29,8 +29,8 @@ set -e
 
 # Note: We can't do this per-contig then join them, as some variants switch contigs between builds
 CUT_COLUMNS="3,4,5,6,8,9,15,69,74,84,106,109,139,140,142,143,144,145,146,148,185,705"
-SEQ_COL=3  # hg19_chr was col 5 (but 3rd after cut)
-POS_COL=4  # hg19_pos(1-based) was 6 (but 4th after cut)
+SEQ_COL=5  # hg19_chr (after cut)
+POS_COL=6  # hg19_pos(1-based) (after cut)
 
 version=4.5a
 out_vcf=dbNSFP${version}_grch37.gz
@@ -39,7 +39,7 @@ out_vcf=dbNSFP${version}_grch37.gz
 
 zcat dbNSFP${version}_variant.chr1.gz | head -n1 > h
 zgrep -h -v ^#chr dbNSFP${version}_variant.chr* | awk '$8 != "." ' | sort -T ${TMP_DIR} -k8,8 -k9,9n - | cat h - | bgzip -c > ${out_vcf}
-zcat ${out_vcf} | cut -f  ${CUT_COLUMNS}  > dbNSFP${version}_grch37.stripped
-bgzip dbNSFP${version}_grch37.stripped
+# Needs a '#' header
+(echo -n "#" ; zcat ${out_vcf} | cut -f  ${CUT_COLUMNS}) | bgzip > dbNSFP${version}_grch37.stripped.gz
 
 tabix -s ${SEQ_COL} -b ${POS_COL} -e ${POS_COL} dbNSFP${version}_grch37.stripped.gz
