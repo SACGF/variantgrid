@@ -70,6 +70,7 @@ class BulkVEPVCFAnnotationInserter:
         "predictions_num_pathogenic",
         "predictions_num_benign",
         "overlapping_symbols",
+        "gnomad_hemi_count",
     ]
     DB_IGNORED_COLUMNS = ["id", "transcript"]
     VEP_NOT_COPIED_FIELDS = [
@@ -408,6 +409,7 @@ class BulkVEPVCFAnnotationInserter:
 
     def add_calculated_variant_annotation_columns(self, transcript_data):
         self._add_calculated_num_predictions(transcript_data)
+        self._add_hemi_count(transcript_data)
 
     def _add_calculated_num_predictions(self, transcript_data):
         num_pathogenic = 0
@@ -421,6 +423,11 @@ class BulkVEPVCFAnnotationInserter:
                     num_not_pathogenic += 1
         transcript_data["predictions_num_pathogenic"] = num_pathogenic
         transcript_data["predictions_num_benign"] = num_not_pathogenic
+
+    def _add_hemi_count(self, transcript_data):
+        """ gnomad_non_par=True means not on pseudoautosomal region on chrX, so XY count = hemizygous """
+        if transcript_data.get("gnomad_non_par"):
+            transcript_data["gnomad_hemi_count"] = transcript_data.get("gnomad_xy_ac")
 
     @staticmethod
     def _add_calculated_maxentscan(transcript_data):
