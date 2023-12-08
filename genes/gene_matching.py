@@ -232,7 +232,7 @@ class ReleaseGeneMatcher:
     def _match_unmatched_gene_symbol_qs(self, gene_symbol_qs):
         """ Match any matched symbols without matched genes """
         unmatched_symbols_qs = gene_symbol_qs.exclude(releasegenesymbol__release=self.release)
-        unmatched_symbols = unmatched_symbols_qs.values_list("symbol", flat=True).distinct()
+        unmatched_symbols = list(unmatched_symbols_qs.values_list("symbol", flat=True).distinct())
         self.match_gene_symbols(unmatched_symbols)
 
     def match_unmatched_symbols(self, gene_symbol_list):
