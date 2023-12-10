@@ -53,7 +53,7 @@ def _get_custom_params_list(fields, prefix, data_path) -> list:
         try:
             field = get_single_element(fields)
         except Exception as e:
-            msg = f"Expected exactly 1 ColumnVEPField source field for VEP custom: {prefix}"
+            msg = f"Expected exactly 1 ColumnVEPField source field for VEP custom: {prefix}, {fields=}"
             raise ValueError(msg) from e
 
         if extension == 'bed':
