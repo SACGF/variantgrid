@@ -191,13 +191,14 @@ def server_status(request):
             highest_variant_annotated["message"] = "OK"
         else:
             try:
-                ar = AnnotationRun.objects.filter(annotation_range_lock__version=vav,
-                                               annotation_range_lock__min_variant__lte=highest_variant.pk,
-                                               annotation_range_lock__max_variant__gte=highest_variant.pk)\
-                    .exclude(status=AnnotationStatus.ERROR).get()
+                ar_qs = AnnotationRun.objects.filter(annotation_range_lock__version=vav,
+                                                     annotation_range_lock__min_variant__lte=highest_variant.pk,
+                                                     annotation_range_lock__max_variant__gte=highest_variant.pk)
+                ar_qs = ar_qs.exclude(status=AnnotationStatus.ERROR)
+                annotation_run_message = f"AnnotationRuns: {', '.join([str(ar) for ar in ar_qs])}"
 
                 highest_variant_annotated["status"] = "warning"
-                highest_variant_annotated["message"] = f"AnnotationRun: {ar}"
+                highest_variant_annotated["message"] = annotation_run_message
             except AnnotationRun.DoesNotExist:
                 highest_variant_annotated["status"] = "danger"
                 highest_variant_annotated["message"] = "Not annotated, no AnnotationRun!"

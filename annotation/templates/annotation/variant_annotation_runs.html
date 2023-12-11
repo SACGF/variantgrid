@@ -96,9 +96,17 @@
     <div class="container-table">
         {% page_help 'annotation/variant_annotation_runs_help' 'Variant Annotation Runs' %}
 
-        {% for build_name, vav_field_counts in genome_build_field_counts.items %}
-            <form method="post" id='vcf-form'>
+            <form method="post">
                 {% csrf_token %}
+                <div>
+                    <button name="annotation-scheduler" class="btn btn-danger">Run Annotation Scheduler</button>
+                </div>
+            </form>
+
+        {% for build_name, vav_field_counts in genome_build_field_counts.items %}
+            <form method="post">
+                {% csrf_token %}
+
                 <div id="build-{{ build_name }}-details" class="card mt-4">
                     <div class="card-header">{{ build_name }}</div>
                         {% ui_register_tabs tab_set=build_name %}

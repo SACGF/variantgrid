@@ -28,6 +28,7 @@ from annotation.models.models_citations import CitationFetchRequest
 from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
+from annotation.tasks.annotation_scheduler_task import annotation_scheduler
 from annotation.vep_annotation import get_vep_command
 from genes.models import GeneListCategory, GeneAnnotationImport, GeneVersion, TranscriptVersion, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
@@ -345,6 +346,9 @@ def variant_annotation_runs(request):
     genome_build_summary = defaultdict(dict)
 
     if request.method == "POST":
+        if "annotation-scheduler" in request.POST:
+            annotation_scheduler.si().apply_async()
+
         for genome_build in GenomeBuild.builds_with_annotation():
             for vav in VariantAnnotationVersion.objects.filter(genome_build=genome_build):
                 annotation_runs = AnnotationRun.objects.filter(annotation_range_lock__version=vav)

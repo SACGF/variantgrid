@@ -793,7 +793,7 @@ class AnnotationRun(TimeStampedModel):
         task_log[key] = value
 
     def __str__(self):
-        return f"AnnotationRun: {self.pk}/{self.get_pipeline_type_display()}: ({self.status})"
+        return f"AnnotationRun: {self.pk}/{self.get_pipeline_type_display()}: ({self.get_status_display()})"
 
 
 class AbstractVariantAnnotation(models.Model):
