@@ -5,8 +5,8 @@ We want to do this per-chrom so we can process in parallel
 Steps are:
     1. Download exomes.vcf + genome.vcf, removing most INFO fields before writing to disk (to reduce disk space)
     2. Merge exome + genome, summing counts
-    3. Run through this script with --af to calculate allele frequency, write TSV (more efficient than VCF)
-    4. Cat them all together again
+    3. Run through this script with --af to calculate allele frequency, write combined VCF
+    4. Merge VCFs
 """
 
 import gzip
