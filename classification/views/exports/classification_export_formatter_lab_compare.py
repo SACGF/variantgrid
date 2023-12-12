@@ -1,6 +1,6 @@
 import re
 from collections import defaultdict
-from typing import List
+from typing import List, Optional
 
 from django.http import HttpRequest
 from django.urls.base import reverse
@@ -15,11 +15,12 @@ from library.utils import ExportRow, export_column, delimited_row
 
 class ClassificationlabCompareRow(ExportRow):
 
-    def __init__(self,  allele_data: AlleleData, lab1, lab2, comment=None, authorised_date=None, created_date=None,
-                 patient_id=None):
+    def __init__(self,  allele_data: AlleleData, lab_1: Optional[str] = None, lab_2: Optional[str] = None,
+                 comment: Optional[str] = None, authorised_date: Optional[str] = None,
+                 created_date: Optional[str] = None, patient_id: Optional[str] = None):
         self.AlleleData = allele_data.allele_id
-        self.lab1 = lab1
-        self.lab2 = lab2
+        self.lab1 = lab_1
+        self.lab2 = lab_2
         self.comment = comment
         self.authorised_date = authorised_date
         self.created_date = created_date
@@ -115,34 +116,35 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
             lab_name1, lab_name2 = sorted(self.classification_filter.include_sources)
             for cm in allele_data.cms_regardless_of_issues:
                 authorised_by = cm.get('curation_verified_by', '')
-                authorised_date = cm.get('curation_verified_date', '')
+                authorised_date = cm.get(SpecialEKeys.CURATION_VERIFIED_DATE, '')
                 created_by = cm.get('curated_by', '')
-                created_date = cm.get('curation_date', '')
-                patient_id = cm.get('patient_id', '')
+                created_date = cm.get(SpecialEKeys.CURATION_DATE, '')
+                patient_id = cm.get(SpecialEKeys.PATIENT_ID, '')
+                cs = cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
                 if patient_id != '':
                     patient_ids.add(patient_id)
                 if cm.lab == lab_name1:
-                    if cm.clinical_significance is not None:
-                        lab1.add(cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
+                    if cs and cs != 'None':
+                        lab1.add(cs)
                     for key, value in cm.evidence.items():
                         lab1_comment_data[key].append(value)
                     authorised_date_lab1.add(authorised_by + ' ' + authorised_date)
                     created_date_lab1.add(created_by + ' ' + created_date)
                 if cm.lab == lab_name2:
-                    if cm.clinical_significance is not None:
-                        lab2.add(cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
+                    if cs and cs != 'None':
+                        lab2.add(cs)
                     for key, value in cm.evidence.items():
                         lab2_comment_data[key].append(value)
                     authorised_date_lab2.add(authorised_by + ' ' + authorised_date)
                     created_date_lab2.add(created_by + ' ' + created_date)
 
-            lab1_set = ','.join(lab1)
-            lab2_set = ','.join(lab2)
-            patient_id_set = ','.join(patient_ids)
-            authorised_date_lab1_set = ','.join(authorised_date_lab1)
-            authorised_date_lab2_set = ','.join(authorised_date_lab2)
-            created_date_lab1_set = ','.join(created_date_lab1)
-            created_date_lab2_set = ','.join(created_date_lab2)
+            lab1_set = ','.join(sorted(lab1))
+            lab2_set = ','.join(sorted(lab2))
+            patient_id_set = ','.join(sorted(patient_ids))
+            authorised_date_lab1_set = {str(x) for x in authorised_date_lab1}
+            authorised_date_lab2_set = {str(x) for x in authorised_date_lab2}
+            created_date_lab1_set = {str(x) for x in created_date_lab1}
+            created_date_lab2_set = {str(x) for x in created_date_lab2}
 
             if authorised_date_lab1_set != authorised_date_lab2_set:
                 difference_authorised_by = 'Different'
@@ -162,11 +164,10 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
                 if not comment_data_same:
                     message += f'{key}, '
 
-            row = ClassificationlabCompareRow(allele_data=allele_data, patient_id=patient_id_set, lab1=lab1_set,
-                                              lab2=lab2_set,
+            row = ClassificationlabCompareRow(allele_data=allele_data, patient_id=patient_id_set, lab_1=lab1_set,
+                                              lab_2=lab2_set,
                                               authorised_date=difference_authorised_by,
                                               created_date=difference_created_by, comment=message
-
                                               )
             rows.append(delimited_row([row.allele_url(), row.patient_id(), row.lab_clinical_significance(),
                                        row.lab2_clinical_significance(), row.difference(lab_name1, lab_name2),
