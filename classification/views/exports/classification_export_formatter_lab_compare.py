@@ -81,7 +81,7 @@ class ClassificationlabCompareRow(ExportRow):
         else:
             return ''
 
-    @export_column("Other Variables")
+    @export_column("Fields With Differences")
     def comment(self):
         return ''
 
@@ -116,9 +116,10 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
                                    f'{lab_names[0]} Curated Date',
                                    f'{lab_names[1]} Curated Date',
                                    'Curated Date Difference',
+                                   'Fields With Differences',
                                    f'{lab_names[0]} Interpretation Summary',
-                                   f'{lab_names[1]} Interpretation Summary',
-                                   'Other Variables'], ',')]
+                                   f'{lab_names[1]} Interpretation Summary'
+                                   ], ',')]
         else:
             raise ValueError("Must specify 2 labs to compare")
 
@@ -216,9 +217,10 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
                                        row.lab_1_curated_date,
                                        row.lab_2_curated_date,
                                        row.created_date_diff(),
+                                       row.comment,
                                        row.lab_1_interpretation_summary,
                                        row.lab_2_interpretation_summary,
-                                       row.comment], ','))
+                                       ], ','))
         else:
             raise ValueError("Error comparing labs")
         return rows
