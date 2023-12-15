@@ -16,15 +16,22 @@ from library.utils import ExportRow, export_column, delimited_row
 class ClassificationlabCompareRow(ExportRow):
 
     def __init__(self,  allele_data: AlleleData, lab_1: Optional[str] = None, lab_2: Optional[str] = None,
-                 comment: Optional[str] = None, authorised_date: Optional[str] = None,
-                 created_date: Optional[str] = None, patient_id: Optional[str] = None):
+                 comment: Optional[str] = None, lab_1_authorised_date: Optional[str] = None,
+                 lab_2_authorised_date: Optional[str] = None, lab_1_curated_date: Optional[str] = None,
+                 lab_2_curated_date: Optional[str] = None, lab_1_interpretation_summary: Optional[str] = None,
+                 lab_2_interpretation_summary: Optional[str] = None,
+                 patient_id: Optional[str] = None):
         self.AlleleData = allele_data.allele_id
         self.lab1 = lab_1
         self.lab2 = lab_2
         self.comment = comment
-        self.authorised_date = authorised_date
-        self.created_date = created_date
+        self.lab_1_authorised_date = lab_1_authorised_date
+        self.lab_2_authorised_date = lab_2_authorised_date
+        self.lab_1_curated_date = lab_1_curated_date
+        self.lab_2_curated_date = lab_2_curated_date
         self.Patient_id = patient_id
+        self.lab_1_interpretation_summary = lab_1_interpretation_summary
+        self.lab_2_interpretation_summary = lab_2_interpretation_summary
 
     @export_column("Allele URL")
     def allele_url(self):
@@ -52,13 +59,27 @@ class ClassificationlabCompareRow(ExportRow):
         elif self.lab1 == '' and self.lab2 == '':
             return 'No data'
 
-    @export_column("Authorised Date")
-    def authorised_date(self):
-        return self.authorised_date
+    @export_column("Authorised Date Difference")
+    def authorised_date_diff(self):
+        if not self.lab_1_authorised_date or not self.lab_2_authorised_date:
+            return 'No Overlap'
+        elif self.lab_1_authorised_date != self.lab_2_authorised_date:
+            return 'Different'
+        elif self.lab_1_authorised_date == self.lab_2_authorised_date:
+            return 'Same'
+        else:
+            return ''
 
-    @export_column("Created Date")
-    def created_date(self):
-        return self.created_date
+    @export_column("Created Date Difference")
+    def created_date_diff(self):
+        if not self.lab_1_curated_date or not self.lab_2_curated_date:
+            return 'No Overlap'
+        elif self.lab_1_curated_date != self.lab_2_curated_date:
+            return 'Different'
+        elif self.lab_1_curated_date == self.lab_2_curated_date:
+            return 'Same'
+        else:
+            return ''
 
     @export_column("Other Variables")
     def comment(self):
@@ -87,8 +108,17 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
     def header(self) -> List[str]:
         if self.classification_filter.include_sources and len(self.classification_filter.include_sources) == 2:
             lab_names = sorted([str(lab) for lab in self.classification_filter.include_sources])
-            return [delimited_row(['Allele URL', 'Patient_Id', lab_names[0], lab_names[1], 'Classification',
-                                   'Authorised Date', 'Created Date', 'Other Variables'], ',')]
+            return [delimited_row(['Allele URL', 'Patient_Id', lab_names[0], lab_names[1],
+                                   'Classification',
+                                   f'{lab_names[0]} Authorised Date',
+                                   f'{lab_names[1]} Authorised Date',
+                                   'Authorised Date Difference',
+                                   f'{lab_names[0]} Curated Date',
+                                   f'{lab_names[1]} Curated Date',
+                                   'Curated Date Difference',
+                                   f'{lab_names[0]} Interpretation Summary',
+                                   f'{lab_names[1]} Interpretation Summary',
+                                   'Other Variables'], ',')]
         else:
             raise ValueError("Must specify 2 labs to compare")
 
@@ -109,6 +139,8 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
         authorised_date_lab2 = set()
         created_date_lab1 = set()
         created_date_lab2 = set()
+        interpretation_summary_lab1 = set()
+        interpretation_summary_lab2 = set()
 
         if not allele_data.allele_id:
             return []
@@ -120,6 +152,7 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
                 created_by = cm.get('curated_by', '')
                 created_date = cm.get(SpecialEKeys.CURATION_DATE, '')
                 patient_id = cm.get(SpecialEKeys.PATIENT_ID, '')
+                interpretation_summary = cm.get(SpecialEKeys.INTERPRETATION_SUMMARY, '')
                 cs = cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
                 if patient_id != '':
                     patient_ids.add(patient_id)
@@ -130,6 +163,7 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
                         lab1_comment_data[key].append(value)
                     authorised_date_lab1.add(authorised_by + ' ' + authorised_date)
                     created_date_lab1.add(created_by + ' ' + created_date)
+                    interpretation_summary_lab1.add(interpretation_summary)
                 if cm.lab == lab_name2:
                     if cs and cs != 'None':
                         lab2.add(cs)
@@ -137,41 +171,53 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
                         lab2_comment_data[key].append(value)
                     authorised_date_lab2.add(authorised_by + ' ' + authorised_date)
                     created_date_lab2.add(created_by + ' ' + created_date)
+                    interpretation_summary_lab2.add(interpretation_summary)
 
             lab1_set = ','.join(sorted(lab1))
             lab2_set = ','.join(sorted(lab2))
             patient_id_set = ','.join(sorted(patient_ids))
-            authorised_date_lab1_set = {str(x) for x in authorised_date_lab1}
-            authorised_date_lab2_set = {str(x) for x in authorised_date_lab2}
-            created_date_lab1_set = {str(x) for x in created_date_lab1}
-            created_date_lab2_set = {str(x) for x in created_date_lab2}
+            authorised_date_lab1_set = ','.join(sorted(authorised_date_lab1))
+            authorised_date_lab2_set = ','.join(sorted(authorised_date_lab2))
+            created_date_lab1_set = ','.join(sorted(created_date_lab1))
+            created_date_lab2_set = ','.join(sorted(created_date_lab2))
+            interpretation_summary_lab1_set = ','.join(sorted(interpretation_summary_lab1))
+            interpretation_summary_lab2_set = ','.join(sorted(interpretation_summary_lab2))
 
-            if authorised_date_lab1_set != authorised_date_lab2_set:
-                difference_authorised_by = 'Different'
+            if lab1_comment_data and lab2_comment_data:
+                for key in lab1_comment_data.keys():
+                    lab1_values = lab1_comment_data[key]
+                    lab2_values = lab2_comment_data[key]
+
+                    comment_data_same = self.compare_comment_data(lab1_values, lab2_values)
+
+                    if not comment_data_same:
+                        message += f'{key}, '
             else:
-                difference_authorised_by = 'Same'
-            if created_date_lab1_set != created_date_lab2_set:
-                difference_created_by = 'Different'
-            else:
-                difference_created_by = 'Same'
+                message = 'No Overlap'
 
-            for key in lab1_comment_data.keys():
-                lab1_values = lab1_comment_data[key]
-                lab2_values = lab2_comment_data[key]
-
-                comment_data_same = self.compare_comment_data(lab1_values, lab2_values)
-
-                if not comment_data_same:
-                    message += f'{key}, '
-
-            row = ClassificationlabCompareRow(allele_data=allele_data, patient_id=patient_id_set, lab_1=lab1_set,
+            row = ClassificationlabCompareRow(allele_data=allele_data, patient_id=patient_id_set,
+                                              lab_1=lab1_set,
                                               lab_2=lab2_set,
-                                              authorised_date=difference_authorised_by,
-                                              created_date=difference_created_by, comment=message
+                                              lab_1_authorised_date=authorised_date_lab1_set,
+                                              lab_2_authorised_date=authorised_date_lab2_set,
+                                              lab_1_curated_date=created_date_lab1_set,
+                                              lab_2_curated_date=created_date_lab2_set,
+                                              lab_1_interpretation_summary=interpretation_summary_lab1_set,
+                                              lab_2_interpretation_summary=interpretation_summary_lab2_set,
+                                              comment=message
                                               )
-            rows.append(delimited_row([row.allele_url(), row.patient_id(), row.lab_clinical_significance(),
-                                       row.lab2_clinical_significance(), row.difference(lab_name1, lab_name2),
-                                       row.authorised_date, row.created_date,
+            rows.append(delimited_row([row.allele_url(), row.patient_id(),
+                                       row.lab_clinical_significance(),
+                                       row.lab2_clinical_significance(),
+                                       row.difference(lab_name1, lab_name2),
+                                       row.lab_1_authorised_date,
+                                       row.lab_2_authorised_date,
+                                       row.authorised_date_diff(),
+                                       row.lab_1_curated_date,
+                                       row.lab_2_curated_date,
+                                       row.created_date_diff(),
+                                       row.lab_1_interpretation_summary,
+                                       row.lab_2_interpretation_summary,
                                        row.comment], ','))
         else:
             raise ValueError("Error comparing labs")
