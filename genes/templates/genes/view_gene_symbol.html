@@ -300,7 +300,11 @@
                         {% labelled label="gnomAD prob LOF HOM" help=annotation_description.gnomad_prec %}{{ dbnsfp_gene_annotation.gnomad_prec|floatformat:4 }}{% endlabelled %}
                         {% labelled label="gnomAD prob LOF tolerant" help=annotation_description.gnomad_pnull %}{{ dbnsfp_gene_annotation.gnomad_pnull|floatformat:4 }}{% endlabelled %}
                         {% labelled label="gnomAD Gene Constraints" help=annotation_description.gnomad_gene_constraint %}
-                            {% gnomad_gene_constraint gene_symbol %}
+                            {% if gene_constraint %}
+                                {% gnomad_gene_constraint gene_constraint %}
+                            {% else %}
+                                -
+                            {% endif %}
                         {% endlabelled %}
                     </div>
                 </div>

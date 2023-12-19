@@ -32,7 +32,7 @@ from genes.hgvs import HGVSMatcher
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, \
-    PanelAppServer, SampleGeneList, HGNC, GeneVersion, TranscriptVersionSequenceInfo, NoTranscript
+    PanelAppServer, SampleGeneList, HGNC, GeneVersion, TranscriptVersionSequenceInfo, NoTranscript, GnomADGeneConstraint
 from genes.models_enums import AnnotationConsortium
 from genes.serializers import SampleGeneListSerializer
 from library.constants import WEEK_SECS
@@ -176,6 +176,10 @@ class GeneSymbolViewInfo:
         if dbnsfp_gene_version := DBNSFPGeneAnnotationVersion.latest():
             dga = self.gene_symbol.dbnsfpgeneannotation_set.filter(version=dbnsfp_gene_version).first()
         return dga
+
+    @cached_property
+    def gene_constraint(self) -> Optional[GnomADGeneConstraint]:
+        return GnomADGeneConstraint.objects.filter(gene_symbol=self.gene_symbol).order_by("-mane_select").first()
 
     @cached_property
     def gene_summary(self) -> Optional[str]:
@@ -362,6 +366,7 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
             "dbnsfp_gene_annotation",
             "gene_symbol",
             "gene_external_urls",
+            "gene_constraint",
             "gene_in_gene_lists",
             "gene_infos",
             "gene_summary",
