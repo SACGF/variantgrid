@@ -38,7 +38,7 @@ class Command(BaseCommand):
             unit_test_dir = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
             vcf_filename = os.path.join(unit_test_dir, f"{base_name}.vcf")
             output_dir = unit_test_dir
-            base_name = f"test_columns_version_{vc.columns_version}_{genome_build.name.lower()}"
+            base_name = f"test_columns_version{vc.columns_version}_{genome_build.name.lower()}"
         else:
             vep_suffix = f"vep_annotated_{genome_build.name}"
             output_dir = settings.ANNOTATION_VCF_DUMP_DIR

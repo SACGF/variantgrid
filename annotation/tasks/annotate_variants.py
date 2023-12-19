@@ -48,6 +48,8 @@ def assign_range_lock_to_annotation_run(annotation_run_id, annotation_range_lock
 @celery.shared_task
 def annotate_variants(annotation_run_id):
     annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
+    if annotation_run.status != AnnotationStatus.CREATED:
+        raise ValueError(f"{annotation_run} status={annotation_run.get_status_display()} != CREATED")
     logging.info("annotate_variants: %s", annotation_run)
 
     # task_id used as Celery lock
