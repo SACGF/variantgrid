@@ -1,0 +1,36 @@
+<table>
+    <tr>
+       <th>Category</th>
+       <th>Expected SNVs</th>
+       <th>Observed SNVs</th>
+       <th>Metrics</th>
+    </tr>
+    <tr>
+        <td>Synonymous</td>
+        <td>{{ gene_constraint.syn_exp|floatformat:1 }}</td>
+        <td>{{ gene_constraint.syn_obs }}</td>
+        <td>
+            Z = {{ gene_constraint.syn_z_score|floatformat:2  }}<br>
+            o/e = {{ gene_constraint.syn_oe_summary }}
+        </td>
+    </tr>
+    <tr>
+        <td>Missense</td>
+        <td>{{ gene_constraint.mis_exp|floatformat:1 }}</td>
+        <td>{{ gene_constraint.mis_obs }}</td>
+        <td>
+            Z = {{ gene_constraint.mis_z_score|floatformat:2 }}<br>
+            o/e = {{ gene_constraint.mis_oe_summary }}
+        </td>
+    </tr>
+    <tr>
+        <td>pLof</td>
+        <td>{{ gene_constraint.lof_exp|floatformat:1 }}</td>
+        <td>{{ gene_constraint.lof_obs }}</td>
+        <td>
+            Z = {{ gene_constraint.lof_z_score|floatformat:2  }}<br>
+            o/e = {{ gene_constraint.lof_oe_summary }}
+        </td>
+    </tr>
+</table>
+Constraint metrics based on {% if gene_constraint.mane_select %}MANE Select{% endif %} transcript (<a href="{{ gene_constraint.transcript_url }}">{{ gene_constraint.transcript_accession }}</a>)

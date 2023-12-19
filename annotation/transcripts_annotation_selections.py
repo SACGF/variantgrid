@@ -154,7 +154,7 @@ class VariantTranscriptSelections:
             transcript_canonical_score = obj.transcript_version.canonical_score
             ggc, ggc_method, ggc_url = GnomADGeneConstraint.get_for_transcript_version_with_method_and_url(obj.transcript_version)
             if ggc:
-                data[self.GNOMAD_GENE_CONSTRAINT_OE_LOF_SUMMARY] = ggc.oe_lof_summary
+                data[self.GNOMAD_GENE_CONSTRAINT_OE_LOF_SUMMARY] = ggc.lof_oe_summary
                 data[self.GNOMAD_GENE_CONSTRAINT_METHOD] = ggc_method
                 data[self.GNOMAD_GENE_CONSTRAINT_URL] = ggc_url
 

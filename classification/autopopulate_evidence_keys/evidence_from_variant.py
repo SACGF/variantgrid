@@ -539,7 +539,7 @@ def get_literature(clinvar) -> str:
 def get_gnomad_oe_lof_summary(transcript_version: TranscriptVersion):
     oe_lof_summary = None
     if ggc := GnomADGeneConstraint.get_for_transcript_version(transcript_version):
-        oe_lof_summary = ggc.oe_lof_summary
+        oe_lof_summary = ggc.lof_oe_summary
     return oe_lof_summary
 
 
