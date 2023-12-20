@@ -59,6 +59,9 @@
             {% labelled label="Gene/Transcript Information" %}
                 {% if details.genes_and_transcripts %}
                     <div>
+                        <b>Lastest cdot</b> {{ details.genes_and_transcripts.latest_cdot }}
+                    </div>
+                    <div>
                         <b>Annotation:</b> {{ details.annotation_consortium }}
                         <b>Genes:</b> {{ details.genes_and_transcripts.genes | intcomma }}
                         <b>Transcripts:</b> {{ details.genes_and_transcripts.transcripts | intcomma }}
