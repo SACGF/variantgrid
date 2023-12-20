@@ -318,7 +318,7 @@ class Command(BaseCommand):
                 print(f"Warning: {gav.gene_annotation_release} has no match for '{gene_symbol_id}' - dbNSFP Gene Annotation")
                 missing_genes["dbnsfp_gene_annotation"] += 1
 
-        for gene_symbol_id, oe_lof in GnomADGeneConstraint.objects.all().values_list("gene_symbol_id", "oe_lof"):
+        for gene_symbol_id, oe_lof in GnomADGeneConstraint.objects.all().values_list("gene_symbol_id", "lof_oe"):
             if gene_ids_for_symbol := symbol_to_gene_ids.get(gene_symbol_id):
                 for gene_id in gene_ids_for_symbol:
                     annotation_by_gene[gene_id]["gnomad_oe_lof"] = oe_lof
