@@ -74,10 +74,13 @@ class Command(BaseCommand):
         if gar_id:
             ontology_version = self._get_ontology_version(ov_id)
 
+            gav_kwargs = {}
             if dbnsfp_gene_version_id:
                 dbnsfp_gene_version = DBNSFPGeneAnnotationVersion.objects.get(pk=dbnsfp_gene_version_id)
+                gav_kwargs["dbnsfp_gene_version"] = dbnsfp_gene_version
             gene_annotation_release = GeneAnnotationRelease.objects.get(pk=gar_id)
-            gar = GeneAnnotationVersion.objects.filter(gene_annotation_release=gene_annotation_release).first()
+            gar = GeneAnnotationVersion.objects.filter(gene_annotation_release=gene_annotation_release,
+                                                       ontology_version=ontology_version, **gav_kwargs).first()
             if gar and not force:
                 num_gene_annotations = gar.geneannotation_set.count()
                 raise ValueError(f"Existing GeneAnnotationVersion for {gene_annotation_release=} exists (records={num_gene_annotations}, created={gar.created})! Use --force?")
