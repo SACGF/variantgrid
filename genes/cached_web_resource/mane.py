@@ -13,8 +13,9 @@ from snpdb.models import GenomeBuild
 
 
 def store_mane_from_web(cached_web_resource: CachedWebResource):
-    MANE_VERSION = "v1.0"
-    MANE_URL = f"https://ftp.ncbi.nlm.nih.gov/refseq/MANE/MANE_human/current/MANE.GRCh38.{MANE_VERSION}.summary.txt.gz"
+    # Don't link to "current" as the filename will change...
+    MANE_VERSION = "1.3"
+    MANE_URL = f"https://ftp.ncbi.nlm.nih.gov/refseq/MANE/MANE_human/release_{MANE_VERSION}/MANE.GRCh38.v{MANE_VERSION}.summary.txt.gz"
     logging.info("Retrieving %s", MANE_URL)
     r = requests.get(MANE_URL, stream=True, timeout=MINUTE_SECS)
     f = gzip.GzipFile(fileobj=r.raw)
