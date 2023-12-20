@@ -119,8 +119,9 @@ class Command(BaseCommand):
             elif ov_id:
                 ontology_version = OntologyVersion.objects.get(pk=ov_id)
             else:
+                latest_ontology_version = OntologyVersion.objects.order_by("pk").last().pk
                 raise ValueError("You must specify ontology-version when gene-annotation-release is specified "
-                                 "and more than 1 ontology version exists")
+                                 f"and more than 1 ontology version exists (latest is {latest_ontology_version})")
         else:
             raise ValueError("No ontology versions - you need to import this first (see annotation page)")
         return ontology_version
