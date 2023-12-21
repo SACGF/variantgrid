@@ -10,6 +10,7 @@ from frozendict import frozendict
 from model_utils.models import TimeStampedModel
 
 from classification.models import ClassificationModification, ConditionResolved
+from library.preview_request import PreviewModelMixin, PreviewData, PreviewKeyValue
 from library.utils import first, invalidate_cached_property, JsonObjType
 from snpdb.models import ClinVarKey, Allele
 from uicore.json.validated_json import ValidatedJson, JsonMessages
@@ -51,7 +52,7 @@ class ClinVarExportStatus(models.TextChoices):
     EXCLUDE = "X", "Exclude"
 
 
-class ClinVarExport(TimeStampedModel):
+class ClinVarExport(TimeStampedModel, PreviewModelMixin):
     class Meta:
         verbose_name = "ClinVar export"
 
@@ -182,6 +183,23 @@ class ClinVarExport(TimeStampedModel):
     def differences_since_last_submission(self):
         from classification.models.clinvar_export_convertor import ClinVarExportConverter
         return ClinVarExportConverter(self).convert().changes
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-file-medical"
+
+    @classmethod
+    def preview_category(cls) -> str:
+        return "ClinVar Export"
+
+    @property
+    def preview(self) -> PreviewData:
+        extra = [
+            PreviewKeyValue(key="Lab:", value=self.classification_based_on.lab.name),
+        ]
+        return PreviewData.for_object(obj=self, summary_extra=extra,
+                                      icon=self.preview_icon(),
+                                      category=self.preview_category())
 
 
 class ClinVarExportBatchStatus(models.TextChoices):

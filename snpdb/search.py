@@ -27,6 +27,7 @@ HAS_ANYTHING = re.compile(r".")
 HAS_3_ALPHA_MIN = re.compile(r"[a-zA-Z]{3,}")
 HAS_3_ANY = re.compile(r"\S{3,}")
 _SPLIT_GAPS = re.compile(r"[\s,]+")
+HAS_SCV = re.compile(r"SCV\d+")
 
 MAX_VARIANT_RESULTS = 100
 MAX_RESULTS_PER_SEARCH = 25
