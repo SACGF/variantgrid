@@ -498,9 +498,13 @@ def clinvar_export_create_batch(request: HttpRequest, clinvar_key_id: str) -> Ht
             batch_records_count = batch.clinvarexportsubmission_set.count()
             messages.add_message(request, level=messages.SUCCESS, message=f"Created Export Batch {batch} with {batch_records_count}")
             if missing := len(all_ids) - batch_records_count:
-                messages.add_message(request, level=messages.WARNING, message=f"Some records were not added to the batch, already up to date or in error : {missing}")
+                batch_record_ids = set(batch.clinvarexportsubmission_set.values_list('clinvar_export_id', flat=True).all())
+                missing_ids = sorted(all_ids - batch_record_ids)
+                missing_ids_list = ', '.join(str(i) for i in missing_ids)
+                messages.add_message(request, level=messages.WARNING, message=f"Some records were not added to the batch, already up to date or in error : {missing_ids_list}")
         if not batches:
-            messages.add_message(request, level=messages.ERROR, message="All IDs were already in were already up to date or in error")
+            lab_record_ids = ', '.join(str(i) for i in all_ids)
+            messages.add_message(request, level=messages.ERROR, message=f"{lab_record_ids} IDs were already up to date or in error.")
     return redirect(reverse('clinvar_key_summary', kwargs={'clinvar_key_id': clinvar_key_id}))
 
 
