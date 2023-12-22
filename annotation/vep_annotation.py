@@ -300,7 +300,7 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
     if os.path.exists(cosmic_filename):
         cosmic_basename = os.path.basename(cosmic_filename)
         if m := re.match(r"^Cosmic.*_v(\d{2,})_.*.vcf.gz", cosmic_basename):
-            kwargs["cosmic"] = m.group(1)
+            kwargs["cosmic"] = int(m.group(1))
 
     return kwargs
 
