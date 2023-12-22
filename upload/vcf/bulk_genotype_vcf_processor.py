@@ -6,6 +6,7 @@ from typing import Optional, Set, List, Dict
 
 import cyvcf2
 import numpy as np
+import simplejson
 from django.conf import settings
 from django.db.models import Max
 
@@ -14,7 +15,7 @@ from library.django_utils.django_file_utils import get_import_processing_filenam
 from library.genomics.vcf_enums import VCFConstant
 from library.genomics.vcf_utils import vcf_get_ref_alt_end
 from library.git import Git
-from library.utils import double_quote
+from library.utils import double_quote, json_default_converter
 from library.utils.database_utils import postgres_arrays
 from patients.models_enums import Zygosity
 from snpdb.common_variants import get_classified_high_frequency_variants_qs
@@ -162,6 +163,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         data = self.vcf.vcffilter_set.aggregate(Max("filter_code"))
         if existing_max := data.get("filter_code__max"):
             filter_code_id = ord(existing_max) + 1
+            if chr(filter_code_id) in "',\"":
+                filter_code_id += 1  # Skip these as it causes quoting issues
         else:
             filter_code_id = VCFFilter.ASCII_MIN
         filter_code = chr(filter_code_id)
@@ -380,8 +383,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             genotype_quality_str,
             phred_likelihood_str,
             samples_filters_str,
-            json.dumps(format_json),
-            json.dumps(info_json)
+            simplejson.dumps(format_json, ignore_nan=True, default=json_default_converter),
+            simplejson.dumps(info_json, ignore_nan=True, default=json_default_converter),
         ]
 
         self.locus_variant_hashes.append(alt_hash)

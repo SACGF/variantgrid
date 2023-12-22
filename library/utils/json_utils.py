@@ -193,3 +193,9 @@ class JsonDiffs:
                 diffs.append(JsonDiff(json_path=path, a=obj1, b=obj2))
         else:
             diffs.append(JsonDiff(json_path=path, a=obj1, b=obj2))
+
+
+def json_default_converter(obj):
+    if isinstance(obj, set):
+        return list(obj)
+    raise TypeError("Type not serializable")
