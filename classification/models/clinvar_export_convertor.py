@@ -378,13 +378,15 @@ class ClinVarExportConverter:
         """
 
         id_part = condition.id
+        db = condition.ontology_service
         if condition.ontology_service == OntologyService.OMIM:
             id_part = str(condition.index)  # OMIM is not 0 prefixed
         elif condition.ontology_service == OntologyService.ORPHANET:
             id_part = f"ORPHA{str(condition.index)}"  # ORPHA is not 0 prefixed
+            db = "ORPHANET"
 
         return ValidatedJson({
-            "db": condition.ontology_service,
+            "db": db,
             "id": id_part
         }, messages)
 
@@ -472,6 +474,8 @@ class ClinVarExportConverter:
                 gene_symbols = []
                 if gene_symbol := self.value(SpecialEKeys.GENE_SYMBOL):
                     gene_symbols.append({"symbol": gene_symbol})
+                else:
+                    gene_symbols = ValidatedJson([], JsonMessages.error("No gene symbol provided"))
 
                 json_data = {
                     "variant": [
