@@ -70,6 +70,7 @@ requests
 requests_oauthlib
 rollbar
 scipy
+simplejson
 sqlparse
 toposort
 Unidecode
