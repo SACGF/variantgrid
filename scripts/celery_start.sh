@@ -6,6 +6,7 @@ BROKER_URL=${RABBIT_MQ_URL}
 
 cd "$(dirname $0)/.." || exit;
 
+# --max-tasks-per-child
 celery -b ${BROKER_URL} --app variantgrid worker -l DEBUG --concurrency=4 -n analysis_workers --queues analysis_workers &
 celery -b ${BROKER_URL} --app variantgrid worker -l DEBUG --concurrency=4 -n annotation_workers --queues annotation_workers &
 celery -b ${BROKER_URL} --app variantgrid worker -l DEBUG --concurrency=4 -n db_workers --queues db_workers &
