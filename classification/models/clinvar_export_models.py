@@ -192,6 +192,10 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
     def preview_category(cls) -> str:
         return "ClinVar Export"
 
+    @classmethod
+    def preview_if_url_visible(cls) -> str:
+        return "clinvar_export"
+
     @property
     def preview(self) -> PreviewData:
         extra = [
