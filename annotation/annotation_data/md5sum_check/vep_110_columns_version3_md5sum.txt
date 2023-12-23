@@ -17,3 +17,5 @@ bfdfd76bde3b6406b550343403a32e2f  GRCh38/gnomad4.0_GRCh38_combined_af.vcf.bgz
 969db4f6f3a4e4fea52ef537536514a0  GRCh38/gnomad.v4.0.sv.merged.vcf.gz.tbi
 b87a08289db89f68ed71b169a3f19666  GRCh38/mastermind_cited_variants_reference-2023.10.02-grch38.vcf.gz
 d038091241be86ca1404eacfba0c434b  GRCh38/mastermind_cited_variants_reference-2023.10.02-grch38.vcf.gz.tbi
+e0d0dbaad5c963618e7f78261de61ed8  GRCh38/MaveDB_variants.tsv.gz
+ee1888536de0213c7f983ba2d2506cb7  GRCh38/MaveDB_variants.tsv.gz.tbi

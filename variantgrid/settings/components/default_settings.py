@@ -230,7 +230,6 @@ ANNOTATION = {
         # so you can change just that variable and have everything else work
         # The names correspond to VEPPlugin or VEPCustom entries (but lower case)
         "vep_config": {
-            "alphamissense": "annotation_data/GRCh37/AlphaMissense_hg19.tsv.gz",
             "cosmic": "annotation_data/GRCh37/CosmicCodingMuts_v95_20211101_grch37.normal.vcf.gz",
             "dbnsfp": "annotation_data/GRCh37/dbNSFP4.0a.grch37.stripped.gz",
             "dbscsnv": "annotation_data/GRCh37/dbscSNV1.1_GRCh37.txt.gz",
@@ -265,7 +264,6 @@ ANNOTATION = {
         # so you can change just that variable and have everything else work
         # The names correspond to VEPPlugin or VEPCustom entries (but lower case)
         "vep_config": {
-            "alphamissense": "annotation_data/GRCh38/AlphaMissense_hg38.tsv.gz",
             "cosmic": "annotation_data/GRCh38/CosmicCodingMuts_v95_20211101_grch38.normal.vcf.gz",
             "dbnsfp": "annotation_data/GRCh38/dbNSFP4.0a.grch38.stripped.gz",
             "dbscsnv": "annotation_data/GRCh38/dbscSNV1.1_GRCh38.txt.gz",
