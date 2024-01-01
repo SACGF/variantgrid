@@ -50,17 +50,16 @@ def active_users_health_check(sender, health_request: HealthCheckRequest, **kwar
             )
         )
 
-    if non_admin_count > 0:
-        health_checks.append(
-            HealthCheckRecentActivity(
-                emoji=non_admin_emoji,
-                name="Active Users",
-                amount=non_admin_count,
-                extra=", ".join(list(non_admin_users)),
-                preview=non_admin_previews,
-                stand_alone=True
-            )
+    health_checks.append(
+        HealthCheckRecentActivity(
+            emoji=non_admin_emoji,
+            name="Active Users",
+            amount=non_admin_count,
+            extra=", ".join(list(non_admin_users)),
+            preview=non_admin_previews,
+            stand_alone=True
         )
+    )
     return health_checks
 
 
