@@ -128,7 +128,7 @@ def write_scripts(args):
         prefix = f"gnomad{args.version}_{args.genome_build}_chr{chrom}"
         chrom_script = f"{prefix}.sh"
         chrom_scripts.append(chrom_script)
-        with (open(chrom_script, "w") as cs):
+        with open(chrom_script, "w") as cs:
             cs.write(bash_header)
 
             output_vcfs = []
