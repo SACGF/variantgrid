@@ -717,7 +717,7 @@ INSTALLED_APPS = [
     'django_json_widget',
     'django.contrib.humanize',
     'django.contrib.sites',
-    'captcha',
+    'django_recaptcha',
     'registration',
     'django.contrib.auth',
     'mozilla_django_oidc',

@@ -1,14 +1,13 @@
 import sys
 
-from captcha.fields import ReCaptchaField
-from captcha.widgets import ReCaptchaV3
+from django_recaptcha.fields import ReCaptchaField
+from django_recaptcha.widgets import ReCaptchaV3
 from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
-from django.http.response import HttpResponseServerError, JsonResponse, \
-    HttpResponseForbidden
+from django.http.response import HttpResponseServerError, JsonResponse
 from django.shortcuts import redirect, render
 from django.template.loader import get_template, render_to_string
 from django.urls.base import resolve, reverse
