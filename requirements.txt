@@ -12,7 +12,7 @@ cyvcf2==0.30.14
 Django==4.2.5
 django-amazon-ses==4.0.1
 django_autocomplete_light==3.9.1
-django-avatar==7.1.1
+django-avatar==8.0.0
 django_cache_memoize==0.1.10
 django-compressor==4.3.1
 django_crispy_forms==2.0
@@ -29,7 +29,7 @@ django_htmlmin==0.11.0
 django-leaflet==0.28.2
 django_model_utils==4.2.0
 django-postgres-extra==2.0.5
-django_recaptcha==3.0.0
+django_recaptcha==4.0.0
 django-registration-redux==2.9
 django_termsandconditions==2.0.12
 django-reversion-compare==0.15.0
@@ -42,7 +42,7 @@ git+https://github.com/davmlaw/django-messages/#egg=django-messages
 git+https://github.com/davmlaw/django-starfield#egg=django_starfield
 git+https://github.com/davmlaw/django-js-reverse#egg=django-js-reverse
 git+https://github.com/SACGF/hgvs#egg=pyhgvs
-git+https://github.com/biocommons/hgvs@4efed793dad6b230feb39ff0e28f1ba16b8843ac#egg=hgvs
+git+https://github.com/biocommons/hgvs#egg=hgvs
 gunicorn
 HTSeq==2.0.1
 ijson==3.1.4
