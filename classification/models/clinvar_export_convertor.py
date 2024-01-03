@@ -595,7 +595,7 @@ class ClinVarExportConverter:
                 allele_origin_value = "somatic"
                 allele_origin_messages += JsonMessages.info("Defaulting \"Allele origin\" to \"somatic\" as no value provided")
 
-        data["allele_origin"] = ValidatedJson(allele_origin_value, allele_origin_messages)
+        data["alleleOrigin"] = ValidatedJson(allele_origin_value, allele_origin_messages)
 
         data["collectionMethod"] = "clinical testing"
         # numberOfIndividuals do we do anything with this?
