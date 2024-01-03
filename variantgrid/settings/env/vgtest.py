@@ -26,6 +26,9 @@ ANNOTATION_VEP_CACHE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_cache")
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
 _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "fasta")
 
+PYTHON_COMMAND = os.path.join(BASE_DIR, "env", "bin", "python3")
+MANAGE_COMMAND = [PYTHON_COMMAND, os.path.join(BASE_DIR, "manage.py")]
+
 
 ANNOTATION[BUILD_GRCH37].update({
     "columns_version": 3,
