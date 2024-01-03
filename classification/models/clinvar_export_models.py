@@ -186,7 +186,7 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
 
     @classmethod
     def preview_icon(cls) -> str:
-        return "fa-file-medical"
+        return "fa-solid fa-upload"
 
     @classmethod
     def preview_category(cls) -> str:
