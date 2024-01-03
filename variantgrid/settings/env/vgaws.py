@@ -15,6 +15,8 @@ WEB_HOSTNAME = 'variantgrid.com'
 WEB_IP = '54.253.175.206'
 
 DEBUG = False
+PYTHON_COMMAND = os.path.join(BASE_DIR, "env", "bin", "python3")
+MANAGE_COMMAND = [PYTHON_COMMAND, os.path.join(BASE_DIR, "manage.py")]
 
 ANNOTATION_ENTREZ_EMAIL = 'davmlaw@gmail.com'
 
