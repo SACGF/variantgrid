@@ -1,3 +1,61 @@
+@keyframes animationDrop {
+  0% {
+    opacity: 0.1;
+    transform: translateY(-16px);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  85% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.list-group-item .user-award {
+  text-shadow: #fff 0px 0 4px;
+}
+
+.avatar-frame {
+  position: relative;
+}
+.avatar-frame .user-award {
+  animation: animationDrop ease-in 0.5s;
+  text-shadow: #fff 0px 0 2px;
+}
+
+.avatar-frame.avatar-frame-tiny .user-award {
+  position: absolute;
+  right: -6px;
+  top: -6px;
+  font-size: 8pt;
+}
+
+.avatar-frame.avatar-frame-normal .user-award {
+  position: absolute;
+  right: 2px;
+  top: -2px;
+  font-size: 16pt;
+}
+
+.user-award-gold {
+  color: #e5b80b;
+}
+
+.user-award-silver {
+  color: #a0a0a0;
+  transform: scale(0.9);
+}
+
+.user-award-bronze {
+  color: #cd7f32;
+  transform: scale(0.7);
+}
+
 h3:not(.popover-header), h4:not(.popover-header) {
   margin-bottom: 16px;
 }
@@ -20,10 +78,6 @@ h3:not(:first-child):not(.popover-header), h4:not(:first-child):not(.popover-hea
 
 .form-control .select2-selection__arrow, .form-group .select2-selection__arrow {
   display: none;
-}
-
-.form-group .select2-selection__rendered {
-  margin-top: -5px;
 }
 
 label, form label {
@@ -298,10 +352,10 @@ a.list-group-item-action {
   height: 32px;
 }
 
-.link-toolbar > *:not(:first-child) {
+.link-toolbar > *:not(:first-child):not(#allele-origin-toggle) {
   margin-left: 10px;
 }
-.link-toolbar > *:not(:first-child)::before {
+.link-toolbar > *:not(:first-child):not(#allele-origin-toggle)::before {
   content: '|';
   margin-right: 10px;
   color: grey !important;
@@ -560,6 +614,26 @@ span.cs {
   padding: 2px 4px 2px 4px;
   border: 1px solid gray;
   border-radius: 4px;
+}
+
+.scs {
+  font-weight: bold;
+}
+
+.scs-tier_1 {
+  color: #444;
+}
+
+.scs-tier_2 {
+  color: #666;
+}
+
+.scs-tier_3 {
+  color: #666;
+}
+
+.scs-tier_4 {
+  color: #888;
 }
 
 .cs-b {
@@ -1425,6 +1499,81 @@ li.help-item :last-child {
   background-color: #fee;
   padding: 8px;
   border-radius: 4px;
+}
+
+#allele-origin-toggle .btn-group label {
+  opacity: 0.5;
+  background-color: #aaa;
+  color: #222;
+}
+#allele-origin-toggle .btn-group label.active {
+  opacity: 1;
+}
+#allele-origin-toggle .btn-group .allele-origin-A.active {
+  color: #fff;
+  background-color: #99c;
+}
+#allele-origin-toggle .btn-group .allele-origin-G.active {
+  color: #fff;
+  background-color: #88cc88 !important;
+}
+#allele-origin-toggle .btn-group .allele-origin-S.active {
+  color: #fff;
+  background-color: #cc99cc;
+}
+
+.allele-origin-box {
+  background-color: #999;
+  border-radius: 8px;
+}
+.allele-origin-box.allele-origin-G {
+  background-color: #88cc88;
+}
+.allele-origin-box.allele-origin-S {
+  background-color: #cc99cc;
+}
+.allele-origin-box.allele-origin-U .allele-origin-text {
+  font-size: 7pt;
+  padding-bottom: 0.5px;
+}
+.allele-origin-box .allele-origin-text {
+  font-weight: 500;
+  color: white;
+  font-size: 8pt;
+  text-transform: uppercase;
+  text-align: center;
+}
+.allele-origin-box.horizontal {
+  display: inline-block;
+  position: relative;
+  width: 70px;
+  margin-right: 6px;
+}
+.allele-origin-box.horizontal .allele-origin-text {
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+.allele-origin-box.vertical {
+  margin-top: -4px;
+  margin-left: 6px;
+  margin-right: 8px;
+  width: 14px;
+  height: 66px;
+}
+.allele-origin-box.vertical .allele-origin-text {
+  width: 180px;
+  transform: rotate(-90deg);
+  position: relative;
+  left: -83px;
+  bottom: -28px;
+}
+
+#vc-extras .allele-origin-box.horizontal {
+  width: initial;
+}
+#vc-extras .allele-origin-box.horizontal .allele-origin-text {
+  padding: 3px 6px 2px 6px;
+  font-size: 8pt;
 }
 
 /*# sourceMappingURL=global_bs.css.map */

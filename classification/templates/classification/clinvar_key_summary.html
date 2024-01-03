@@ -17,6 +17,19 @@
         function batches(data) {
             data.clinvar_key = {{ clinvar_key.pk | jsonify }};
         }
+        function render_allele_origin_bucket(data) {
+            return VCTable.allele_origin_bucket_label(data, null, "horizontal");
+        }
+        function renderId(data, type, row) {
+            let allele_origin_bucket = data.allele_origin_bucket;
+            let bucket_dom = VCTable.allele_origin_bucket_label(allele_origin_bucket);
+            return $('<div>', {
+                style: "display:flex; position: relative; top: -12px; left: 6px",
+                html:[
+                bucket_dom,
+                data.id
+            ]}).prop('outerHTML');
+        }
         function renderStatus(data, type, row) {
             let dom = null;
             if (data === 'D') {
@@ -67,6 +80,7 @@
                 return data;
             }
         }
+        /*
         function renderId(data, type, row) {
             let content = [$('<span/>', {text: data.genome_build}), $("<br/>"), $('<span/>', {text: data.c_hgvs})];
             // let id = data.id;
@@ -74,6 +88,7 @@
             let elem = $('<span>', {html: content});
             return elem.prop('outerHTML');
         }
+        */
         function renderBatches(data, type, row) {
             if (!data) {
                 return $('<span>', {text: '-', class:'no-value'}).prop('outerHTML');
@@ -150,14 +165,14 @@
             <p>Data is sent to ClinVar in batches, these just show you the technical detail data that was sent to ClinVar if required for review.</p>
         {% end_page_help_embedded %}
         {% if missing_condition_count %}
-            {% labelled label="Classifications w/out Standard Condition" %}
+            {% labelled label="Classification Records w/out Standard Condition" %}
                 <a href="{% url 'condition_matchings' %}" title="Only classifications with standard conditions can be submitted to ClinVar">
                     {{ 'warning' | severity_icon }}
                     {{ missing_condition_count }}</a>
             {% endlabelled %}
         {% else %}
-            {% labelled label="Classifications w/out standard condition" %}
-                {{ 'success' | severity_icon }} All classifications have a standard condition
+            {% labelled label="Classification Records w/out standard condition" %}
+                {{ 'success' | severity_icon }} All classification records have a standard condition
             {% endlabelled %}
         {% endif %}
         <div class="text-info mb-1">Important: the status of ClinVar exports is cached. Recent changes may not be reflected yet.</div>
@@ -167,7 +182,7 @@
                 {% labelled label="Refresh" admin_only=True %}
                     <form data-loadscreen=".loading-wrapper" method="POST" action="{% url 'clinvar_export_refresh' clinvar_key.pk %}">
                         {% csrf_token %}
-                        <button class="btn btn-primary" onclick="return window.confirm('This may take a while. Please confirm to proceed.');">Refresh ClinVar Exports for {{ clinvar_key }}</button>
+                        <button class="btn btn-primary" onclick="return window.confirm('This may take a while. Please confirm to proceed.');"><i class="fa-solid fa-arrows-rotate"></i> Refresh ClinVar Exports for {{ clinvar_key }}</button>
                     </form>
                 {% endlabelled %}
                 <hr/>
@@ -175,7 +190,7 @@
                     <form method="POST" action="{% url 'clinvar_export_create_batch' clinvar_key.pk %}">
                         {% csrf_token %}
                         <textarea placeholder="Provide a list of IDs seperated with spaces, tabs, new lines and/or commas." name="clinvar_export_ids" class="form-control"></textarea>
-                        <button class="btn btn-primary mt-1">Create Batch for {{ clinvar_key }}</button>
+                        <button class="btn btn-primary mt-1"><i class="fa-solid fa-circle-plus"></i> Create Batch for {{ clinvar_key }}</button>
                     </form>
                 {% endlabelled %}
             {% endif %}

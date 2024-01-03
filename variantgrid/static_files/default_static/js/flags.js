@@ -832,12 +832,12 @@ let Flags = (function () {
                 if (this.creating) {
                     if (this.flag_type === 'classification_suggestion') {
                         return $(`<div>
-                        If you have found some extra information that you think should be incorporated into this classification,
-                        you can raise a suggestion for the classification owner to accept or reject.
+                        If you have found some extra information that you think should be incorporated into this classification record,
+                        you can raise a suggestion for the classification record owner to accept or reject.
                         </div>`);
                     } else if (this.flag_type === 'classification_internal_review') {
                         return $(`<div>
-                        You can raise this flag to let people know the classification is currently in review, or raise it
+                        You can raise this flag to let people know the classification record is currently in review, or raise it
                         as "Completed" to record the fact that a review has recently taken place.<br/>
                         Please record any internal reviews while a classification is marked as discordant.
                         </div>`);
@@ -856,7 +856,7 @@ let Flags = (function () {
             
                 if (this.flag_type === 'classification_suggestion') {
                     return $(`<div>
-                    Someone has raised suggestion(s) against this classification.
+                    Someone has raised suggestion(s) against this classification record.
                     <ol><li>Review the contents of each suggestion.</li>
                     <li>If appropriate, make changes in your curation system and mark the suggestion as Complete.</li>
                     <li>If you decline the suggestion, mark it as Rejected.</li>
@@ -864,26 +864,26 @@ let Flags = (function () {
                     `);
                 } else if (this.flag_type === 'classification_outstanding_edits') {
                     return $(`<div>
-                    Edits have been made to this classification that are not included in a published version.
-                    <ol><li>From the classification form, ensure there are no validation errors stopping this record from being published.</li>
+                    Edits have been made to this classification record that are not included in a published version.
+                    <ol><li>From the classification record form, ensure there are no validation errors stopping this record from being published.</li>
                     <li>At the bottom of the form, click the tick to submit the outstanding changes.</li></ol></div>`
                     );
                 } else if (this.flag_type === 'classification_internal_review') {
                     return $(`<div>
-                    This classification is marked as currently being internally reviewed.
+                    This classification record is marked as currently being internally reviewed.
                     <ol><li>Once the internal review is complete, ensure you update the classification in your curation system.</li>
                     <li>Mark the internal review as Completed</li></ol>
                     </div>
                     `);
                 } else if (this.flag_type === 'classification_withdrawn') {
                     return $(`<div>
-                    This classification has been marked as withdrawn. It will be hidden from almost all searches and exports.
+                    This classification record has been marked as withdrawn. It will be hidden from almost all searches and exports.
                     <ol><li>If the classification is not of high enough quality or in error, you may leave it as "withdrawn" indefinitely.</li>
-                    <li>If you wish to un-withdraw the classification, click the open bin icon in actions from the variant classification form</li></ol></div>
+                    <li>If you wish to un-withdraw the classification record, click the open bin icon in actions from the variant classification record form</li></ol></div>
                     `);
                 } else if (this.flag_type === 'classification_significance_change') {
                     return $(`<div>
-                    This classification has changed its clinical significance compared to a previously published version.
+                    This classification record has changed its classification compared to a previously published version.
                     <ol><li>Set the status of this flag to reflect the primary reason behind the change in classification</li>
                     <div><ul>
                     <li>Discordance Discussion - Data was changed as a result of talking to other labs when this classification was in discordance.
@@ -894,7 +894,7 @@ let Flags = (function () {
                     <li>Please also add a comment providing some context.</li></ol></div>`);
                 } else if (this.flag_type === 'classification_discordant') {
                     return $(`<div>
-                    This classification is in discordance with one or more classifications.
+                    This classification record is in discordance with one or more classification records.
                     <ol><li>Ensure that you have completed an internal review of your lab's classification recently (within the last 12 months is recommended). If not, raise the internal review flag and complete an internal review of your lab's classification.
                     <li>Review any outstanding suggestions against your lab's classification.
                     <li>View the other classifications in the discordance report and view the evidence differing between multiple records via the diff page. If appropriate, raise suggestions against other lab classifications.
@@ -903,16 +903,16 @@ let Flags = (function () {
                     `);
                 } else if (this.flag_type === 'classification_pending_changes') {
                     return $(`<div>
-                    This classification has outstanding changes to apply.<br/>
+                    This classification record has outstanding changes to apply.<br/>
                     If a subsequent sync to this system provides a new clinical significance this flag will automatically close.<br/>
                     Otherwise it can be closed manually if the flag was raised in error or circumstances have changed.
                     </div>`);
                 } else if (this.flag_type === 'classification_unshared') {
                     return $(`<div>
-                    This classification is not yet shared outside of your lab or institution.
-                    <ol><li>From the classification form, ensure there are no validation errors stopping this record from being published.</li>
-                    <li>Review the content of the classification to make sure it's ready to be shared.</li>
-                    <li>At the bottom of the form, click the Share to submit at a higher share level.</li></ol></div>
+                    This classification record is not yet shared outside of your lab or institution.
+                    <ol><li>From the classification record form, ensure there are no validation errors stopping this record from being published.</li>
+                    <li>Review the content of the classification record to make sure it's ready to be shared.</li>
+                    <li>At the side of the form, click the Share to submit at a higher share level.</li></ol></div>
                     `);
                 }
                 return $('<div>');
@@ -977,7 +977,7 @@ let Flags = (function () {
                             `Go to the `,
                             $('<a>', {class: 'hover-link', text: `Discordance Report`, href:`/classification/classification/discordance_report/${reportId}`}),
                             ` | `,
-                            $('<a>', {class: 'hover-link', text: `Diff with other Classifications`, href: `/classification/diff/?clinical_context=${clinicalContext}`})
+                            $('<a>', {class: 'hover-link', text: `Diff with other Classification Records`, href: `/classification/diff/?clinical_context=${clinicalContext}`})
                         ]});
                     }
                 }

@@ -9,6 +9,7 @@ class ClassificationLabSummaryEntry:
     lab: Lab
     clinical_significance_from: str
     clinical_significance_to: str
+    somatic_clinical_significance: str
     pending: bool = False
 
 
@@ -33,6 +34,10 @@ class ClassificationLabSummary:
     @property
     def clinical_significance_to(self):
         return self.group.clinical_significance_to or 'Unclassified'
+
+    @property
+    def somatic_clinical_significance(self):
+        return self.group.somatic_clinical_significance
 
     @property
     def changed(self):

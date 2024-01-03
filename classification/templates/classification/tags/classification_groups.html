@@ -2,11 +2,13 @@
 {% load ui_utils %}
 {% load js_tags %}
 {% load static %}
-
 {% for ccg in clinical_contexts %}
     {% with discordance_status=ccg.calculate_discordance_status %}
         <div>
-            <label class="mr-2">Overlap Status {% if not ccg.is_default %}{{ ccg.name }}{% endif %}:</label>
+            {% clinical_context ccg %}
+            <label class="mr-2">
+                Overlap Status:
+            </label>
             <div class="d-inline-block">
                 <span class="mr-2 {{ discordance_status.css_class }}">
                     {% comment %}Status: {% endcomment %}
@@ -27,7 +29,7 @@
                     {% endif %}
                 {% endwith %}
                 {% if discordance_status.has_ignored_clin_sigs %}
-                    <div>{{ 'i'|severity_icon }} <span class="text-info">Some clinical significances do not count towards discordance calculations.</span></div>
+                    <div>{{ 'i'|severity_icon }} <span class="text-info">Some classification values do not count towards discordance calculations.</span></div>
                 {% endif %}
                 {% if ccg.pending_status %}<span class="mr-2 hover-detail" title="There is an active import, the status will be calculated when it completes.">(<i class="fa-regular fa-clock fa-spin fa-animate-1"></i> Pending)</span>{% endif %}
             </div>
@@ -58,6 +60,9 @@
         {% if history_link %}
             <a class="hover-link" href="{{ history_link }}"><i class="fas fa-key" style="color:gray;opacity:0.75"></i> Show History</a>
         {% endif %}
+        {% if allele_origin_filter_enabled %}
+            {% allele_origin_toggle style="position:absolute; top: -6px; right: 0" %}
+        {% endif %}
         {% comment %}<a class="btn btn-outline-secondary" href="#">TODO Download CSV</a>{% endcomment %}
     </div>
 {% elif title %}
@@ -70,12 +75,13 @@
         <tr>
             <th>Lab</th>
             <th>HGVS <span class="text-secondary">{{ genome_build }}</span></th>
-            <th class="text-center">Clinical Significance</th>
+            <th class="text-center">Classification</th>
             <th>Condition</th>
             <th>{% if show_allele_origin %}Origin, {% endif %}Zygosities</th>
-            <th><span class="text-secondary">Latest</span><br/>ACMG</th>
+            <th><span class="text-secondary">Latest</span><br/>Criteria</th>
             <th><span class="text-secondary">Latest</span><br/>Curated</th>
             <th>Sort Column (hidden)</th>
+            <th>Allele Origin Code (hidden)</th>
             <th>Imported As</th>
             <th>Allele</th>
             <th>Gene Symbol</th>
@@ -88,53 +94,70 @@
         {% endfor %}
     </tbody>
 </table>
-<script>$(document).ready(() => {
-    var tableDom = $('#{{ table_id }}')
-    var table = tableDom.DataTable({
-        order: [{{ sort_order_index }}, "asc"],
-        dom: '<"top"><"toolbar"<"custom">{% if paging %}f{% endif %}>rt<"bottom"{% if paging %}<"showing"il>{% endif %}p><"clear">',
-        "orderFixed": {
-            post: [7, "desc"]
-        },
-        paging: {{ paging | jsonify }},
-        pagingType: "input",
-        classes: {
-            'sPageButton': 'btn btn-outline-primary btn-rnd-rect',
-            'sPageButtonDisabled': 'disabled'
-        },
-        pageLength: 50,
-        responsive: {
-            details: {
-                // type: 'column',
-                // target: 'td.dt-preview',
-                // renderer: TableFormat.detailRenderer
-                type: 'column',
-                target: 'tr',
-                renderer: TableFormat.detailRendererHtml
-            }
-        },
-        columns: [
-            {}, // ID
-            {className: 'dt-hgvs'}, // HGVS
-            {}, // Clinical Sig
-            {}, // Conditions
-            {}, // Zygosities
-            {}, // ACMG
-            {}, // last record
-            {visible: false}, // sorting column
-            {className: 'none'}, // imported as
-            {className: 'none'}, // allele
-            {className: 'none'}, // gene symbols
-            {className: 'none'}, // record sub-table
-        ]
+<script>
+    let table = null;
+    $(document).ready(() => {
+        let tableDom = $('#{{ table_id }}')
+        table = tableDom.DataTable({
+            order: [{{ sort_order_index }}, "asc"],
+            dom: '<"top"><"toolbar"<"custom">{% if paging %}f{% endif %}>rt<"bottom"{% if allele_origin_filter_enabled %}<"showing"il>p{% endif %}><"clear">',
+            "orderFixed": {
+                post: [7, "desc"]
+            },
+            paging: {{ paging | jsonify }},
+            pagingType: "input",
+            classes: {
+                'sPageButton': 'btn btn-outline-primary btn-rnd-rect',
+                'sPageButtonDisabled': 'disabled'
+            },
+            pageLength: 50,
+            responsive: {
+                details: {
+                    // type: 'column',
+                    // target: 'td.dt-preview',
+                    // renderer: TableFormat.detailRenderer
+                    type: 'column',
+                    target: 'tr',
+                    renderer: TableFormat.detailRendererHtml
+                }
+            },
+            columns: [
+                {}, // ID
+                {className: 'dt-hgvs'}, // HGVS
+                {}, // Classification
+                {}, // Conditions
+                {}, // Zygosities
+                {}, // ACMG
+                {}, // last record
+                {visible: false}, // sorting column
+                {visible: false}, // allele origin code
+                {className: 'none'}, // imported as
+                {className: 'none'}, // allele
+                {className: 'none'}, // gene symbols
+                {className: 'none'}, // record sub-table
+            ]
+        });
+        table.on('responsive-display', (e, datatable, row, showHide, update) => {
+            window.setTimeout(() => {
+                Flags.instance.init({userId: '{{user.id}}', forceRender: true, filter:'.child', flagGroup:'classifications'});
+            },1);
+        });
+        $(`[data-toolbar="#{{table_id}}"]`).detach().appendTo(tableDom.closest('.dataTables_wrapper').find('.toolbar .custom'));
+
+        {% if allele_origin_filter_enabled %}
+            let checkedValue = $("input[name='allele-origin-toggle']:checked").val();
+            alleleOriginToggle(checkedValue);
+        {% endif %}
     });
-    table.on('responsive-display', (e, datatable, row, showHide, update) => {
-        window.setTimeout(() => {
-            Flags.instance.init({userId: '{{user.id}}', forceRender: true, filter:'.child', flagGroup:'classifications'});
-        },1);
-    });
-    $(`[data-toolbar="#{{table_id}}"]`).detach().appendTo(tableDom.closest('.dataTables_wrapper').find('.toolbar .custom'));
-})
+
+    function alleleOriginToggle(filterValue) {
+        if (filterValue === "A") {
+            table.column(8).search("").draw();
+        } else {
+            let regexSearch = `[${filterValue}|U]`;
+            table.column(8).search(regexSearch, true, false).draw();
+        }
+    }
 </script>
 {% else %}
     <div class="no-value mb-4 text-center">No records</div>

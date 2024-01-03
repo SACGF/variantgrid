@@ -180,7 +180,7 @@
                         <a class='toggle-link' data-toggle='collapse' href='#classifications-of-interest'>View {% count dashboard_notices.classifications_of_interest singular='1 Classification' plural='Classifications' %} w Issues</a>
                     </div>
                     <div class="col-9">
-                        <a href="{% url 'activity' %}">Goto Classification Activity</a>
+                        <a href="{% url 'activity' %}">Goto Classification Record Activity</a>
                     </div>
                 </div>
 
@@ -211,7 +211,7 @@
                         <label>{% count dashboard_notices.classifications_created singular='1 New Classification' plural='New Classifications' %}</label>
                     </div>
                     <div class="col-6">
-                        <a href="{% url 'classifications' %}">Goto Classifications</a>
+                        <a href="{% url 'classifications' %}">Goto Classification Records</a>
                     </div>
                 </div>
             {% endif %}

@@ -71,6 +71,18 @@
                 {% labelled id="is_admin" label="Admin" %}True{% endlabelled %}
             {% endif %}
 
+            {% if avatar_details.awards %}
+                {% labelled label="Awards" %}
+                    <div class="list-group">
+                        {% for award in avatar_details.awards.all_awards %}
+                        <div class="list-group-item list-group-item-success" {% if not award.active %}style="opacity:0.6"{% endif %}>
+                            {{ award.icon }} {{ award.award_text }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% endlabelled %}
+            {% endif %}
+
             {% if group_initial_perm_forms %}
             {% page_help_embedded "Groups" %}
                 <b>Groups</b>: Speak to your administrator to manage groups. Everyone is a member of the 'public' group, use this to share with everyone.

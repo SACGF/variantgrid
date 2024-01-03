@@ -2,11 +2,12 @@ from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Iterable, List, Union, Set, Dict, Tuple
-
 from django.utils.safestring import SafeString
-
 from classification.enums import CriteriaEvaluation
 from library.utils import first
+
+
+_UNDERSTOOD_NAMESPACES = {"acmg", "horak"}
 
 
 @dataclass(frozen=True)
@@ -77,11 +78,15 @@ class CriteriaStrength:
         pretty_label = self.ekey.pretty_label.replace(" ", "")
         suffix = self.strength
         if suffix:
-            if not self.ekey.namespace:
-                if self.is_expected_direction and self.is_default_strength:
+            if not bool(self.ekey.namespace) or self.ekey.namespace in _UNDERSTOOD_NAMESPACES:
+                if self.is_default_strength:
                     return pretty_label
 
-            if self.is_expected_direction:
+            if self.ekey.crit_uses_points:
+                score = self.acmg_point
+                if score is not None:
+                    suffix = f"{score}"
+            elif self.is_expected_direction:
                 suffix = suffix[1:]
 
         return f"{pretty_label}_{CriteriaStrength.strength_suffix_for(suffix, short=format_spec=='short')}"
@@ -188,15 +193,22 @@ class CriteriaStrengths:
         return any(s.is_met for s in self.strengths)
 
     def __getitem__(self, item) -> Union[None, CriteriaStrength, List[CriteriaStrength]]:
+
+        # this bit is to not confuse Django templates by having it call getitem for regular properties
         if hasattr(self, item):
             return getattr(self, item)
+
         if isinstance(item, str):
             from classification.models import EvidenceKeyMap
-            if '_' in item:
-                parts = item.split('_')
-                return [self.strength_map.get(part.lower()) or CriteriaStrength(EvidenceKeyMap.cached_key(part), None) for part in parts]
+            parts = [item]
+            if '__' in item:
+                parts = item.split('__')
+            prefixed = []
+            for part in parts:
+                part = part.replace("_", ":")
+                prefixed.append(part)
 
-            return self.strength_map.get(item.lower()) or CriteriaStrength(EvidenceKeyMap.cached_key(item), None)
+            return [self.strength_map.get(part.lower()) or CriteriaStrength(EvidenceKeyMap.cached_key(part), None) for part in prefixed]
 
     def __contains__(self, item) -> bool:
         if isinstance(item, str):

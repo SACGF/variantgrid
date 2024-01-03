@@ -178,8 +178,8 @@ rest_urlpatterns = [
 
     perm_path('api/classifications/auto_populate', AutopopulateView.as_view(), name='classification_auto_populate_api'),
 
-    perm_path('api/classifications/record/', ClassificationView.as_view(), name='classification_api'),
-    perm_path('api/classifications/record/<record_id>', ClassificationView.as_view(), name='classification_with_record_api'),
+    perm_path('api/classifications/record/', ClassificationView.as_view(api_version=1), name='classification_api'),
+    perm_path('api/classifications/record/<record_id>', ClassificationView.as_view(api_version=1), name='classification_with_record_api'),
     perm_path('api/evidence_keys', EvidenceKeysView.as_view(), name='evidence_keys_api'),
 
     perm_path('api/classifications/v1/record/', ClassificationView.as_view(), name='classification_api'),
@@ -187,6 +187,10 @@ rest_urlpatterns = [
 
     perm_path('api/classifications/v2/record/', ClassificationView.as_view(api_version=2), name='classification_api_2'),
     perm_path('api/classifications/v2/record/<record_id>', ClassificationView.as_view(api_version=2), name='classification_with_record_api_2'),
+
+    perm_path('api/classifications/v3/record/', ClassificationView.as_view(api_version=3), name='classification_api_3'),
+    perm_path('api/classifications/v3/record/<record_id>', ClassificationView.as_view(api_version=3),
+              name='classification_with_record_api_3'),
 
     perm_path('api/classifications/export', ClassificationApiExportView.as_view(), name='classification_export_api'),
     perm_path('api/classifications/datatables/', DatabaseTableView.as_view(column_class=ClassificationColumns), name='classification_datatables'),

@@ -14,11 +14,48 @@ from genes.hgvs import HGVSMatcher
 from genes.models import NoTranscript
 from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 
-VARIANT_VALIDATING_CODES = {ValidationCode.MATCHING_ERROR, ValidationCode.INCONSISTENT_VARIANT, ValidationCode.MATCHING_ERROR}
+
+__AT_LEAST_ONE_SET = {SpecialEKeys.CLINICAL_SIGNIFICANCE, SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}
 
 
 @receiver(classification_validation_signal, sender=Classification)
-def validate_variant_fields(sender, **kwargs) -> Optional[ValidationMerger]:  # pylint: disable=unused-argument
+def validate_variant_classification_significance(sender, patch_meta: PatchMeta, key_map: EvidenceKeyMap, **kwargs) -> Optional[ValidationMerger]:
+    """
+    Validates that at least one of clinical significance or somatic clinical significance has a value
+    """
+    if patch_meta.intersection_modified(__AT_LEAST_ONE_SET):
+        vm = ValidationMerger()
+        vm.tested(
+            keys=[SpecialEKeys.CLINICAL_SIGNIFICANCE],
+            codes=[ValidationCode.MISSING_CLINICAL_SIGNIFICANCE]
+        )
+
+        has_value = False
+        for code in __AT_LEAST_ONE_SET:
+            if patch_meta.get(code, fallback_existing=True):
+                has_value = True
+                break
+
+        if not has_value:
+            # TODO this test is pretty basic compared to what
+            likely_somatic = "somatic" in (patch_meta.get(SpecialEKeys.ALLELE_ORIGIN, fallback_existing=True) or "").lower()
+            message: str
+            if likely_somatic:
+                message = f"{key_map.get(SpecialEKeys.CLINICAL_SIGNIFICANCE).label} or {key_map.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).label} requires a value"
+            else:
+                message = f"{key_map.get(SpecialEKeys.CLINICAL_SIGNIFICANCE).label} requires a value"
+
+            vm.add_message(
+                SpecialEKeys.CLINICAL_SIGNIFICANCE,
+                code=ValidationCode.MISSING_CLINICAL_SIGNIFICANCE,
+                severity='error',
+                message=message
+            )
+        return vm
+
+
+@receiver(classification_validation_signal, sender=Classification)
+def validate_variant_fields(sender, patch_meta: PatchMeta, key_map: EvidenceKeyMap, **kwargs) -> Optional[ValidationMerger]:  # pylint: disable=unused-argument
     """
     Ensures hgvs fields are valid, and that they match each other and the variant coordinate
     """
@@ -28,9 +65,6 @@ def validate_variant_fields(sender, **kwargs) -> Optional[ValidationMerger]:  # 
         # while this technically isn't about matching a variant, much of the work in get_variant_tuple -> pyhgvs
         # requires
         return vm
-
-    patch_meta: PatchMeta = kwargs.get('patch_meta')
-    evidence_key_map: EvidenceKeyMap = kwargs.get('key_map')
 
     VARIANT_LINKING_KEYS_SET = set(SpecialEKeys.VARIANT_LINKING_KEYS)
     # Only do this validation if at least variant linking key value has changed
@@ -97,7 +131,7 @@ def validate_variant_fields(sender, **kwargs) -> Optional[ValidationMerger]:  # 
     if len(variant_map) > 1:
         # generate message like:
         # c HGVS resolves to 4:53454A>T but g HGVS resolves to 4:4:53454A>C
-        resolutions = ['%s resolves to (%s)' % (' and '.join([evidence_key_map.get(key).pretty_label for key in keys]), variant_str) for variant_str, keys in variant_map.items()]
+        resolutions = ['%s resolves to (%s)' % (' and '.join([key_map.get(key).pretty_label for key in keys]), variant_str) for variant_str, keys in variant_map.items()]
         message = ' but '.join(resolutions)
 
         vm.add_message(SpecialEKeys.VARIANT_COORDINATE, code=ValidationCode.INCONSISTENT_VARIANT, severity='warning', message=message)
@@ -105,20 +139,20 @@ def validate_variant_fields(sender, **kwargs) -> Optional[ValidationMerger]:  # 
     return vm
 
 
-# SUB_VUS_1 = re.compile(r'this variant .{2,20}? classified .{0,5}?3(A|B|C).{0,10}?V(?:O)?US', RegexFlag.IGNORECASE)
-# SUB_VUS_2 = re.compile(r'this variant .{2,20}? classified .{0,5}?V(?:O)?US.{0,10}?3(A|B|C)', RegexFlag.IGNORECASE)
 SUB_CLIN_SIG = re.compile(r'this variant .{2,20}? classified .*?[.]', RegexFlag.IGNORECASE | RegexFlag.DOTALL)
 
 
 @receiver(classification_validation_signal, sender=Classification)
-def validate_clinical_significance(sender, **kwargs) -> Optional[ValidationMerger]:  # pylint: disable=unused-argument
+def validate_clinical_significance(sender, patch_meta: PatchMeta, **kwargs) -> Optional[ValidationMerger]:  # pylint: disable=unused-argument
+    """
+    Warns if the text description seems to imply one clinical significance wheras the actua value states another
+    """
+
     vm = ValidationMerger()
     vm.tested(
         keys=[SpecialEKeys.CLINICAL_SIGNIFICANCE],
         codes=['cs_mismatch']
     )
-
-    patch_meta: PatchMeta = kwargs.get('patch_meta')
 
     if patch_meta.is_modified(SpecialEKeys.CLINICAL_SIGNIFICANCE) or patch_meta.is_modified(SpecialEKeys.INTERPRETATION_SUMMARY):
         cs: str = patch_meta.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)

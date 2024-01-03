@@ -169,7 +169,15 @@ let DataTableDefinition = (function() {
                 columnDef.targets = target;
                 columnDefs.push(columnDef);
                 if (col.render) {
-                    columnDef.render = eval(col.render);
+                    let rawRenderer = eval(col.render);
+                    let renderer = (data, type, row) => {
+                        let output = rawRenderer(data, type, row);
+                        if (output instanceof jQuery) {
+                            return output.prop("outerHTML");
+                        }
+                        return output;
+                    }
+                    columnDef.render = renderer;
                     if (col.render.includes('VCTable')) {
                         waitOnEKeys = true;
                     }
@@ -473,10 +481,12 @@ TableFormat.severeNumber = function(severity, data, type, columns) {
 TableFormat.expandAjax = function(url_or_method, param, expectedHeight, data) {
     if (data) {
         let dataId = data[param];
+        if (typeof(dataId) === "object") {
+            dataId = dataId.id;
+        }
         if (!dataId) {
             return `<i class="fas fa-bomb text-danger"></i> No value for "${param}" in this ${JSON.stringify(data)} : DEBUG - is ${param} a column in this table, visible or otherwise?`;
         }
-        let ajaxId = `ajax_${dataId}`;
         let reverseUrl = window[url_or_method] || Urls[url_or_method];
         if (!reverseUrl) {
             return `<i class="fas fa-bomb text-danger"></i> Method or URL not configured for "${url_or_method} : Developer may need to run<br/>
@@ -484,6 +494,9 @@ TableFormat.expandAjax = function(url_or_method, param, expectedHeight, data) {
         }
         if (param) {
             reverseUrl = reverseUrl(dataId);
+            if (!reverseUrl) {
+                throw `DataId ${dataId} did not make a URL from ${url_or_method}`;
+            }
         }
 
         let ajaxDom =

@@ -79,7 +79,8 @@ def ui_register_tab(
         badge: Optional[int] = None,
         badge_status: Optional[str] = None,
         tab_status: Optional[str] = None,
-        active=False):
+        active=False,
+        tab_id: Optional[str] = None):
 
     if url_check:
         if not context["url_name_visible"].get(url):
@@ -93,7 +94,8 @@ def ui_register_tab(
 
     tab_number = len(builder.tabs)
     param_id = "_" + str(param) if param else ""
-    tab_id = url + param_id
+    if not tab_id:
+        tab_id = url + param_id
 
     if active or check_active_tab(tab_set, tab_id, context.request):
         builder.active_tab = tab_number

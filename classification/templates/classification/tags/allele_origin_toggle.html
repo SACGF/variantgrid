@@ -1,0 +1,21 @@
+<div id="allele-origin-toggle" style="display:inline-block; {{ style }}">
+    {% if show_label %}<label class="btn-group-label" style="position: relative; right: 6px; bottom: -6px;">Allele Origin: </label>{% endif %}
+    <div class="btn-group btn-group-toggle mb-2" data-toggle="buttons" style="float:right">
+        <label class="btn btn-sm btn-outline-secondary allele-origin-A active">
+            <input type="radio" name="allele-origin-toggle" value="A" {% if value == "A" %}checked="checked"{% endif %} onclick="alleleOriginToggle('A')"> All
+        </label>
+        <label class="btn btn-sm btn-secondary allele-origin-G">
+            <input type="radio" name="allele-origin-toggle" value="G" {% if value == "G" %}checked="checked"{% endif %} onclick="alleleOriginToggle('G')"> Germline
+        </label>
+        <label class="btn btn-sm btn-secondary allele-origin-S">
+            <input type="radio" name="allele-origin-toggle" value="S" {% if value == "S" %}checked="checked"{% endif %} onclick="alleleOriginToggle('S')"> Somatic
+        </label>
+    </div>
+</div>
+{% comment %}
+     note you must implement a method called
+     alleleOriginToggle(filterValue)
+     to include this on the page
+     it's also expect you do an filter to start with using the value
+     let checkedValue = $("input[name='allele-origin-toggle']:checked").val();
+{% endcomment %}

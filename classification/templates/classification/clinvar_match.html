@@ -39,7 +39,7 @@
         {% page_help_embedded title="ClinVar Matching" %}
             <p>This page allows admins to compare a lab's pre-existing ClinVar export details against records in {{ site_name }}.</p>
             <p>As of right now it will show you matches, but not give you the ability to assign the SCVs.</p>
-            <p>ClinVar Details shows you the c.HGVS as it was normalised by ClinVar, condition ID(s) that were assigned, and the clinical significance.</p>
+            <p>ClinVar Details shows you the c.HGVS as it was normalised by ClinVar, condition ID(s) that were assigned, and the classification record.</p>
             <p>Matches to Alleles can be based on
                 <ul>
                     <li>ClinVar VariantID matches : the {{ site_name }} annotation process matched this ClinVar VariantID to our Allele</li>
@@ -47,10 +47,10 @@
                     <li>imported c.HGVS matches : by trying 3 lower and higher transcript versions, did the c.HGVS as it was provided by the lab match the c.hgvs evidence key (e.g. as it was imported to us without normalisation)</li>
                 </ul>
             </p>
-            <p>If the matched Alleles have associated ClinVarExports for the ClinVarkey the following will also be checked
+            <p>If the matched Alleles have associated ClinVarExports for the ClinVarKey the following will also be checked
                 <ul>
                     <li>condition matches : If the condition provided to ClinVar is equal or a descendant of the condition umbrella.</li>
-                    <li>clin sig matches : If the clinical significance as it is in ClinVar matches exactly the value as it is in {{ site_name }}.</li>
+                    <li>classification record matches : If the classification record as it is in ClinVar matches exactly the value as it is in {{ site_name }}.</li>
                     <li>SCV matches : If the ClinVarExport has already been assigned a SCV, does it match.</li>
                 </ul>
             </p>

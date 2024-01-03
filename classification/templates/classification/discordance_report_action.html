@@ -152,8 +152,8 @@
                         <input type="hidden" name="resolution" id="resolution" value="X" />
                         {% csrf_token %}
                         <p class="text-secondary">
-                            Select the new clinical significance next to each lab that has agreed to re-classify.<br/>
-                            IMPORTANT: classifications will still need to be re-submitted to {{ site_name }} with these changes.
+                            Select the new classification next to each lab that has agreed to re-classify.<br/>
+                            IMPORTANT: classification records will still need to be re-submitted to {{ site_name }} with these changes.
                         </p>
 
                         {% labelled label="Agreed Changes (if any)"%}
@@ -197,7 +197,7 @@
                         {% endlabelled %}
                         <div id="no-bucket" class="collapse">
                             <div class="text-info m-4">
-                                {{ 'i'|severity_icon }} The following clinical significances are not used in discordance calculations:
+                                {{ 'i'|severity_icon }} The following classification values are not used in discordance calculations:
                                 {% for clin_sig in data.bucketless_clin_sig_options %}{% if not forloop.first %}, {% endif %}{{ clin_sig.label }}{% endfor %}
                             </div>
                         </div>

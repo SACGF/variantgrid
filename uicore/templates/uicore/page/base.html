@@ -186,6 +186,7 @@
                 <a id="navbar-user-profile" href="{% url 'view_user_settings' %}" class="nav-link text-nowrap">
                     <i class="fas fa-user-circle"></i>
                     {{ user.username }}
+                    {{ user_properties.avatar_details.awards.html }}
                 </a>
             </div>
         </div>
@@ -199,8 +200,10 @@
             </nav>
         </div>
         <div class="main-content">
-            <div class="container">{% include "uicore/messages/messages.html" %}</div>
-            {% block content %}{% endblock content %}
+            <div id="main-content-messages" class="container">{% include "uicore/messages/messages.html" %}</div>
+            <div id="main-content-body">
+                {% block content %}{% endblock content %}
+            </div>
         </div>
     </div>
 

@@ -159,8 +159,8 @@ class ClinVarExportRequestAdmin(admin.TabularInline):
 
 @admin.register(ClinVarExportBatch)
 class ClinVarExportBatchAdmin(ModelAdminBasics):
-    list_display = ("pk", "clinvar_key", "created", "modified", "record_count", "status")
-    list_filter = (('status', AllValuesChoicesFieldListFilter), ('clinvar_key', admin.RelatedFieldListFilter))
+    list_display = ("pk", "clinvar_key", "allele_origin_bucket", "created", "modified", "record_count", "status")
+    list_filter = (('status', AllValuesChoicesFieldListFilter), ('clinvar_key', admin.RelatedFieldListFilter), "allele_origin_bucket")
     search_fields = ('pk', )
     inlines = (ClinVarExportRequestAdmin, ClinVarExportSubmissionAdmin)
 

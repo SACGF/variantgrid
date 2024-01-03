@@ -4,7 +4,7 @@
 
 {% ui_register_tabs tab_set="graph_tabs" %}
 {% if vc_org_data %}
-    {% ui_register_tab_embedded tab_set="graph_tabs" label="Clinical Significance by Org" %}<div id='org-classifications-graph'></div>{% end_ui_register_tab_embedded %}
+    {% ui_register_tab_embedded tab_set="graph_tabs" label="Classification Records by Org" %}<div id='org-classifications-graph'></div>{% end_ui_register_tab_embedded %}
 {% endif %}
 {% if accumulation_by_status %}
     {% ui_register_tab_embedded tab_set="graph_tabs" label="Cumulative Alleles by Status" %}<div id='accumulation-status-graph'></div>{% end_ui_register_tab_embedded %}
@@ -52,7 +52,7 @@
     let graph_height = 400;
     {% if vc_org_data %}
         let vc_org_data = {{ vc_org_data | jsonify }};
-        plotClassifications('org-classifications-graph', vc_org_data, 'Allele Clinical Significance by Organisation', graph_width, graph_height);
+        plotClassifications('org-classifications-graph', vc_org_data, 'Allele Classification by Organisation', graph_width, graph_height);
     {% endif %}
     {% if accumulation_by_status %}
         let accumulation_by_status = {{ accumulation_by_status | jsonify }};

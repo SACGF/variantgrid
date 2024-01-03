@@ -2,7 +2,13 @@
 {% load static %}
 {% load user_tags %}
 <div class="d-flex">
-    {% avatar2 user_details.avatar size=user_details.size %}
+    <div class="avatar-frame avatar-frame-{{ user_details.size }}">
+        {% avatar2 user_details.avatar size=user_details.size %}
+        {% if user_details.avatar.awards %}
+            {{ user_details.avatar.awards.html }}
+        {% endif %}
+    </div>
+
     <div style="line-height:1.3" class="flex-grow align-self-center">
         {% if user_details.show_email and user_details.email %}
             <a class="hover-link" href="mailto:{{user_details.email}}" title="{{ user_details.email }}">{{ user_details.preferred_label }}</a>

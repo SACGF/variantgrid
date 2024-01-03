@@ -1,5 +1,6 @@
 # used for validating multiple keys when one changes
 import operator
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from functools import reduce
@@ -107,26 +108,28 @@ class ValidationMerger:
     """
 
     @staticmethod
-    def union_send_responses(tuples: List) -> 'ValidationMerger':
+    def union_send_responses(tuples: Iterable['ValidationMerger']) -> 'ValidationMerger':
         validations = [v[1] for v in tuples]
         merged = ValidationMerger()
         for vm in validations:
             if vm:
-                merged.remove_codes.update(vm.remove_codes)
-                merged.flat_messages = merged.flat_messages + vm.flat_messages
+                for key, codes in vm.remove_codes.items():
+                    merged.tested([key], codes)
+                merged.flat_messages += vm.flat_messages
         return merged
 
     def __init__(self):
-        self.remove_codes = {}
+        self.remove_codes: dict[str, list] = defaultdict(set)
         self.flat_messages = []
 
     def tested(self, keys: Iterable[str], codes: Iterable[str]):
+        if isinstance(keys, str):
+            raise ValueError("Keys should be list or set")
         if isinstance(codes, str):
-            for key in keys:
-                self.remove_codes[key] = (self.remove_codes.get(key, [])) + [codes]
-        else:
-            for code in codes:
-                self.tested(keys, code)
+            raise ValueError("Codes should be list or set")
+
+        for key in keys:
+            self.remove_codes[key] |= set(codes)
 
     #  FIXME fix terminology of message/validation
     def add_message(self, key: str, code: str, severity: str, message: str, options=None, link=None):
@@ -199,7 +202,8 @@ class ClassificationJsonParams:
                  strip_complicated=False,
                  api_version=1,
                  hardcode_extra_data: Dict = None,
-                 fix_data_types=False):
+                 fix_data_types=False,
+                 remove_acmg_namespace: Optional[bool] = None):
         """
         :param current_user: The user who will be consuming this data
         :param include_data: Include all the evidence for this classification (typically True for a GET and False for a POST)
@@ -222,6 +226,7 @@ class ClassificationJsonParams:
         self.api_version = api_version
         self.hardcode_extra_data = hardcode_extra_data
         self.fix_data_types = fix_data_types
+        self.remove_acmg_namespace = remove_acmg_namespace
 
     def report(self) -> None:
         """

@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property, reduce
-from typing import List, Optional, Dict, Set, Iterator
+from typing import List, Optional, Dict, Set, Iterator, Tuple
 
 from django.db.models import Count, QuerySet, Subquery
 
@@ -80,7 +80,7 @@ class OverlapsCalculatorState:
 
     @cached_property
     def _collection_to_flag(self):
-        # The number of open clinical significance change flags should be limited, so fetch them all to check later
+        # The number of open classification change flags should be limited, so fetch them all to check later
         all_open_pending_changes = Flag.objects.filter(flag_type=classification_flag_types.classification_pending_changes, resolution__status=FlagStatus.OPEN)
         collection_clin_sig = {}
         for flag in all_open_pending_changes:
@@ -129,9 +129,15 @@ class ClinicalGroupingOverlap:
     Overlaps detail for a clinical grouping within an allele
     """
 
-    def __init__(self, state: OverlapState, clinical_context: Optional[ClinicalContext]):
+    def __init__(
+            self,
+            state: OverlapState,
+            clinical_context: Optional[ClinicalContext],
+            shared: bool = True
+    ):
         self.state = state
         self.clinical_context = clinical_context
+        self.shared = shared
         self.groups: Dict[ClassificationLabSummaryEntry, List[ClassificationModification]] = defaultdict(list)
         self.labs = set()
 
@@ -158,10 +164,12 @@ class ClinicalGroupingOverlap:
     def add_classification(self, cm: ClassificationModification):
         clinical_sig = cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         pending_clin_sig = self.calculator_state.pending_change_clin_sig(cm)
+        somatic_clinical_significance = cm.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
         group = ClassificationLabSummaryEntry(
             lab=cm.classification.lab,
             clinical_significance_from=clinical_sig,
             clinical_significance_to=pending_clin_sig or clinical_sig,  # FIXME, check flags for pending
+            somatic_clinical_significance=somatic_clinical_significance,
             pending=bool(pending_clin_sig)
         )
         self.groups[group].append(cm)
@@ -178,19 +186,20 @@ class ClinicalGroupingOverlap:
     @cached_property
     def status(self) -> 'DiscordanceStatus':
         dr: Optional[DiscordanceReport] = None
-        if cc := self.clinical_context:
-            dr = DiscordanceReport.latest_report(cc)
-        return DiscordanceStatus.calculate(self.cms, dr)
+        if self.shared:
+            if cc := self.clinical_context:
+                dr = DiscordanceReport.latest_report(cc)
+        return DiscordanceStatus.calculate(
+            modifications=self.cms,
+            allele_origin_bucket=self.clinical_context.allele_origin_bucket if self.clinical_context else None,
+            discordance_report=dr
+        )
 
     @cached_property
     def discordance_report(self) -> Optional[DiscordanceReport]:
         if self.status.is_discordant:
             if cc := self.clinical_context:
                 return DiscordanceReport.latest_report(cc)
-
-    @property
-    def shared(self):
-        return self.clinical_context is not None
 
     @property
     def is_multi_lab(self):
@@ -241,7 +250,7 @@ class AlleleOverlap(OverlapState):
     def __init__(self, calculator_state: OverlapsCalculatorState, allele: Allele):
         self._calculator_state = calculator_state
         self.allele = allele
-        self.context_map: Dict[Optional[ClinicalContext], ClinicalGroupingOverlap] = {}
+        self.context_map: Dict[Tuple[Optional[ClinicalContext], bool], ClinicalGroupingOverlap] = {}
         self._c_hgvses: Set[CHGVS] = set()
 
         # need to keep track of the below for sorting
@@ -259,11 +268,12 @@ class AlleleOverlap(OverlapState):
         lab = cms.classification.lab
 
         is_shared = cms.classification.share_level_enum.is_discordant_level
-        cc = cms.classification.clinical_context if is_shared else None
-        cgo = self.context_map.get(cc)
+        cc = cms.classification.clinical_context
+        key = (cc, is_shared)
+        cgo = self.context_map.get(key)
         if not cgo:
-            cgo = ClinicalGroupingOverlap(clinical_context=cc, state=self)
-            self.context_map[cc] = cgo
+            cgo = ClinicalGroupingOverlap(clinical_context=cc, state=self, shared=is_shared)
+            self.context_map[key] = cgo
         cgo.add_classification(cms)
         if is_shared:
             self.shared_labs.add(lab)

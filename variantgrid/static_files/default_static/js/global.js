@@ -594,6 +594,32 @@ function loadAjaxModal(linkDom, size) {
     modalDialog.modal('show');
 }
 
+let activeAjaxLoading = 0;
+
+function alterAjaxCount(delta) {
+    activeAjaxLoading += delta;
+    if (activeAjaxLoading === 0) {
+        $('body').attr('data-ajax', "000");
+    } else {
+        $('body').attr('data-ajax', activeAjaxLoading);
+    }
+}
+
+$(document).ready(() => {
+    alterAjaxCount(0);
+});
+
+$(document).on("ajaxStart", () => {
+    alterAjaxCount(1);
+});
+
+$(document).on("ajaxStop", () => {
+    // give 100ms timeout before reducing ajaxCount, in case there's some JavaScript to run & animate etc when it finished
+    window.setTimeout(
+        () => {alterAjaxCount(-1)},
+        350);
+});
+
 function loadAjaxBlock(dom, url) {
     if (!url) {
         url = dom.attr('href');

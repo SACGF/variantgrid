@@ -719,7 +719,7 @@
                 Condition Texts</a>
             {% page_help_embedded title='Condition Matching' %}
                 <p>
-                    Condition matching collects classifications that share the same "condition under curation", and allows you to assign
+                    Condition matching collects classification records that share the same "condition under curation", and allows you to assign
                     standard ontology terms to them.<br/>
                     If a free text condition is provided, text will be matched to MONDO terms as a first pass
                     (see <a href="https://mondo.monarchinitiative.org/" target="_blank">https://mondo.monarchinitiative.org/</a> for more information)<br/>
@@ -732,11 +732,11 @@
                         <li>Default for the condition text</li>
                         <li>For a specific gene symbol within that condition text</li>
                         <li>For a combination of mode of inheritance within the gene symbol</li>
-                        <li>For a specific classification</li>
+                        <li>For a specific classification record</li>
                     </ul>
                     At each level, if no value is set, it will inherit the values above it.<br/>
-                    The goal is to have all classifications linked to a standard term. e.g. to end with Outstanding Classifications : 0<br/>
-                    New classifications will automatically inherit values set here.<br/>
+                    The goal is to have all classification records linked to a standard term. e.g. to end with Outstanding Classification Records : 0<br/>
+                    New classification records will automatically inherit values set here.<br/>
                 </p>
                 <p>
                     <h5>Edit</h5>
@@ -761,8 +761,8 @@
                 {% labelled label="Lab" %}
                     {% lab condition_text.lab %}
                 {% endlabelled %}
-                {% labelled label="Total Classifications" %}<span class="mono">{{ condition_text.classifications_count }}</span>{% endlabelled %}
-                {% labelled label="Outstanding Classifications" %}<span class="mono" id="count_outstanding">{{ condition_text.classifications_count_outstanding }}</span> &nbsp;<span id="no_outstanding"></span>{% endlabelled %}
+                {% labelled label="Total Classification Records" %}<span class="mono">{{ condition_text.classifications_count }}</span>{% endlabelled %}
+                {% labelled label="Outstanding Classification Records" %}<span class="mono" id="count_outstanding">{{ condition_text.classifications_count_outstanding }}</span> &nbsp;<span id="no_outstanding"></span>{% endlabelled %}
             </div>
 
             <ul id="condition-list" class="list-group mt-4">

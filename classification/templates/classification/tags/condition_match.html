@@ -20,7 +20,7 @@
             {% elif condition_match.gene_symbol %}
                 <div style="margin-left:16px" title="Default for condition text & this gene" data-toggle="tooltip" class="hover-detail">
                     <label>Gene Symbol</label> : {{ condition_match.gene_symbol }}<br/>
-                    <a data-toggle="collapse" class="toggle-link" href="#condition-children-{{ condition_match.id }}">Show {{ condition_match.classification_count }} Classification{% if condition_match.classification_count != 1 %}s{% endif %}</a>
+                    <a data-toggle="collapse" class="toggle-link" href="#condition-children-{{ condition_match.id }}">Show {{ condition_match.classification_count }} Classification Record{% if condition_match.classification_count != 1 %}s{% endif %}</a>
                 </div>
             {% else %}
                 <span title="Default for condition text" data-toggle="tooltip" class="hover-detail">{{ condition_match.condition_text.normalized_text }}</span>

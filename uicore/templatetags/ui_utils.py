@@ -163,6 +163,7 @@ def render_labelled(parser, token):
     nodelist = parser.parse(('endlabelled',))
     parser.delete_first_token()
     return LabelledValueTag(nodelist,
+                            row_id=kwargs.get('row_id'),
                             id_prefix=kwargs.get('id_prefix'),
                             value_id=kwargs.get('id'),
                             label=kwargs.get('label'),
@@ -178,6 +179,7 @@ def render_labelled(parser, token):
 
 class LabelledValueTag(template.Node):
     def __init__(self, nodelist,
+                 row_id: FilterExpression,
                  id_prefix: FilterExpression,
                  value_id: FilterExpression,
                  label: FilterExpression = None,
@@ -188,6 +190,7 @@ class LabelledValueTag(template.Node):
                  help: FilterExpression = None,
                  admin_only: FilterExpression = None,
                  errors: FilterExpression = None):
+        self.row_id = row_id
         self.id_prefix = id_prefix
         self.nodelist = nodelist
         self.value_id = value_id
@@ -250,6 +253,8 @@ class LabelledValueTag(template.Node):
         row_css = f"{row_css} {row_css_extra}".strip()
 
         output = self.nodelist.render(context)
+        if output:
+            output = output.strip()
         give_div_id = complete_id
         if not complete_id and not '<label' in output:
             if found_id := LabelledValueTag.id_regex.search(output):
@@ -285,7 +290,12 @@ class LabelledValueTag(template.Node):
         if hint == "inline":
             return content
 
-        content = f'<div class="{row_css}">{content}</div>'
+        row_id_value = ""
+        if row_id := self.row_id:
+            row_id_value = escape(TagUtils.value_str(context, row_id))
+            row_id_value = f' id="{ row_id_value }"'
+
+        content = f'<div class="{row_css}"{row_id_value}>{content}</div>'
         return content
 
 

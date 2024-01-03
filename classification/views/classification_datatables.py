@@ -8,7 +8,7 @@ from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Lower, Cast
 from django.http import HttpRequest
 
-from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel
+from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel, AlleleOriginBucket
 from classification.models import ClassificationModification, EvidenceKeyMap, \
     ImportedAlleleInfo
 from classification.models.classification_utils import classification_gene_symbol_filter
@@ -26,6 +26,12 @@ ALLELE_KNOWN_VALUES = ALLELE_GERMLINE_VALUES + ALLELE_SOMATIC_VALUES
 
 
 class ClassificationColumns(DatatableConfig[ClassificationModification]):
+
+    def render_clinical_significance(self, row: Dict[str, Any]) -> JsonDataType:
+        return {
+            SpecialEKeys.CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.CLINICAL_SIGNIFICANCE}__value"],
+            SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}__value"]
+        }
 
     def render_c_hgvs(self, row: Dict[str, Any]) -> JsonDataType:
         def get_preferred_chgvs_json() -> Dict:
@@ -92,7 +98,8 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             "lab_record_id": cr_lab_id,
             "share_level": row.get('classification__share_level'),
             "matches": matches,
-            "search": id_filter
+            "search": id_filter,
+            "allele_origin_bucket": row.get('classification__allele_origin_bucket')
         }
 
     @cached_property
@@ -123,7 +130,8 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                     'classification__lab__organization__name',
                     'classification__lab__name',
                     'classification__lab_record_id',
-                    'classification__share_level'
+                    'classification__share_level',
+                    'classification__allele_origin_bucket'
                 ]
             ),
             RichColumn(
@@ -158,10 +166,12 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             RichColumn(
                 key='published_evidence__clinical_significance__value',
                 name='clinical_significance',
-                label='Clinical Significance',
+                label='Classification',
+                renderer=self.render_clinical_significance,
                 client_renderer='VCTable.clinical_significance',
                 client_renderer_td='VCTable.clinical_significance_td',
                 sort_keys=['clinical_significance', 'clin_sig_sort'],
+                extra_columns=["published_evidence__somatic:clinical_significance__value"],
                 orderable=True
             ),
             RichColumn(
@@ -350,17 +360,21 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             else:
                 return qs.none()
 
-        if settings.CLASSIFICATION_GRID_SHOW_ORIGIN:
-            if allele_origin := self.get_query_param("allele_origin"):
-                if allele_origin == 'germline':
-                    filters.append(Q(published_evidence__allele_origin__value__in=ALLELE_GERMLINE_VALUES))
-                elif allele_origin == 'somatic':
-                    filters.append(Q(published_evidence__allele_origin__value__in=ALLELE_SOMATIC_VALUES))
-                elif allele_origin == 'other':
-                    filters.append(
-                        ~Q(published_evidence__allele_origin__value__in=ALLELE_KNOWN_VALUES) |
-                        Q(published_evidence__allele_origin__value__isnull=True)
-                    )
+        if allele_origin := self.get_query_param("allele_origin"):
+            if allele_origin != "A":
+                filters.append(Q(classification__allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
+
+        # if settings.CLASSIFICATION_GRID_SHOW_ORIGIN:
+        #     if allele_origin := self.get_query_param("allele_origin"):
+        #         if allele_origin == 'germline':
+        #             filters.append(Q(published_evidence__allele_origin__value__in=ALLELE_GERMLINE_VALUES))
+        #         elif allele_origin == 'somatic':
+        #             filters.append(Q(published_evidence__allele_origin__value__in=ALLELE_SOMATIC_VALUES))
+        #         elif allele_origin == 'other':
+        #             filters.append(
+        #                 ~Q(published_evidence__allele_origin__value__in=ALLELE_KNOWN_VALUES) |
+        #                 Q(published_evidence__allele_origin__value__isnull=True)
+        #             )
 
         # ClassificationListGrid is also used on patient/sample page so we
         # need to filter by samples

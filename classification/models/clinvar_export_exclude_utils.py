@@ -15,6 +15,13 @@ from library.utils import DebugTimer
 from snpdb.models import ClinVarKey, ClinVarKeyExcludePattern
 
 
+"""
+This file has the data responsible for applying the ClinVarExclude patterns to automatically stop
+records with certain values being exported to ClinVar.
+TODO - there needs to be some separation of automated exclusions vs speific manual exclusions
+"""
+
+
 @receiver(classification_post_publish_signal, sender=Classification)
 def published(sender,
               classification: Classification,

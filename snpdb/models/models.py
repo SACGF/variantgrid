@@ -11,9 +11,9 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property, total_ordering
+from html import escape
 from re import RegexFlag
 from typing import List, TypedDict, Optional
-
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -24,15 +24,18 @@ from django.db.models import QuerySet, TextChoices
 from django.db.models.deletion import SET_NULL, CASCADE, PROTECT
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.safestring import SafeString
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
+from more_itertools import first
 
 from classification.enums.classification_enums import ShareLevel
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.enums.log_level import LogLevel
 from library.preview_request import PreviewModelMixin
 from library.utils import import_class, JsonObjType
+from snpdb.models.models_enums import UserAwardLevel
 
 
 class Tag(models.Model):
@@ -631,6 +634,66 @@ class LabHead(models.Model):
 
     def __str__(self):
         return f"{self.lab}: {self.user}"
+
+
+class UserAward(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=CASCADE)
+    award_text = models.TextField(null=False, blank=False)
+    award_level = models.TextField(max_length=1, choices=UserAwardLevel.choices, default=UserAwardLevel.GOLD)
+    active = models.BooleanField(null=False, blank=True, default=True)
+
+    @property
+    def icon_class(self):
+        return SafeString(f"fa-solid fa-trophy user-award user-award-{self.get_award_level_display().lower()}")
+
+    @property
+    def icon(self):
+        return SafeString(f"<i class='{self.icon_class}'></i>")
+
+    def __str__(self):
+        return f"{self.get_award_level_display()} {self.user}: {self.award_text}"
+
+
+class UserAwards:
+
+    def __init__(self, user: User):
+        award_qs = UserAward.objects.filter(user=user).all()
+        award_list: list[UserAward] = list(sorted(award_qs, key=lambda x: (not x.active, 100 - UserAwardLevel(x.award_level).int_value, x.award_text)))
+
+        self.all_awards = award_list
+        self.awards = [award for award in award_list if award.active]
+
+    def __bool__(self):
+        return bool(self.awards)
+
+    @cached_property
+    def highest_award(self) -> Optional[UserAward]:
+        return first(self.awards, None)
+
+    @property
+    def award_text_html(self):
+        def icon_for_award(award):
+            icon = "fa-trophy"
+            if award.award_level == UserAwardLevel.BRONZE:
+                icon = "fa-award"
+            return f"<i class='fa-solid {icon} user-award-{award.get_award_level_display().lower()}'></i>"
+
+        return "<br/>".join([f"<i class='{award.icon_class}'></i>" + escape(award.award_text) for award in self.awards])
+
+    @property
+    def html(self):
+        if not self.awards:
+            return ""
+        return SafeString(f'<i class="{self.highest_award.icon_class}" title="{ self.award_text_html }"></i>')
+
+    def __iter__(self):
+        return iter(self.awards)
+
+    def __len__(self):
+        return len(self.awards)
+
+    def __getitem__(self, item):
+        return self.awards[item]
 
 
 class LabProject(models.Model):

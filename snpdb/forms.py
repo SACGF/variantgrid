@@ -419,11 +419,13 @@ class SettingsOverrideForm(BaseModelForm):
             "email_discordance_updates": "Email Discordance Updates",
             "variant_link_in_analysis_opens_new_tab": "Variant Link in Analysis Opens New Tab",
             "tool_tips": "Tooltips",
+            "tag_colors": "Tag Colours",
             "node_debug_tab": "Node Debug Tab",
             "import_messages": "Import Messages",
             "default_sort_by_column": "Default Sort by Column",
             "igv_port": "IGV Port",
             "default_genome_build": "Default Genome Build",
+            "default_allele_origin": "Default Allele Origin Filter",
             "default_lab": "Default Lab",
             "timezone": "TimeZone (for downloads)"
         }

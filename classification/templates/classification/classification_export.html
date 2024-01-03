@@ -5,7 +5,8 @@
 {% load js_tags %}
 {% load lab_tags %}
 {% load static %}
-{% block title %}Variant Classification Export{% endblock %}
+{% load classification_tags %}
+{% block title %}Classification Record Export{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
 <script>
@@ -31,6 +32,11 @@
         params.share_level = $("input[name='share_level']:checked").val();
 
         params.build = $("input[name='genome_build']:checked").val();
+
+        let allele_origin = $("input[name='allele-origin-toggle']:checked").val();
+        if (allele_origin !== "A") {
+            params.allele_origin = allele_origin
+        }
 
         params.type = format;
 
@@ -158,6 +164,10 @@
         }
     }
 
+    function alleleOriginToggle(filterValue) {
+        this.generateUrl();
+    }
+
     $(document).ready(() => {
         $('#export-fields input').change(() => {
            this.generateUrl();
@@ -175,7 +185,7 @@
 {% endblock %}
 {% block content %}
 <div class="container" id="export-fields">
-    {% page_help page_id='classification/export_help' title='Classifications Export' %}
+    {% page_help page_id='classification/export_help' title='Classification Records Export' %}
     
     <p class="text-info">Please refer to the terms and conditions about proper use of the classifications download.</p>
     <p class="text-info">Once you have configured your download you can save and re-use the generated URL.</p>
@@ -237,10 +247,14 @@
             {% endif %}
         {% endfor %}
     {% endlabelled %}
+    {% labelled label="Allele Origin" %}
+        {% allele_origin_toggle show_label=False %}
+        <div class="text-muted">Note that records with an allele origin other than germline or somatic will always be included in downloads.</div>
+    {% endlabelled %}
     {% labelled label="Since" %}
         <input class="form-control" type="text" name="since" placeholder="YYYY-MM-DD or <number of days>" />
-        <div class="text-muted">Optional - Filter out classifications that haven't changed since this date e.g. 2020-01-06<br/>
-        WARNING: Applying incremental changes with "since" can result in withdrawn classifications remaining in your system.<br/>
+        <div class="text-muted">Optional - Filter out classification records that haven't changed since this date e.g. 2020-01-06<br/>
+        WARNING: Applying incremental changes with "since" can result in withdrawn classification records remaining in your system.<br/>
         Recommended for users of Alissa 5.2
         </div>
     {% endlabelled %}
@@ -267,7 +281,7 @@
         <span class="text-muted">Maximum number of rows (approx) to be downloaded.</span>
     {% endlabelled %}
 
-    {% labelled label="Organistion Exclusion" %}
+    {% labelled label="Organisation Exclusion" %}
         {% for org in orgs %}
             <div class="form-check">
                 <label class="form-check-label">
@@ -327,8 +341,8 @@
     </div>
     <div class="custom-option" data-format="csv">
         {% labelled label="CSV Grouping" %}
-            The CSV file will have one row per variant classification.<br/>
-            Unlike other formats, classifications with variant matching issues will be included at the bottom of the file.
+            The CSV file will have one row per classification record.<br/>
+            Unlike other formats, classification records with variant matching issues will be included at the bottom of the file.
         {% endlabelled %}
         {% labelled label="Value Format" %}
             <div class="form-check">
@@ -375,125 +389,127 @@
             </div>
         {% endlabelled %}
     </div>
-    <div class="custom-option" data-format="mvl">
-        {% labelled label="MVL Grouping" %}
-            MVLs will have one row per transcript-variant combination.<br/>
-            If there are multiple classifications for a transcript-variant pair then the details of those will be in the report abstract section for that row.
-        {% endlabelled %}
-        {% labelled label="MVL File Format" admin_only=True %}
-            <div class="form-check">
-                <label class="form-check-label">
-                    <input checked="checked" id="mvl_file_format_tsv" type="radio" name="mvl_file_format" value="tsv" class="form-check-input" />
-                    TSV
-                </label>
-            </div>
-            <div class="form-check">
-                <label class="form-check-label">
-                    <input id="mvl_file_format_json" type="radio" name="mvl_file_format" value="json" class="form-check-input" />
-                    JSON
-                </label>
-            </div>
-            <div class="form-check">
-                <label class="form-check-label">
-                    <input id="mvl_file_format_html" type="radio" name="mvl_file_format" value="html" class="form-check-input" />
-                    HTML
-                </label>
-            </div>
-        {% endlabelled %}
-        {% labelled label="MVL Conflict Strategy" %}
-            <div class="form-check">
-                <label class="form-check-label">
-                    <input checked="checked" id="conflict_most_pathogenic" type="radio" name="conflict_strategy" value="most_pathogenic" class="form-check-input" />
-                    Most Pathogenic
-                </label>
-            </div>
-            <div class="form-check">
-                <label class="form-check-label">
-                    <input id="conflict_most_benign" type="radio" name="conflict_strategy" value="most_benign" class="form-check-input" />
-                    Most Benign
-                </label>
-            </div>
-        {% endlabelled %}
-        {% labelled label="Transcript Strategy" %}
-            <div class="form-check">
-                <label class="form-check-label">
-                    <input checked="checked" id="transcript_strategy_refseq" type="radio" name="transcript_strategy" value="refseq" class="form-check-input" />
-                    Only include RefSeq
-                </label>
-            </div>
-            <div class="form-check">
-                <label class="form-check-label">
-                    <input id="transcript_strategy_all" type="radio" name="transcript_strategy" value="all" class="form-check-input" />
-                    Include all transcripts - WARNING Alissa can only handle RefSeq transcripts
-                </label>
-            </div>
-        {% endlabelled %}
-        {% labelled label="Clinical Significance Labels" %}
-            MVL installations might have custom labels for clinical significance values.<br/>
-            If your system does not use the defaults below, you can override individual values.
-        {% endlabelled %}
-        {% labelled label="Benign" %}
-            <input class="form-control" id="cs_b" type="text" placeholder="BENIGN" />
-        {% endlabelled %}
-        {% labelled label="Likely Benign" %}
-            <input class="form-control" id="cs_lb" type="text" placeholder="LIKELY_BENIGN" />
-        {% endlabelled %}
-        {% labelled label="VUS, Risk Factor, Drug Response" %}
-            <input class="form-control" id="cs_vus" type="text" placeholder="VOUS" />
-        {% endlabelled %}
-        {% labelled label="Likely Pathogenic" %}
-            <input class="form-control" id="cs_lp" type="text" placeholder="LIKELY_PATHOGENIC" />
-        {% endlabelled %}
-        {% labelled label="Pathogenic" %}
-            <input class="form-control" id="cs_p" type="text" placeholder="PATHOGENIC" />
-        {% endlabelled %}
-        {% labelled label="VCF Detail Level" admin_only=True %}
-            <div class="form-check">
-                <label class="form-check-label">
-                    <input checked="checked" id="mvl_detail_standard" type="radio" name="mvl_detail" value="standard" class="form-check-input" />
-                    Standard
-                </label>
-            </div>
-            <div class="form-check">
-                <label class="form-check-label">
-                    <input id="mvl_detail_shell" type="radio" name="mvl_detail" value="shell" class="form-check-input" />
-                    Minimal (for testing)
-                </label>
-            </div>
-        {% endlabelled %}
-    </div>
-    <div class="custom-option" data-format="json">
-        {% labelled label="JSON Grouping" %}
-            The JSON file will have one object per variant classification.<br/>
-            Selecting different genome builds will not affect the JSON, it will include Shariant available data for each genome build in the allele section of the record.
-        {% endlabelled %}
-    </div>
-    <div class="custom-option" data-format="vcf">
-        {% labelled label="VCF Grouping" %}
-            The VCF will have one row per variant, but details of individual classifications will be included as INFO fields in that row.
-        {% endlabelled %}
-        {% labelled label="VCF Encoding Level" %}
-            <div class="form-check">
-                <label class="form-check-label">
-                    <input checked="checked" id="encoding_basic" type="radio" name="encoding" value="basic" class="form-check-input" />
-                    Basic (e.g. space -> underscore)
-                </label>
-            </div>
-            <div class="form-check">
-                <label class="form-check-label">
-                    <input id="encoding_full" type="radio" name="encoding" value="full" class="form-check-input" />
-                    Full (e.g. space -> %20)
-                </label>
-            </div>
-        {% endlabelled %}
-    </div>
-    <div class="custom-option" data-format="redcap">
-        {% labelled label="REDCap Grouping" %}
-            The REDCap file will have one row for each distinct <b>redcap_record_id</b>. Records without a value for that will be excluded.
-        {% endlabelled %}
-        {% labelled label="REDCap Data Definition" %}
-            Click <a href="/classification/redcap_data_dictionary.csv">here to download the REDCap data definition</a>.
-        {% endlabelled %}
+    <div id="format-options">
+        <div class="custom-option" data-format="mvl">
+            {% labelled label="MVL Grouping" %}
+                MVLs will have one row per transcript-variant combination.<br/>
+                If there are multiple classifications for a transcript-variant pair then the details of those will be in the report abstract section for that row.
+            {% endlabelled %}
+            {% labelled label="MVL File Format" admin_only=True %}
+                <div class="form-check">
+                    <label class="form-check-label">
+                        <input checked="checked" id="mvl_file_format_tsv" type="radio" name="mvl_file_format" value="tsv" class="form-check-input" />
+                        TSV
+                    </label>
+                </div>
+                <div class="form-check">
+                    <label class="form-check-label">
+                        <input id="mvl_file_format_json" type="radio" name="mvl_file_format" value="json" class="form-check-input" />
+                        JSON
+                    </label>
+                </div>
+                <div class="form-check">
+                    <label class="form-check-label">
+                        <input id="mvl_file_format_html" type="radio" name="mvl_file_format" value="html" class="form-check-input" />
+                        HTML
+                    </label>
+                </div>
+            {% endlabelled %}
+            {% labelled label="MVL Conflict Strategy" %}
+                <div class="form-check">
+                    <label class="form-check-label">
+                        <input checked="checked" id="conflict_most_pathogenic" type="radio" name="conflict_strategy" value="most_pathogenic" class="form-check-input" />
+                        Most Pathogenic
+                    </label>
+                </div>
+                <div class="form-check">
+                    <label class="form-check-label">
+                        <input id="conflict_most_benign" type="radio" name="conflict_strategy" value="most_benign" class="form-check-input" />
+                        Most Benign
+                    </label>
+                </div>
+            {% endlabelled %}
+            {% labelled label="Transcript Strategy" %}
+                <div class="form-check">
+                    <label class="form-check-label">
+                        <input checked="checked" id="transcript_strategy_refseq" type="radio" name="transcript_strategy" value="refseq" class="form-check-input" />
+                        Only include RefSeq
+                    </label>
+                </div>
+                <div class="form-check">
+                    <label class="form-check-label">
+                        <input id="transcript_strategy_all" type="radio" name="transcript_strategy" value="all" class="form-check-input" />
+                        Include all transcripts - WARNING Alissa can only handle RefSeq transcripts
+                    </label>
+                </div>
+            {% endlabelled %}
+            {% labelled label="Classification Labels" %}
+                MVL installations might have custom labels for classification values.<br/>
+                If your system does not use the defaults below, you can override individual values.
+            {% endlabelled %}
+            {% labelled label="Benign" %}
+                <input class="form-control" id="cs_b" type="text" placeholder="BENIGN" />
+            {% endlabelled %}
+            {% labelled label="Likely Benign" %}
+                <input class="form-control" id="cs_lb" type="text" placeholder="LIKELY_BENIGN" />
+            {% endlabelled %}
+            {% labelled label="VUS, Risk Factor, Drug Response" %}
+                <input class="form-control" id="cs_vus" type="text" placeholder="VOUS" />
+            {% endlabelled %}
+            {% labelled label="Likely Pathogenic" %}
+                <input class="form-control" id="cs_lp" type="text" placeholder="LIKELY_PATHOGENIC" />
+            {% endlabelled %}
+            {% labelled label="Pathogenic" %}
+                <input class="form-control" id="cs_p" type="text" placeholder="PATHOGENIC" />
+            {% endlabelled %}
+            {% labelled label="VCF Detail Level" admin_only=True %}
+                <div class="form-check">
+                    <label class="form-check-label">
+                        <input checked="checked" id="mvl_detail_standard" type="radio" name="mvl_detail" value="standard" class="form-check-input" />
+                        Standard
+                    </label>
+                </div>
+                <div class="form-check">
+                    <label class="form-check-label">
+                        <input id="mvl_detail_shell" type="radio" name="mvl_detail" value="shell" class="form-check-input" />
+                        Minimal (for testing)
+                    </label>
+                </div>
+            {% endlabelled %}
+        </div>
+        <div class="custom-option" data-format="json">
+            {% labelled label="JSON Grouping" %}
+                The JSON file will have one object per variant classification.<br/>
+                Selecting different genome builds will not affect the JSON, it will include Shariant available data for each genome build in the allele section of the record.
+            {% endlabelled %}
+        </div>
+        <div class="custom-option" data-format="vcf">
+            {% labelled label="VCF Grouping" %}
+                The VCF will have one row per variant, but details of individual classifications will be included as INFO fields in that row.
+            {% endlabelled %}
+            {% labelled label="VCF Encoding Level" %}
+                <div class="form-check">
+                    <label class="form-check-label">
+                        <input checked="checked" id="encoding_basic" type="radio" name="encoding" value="basic" class="form-check-input" />
+                        Basic (e.g. space -> underscore)
+                    </label>
+                </div>
+                <div class="form-check">
+                    <label class="form-check-label">
+                        <input id="encoding_full" type="radio" name="encoding" value="full" class="form-check-input" />
+                        Full (e.g. space -> %20)
+                    </label>
+                </div>
+            {% endlabelled %}
+        </div>
+        <div class="custom-option" data-format="redcap">
+            {% labelled label="REDCap Grouping" %}
+                The REDCap file will have one row for each distinct <b>redcap_record_id</b>. Records without a value for that will be excluded.
+            {% endlabelled %}
+            {% labelled label="REDCap Data Definition" %}
+                Click <a href="/classification/redcap_data_dictionary.csv">here to download the REDCap data definition</a>.
+            {% endlabelled %}
+        </div>
     </div>
     {% labelled label="Generated URL" %}
         <a class="hover-link" id="export_url" href="{{base_url_redirect}}">{{base_url_redirect}}</a>

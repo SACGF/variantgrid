@@ -53,124 +53,136 @@
             </p>
         {% end_page_help_embedded %}
 
-         <div class="card">
+         <div class="card" id="discordance-report-card">
             <div class="card-header">
                 <h5>Discordance Report (<i class="{{ data.report.preview.icon }} preview-icon"></i> DR_{{ data.report.id }}) {% admin_link data.report %}</h5>
             </div>
              <div class="card-body">
-                 {% labelled label="Status" %}
-                    {% if data.report.resolution %}
-                        {% if data.report.resolution == "C" %}
-                            <span class="text-success font-weight-bold">{{ data.report.get_resolution_display }}</span>
+                <div id="discordance-report-details">
+                    {% labelled label="Status" %}
+                        {% if data.report.resolution %}
+                            {% if data.report.resolution == "C" %}
+                                <span class="text-success font-weight-bold">{{ data.report.get_resolution_display }}</span>
+                            {% else %}
+                                <span class="text-danger font-weight-bold">{{ data.report.get_resolution_display }}</span>
+                            {% endif %}
+                        {% elif data.is_pending_concordance %}
+                            <span class="overlap-pending_concordance">Pending Concordance</span>
                         {% else %}
-                            <span class="text-danger font-weight-bold">{{ data.report.get_resolution_display }}</span>
+                            <span class="no-value">Active Discordance</span>
                         {% endif %}
-                    {% elif data.is_pending_concordance %}
-                        <span class="overlap-pending_concordance">Pending Concordance</span>
-                    {% else %}
-                        <span class="no-value">Active Discordance</span>
-                    {% endif %}
-                    {% if data.is_pending_concordance and not data.report.resolution %}
-                         <div>
-                         <div class="flag flag-classification_pending_changes mr-1" style="position:relative; top: 5px"></div>
-                         There are pending changes to classifications within this discordance.<br/>Once updated data has been submitted, this report will automatically close.
+                        {% if data.is_pending_concordance and not data.report.resolution %}
+                             <div>
+                             <div class="flag flag-classification_pending_changes mr-1" style="position:relative; top: 5px"></div>
+                             There are pending changes to classifications within this discordance.<br/>Once updated data has been submitted, this report will automatically close.
+                             </div>
+                        {% endif %}
+                         {% if data.latest_for_allele_if_not_this %}
+                             <p class="text-info">For the latest discordance report for this allele <a href="{{ data.latest_for_allele_if_not_this.get_absolute_url }}" class="hover-link">click here</a>.</p>
+                        {% endif %}
+                     {% endlabelled %}
+                     {% labelled label="Allele Origin" %}
+                         <div class="allele-origin-box horizontal allele-origin-{{ data.report.clinical_context.allele_origin_bucket }}">
+                            <div class="allele-origin-text">{{ data.report.clinical_context.get_allele_origin_bucket_display }}</div>
                          </div>
-                    {% endif %}
-                     {% if data.latest_for_allele_if_not_this %}
-                         <p class="text-info">For the latest discordance report for this allele <a href="{{ data.latest_for_allele_if_not_this.get_absolute_url }}" class="hover-link">click here</a>.</p>
-                    {% endif %}
-                 {% endlabelled %}
-                 {% labelled label="Allele" %}{% allele data.allele %}{% endlabelled %}
-                {% labelled label="c.HGVS "|add:data.genome_build.name %}
-                    {% for c_hgvs in data.c_hgvses %}<div>{% c_hgvs c_hgvs %}</div>{% endfor %}
-                {% endlabelled %}
-                {% if data.clinical_context.name != "default" %}
-                {% labelled label="Variant Interpreted in Context of" %}{{ data.clinical_context }}{% endlabelled %}
-                {% endif %}
-                {% labelled label="Opened At" value_css="timestamp" %}{% timestamp data.report.report_started_date %}{% endlabelled %}
-                {% labelled label="Closed At" value_css="timestamp" %}
-                    {% if data.report.report_completed_date %}{% timestamp data.report.report_completed_date %}
-                    {% else %}<span class="no-value">-</span>
-                    {% endif %}
-                {% endlabelled %}
-                {% if data.report.report_closed_by %}
-                    {% labelled label="Closed by" %}
-                        <span class="username">{% user data.report.report_closed_by size="tiny" show_group=True %}</span>
+                     {% endlabelled %}
+                     {% labelled label="Allele" %}{% allele data.allele %}{% endlabelled %}
+                    {% labelled label="c.HGVS "|add:data.genome_build.name %}
+                        {% for c_hgvs in data.c_hgvses %}<div>{% c_hgvs c_hgvs %}</div>{% endfor %}
                     {% endlabelled %}
-                {% endif %}
-                {% labelled label="Initial Trigger for Discordance" %}{{ data.report.cause_text | default:"Unknown" }}{% endlabelled %}
-                {% if data.report.resolved_text %}
-                    {% labelled label="Final Trigger to end Discordance" %}{{ data.report.resolved_text }}{% endlabelled %}
-                {% endif %}
+                    {% if data.clinical_context.name != "default" %}
+                    {% labelled label="Variant Interpreted in Context of" %}{{ data.clinical_context }}{% endlabelled %}
+                    {% endif %}
+                    {% labelled label="Opened At" value_css="timestamp" %}{% timestamp data.report.report_started_date %}{% endlabelled %}
+                    {% labelled label="Closed At" value_css="timestamp" %}
+                        {% if data.report.report_completed_date %}{% timestamp data.report.report_completed_date %}
+                        {% else %}<span class="no-value">-</span>
+                        {% endif %}
+                    {% endlabelled %}
+                    {% if data.report.report_closed_by %}
+                        {% labelled label="Closed by" %}
+                            <span class="username">{% user data.report.report_closed_by size="tiny" show_group=True %}</span>
+                        {% endlabelled %}
+                    {% endif %}
+                    {% labelled label="Initial Trigger for Discordance" %}{{ data.report.cause_text | default:"Unknown" }}{% endlabelled %}
+                    {% if data.report.resolved_text %}
+                        {% labelled label="Final Trigger to end Discordance" %}{{ data.report.resolved_text }}{% endlabelled %}
+                    {% endif %}
+                </div>
+                <div id="discordance-report-records">
+                    {% if data.is_closed %}
+                        <p class="text-info">Data is shown as it was at the time of the discordance being resolved.</p>
+                    {% endif %}
+                    {% url 'discordance_export' data.report.id as download_link %}
+                    {% url 'activity_discordance' discordance_report_id=report.id as history_link %}
+
+                    {% classification_groups data.effective_classifications group_utils=data.group_utils title="Classifications Records Considered" download_link=download_link history_link=history_link context_object=data.report default_sort='clinical_significance' allele_origin_filter_enabled=False %}
+
+                    {% for nlc in data.no_longer_considered %}
+                        {% classification_groups nlc.classifications group_utils=data.group_utils title=nlc.reason context_object=report allele_origin_filter_enabled=False %}
+                    {% endfor %}
+                </div>
              </div>
-
-            <div class="mx-4">
-                {% if data.is_closed %}
-                    <p class="text-info">Data is shown as it was at the time of the discordance being resolved.</p>
-                {% endif %}
-                {% url 'discordance_export' data.report.id as download_link %}
-                {% url 'activity_discordance' discordance_report_id=report.id as history_link %}
-
-                {% classification_groups data.effective_classifications group_utils=data.group_utils title="Classifications Considered" download_link=download_link history_link=history_link context_object=data.report default_sort='clinical_significance' %}
-
-                {% for nlc in data.no_longer_considered %}
-                    {% classification_groups nlc.classifications group_utils=data.group_utils title=nlc.reason context_object=report %}
-                {% endfor %}
-            </div>
         </div>
     </div>
 
     <div class="container mt-4">
-        <h4 {% if triages %}style="margin-bottom:0"{% endif %}>Step 1: Triages</h4>
-        {% with triages=data.triage_embeds %}
-            {% if triages %}
-                <div class="row equal">
-                {% for triage in triages %}
-                    <div class="col-sm-12 col-md-6 mt-3">
-                        {% embed triage %}
-                    </div>
-                {% endfor %}
-                </div>
-            {% else %}
-                <div class="no-value">This Discordance Report was resolved before triage functionality.</div>
-            {% endif %}
-        {% endwith %}
-
-        <h4>Step 2: Multi-Lab Discussion</h4>
-        {% if data.review %}
-            <div data-toggle="ajax" href="{% url 'review_detail' data.review.pk %}?show_source_object=false&edit=true"></div>
-            {% if data.is_pending_concordance %}<p class="text-info mt-2">There are outstanding pending changes for this discordance. When labs re-submit with the agreed changes the discordance should be resolved. There is likely no need for further discussion.</p>{% endif %}
-        {% else %}
-            {% if data.is_user_editable and data.report.resolution is empty %}
-                {% comment %}Warning this is duplicated in discordance_report_triage_detail.html{% endcomment %}
-                <div id="discordance-report-discussion">
-                    {% if data.row_data.next_step == "D" %}
-                        <div class="card">
-                            <div class="card-header">Discussion</div>
-                            <div class="card-body">
-                                <div class="no-value">This Discordance Report has not yet been discussed.</div>
-                            </div>
-                            <div class="card-footer">
-                                <a class="mt-2 btn btn-primary" href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">Start Discordance Discussion</a>
-                            </div>
+        <div id="discordance-report-triages">
+            <h4 {% if triages %}style="margin-bottom:0"{% endif %}>Step 1: Triages</h4>
+            {% with triages=data.triage_embeds %}
+                {% if triages %}
+                    <div class="row equal">
+                    {% for triage in triages %}
+                        <div class="col-sm-12 col-md-6 mt-3">
+                            {% embed triage %}
                         </div>
-                    {% else %}
-                        <div class="no-value">This discordance isn't marked as ready for discussion - see triages. <a class="hover-link" href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">Click here to discuss anyway.</a></div>
-                    {% endif %}
-                </div>
+                    {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="no-value">This Discordance Report was resolved before triage functionality.</div>
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <div id="discordance-report-multi-lab-discussion" class="mt-4">
+            <h4>Step 2: Multi-Lab Discussion</h4>
+            {% if data.review %}
+                <div data-toggle="ajax" href="{% url 'review_detail' data.review.pk %}?show_source_object=false&edit=true"></div>
+                {% if data.is_pending_concordance %}<p class="text-info mt-2">There are outstanding pending changes for this discordance. When labs re-submit with the agreed changes the discordance should be resolved. There is likely no need for further discussion.</p>{% endif %}
             {% else %}
-                <div class="no-value">This Discordance Report was not discussed.</div>
+                {% if data.is_user_editable and data.report.resolution is empty %}
+                    {% comment %}Warning this is duplicated in discordance_report_triage_detail.html{% endcomment %}
+                    <div id="discordance-report-discussion">
+                        {% if data.row_data.next_step == "D" %}
+                            <div class="card">
+                                <div class="card-header">Discussion</div>
+                                <div class="card-body">
+                                    <div class="no-value">This Discordance Report has not yet been discussed.</div>
+                                </div>
+                                <div class="card-footer">
+                                    <a class="mt-2 btn btn-primary" href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">Start Discordance Discussion</a>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="no-value">This discordance isn't marked as ready for discussion - see triages. <a class="hover-link" href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">Click here to discuss anyway.</a></div>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <div class="no-value">This Discordance Report was not discussed.</div>
+                {% endif %}
             {% endif %}
-        {% endif %}
+        </div>
 
         {% if data.is_user_editable and data.provide_reopen %}
-            <h4>Actions</h4>
-            <div class="btn-toolbar">
-                <form method="post">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="reopen" />
-                    <button class="btn btn-warning" onclick="return reopenWarning()">Re-open Discordance</button>
-                </form>
+            <div id="discordance-report-actions" class="mt-4">
+                <h4>Actions</h4>
+                <div class="btn-toolbar">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="reopen" />
+                        <button class="btn btn-warning" onclick="return reopenWarning()">Re-open Discordance</button>
+                    </form>
+                </div>
             </div>
         {% endif %}
 
@@ -178,25 +190,27 @@
             {% clinvar allele=data.allele expert_panel_only=True %}
         </div>
 
-        <h4 class="text-secondary">History of this Clinical Grouping's Discordance Reports</h4>
-        {% if data.has_history %}
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th style="width:100px" class="text-center">ID</th>
-                        <th class="text-left">Discordance Detected</th>
-                        <th class="text-left">c.HGVS ({{ data.genome_build.name }})</th>
-                        <th class="text-center" style="width:50%">Lab / Clinical Significances</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for summary in data.report_history_summary %}
-                    {% discordance_report_row summary filter=False selected=data.report read_only=True %}
-                {% endfor %}
-                </tbody>
-            </table>
-        {% else %}
-            <div class="no-value">This is the first discordance recorded for this Clinical Grouping.</div>
-        {% endif %}
+        <div id="discordance-report-history" class="mt-4">
+            <h4 class="text-secondary">History of this Clinical Grouping's Discordance Reports</h4>
+            {% if data.has_history %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th style="width:100px" class="text-center">ID</th>
+                            <th class="text-left">Discordance Detected</th>
+                            <th class="text-left">c.HGVS ({{ data.genome_build.name }})</th>
+                            <th class="text-center" style="width:50%">Lab / Classifications</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for summary in data.report_history_summary %}
+                        {% discordance_report_row summary filter=False selected=data.report read_only=True %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="no-value">This is the first discordance recorded for this Clinical Grouping.</div>
+            {% endif %}
+        </div>
 
 {% endblock content %}

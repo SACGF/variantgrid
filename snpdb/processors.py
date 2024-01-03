@@ -1,13 +1,29 @@
 import socket
+from functools import cached_property
 
 from django.apps import apps
 from django.conf import settings
 from django.contrib.sites.models import Site
 
 from snpdb.models import SiteMessage
+from snpdb.user_settings_manager import UserSettingsManager
 from uicore.utils.form_helpers import FORM_HELPER_HELPER
 from variantgrid.perm_path import get_visible_url_names
 from variantopedia.forms import SearchForm
+
+
+class LazyUserProperties:
+    """
+    A class that we can send to every page that can provide access to common user values but doesn't need to
+    pre-process anything unless the details are asked for
+    """
+
+    def __init__(self, request):
+        self.request = request
+
+    @cached_property
+    def avatar_details(self):
+        return UserSettingsManager.get_avatar_details()
 
 
 def settings_context_processor(request):
@@ -31,7 +47,8 @@ def settings_context_processor(request):
         'url_name_visible': get_visible_url_names(),
         'use_oidc': settings.USE_OIDC,  # whether user is managed by django or externally by open connect
         'user_feedback_enabled': settings.ROLLBAR.get('enabled', False) and settings.USER_FEEDBACK_ENABLED,
-        "contact_us_enabled": settings.CONTACT_US_ENABLED
+        "contact_us_enabled": settings.CONTACT_US_ENABLED,
+        "user_properties": LazyUserProperties(request)
     }
 
     # This can fail on bad urls

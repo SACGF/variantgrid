@@ -1,16 +1,14 @@
 import re
 from functools import cached_property
 from typing import Dict, Any, Mapping, Optional, Union, List, TypedDict
-
 from django.conf import settings
-
 from annotation.models import CitationFetchRequest
 from annotation.models.models_citations import CitationFetchResponse
 from classification.criteria_strengths import CriteriaStrength, CriteriaStrengths
 from classification.enums import SpecialEKeys
 from genes.hgvs import CHGVS, PHGVS
 from library.log_utils import report_message
-from library.utils import empty_to_none
+from library.utils import empty_to_none, first
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion
 
 
@@ -215,10 +213,13 @@ class EvidenceMixin:
         :param raw: A dictionary, presumably from JSON
         :return: A VCStore where all keys are clean str keys and all values are dicts
         """
+
+        from classification.models import EvidenceKeyMap
+        keys = EvidenceKeyMap.instance()
+
         clean: VCPatch = {}
         for key, value_obj in raw.items():
-            key = EvidenceMixin._clean_key(key)
-
+            key = keys.with_namespace_if_required(EvidenceMixin._clean_key(key))
             if key in clean:
                 report_message(message=f'Multiple keys have been normalised to {key}',
                                extra_data={'raw_keys': list(raw.keys())},

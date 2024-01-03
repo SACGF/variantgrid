@@ -20,6 +20,7 @@ from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.preview_request import PreviewData, PreviewModelMixin, PreviewKeyValue
 from library.utils import string_deterministic_hash, rgb_invert
+from snpdb.models import AlleleOriginFilterDefault, UserAward, UserAwards
 from snpdb.models.models import Tag, Lab, Organization
 from snpdb.models.models_columns import CustomColumnsCollection, CustomColumn
 from snpdb.models.models_enums import BuiltInFilters
@@ -172,6 +173,13 @@ class SettingsOverride(models.Model):
                                    help_text="Port to connect to IGV on your machine")
     default_genome_build = models.ForeignKey(GenomeBuild, on_delete=SET_NULL, null=True, blank=True,
                                              help_text="Used for search (jump to result if that is the only one for this build) and populating defaults everywhere")
+    default_allele_origin = models.CharField(
+        max_length=1,
+        choices=AlleleOriginFilterDefault.choices,
+        null=True,
+        blank=True,
+        help_text="Automatically filters most pages to default filter to germline or somatic if either of those options are chosen")
+
     timezone = models.TextField(null=True, blank=True,
                                 help_text="Time/date used in classification download")
 
@@ -292,6 +300,10 @@ class AvatarDetails:
         return AvatarDetails(user=user)
 
     @cached_property
+    def awards(self) -> UserAwards:
+        return UserAwards(user=self.user)
+
+    @cached_property
     def preferred_label(self) -> str:
         user = self.user
         preferred_label = user.username
@@ -335,6 +347,7 @@ class UserSettings:
     import_messages: bool
     igv_port: bool
     default_genome_build: GenomeBuild
+    default_allele_origin: AlleleOriginFilterDefault
     default_lab: Optional[Lab]
     oauth_sub: str
     timezone: str

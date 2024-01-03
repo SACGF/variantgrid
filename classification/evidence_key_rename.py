@@ -1,4 +1,40 @@
 # DO NOT import any models, so keep this safe to be used by migrations
+import contextlib
+from typing import Optional
+
+
+class BulkUpdator:
+
+    def __init__(self, model, fields: list[str]):
+        self.model = model
+        self.fields = fields
+        self.batch = []
+        self.records_updated = 0
+
+    def append(self, obj):
+        self.batch.append(obj)
+        if len(self.batch) >= 1000:
+            self.model.objects.bulk_update(self.batch, fields=self.fields)
+            self.records_updated += len(self.batch)
+            self.batch = []
+            print(f"Bulk updated {self.model} x {self.records_updated}")
+
+    def finish(self):
+        if self.batch:
+            self.model.objects.bulk_update(self.batch, fields=self.fields)
+            self.records_updated += len(self.batch)
+            self.batch = []
+        print(f"Bulk updated {self.model} x {self.records_updated}")
+
+    @staticmethod
+    @contextlib.contextmanager
+    def instance(model, fields: list[str]):
+        updator = BulkUpdator(model=model, fields=fields)
+        try:
+            yield updator
+        finally:
+            updator.finish()
+
 
 class EvidenceKeyRenamer:
     """
@@ -6,55 +42,59 @@ class EvidenceKeyRenamer:
     (current and historical in modifications) as well us migrating the evidence key
     """
 
-    def __init__(self, apps, old_key: str, new_key: str):
+    def __init__(self, apps, old_key: Optional[str] = None, new_key: Optional[str] = None, key_dict: Optional[dict[str, str]] = None):
         self.apps = apps
         self.EvidenceKey = apps.get_model("classification", "EvidenceKey")
-        self.old_key = old_key
-        self.new_key = new_key
+        if not key_dict:
+            key_dict = {}
+        if old_key and new_key:
+            key_dict[old_key] = new_key
+        self.key_dict = key_dict
+        if not key_dict:
+            raise ValueError("Have nothing to rename")
 
-    def _create_new_evidence_key(self):
-        new_key = self.EvidenceKey.objects.filter(key=self.new_key).first()
-        old_key = self.EvidenceKey.objects.filter(key=self.old_key).first()
-        if not new_key and old_key:
-            print(f"Copying {self.old_key} into new key {self.new_key}")
-            new_key = old_key
-            new_key.key = self.new_key
-            new_key.save()
-            return True
-        print("Old key doesn't exist or new key already exists - not migrating")
-        return False
+    def _move_evidence_keys(self):
+        for old_key, new_key in self.key_dict.items():
+            if self.EvidenceKey.objects.filter(key=new_key).exists():
+                raise ValueError(f"New evidence key {new_key} already exists")
+            if old_e_key := self.EvidenceKey.objects.filter(key=old_key).first():
+                print(f"Moving {old_key} to be {new_key}")
+                old_e_key.key = new_key
+                old_e_key.save()
+                self.EvidenceKey.objects.filter(key=old_key).delete()
+            else:
+                raise ValueError(f"Old evidence key {old_key} doesn't exist")
 
-    def _rename_in_dict(self, data: dict):
-        if data and self.old_key in data:
-            data[self.new_key] = data[self.old_key]
-            data.pop(self.old_key)
+    def _rename_in_dict(self, data: dict) -> bool:
+        updated = False
+        for old_key, new_key in self.key_dict.items():
+            if data and old_key in data:
+                data[new_key] = data[old_key]
+                data.pop(old_key)
+                updated = True
+        return updated
 
-    def _migrate_existing_evidence_key(self):
+    def run(self):
         Classification = self.apps.get_model("classification", "Classification")
         ClassificationModification = self.apps.get_model("classification", "ClassificationModification")
 
-        kwargs = {f"evidence__{self.old_key}__isnull": False}
-        for vc in Classification.objects.filter(**kwargs):
-            self._rename_in_dict(vc.evidence)
-            vc.save(update_fields=["evidence"])
+        self._move_evidence_keys()
 
-        for vcm in ClassificationModification.objects.filter():
-            self._rename_in_dict(vcm.published_evidence)
-            self._rename_in_dict(vcm.delta)
+        with BulkUpdator.instance(model=Classification, fields=["evidence"]) as batch_update:
+            for vc in Classification.objects.iterator():
+                if self._rename_in_dict(vc.evidence):
+                    batch_update.append(vc)
 
-            vcm.save(update_fields=["published_evidence", "delta"])
-
-    def _delete_old_evidence_key(self):
-        self.EvidenceKey.objects.filter(key=self.old_key).delete()
-
-    def run(self):
-        if self._create_new_evidence_key():
-            self._migrate_existing_evidence_key()
-            self._delete_old_evidence_key()
+        with BulkUpdator.instance(model=ClassificationModification, fields=["published_evidence", "delta"]) as batch_update:
+            for vcm in ClassificationModification.objects.iterator():
+                update_published = self._rename_in_dict(vcm.published_evidence)
+                update_delta = self._rename_in_dict(vcm.delta)
+                if update_published or update_delta:
+                    batch_update.append(vcm)
 
     @staticmethod
-    def rename(apps, old_key: str, new_key: str):
-        EvidenceKeyRenamer(apps=apps, old_key=old_key, new_key=new_key).run()
+    def rename(apps, old_key: Optional[str] = None, new_key: Optional[str] = None, key_dict: Optional[dict[str, str]] = None):
+        EvidenceKeyRenamer(apps=apps, old_key=old_key, new_key=new_key, key_dict=key_dict).run()
 
 
 class EvidenceSelectKeyRenamer:

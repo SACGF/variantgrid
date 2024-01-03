@@ -216,7 +216,7 @@ div.json {
 {% endblock %}
 {% block content %}
 <div class="container">
-    {% page_help page_id='classification/import_help' title='Classifications Import' %}
+    {% page_help page_id='classification/import_help' title='Classification Record Import' %}
 
     <p class="text-info">The form below will help show you the content required for the import API.</p>
 
@@ -297,7 +297,7 @@ div.json {
                 <option value="GRCh38" selected>GRCh38</option>
             </select>
         {% endlabelled %}
-        {% labelled label="Clinical Significance" %}
+        {% labelled label="Classification" %}
             <input id="clinical_significance" type="text" placeholder="B, LB, VUS, LP, P, etc" class="form-control data-field" value="VUS" />
         {% endlabelled %}
         {% labelled label="Zygosity" %}

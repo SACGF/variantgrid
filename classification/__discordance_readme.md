@@ -1,17 +1,17 @@
 # Discordances
 
-Discordances are only currently enabled in the Shariant environment. The definition of a discordance follows the one used by ClinVar - by dividing clinical significances into 3 buckets:
+Discordances are only currently enabled in the Shariant environment. The definition of a discordance follows the one used by ClinVar - by dividing classification into 3 buckets:
 
 Bucket 1: Benign, Likely Benign
 Bucket 2: VUS, VUS-A, VUS-B, VUS-C
 Bucket 3: Likely Pathogenic, Pathogenic
 
-If for any given allele with multiple classifications, if they fall into two or more buckets, a discordance is raised.
+If for any given allele with multiple classification records, if they fall into two or more buckets, a discordance is raised.
 
 ## Clinical Groupings
 _formerly clinical contexts_
 
-While not heavily exposed in the interface currently, published classifications are assigned to a clinical grouping, and the clinical groupings are assigned to an allele.
+While not heavily exposed in the interface currently, published classification records are assigned to a clinical grouping, and the clinical groupings are assigned to an allele.
 
 This will allow us to sub-divide classifications within the same allele by condition, if the conditions were significantly different.
 

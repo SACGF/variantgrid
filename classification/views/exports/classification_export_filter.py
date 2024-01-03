@@ -18,7 +18,7 @@ from classification.models import ClassificationModification, Classification, cl
     DiscordanceReport, ClinicalContext, ImportedAlleleInfo
 from flags.models import FlagsMixin, Flag, FlagComment
 from library.utils import batch_iterator, local_date_string, http_header_date_now
-from snpdb.models import GenomeBuild, Lab, Organization, Allele, Variant
+from snpdb.models import GenomeBuild, Lab, Organization, Allele, Variant, AlleleOriginFilterDefault
 
 
 @dataclass
@@ -213,6 +213,7 @@ class ClassificationFilter:
 
     user: User
     genome_build: GenomeBuild
+    allele_origin_filter: AlleleOriginFilterDefault = AlleleOriginFilterDefault.SHOW_ALL
     exclude_sources: Optional[Set[Union[Lab, Organization]]] = None
     include_sources: Optional[Set[Lab]] = None
     since: Optional[datetime] = None
@@ -294,6 +295,9 @@ class ClassificationFilter:
             share_level_str = 'logged_in_users'
         elif share_level_str == 'any':
             share_level_str = 'lab'
+
+        allele_origin_filter = AlleleOriginFilterDefault(request.query_params.get('allele_origin', AlleleOriginFilterDefault.SHOW_ALL.value))
+
         share_level = ShareLevel(share_level_str)
         genome_build = GenomeBuild.get_name_or_alias(build_name)
         transcript_strategy = TranscriptStrategy(request.query_params.get('transcript_strategy', 'all'))
@@ -331,6 +335,7 @@ class ClassificationFilter:
             exclude_sources=exclude_sources,
             include_sources=include_sources,
             genome_build=genome_build,
+            allele_origin_filter=allele_origin_filter,
             min_share_level=share_level,
             transcript_strategy=transcript_strategy,
             since=since,
@@ -350,53 +355,6 @@ class ClassificationFilter:
             return 'classification__allele_info__grch37__c_hgvs'
         else:
             return 'classification__allele_info__grch38__c_hgvs'
-
-    # @cached_property
-    # def _bad_allele_transcripts(self) -> Dict[int, Set[str]]:
-    #     """
-    #     :return: A dictionary of Allele ID to a set of Transcripts for that allele which has bad flags
-    #     """
-    #
-    #     qs = Flag.objects.filter(
-    #         flag_type=allele_flag_types.allele_37_not_38,
-    #         resolution__status=FlagStatus.OPEN
-    #     ).values_list('collection_id', 'data')
-    #
-    #     allele_to_bad_transcripts: Dict[int, Set[str]] = defaultdict(set)
-    #     collection_id_to_transcript = defaultdict(set)
-    #     for collection_id, data in qs:
-    #         if data:
-    #             collection_id_to_transcript[collection_id].add(data.get('transcript'))
-    #
-    #     allele_qs = Allele.objects.filter(flag_collection__in=collection_id_to_transcript.keys())\
-    #         .values_list('pk', 'flag_collection_id')
-    #     for pk, collection_id in allele_qs:
-    #         if transcripts := collection_id_to_transcript.get(collection_id):
-    #             allele_to_bad_transcripts[pk].update(transcripts)
-    #
-    #     return allele_to_bad_transcripts
-    #
-    # @cached_property
-    # def _transcript_version_classification_ids(self) -> Set[int]:
-    #     """
-    #     Returns a set of classification IDs that have flags that make us want to exclude due to errors
-    #     :return: A set of classification IDs
-    #     """
-    #     return flag_ids_to(
-    #         Classification,
-    #         Flag.objects.filter(
-    #             flag_type=classification_flag_types.transcript_version_change_flag,
-    #             resolution__status=FlagStatus.OPEN
-    #         ))
-    #
-    # @cached_property
-    # def _variant_matching_classification_ids(self) -> Set[int]:
-    #     return flag_ids_to(
-    #         Classification,
-    #         Flag.objects.filter(
-    #             flag_type=classification_flag_types.matching_variant_warning_flag,
-    #             resolution__status=FlagStatus.OPEN
-    #         ))
 
     @cached_property
     def _discordant_classification_ids(self) -> Dict[int, DiscordanceReportStatus]:
@@ -482,6 +440,9 @@ class ClassificationFilter:
 
         if self.min_share_level != ShareLevel.LAB:
             cms = cms.filter(share_level__in=self._share_levels)
+
+        if self.allele_origin_filter and self.allele_origin_filter != AlleleOriginFilterDefault.SHOW_ALL:
+            cms = cms.filter(classification__allele_origin_bucket__in=self.allele_origin_filter.buckets)
 
         if not self.since:
             # only worry about withdrawn if doing 'since' (as we might need to report the withdrawing (json),

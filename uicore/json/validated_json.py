@@ -122,6 +122,13 @@ class ValidatedJson:
         """
         return ValidatedJson.recursive_to_json(self)
 
+    def without_warnings(self) -> 'ValidatedJson':
+        return ValidatedJson(
+            json_data=self.json_data,
+            messages=self.messages.errors(),
+            void=self.void
+        )
+
     @staticmethod
     def recursive_to_json(data: JsonDataType) -> JsonDataType:
         if isinstance(data, ValidatedJson):

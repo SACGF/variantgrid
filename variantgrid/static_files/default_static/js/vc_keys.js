@@ -16,6 +16,9 @@ let EKey = (function() {
             if (val.startsWith('#')) {
                 return val.substring(1) == this.key.toLowerCase();
             }
+            if (this.sub_label != null && this.sub_label.toLowerCase().indexOf(val) != -1) {
+                return true;
+            }
             return this.key.toLowerCase().indexOf(val) != -1 ||
                 this.label.toLowerCase().indexOf(val) != -1;
         },
@@ -230,6 +233,7 @@ EKey.critValues = {
     "NA": "Not Applicable",
     "BA": "Benign Standalone",
     "BS": "Benign Strong",
+    // not that "BM" is not a standard strength
     "BP": "Benign Supporting",
     // "BX": "Benign (Unspecified Strength)",
     "N": "Neutral",
@@ -239,6 +243,17 @@ EKey.critValues = {
     "PVS": "Pathogenic Very Strong",
     // "PX": "Pathogenic (Unspecified Strength)"
 };
+
+EKey.strengthToPoints = {
+    "BA": -8,
+    "BS": -4,
+    "BM": -2,
+    "BP": -1,
+    "PP": 1,
+    "PM": 2,
+    "PS": 4,
+    "PVS": 8
+}
 
 EKey.families = {
     V: 'Variant',
@@ -285,7 +300,11 @@ var EKeys = (function() {
             labConfig = labConfig || {};
             let namespaces = new Set(labConfig['namespaces']);
             namespaces.add(null);
-            delete labConfig['namespaces'];
+            // default namespace to include ACMG if we're not horak
+            // as there are plenty of classifications that didn't set an assertion method
+            if (!namespaces.has("horak")) {
+                namespaces.add("acmg");
+            }
 
             return new EKeys(Array.from(this._map.values()).map(ekey => {
                 let config = labConfig[ekey.key];
@@ -299,7 +318,7 @@ var EKeys = (function() {
                     config.mandatory = false;   
                 }
                 if (config) {
-                    data = Object.assign({}, ekey, config);
+                    let data = Object.assign({}, ekey, config);
                     let newkey = new EKey(data, ekey.index);
                     return newkey;
                 } else {
@@ -492,10 +511,12 @@ EKeys.fixDescription = function(htmlText) {
 
 SpecialEKeys = {};
 SpecialEKeys.ASSERTION_METHOD = 'assertion_method';
+SpecialEKeys.ALLELE_ORIGIN = 'allele_origin';
 SpecialEKeys.GENOME_BUILD = 'genome_build';
 SpecialEKeys.REFSEQ_TRANSCRIPT_ID = 'refseq_transcript_id';
 SpecialEKeys.CONDITION = 'condition';
 SpecialEKeys.CLINICAL_SIGNIFICANCE = 'clinical_significance';
+SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE = 'somatic:clinical_significance';
 SpecialEKeys.GENE_SYMBOL = 'gene_symbol';
 SpecialEKeys.GENE_OMIM_ID = 'gene_omim_id';
 SpecialEKeys.UNIPROT_ID = 'uniprot_id';

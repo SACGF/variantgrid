@@ -311,6 +311,7 @@ def load_hpo(filename: str, force: bool):
                 "scope": scope
             })
         if detailed_aliases:
+            detailed_aliases.sort(key=lambda x: x.get("name"))
             extra = {"synonyms": detailed_aliases}
 
         if not term_id.startswith(OntologyService.HPO):
@@ -328,7 +329,7 @@ def load_hpo(filename: str, force: bool):
             definition=term.definition,
             primary_source=True,
             status=status,
-            aliases=list(aliases)
+            aliases=list(sorted(aliases))
         )
 
         children = itertools.islice(term.subclasses(), 1, None)

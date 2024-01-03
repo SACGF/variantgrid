@@ -138,7 +138,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
             ),
             RichColumn(
                 key='classification_count',
-                label="<span style=\"font-size:10px\">Classification</span><br/>Count",
+                label="<span style=\"font-size:10px\">Classification<br/>Record Count</span>",
                 orderable=True
             ),
             RichColumn('id', visible=False)  # just used for the expand
@@ -327,7 +327,7 @@ class ImportedAlleleInfoDownload(ExportRow):
     def confirmed(self):
         return self.allele_info.latest_validation.confirmed
 
-    @export_column(label="Classification Count")
+    @export_column(label="Classification Record Count")
     def classification_count(self):
         return Classification.objects.filter(allele_info=self.allele_info, withdrawn=False).count()
 

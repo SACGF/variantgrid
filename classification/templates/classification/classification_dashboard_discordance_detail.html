@@ -6,7 +6,7 @@
     {% if not preview.awaiting_triage_count %}
         <div class="no-value">There are no outstanding triages for this lab {{ 'S' | severity_icon }}</div>
     {% else %}
-        {% labelled label="Discordances Awaiting Triage" hint="tiny" %}
+        {% labelled label="Discordance Reports Awaiting Triage" hint="tiny" %}
             <div>{{ preview.awaiting_triage_count| number:'W' }}</div>
             {% if preview.awaiting_triage_count > 3 %}<div>Showing most relevant 3</div>{% endif %}
             <div><a class="hover-link" href="{% url 'discordance_reports' dlab.lab_picker.selection %}"><small class="form-text">Review all discordances here</small></a></div>
@@ -17,7 +17,7 @@
                     <th style="width:100px" class="text-center">ID</th>
                     <th class="text-left">Discordance Detected</th>
                     <th class="text-left">c.HGVS ({{ genome_build.name }})</th>
-                    <th class="text-center" style="width:50%">Lab / Clinical Significances</th>
+                    <th class="text-center" style="width:50%">Lab / Classification</th>
                 </tr>
             </thead>
             <tbody>
