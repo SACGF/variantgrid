@@ -7,6 +7,7 @@ def _one_off_annotation_version_use_cosmic_vcf(apps, _schema_editor):
      """
 
     VariantAnnotationVersion = apps.get_model("annotation", "VariantAnnotationVersion")
+    VariantAnnotationVersion.objects.filter(columns_version=1).update(cosmic=95)
     VariantAnnotationVersion.objects.filter(columns_version=2).update(cosmic=97)
     VariantAnnotationVersion.objects.filter(columns_version=3).update(cosmic=99)
 
