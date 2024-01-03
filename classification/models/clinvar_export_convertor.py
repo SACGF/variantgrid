@@ -387,7 +387,7 @@ class ClinVarExportConverter:
             id_part = str(condition.index)  # OMIM is not 0 prefixed
         elif condition.ontology_service == OntologyService.ORPHANET:
             id_part = f"ORPHA{str(condition.index)}"  # ORPHA is not 0 prefixed
-            db = "ORPHANET"
+            db = "Orphanet"
 
         return ValidatedJson({
             "db": db,
