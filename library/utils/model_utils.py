@@ -29,6 +29,10 @@ class ArrayLength(models.Func):
     function = 'CARDINALITY'
 
 
+class AsciiValue(models.Func):
+    function = 'ASCII'
+
+
 def model_has_field(model: Type[Model], field_name: str) -> bool:
     try:
         if field_name.endswith('_id'):

@@ -1,13 +1,14 @@
 import csv
-import json
 import logging
 import os
+from time import sleep
 from typing import Optional, Set, List, Dict
 
 import cyvcf2
 import numpy as np
 import simplejson
 from django.conf import settings
+from django.db import IntegrityError
 from django.db.models import Max
 
 from library.django_utils import thread_safe_unique_together_get_or_create
@@ -15,7 +16,7 @@ from library.django_utils.django_file_utils import get_import_processing_filenam
 from library.genomics.vcf_enums import VCFConstant
 from library.genomics.vcf_utils import vcf_get_ref_alt_end
 from library.git import Git
-from library.utils import double_quote, json_default_converter
+from library.utils import double_quote, json_default_converter, AsciiValue
 from library.utils.database_utils import postgres_arrays
 from patients.models_enums import Zygosity
 from snpdb.common_variants import get_classified_high_frequency_variants_qs
@@ -156,25 +157,34 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     def _add_undeclared_filter_code(self, filter_id: str) -> str:
         # Because we split files - it may be possible an undeclared code would have been already added
         # In another worker - so re-check from DB
-        self.vcf_filter_map = self.vcf.get_filter_dict()
-        if filter_code := self.vcf_filter_map.get(filter_id):
-            return filter_code
+        max_attempts = 2
+        filter_code = None
 
-        data = self.vcf.vcffilter_set.aggregate(Max("filter_code"))
-        if existing_max := data.get("filter_code__max"):
-            filter_code_id = ord(existing_max) + 1
-            if chr(filter_code_id) in "',\"":
-                filter_code_id += 1  # Skip these as it causes quoting issues
-        else:
-            filter_code_id = VCFFilter.ASCII_MIN
-        filter_code = chr(filter_code_id)
+        for attempt in range(max_attempts):
+            self.vcf_filter_map = self.vcf.get_filter_dict()
+            if filter_code := self.vcf_filter_map.get(filter_id):
+                return filter_code
 
-        VCFFilter.objects.create(vcf=self.vcf,
-                                 filter_code=filter_code,
-                                 filter_id=filter_id,
-                                 description="Undeclared filter")
-        self.vcf_filter_map[filter_id] = filter_code
-        return filter_code
+            data = self.vcf.vcffilter_set.aggregate(max_ascii=Max(AsciiValue("filter_code")))
+            if existing_max := data.get("max_ascii"):
+                filter_code_id = existing_max + 1
+                if chr(filter_code_id) in "',\"":
+                    filter_code_id += 1  # Skip these as it causes quoting issues
+            else:
+                filter_code_id = VCFFilter.ASCII_MIN
+            filter_code = chr(filter_code_id)
+
+            try:
+                VCFFilter.objects.create(vcf=self.vcf,
+                                         filter_code=filter_code,
+                                         filter_id=filter_id,
+                                         description="Undeclared filter")
+                self.vcf_filter_map[filter_id] = filter_code
+                return filter_code
+            except IntegrityError:
+                sleep(1)
+
+        raise ValueError(f"Could not create undeclared filter {filter_id=}/{filter_code=} after {max_attempts=}")
 
     @staticmethod
     def get_ref_alt_allele_depth_default(variant):
@@ -274,7 +284,11 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     def _get_format_json(num_samples: int, variant: cyvcf2.Variant) -> List[Dict]:
         sample_formats = [{} for _ in range(num_samples)]
         for k in variant.FORMAT:
-            fmt = variant.format(k).tolist()
+            if k == "GT":
+                # Special case to work around crash bug - https://github.com/brentp/cyvcf2/issues/291
+                fmt = variant.genotypes
+            else:
+                fmt = variant.format(k).tolist()
             for i in range(num_samples):
                 val = fmt[i]
                 sample_formats[i][k] = val
@@ -359,9 +373,16 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
         # If record is missing genotype call, calling any built in genotype methods can
         # cause cyvcf2 to crash, @see https://github.com/brentp/cyvcf2/issues/17
-        has_genotype = self.vcf.genotype_field and variant.format(self.vcf.genotype_field) is not None
-        if has_genotype:
-            alt_zygosity = [BulkGenotypeVCFProcessor.ALT_CYVCF_GT_ZYGOSITIES[i] for i in variant.gt_types]
+        # And we can't call variant.format("GT") due to crash bug - https://github.com/brentp/cyvcf2/issues/291
+        gt_types = None
+        if self.vcf.genotype_field:
+            try:
+                gt_types = variant.gt_types
+            except Exception:  # Can be absent from a record
+                pass
+
+        if gt_types is not None:
+            alt_zygosity = [BulkGenotypeVCFProcessor.ALT_CYVCF_GT_ZYGOSITIES[i] for i in gt_types]
             cohort_gt = [
                 str(variant.num_hom_ref),
                 str(variant.num_het),
