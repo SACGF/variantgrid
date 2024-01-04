@@ -123,7 +123,6 @@ class UploadPipeline(models.Model):
     def file_type(self):
         return self.uploaded_file.file_type
 
-    @property
     def get_file_type_display(self):
         return self.uploaded_file.get_file_type_display()
 
