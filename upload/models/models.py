@@ -186,7 +186,7 @@ class UploadPipeline(models.Model):
         filename = self.uploaded_file.get_filename()
         create_event(user, name, error_message, filename=filename, severity=LogLevel.ERROR)
         message = f"UploadPipeline {self.pk} failed. " \
-            f"Filename: {self.get_file_type_display} Error: {error_message}"
+            f"Filename: {self.get_file_type_display()} Error: {error_message}"
         report_message(message, level='error')
 
     def _set_related_data_import_status(self, import_status: ImportStatus):
