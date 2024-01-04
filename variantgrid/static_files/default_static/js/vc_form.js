@@ -361,8 +361,8 @@ const VCForm = (function() {
             $('<p>', {class: 'mt-2', text: 'Note that once shared at a certain level, this classification record can only be shared at the same or higher level'}).appendTo(dialogBody);
 
             dialogFooter.html([
-                $('<button>', {type:"button", class:"btn btn-secondary", 'data-dismiss':"modal", text:'Cancel'}),
-                $('<button>', {type:"button", class:"btn btn-primary", text:'Submit', click: () => {
+                $('<button>', {type:"button", class:"btn btn-secondary", 'data-dismiss':"modal", text:'Cancel', id:'share-cancel'}),
+                $('<button>', {type:"button", class:"btn btn-primary", text:'Submit', id:'share-confirm', click: () => {
                     this.publish(newShareLevel);
                     dialogContent.modal('hide');
                 }})
@@ -425,6 +425,7 @@ const VCForm = (function() {
                                     class: 'mt-1 btn btn-primary w-100',
                                     html: '<i class="fas fa-upload"></i> Submit',
                                     title: 'Submit/Share',
+                                    id :'action-submit',
                                     click: this.share.bind(this)
                                 }).appendTo(quickSubmitWrapper);
                             } else if (this.hasErrors()) {
@@ -446,6 +447,7 @@ const VCForm = (function() {
                         class: 'mt-1 btn btn-primary w-100',
                         html: '<i class="fas fa-stopwatch"></i> Go to Latest Version',
                         title: 'Submit/Share',
+                        id: 'action-latest',
                         click: goToLatest
                     }).appendTo(quickSubmitWrapper);
                 } else {
