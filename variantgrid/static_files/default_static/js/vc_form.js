@@ -191,11 +191,11 @@ const VCForm = (function() {
         generateExportButtons() {
             let wrapper = $('<div>', {html: $('<h5>', {text:'Export as', class: 'mt-4'})});
             let buttons = $('<div>', {class: 'btn-toolbar'}).appendTo(wrapper);
-            let csvButton = $('<button>', {class:'btn btn-outline-primary btn-lg', html: '<i class="fas fa-file-csv"></i> CSV', click: () => {this.csv()}});
+            let csvButton = $('<button>', {class:'btn btn-outline-primary btn-lg', id: 'export-csv', html: '<i class="fas fa-file-csv"></i> CSV', click: () => {this.csv()}});
             csvButton.appendTo(buttons);
 
             if (this.reportEnabled) {
-                let reportButton = $('<button>', {class:'btn btn-outline-primary btn-lg', html: '<i class="far fa-file"></i> Report', click: () => {this.report()}});
+                let reportButton = $('<button>', {class:'btn btn-outline-primary btn-lg', id: 'export-report', html: '<i class="far fa-file"></i> Report', click: () => {this.report()}});
                 reportButton.appendTo(buttons);
             } else {
                 buttons.append($('<div>'));
@@ -207,6 +207,7 @@ const VCForm = (function() {
             let dialogContent = createModalShell('confirmation-modal', headerText, 'lg');
             let dialogBody = dialogContent.find('.modal-body');
             let dialogFooter = dialogContent.find('.modal-footer');
+            let idPrefix = "modal-action";
 
             if (isWithdrawal) {
                 let withdrawReasonDropdown = $('<select class="form-control" id="withdrawReasonDropdown" required></select>');
@@ -233,6 +234,7 @@ const VCForm = (function() {
                 $('<button>', {
                     type: "button",
                     class: "btn btn-secondary",
+                    id: `${idPrefix}-cancel`,
                     'data-dismiss': "modal",
                     text: 'Cancel',
                     click: cancelCallback
@@ -241,6 +243,7 @@ const VCForm = (function() {
                     type: "button",
                     class: "btn btn-primary",
                     text: confirmButtonText,
+                    id: `${idPrefix}-confirm`,
                     click: function () {
                         if (isWithdrawal && !$('#withdrawReasonDropdown').val()) {
                             alert('Please select a withdrawal reason.');
@@ -465,6 +468,7 @@ const VCForm = (function() {
 
             let butt = $('<button>', {class: 'btn btn-danger btn-lg', html: '<i class="fas fa-trash-alt"></i> Delete', title: 'Delete', click: this.trash.bind(this)});
             if (this.record.withdrawn) {
+                butt.attr('id', 'action-un-withdraw');
                 butt.attr('title', 'Un-withdraw Classification');
                 butt.html('<i class="fas fa-trash-restore-alt"></i> Unwithdraw');
                 butt.removeClass('btn-danger');
@@ -474,6 +478,7 @@ const VCForm = (function() {
                 !this.deleteEnabled) {
                 //butt.attr('title', 'Cannot delete classification after it has been shared with logged in users or 3rd parties');
                 //butt = disableButton(butt);
+                butt.attr('id', 'action-withdraw');
                 butt.attr('title', 'Withdraw Classification');
                 butt.html('<i class="fas fa-trash-alt"></i> Withdraw');
             }
