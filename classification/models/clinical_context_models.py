@@ -26,11 +26,15 @@ from snpdb.models.models_variant import Allele
 
 clinical_context_signal = django.dispatch.Signal()  # args: "clinical_context", "status", "is_significance_change", "clinical_context_change_data:ClinicalContextChangeData"
 
-# TODO, consider moving this into the clinical significance evidence key options rather than hardcoded
+# TODO, consider moving these into the clinical significance evidence key options rather than hardcoded
 SPECIAL_VUS = {
     'VUS_A': 1,
     'VUS_B': 2,
     'VUS_C': 3
+}
+SPECIAL_CS = {
+    "O": "P",
+    "LO": "LP"
 }
 
 
@@ -217,7 +221,7 @@ class DiscordanceStatus:
                     counted_classifications += 1
                     shared_labs.add(row.lab)
                     cs_scores.add(strength)
-                    cs_values.add(clin_sig)
+                    cs_values.add(SPECIAL_CS.get(clin_sig, clin_sig))
                 else:
                     shared_labs.add(row.lab)
                     ignored_clin_sigs.add(clin_sig)
