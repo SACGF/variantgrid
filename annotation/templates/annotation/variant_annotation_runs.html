@@ -33,7 +33,7 @@
                 let c = buildData[name] || 0;
                 let trace = {
                     x: [c],
-                    y: ["counts"],
+                    y: ["Counts: "],
                     orientation: 'h',
                     name: name,
                     marker: {
@@ -45,7 +45,7 @@
             }
 
             let layout = {
-                width: 800,
+                width: 600,
                 height: 100,
                 barmode: 'stack',
                 showlegend: true,
@@ -103,41 +103,45 @@
                 </div>
             </form>
 
-        {% for build_name, vav_field_counts in genome_build_field_counts.items %}
-            <form method="post">
-                {% csrf_token %}
+        <div class="row equal">
+            {% for build_name, vav_field_counts in genome_build_field_counts.items %}
+                <div class="col-xl-6">
+                    <form method="post">
+                        {% csrf_token %}
 
-                <div id="build-{{ build_name }}-details" class="card mt-4">
-                    <div class="card-header">{{ build_name }}</div>
-                    <div class="card-body">
-                        {% ui_register_tabs tab_set=build_name %}
-                        {% for vav, field_counts in vav_field_counts.items %}
-                            {% ui_register_tab_embedded tab_set=build_name label=vav.short_string %}
-                                <div id="build-{{ build_name }}-{{ vav.pk }}-summary-graph"></div>
-                                {% for field, count in field_counts.items %}
-                                    {% labelled label=field %}{{ count }}{% endlabelled %}
-                                {% endfor %}
+                        <div id="build-{{ build_name }}-details" class="mt-4 card">
+                            <div class="card-header">{{ build_name }}</div>
+                            {% ui_register_tabs tab_set=build_name %}
+                            {% for vav, field_counts in vav_field_counts.items %}
+                                {% ui_register_tab_embedded tab_set=build_name label=vav.short_string %}
+                                    <div class="card-body">
+                                        <div id="build-{{ build_name }}-{{ vav.pk }}-summary-graph"></div>
+                                        {% for field, count in field_counts.items %}
+                                            {% labelled label=field %}{{ count }}{% endlabelled %}
+                                        {% endfor %}
 
-                                {% with vav_summary=genome_build_summary|get_item:build_name|get_item:vav.pk %}
-                                    {% if vav_summary|get_item:'Running' or vav_summary|get_item:'Queued' or vav_summary|get_item:'Error'%}
-                                    <div class="btn-toolbar">
-                                        {% if vav_summary|get_item:'Running' or vav_summary|get_item:'Queued' %}
-                                            <button name="set-non-finished-to-error-{{ build_name }}-{{ vav.pk }}" class="btn btn-danger">Set non-finished runs to Error</button>
-                                        {% endif %}
-                                        {% if vav_summary|get_item:'Error' %}
-                                            <button name="retry-annotation-runs-{{ build_name }}-{{ vav.pk }}" class="btn btn-danger">Retry all failed runs</button>
-                                        {% endif  %}
+                                        {% with vav_summary=genome_build_summary|get_item:build_name|get_item:vav.pk %}
+                                            {% if vav_summary|get_item:'Running' or vav_summary|get_item:'Queued' or vav_summary|get_item:'Error'%}
+                                            <div class="btn-toolbar">
+                                                {% if vav_summary|get_item:'Running' or vav_summary|get_item:'Queued' %}
+                                                    <button name="set-non-finished-to-error-{{ build_name }}-{{ vav.pk }}" class="btn btn-danger">Set non-finished runs to Error</button>
+                                                {% endif %}
+                                                {% if vav_summary|get_item:'Error' %}
+                                                    <button name="retry-annotation-runs-{{ build_name }}-{{ vav.pk }}" class="btn btn-danger">Retry all failed runs</button>
+                                                {% endif  %}
+                                            </div>
+                                            {% endif %}
+                                        {% endwith %}
                                     </div>
-                                    {% endif %}
-                                {% endwith %}
-
-                            {% end_ui_register_tab_embedded %}
-                        {% endfor %}
-                        {% ui_render_tabs tab_set=build_name %}
-                    </div>
+                                {% end_ui_register_tab_embedded %}
+                            {% endfor %}
+                            {% ui_render_tabs tab_set=build_name %}
+                        </div>
+                    </form>
                 </div>
-            </form>
-        {% endfor %}
+            {% endfor %}
+        </div>
+
         <div class="mt-4">
             {% labelled label="Version" %}
             <div class="btn-group btn-group-toggle" data-toggle="buttons">
