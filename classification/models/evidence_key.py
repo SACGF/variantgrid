@@ -436,7 +436,8 @@ class EvidenceKey(TimeStampedModel):
             'key': o.get('key'),
             'label': o.get('label'),
             'default': o.get('default'),
-            'override': o.get('override')
+            'override': o.get('override'),
+            'namespace': o.get('namespace')
         } for o in options]
 
     def to_json(self) -> dict:

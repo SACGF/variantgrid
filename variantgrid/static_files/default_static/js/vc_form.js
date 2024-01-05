@@ -70,7 +70,7 @@ const VCForm = (function() {
 
         renderReference(ref) {
             let text = ref.id;
-            if (ref.db == "HTTP" || ref.db == "HTTPS") {
+            if (ref.db === "HTTP" || ref.db === "HTTPS") {
                 text = `${ref.db.toLowerCase()}:${ref.idx}`;
             }
 
@@ -807,8 +807,19 @@ const VCForm = (function() {
                         return;
                     }
 
+                    let updateSet = new Set();
+
                     if (record.config) {
                         eKeys = eKeysBase.configCopy(record.config);
+                        eKeys.forEach(eKey => {
+                            if (eKey.config_updates) {
+                                let original = jContent.find(`[entry="${eKey.key}"]`);
+                                let replacement = this.createEntry(eKey);
+                                replacement.css('display', original.css('display'));
+                                original.replaceWith(replacement);
+                                updateSet.add(eKey.key);
+                            }
+                        });
                         this.updateSummaryTable();
                     }
                     
@@ -822,7 +833,6 @@ const VCForm = (function() {
                     this.messages = record.messages || [];
                     
                     Object.assign(this.delayedPatch, record.data);
-                    let updateSet = new Set();
                     let delayedPatch = {};
                     for (let key of Object.keys(this.delayedPatch)) {
                         if (typeof(this.delta[key]) !== 'undefined') {
@@ -918,9 +928,9 @@ const VCForm = (function() {
 
             let alleleOriginBucket = this.record.allele_origin_bucket;
             let alleleOriginDisplay = {
-                "U": "UNKNOWN",
-                "G": "GERMLINE",
-                "S": "SOMATIC"
+                "U": "not-set",
+                "G": "GERMLINE (default)",
+                "S": "SOMATIC (default)"
             }[alleleOriginBucket];
             let alleleOriginValue = this.value(SpecialEKeys.ALLELE_ORIGIN);
             if (alleleOriginValue) {
@@ -1055,7 +1065,7 @@ const VCForm = (function() {
                     } else if (elem[0].nodeName === 'SPAN') {
                         elem.age('value', val);
                     } else {
-                        if (elem.val().trim() == val) {
+                        if (elem.val().trim() === val) {
                             // don't remove whitespace that the user has entered
                             // e.g. "One day I " would be changed to "One day I" before the user had a chance
                             // to finish (if the auto-update kicked in).
@@ -1086,7 +1096,7 @@ const VCForm = (function() {
                 }
                 
                 // find all the values that have no matching options
-                let customValues = val.filter(v => !options.some(o => o.value == `${v}`));
+                let customValues = val.filter(v => !options.some(o => o.value === `${v}`));
 
                 if (customValues.length) {
                     let appendTo = select;
@@ -1098,7 +1108,7 @@ const VCForm = (function() {
                         appendTo = $('<optgroup>', {label: 'Illegal Value'});
                         select.append(appendTo);
                     }
-                    for (custom of customValues) {
+                    for (const custom of customValues) {
                         appendTo.prepend($('<option>', {value: custom, text: `${custom}`}));
                     }
                 }
@@ -1305,7 +1315,7 @@ const VCForm = (function() {
                 entry.find('input').focus();
                 entry.find('[tabindex]').focus();
             });
-            
+
             jFilterBox.keyup(function() {
                 let filterValue = $(this).val().trim();
                 vcform.filter( filterValue );
@@ -1321,7 +1331,7 @@ const VCForm = (function() {
                 }, 1);
                 jHelp.closest('.card').find('.card-title').text('Filter');
                 jHelp.empty()
-                    .append($('<div>', {class: 'description', html: 'Type in the filter to search on field names<br/>Type * to see the entire populated form at once.<br/>Type ** to see all possible fileds at once.'}));
+                    .append($('<div>', {class: 'description', html: 'Type in the filter to search on field names<br/>Type * to see the entire populated form at once.<br/>Type ** to see all possible fields at once.'}));
             });
 
             this.populateForm();
@@ -1343,6 +1353,7 @@ const VCForm = (function() {
             }
         },
 
+        // The actual show/hide of elements on the form
         filter: function(val) {
             let oldFiltering = filtering;
             let showUploads = null;
@@ -1597,7 +1608,7 @@ const VCForm = (function() {
             let vcform = this;
             let eKey = eKeys.key(key);
 
-            let dialogContent = createModalShell('note',eKey.label);
+            let dialogContent = createModalShell('note',eKey.label, 'lg');
             let body = dialogContent.find('.modal-body');
             $('<p>', {text: 'Edit the note for this field below'}).appendTo(body);
             let textArea = $('<textarea>', {text: this.note(key), class:'form-control', rows:5}).appendTo(body);
@@ -1695,6 +1706,9 @@ const VCForm = (function() {
                 case 'multiple': {
                     let value = this.value(key);
                     let optionSources = eKey.options || [];
+
+                    // move all disabled options to the bottom
+                    optionSources = _.flatten(_.partition(optionSources, o => !o.exclude_namespace));
                     if (type === 'bool') {
                         optionSources = [
                             {key: 'true', label: 'True'},
@@ -1719,41 +1733,38 @@ const VCForm = (function() {
                         optGroups.push($('<option>', {value: '', text: ''}));
                     }
 
-                    if (optionSources.find(o => o.override)) {
-                        optGroupNormal = optionSources.filter(o => !o.override).map(option => {
-                            let prefix = "";
-                            if (option.key === "NM" || option.key === "NA") {
-                                prefix = emptyValuePrefix;
-                            } else if (option.key) {
-                                prefix = standardPrefix;
-                            }
+                    let makeOption = (option, overridePrefix) => {
+                        let prefix = "";
+                        if (option.key === "NM" || option.key === "NA") {
+                            prefix = emptyValuePrefix;
+                        } else if (option.key) {
+                            prefix = standardPrefix;
+                        }
+                        if (overridePrefix) {
+                            prefix = overridePrefix;
+                        }
 
-                            return $('<option>', {
-                                value: option.key || '',
-                                text: prefix + (option.label || EKey.prettyKey(option.key))
-                            });
+                        let optDom = $('<option>', {
+                            value: option.key || '',
+                            text: prefix + (option.label || EKey.prettyKey(option.key))
                         });
-                        optGroupOverride = optionSources.filter(o => o.override).map(option => {
-                            return $('<option>', {
-                                value: option.key || '',
-                                text: overridePrefix + (option.label || EKey.prettyKey(option.key))
-                            });
+                        optDom.prop("disabled", !!option.exclude_namespace);
+
+                        return optDom;
+                    }
+
+                    if (optionSources.find(o => o.override)) {
+                        let optGroupNormal = optionSources.filter(o => !o.override).map(option => {
+                            return makeOption(option);
+                        });
+                        let optGroupOverride = optionSources.filter(o => o.override).map(option => {
+                            return makeOption(option, overridePrefix);
                         });
                         optGroups.push($('<optgroup>', {label: 'standard values', html: optGroupNormal}));
                         optGroups.push($('<optgroup>', {label: 'override values', html: optGroupOverride}));
                     } else {
                         options = optionSources.map(option => {
-                            let prefix = "";
-                            if (option.key === "NM" || option.key === "NA") {
-                                prefix = emptyValuePrefix;
-                            } else if (option.key) {
-                                prefix = standardPrefix;
-                            }
-
-                            return $('<option>', {
-                                value: option.key || '',
-                                text: prefix + (option.label || EKey.prettyKey(option.key))
-                            });
+                            return makeOption(option);
                         });
                         optGroups = optGroups.concat(options);
                     }
@@ -1787,7 +1798,7 @@ const VCForm = (function() {
                         if (valueArray.indexOf('!CUSTOM!') !== -1) {
                             valueArray = valueArray.filter(v => v !== '!CUSTOM!');
                             custom = true;
-                            customVal = emptyToNull(prompt('Please enter the custom value'));
+                            let customVal = emptyToNull(prompt('Please enter the custom value'));
                             valueArray.push(customVal);
                         }
 
@@ -1878,7 +1889,7 @@ const VCForm = (function() {
             divy = $(divy);
             let family = divy.attr('family');
             eKeys.forEach(eKey => {
-                if (eKey.evidence_category == family) {
+                if (eKey.evidence_category === family) {
                     const entry = this.createEntry(eKey);
                     divy.append(entry);
                 }
@@ -2188,7 +2199,7 @@ const VCForm = (function() {
                 let resultDom = this.formatOverall(result);
                 jCritTable.append(evidenceWeightsDom).append(resultDom);
             } else {
-                let overallValue = "";
+                let overallValue;
                 if (score <= -7) {
                     overallValue = "Benign";
                 } else if (score <= -1) {

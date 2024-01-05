@@ -14,17 +14,17 @@ let EKey = (function() {
     
         matchesFilter: function(val) {
             if (val.startsWith('#')) {
-                return val.substring(1) == this.key.toLowerCase();
+                return val.substring(1) === this.key.toLowerCase();
             }
-            if (this.sub_label != null && this.sub_label.toLowerCase().indexOf(val) != -1) {
+            if (this.sub_label != null && this.sub_label.toLowerCase().indexOf(val) !== -1) {
                 return true;
             }
-            return this.key.toLowerCase().indexOf(val) != -1 ||
-                this.label.toLowerCase().indexOf(val) != -1;
+            return this.key.toLowerCase().indexOf(val) !== -1 ||
+                this.label.toLowerCase().indexOf(val) !== -1;
         },
     
         matchingOption: function(val) {
-            var options = this.options || [];
+            let options = this.options || [];
             return options.find(o => {
                 if ((val === '' || val === null) && (!('key' in o) || o.key === '')) {
                     return o;
@@ -36,7 +36,7 @@ let EKey = (function() {
         
         namespace: function() {
             let dividerIndex = this.key.indexOf(':');
-            if (dividerIndex == -1) {
+            if (dividerIndex === -1) {
                 return null;
             } else {
                 return this.key.substring(0, dividerIndex);
@@ -57,7 +57,6 @@ let EKey = (function() {
             if (this.value_type === 'S' || this.value_type === 'C' || this.value_type === 'M') {
                 if (val === null) {
                     // check for special blank option
-                    isBlank = true;
                     let matchingOpt = this.matchingOption(val);
                     if (matchingOpt) {
                         val = matchingOpt.label || EKey.prettyKey(matchingOpt.key);
@@ -305,10 +304,12 @@ var EKeys = (function() {
             if (!namespaces.has("horak")) {
                 namespaces.add("acmg");
             }
+            console.log("Namespaces = ");
+            console.log(namespaces);
 
             return new EKeys(Array.from(this._map.values()).map(ekey => {
                 let config = labConfig[ekey.key];
-                if (config == true || config == false) {
+                if (config === true || config === false) {
                     config = {hide: config};
                 }
                 let exclude_namespace = !namespaces.has(ekey.namespace());
@@ -317,10 +318,23 @@ var EKeys = (function() {
                     config.exclude_namespace = true;
                     config.mandatory = false;   
                 }
+                if (ekey.options && _.some(ekey.options, (input) => {return !!(input.namespace)})) {
+                    config = config || {};
+                    config.config_updates = true;
+                }
                 if (config) {
                     let data = Object.assign({}, ekey, config);
-                    let newkey = new EKey(data, ekey.index);
-                    return newkey;
+                    if (data.config_updates) {
+                        // make deep clone so we don't screw up exclude_namespace for future options
+                        // though in theory that should always be overwritten anyway
+                        config.options = _.cloneDeep(data.options);
+                        for (let option of data.options) {
+                            if (option.namespace) {
+                                option.exclude_namespace = !namespaces.has(option.namespace);
+                            }
+                        }
+                    }
+                    return new EKey(data, ekey.index);
                 } else {
                     return ekey;
                 }
@@ -338,7 +352,7 @@ var EKeys = (function() {
         
         _set(eKey) {
             this._map.set(eKey.key, eKey);
-            this.hasUnknown = this.hasUnknown || eKey.evidence_category == 'U';
+            this.hasUnknown = this.hasUnknown || eKey.evidence_category === 'U';
         },
         
         forEach(funkey) {
@@ -446,7 +460,7 @@ EKeys.levelToIndex = {
 
 EKeys.shareLevelInfo = function(share_level, record, defaultToInstitution) {
     var base = '/static/icons/share_level/';
-    if (!share_level || share_level == 'user') {
+    if (!share_level || share_level === 'user') {
         return { icon: base + 'draft.png', title: 'Last Edited'};
     }
     
@@ -480,7 +494,7 @@ EKeys.shareLevelInfo = function(share_level, record, defaultToInstitution) {
     if (record) {
         let consider_level = EKeys.levelToIndex[share_level] || 0;
         let current_level = EKeys.levelToIndex[record.publish_level] || (defaultToInstitution ? 1 : 0);
-        content.current = current_level == consider_level;
+        content.current = current_level === consider_level;
         content.included = consider_level < current_level;
     }
     return content;
