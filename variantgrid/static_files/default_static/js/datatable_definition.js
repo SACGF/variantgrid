@@ -412,6 +412,14 @@ TableFormat.text = (data, type, row) => {
         return data;
     }
 };
+TableFormat.number = (data, type, row) => {
+    if (data === '' || data === null) {
+        return $('<span/>', {class:'no-value', text:'-'}).prop('outerHTML');
+    } else {
+        // TODO, put in format commas, monospace etc
+        return `<span class="text-number">${data.toLocaleString('en-US')}</span>`;
+    }
+}
 
 TableFormat.linkUrl = (data, type, row) => {
     if (!data) {
