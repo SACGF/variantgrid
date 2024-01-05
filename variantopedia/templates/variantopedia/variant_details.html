@@ -644,7 +644,11 @@ function applyVariantValues() {
                             <div id="other-predictions" class="collapse">
                                 {% labelled id='mutation_taster_pred_most_damaging' label='Mutation Taster' help=annotation_description.mutation_taster_pred_most_damaging hint="tiny" %}{% endlabelled %}
                             </div>
-                        {% elif annotation_version.variant_annotation_version.columns_version == 2 %}
+                        {% elif annotation_version.variant_annotation_version.columns_version >= 2 %}
+                            {% if annotation_version.variant_annotation_version.columns_version >= 3 %}
+                                {% labelled id='alphamissense_rankscore' label='AlphaMissense rankscore' help=annotation_description.alphamissense_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.alphamissense_rankscore }}{% endlabelled %}
+                            {% endif %}
+
                             {% labelled id='bayesdel_noaf_rankscore' label='BayesDel (No AF) rankscore' help=annotation_description.bayesdel_noaf_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.bayesdel_noaf_rankscore }}{% endlabelled %}
                             {% labelled id='cadd_raw_rankscore' label='CADD Raw rankscore' help=annotation_description.cadd_raw_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.cadd_raw_rankscore }}{% endlabelled %}
                             {% labelled id='clinpred_rankscore' label='ClinPred rankscore' help=annotation_description.clinpred_rankscore hint="tiny" value_css="text-monospace" %}{{ variant_annotation.clinpred_rankscore }}{% endlabelled %}
@@ -736,6 +740,9 @@ function applyVariantValues() {
                                 {% labelled id='gnomad_fin_af' label='European (Finnish)' help=annotation_description.gnomad_fin_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_fin_af|format_unit_as_percent }}{% endlabelled %}
                                 {% labelled id='gnomad_nfe_af' label='European (Non-Finnish)' help=annotation_description.gnomad_nfe_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_nfe_af|format_unit_as_percent }}{% endlabelled %}
                                 {% labelled id='gnomad_amr_af' label='Latino' help=annotation_description.gnomad_amr_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_amr_af|format_unit_as_percent }}{% endlabelled %}
+                                {% if annotation_version.variant_annotation_version.columns_version >= 3 %}
+                                    {% labelled id='gnomad_mid_af' label='Middle Eastern' help=annotation_description.gnomad_mid_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_mid_af|format_unit_as_percent }}{% endlabelled %}
+                                {% endif %}
                                 {% labelled id='gnomad_sas_af' label='South Asian' help=annotation_description.gnomad_sas_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_sas_af|format_unit_as_percent }}{% endlabelled %}
                             </div>
                         {% else %}
