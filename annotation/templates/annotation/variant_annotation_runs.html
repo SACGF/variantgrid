@@ -10,6 +10,11 @@
 {% block submenu %}{% menu_bar_annotations %}{% endblock submenu %}
 {% block head %}
 {{ block.super }}
+<style>
+    .card > h4 {
+        margin-left: 16px;
+    }
+</style>
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <script>
