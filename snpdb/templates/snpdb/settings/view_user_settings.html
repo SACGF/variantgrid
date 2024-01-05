@@ -46,53 +46,57 @@
         {% endif %}
 
         <form class='user-settings-form' id="user-settings-form" enctype="multipart/form-data" method="post" action="{{ form_url }}">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="" />
-            {% labelled id="avatar" label="Avatar" %}
-                {% if avatar_details.is_editable %}
-                    {% avatar user  %}
-                    <div id='edit-avatar'></div>
-                    <a class="hover-link" href="javascript:changeAvatar()"><br/>Change avatar</a>
-                {% else %}
-                    {% avatar2 avatar_details %}
-                {% endif %}
-            {% endlabelled %}
-            {% labelled id="user_name" label="Username" %}{{ user.username }}{% endlabelled %}
-            {% if use_oidc %}
-                {% labelled id="first_name" label="First Name" %}{{ user.first_name }}{% endlabelled %}
-                {% labelled id="last_name" label="Last Name" %}{{ user.last_name }}{% endlabelled %}
-                {% labelled id="email" label="Email Address" %}{{ user.email }}{% endlabelled %}
-            {% else %}
-                {% crispy user_form form_helper.horizontal_nested %}
-            {% endif %}
-
-            {% crispy user_contact_form form_helper.horizontal_nested %}
-            {% if user.is_superuser %}
-                {% labelled id="is_admin" label="Admin" %}True{% endlabelled %}
-            {% endif %}
-
-            {% if avatar_details.awards %}
-                {% labelled label="Awards" %}
-                    <div class="list-group">
-                        {% for award in avatar_details.awards.all_awards %}
-                        <div class="list-group-item list-group-item-success" {% if not award.active %}style="opacity:0.6"{% endif %}>
-                            {{ award.icon }} {{ award.award_text }}
-                        </div>
-                        {% endfor %}
-                    </div>
+            <div id="user-profile">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="" />
+                {% labelled id="avatar" label="Avatar" %}
+                    {% if avatar_details.is_editable %}
+                        {% avatar user %}
+                        <div id='edit-avatar'></div>
+                        <a class="hover-link" href="javascript:changeAvatar()"><br/>Change avatar</a>
+                    {% else %}
+                        {% avatar2 avatar_details %}
+                    {% endif %}
                 {% endlabelled %}
-            {% endif %}
+                {% labelled id="user_name" label="Username" %}{{ user.username }}{% endlabelled %}
+                {% if use_oidc %}
+                    {% labelled id="first_name" label="First Name" %}{{ user.first_name }}{% endlabelled %}
+                    {% labelled id="last_name" label="Last Name" %}{{ user.last_name }}{% endlabelled %}
+                    {% labelled id="email" label="Email Address" %}{{ user.email }}{% endlabelled %}
+                {% else %}
+                    {% crispy user_form form_helper.horizontal_nested %}
+                {% endif %}
 
-            {% if group_initial_perm_forms %}
-            {% page_help_embedded "Groups" %}
-                <b>Groups</b>: Speak to your administrator to manage groups. Everyone is a member of the 'public' group, use this to share with everyone.
-            {% end_page_help_embedded %}
+                {% crispy user_contact_form form_helper.horizontal_nested %}
+                {% if user.is_superuser %}
+                    {% labelled id="is_admin" label="Admin" %}True{% endlabelled %}
+                {% endif %}
+            </div>
+            <div id="user-awards">
+                {% if avatar_details.awards %}
+                    {% labelled label="Awards" %}
+                        <div class="list-group">
+                            {% for award in avatar_details.awards.all_awards %}
+                            <div class="list-group-item list-group-item-success" {% if not award.active %}style="opacity:0.6"{% endif %}>
+                                {{ award.icon }} {{ award.award_text }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% endlabelled %}
+                {% endif %}
+            </div>
 
-            <p class="text-info">
-                The settings below are how data is initially shared with your groups.
-                You can change object sharing permissions individually at any time using the "Settings/Permissions" tab
-            </p>
-            <div>
+            <div id="user-group-permissions">
+                {% if group_initial_perm_forms %}
+                {% page_help_embedded "Groups" %}
+                    <b>Groups</b>: Speak to your administrator to manage groups. Everyone is a member of the 'public' group, use this to share with everyone.
+                {% end_page_help_embedded %}
+
+                <p class="text-info">
+                    The settings below are how data is initially shared with your groups.
+                    You can change object sharing permissions individually at any time using the "Settings/Permissions" tab
+                </p>
+
                 <label>Initial group permissions</label>
                 <table class="table">
                     <thead>
@@ -131,7 +135,7 @@
             </div>
             {% else %}
                 <h4>Labs</h4>
-                <ul class="list-group">
+                <ul class="list-group" id="user-labs">
                 {% for _, lab in labs_by_group_name.items %}
                     {% if url_name_visible.view_lab %}
                         <a class='list-group-item list-group-item-action' href="{% url 'view_lab' lab.pk %}">{% lab lab %}</a>
@@ -141,8 +145,10 @@
                 {% endfor %}
                 </ul>
             {% endif %}
-            {% settings_override form=user_settings_form override_level="User" override_source=override_source override_values=override_values %}
-            <input type="submit" class="btn btn-primary" value="Save">
+            <div id="user-settings">
+                {% settings_override form=user_settings_form override_level="User" override_source=override_source override_values=override_values %}
+            </div>
+            <input id="user-save" type="submit" class="btn btn-primary" value="Save">
         </form>
     {% end_ui_register_tab_embedded %}
     {% if url_name_visible.analysis and url_name_visible.user_settings_node_counts_tab %}

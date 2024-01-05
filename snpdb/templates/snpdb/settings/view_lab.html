@@ -32,38 +32,42 @@
                 <form class='lab-settings-form' id="lab-settings-form" enctype="multipart/form-data" method="post" action="{{ form_url }}">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="" />
-                    {% crispy lab_form form_helper.horizontal_nested %}
-
-                    {% if group_initial_perm_form %}
-                        {% page_help_embedded "Groups" %}
-                            <b>Groups</b>: Speak to your administrator to manage groups. Everyone is a member of the 'public' group, use this to share with everyone.
-                        {% end_page_help_embedded %}
-                        <p class="text-info">
-                            The settings below are how data is initially shared with your groups.
-                            You can change object sharing permissions individually at any time using the "Settings/Permissions" tab
-                        </p>
-                        <label>Initial group permissions</label>
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Group</th>
-                                    <th>Read</th>
-                                    <th>Write</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>{{ lab.group }}</td>
-                                    <td>{{ group_initial_perm_form.read }}</td>
-                                    <td>{{ group_initial_perm_form.write }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    {% endif %}
-
-                    {% settings_override form=settings_override_form override_level="Lab" override_source=override_source override_values=override_values %}
+                    <div id="lab-profile">
+                        {% crispy lab_form form_helper.horizontal_nested %}
+                    </div>
+                    <div id="lab-permissions">
+                        {% if group_initial_perm_form %}
+                            {% page_help_embedded "Groups" %}
+                                <b>Groups</b>: Speak to your administrator to manage groups. Everyone is a member of the 'public' group, use this to share with everyone.
+                            {% end_page_help_embedded %}
+                            <p class="text-info">
+                                The settings below are how data is initially shared with your groups.
+                                You can change object sharing permissions individually at any time using the "Settings/Permissions" tab
+                            </p>
+                            <label>Initial group permissions</label>
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Group</th>
+                                        <th>Read</th>
+                                        <th>Write</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>{{ lab.group }}</td>
+                                        <td>{{ group_initial_perm_form.read }}</td>
+                                        <td>{{ group_initial_perm_form.write }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        {% endif %}
+                    </div>
+                    <div id="lab-settings">
+                        {% settings_override form=settings_override_form override_level="Lab" override_source=override_source override_values=override_values %}
+                    </div>
                     {% if has_write_permission %}
-                        <input type="submit" class="btn btn-primary" value="Save">
+                        <input id="lab-save" type="submit" class="btn btn-primary" value="Save">
                     {% endif %}
                 </form>
             {% end_ui_register_tab_embedded %}

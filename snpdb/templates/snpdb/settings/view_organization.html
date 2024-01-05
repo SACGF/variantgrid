@@ -29,14 +29,16 @@
             {% ui_register_tab_embedded label="Org Settings" tab_set="org_tabs" %}
                     <div class="alert alert-info">Only administrators can modify these settings</div>
                     <h4>Organization Details</h4>
-
                     <form class='org-settings-form' id="org-settings-form" enctype="multipart/form-data" method="post" action="{{ form_url }}">
                         {% csrf_token %}
-                        {% crispy organization_form form_helper.horizontal_nested %}
-
-                        {% settings_override form=settings_override_form override_level="Organisation" override_source=override_source override_values=override_values %}
+                        <div id="org-profile">
+                            {% crispy organization_form form_helper.horizontal_nested %}
+                        </div>
+                        <div id="org-settings">
+                            {% settings_override form=settings_override_form override_level="Organisation" override_source=override_source override_values=override_values %}
+                        </div>
                         {% if has_write_permission %}
-                            <input type="submit" class="btn btn-primary" value="Save">
+                            <input id="org-save" type="submit" class="btn btn-primary" value="Save">
                         {% endif %}
                     </form>
 
