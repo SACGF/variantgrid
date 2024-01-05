@@ -1,6 +1,54 @@
 # DO NOT import any models, so keep this safe to be used by migrations
 import contextlib
-from typing import Optional
+from collections import defaultdict
+from typing import Optional, Any
+
+
+class OptionUpdator:
+
+    def __init__(self, e_key):
+        self.e_key = e_key
+        self.options: list[dict] = e_key.options
+        if not self.options:
+            raise ValueError("Evidence key doesn't come with options")
+
+    def set_attributes(self, option_key: str, mandatory: bool = False, **kwargs):
+        matching_options = [option for option in self.options if option.get('key') == option_key]
+        if mandatory and not matching_options:
+            raise ValueError(f"{self.e_key.key} has no option {option_key}")
+        for matching_option in matching_options:
+            matching_option.update(kwargs)
+
+    def ensure_option(self, option_data: dict, update_existing: bool = False):
+        option_key = option_data.get("key")
+        if not option_key:
+            raise ValueError("Option Data must have key of 'key'")
+        matching_options = [option for option in self.options if option.get('key') == option_key]
+        if not matching_options:
+            self.options.append(option_data)
+        elif update_existing:
+            for matching_option in matching_options:
+                matching_option.update(option_data)
+
+    def preferred_order(self, option_keys: list[str]):
+        known_options = set(option_keys)
+
+        options_unknown = [] # maintain the order of options not listed in option_keys and put them at the end.
+        option_dict = defaultdict(list)
+        for option in self.options:
+            option_key = option.get("key")
+            if option_key not in known_options:
+                options_unknown.append(option)
+            else:
+                option_dict[option_key].append(option)
+
+        self.options.clear()
+        for ordered_option in option_keys:
+            self.options.extend(option_dict[ordered_option])
+        self.options.extend(options_unknown)
+
+    def save(self):
+        self.e_key.save()
 
 
 class BulkUpdator:
