@@ -1047,6 +1047,15 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return any(getattr(self, f) is not None for f in extended_fields)
 
     @property
+    def has_hemi(self):
+        return self.version.gnomad.startswith("4") and self.variant.locus.contig.name == 'X'
+
+    @property
+    def has_mid(self):
+        return self.version.gnomad.startswith("4")
+
+
+    @property
     def gnomad_url(self):
         GNOMAD2 = "gnomad_r2_1"
         GNOMAD3 = "gnomad_r3"

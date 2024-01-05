@@ -704,6 +704,10 @@ function applyVariantValues() {
                         {% labelled id='topmed_af' label='TopMed' help=annotation_description.topmed_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.topmed_af|format_unit_as_percent }}{% endlabelled %}
                         {% if variant_annotation.gnomad_url %}
                             {% labelled id='gnomad_af' label='gnomAD Allele Frequency' help=annotation_description.gnomad_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_af|format_unit_as_percent }}{% endlabelled %}
+                            {% if annotation_version.variant_annotation_version.columns_version >= 3 %}
+                                {% labelled id='gnomad_fafmax_faf95_max' label='Grpmax Filtering AF (95% confidence)' help=annotation_description.gnomad_fafmax_faf95_max hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_fafmax_faf95_max|format_unit_as_percent }}{% endlabelled %}
+                            {% endif %}
+
                             {% if variant_annotation.has_extended_gnomad_fields %}
                                 {% labelled id='gnomad_gnomad2_liftover_af' label='Legacy gnomAD 2 liftover AF' help=annotation_description.gnomad_gnomad2_liftover_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad2_liftover_af|format_unit_as_percent }}{% endlabelled %}
                             {% endif %}
@@ -719,6 +723,16 @@ function applyVariantValues() {
                             {% if variant_annotation.has_extended_gnomad_fields %}
                                 {% labelled id='gnomad_ac' label='gnomAD Alt Allele Count' help=annotation_description.gnomad_ac hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_ac }}{% endlabelled %}
                                 {% labelled id='gnomad_an' label='gnomAD Total number of alleles' help=annotation_description.gnomad_an hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_an }}{% endlabelled %}
+                            {% endif %}
+
+                            {% if variant_annotation.has_hemi %}
+                                {% labelled id='gnomad_hemizgotes' label='gnomAD Hemizygotes' help=annotation_description.gnomad_hemi_count hint="tiny" value_css="text-monospace" %}
+                                    {% if variant_annotation.gnomad_non_par %}
+                                        {{ variant_annotation.gnomad_hemi_count }}
+                                    {% else %}
+                                        PAR region
+                                    {% endif %}
+                                {% endlabelled %}
                             {% endif %}
 
                             {% labelled label="View in gnomAD" hint="tiny" %}
@@ -740,7 +754,7 @@ function applyVariantValues() {
                                 {% labelled id='gnomad_fin_af' label='European (Finnish)' help=annotation_description.gnomad_fin_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_fin_af|format_unit_as_percent }}{% endlabelled %}
                                 {% labelled id='gnomad_nfe_af' label='European (Non-Finnish)' help=annotation_description.gnomad_nfe_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_nfe_af|format_unit_as_percent }}{% endlabelled %}
                                 {% labelled id='gnomad_amr_af' label='Latino' help=annotation_description.gnomad_amr_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_amr_af|format_unit_as_percent }}{% endlabelled %}
-                                {% if annotation_version.variant_annotation_version.columns_version >= 3 %}
+                                {% if variant_annotation.has_mid %}
                                     {% labelled id='gnomad_mid_af' label='Middle Eastern' help=annotation_description.gnomad_mid_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_mid_af|format_unit_as_percent }}{% endlabelled %}
                                 {% endif %}
                                 {% labelled id='gnomad_sas_af' label='South Asian' help=annotation_description.gnomad_sas_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_sas_af|format_unit_as_percent }}{% endlabelled %}
