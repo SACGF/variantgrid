@@ -41,7 +41,7 @@ class AnnotationRunColumns(DatatableConfig):
         preview_columns = ["error_exception", "pipeline_stdout", "pipeline_stderr"]
 
         self.rich_columns = [
-            RichColumn(key="id", label='ID', orderable=True, client_renderer='idRenderer'),
+            RichColumn(key="id", label='ID', orderable=True, client_renderer='idRenderer', default_sort=SortOrder.DESC),
             RichColumn(key="status", orderable=True, renderer=self.status),
             RichColumn(key="pipeline_type", orderable=True, renderer=self.pipeline_type),
             RichColumn(key="annotation_range_lock__version__genome_build__name", label='Build', orderable=True),

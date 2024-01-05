@@ -109,6 +109,7 @@
 
                 <div id="build-{{ build_name }}-details" class="card mt-4">
                     <div class="card-header">{{ build_name }}</div>
+                    <div class="card-body">
                         {% ui_register_tabs tab_set=build_name %}
                         {% for vav, field_counts in vav_field_counts.items %}
                             {% ui_register_tab_embedded tab_set=build_name label=vav.short_string %}
@@ -134,6 +135,7 @@
                         {% endfor %}
                         {% ui_render_tabs tab_set=build_name %}
                     </div>
+                </div>
             </form>
         {% endfor %}
         <div class="mt-4">
