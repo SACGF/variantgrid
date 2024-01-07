@@ -231,12 +231,14 @@ $(document).ready(function() {
     addCreateProjectButtonAndForm();
 
     const dialog = setupCreatePatientDialog();
+{% if has_write_permission %}
     $(".sample-patient select", "form#vcf-form").each(function () {
         const parentRow = $(this).parents("tr");
         const sampleNameCell = $(".sample-name", parentRow);
         const sampleName = $("input", sampleNameCell).val();
         addCreatePatientButton(dialog, $(this), sampleName, ".sample-patient");
     });
+{% endif %}
 
     drawZygosityGraphs();
 
