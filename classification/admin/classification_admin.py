@@ -527,6 +527,7 @@ class EvidenceKeyAdmin(ModelAdminBasics):
         ('Basic', {'fields': ('key', 'label', 'sub_label')}),
         ('Position', {'fields': ('hide', 'evidence_category', 'order')}),
         ('Type', {'fields': ('mandatory', 'value_type', 'options', 'allow_custom_values', 'default_crit_evaluation', 'crit_allows_override_strengths', 'crit_uses_points')}),
+        ('Overrides', {'fields': ('namespace_overrides', )}),
         ('Help', {'fields': ('description', 'examples', 'see')}),
         ('Admin', {'fields': ('max_share_level', 'copy_consensus', 'variantgrid_column', 'immutable')})
     )

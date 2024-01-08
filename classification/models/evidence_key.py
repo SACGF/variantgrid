@@ -169,6 +169,8 @@ class EvidenceKey(TimeStampedModel):
     allow_custom_values = models.BooleanField(default=False, null=False, blank=True)
     hide = models.BooleanField(default=False, null=False, blank=True)
 
+    namespace_overrides = models.JSONField(null=True, blank=True)
+
     immutable = models.BooleanField(default=False, null=False, blank=True)
 
     copy_consensus = models.BooleanField(default=True, null=False, blank=True)
@@ -444,6 +446,7 @@ class EvidenceKey(TimeStampedModel):
         return strip_json({
             'key': self.key,
             'allow_custom_values': self.allow_custom_values,
+            'namespace_overrides': self.namespace_overrides,
             'order': self.order,
             'label': self.label,
             'sub_label': self.sub_label,

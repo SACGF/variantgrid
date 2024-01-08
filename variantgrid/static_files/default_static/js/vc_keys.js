@@ -318,23 +318,29 @@ var EKeys = (function() {
                     config.exclude_namespace = true;
                     config.mandatory = false;   
                 }
+                if (ekey.namespace_overrides) {
+                    config = config || {};
+                    for (let namespace of namespaces) {
+                        let namespace_config = ekey.namespace_overrides[namespace];
+                        if (namespace_config) {
+                            config = Object.assign(config, namespace_config)
+                        }
+                    }
+                    config.config_updates = true;
+                }
                 if (ekey.options && _.some(ekey.options, (input) => {return !!(input.namespace)})) {
                     config = config || {};
                     config.config_updates = true;
-                }
-                if (config) {
-                    let data = Object.assign({}, ekey, config);
-                    if (data.config_updates) {
-                        // make deep clone so we don't screw up exclude_namespace for future options
-                        // though in theory that should always be overwritten anyway
-                        config.options = _.cloneDeep(data.options);
-                        for (let option of data.options) {
-                            if (option.namespace) {
-                                option.exclude_namespace = !namespaces.has(option.namespace);
-                            }
+                    config.options = _.cloneDeep(ekey.options);
+                    for (let option of config.options) {
+                        if (option.namespace) {
+                            option.exclude_namespace = !namespaces.has(option.namespace);
                         }
                     }
-                    return new EKey(data, ekey.index);
+                }
+                if (config) {
+                    let ekeyWithConfig = Object.assign({}, ekey, config);
+                    return new EKey(ekeyWithConfig, ekey.index);
                 } else {
                     return ekey;
                 }
@@ -342,7 +348,7 @@ var EKeys = (function() {
         },
     
         key(key) {
-            var eKey = this._map.get(key);
+            let eKey = this._map.get(key);
             if (!eKey) {
                 eKey = new EKey({key: key}, this._map.length);
                 this._set(eKey);
