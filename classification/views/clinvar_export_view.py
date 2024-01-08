@@ -292,6 +292,7 @@ class ClinVarExportSummaryData:
     batch_ids: Optional[List[int]]
 
 
+@dataclass(frozen=True)
 class ClinVarExportSummary(ExportRow):
 
     clinvar_export: ClinVarExport
