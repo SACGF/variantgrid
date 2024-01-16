@@ -2,7 +2,7 @@ import dataclasses
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, List, Tuple, Dict, Set
+from typing import Optional, List, Tuple, Dict, Set, Iterable, Any
 
 from avatar.templatetags.avatar_tags import avatar_url
 from dateutil.tz import gettz
@@ -173,12 +173,18 @@ class SettingsOverride(models.Model):
                                    help_text="Port to connect to IGV on your machine")
     default_genome_build = models.ForeignKey(GenomeBuild, on_delete=SET_NULL, null=True, blank=True,
                                              help_text="Used for search (jump to result if that is the only one for this build) and populating defaults everywhere")
-    default_allele_origin = models.CharField(
+    allele_origin_focus = models.CharField(
         max_length=1,
-        choices=AlleleOriginFilterDefault.choices,
+        choices=[(member.value, member.label) for member in [AlleleOriginFilterDefault.GERMLINE, AlleleOriginFilterDefault.SOMATIC]],
         null=True,
         blank=True,
-        help_text="Automatically filters most pages to default filter to germline or somatic if either of those options are chosen")
+        help_text="Your primary focus when it comes to allele origin")
+
+    allele_origin_exclude_filter = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Should records not for your allele origin focus be excluded out by default"
+    )
 
     timezone = models.TextField(null=True, blank=True,
                                 help_text="Time/date used in classification download")
@@ -347,7 +353,24 @@ class UserSettings:
     import_messages: bool
     igv_port: bool
     default_genome_build: GenomeBuild
-    default_allele_origin: AlleleOriginFilterDefault
+    # default_allele_origin: AlleleOriginFilterDefault
+    allele_origin_focus: AlleleOriginFilterDefault
+    allele_origin_exclude_filter: bool
+    timezone: str
+
+    @staticmethod
+    def parse_value(field_name: str, value: Any) -> Any:
+        if field_name == "allele_origin_focus" and isinstance(value, str):
+            value = AlleleOriginFilterDefault(value)
+        return value
+
+    @property
+    def default_allele_origin(self) -> AlleleOriginFilterDefault:
+        if self.allele_origin_exclude_filter:
+            return self.allele_origin_focus
+        else:
+            return AlleleOriginFilterDefault.SHOW_ALL
+
     default_lab: Optional[Lab]
     oauth_sub: str
     timezone: str
@@ -409,6 +432,9 @@ class UserSettings:
             for f in override_fields:
                 val = getattr(so, f, None)
                 if val is not None and val != '':
+                    # could do this in a more generic way, but allele origin focus is the only enum
+                    val = UserSettings.parse_value(f, val)
+
                     kwargs[f] = val
         return UserSettings(**kwargs)
 
@@ -448,16 +474,16 @@ class UserSettings:
         return self.get_override_source_and_values(override_fields, parent_overrides)
 
     @staticmethod
-    def get_override_source_and_values(override_fields, parent_overrides) -> Tuple[Dict[str, str], Dict[str, str]]:
+    def get_override_source_and_values(override_fields: Iterable[str], parent_overrides: Iterable[SettingsOverride]) -> Tuple[Dict[str, str], Dict[str, str]]:
         override_source = {}
         override_values = {}
         for so in parent_overrides:
             source = str(so)
             for f in override_fields:
                 val = getattr(so, f, None)
-                if val is not None:
+                if val is not None and val != '':
                     override_source[f] = source
-                    override_values[f] = val
+                    override_values[f] = UserSettings.parse_value(f, val)
         return override_source, override_values
 
     def get_lab(self):

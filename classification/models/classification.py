@@ -2499,7 +2499,7 @@ class ClassificationConsensus:
     def all_consensus_candidates(allele: Allele, user: User) -> ['ClassificationConsensus']:
         us = UserSettingsManager.get_user_settings(user)
 
-        default_allele_origin_filter = AlleleOriginFilterDefault(us.default_allele_origin)
+        default_allele_origin_filter = us.allele_origin_focus
         default_allele_origin_bucket: Optional[AlleleOriginBucket] = None
         if default_allele_origin_filter.value in (AlleleOriginBucket.GERMLINE.value, AlleleOriginBucket.SOMATIC.value):
             default_allele_origin_bucket = AlleleOriginBucket(default_allele_origin_filter.value)
