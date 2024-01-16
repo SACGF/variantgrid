@@ -11,3 +11,5 @@ LabNameLocations.csv
 dump.rdb
 watcherTasks.xml
 /sapath
+env/
+variantgrid/settings/env_developers/

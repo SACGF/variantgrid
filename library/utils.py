@@ -608,6 +608,10 @@ class ArrayLength(models.Func):
     function = 'CARDINALITY'
 
 
+class AsciiValue(models.Func):
+    function = 'ASCII'
+
+
 @dataclass(frozen=True)
 class DebugTime:
     description: str

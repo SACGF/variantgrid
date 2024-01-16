@@ -1,8 +1,11 @@
 import csv
+from time import sleep
 from typing import Optional
 
 import cyvcf2
 from django.conf import settings
+from django.db import IntegrityError
+from django.db.models import Max
 import logging
 import os
 
@@ -12,10 +15,10 @@ from library.git import Git
 from library.postgres_utils import postgres_arrays
 import numpy as np
 
-from library.utils import double_quote
+from library.utils import double_quote, AsciiValue
 from library.vcf_utils import VCFConstant
 from patients.models_enums import Zygosity
-from snpdb.models import CohortGenotype
+from snpdb.models import CohortGenotype, VCFFilter
 from snpdb.models.models_enums import ProcessingStatus
 from upload.models import UploadPipeline, PipelineFailedJobTerminateEarlyException, \
     VCFImporter, UploadStep, UploadStepTaskType, VCFPipelineStage
@@ -129,9 +132,47 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     def convert_filters(self, vcf_filter) -> Optional[str]:
         filters = None
         if vcf_filter and vcf_filter != '.':  # FORMAT filters can be '.'
-            filters_iter = (self.vcf_filter_map[f] for f in vcf_filter.split(";"))
-            filters = ''.join(sorted(filters_iter))
+            filter_codes = []
+            for filter_id in vcf_filter.split(";"):
+                filter_code = self.vcf_filter_map.get(filter_id)
+                if filter_code is None:
+                    filter_code = self._add_undeclared_filter_code(filter_id)
+                filter_codes.append(filter_code)
+
+            filters = ''.join(sorted(filter_codes))
         return filters
+
+    def _add_undeclared_filter_code(self, filter_id: str) -> str:
+        # Because we split files - it may be possible an undeclared code would have been already added
+        # In another worker - so re-check from DB
+        max_attempts = 2
+        filter_code = None
+
+        for attempt in range(max_attempts):
+            self.vcf_filter_map = self.vcf.get_filter_dict()
+            if filter_code := self.vcf_filter_map.get(filter_id):
+                return filter_code
+
+            data = self.vcf.vcffilter_set.aggregate(max_ascii=Max(AsciiValue("filter_code")))
+            if existing_max := data.get("max_ascii"):
+                filter_code_id = existing_max + 1
+                if chr(filter_code_id) in "',\"":
+                    filter_code_id += 1  # Skip these as it causes quoting issues
+            else:
+                filter_code_id = VCFFilter.ASCII_MIN
+            filter_code = chr(filter_code_id)
+
+            try:
+                VCFFilter.objects.create(vcf=self.vcf,
+                                         filter_code=filter_code,
+                                         filter_id=filter_id,
+                                         description="Undeclared filter")
+                self.vcf_filter_map[filter_id] = filter_code
+                return filter_code
+            except IntegrityError:
+                sleep(1)
+
+        raise ValueError(f"Could not create undeclared filter {filter_id=}/{filter_code=} after {max_attempts=}")
 
     @staticmethod
     def get_ref_alt_allele_depth_default(variant):
