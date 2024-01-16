@@ -796,6 +796,7 @@ const VCForm = (function() {
                     this.dataUpdated();
                 },
                 success: (record) => {
+                    console.log("Success in post");
                     if (record.deleted) {
                         this.deleted = true;
                         document.location.href = '../../../../classification/classifications';
@@ -824,10 +825,6 @@ const VCForm = (function() {
                     }
                     
                     this.publish_level = null;
-                    this.updateSendingStatus({
-                        sending: false, modifications: Object.keys(this.delta).length > 0,
-                        error: null
-                    });
                     record.evidence = this.record.evidence;
                     this.record = record;
                     this.messages = record.messages || [];
@@ -851,7 +848,12 @@ const VCForm = (function() {
                     if (updateSet.size) {
                         this.populateForm(updateSet);
                     }
-                    
+
+                    this.updateSendingStatus({
+                        sending: false, modifications: Object.keys(this.delta).length > 0,
+                        error: null
+                    });
+
                     this.updatePublishHistory();
                     this.updateLinks();
                     this.updateErrors();
@@ -878,6 +880,7 @@ const VCForm = (function() {
         },
 
         updateTitle() {
+            console.log("Updating title");
 
             let appendLabelHeading = (label, valueElement) => {
                 return $('<div>', {class: 'row no-gutters', html:[
@@ -959,7 +962,11 @@ const VCForm = (function() {
             appendLabelHeadingForKey(SpecialEKeys.ASSERTION_METHOD, true, "Method")
 
             if (this.record.resolved_condition) {
-                appendLabelHeading('Condition', VCForm.format_condition(this.record.resolved_condition));
+                let label = "Condition";
+                if (alleleOriginBucket === "S") {
+                    label = "Cancer";
+                }
+                appendLabelHeading(label, VCForm.format_condition(this.record.resolved_condition));
             }
 
             appendLabelHeadingForKey(SpecialEKeys.CLINICAL_SIGNIFICANCE, true, 'Class.');
