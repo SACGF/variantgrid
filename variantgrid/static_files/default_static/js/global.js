@@ -83,6 +83,15 @@ function enhanceAndMonitor() {
         // load ajax blocks as soon as we see them
         {test: '[data-toggle="ajax"]', func: (node) => {loadAjaxBlock(node);}},
 
+        {test: '[data-toggle="collapse"]', func: (node) => {
+            let href = $(node).attr('href');
+            let target = $(href);
+            target.on('show.bs.collapse', () => {alterAjaxCount(1, "toggle show start")});
+            target.on('shown.bs.collapse', () => {alterAjaxCount(-1, "toggle show end")});
+            target.on('hide.bs.collapse', () => {alterAjaxCount(1, "toggle hide start")});
+            target.on('hidden.bs.collapse', () => {alterAjaxCount(-1, "toggle hide end")})
+        }},
+
         {test: '[data-toggle="embed-content"]', func: (node) => {
             let $node = $(node);
             let url = $node.attr('href');
@@ -569,6 +578,23 @@ function cardToModal(content) {
     }
 }
 
+function setupModalAnimationForWebTesting(modalContent) {
+    // this causes the counter used by web testing to increment/decrement when modal dialogs open/close
+    // so we don't capture screenshots while a dialog is animating
+    modalContent.on('hide.bs.modal', function() {
+       alterAjaxCount(1, 'modal: hide start');
+    });
+    modalContent.on('hidden.bs.modal', function() {
+       alterAjaxCount(-1, 'modal: hide end');
+    });
+    modalContent.on('show.bs.modal', function() {
+       alterAjaxCount(1, 'modal: show start');
+    });
+    modalContent.on('shown.bs.modal', function() {
+       alterAjaxCount(-1, 'modal: show end');
+    });
+}
+
 function loadAjaxModal(linkDom, size) {
     let url = linkDom.attr('data-href') || linkDom.attr('href');
     let useId = url.replace('/', '_');
@@ -596,28 +622,29 @@ function loadAjaxModal(linkDom, size) {
 
 let activeAjaxLoading = 0;
 
-function alterAjaxCount(delta) {
+function alterAjaxCount(delta, comment) {
     activeAjaxLoading += delta;
     if (activeAjaxLoading === 0) {
         $('body').attr('data-ajax', "000");
     } else {
         $('body').attr('data-ajax', activeAjaxLoading);
     }
+    // console.log(`Adjusting ajax count by ${delta} to ${activeAjaxLoading} for ${comment}`);
 }
 
 $(document).ready(() => {
-    alterAjaxCount(0);
+    alterAjaxCount(0, "Page loaded");
 });
 
 $(document).on("ajaxStart", () => {
-    alterAjaxCount(1);
+    alterAjaxCount(1, "ajaxStart");
 });
 
 $(document).on("ajaxStop", () => {
     // give 100ms timeout before reducing ajaxCount, in case there's some JavaScript to run & animate etc when it finished
     window.setTimeout(
-        () => {alterAjaxCount(-1)},
-        350);
+        () => {alterAjaxCount(-1, "ajaxEnd")},
+        200); // timeout was 350, but now we have timeout on spinners and modals, so can put a small buffer on this
 });
 
 function loadAjaxBlock(dom, url) {
@@ -636,6 +663,7 @@ function loadAjaxBlock(dom, url) {
     // give ajax 300 ms to load before we start showing the spinner
     let spinnerTimeout = window.setTimeout(() => {
         showingOverlay = true;
+        alterAjaxCount(1, "spinner show");
         dom.LoadingOverlay('show', {zIndex: 100000});
     }, 300);
 
@@ -659,6 +687,10 @@ function loadAjaxBlock(dom, url) {
         complete: (jqXHR, textStatus) => {
             if (showingOverlay) {
                 dom.LoadingOverlay('hide');
+                window.setTimeout(() => {
+                    alterAjaxCount(-1, "spinner hide");
+                    // default fade out time is 200ms, so an extra 50ms should be plenty
+                }, 250);
             }
             window.clearTimeout(spinnerTimeout);
         }
@@ -1024,7 +1056,7 @@ function highlightTextAsDom(value, full_text) {
 
 // Dialogs
 function createModalShell(id, title, size="xl") {
-    return $(`
+    let modalShell = $(`
         <div class="modal fade" id="${id}" tabindex="-1" role="dialog" aria-labelledby="${id}Label" aria-hidden="true">
             <div class="modal-dialog modal-${size}" role="document">
                 <div class="modal-content">
@@ -1042,6 +1074,8 @@ function createModalShell(id, title, size="xl") {
             </div>
         </div>
     `);
+    setupModalAnimationForWebTesting(modalShell);
+    return modalShell;
 }
 
 function createModal(id, title, body) {

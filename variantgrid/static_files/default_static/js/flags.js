@@ -690,6 +690,7 @@ let Flags = (function () {
                         </div>
                     </div>
                 `);
+                setupModalAnimationForWebTesting(modalContent);
                 modalContent.find('.modal-header').html(`
                     <nav aria-label="breadcrumb">
                       <ol class="breadcrumb"></ol>

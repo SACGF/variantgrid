@@ -373,7 +373,10 @@ class ModalTag(template.Node):
                     </div>
                 </div>
             """
-        return link + modal
+
+        script = f'<script>setupModalAnimationForWebTesting($("#{id_str}"))</script>'
+
+        return link + modal + script
 
 
 @register.filter()
