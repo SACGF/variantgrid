@@ -71,9 +71,14 @@ def email_health_check(sender, health_request: HealthCheckRequest, **kwargs):
     if count := recent_emails.count():
         subject_counts = Counter(email.subject for email in recent_emails)
 
-        email_subj = ", ".join(
-            f"{subject} x *{count}*" if count > 1 else subject for subject, count in subject_counts.items()
-        )
+        if len(subject_counts) <= 10:
+            email_subj = ", ".join(
+                f"{subject} x *{count}*" if count > 1 else subject for subject, count in subject_counts.items()
+            )
+        else:
+            # admin can go into the product to get more details if they need, otherwise risks overflowing
+            # Slack if there's a giant number of emails
+            email_subj = f"across {len(subject_counts)} different email subjects"
 
         return HealthCheckRecentActivity(
             emoji=":email:",
