@@ -293,9 +293,9 @@ class ImportedAlleleInfoValidation(TimeStampedModel):
         if validation_tags_list := self.validation_tags_list:
             tag_string = "\n".join([str(tag) for tag in validation_tags_list])
 
-        output = f"Include : {self.include}\nConfirmed : {self.confirmed}\n{tag_string}"
+        output = f"Include : {self.include}\nConfirmed : {self.confirmed}\n{tag_string}".strip()
         if self.confirmed_by_note:
-            output += f"CONFIRMED BY NOTE: \"{self.confirmed_by_note}\""
+            output = f"CONFIRMED BY NOTE: \"{self.confirmed_by_note}\"\n" + output
         return output
 
     @property
