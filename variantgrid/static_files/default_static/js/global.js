@@ -629,7 +629,7 @@ function alterAjaxCount(delta, comment) {
     } else {
         $('body').attr('data-ajax', activeAjaxLoading);
     }
-    // console.log(`Adjusting ajax count by ${delta} to ${activeAjaxLoading} for ${comment}`);
+    console.log(`Adjusting ajax count by ${delta} to ${activeAjaxLoading} for ${comment}`);
 }
 
 $(document).ready(() => {
@@ -646,6 +646,11 @@ $(document).on("ajaxStop", () => {
         () => {alterAjaxCount(-1, "ajaxEnd")},
         200); // timeout was 350, but now we have timeout on spinners and modals, so can put a small buffer on this
 });
+
+function setGlobalDebugMessage(message) {
+    let messageBox = $('<div>', {class: 'site-message border rounded m-2 p-2 bg-light severity-warning', html: message});
+    $('#global-debug-message').html(messageBox);
+}
 
 function loadAjaxBlock(dom, url) {
     if (!url) {
