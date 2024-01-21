@@ -27,7 +27,14 @@
                 style: "display:flex; position: relative; top: -12px; left: 6px",
                 html:[
                 bucket_dom,
-                data.id
+                "CE_" + data.id
+            ]}).prop('outerHTML');
+        }
+        function batchId(data, type, row) {
+            return $('<div>', {
+                style: "display:flex; position: relative; top: -12px; left: 12px",
+                html:[
+                "CB_" + data
             ]}).prop('outerHTML');
         }
         function renderStatus(data, type, row) {

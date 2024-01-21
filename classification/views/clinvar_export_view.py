@@ -26,7 +26,7 @@ from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path, require_superuser, RequireSuperUserView
 from library.utils import html_to_text, export_column, ExportRow, local_date_string, ExportDataType, JsonDataType
-from ontology.models import OntologyTerm, AncestorCalculator
+from ontology.models import OntologyTerm, AncestorCalculator, OntologyTermRelation
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import ClinVarKey, Lab, Allele, GenomeBuild
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
@@ -42,12 +42,15 @@ class ClinVarExportBatchColumns(DatatableConfig):
     def render_status(self, row: CellData):
         return ClinVarExportBatchStatus(row['status']).label
 
+    def batch_id(self, row: CellData):
+        return row['id']
+
     def __init__(self, request):
         super().__init__(request)
 
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_batch_detail', expected_height=120)
         self.rich_columns = [
-            RichColumn("id", label="ID", orderable=True, default_sort=SortOrder.DESC),
+            RichColumn("id", label="ID", orderable=True, renderer=self.batch_id, client_renderer='batchId', default_sort=SortOrder.DESC),
             RichColumn("clinvar_key", label="ClinVar Key", orderable=True, enabled=False),
             RichColumn("allele_origin_bucket", label="Allele Origin", orderable=True, client_renderer="render_allele_origin_bucket"),
             RichColumn("created", client_renderer='TableFormat.timestamp', orderable=True),
@@ -110,6 +113,9 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
                 # filter rather than just return submissions to make sure user has permission to see items that belong to the batch
                 # also make sure an individual export doesn't have the batch ID
                 return qs.filter(Q(pk__in=submissions) | Q(pk=batch_id))
+            elif search_string.upper().startswith("CE_"):
+                batch_id = search_string[3:]
+                return qs.filter(Q(pk=batch_id))
 
             # if searcing a ClinGenAlleleID
             elif search_string.upper().startswith("CA"):
@@ -253,7 +259,7 @@ def clinvar_export_review(request: HttpRequest, clinvar_export_id: int) -> HttpR
         add_save_message(request, valid=True, name="ClinVarExport")
         return redirect(clinvar_export)
 
-    common_condition: Set[OntologyTerm] = None
+    common_condition: Optional[OntologyTerm] = None
     clinvar_exports_for_allele = list(ClinVarExport.objects.filter(
         clinvar_allele_id=clinvar_export.clinvar_allele_id
     ).exclude(pk=clinvar_export_id).all())
@@ -261,7 +267,9 @@ def clinvar_export_review(request: HttpRequest, clinvar_export_id: int) -> HttpR
         all_condition_terms: Set[OntologyTerm] = set()
         clinvar_exports_for_allele.append(clinvar_export)
         for clinvar_allele in clinvar_exports_for_allele:
-            all_condition_terms.update(set(clinvar_allele.condition_resolved.terms))
+            for term in clinvar_allele.condition_resolved.terms:
+                if mondo := OntologyTermRelation.as_mondo(term):
+                    all_condition_terms.add(mondo)
 
         clinvar_exports_for_allele = sorted(clinvar_exports_for_allele, key=lambda cve: cve.pk)
         common_condition = AncestorCalculator.common_ancestor(all_condition_terms)
@@ -313,7 +321,7 @@ class ClinVarExportSummary(ExportRow):
 
     @export_column("ID")
     def _id(self):
-        return self.clinvar_export.id
+        return self.clinvar_export.clinvar_export_id
 
     @export_column("ClinVar Export URL")
     def _clinvar_export_url(self):

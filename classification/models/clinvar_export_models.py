@@ -148,6 +148,10 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
     def __repr__(self):
         return str(self)
 
+    @property
+    def clinvar_export_id(self):
+        return f"CE_{self.id}"
+
     @cached_property
     def _condition_resolved(self) -> ConditionResolved:
         return ConditionResolved.from_dict(self.condition)
@@ -284,6 +288,10 @@ class ClinVarExportBatch(TimeStampedModel):
                 }
             }]
         }
+
+    @property
+    def clinvar_batch_id(self):
+        return f"CB_{self.id}"
 
     def requests(self) -> Iterable['ClinVarExportRequest']:
         return self.clinvarexportrequest_set.order_by('created')
