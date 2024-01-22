@@ -24,6 +24,8 @@ class PopulationNode(AnalysisNode):
     # highest in gnomAD - for diff groups see PopulationNodeGnomADPopulation below
     gnomad_af = models.BooleanField(default=True)
     gnomad_popmax_af = models.BooleanField(default=False)
+    gnomad_fafmax_faf95_max = models.BooleanField(default=False)
+    gnomad_fafmax_faf99_max = models.BooleanField(default=False)
     gnomad_hom_alt_max = models.IntegerField(null=True, blank=True)
     show_gnomad_filtered = models.BooleanField(default=True)
     af_1kg = models.BooleanField(default=True)
@@ -35,11 +37,16 @@ class PopulationNode(AnalysisNode):
     internal_percent = models.FloatField(default=EVERYTHING)
     keep_internally_classified_pathogenic = models.BooleanField(default=True)
 
-    POPULATION_DATABASE_FIELDS = ["gnomad_af", "gnomad_popmax_af", "af_1kg", "af_uk10k", "topmed_af"]
-
     @property
     def filtering_by_population(self):
         return self.percent != self.EVERYTHING
+
+    @property
+    def population_database_fields(self) -> List[str]:
+        fields = ["gnomad_af", "gnomad_popmax_af", "af_1kg", "af_uk10k", "topmed_af"]
+        if self.columns_version >= 3:
+            fields += ["gnomad_fafmax_faf95_max", "gnomad_fafmax_faf99_max"]
+        return fields
 
     def modifies_parents(self):
         return any([self.filtering_by_population, self.use_internal_counts,
@@ -66,7 +73,7 @@ class PopulationNode(AnalysisNode):
         and_q = []
         if self.filtering_by_population:
             population_databases = []
-            for field in self.POPULATION_DATABASE_FIELDS:
+            for field in self.population_database_fields:
                 if getattr(self, field):
                     population_databases.append(field)
 
@@ -193,7 +200,7 @@ class PopulationNode(AnalysisNode):
         if self.modifies_parents():
             filters = []
             max_allele_frequency = self.percent / 100
-            for field in self.POPULATION_DATABASE_FIELDS:
+            for field in self.population_database_fields:
                 if getattr(self, field):
                     filters.append(f'{field} <= {max_allele_frequency:g}')
 

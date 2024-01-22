@@ -467,6 +467,10 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         write_sql_to_variant_collection(variant_collection, sql)
 
     @cached_property
+    def columns_version(self):
+        return self.analysis.annotation_version.variant_annotation_version.columns_version
+
+    @cached_property
     def node_version(self):
         return NodeVersion.get(self)
 

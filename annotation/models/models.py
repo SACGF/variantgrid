@@ -575,7 +575,7 @@ class VariantAnnotationVersion(SubVersionPartition):
         description = ""
         if self.columns_version == 1:
             description = f"Count of {columns} at the most damaging level."
-        elif self.columns_version == 2:
+        elif self.columns_version >= 2:
             description = f"Count of {columns} that exceed {settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE}"
         return description
 

@@ -307,6 +307,8 @@ class DamageNodeForm(BaseNodeForm):
             'metalr_rankscore_min': HiddenInput(attrs={"min": 0, "max": 1, "step": 0.05}),
             'revel_rankscore_min': HiddenInput(attrs={"min": 0, "max": 1, "step": 0.05}),
             'vest4_rankscore_min': HiddenInput(attrs={"min": 0, "max": 1, "step": 0.05}),
+            # Columns v3
+            'alphamissense_rankscore_min': HiddenInput(attrs={"min": 0, "max": 1, "step": 0.05}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -660,7 +662,8 @@ class PopulationNodeForm(BaseNodeForm):
 
     class Meta:
         model = PopulationNode
-        fields = ('percent', 'group_operation', 'gnomad_af', 'gnomad_popmax_af', 'af_1kg', 'af_uk10k', 'topmed_af',
+        fields = ('percent', 'group_operation', 'gnomad_af', 'gnomad_popmax_af',
+                  'gnomad_fafmax_faf95_max', 'gnomad_fafmax_faf99_max', 'af_1kg', 'af_uk10k', 'topmed_af',
                   'gnomad_hom_alt_max', 'show_gnomad_filtered', 'zygosity', 'use_internal_counts', 'max_samples',
                   'internal_percent', 'keep_internally_classified_pathogenic')
         widgets = {'gnomad_hom_alt_max': WIDGET_INTEGER_MIN_0,

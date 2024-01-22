@@ -89,9 +89,21 @@ function showGnomadPopulations() {
         <div>
             <a target='_blank' href='http://gnomad.broadinstitute.org/about'>gnomAD</a> <i>138,632 individual genomes/exomes.</i>
             <div id="gnomad-options">
+                <div>
                 <span>{{ form.gnomad_af }} <i>AF (average)</i></span>
                 <span>{{ form.gnomad_popmax_af }} <i>Popmax (Highest sub-pop frequency)</i>  </span>
-                <a id='show-gnomad-populations-link' href='javascript:showGnomadPopulations()'>Pick individual gnomAD populations</a>
+                </div>
+
+                {% if node.columns_version >= 3 %}
+                <div>
+                <span>{{ form.gnomad_fafmax_faf95_max }} <i>Filtering Allele Frequency (95% confidence)</i>  </span>
+                <span>{{ form.gnomad_fafmax_faf99_max }} <i>Filtering Allele Frequency (99% confidence)</i>  </span>
+                </div>
+                {% endif %}
+                <div>
+                    <a id='show-gnomad-populations-link' href='javascript:showGnomadPopulations()'>Pick individual gnomAD populations</a>
+                </div>
+
                 <div id='gnomad-populations' class='hidden'>
                 {{ form.gnomad_population }}
                 </div>
@@ -109,7 +121,6 @@ function showGnomadPopulations() {
 
         <div id='db-restrictions-container'>
             <h3>Internal Population Frequency</h3>
-
 
             Filter based on samples in this database {{ form.use_internal_counts }}
             <div id='internal-population-container' class='hidden'>

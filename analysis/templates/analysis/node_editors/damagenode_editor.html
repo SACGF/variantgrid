@@ -71,13 +71,17 @@
         {% if node.columns_version == 1 %}
             setupSlider($("#id_cadd_score_min"), $("#cadd-slider"), $("input#enable-cadd"));
             setupSlider($("#id_revel_score_min"), $("#revel-slider"), $("input#enable-revel"));
-        {% elif node.columns_version == 2 %}
-        setupSlider($("#id_bayesdel_noaf_rankscore_min"), $("#bayesdel_noaf_rankscore-slider"), $("input#enable-bayesdel_noaf_rankscore"));
-        setupSlider($("#id_cadd_raw_rankscore_min"), $("#cadd_raw_rankscore-slider"), $("input#enable-cadd_raw_rankscore"));
-        setupSlider($("#id_clinpred_rankscore_min"), $("#clinpred_rankscore-slider"), $("input#enable-clinpred_rankscore"));
-        setupSlider($("#id_metalr_rankscore_min"), $("#metalr_rankscore-slider"), $("input#enable-metalr_rankscore"));
-        setupSlider($("#id_revel_rankscore_min"), $("#revel_rankscore-slider"), $("input#enable-revel_rankscore"));
-        setupSlider($("#id_vest4_rankscore_min"), $("#vest4_rankscore-slider"), $("input#enable-vest4_rankscore"));
+        {% elif node.columns_version >= 2 %}
+            {% if node.columns_version >= 3 %}
+                setupSlider($("#id_alphamissense_rankscore_min"), $("#alphamissense_rankscore-slider"), $("input#enable-alphamissense_rankscore"));
+            {% endif %}
+
+            setupSlider($("#id_bayesdel_noaf_rankscore_min"), $("#bayesdel_noaf_rankscore-slider"), $("input#enable-bayesdel_noaf_rankscore"));
+            setupSlider($("#id_cadd_raw_rankscore_min"), $("#cadd_raw_rankscore-slider"), $("input#enable-cadd_raw_rankscore"));
+            setupSlider($("#id_clinpred_rankscore_min"), $("#clinpred_rankscore-slider"), $("input#enable-clinpred_rankscore"));
+            setupSlider($("#id_metalr_rankscore_min"), $("#metalr_rankscore-slider"), $("input#enable-metalr_rankscore"));
+            setupSlider($("#id_revel_rankscore_min"), $("#revel_rankscore-slider"), $("input#enable-revel_rankscore"));
+            setupSlider($("#id_vest4_rankscore_min"), $("#vest4_rankscore-slider"), $("input#enable-vest4_rankscore"));
         {% endif %}
 
         if (showRequiredFilter) {
@@ -203,7 +207,27 @@
                     <td class="collapse filter-required">{{ form.revel_score_required }}</td>
                     <td class="collapse filter-required">{{ form.revel_score_allow_null }}</td>
                 </tr>
-            {% elif node.columns_version == 2 %}
+            {% elif node.columns_version >= 2 %}
+                {% if node.columns_version >= 3 %}
+                    <tr class="individual-pathogenic-prediction">
+                        <th>{{ form.alphamissense_rankscore_min.label }}</th>
+                        <td>{{ form.alphamissense_rankscore_min.errors }}
+                            <input id="enable-alphamissense_rankscore"  title="Enable AlphaMissense slider" class="enable-slider" type="checkbox" />
+                            <span class='slider-container'>
+                                <div class="display-flex">
+                                    <div id="alphamissense_rankscore-slider" class='slider'></div>
+                                    <div class='label slider-value'></div>
+                                </div>
+                                <div class='slider-labels'>
+                                    <span class='label min-value left'></span>
+                                    <span class='label max-value right'></span>
+                                </div>
+                            </span>
+                        </td>
+                        <td class="collapse filter-required">{{ form.alphamissense_rankscore_required }}</td>
+                        <td class="collapse filter-required">{{ form.alphamissense_rankscore_allow_null }}</td>
+                    </tr>
+                {% endif %}
                 <tr class="individual-pathogenic-prediction">
                     <th>{{ form.bayesdel_noaf_rankscore_min.label }}</th>
                     <td>{{ form.bayesdel_noaf_rankscore_min.errors }}
@@ -332,7 +356,7 @@
                 <td class="collapse filter-required"> <!-- cosmic_count is non-nullable --> </td>
             </tr>
 
-            {% if node.columns_version == 2 %}
+            {% if node.columns_version >= 2 %}
                 <tr>
                     <th>ALoFT</th>
                     <td>{{ form.aloft.errors }} {{ form.aloft }}</td>

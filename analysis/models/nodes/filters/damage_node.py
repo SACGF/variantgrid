@@ -1,6 +1,6 @@
 import itertools
 import operator
-from functools import cached_property, reduce
+from functools import reduce
 from typing import Optional
 
 from django.db import models
@@ -19,6 +19,7 @@ class ALoFTPredictionOptions(models.TextChoices):
 
 
 class DamageNode(AnalysisNode):
+    """ This is called 'EffectNode' in analysis """
     impact_min = models.CharField(max_length=1, choices=PathogenicityImpact.CHOICES, null=True, blank=True)
     impact_required = models.BooleanField(default=False)
 
@@ -48,7 +49,11 @@ class DamageNode(AnalysisNode):
     revel_score_required = models.BooleanField(default=False)
     revel_score_allow_null = models.BooleanField(default=True)
 
-    # Columns v2
+    # Rankscores added in columns v2, alpha missense in v3
+    alphamissense_rankscore_min = models.FloatField(null=True, blank=True)
+    alphamissense_rankscore_required = models.BooleanField(default=False)
+    alphamissense_rankscore_allow_null = models.BooleanField(default=True)
+
     bayesdel_noaf_rankscore_min = models.FloatField(null=True, blank=True)
     bayesdel_noaf_rankscore_required = models.BooleanField(default=False)
     bayesdel_noaf_rankscore_allow_null = models.BooleanField(default=True)
@@ -81,44 +86,50 @@ class DamageNode(AnalysisNode):
     aloft_allow_null = models.BooleanField(default=True)
 
     def modifies_parents(self):
-        _ALL_VERSIONS = [self.impact_min, self.splice_min, self.cosmic_count_min, self.damage_predictions_min,
-                         self.protein_domain, self.published]
-        _COLUMNS_VERSION = {
-            1: [self.cadd_score_min, self.revel_score_min, ],
-            2: [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min, self.clinpred_rankscore_min,
+        all_versions = [self.impact_min, self.splice_min, self.cosmic_count_min, self.damage_predictions_min,
+                        self.protein_domain, self.published]
+        v2_fields = [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min, self.clinpred_rankscore_min,
                 self.metalr_rankscore_min, self.revel_rankscore_min, self.vest4_rankscore_min,
-                self.nmd_escaping_variant, self.aloft],
+                self.nmd_escaping_variant, self.aloft]
+        v3_fields = v2_fields + [self.alphamissense_rankscore_min]
+
+        _COLUMNS_VERSION = {
+            1: [self.cadd_score_min, self.revel_score_min],
+            2: v2_fields,
+            3: v3_fields,
         }
-        modifiers = _ALL_VERSIONS + _COLUMNS_VERSION.get(self.columns_version, [])
+        modifiers = all_versions + _COLUMNS_VERSION.get(self.columns_version, [])
         return any(modifiers)
 
     def has_required(self) -> bool:
-        _ALL_VERSIONS = [self.impact_required, self.splice_required, self.cosmic_count_required,
-                         self.damage_predictions_required, self.protein_domain_required, self.published_required]
+        all_versions = [self.impact_required, self.splice_required, self.cosmic_count_required,
+                        self.damage_predictions_required, self.protein_domain_required, self.published_required]
+        v2_fields = [self.bayesdel_noaf_rankscore_required, self.cadd_raw_rankscore_required,
+                self.clinpred_rankscore_required, self.metalr_rankscore_required, self.revel_rankscore_required,
+                self.vest4_rankscore_required, self.nmd_escaping_variant_required, self.aloft_required]
+        v3_fields = v2_fields + [self.alphamissense_rankscore_required]
         _COLUMNS_VERSION = {
             1: [self.cadd_score_required, self.revel_score_required],
-            2: [self.bayesdel_noaf_rankscore_required, self.cadd_raw_rankscore_required,
-                self.clinpred_rankscore_required, self.metalr_rankscore_required, self.revel_rankscore_required,
-                self.vest4_rankscore_required, self.nmd_escaping_variant_required, self.aloft_required],
+            2: v2_fields,
+            3: v3_fields,
         }
-        required = _ALL_VERSIONS + _COLUMNS_VERSION.get(self.columns_version, [])
+        required = all_versions + _COLUMNS_VERSION.get(self.columns_version, [])
         return any(required)
 
     def has_individual_pathogenic_predictions(self) -> bool:
+        v2_fields = [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min, self.clinpred_rankscore_min,
+                self.metalr_rankscore_min, self.revel_rankscore_min, self.vest4_rankscore_min]
+        v3_fields = v2_fields + [self.alphamissense_rankscore_min]
         _COLUMNS_VERSION = {
             1: [self.cadd_score_min, self.revel_score_min],
-            2: [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min, self.clinpred_rankscore_min,
-                self.metalr_rankscore_min, self.revel_rankscore_min, self.vest4_rankscore_min],
+            2: v2_fields,
+            3: v3_fields,
         }
         pathogenic_predictions = _COLUMNS_VERSION.get(self.columns_version, [])
         return any(pathogenic_predictions)
 
     def damage_predictions_description(self) -> str:
         return self.analysis.annotation_version.variant_annotation_version.damage_predictions_description
-
-    @cached_property
-    def columns_version(self):
-        return self.analysis.annotation_version.variant_annotation_version.columns_version
 
     def _get_node_q_hash(self) -> str:
         return str(self._get_node_q())
@@ -180,12 +191,14 @@ class DamageNode(AnalysisNode):
                     and_filters.append(q_revel)
                 else:
                     or_filters.append(q_revel)
-        elif self.columns_version == 2:
+        elif self.columns_version >= 2:
             # Rank score path predictors
             vav = self.analysis.annotation_version.variant_annotation_version
             for path_prediction in vav.get_pathogenic_prediction_funcs():
-                if score_min := getattr(self, path_prediction, None):
+                path_prediction_min = f"{path_prediction}_min"
+                if score_min := getattr(self, path_prediction_min):
                     q_path = Q(**{f"variantannotation__{path_prediction}__gte": score_min})
+                    print(f"EffectNode: {q_path}")
                     if getattr(self, f"{path_prediction}_required"):
                         if getattr(self, f"{path_prediction}_allow_null"):
                             q_path |= Q(**{f"variantannotation__{path_prediction}__isnull": True})
