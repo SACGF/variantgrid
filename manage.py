@@ -7,4 +7,7 @@ if __name__ == "__main__":
 
     from django.core.management import execute_from_command_line
 
+    if sys.version_info < (3, 10):
+        raise SystemExit("VariantGrid requires Python 3.10 or later.")
+
     execute_from_command_line(sys.argv)
