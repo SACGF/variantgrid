@@ -198,7 +198,6 @@ class DamageNode(AnalysisNode):
                 path_prediction_min = f"{path_prediction}_min"
                 if score_min := getattr(self, path_prediction_min):
                     q_path = Q(**{f"variantannotation__{path_prediction}__gte": score_min})
-                    print(f"EffectNode: {q_path}")
                     if getattr(self, f"{path_prediction}_required"):
                         if getattr(self, f"{path_prediction}_allow_null"):
                             q_path |= Q(**{f"variantannotation__{path_prediction}__isnull": True})
