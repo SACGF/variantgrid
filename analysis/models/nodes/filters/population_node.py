@@ -44,9 +44,16 @@ class PopulationNode(AnalysisNode):
     @property
     def population_database_fields(self) -> list[str]:
         fields = ["gnomad_af", "gnomad_popmax_af", "af_1kg", "af_uk10k", "topmed_af"]
-        if self.columns_version >= 3:
+        if self.has_filtering_allele_frequency:
             fields += ["gnomad_fafmax_faf95_max", "gnomad_fafmax_faf99_max"]
         return fields
+
+    @property
+    def has_filtering_allele_frequency(self) -> bool:
+        try:
+            return int(float(self.analysis.annotation_version.variant_annotation_version.gnomad)) >= 4
+        except AttributeError as e:
+            return False
 
     def modifies_parents(self):
         return any([self.filtering_by_population, self.use_internal_counts,

@@ -94,7 +94,7 @@ function showGnomadPopulations() {
                 <span>{{ form.gnomad_popmax_af }} <i>Popmax (Highest sub-pop frequency)</i>  </span>
                 </div>
 
-                {% if node.columns_version >= 3 %}
+                {% if node.has_filtering_allele_frequency %}
                 <div>
                 <span>{{ form.gnomad_fafmax_faf95_max }} <i>Filtering Allele Frequency (95% confidence)</i>  </span>
                 <span>{{ form.gnomad_fafmax_faf99_max }} <i>Filtering Allele Frequency (99% confidence)</i>  </span>
