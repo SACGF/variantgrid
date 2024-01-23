@@ -6,7 +6,7 @@ from typing import Iterator
 from dateutil.tz import gettz
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import Q
+from django.db.models import Q, Min
 
 from eventlog.models import ViewEvent
 from library.django_utils import require_superuser
@@ -58,8 +58,9 @@ def week_start_date(freq: datetime.date) -> datetime.date:
 
 def stream_report_rows(interval) -> Iterator[ReportDataRow]:
 
-    start_of_time_period = datetime.now() - timedelta(days=365)
-    start_of_time_period = start_of_time_period.date()
+    # start_of_time_period = datetime.now() - timedelta(days=365)
+    latest_created_date = ViewEvent.objects.aggregate(Min('created'))['created__min']
+    start_of_time_period = latest_created_date.date()
     report_data = defaultdict(lambda: {'users': set(), 'search_count': 0, 'allele_count': 0,
                                        'gene_symbol_count': 0, 'classification_count': 0,
                                        'overall_activity': 0})
