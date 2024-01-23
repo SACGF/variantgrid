@@ -42,6 +42,9 @@ def update_node_task(node_id, version):
             # Also will throw NodeOutOfDateException if node already bumped (before calling expensive load())
             node.set_node_task_and_status(update_node_task.request.id, NodeStatus.LOADING)
             node.load()
+            # Check if we need to clear shadow color
+            if node.shadow_color == NodeColors.ERROR and node.is_valid():
+                node.update(shadow_color=None)
             return  # load already modified status, no need to save again below
         except NodeOutOfDateException:
             logging.warning("Node %d/%d out of date - exiting Celery task", node.pk, node.version)
