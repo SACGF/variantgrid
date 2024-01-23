@@ -79,7 +79,6 @@ class Test(URLTestCase):
             ("classification_datatables", {}, classification),
         ]
 
-
     def testAdminUrls(self):
         ADMIN_URL_NAMES_AND_KWARGS = [
             ("activity", {}, 200),

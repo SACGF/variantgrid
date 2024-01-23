@@ -183,8 +183,6 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
             logging.warning(e)
             logging.warning("No annotation set for plugin: %s", vep_plugin)
 
-
-
     return cmd
 
 

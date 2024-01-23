@@ -968,7 +968,6 @@ class UploadedClassificationsUnmappedAdmin(ModelAdminBasics):
                     records_mapped = validation_summary.get("records_mapped") or 0
                     self.message_user(request, message=f"{records_mapped} records mapped")
 
-
     @admin_action("Process (Async)")
     def process_async(self, request, queryset: QuerySet[UploadedClassificationsUnmapped]):
         for ufl in queryset:

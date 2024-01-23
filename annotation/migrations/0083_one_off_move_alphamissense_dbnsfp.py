@@ -6,7 +6,6 @@ def _one_off_move_alphamissense_dbnsfp(apps, _schema_editor):
     PATHOGENICITY_PREDICTIONS = 'P'
     VEP_PLUGIN_DBNSFP = 'd'
 
-
     ColumnVEPField = apps.get_model("annotation", "ColumnVEPField")
     # The old alphamissense VEPFields cascade deleted from 0108_one_off_move_alphamissense_dbnsfp
 

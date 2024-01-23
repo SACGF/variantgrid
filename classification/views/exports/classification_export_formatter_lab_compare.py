@@ -240,4 +240,3 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
             lab2_tokens.update(self.tokenize_text(str(value).replace('\\n', ' ')))
 
         return lab1_tokens == lab2_tokens
-

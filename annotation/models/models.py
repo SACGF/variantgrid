@@ -1054,7 +1054,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
     def has_mid(self):
         return self.version.gnomad.startswith("4")
 
-
     @property
     def gnomad_url(self):
         GNOMAD2 = "gnomad_r2_1"

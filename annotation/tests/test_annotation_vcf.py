@@ -278,7 +278,6 @@ class TestAnnotationVCF3(TestAnnotationVCF):
         self.assertTrue(vta.nmd_escaping_variant)
 
 
-
 class TestVEP(TestCase):
     """ Random VEP annotation methods """
     maxDiff = None

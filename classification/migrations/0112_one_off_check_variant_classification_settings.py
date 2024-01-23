@@ -31,4 +31,3 @@ class Migration(migrations.Migration):
             "Rename settings from VARIANT_CLASSIFICATION_X to CLASSIFICATION_X"
         ], test=_check_settings_for_variant_classification),
     ]
-

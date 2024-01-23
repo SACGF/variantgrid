@@ -30,4 +30,3 @@ def clinvar_export_search(search_input: SearchInputInstance):
     else:
         message = f"Only SCVs directly managed by {settings.SITE_NAME} are returned by search. Please check ClinVar directly for this SCV."
         yield SearchMessageOverall(message, LogLevel.WARNING)
-

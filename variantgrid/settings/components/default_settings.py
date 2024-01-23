@@ -235,7 +235,7 @@ ANNOTATION = {
             "dbscsnv": "annotation_data/GRCh37/dbscSNV1.1_GRCh37.txt.gz",
             "gnomad2": "annotation_data/GRCh37/gnomad2.1.1_GRCh37_combined_af.vcf.bgz",
             "mastermind": "annotation_data/GRCh37/mastermind_cited_variants_reference-2022.04.02-grch37.vcf.gz",
-            "mave": None, # n/a for GRCh37
+            "mave": None,  # n/a for GRCh37
             "maxentscan": "annotation_data/all_builds/maxentscan",
             'phastcons100way': "annotation_data/GRCh37/hg19.100way.phastCons.bw",
             'phastcons46way': "annotation_data/GRCh37/hg19.phastCons46way.placental.bw",

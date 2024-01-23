@@ -84,7 +84,6 @@ class Test(URLTestCase):
         ]
         self._test_urls(ADMIN_URL_NAMES_AND_KWARGS, self.admin_user)
 
-
     def testGridUrls(self):
         """ Grids w/o permissions """
         build_name_kwargs = {"genome_build_name": self.grch37.name}

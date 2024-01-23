@@ -346,7 +346,7 @@ def calculate_allele_frequency(version, gnomad_input_vcf, af_output_vcf):
             gnomad_filtered = '0' if variant.FILTER is None else '1'
             infos["gnomad_filtered"] = gnomad_filtered
 
-            for p in popmax_fields: # can be popmax or grpmax
+            for p in popmax_fields:  # can be popmax or grpmax
                 if p.startswith("AF_"):
                     infos[p] = str(af_popmax)
                 elif p.startswith("AC_"):

@@ -29,6 +29,5 @@ class EventLogModelTestCase(TestCase):
         self.assertFalse(event.can_write(self.non_owner_user))
 
 
-
 if __name__ == '__main__':
     unittest.main()

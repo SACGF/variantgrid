@@ -30,7 +30,6 @@ class Command(BaseCommand):
         genome_build = GenomeBuild.get_name_or_alias(build_name)
         vc = VEPConfig(genome_build)
 
-
         if test:
             print("Re-generating VCF for unit test")
             vep_suffix = "vep_annotated"

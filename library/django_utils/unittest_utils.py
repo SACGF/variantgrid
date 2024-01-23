@@ -49,7 +49,7 @@ class URLTestCase(TestCase):
         for name, kwargs, expected_code in names_and_kwargs:
             with self.subTest(url_name=name):
                 expected_code = expected_code_override or expected_code
-                kwargs = kwargs.copy() # As we'll pop next
+                kwargs = kwargs.copy()  # As we'll pop next
                 get_params = kwargs.pop("GET_PARAMS", {})
                 url = reverse(name, kwargs=kwargs)
                 if get_params:
