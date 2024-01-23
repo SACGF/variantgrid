@@ -481,14 +481,6 @@ class Variant(PreviewModelMixin, models.Model):
         return ~Q(alt__seq=Variant.REFERENCE_ALT)
 
     @staticmethod
-    def get_overlap_annotate_and_q(contig, start, end):
-        """ Query handling indels. Contigs must match and variant.start <= end AND variant.end_position >= start """
-        annotation_kwargs = {"longest_sequence": Greatest("locus__ref__length", "alt__length"),
-                             "end_position": F("locus__position") + F("longest_sequence")}
-        q = Q(locus__contig=contig, locus__position__lte=end, end_position__gte=start)
-        return annotation_kwargs, q
-
-    @staticmethod
     def annotate_variant_string(qs, name="variant_string", path_to_variant=""):
         """ Return a "1:123321 G>C" style string in a query """
         kwargs = {name: Concat(f"{path_to_variant}locus__contig__name", Value(":"),

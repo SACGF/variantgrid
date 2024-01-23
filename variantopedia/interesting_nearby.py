@@ -200,8 +200,7 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
 def filter_variant_range(qs, variant: Variant, distance):
     start = variant.start - distance
     end = variant.end + distance
-    annotation_kwargs, q = Variant.get_overlap_annotate_and_q(variant.locus.contig, start, end)
-    return qs.annotate(**annotation_kwargs).filter(q)
+    return qs.filter(locus__contig=variant.locus.contig, locus__position__lte=end, end__gte=start)
 
 
 def get_transcripts_and_codons(variant: Variant):
