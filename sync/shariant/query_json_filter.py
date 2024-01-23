@@ -48,7 +48,7 @@ class QueryJsonFilter:
                 return ~self.q('allele_origin', ['somatic'], 'in') | self.q('allele_origin', True, 'isnull')
             else:
                 # so ugly that this is the only way I know to make a Q that wont restrict record counts
-                raise ~Q(pk=None)
+                return ~Q(pk=None)
         else:
             if key == 'not':
                 return ~self.convert_to_q(value)

@@ -441,7 +441,7 @@ class HGVSVariant(abc.ABC):
     def ref_allele(self) -> str:
         return self._get_ref_allele()
 
-    @kind.setter
+    @ref_allele.setter
     def ref_allele(self, value):
         self._set_ref_allele(value)
 
