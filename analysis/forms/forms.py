@@ -1,7 +1,6 @@
 import itertools
 import operator
 from collections import defaultdict
-from typing import Dict
 
 from crispy_forms.bootstrap import FieldWithButtons, StrictButton
 from crispy_forms.layout import Layout, Field
@@ -205,7 +204,7 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
         fni_qs = FilterNodeItem.objects.filter(filter_node__analysis=self.instance)
         invalid_items = fni_qs.exclude(field__in=valid_columns)
         if invalid_items.exists():
-            node_items: Dict[AnalysisNode, set] = defaultdict(set)
+            node_items: dict[AnalysisNode, set] = defaultdict(set)
             for fni in invalid_items.order_by("filter_node"):
                 node_items[fni.filter_node].add(fni.column.label)
 

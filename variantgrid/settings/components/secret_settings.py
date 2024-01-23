@@ -1,10 +1,10 @@
 import json
 import logging
 import os
-from typing import Dict, Optional, List, Any, Tuple
+from typing import Optional, Any
 
 
-def _get_env_variable(key: str) -> Tuple[Any, bool]:
+def _get_env_variable(key: str) -> tuple[Any, bool]:
     try:
         e_value = os.environ[key]
         if e_value:
@@ -104,7 +104,7 @@ _default_settings = {
 """
 
 
-def _get_nested(parts: List[str], value) -> Tuple[Any, bool]:
+def _get_nested(parts: list[str], value) -> tuple[Any, bool]:
     if not len(parts):
         return value, True
     elif isinstance(value, dict) and parts[0] in value:
@@ -143,7 +143,7 @@ def get_secret(key: str, mandatory: bool = True) -> Optional[Any]:
     raise ValueError(f"Error '{key}' not present in config file '{settings_filename}'")
 
 
-def get_secrets(prefix: str, leafs: List[str], mandatory: bool = True) -> Dict[str, Any]:
+def get_secrets(prefix: str, leafs: list[str], mandatory: bool = True) -> dict[str, Any]:
     secret_dict = {}
     for leaf in leafs:
         secret_dict[leaf] = get_secret(prefix + '.' + leaf, mandatory=mandatory)

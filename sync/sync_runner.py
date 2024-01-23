@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
-from typing import Optional, Callable, Dict, List
+from typing import Optional, Callable
 
 from library.oauth import ServerAuth
 from library.utils import parse_http_header_date
@@ -58,7 +58,7 @@ class SyncRunInstance:
         self.sync_run.status = SyncStatus.FAILED
         self.sync_run.save()
 
-    def run_completed(self, had_records: bool, meta: Optional[Dict] = None):
+    def run_completed(self, had_records: bool, meta: Optional[dict] = None):
         self.sync_run.status = SyncStatus.SUCCESS if had_records else SyncStatus.NO_RECORDS
         self.sync_run.meta = meta
         self.sync_run.save()
@@ -79,7 +79,7 @@ SyncRunnerFactory = Callable[[], SyncRunner]
 
 @dataclass
 class SyncRunnerFactoryRequirements:
-    config: Dict
+    config: dict
     factory: SyncRunnerFactory
 
     def matches(self, sync_destination: SyncDestination) -> bool:
@@ -95,10 +95,10 @@ class SyncRunnerFactoryRequirements:
         return True
 
 
-_sync_runner_registry: List[SyncRunnerFactoryRequirements] = []
+_sync_runner_registry: list[SyncRunnerFactoryRequirements] = []
 
 
-def register_sync_runner(config: Dict):
+def register_sync_runner(config: dict):
     def _wrapper(cls):
         _sync_runner_registry.append(SyncRunnerFactoryRequirements(config, cls))
         return cls

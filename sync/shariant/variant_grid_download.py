@@ -1,5 +1,5 @@
 import time
-from typing import Optional, Dict
+from typing import Optional
 
 import ijson
 
@@ -68,7 +68,7 @@ class VariantGridDownloadSyncer(SyncRunner):
 
             return sanitized
 
-        def shariant_download_to_upload(known_keys: EvidenceKeyMap, record_json: dict) -> Optional[Dict]:
+        def shariant_download_to_upload(known_keys: EvidenceKeyMap, record_json: dict) -> Optional[dict]:
             meta = record_json.get('meta', {})
             record_id = meta.get('id')
 

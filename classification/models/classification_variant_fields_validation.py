@@ -1,6 +1,6 @@
 import re
 from re import RegexFlag
-from typing import Optional, Set
+from typing import Optional
 
 from django.conf import settings
 from django.dispatch.dispatcher import receiver
@@ -129,7 +129,7 @@ def validate_clinical_significance(sender, **kwargs) -> Optional[ValidationMerge
             if attempt_clin_sig:
                 clin_text = attempt_clin_sig.group(0).lower()
 
-                actual_cs_parts: Set[str] = set()
+                actual_cs_parts: set[str] = set()
 
                 if cs.startswith('VUS'):  # we don't complain about VUS A,B,C differences
                     actual_cs_parts.add('VUS')
@@ -147,7 +147,7 @@ def validate_clinical_significance(sender, **kwargs) -> Optional[ValidationMerge
                     elif cs == 'A':
                         actual_cs_parts.add('artefact')
 
-                detected_cs_parts: Set[str] = set()
+                detected_cs_parts: set[str] = set()
                 if 'vous' in clin_text or 'vus' in clin_text or 'variant of uncertain' in clin_text:
                     detected_cs_parts.add('VUS')
                 if 'like' in clin_text:

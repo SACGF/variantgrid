@@ -1,15 +1,14 @@
-import itertools
+import operator
 import operator
 import re
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import reduce
-from typing import Any, List
+from typing import Any
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.models import User
 from django.db import connection
 from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404, render, redirect
@@ -32,9 +31,8 @@ from genes.models import CanonicalTranscriptCollection, GeneSymbol
 from library.django_utils import require_superuser, highest_pk, get_field_counts
 from library.git import Git
 from library.guardian_utils import admin_bot
-from library.health_check import health_check_signal, HealthCheckRequest, HealthCheckStat, HealthCheckRecentActivity, \
-    health_check_overall_stats_signal
-from library.log_utils import log_traceback, report_message, slack_bot_username, NotificationBuilder
+from library.health_check import HealthCheckRequest, health_check_overall_stats_signal
+from library.log_utils import log_traceback, report_message, slack_bot_username
 from library.utils import flatten_nested_lists
 from pathtests.models import cases_for_user
 from patients.models import Clinician
@@ -47,7 +45,7 @@ from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleConversionTool, ImportSource, AlleleOrigin, \
     VariantAlleleSource, VariantGridColumn, Tag
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.models.models_user_settings import UserSettings, UserPreview
+from snpdb.models.models_user_settings import UserSettings
 from snpdb.search import search_data
 from snpdb.serializers import VariantAlleleSerializer
 from snpdb.variant_sample_information import VariantSampleInformation

@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from analysis.models import VariantTag
 from annotation.fake_annotation import get_fake_annotation_version, create_fake_variants, create_fake_variant_annotation
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
-from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
+from library.django_utils.unittest_utils import URLTestCase
 from snpdb.models import Variant, ClinGenAllele, Allele, VariantAllele, AlleleOrigin, Tag, \
     VariantZygosityCountCollection, VariantZygosityCount, VariantWiki
 from snpdb.models.models_genome import GenomeBuild

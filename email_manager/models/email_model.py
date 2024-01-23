@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 
 from django.conf import settings
 from django.core.mail import send_mail, get_connection, EmailMultiAlternatives
@@ -26,7 +26,7 @@ class EmailLog(PreviewModelMixin, TimeStampedModel):
                   html: str,
                   text: str,
                   from_email: Optional[str],
-                  recipient_list: List[str],
+                  recipient_list: list[str],
                   allow_users_to_see_others: bool = False) -> bool:
 
         if html:

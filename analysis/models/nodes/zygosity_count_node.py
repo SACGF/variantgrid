@@ -1,8 +1,7 @@
-import abc
 import operator
 from collections import defaultdict
 from functools import reduce
-from typing import Dict, Optional, List
+from typing import Optional
 
 from django.db import models
 from django.db.models import Q, Model
@@ -23,7 +22,7 @@ class AbstractZygosityCountNode(Model):
     class Meta:
         abstract = True
 
-    def get_zygosity_count_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def get_zygosity_count_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         COUNT_COLUMNS = [
             # arg                               column                         MIN                 MAX
             (self.any_zygosity_count_column, self.any_zygosity_count_column, self.min_het_or_hom_count, self.max_het_or_hom_count),

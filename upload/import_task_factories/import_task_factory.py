@@ -1,6 +1,6 @@
 import inspect
 from abc import ABC, abstractmethod
-from typing import Iterable, Type, List
+from typing import Iterable, Type
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -38,7 +38,7 @@ class ImportTaskFactory(ABC):
         pass
 
 
-def get_import_task_factories() -> List[ImportTaskFactory]:
+def get_import_task_factories() -> list[ImportTaskFactory]:
     # Import all factory scripts into scope  so __subclasses__ works
     for i in settings.IMPORT_TASK_FACTORY_IMPORTS:
         exec(f"import {i}")

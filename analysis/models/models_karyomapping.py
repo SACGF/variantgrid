@@ -1,7 +1,6 @@
 import operator
 from collections import defaultdict, Counter
 from functools import reduce
-from typing import Tuple
 
 from django.contrib.auth.models import User
 from django.db import models
@@ -173,7 +172,7 @@ class KaryomappingGene(models.Model):
         iv, _ = self.get_genomic_interval_and_strand()
         return iv
 
-    def get_genomic_interval_and_strand(self) -> Tuple[GenomicInterval, str]:
+    def get_genomic_interval_and_strand(self) -> tuple[GenomicInterval, str]:
         gene_version = self.gene.latest_gene_version(self.karyomapping_analysis.trio.genome_build)
         start_position = gene_version.start
         end_position = gene_version.end

@@ -1,5 +1,5 @@
 import itertools
-from typing import List, Tuple, Iterable, Optional
+from typing import Iterable, Optional
 from urllib.error import HTTPError
 
 from django.conf import settings
@@ -104,7 +104,7 @@ class AutopopulateData:
                 sums.append(sum_text)
         return '\n\n'.join(sums)
 
-    def _flatten(self, evidence_list: List['AutopopulateData']):
+    def _flatten(self, evidence_list: list['AutopopulateData']):
         found = False
         for check_me in evidence_list:
             if check_me.name == self.name:
@@ -117,7 +117,7 @@ class AutopopulateData:
         for other_data in self.linked:
             other_data._flatten(evidence_list)
 
-    def flatten(self) -> List['AutopopulateData']:
+    def flatten(self) -> list['AutopopulateData']:
         evidence_list = []
         self._flatten(evidence_list)
         return evidence_list
@@ -178,7 +178,7 @@ def ekey_from_vg_column_formatters():
     }
 
 
-def get_clingen_allele_and_evidence_value_for_variant(genome_build: GenomeBuild, variant: Variant) -> Tuple[ClinGenAllele, str, str]:
+def get_clingen_allele_and_evidence_value_for_variant(genome_build: GenomeBuild, variant: Variant) -> tuple[ClinGenAllele, str, str]:
     """ returns (clingen_allele, evidence_value) """
     message = None
     try:

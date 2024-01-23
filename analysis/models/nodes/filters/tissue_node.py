@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional
 
 from django.db import models
 from django.db.models.deletion import SET_NULL
@@ -24,7 +24,7 @@ class TissueNode(AnalysisNode):
     accordion_panel = models.IntegerField(default=0)
     group_operation = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ALL)
 
-    def _get_configuration_errors(self) -> List:
+    def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
         if self.analysis.annotation_version.human_protein_atlas_version is None:
             msg = "To use the TissueNode you must use an AnnotationVersion with human_protein_atlas_version not equal to None. <a href='javascript:analysisSettings()'>Open Analysis Settings</a>"

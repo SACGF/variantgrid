@@ -2,7 +2,7 @@ import csv
 import logging
 import os
 from time import sleep
-from typing import Optional, Set, List, Dict
+from typing import Optional
 
 import cyvcf2
 import numpy as np
@@ -123,7 +123,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             raise ValueError(f"Could not find 'samples_allele_frequency' in {COHORT_GENOTYPE_HEADER}")
         self.cohort_gt_vaf_index -= self.COHORT_GT_NUM_ADDED_FIELDS
 
-    def _get_uncommon_variant_ids(self) -> Set[int]:
+    def _get_uncommon_variant_ids(self) -> set[int]:
         uncommon_variant_ids = set()
         if common_collection := self.cohort_genotype_collection.common_collection:
             uncommon_qs = get_classified_high_frequency_variants_qs(common_collection.common_filter)
@@ -281,7 +281,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         return samples_filters_str
 
     @staticmethod
-    def _get_format_json(num_samples: int, variant: cyvcf2.Variant) -> List[Dict]:
+    def _get_format_json(num_samples: int, variant: cyvcf2.Variant) -> list[dict]:
         sample_formats = [{} for _ in range(num_samples)]
         for k in variant.FORMAT:
             if k == "GT":
@@ -295,7 +295,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         return sample_formats
 
     @staticmethod
-    def _get_info_json(variant: cyvcf2.Variant) -> Dict:
+    def _get_info_json(variant: cyvcf2.Variant) -> dict:
         return dict(variant.INFO)
 
     def finished_locus(self):

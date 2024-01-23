@@ -1,6 +1,6 @@
 # NOTE it would be ideal for this to react to notification instead of having to be called directly
 from datetime import datetime
-from typing import Dict, List, Optional, Iterable
+from typing import Optional, Iterable
 
 from django.db.models import Q
 
@@ -18,7 +18,7 @@ class FlagDelta:
         return self.flag_type.label < other.flag_type.label
 
 
-def flag_chanced_since(since: datetime, flag_types: Optional[Iterable[FlagType]] = None) -> List[FlagDelta]:
+def flag_chanced_since(since: datetime, flag_types: Optional[Iterable[FlagType]] = None) -> list[FlagDelta]:
     # TODO take a NOW date
     time_range_q = Q(created__gte=since)  # & Q(created__lte=min_age)
     if not flag_types:
@@ -35,7 +35,7 @@ def flag_chanced_since(since: datetime, flag_types: Optional[Iterable[FlagType]]
     # also need to filter out flags that were open before since and are still open now (likewise for closed)
     # to know that we need to find the most recent flag comment from before closing, and the last flag comment
     # just loop through all the possibile candidates for now, and then see if things start to get too wasteful
-    flag_deltas: Dict[FlagType, FlagDelta] = {}
+    flag_deltas: dict[FlagType, FlagDelta] = {}
 
     def count_delta(flag_type: FlagType, diff: int):
         delta = flag_deltas.get(flag_type)

@@ -1,5 +1,4 @@
 import json
-from typing import List
 
 from dal import forward
 from django import forms
@@ -581,17 +580,17 @@ class MOINodeForm(BaseNodeForm):
             node.save()
         return node
 
-    def _get_fields_with_prefix(self, prefix) -> List[str]:
+    def _get_fields_with_prefix(self, prefix) -> list[str]:
         fields = []
         for field_name in self.fields:
             if field_name.startswith(prefix):
                 fields.append(self[field_name])
         return fields
 
-    def get_moi_fields(self) -> List[str]:
+    def get_moi_fields(self) -> list[str]:
         return self._get_fields_with_prefix("moi_")
 
-    def get_submitter_fields(self) -> List[str]:
+    def get_submitter_fields(self) -> list[str]:
         return self._get_fields_with_prefix("submitter_")
 
 

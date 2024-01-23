@@ -1,6 +1,6 @@
 import inspect
 from functools import cached_property
-from typing import Optional, List, Iterator, Dict, Type
+from typing import Optional, Iterator, Type
 
 from dateutil.tz import gettz
 from django.conf import settings
@@ -301,12 +301,12 @@ class ModelAdminBasics(admin.ModelAdmin):
                 return True
         return False
 
-    def _get_readonly_fields(self, request, obj=None) -> List[str]:
+    def _get_readonly_fields(self, request, obj=None) -> list[str]:
         return [f.name for f in self.model._meta.fields if self.is_readonly_field(f)]
 
-    def _get_fields(self, request, obj=None, **kwargs) -> List[str]:
-        first: List[str] = []
-        second: List[str] = []
+    def _get_fields(self, request, obj=None, **kwargs) -> list[str]:
+        first: list[str] = []
+        second: list[str] = []
         exclude_us = self.exclude or set()
         for f in self.model._meta.fields:
             if f.name in exclude_us:
@@ -326,7 +326,7 @@ class ModelAdminBasics(admin.ModelAdmin):
     def get_fields(self, request, obj=None):
         return self._get_fields(request=request, obj=obj)
 
-    def widget_overrides(self) -> Dict[str, Widget]:
+    def widget_overrides(self) -> dict[str, Widget]:
         return {}
 
     def get_form(self, request, obj=None, **kwargs):

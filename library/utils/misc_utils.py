@@ -2,7 +2,7 @@ import functools
 import json
 from enum import Enum
 from json.encoder import JSONEncoder
-from typing import TypeVar, Optional, Any, Dict
+from typing import TypeVar, Optional, Any
 from urllib.parse import urlparse
 
 from django.core.serializers import serialize
@@ -126,7 +126,7 @@ def invalidate_cached_property(obj, property_name: str):
         delattr(obj, property_name)
 
 
-def update_dict_of_dict_values(dict_to_update: Dict[Any, Dict], new_values: Dict[Any, Dict]):
+def update_dict_of_dict_values(dict_to_update: dict[Any, dict], new_values: dict[Any, dict]):
     for k, v in new_values.items():
         old_values = dict_to_update.get(k, {})
         old_values.update(v)

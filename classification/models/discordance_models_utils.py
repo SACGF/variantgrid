@@ -2,7 +2,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property
-from typing import List, Set, Iterable, Optional, Dict
+from typing import Iterable, Optional
 
 from django.utils import timezone
 from frozendict import frozendict
@@ -24,7 +24,7 @@ class DiscordanceReportRowDataTriagesRowData(ExportRow):
         self.perspective = perspective
 
     @cached_property
-    def triages(self) -> List['DiscordanceReportTriage']:
+    def triages(self) -> list['DiscordanceReportTriage']:
         return list(self.discordance_report.discordancereporttriage_set.order_by('lab__name'))
 
     def formatted_triages_for_status(self, status: 'DiscordanceReportTriageStatus') -> str:
@@ -143,7 +143,7 @@ class DiscordanceReportRowData(ExportRow):
         return self.perspective.is_admin_mode or bool(set(self.discordance_report.involved_labs.keys()).intersection(self.perspective.your_labs))
 
     @property
-    def other_labs(self) -> Set[Lab]:
+    def other_labs(self) -> set[Lab]:
         involved_labs = self.all_actively_involved_labs
         if (not self.perspective.has_multi_org_selection) and (selected := self.perspective.selected_labs):
             involved_labs -= selected
@@ -191,7 +191,7 @@ class DiscordanceReportRowData(ExportRow):
         return self._cm_candidate.c_hgvs_best(genome_build=self.perspective.genome_build)
 
     @property
-    def c_hgvses(self) -> List[CHGVS]:
+    def c_hgvses(self) -> list[CHGVS]:
         return sorted({candidate.c_hgvs_best(genome_build=self.perspective.genome_build) for candidate in self._cm_candidates})
 
     @property
@@ -199,7 +199,7 @@ class DiscordanceReportRowData(ExportRow):
         return self.discordance_report.is_pending_concordance
 
     @cached_property
-    def lab_significances(self) -> List[ClassificationLabSummary]:
+    def lab_significances(self) -> list[ClassificationLabSummary]:
         from classification.models.discordance_lab_summaries import DiscordanceLabSummary
         return DiscordanceLabSummary.for_discordance_report(discordance_report=self.discordance_report, perspective=self.perspective)
 
@@ -285,9 +285,9 @@ class DiscordanceReportTableData:
         return self.perspective.genome_build
 
     @cached_property
-    def counts(self) -> List[DiscordanceReportSummaryCount]:
+    def counts(self) -> list[DiscordanceReportSummaryCount]:
         internal_count = 0
-        by_lab: Dict[Lab, int] = defaultdict(int)
+        by_lab: dict[Lab, int] = defaultdict(int)
         for summary in self.summaries:
             if summary.is_internal:
                 internal_count += 1
@@ -314,7 +314,7 @@ class DiscordanceReportCategoriesCounts:
 @dataclass
 class DiscordanceReportPreview:
     awaiting_triage_count: int
-    medically_significant_awaiting_triage: List[DiscordanceReport]
+    medically_significant_awaiting_triage: list[DiscordanceReport]
 
 
 class DiscordanceReportCategories:
@@ -332,7 +332,7 @@ class DiscordanceReportCategories:
             .prefetch_related('discordancereportclassification_set')\
             .select_related('clinical_context')
 
-    def labs(self) -> List[Lab]:
+    def labs(self) -> list[Lab]:
         return sorted(self.perspective.your_labs)
 
     def labs_quick_str(self) -> str:
@@ -354,8 +354,8 @@ class DiscordanceReportCategories:
         return counts
 
     @cached_property
-    def unresolved(self) -> List[DiscordanceReportRowData]:
-        all_summaries: List[DiscordanceReportRowData] = []
+    def unresolved(self) -> list[DiscordanceReportRowData]:
+        all_summaries: list[DiscordanceReportRowData] = []
         for dr in self.dr_qs.filter(resolution__isnull=True):
             summary = DiscordanceReportRowData(discordance_report=dr, perspective=self.perspective)
             if summary.is_valid_including_withdraws:
@@ -364,12 +364,12 @@ class DiscordanceReportCategories:
         return all_summaries
 
     @cached_property
-    def active(self) -> List[DiscordanceReportRowData]:
+    def active(self) -> list[DiscordanceReportRowData]:
         return [drr for drr in self.unresolved if drr.is_requiring_attention]
 
     @cached_property
-    def historic(self) -> List[DiscordanceReportRowData]:
-        historic: List[DiscordanceReportRowData] = []
+    def historic(self) -> list[DiscordanceReportRowData]:
+        historic: list[DiscordanceReportRowData] = []
         # add unresolved but not requiring attention discordance reports (aka pending concordance)
         for summary in self.unresolved:
             if not summary.is_requiring_attention:
@@ -385,7 +385,7 @@ class DiscordanceReportCategories:
         return historic
 
     @cached_property
-    def active_by_next_step(self) -> Dict[DiscordanceReportNextStep, List[DiscordanceReportRowData]]:
+    def active_by_next_step(self) -> dict[DiscordanceReportNextStep, list[DiscordanceReportRowData]]:
         by_step = defaultdict(list)
         for row_data in self.active:
             by_step[row_data.next_step].append(row_data)

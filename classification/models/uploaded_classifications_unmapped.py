@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import Union, Optional, Dict, List, Tuple, Any
+from typing import Union, Optional, Any
 
 from django.contrib.auth.models import User
 from django.db import models
@@ -25,7 +25,7 @@ class UploadedClassificationsUnmappedStatus(models.TextChoices):
 
 class UploadedClassificationsUnmappedValidationRow(ExportRow):
 
-    def __init__(self, row: Dict[str, Any]):
+    def __init__(self, row: dict[str, Any]):
         self._row = row
 
     def filename(self):
@@ -86,7 +86,7 @@ class UploadedClassificationsUnmapped(TimeStampedModel):
     def get_absolute_url(self):
         return reverse('classification_upload_unmapped_status', kwargs={'uploaded_classification_unmapped_id': self.pk})
 
-    def validation_list_objs(self) -> List[UploadedClassificationsUnmappedValidationRow]:
+    def validation_list_objs(self) -> list[UploadedClassificationsUnmappedValidationRow]:
         if messages := self.validation_list.get('messages'):
             return [UploadedClassificationsUnmappedValidationRow(entry) for entry in messages]
         return []
@@ -110,13 +110,13 @@ class UploadedClassificationsUnmapped(TimeStampedModel):
         return resolve_uploaded_url_to_handle(self.url)
 
     @property
-    def message_counts(self) -> Optional[List[Tuple[str, int]]]:
+    def message_counts(self) -> Optional[list[tuple[str, int]]]:
         if summary := self.validation_summary:
             entries = list(summary.get("message_counts").items())
             return sorted(entries, key=lambda x: x[0])
 
     @property
-    def validation_summary_properties(self) -> Optional[List[Tuple[str, Union[int, str]]]]:
+    def validation_summary_properties(self) -> Optional[list[tuple[str, Union[int, str]]]]:
         if summary := self.validation_summary:
             entries = [(key, value) for key, value in summary.items() if isinstance(value, (str, int))]
             return sorted(entries, key=lambda x: x[0])

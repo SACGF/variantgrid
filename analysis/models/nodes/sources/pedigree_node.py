@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict
+from typing import Optional
 
 from django.db import models
 from django.db.models import Q
@@ -22,7 +22,7 @@ class PedigreeNode(AbstractCohortBasedNode):
             cohort = self.pedigree.cohort
         return cohort
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         cohort, arg_q_dict = self.get_cohort_and_arg_q_dict()
         if cohort:
             q = None
@@ -85,7 +85,7 @@ class PedigreeNode(AbstractCohortBasedNode):
     def get_node_class_label():
         return "Pedigree"
 
-    def _get_configuration_errors(self) -> List:
+    def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
         if not self.pedigree:
             errors.append("No pedigree selected.")

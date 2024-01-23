@@ -2,7 +2,7 @@ import copy
 import json
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import List, Iterator, Union, Optional, Any
+from typing import Iterator, Union, Optional, Any
 
 from library.utils import invalidate_cached_property, JsonDataType
 
@@ -45,7 +45,7 @@ class JsonMessage:
 @dataclass(frozen=True)
 class JsonMessages:
 
-    messages: List[JsonMessage] = field(default_factory=list)
+    messages: list[JsonMessage] = field(default_factory=list)
 
     def errors(self) -> 'JsonMessages':
         return JsonMessages(messages=[mess for mess in self.messages if mess.severity == "error"])

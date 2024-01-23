@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import List, Any, Mapping, TypedDict, Optional
+from typing import Any, Mapping, TypedDict, Optional
 
 from annotation.models import CitationFetchRequest
 from annotation.models.models_citations import CitationSource
@@ -306,7 +306,7 @@ class ClinVarExportConverter:
     }
 
     @property
-    def citations(self) -> List[ValidatedJson]:
+    def citations(self) -> list[ValidatedJson]:
         request_ids = []
         if self.clinvar_key.citations_mode == ClinVarCitationsModes.interpretation_summary_only:
             if text := self.classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY):
@@ -510,7 +510,7 @@ class ClinVarExportConverter:
             data["citation"] = citations
         data["clinicalSignificanceDescription"] = self.clinvar_value(SpecialEKeys.CLINICAL_SIGNIFICANCE).value(single=True)
 
-        comment_parts: List[str] = []
+        comment_parts: list[str] = []
 
         if interpret := self.value(SpecialEKeys.INTERPRETATION_SUMMARY):
             comment_parts.append(interpret.strip())

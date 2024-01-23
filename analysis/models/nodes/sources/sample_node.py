@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict
+from typing import Optional
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
@@ -69,7 +69,7 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             zyg = ''  # Any
         return zyg
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         arg_q_dict = {}
         if not self.sample:
             q_none = self.q_none()
@@ -147,7 +147,7 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
     def get_help_text() -> str:
         return "Variants from a VCF sample, usually one genotype (patient, cell or organism)"
 
-    def get_gene_lists(self) -> List:
+    def get_gene_lists(self) -> list:
         """ Used for gene coverage """
         gene_lists = []
         if self.sample_gene_list and self.restrict_to_qc_gene_list:
@@ -192,7 +192,7 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
     def get_node_class_label():
         return "Sample"
 
-    def _get_configuration_errors(self) -> List:
+    def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
         if not self.sample:
             errors.append("No sample selected.")

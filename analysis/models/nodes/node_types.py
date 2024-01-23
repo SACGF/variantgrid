@@ -1,5 +1,4 @@
 from collections import defaultdict
-from typing import Dict, List
 
 from django.db import models
 
@@ -39,7 +38,7 @@ def get_node_types_hash_by_class_name():
     return node_types_hash_by_class
 
 
-def get_nodes_by_classification() -> Dict[str, List]:
+def get_nodes_by_classification() -> dict[str, list]:
     node_types = get_node_types_hash()
     nodes = defaultdict(list)
 

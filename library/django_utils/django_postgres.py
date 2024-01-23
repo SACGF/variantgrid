@@ -1,4 +1,3 @@
-from typing import List
 
 from django.db import models
 from django.db.models import Model, sql
@@ -25,7 +24,7 @@ def _escape_sql_param(param):
 
 
 # noinspection PyProtectedMember
-def model_to_insert_sql(model_list: List[Model], db_table: str = None, ignore_fields: List[str] = None):
+def model_to_insert_sql(model_list: list[Model], db_table: str = None, ignore_fields: list[str] = None):
     """ From https://stackoverflow.com/a/63715608/295724 """
 
     if ignore_fields is None:

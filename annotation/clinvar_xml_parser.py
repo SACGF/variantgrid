@@ -2,7 +2,7 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 
 from annotation.models import ClinVarRecord
 from library.utils.xml_utils import XmlParser
@@ -43,12 +43,12 @@ class ClinVarXmlParserOutput:
     """
     When we retrieve from ClinVar, this is our result.
     """
-    urls: List[str]
+    urls: list[str]
     """
     urls Are condition/variant combinations - a single variant might have multiple of these to retrieve.
     The list of urls is only useful for debugging purposes.
     """
-    all_records: List[ClinVarRecord]
+    all_records: list[ClinVarRecord]
     """
     All records that ClinVar had for the a given clinvar_variation_id regardless of stars.
     Up to the caller to only save the relevant records.
@@ -92,14 +92,14 @@ class ClinVarXmlParser(XmlParser, ABC):
         pass
 
     @classmethod
-    def load_from_input(cls, handle) -> List[ClinVarRecord]:
-        parsed_results: List[ClinVarRecord] = []
+    def load_from_input(cls, handle) -> list[ClinVarRecord]:
+        parsed_results: list[ClinVarRecord] = []
         for result in cls().parse(handle):
             parsed_results.append(result)
         parsed_results.sort(reverse=True)
         return parsed_results
 
-    def __init__(self, prefix: Optional[List] = None):
+    def __init__(self, prefix: Optional[list] = None):
         self.latest: Optional[ClinVarRecord] = None
         super().__init__(prefix=prefix)
 

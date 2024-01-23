@@ -6,7 +6,6 @@ from django.utils import timezone
 
 from analysis.models import Analysis, AnalysisLock
 from annotation.fake_annotation import get_fake_annotation_version
-
 from snpdb.models import GenomeBuild
 
 

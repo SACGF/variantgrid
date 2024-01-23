@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Optional
 
 from django import forms
 from django.contrib import messages
@@ -43,7 +43,7 @@ class DiscordanceReportTriageForm(forms.ModelForm):
 class DiscordanceReportTriageView(AjaxFormView[DiscordanceReportTriage]):
 
     @classmethod
-    def lazy_render(cls, obj: DiscordanceReportTriage, context: Optional[Dict] = None) -> LazyRender:
+    def lazy_render(cls, obj: DiscordanceReportTriage, context: Optional[dict] = None) -> LazyRender:
         def dynamic_context_gen(request):
             if context and context.get("saved") is True:
                 user = request.user

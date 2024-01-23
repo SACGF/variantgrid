@@ -1,5 +1,4 @@
 import os
-from typing import Tuple
 
 import cyvcf2
 from django.conf import settings
@@ -26,7 +25,7 @@ class TestVCFProcessors(TestCase):
             Sequence.objects.get_or_create(seq=base, seq_md5_hash=md5sum_str(base), length=len(base))
 
     @classmethod
-    def _create_fake_upload_step_and_vcf(cls, vcf_filename, vcf_reader) -> Tuple[UploadStep, UploadedVCF]:
+    def _create_fake_upload_step_and_vcf(cls, vcf_filename, vcf_reader) -> tuple[UploadStep, UploadedVCF]:
         user = User.objects.get_or_create(username='testuser')[0]
         uploaded_file = UploadedFile.objects.create(path=vcf_filename,
                                                     import_source=ImportSource.COMMAND_LINE,

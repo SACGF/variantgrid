@@ -1,5 +1,3 @@
-from typing import Tuple
-
 from django.contrib.auth.models import User
 
 from snpdb.models import Lab, Organization, Country
@@ -55,9 +53,9 @@ class ClassificationTestUtils:
         pass
 
     @staticmethod
-    def lab_and_user() -> Tuple[Lab, User]:
+    def lab_and_user() -> tuple[Lab, User]:
         return Lab.objects.get(group_name='instx/labby'), User.objects.get(username='joejoe')
 
     @staticmethod
-    def external_lab_and_user() -> Tuple[Lab, User]:
+    def external_lab_and_user() -> tuple[Lab, User]:
         return Lab.objects.get(group_name='instx/ext'), User.objects.get(username='joejoe')

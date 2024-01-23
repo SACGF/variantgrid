@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional, List
+from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import Group, User
@@ -48,7 +48,7 @@ class LabNotificationBuilder(NotificationBuilder):
         if self.notification_type == LabNotificationBuilder.NotificationType.SLACK_ONLY:
             return
 
-        recipient_list: List[str] = []
+        recipient_list: list[str] = []
         if lab_email := self.lab.email:
             recipient_list.append(lab_email)
         else:

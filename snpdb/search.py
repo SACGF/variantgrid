@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from functools import cached_property, reduce
 from re import IGNORECASE
-from typing import List, Set, Optional, Type, Pattern, Callable, Any, Match, Union, Dict, Iterable
+from typing import Optional, Type, Pattern, Callable, Any, Match, Union, Iterable
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -66,7 +66,7 @@ class SearchInput:
             return pattern.match(self.search_string)
 
     @property
-    def search_words(self) -> List[str]:
+    def search_words(self) -> list[str]:
         """
         Split on white space and commas in the search input - use when filtering on name
         :return:
@@ -86,19 +86,19 @@ class SearchInput:
         # TODO, this would be a good place to handle roman numerals and arabic as the inverse (per Ontology search)
         # have a parameter to say if the substitution is desired
         if words := self.search_words:
-            qs: List[Q] = []
+            qs: list[Q] = []
             for word in words:
                 qs.append(Q(**{f"{field_name}__{test}": word}))
             return reduce(operator.and_, qs)
         else:
             raise ValueError("No tokens found in search, can't generate q_words")
 
-    def search(self) -> List['SearchResponse']:
+    def search(self) -> list['SearchResponse']:
         """
         Execute the search by firing off the search_signal (which is connected to via @search_receiver)
         :return:
         """
-        valid_responses: List[SearchResponse] = []
+        valid_responses: list[SearchResponse] = []
         response_tuples = search_signal.send_robust(sender=SearchInput, search_input=self)
         for caller, response in response_tuples:
             if response:
@@ -130,7 +130,7 @@ class SearchInput:
         return variant_qs
 
     @cached_property
-    def genome_builds(self) -> Set[GenomeBuild]:
+    def genome_builds(self) -> set[GenomeBuild]:
         """
         Provide the list of genome builds that should be included in the search
         """
@@ -165,7 +165,7 @@ class SearchInputInstance:
         return self.search_input.search_string
 
     @property
-    def genome_builds(self) -> Set[GenomeBuild]:
+    def genome_builds(self) -> set[GenomeBuild]:
         return self.search_input.genome_builds
 
     @property
@@ -176,7 +176,7 @@ class SearchInputInstance:
         return self.search_input.get_visible_variants(genome_build=genome_build)
 
     @property
-    def search_words(self) -> List[str]:
+    def search_words(self) -> list[str]:
         return self.search_input.search_words
 
     def q_words(self, field_name: str = "name", test: str = "icontains") -> Q:
@@ -188,7 +188,7 @@ class SearchMessageOverall:
     message: str
     severity: LogLevel = LogLevel.ERROR
     search_info: Optional['SearchResponse'] = None
-    genome_builds: Optional[List[GenomeBuild]] = None
+    genome_builds: Optional[list[GenomeBuild]] = None
 
     @property
     def _sort_order(self):
@@ -263,7 +263,7 @@ class SearchResultGenomeBuildMessages:
     Note that genome build agnostic messages will return an empty array of these
     """
     genome_build: GenomeBuild
-    messages: List[SearchMessage]
+    messages: list[SearchMessage]
 
     @cached_property
     def message_summary(self):
@@ -289,7 +289,7 @@ class SearchResult:
     The actual object returned by the search
     """
 
-    messages: List[SearchMessage] = field(default_factory=list)
+    messages: list[SearchMessage] = field(default_factory=list)
     """
     Any validation messages associated with the preview
     """
@@ -334,7 +334,7 @@ class SearchResult:
         return self.match_strength or SearchResultMatchStrength.STRONG_MATCH
 
     @cached_property
-    def genome_build_relevant_messages(self) -> List[SearchMessage]:
+    def genome_build_relevant_messages(self) -> list[SearchMessage]:
         """
         What validation messages are relevant to show for this record, e.g. if it's a variant found using both 37 & 38
         and the user's preferred genome build is 38, this will return messages associated to no genome build and to
@@ -348,7 +348,7 @@ class SearchResult:
             return remove_duplicates_from_list(filtered_list)
 
     @property
-    def genome_builds_with_messages(self) -> List[SearchResultGenomeBuildMessages]:
+    def genome_builds_with_messages(self) -> list[SearchResultGenomeBuildMessages]:
         """
         Lists genome build with associated messages
         """
@@ -407,11 +407,11 @@ class SearchResult:
         return self.preview.category
 
     @property
-    def genome_builds(self) -> Optional[Set[GenomeBuild]]:
+    def genome_builds(self) -> Optional[set[GenomeBuild]]:
         return self.preview.genome_builds
 
     @property
-    def annotation_consortia(self) -> Optional[List['AnnotationConsortia']]:
+    def annotation_consortia(self) -> Optional[list['AnnotationConsortia']]:
         if consortia := self.preview.annotation_consortia:
             return list(sorted(consortia))
 
@@ -441,7 +441,7 @@ class _SearchResultFactory:
     Could be a
     * QuerySet, a PreviewData, an instance of a PreviewModelMixin or list
     * A tuple where the first item is any of the above, and the subsequent items are:
-    ** str, List[str], SearchMessage, List[SearchMessage] - to be converted to SearchMessage and applies to every
+    ** str, list[str], SearchMessage, list[SearchMessage] - to be converted to SearchMessage and applies to every
     value from the first index.
     ** A callable that takes a value from the first item of the tuple and creates a SearchResult (handy for providing
     extra validation).
@@ -453,9 +453,9 @@ class _SearchResultFactory:
     extra validation)
     """
 
-    extra_messages: List[SearchMessage]
+    extra_messages: list[SearchMessage]
     """
-    If str, List[str] etc is provided in a tuple yielded from a @search_receiver, the messages apply to every object
+    If str, list[str] etc is provided in a tuple yielded from a @search_receiver, the messages apply to every object
     that came from the first parameter
     """
 
@@ -463,7 +463,7 @@ class _SearchResultFactory:
     def convert(output: Any):
         source: Any
         factory: Callable[[Any], SearchResult] = _default_make_search_result
-        extra_messages: List[SearchMessage] = []
+        extra_messages: list[SearchMessage] = []
 
         if isinstance(output, tuple):
             # if we got a tuple or a list, the first entry is the "source" and the subsequent values
@@ -544,7 +544,7 @@ class SearchExample:
     English explanation of what text will activate this search
     """
 
-    examples: Optional[List[str]] = None
+    examples: Optional[list[str]] = None
     """
     An example of input that will activate the search
     """
@@ -588,12 +588,12 @@ class SearchResponse:
     The example to show to the user
     """
 
-    results: List[SearchResult] = field(default_factory=list)
+    results: list[SearchResult] = field(default_factory=list)
     """
     Actual search results if matched_pattern
     """
 
-    messages_overall: List[SearchMessageOverall] = field(default_factory=list)
+    messages_overall: list[SearchMessageOverall] = field(default_factory=list)
     """
     Messages about the search overall that aren't linked to a single record.
     Handy if the input is broken
@@ -635,10 +635,10 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
     This method converts a SearchResponse for Variants into a SearchResponse for Alleles.
     It will get cranky if there are variants without Alleles
     """
-    allele_to_variants: Dict[Allele, List[SearchResult]] = defaultdict(list)
-    no_allele_variants: List[SearchResult] = []
-    allele_results: List[SearchResult] = []
-    non_variant_data: List[SearchResult] = []  # probably ManualCreateVariants etc
+    allele_to_variants: dict[Allele, list[SearchResult]] = defaultdict(list)
+    no_allele_variants: list[SearchResult] = []
+    allele_results: list[SearchResult] = []
+    non_variant_data: list[SearchResult] = []  # probably ManualCreateVariants etc
 
     for result in variant_response.results:
         if result.preview.icon == Variant.preview_icon():
@@ -720,13 +720,13 @@ class SearchResponsesCombined:
     Is the complete output of a SearchInput across all searches
     """
 
-    def __init__(self, search_input: SearchInput, responses: List[SearchResponse]):
+    def __init__(self, search_input: SearchInput, responses: list[SearchResponse]):
         self.search_input = search_input
         self.responses = list(sorted(responses))
 
     @cached_property
-    def search_counts(self) -> List[SearchCount]:
-        counts: Dict[str, SearchCount] = {}
+    def search_counts(self) -> list[SearchCount]:
+        counts: dict[str, SearchCount] = {}
         for response in self.responses:
             # FIXME if the responses expected return type doesn't match a SearchResult's actual category
             # these counts all go to bunk, probably best to disallow that
@@ -745,11 +745,11 @@ class SearchResponsesCombined:
         return any(sc for sc in self.search_counts if sc.excluded_results)
 
     @cached_property
-    def results(self) -> List[SearchResult]:
+    def results(self) -> list[SearchResult]:
         return list(itertools.chain.from_iterable([response.results for response in self.responses]))
 
     @cached_property
-    def messages_overall(self) -> List[SearchMessageOverall]:
+    def messages_overall(self) -> list[SearchMessageOverall]:
         return list(itertools.chain.from_iterable([response.messages_overall for response in self.responses]))
 
     def single_preferred_result(self):
@@ -830,7 +830,7 @@ def search_receiver(
 
     def medium_search(search_input: SearchInputInstance):
         for x in filtered_results:
-            messages: List[str] = validate(x)
+            messages: list[str] = validate(x)
             yield x, messages
 
     def complicated_search(search_input: SearchInputInstance):
@@ -863,7 +863,7 @@ def search_receiver(
                 #
                 return None
 
-            overall_messages: Set[SearchMessageOverall] = set()
+            overall_messages: set[SearchMessageOverall] = set()
 
             matched_pattern = False
             results = []

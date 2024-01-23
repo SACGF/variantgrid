@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List, Set, Tuple, Dict
+from typing import Optional
 
 from cache_memoize import cache_memoize
 from django.db import models
@@ -38,14 +38,14 @@ class AbstractTrioInheritance(ABC):
         return cohort_genotype_collection.get_zygosity_q(sample_zygosities_dict, sample_require_zygosity_dict)
 
     @staticmethod
-    def _zygosity_options(zyg: Set, allow_unknown=False):
+    def _zygosity_options(zyg: set, allow_unknown=False):
         if allow_unknown:
             # Make a new set so as to not alter passed in value
             zyg = zyg | {Zygosity.UNKNOWN_ZYGOSITY}
         zyg = zyg - {Zygosity.MISSING}  # Implementation detail - don't show to user
         return ", ".join(sorted([Zygosity.display(z) for z in zyg]))
 
-    def get_zygosities_method(self, mum_z: Set, dad_z: Set, proband_z: Set):
+    def get_zygosities_method(self, mum_z: set, dad_z: set, proband_z: set):
         proband = self._zygosity_options(proband_z)
         mum = self._zygosity_options(mum_z, not self.node.require_zygosity)
         dad = self._zygosity_options(dad_z, not self.node.require_zygosity)
@@ -53,24 +53,24 @@ class AbstractTrioInheritance(ABC):
         return ", ".join([f"{k}: {v}" for k, v in filters.items() if v])
 
     @abstractmethod
-    def get_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         pass
 
     @abstractmethod
     def get_method(self) -> str:
         pass
 
-    def get_contigs(self) -> Optional[Set[Contig]]:
+    def get_contigs(self) -> Optional[set[Contig]]:
         """ None means we don't know """
         return None
 
 
 class SimpleTrioInheritance(AbstractTrioInheritance):
     @abstractmethod
-    def _get_mum_dad_proband_zygosities(self) -> Tuple[Set, Set, Set]:
+    def _get_mum_dad_proband_zygosities(self) -> tuple[set, set, set]:
         pass
 
-    def get_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         cgc = self.node.trio.cohort.cohort_genotype_collection
         alias = cgc.cohortgenotype_alias
         q = self._get_zyg_q(cgc, self._get_mum_dad_proband_zygosities())
@@ -81,27 +81,27 @@ class SimpleTrioInheritance(AbstractTrioInheritance):
 
 
 class Recessive(SimpleTrioInheritance):
-    def _get_mum_dad_proband_zygosities(self) -> Tuple[Set, Set, Set]:
+    def _get_mum_dad_proband_zygosities(self) -> tuple[set, set, set]:
         return {Zygosity.HET}, {Zygosity.HET}, {Zygosity.HOM_ALT}
 
 
 class Dominant(SimpleTrioInheritance):
-    def _get_mum_dad_proband_zygosities(self) -> Tuple[Set, Set, Set]:
+    def _get_mum_dad_proband_zygosities(self) -> tuple[set, set, set]:
         mother_zyg = self.UNAFFECTED_AND_AFFECTED_ZYGOSITIES[int(self.node.trio.mother_affected)]
         father_zyg = self.UNAFFECTED_AND_AFFECTED_ZYGOSITIES[int(self.node.trio.father_affected)]
         return mother_zyg, father_zyg, self.HAS_VARIANT
 
 
 class Denovo(SimpleTrioInheritance):
-    def _get_mum_dad_proband_zygosities(self) -> Tuple[Set, Set, Set]:
+    def _get_mum_dad_proband_zygosities(self) -> tuple[set, set, set]:
         return self.NO_VARIANT, self.NO_VARIANT, self.HAS_VARIANT
 
 
 class XLinkedRecessive(SimpleTrioInheritance):
-    def _get_mum_dad_proband_zygosities(self) -> Tuple[Set, Set, Set]:
+    def _get_mum_dad_proband_zygosities(self) -> tuple[set, set, set]:
         return {Zygosity.HET}, set(), {Zygosity.HOM_ALT}
 
-    def get_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         arg_q_dict = super().get_arg_q_dict()
         q = Q(locus__contig__name='X')  # will work for hg19 and GRCh38
         arg_q_dict[None] = {str(q): q}
@@ -110,7 +110,7 @@ class XLinkedRecessive(SimpleTrioInheritance):
     def get_method(self) -> str:
         return super().get_method() + " and contig name = 'X'"
 
-    def get_contigs(self) -> Optional[Set[Contig]]:
+    def get_contigs(self) -> Optional[set[Contig]]:
         return set(self.node.trio.genome_build.contigs.filter(name='X'))
 
 
@@ -147,7 +147,7 @@ class CompHet(AbstractTrioInheritance):
         two_hit_genes = set(two_hits.values_list("varianttranscriptannotation__gene", flat=True).distinct())
         return comp_het_q, two_hit_genes
 
-    def get_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         comp_het_q, two_hit_genes = self._get_comp_het_q_and_two_hit_genes()
         variant_annotation_version = self.node.analysis.annotation_version.variant_annotation_version
         comp_het_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, two_hit_genes)
@@ -165,7 +165,7 @@ class CompHet(AbstractTrioInheritance):
         dad_but_not_mum = self.get_zygosities_method(mum2, dad2, set())
         return f"Proband: HET, and >=2 hits from genes where ({mum_but_not_dad}) OR ({dad_but_not_mum})"
 
-    def get_contigs(self) -> Optional[Set[Contig]]:
+    def get_contigs(self) -> Optional[set[Contig]]:
         _, two_hit_genes = self._get_comp_het_q_and_two_hit_genes()
         contig_qs = Contig.objects.filter(transcriptversion__genome_build=self.node.trio.genome_build,
                                           transcriptversion__gene_version__gene__in=two_hit_genes)
@@ -188,7 +188,7 @@ class TrioNode(AbstractCohortBasedNode):
         return 0
 
     @staticmethod
-    def get_trio_inheritance_errors(trio: Trio, inheritance) -> List[str]:
+    def get_trio_inheritance_errors(trio: Trio, inheritance) -> list[str]:
         errors = []
         if trio:
             if inheritance == TrioInheritance.DOMINANT:
@@ -233,7 +233,7 @@ class TrioNode(AbstractCohortBasedNode):
         klass = inhertiance_classes[TrioInheritance(self.inheritance)]
         return klass(self)
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         cohort, arg_q_dict = self.get_cohort_and_arg_q_dict()
         if cohort:
             inheritance = self._inheritance_factory()
@@ -241,7 +241,7 @@ class TrioNode(AbstractCohortBasedNode):
             self.merge_arg_q_dicts(arg_q_dict, self.get_vcf_locus_filters_arg_q_dict())
         return arg_q_dict
 
-    def _get_node_contigs(self) -> Optional[Set[Contig]]:
+    def _get_node_contigs(self) -> Optional[set[Contig]]:
         node_contigs = None
         if self.trio:
             inheritance = self._inheritance_factory()
@@ -284,7 +284,7 @@ class TrioNode(AbstractCohortBasedNode):
     def get_node_class_label():
         return 'Trio'
 
-    def _get_configuration_errors(self) -> List:
+    def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
         if not self.trio:
             errors.append("No trio selected")

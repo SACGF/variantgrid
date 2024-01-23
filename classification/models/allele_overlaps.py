@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property, reduce
-from typing import List, Optional, Dict, Set, Iterator
+from typing import Optional, Iterator
 
 from django.db.models import Count, QuerySet, Subquery
 
@@ -32,7 +32,7 @@ class PatientCount:
     Is complicated by spotty use of patient_id, and some labs only being able to provide one classification per allele
     """
 
-    counts: Dict[_PatientIdLab, int]
+    counts: dict[_PatientIdLab, int]
 
     @cached_property
     def count(self):
@@ -51,7 +51,7 @@ class PatientCount:
         return PatientCount(counts={key: 1})
 
     def __add__(self, other):
-        counts: Dict[_PatientIdLab, int] = {}
+        counts: dict[_PatientIdLab, int] = {}
         for key in self.counts.keys() | other.counts.keys():
             counts[key] = self.counts.get(key, 0) + other.counts.get(key, 0)
         return PatientCount(counts=counts)
@@ -109,7 +109,7 @@ class OverlapState(ABC):
 
 @dataclass(frozen=True)
 class ClassificationLabSummaryExtra(ClassificationLabSummary):
-    cms: Optional[List[ClassificationModification]]
+    cms: Optional[list[ClassificationModification]]
 
     @property
     def patient_count(self) -> PatientCount:
@@ -132,7 +132,7 @@ class ClinicalGroupingOverlap:
     def __init__(self, state: OverlapState, clinical_context: Optional[ClinicalContext]):
         self.state = state
         self.clinical_context = clinical_context
-        self.groups: Dict[ClassificationLabSummaryEntry, List[ClassificationModification]] = defaultdict(list)
+        self.groups: dict[ClassificationLabSummaryEntry, list[ClassificationModification]] = defaultdict(list)
         self.labs = set()
 
     @property
@@ -217,11 +217,11 @@ class ClinicalGroupingOverlap:
             return self._sort_value < other._sort_value
 
     @property
-    def all_latest(self) -> List[ClassificationModification]:
+    def all_latest(self) -> list[ClassificationModification]:
         return [lb.latest for lb in self.lab_clinical_significances]
 
     @cached_property
-    def lab_clinical_significances(self) -> List[ClassificationLabSummaryExtra]:
+    def lab_clinical_significances(self) -> list[ClassificationLabSummaryExtra]:
         return sorted([ClassificationLabSummaryExtra(
             group=group,
             is_internal=group.lab in self.calculator_state.perspective.labs_if_not_admin,
@@ -241,8 +241,8 @@ class AlleleOverlap(OverlapState):
     def __init__(self, calculator_state: OverlapsCalculatorState, allele: Allele):
         self._calculator_state = calculator_state
         self.allele = allele
-        self.context_map: Dict[Optional[ClinicalContext], ClinicalGroupingOverlap] = {}
-        self._c_hgvses: Set[CHGVS] = set()
+        self.context_map: dict[Optional[ClinicalContext], ClinicalGroupingOverlap] = {}
+        self._c_hgvses: set[CHGVS] = set()
 
         # need to keep track of the below for sorting
         self.shared_labs = set()
@@ -276,11 +276,11 @@ class AlleleOverlap(OverlapState):
         return len(self.all_labs) > 1
 
     @property
-    def clinical_groupings(self) -> List[ClinicalGroupingOverlap]:
+    def clinical_groupings(self) -> list[ClinicalGroupingOverlap]:
         return sorted(self.context_map.values())
 
     @property
-    def c_hgvses(self) -> List[CHGVS]:
+    def c_hgvses(self) -> list[CHGVS]:
         return sorted(self._c_hgvses)
 
     @property
@@ -309,7 +309,7 @@ class AlleleOverlap(OverlapState):
 
 @dataclass(frozen=True)
 class OverlapSet:
-    overlaps: List[AlleleOverlap]
+    overlaps: list[AlleleOverlap]
     label: str
 
 
@@ -325,7 +325,7 @@ class OverlapsCalculator:
         self.shared_only = shared_only
 
     @cached_property
-    def overlaps(self) -> List[AlleleOverlap]:
+    def overlaps(self) -> list[AlleleOverlap]:
         perspective = self.calculator_state.perspective
         lab_ids = perspective.lab_ids
         # find all overlaps, then see if user is allowed to see them and if user wants to see them (lab restriction)
@@ -372,7 +372,7 @@ class OverlapsCalculator:
                 yield cc
 
     @cached_property
-    def overlaps_vus(self) -> List[ClinicalGroupingOverlap]:
+    def overlaps_vus(self) -> list[ClinicalGroupingOverlap]:
         overlaps = []
         for cc in self.clinical_groupings_overlaps:
             if cc.is_all_vus and cc.is_multi_lab:
@@ -381,7 +381,7 @@ class OverlapsCalculator:
         return overlaps
 
     @property
-    def overlap_sets(self) -> List[OverlapSet]:
+    def overlap_sets(self) -> list[OverlapSet]:
         segmented = segment(self.overlaps, filter_func=lambda overlap: overlap.is_multi_lab)
         return [
             OverlapSet(segmented[0], label="Multi-Lab"),
@@ -389,7 +389,7 @@ class OverlapsCalculator:
         ]
 
     @cached_property
-    def multi_lab_counts(self) -> Dict[DiscordanceLevel, int]:
+    def multi_lab_counts(self) -> dict[DiscordanceLevel, int]:
         counts = defaultdict(int)
         for cc in self.clinical_groupings_overlaps:
             if cc.shared and cc.is_multi_lab:
@@ -397,7 +397,7 @@ class OverlapsCalculator:
         return counts
 
     @cached_property
-    def same_lab_counts(self) -> Dict[DiscordanceLevel, int]:
+    def same_lab_counts(self) -> dict[DiscordanceLevel, int]:
         counts = defaultdict(int)
         for cc in self.clinical_groupings_overlaps:
             if cc.shared and not cc.is_multi_lab:

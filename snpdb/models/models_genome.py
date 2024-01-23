@@ -2,7 +2,7 @@ import itertools
 import os
 import re
 from functools import cached_property
-from typing import Dict, Optional, List
+from typing import Optional
 
 from django.conf import settings
 from django.db import models
@@ -102,7 +102,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
 
     @staticmethod
     @timed_cache(ttl=60)
-    def builds_with_annotation_cached() -> List['GenomeBuild']:
+    def builds_with_annotation_cached() -> list['GenomeBuild']:
         enabled_annotation = []
         for build_name, values in settings.ANNOTATION.items():
             if values.get("enabled"):
@@ -110,7 +110,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
         return list(GenomeBuild.objects.filter(name__in=enabled_annotation))
 
     @staticmethod
-    def builds_with_annotation_priority(priority: 'GenomeBuild') -> List['GenomeBuild']:
+    def builds_with_annotation_priority(priority: 'GenomeBuild') -> list['GenomeBuild']:
         return [priority] + list(GenomeBuild.builds_with_annotation().exclude(pk=priority.pk).all())
 
     @staticmethod
@@ -148,7 +148,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
         return build_annotation_descriptions
 
     @cached_property
-    def chrom_contig_mappings(self) -> Dict[str, 'Contig']:
+    def chrom_contig_mappings(self) -> dict[str, 'Contig']:
         chrom_contig_mappings = {}
         for contig in self.contigs:
             chrom_contig_mappings[contig.name] = contig
@@ -159,7 +159,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
         chrom_contig_mappings["mt"] = chrom_contig_mappings["MT"]
         return chrom_contig_mappings
 
-    def get_chrom_contig_id_mappings(self) -> Dict[str, int]:
+    def get_chrom_contig_id_mappings(self) -> dict[str, int]:
         return {k: v.pk for k, v in self.chrom_contig_mappings.items()}
 
     def convert_chrom_to_contig_accession(self, chrom: str) -> str:

@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import List, Dict, Optional, Tuple
+from typing import Optional
 
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -74,7 +74,7 @@ def discordance_reports_download(request: HttpRequest, lab_id: Optional[str] = N
 @dataclass
 class DiscordanceNoLongerConsiders:
     reason: str
-    classifications: List[ClassificationModification]
+    classifications: list[ClassificationModification]
 
 
 @dataclass(frozen=True)
@@ -121,7 +121,7 @@ class DiscordanceReportTemplateData:
         self.report = DiscordanceReport.objects.get(pk=discordance_report_id)
         self.user = user
 
-    def triage_embeds(self) -> List[LazyRender]:
+    def triage_embeds(self) -> list[LazyRender]:
         return [DiscordanceReportTriageView.lazy_render(triage) for triage in
                 self.report.discordancereporttriage_set.all().order_by('-lab')]
 
@@ -157,7 +157,7 @@ class DiscordanceReportTemplateData:
     def has_history(self) -> bool:
         return self.report_history.count() > 1
 
-    def report_history_summary(self) -> List[DiscordanceReportRowData]:
+    def report_history_summary(self) -> list[DiscordanceReportRowData]:
         perspective = LabPickerData.for_user(self.user)
         return [
             DiscordanceReportRowData(
@@ -187,11 +187,11 @@ class DiscordanceReportTemplateData:
                 return first
 
     @cached_property
-    def _effectives_and_not_considered(self) -> Tuple[List[ClassificationModification], List[DiscordanceNoLongerConsiders]]:
+    def _effectives_and_not_considered(self) -> tuple[list[ClassificationModification], list[DiscordanceNoLongerConsiders]]:
 
-        effectives: List[ClassificationModification] = []
-        withdrawns: List[ClassificationModification] = []
-        changed_context: Dict[Optional[ClinicalContext], List[ClassificationModification]] = defaultdict(list)
+        effectives: list[ClassificationModification] = []
+        withdrawns: list[ClassificationModification] = []
+        changed_context: dict[Optional[ClinicalContext], list[ClassificationModification]] = defaultdict(list)
 
         for drc in self.report.discordancereportclassification_set.all().order_by('-created'):
             if drc.withdrawn_effective:
@@ -201,7 +201,7 @@ class DiscordanceReportTemplateData:
             else:
                 effectives.append(drc.classification_effective)
 
-        no_longer_considered: List[DiscordanceNoLongerConsiders] = []
+        no_longer_considered: list[DiscordanceNoLongerConsiders] = []
         if withdrawns:
             no_longer_considered.append(DiscordanceNoLongerConsiders("Withdrawn", withdrawns))
         if unmatched := changed_context.pop(None, None):
@@ -213,7 +213,7 @@ class DiscordanceReportTemplateData:
         return effectives, no_longer_considered
 
     @property
-    def effective_classifications(self) -> List[ClassificationModification]:
+    def effective_classifications(self) -> list[ClassificationModification]:
         return self._effectives_and_not_considered[0]
 
     @property
@@ -232,20 +232,20 @@ class DiscordanceReportTemplateData:
         )
 
     @property
-    def no_longer_considered(self) -> List[DiscordanceNoLongerConsiders]:
+    def no_longer_considered(self) -> list[DiscordanceNoLongerConsiders]:
         return self._effectives_and_not_considered[1]
 
     @property
-    def c_hgvses(self) -> List[CHGVS]:
+    def c_hgvses(self) -> list[CHGVS]:
         return sorted({cm.c_hgvs_best(self.genome_build) for cm in self.report.all_classification_modifications})
 
     def resolve_label(self):
         return f'{self.c_hgvses[0]}'
 
     @property
-    def lab_clin_sigs(self) -> List[_LabClinSig]:
+    def lab_clin_sigs(self) -> list[_LabClinSig]:
 
-        clin_sig_keys_to_pending: Dict[_LabClinSigKey, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        clin_sig_keys_to_pending: dict[_LabClinSigKey, dict[str, int]] = defaultdict(lambda: defaultdict(int))
         for cm in self.effective_classifications:
             lab = cm.classification.lab
             clin_sig = cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
@@ -257,8 +257,8 @@ class DiscordanceReportTemplateData:
             lab_clin_sig_key = _LabClinSigKey(lab=lab, clin_sig=clin_sig)
             clin_sig_keys_to_pending[lab_clin_sig_key][pending_clin_sig] += 1
 
-        lab_clin_sigs: List[_LabClinSig] = []
-        pendings: Dict[str, int]
+        lab_clin_sigs: list[_LabClinSig] = []
+        pendings: dict[str, int]
         for key, pendings in clin_sig_keys_to_pending.items():
             total_count = 0
             suggested_pending_cs = None
@@ -282,17 +282,17 @@ class DiscordanceReportTemplateData:
             SpecialEKeys.CLINICAL_SIGNIFICANCE) == lab_clin_sig.clin_sig]
 
     @property
-    def main_clin_sigs(self) -> List[EvidenceKeyOption]:
+    def main_clin_sigs(self) -> list[EvidenceKeyOption]:
         # consider restricting to clin sigs used by labs
         # but only some labs use VUS_A, B etc
         return [option for option in self.all_clin_sig_options if option.get('key') in {'B', 'LB', 'VUS', 'LP', 'P'}]
 
     @property
-    def all_clin_sig_options(self) -> List[EvidenceKeyOption]:
+    def all_clin_sig_options(self) -> list[EvidenceKeyOption]:
         return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).virtual_options
 
     @property
-    def bucketless_clin_sig_options(self) -> List[EvidenceKeyOption]:
+    def bucketless_clin_sig_options(self) -> list[EvidenceKeyOption]:
         return [sig for sig in self.all_clin_sig_options if sig.get('bucket') is None]
 
     @property
@@ -498,13 +498,13 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
 
 
 @receiver(preview_extra_signal, sender=DiscordanceReport)
-def discordance_preview_extra(sender, user: User, obj: DiscordanceReport, **kwargs) -> Optional[List[PreviewKeyValue]]:
+def discordance_preview_extra(sender, user: User, obj: DiscordanceReport, **kwargs) -> Optional[list[PreviewKeyValue]]:
     template_data = DiscordanceReportTemplateData(obj.pk, user=user)
     groups = ClassificationGroups(
         classification_modifications=template_data.effective_classifications,
         group_utils=template_data.group_utils
     )
-    extras: List[PreviewKeyValue] = []
+    extras: list[PreviewKeyValue] = []
     cids = ",".join([str(g.most_recent.classification.pk) for g in groups.groups])
     diff_url = reverse("classification_diff") + f"?cids={cids}&discordance_report_id={obj.pk}"
 

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
-from typing import List, Iterable, Optional, Dict, Set, Any, Mapping, Callable
+from typing import Iterable, Optional, Any, Mapping, Callable
 
 from django.contrib.auth.models import User
 from django.db.models import Count
@@ -70,7 +70,7 @@ class KeyProperty:
     def count_aggregate(self) -> Count:
         return Count(f"{self.field}")
 
-    def apply_to(self, used_key_dict: Dict[str, UsedKey]):
+    def apply_to(self, used_key_dict: dict[str, UsedKey]):
         used_key = used_key_dict.get(self.key)
         if not used_key:
             used_key = UsedKey()
@@ -93,11 +93,11 @@ class UsedKeyTracker:
                  pretty: bool = False,
                  cell_formatter: Optional[Callable[[Any], Any]] = None,
                  include_explains: bool = False,
-                 ignore_evidence_keys: Optional[Set[str]] = None):
+                 ignore_evidence_keys: Optional[set[str]] = None):
         self.user = user
         self.ekeys = ekeys
         self.key_value_formatter = key_value_formatter
-        self.calc_dict: Dict[str, UsedKey] = {}
+        self.calc_dict: dict[str, UsedKey] = {}
         self.pretty = pretty
         self.cell_formatter = cell_formatter
         self.ordered_keys = None
@@ -112,8 +112,8 @@ class UsedKeyTracker:
         else:
             return self.ekeys.all_keys
 
-    def all_key_properties(self) -> List[KeyProperty]:
-        all_props: List[KeyProperty] = []
+    def all_key_properties(self) -> list[KeyProperty]:
+        all_props: list[KeyProperty] = []
         properties = ['value', 'note']
         if self.include_explains:
             properties.append('explain')
@@ -137,7 +137,7 @@ class UsedKeyTracker:
     def check_record(self, vcm: ClassificationModification):
         self.check_evidence(vcm.evidence)
 
-    def check_evidence(self, evidence: Dict[str, Any]):
+    def check_evidence(self, evidence: dict[str, Any]):
         if self.processed:
             raise ValueError("Can't check evidence after process() has been called")
 
@@ -171,9 +171,9 @@ class UsedKeyTracker:
                 used_key.ekey = ekey
                 self.ordered_keys.append(used_key)
 
-    def header(self) -> List[str]:
+    def header(self) -> list[str]:
         self.process()
-        cols: List[str] = []
+        cols: list[str] = []
         for used_key in self.ordered_keys:
             if used_key.has_value:
                 cols.append(self.key_value_formatter.header_for(used_key.ekey, pretty=self.pretty))
@@ -183,9 +183,9 @@ class UsedKeyTracker:
                 cols.append(self.key_value_formatter.header_for(used_key.ekey, pretty=self.pretty) + '.explain')
         return cols
 
-    def row(self, classification_modification: ClassificationModification, formatter: Callable[[Any], Any]) -> List[Optional[str]]:
+    def row(self, classification_modification: ClassificationModification, formatter: Callable[[Any], Any]) -> list[Optional[str]]:
         self.process()
-        cols: List[Optional[str]] = []
+        cols: list[Optional[str]] = []
         evidence = classification_modification.get_visible_evidence(self.user)
         for used_key in self.ordered_keys:
             value_obj = evidence.get(used_key.ekey.key)
@@ -242,7 +242,7 @@ class TranscriptGroup:
     def __init__(self):
         self.highest_transcript_version: Optional[int] = None
         self.highest_transcript_chgvs: Optional[CHGVS] = None
-        self.vcmcs: List[VariantWithChgvs] = []
+        self.vcmcs: list[VariantWithChgvs] = []
 
     def add(self, vcmc: VariantWithChgvs):
         self.vcmcs.append(vcmc)
@@ -261,7 +261,7 @@ class TranscriptGroup:
         return False
 
     @property
-    def cms(self) -> List[ClassificationModification]:
+    def cms(self) -> list[ClassificationModification]:
         return [vcmcs.vcm for vcmcs in self.vcmcs]
 
     @property

@@ -2,7 +2,7 @@ import math
 import re
 from enum import Enum
 from functools import cached_property
-from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set, TypedDict, cast
+from typing import Any, Optional, Iterable, Mapping, Union, TypedDict, cast
 
 from django.db import models
 from django.db.models.deletion import SET_NULL
@@ -124,7 +124,7 @@ class EvidenceKey(TimeStampedModel):
 
         return lower_key + suffix_str
 
-    def matched_options(self, normal_value_obj) -> List[Dict[str, str]]:
+    def matched_options(self, normal_value_obj) -> list[dict[str, str]]:
         """
         Given a value (or possibly list of values) generate or find the options that match.
         e.g. for the value ["maternal","xsdfdwerew"] for variant inheritance we'd get
@@ -156,7 +156,7 @@ class EvidenceKey(TimeStampedModel):
         return [{'key': value, 'label': value}]
 
     @staticmethod
-    def __special_up_options(options: List[Dict[str, Any]], default: str) -> List[EvidenceKeyOption]:
+    def __special_up_options(options: list[dict[str, Any]], default: str) -> list[EvidenceKeyOption]:
         """
         Converts a CriteriaEvaluation options (e.g. CriteriaEvaluation.BENIGN_OPTIONS) and a default strength (e.g. BM)
         to a list of evidence keys with default and override populated appropriately
@@ -175,9 +175,9 @@ class EvidenceKey(TimeStampedModel):
         return use_options
 
     @property
-    def virtual_options(self) -> Optional[List[EvidenceKeyOption]]:
+    def virtual_options(self) -> Optional[list[EvidenceKeyOption]]:
         if self.options:
-            return cast(List[EvidenceKeyOption], self.options)
+            return cast(list[EvidenceKeyOption], self.options)
         if self.value_type == EvidenceKeyValueType.CRITERIA:
             for criteria in [CriteriaEvaluation.BENIGN_OPTIONS,
                              CriteriaEvaluation.NEUTRAL_OPTIONS,
@@ -190,8 +190,8 @@ class EvidenceKey(TimeStampedModel):
         return None
 
     @cached_property
-    def _option_indexes(self) -> Optional[Dict[str, int]]:
-        index_map: Optional[Dict[str, int]] = None
+    def _option_indexes(self) -> Optional[dict[str, int]]:
+        index_map: Optional[dict[str, int]] = None
         if options := self.virtual_options:
             index_map = {}
             for index, option in enumerate(options):
@@ -203,12 +203,12 @@ class EvidenceKey(TimeStampedModel):
             return index_map.get(val, 0)
         return val
 
-    def sort_values(self, values: Iterable) -> List:
+    def sort_values(self, values: Iterable) -> list:
         sorter = self.classification_sorter_value
         sorted_list = sorted(values, key=lambda x: (sorter(x), x))
         return sorted_list
 
-    def classification_sorter(self, evidence: Dict[str, Any]) -> Union[int, Any]:
+    def classification_sorter(self, evidence: dict[str, Any]) -> Union[int, Any]:
         """
         Provide .classification_sorter as a Callable[dict aka ClassificationData] -> sortable
         """
@@ -224,13 +224,13 @@ class EvidenceKey(TimeStampedModel):
                         raise ValueError(f'{self.key} option with space in it "{option_key}"')
 
     @property
-    def option_dictionary(self) -> Dict[str, str]:
+    def option_dictionary(self) -> dict[str, str]:
         if options := self.virtual_options:
             return {x.get('key'): x.get('label') for x in options}
         else:
             return {}
 
-    def option_dictionary_property(self, prop: str) -> Dict[str, Any]:
+    def option_dictionary_property(self, prop: str) -> dict[str, Any]:
         if options := self.virtual_options:
             return {x.get('key'): x.get(prop) for x in options if prop in x}
         else:
@@ -268,7 +268,7 @@ class EvidenceKey(TimeStampedModel):
         return key[:1].upper() + key[1:].replace('_', ' ')
 
     @staticmethod
-    def merge_config(config1: Dict[str, Any], config2: Dict[str, Any]) -> Dict[str, Any]:
+    def merge_config(config1: dict[str, Any], config2: dict[str, Any]) -> dict[str, Any]:
         """
         This method is typically used to merge org and lab config together
         :param config1 An evidence key config, with key-EvidenceKeyDefinition or key-False (to hide)
@@ -317,7 +317,7 @@ class EvidenceKey(TimeStampedModel):
                 value = [value]
             str_values = []
             for val in value:
-                matched_option: Dict
+                matched_option: dict
                 if val == '' or val is None:
                     matched_option = next((option for option in options if option.get('key') is None or option.get('key') == ''), None)
                 else:
@@ -395,7 +395,7 @@ class EvidenceKeyMap:
         return EvidenceKeyMap.cached_key(key).pretty_value(item.get(key))
 
     @staticmethod
-    def _ordered_keys() -> List[EvidenceKey]:
+    def _ordered_keys() -> list[EvidenceKey]:
         # sort in code (rather than sql) as pretty_label isn't available normally
         key_entries = list(EvidenceKey.objects.all())
         key_entries.sort(key=lambda k: (k.order, k.pretty_label.lower()))
@@ -467,25 +467,25 @@ class EvidenceKeyMap:
     def __contains__(self, item):
         return item in self.key_dict
 
-    def immutable(self) -> List[EvidenceKey]:
+    def immutable(self) -> list[EvidenceKey]:
         return [eKey for eKey in self.all_keys if eKey.immutable]
 
-    def mandatory(self) -> List[EvidenceKey]:
+    def mandatory(self) -> list[EvidenceKey]:
         return [eKey for eKey in self.all_keys if eKey.mandatory]
 
-    def share_level(self, sl: ShareLevel) -> List[EvidenceKey]:
+    def share_level(self, sl: ShareLevel) -> list[EvidenceKey]:
         return [eKey for eKey in self.all_keys if eKey.max_share_level_enum == sl]
 
-    def share_level_and_higher(self, sl: ShareLevel) -> List[EvidenceKey]:
+    def share_level_and_higher(self, sl: ShareLevel) -> list[EvidenceKey]:
         return [eKey for eKey in self.all_keys if eKey.max_share_level_enum in ShareLevel.same_and_higher(sl)]
 
-    def criteria(self) -> List[EvidenceKey]:
+    def criteria(self) -> list[EvidenceKey]:
         """
         :return: A list of ALL criteria EvidenceKeys, includes standard ACMG and custom ones with namespaces
         """
         return [eKey for eKey in self.all_keys if eKey.value_type == EvidenceKeyValueType.CRITERIA]
 
-    def acmg_criteria(self) -> List[EvidenceKey]:
+    def acmg_criteria(self) -> list[EvidenceKey]:
         """
         :return: A list of STANDARD ACMG criteria EvidenceKeys
         """
@@ -627,11 +627,11 @@ class VCDataCell:
         self._ensure_my_data()['note'] = value
 
     @property
-    def db_refs(self) -> Optional[List[VCDbRefDict]]:
+    def db_refs(self) -> Optional[list[VCDbRefDict]]:
         return self._my_data.get('db_refs')
 
     @db_refs.setter
-    def db_refs(self, db_refs: Optional[List[VCDbRefDict]]):
+    def db_refs(self, db_refs: Optional[list[VCDbRefDict]]):
         self._ensure_my_data()['db_refs'] = db_refs
 
     def strip_non_client_submission(self):
@@ -677,7 +677,7 @@ class VCDataCell:
     def __contains__(self, item):
         return item in self._my_data
 
-    def diff(self, dest: Optional['VCDataCell'], ignore_if_omitted: Optional[Set[str]] = None) -> Dict[str, Any]:
+    def diff(self, dest: Optional['VCDataCell'], ignore_if_omitted: Optional[set[str]] = None) -> dict[str, Any]:
         """
         Given two dictionaries, returns only the entries that have changed
         :param dest: Another dict
@@ -739,7 +739,7 @@ class VCDataDict:
     Represents an entire patch or base set of data for EvidenceKeys
     """
 
-    def __init__(self, data: Dict[str, Any], evidence_keys: EvidenceKeyMap):
+    def __init__(self, data: dict[str, Any], evidence_keys: EvidenceKeyMap):
         if not isinstance(data, dict):
             raise ValueError('Data must be of type dict')
         self.data = data

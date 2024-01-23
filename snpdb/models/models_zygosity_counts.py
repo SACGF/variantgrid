@@ -1,6 +1,5 @@
 import logging
 from functools import cached_property
-from typing import Tuple
 
 from django.conf import settings
 from django.db import models
@@ -66,7 +65,7 @@ class VariantZygosityCountCollection(RelatedModelsPartitionModel):
             raise
 
     @staticmethod
-    def annotate_global_germline_counts(qs: QuerySet) -> Tuple[QuerySet, 'VariantZygosityCountCollection']:
+    def annotate_global_germline_counts(qs: QuerySet) -> tuple[QuerySet, 'VariantZygosityCountCollection']:
         vzcc = VariantZygosityCountCollection.get_global_germline_counts()
         return vzcc.annotate_all_germline_counts(qs), vzcc
 

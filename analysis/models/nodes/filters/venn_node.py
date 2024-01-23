@@ -2,7 +2,7 @@ import logging
 import sys
 import traceback
 from functools import cached_property
-from typing import Optional, Tuple, Dict
+from typing import Optional
 
 import celery
 from django.db import models
@@ -93,7 +93,7 @@ class VennNode(AnalysisNode):
         return {"venn_flag": self.get_venn_flag()}
 
     @cached_property
-    def ordered_parents(self) -> Tuple[AnalysisNode, AnalysisNode]:
+    def ordered_parents(self) -> tuple[AnalysisNode, AnalysisNode]:
         """ Return left_parent, right_parent """
         parents = self.get_parent_subclasses()
         a, b = parents
@@ -170,7 +170,7 @@ class VennNode(AnalysisNode):
     def _get_node_q(self) -> Optional[Q]:
         raise ValueError("VennNode always uses cache - this should never be called!")
 
-    def _get_node_cache_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def _get_node_cache_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         if self.set_operation == SetOperations.NONE:
             q_none = self.q_none()
             return {None: {str(q_none): q_none}}

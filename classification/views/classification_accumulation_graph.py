@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import IntEnum, Enum
 from functools import total_ordering
-from typing import Dict, List, Any, Optional, Tuple, Set, Union, Iterable
+from typing import Any, Optional, Union, Iterable
 
 import pandas as pd
 from django.http import StreamingHttpResponse
@@ -85,10 +85,10 @@ class AlleleSummary:
 
     def __init__(self):
         # key is classification ID
-        self.classifications: Dict[int, ClassificationSummary] = {}
+        self.classifications: dict[int, ClassificationSummary] = {}
         self.biggest_status = AlleleStatus.Empty
         self.last_status = AlleleStatus.Empty
-        self.not_withdrawn: List[ClassificationSummary] = []
+        self.not_withdrawn: list[ClassificationSummary] = []
 
     def add_modification(self, summary: ClassificationSummary):
         self.classifications[summary.classification_id] = summary.merge(
@@ -143,21 +143,21 @@ class ClassificationAccumulationGraph:
     @dataclass
     class _SummarySnapshot:
         at: datetime
-        counts: Dict[Any, int]
+        counts: dict[Any, int]
 
     class _RunningAccumulation:
 
         def __init__(self, mode: AccumulationReportMode):
             # id is allele ID
             self.mode = mode
-            self.allele_summaries: Dict[int, AlleleSummary] = defaultdict(AlleleSummary)
+            self.allele_summaries: dict[int, AlleleSummary] = defaultdict(AlleleSummary)
 
         def add_modification(self, summary: ClassificationSummary):
             allele_summary = self.allele_summaries[summary.allele_id]
             allele_summary.add_modification(summary=summary)
 
         def snapshot(self, at: datetime) -> 'ClassificationAccumulationGraph._SummarySnapshot':
-            counts: Dict[Union[AlleleStatus, str], int] = defaultdict(int)
+            counts: dict[Union[AlleleStatus, str], int] = defaultdict(int)
             for allele_summary in self.allele_summaries.values():
                 status = allele_summary.biggest_status
 
@@ -176,7 +176,7 @@ class ClassificationAccumulationGraph:
 
                     allele_summary.reset()
 
-                    involved_labs: Set[str] = set()
+                    involved_labs: set[str] = set()
                     for summary in allele_summary.not_withdrawn:
                         involved_labs.add(summary.lab_name)
 
@@ -188,7 +188,7 @@ class ClassificationAccumulationGraph:
     def __init__(self,
                  mode: AccumulationReportMode,
                  shared_only: bool = True,
-                 labs: Optional[List[Lab]] = None,
+                 labs: Optional[list[Lab]] = None,
                  time_step: Optional[timedelta] = None
                  ):
         self.mode = mode
@@ -204,7 +204,7 @@ class ClassificationAccumulationGraph:
             return ShareLevel.ALL_LEVELS
 
     def withdrawn_iterable(self) -> IterableTransformer[ClassificationSummary]:
-        flag_collection_id_to_allele_classification: Dict[int, Tuple[int, int, Optional[str]]] = {}
+        flag_collection_id_to_allele_classification: dict[int, tuple[int, int, Optional[str]]] = {}
 
         flag_qs = FlagComment.objects.filter(flag__flag_type=classification_flag_types.classification_withdrawn) \
             .order_by("created") \
@@ -261,11 +261,11 @@ class ClassificationAccumulationGraph:
 
         return IterableTransformer(cm_qs_summary, classification_transformer)
 
-    def report(self) -> List['ClassificationAccumulationGraph._SummarySnapshot']:
+    def report(self) -> list['ClassificationAccumulationGraph._SummarySnapshot']:
 
         time_delta = self.time_delta
         running_accum = self._RunningAccumulation(mode=self.mode)
-        sub_totals: List[ClassificationAccumulationGraph._SummarySnapshot] = []
+        sub_totals: list[ClassificationAccumulationGraph._SummarySnapshot] = []
 
         stitcher = IterableStitcher[ClassificationSummary](
             iterables=[
@@ -311,7 +311,7 @@ class ClassificationAccumulationGraph:
 def _iter_report_list(
         mode: AccumulationReportMode = AccumulationReportMode.Classification,
         shared_only: bool = True,
-        labs: Optional[List[Lab]] = None,
+        labs: Optional[list[Lab]] = None,
         time_step: Optional[timedelta] = None
         ):
 
@@ -353,7 +353,7 @@ def download_report(request):
     return response
 
 
-def get_accumulation_graph_data(mode: AccumulationReportMode = AccumulationReportMode.Classification, labs: Optional[Iterable[Lab]] = None) -> Dict[str, Any]:
+def get_accumulation_graph_data(mode: AccumulationReportMode = AccumulationReportMode.Classification, labs: Optional[Iterable[Lab]] = None) -> dict[str, Any]:
     data = list(_iter_report_list(mode=mode, labs=labs))
     header = data[0]
     rows = data[1:]

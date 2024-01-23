@@ -1,7 +1,7 @@
 import itertools
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Union, List, Set, Iterator, Iterable
+from typing import Optional, Union, Iterator, Iterable
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
@@ -17,7 +17,7 @@ from snpdb.models import Lab, Organization, GenomeBuild, UserSettings
 @dataclass
 class OrgLabGroup:
     org: Organization
-    labs: List[Lab]
+    labs: list[Lab]
     external: bool = False
 
     @property
@@ -30,8 +30,8 @@ class LabSelection:
     """
     Used to simply LabPickerData, tracks which labs the view has access to, and which ones are selected
     """
-    all_labs: List[Lab]
-    selected_labs: Set[Lab]
+    all_labs: list[Lab]
+    selected_labs: set[Lab]
     selected_org: Optional[Organization]
     selected_all: bool
 
@@ -58,7 +58,7 @@ class LabSelection:
 
         # grab labs now and filter to reduce the number of SQL calls
         all_labs_list = list(all_labs.all())
-        selected_lab_set: Set[Lab] = set()
+        selected_lab_set: set[Lab] = set()
 
         if isinstance(selection, int) and selection != 0:
             # legacy method of just passing LabID around
@@ -147,11 +147,11 @@ class LabPickerData:
         return self.lab_selection.selection
 
     @property
-    def all_labs(self) -> List[Lab]:
+    def all_labs(self) -> list[Lab]:
         return self.lab_selection.all_labs
 
     @property
-    def selected_labs(self) -> Set[Lab]:
+    def selected_labs(self) -> set[Lab]:
         return self.lab_selection.selected_labs
 
     @property
@@ -225,7 +225,7 @@ class LabPickerData:
         return set(self.all_labs)
 
     @property
-    def labs_if_not_admin(self) -> Set[Lab]:
+    def labs_if_not_admin(self) -> set[Lab]:
         # Used to group together as "internal" labs
         if self.is_admin_mode:
             return set()
@@ -292,7 +292,7 @@ class LabPickerData:
             return redirect(reverse(self.view_name, kwargs={'lab_id': default_lab.pk}))
 
     @property
-    def lab_ids(self) -> Set[int]:
+    def lab_ids(self) -> set[int]:
         """
         :return: A set of selected lab.pks
         """

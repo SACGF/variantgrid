@@ -1,7 +1,7 @@
 import os
 from collections import defaultdict
 from time import sleep
-from typing import List, Dict, Any
+from typing import Any
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
@@ -45,8 +45,8 @@ def process_classification_import(classification_import: ClassificationImport, i
         Batch variant classification submissions are broken up into 1 ClassificationImport per GenomeBuild """
 
     variant_pk_lookup = VariantPKLookup(classification_import.genome_build)
-    variant_tuples_by_hash: Dict[Any, VariantCoordinate] = {}
-    allele_info_by_hash: Dict[Any, List[ImportedAlleleInfo]] = defaultdict(list)
+    variant_tuples_by_hash: dict[Any, VariantCoordinate] = {}
+    allele_info_by_hash: dict[Any, list[ImportedAlleleInfo]] = defaultdict(list)
 
     # WARNING: previously only matched if the allele_info had no matched_variant
     # (not sure we even have to filter on status of processing, as it shouldn't be part of a classificationImport
@@ -85,7 +85,7 @@ def process_classification_import(classification_import: ClassificationImport, i
 
 def _classification_upload_pipeline(
         classification_import: ClassificationImport,
-        unknown_variant_tuples_list: List[VariantCoordinate],
+        unknown_variant_tuples_list: list[VariantCoordinate],
         import_source):
     """ We always run this even with no variants to insert as we need:
         * create Alleles for variants

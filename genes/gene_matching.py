@@ -1,7 +1,7 @@
 import re
 from collections import defaultdict
 from functools import cached_property
-from typing import Iterable, Dict, List
+from typing import Iterable
 
 from django.db.models import F, Q, Subquery, OuterRef
 from django.db.models.functions import Upper
@@ -73,13 +73,13 @@ class HGNCMatcher:
         return HGNCMatcher()
 
     @cached_property
-    def _aliases(self) -> Dict:
+    def _aliases(self) -> dict:
         alias_qs = GeneSymbolAlias.objects.filter(source=GeneSymbolAliasSource.HGNC)
         alias_qs = alias_qs.annotate(uc_alias=Upper("alias"), uc_symbol=Upper("gene_symbol_id"))
         return dict(alias_qs.values_list("uc_alias", "uc_symbol"))
 
     @cached_property
-    def _hgnc_by_uc_gene_symbol(self) -> Dict:
+    def _hgnc_by_uc_gene_symbol(self) -> dict:
         hgnc_qs = HGNC.objects.filter(status=HGNCStatus.APPROVED)
         return {str(hgnc.gene_symbol_id).upper(): hgnc for hgnc in hgnc_qs}
 
@@ -99,7 +99,7 @@ class ReleaseGeneMatcher:
         self.release = release
 
     @cached_property
-    def genes(self) -> Dict[str, list]:
+    def genes(self) -> dict[str, list]:
         gv_qs = GeneVersion.objects.filter(releasegeneversion__release=self.release).annotate(symbol_upper=Upper("gene_symbol"))
         genes_dict = defaultdict(list)
         for symbol_upper, gene_id in gv_qs.values_list("symbol_upper", "gene__identifier"):
@@ -121,7 +121,7 @@ class ReleaseGeneMatcher:
         return genes_dict
 
     @cached_property
-    def aliases_dict(self) -> Dict[str, Dict]:
+    def aliases_dict(self) -> dict[str, dict]:
         """ Get symbols from other GeneVersions that match genes from our release """
         genes_dict = self._get_genes_dict()
 
@@ -186,7 +186,7 @@ class ReleaseGeneMatcher:
                     self._aliases(alias_graph, genes_dict, gene_symbol, child_symbol_match_path,
                                   visited_symbols=visited_symbols)
 
-    def _get_gene_id_and_match_info_for_symbol(self, gene_symbols) -> Dict[str, List]:
+    def _get_gene_id_and_match_info_for_symbol(self, gene_symbols) -> dict[str, list]:
         gene_symbol_gene_id_and_match_info = defaultdict(list)  # list items = (gene_id, match_info)
         for gene_symbol_id in gene_symbols:
             gene_name = clean_string(str(gene_symbol_id)).upper()

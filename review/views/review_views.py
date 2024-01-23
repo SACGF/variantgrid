@@ -1,4 +1,4 @@
-from typing import Optional, List, Any
+from typing import Optional, Any
 
 from django import forms
 from django.contrib import messages
@@ -71,7 +71,7 @@ class ReviewForm(Form):
         self.fields["review_method"].initial = participants.get("review_method")
         self.fields["review_participants"].initial = participants.get("review_participants")
 
-    def describe_difference_fields(self) -> List[BoundField]:
+    def describe_difference_fields(self) -> list[BoundField]:
         return [self[key] for key, f in self.fields.items() if isinstance(f, DescribeDifferenceField)]
 
     def save(self):

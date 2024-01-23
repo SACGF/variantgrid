@@ -2,7 +2,6 @@ import datetime
 import operator
 from functools import reduce
 from functools import wraps, partial
-from typing import List, Tuple, Dict
 
 import nameparser
 from dateutil import parser
@@ -71,7 +70,7 @@ class RequireSuperUserView(View):
         return super().dispatch(request, *args, **kwargs)
 
 
-def get_model_fields(model, ignore_fields=None) -> List[str]:
+def get_model_fields(model, ignore_fields=None) -> list[str]:
     ignore_fields = set(ignore_fields or [])
     return [f.name for f in model._meta.fields if f.name not in ignore_fields]
 
@@ -285,7 +284,7 @@ def highest_pk(model: ModelBase):
     return qs_highest_pk(qs)
 
 
-def bulk_insert_class_data(apps, app_name: str, klass_name_and_data_list: List[Tuple[str, List[Dict]]]):
+def bulk_insert_class_data(apps, app_name: str, klass_name_and_data_list: list[tuple[str, list[dict]]]):
     """ For Django migrations """
     for klass_name, data in klass_name_and_data_list:
         klass = apps.get_model(app_name, klass_name)
@@ -295,7 +294,7 @@ def bulk_insert_class_data(apps, app_name: str, klass_name_and_data_list: List[T
         klass.objects.bulk_create(records)
 
 
-def add_new_columns_after(custom_column_qs, new_columns: List[str]):
+def add_new_columns_after(custom_column_qs, new_columns: list[str]):
     for custom_column in custom_column_qs:
         ccc = custom_column.custom_columns_collection
         # Move everything after hpo_terms down

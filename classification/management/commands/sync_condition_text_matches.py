@@ -1,5 +1,4 @@
 from collections import defaultdict
-from typing import Dict
 
 from django.core.management.base import BaseCommand
 
@@ -51,7 +50,7 @@ class Command(BaseCommand):
             total_deleted = 0
             ct_total_deleted = 0
             for ct in ConditionText.objects.all():
-                classifications_for_gene_symbol: Dict[str, int] = defaultdict(int)
+                classifications_for_gene_symbol: dict[str, int] = defaultdict(int)
                 for ctm in list(ct.conditiontextmatch_set.all()):
                     if gene_symbol := ctm.gene_symbol:
                         if ctm.classification_id:

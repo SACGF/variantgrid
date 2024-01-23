@@ -1,6 +1,6 @@
 import json
 from functools import cached_property
-from typing import List, Optional
+from typing import Optional
 
 from django.http import HttpRequest
 
@@ -35,17 +35,17 @@ class ClassificationExportFormatterJSON(ClassificationExportFormatter):
     def delimiter_for_row(self):
         return ","
 
-    def header(self) -> List[str]:
+    def header(self) -> list[str]:
         return ['{"records":[']
 
-    def row(self, allele_data: AlleleData) -> List[str]:
+    def row(self, allele_data: AlleleData) -> list[str]:
         rows = []
         for ci in allele_data.all_cms:
             if row := self.to_row(ci.classification, withdrawn=ci.withdrawn):
                 rows.append(row)
         return rows
 
-    def footer(self) -> List[str]:
+    def footer(self) -> list[str]:
         return ["]}"]
 
     def get_discordant_status(self, discordant_status):

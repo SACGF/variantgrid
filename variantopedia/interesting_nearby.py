@@ -2,7 +2,6 @@ import operator
 import re
 from collections import defaultdict, Counter
 from functools import reduce
-from typing import Dict, Tuple
 
 from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
@@ -112,7 +111,7 @@ def get_nearby_summaries(user, variant, annotation_version, distance=None, clini
 
 
 def interesting_summary(qs, user, genome_build, total=True, clinvar=True, classifications=True,
-                        clinical_significance=False) -> Tuple[str, Dict[str, int]]:
+                        clinical_significance=False) -> tuple[str, dict[str, int]]:
     """ returns a string summary, and dict of tag counts (so you can format w/colors) """
     counts = interesting_counts(qs, user, genome_build, clinical_significance=clinical_significance)
     summary = ""
@@ -229,7 +228,7 @@ def filter_variant_codon(qs, variant: Variant):
     return qs
 
 
-def get_transcript_and_exons(variant) -> Dict:
+def get_transcript_and_exons(variant) -> dict:
     transcript_qs = variant.varianttranscriptannotation_set.filter(exon__isnull=False)
     return dict(transcript_qs.values_list("transcript_id", "exon"))
 
@@ -246,7 +245,7 @@ def filter_variant_exon(qs, variant: Variant):
     return qs
 
 
-def get_transcript_and_domains(variant) -> Dict[str, set]:
+def get_transcript_and_domains(variant) -> dict[str, set]:
     transcript_and_domain = defaultdict(set)
     transcript_qs = variant.varianttranscriptannotation_set.filter(interpro_domain__isnull=False)
     for t, interpro_domain in transcript_qs.values_list("transcript_id", "interpro_domain"):
@@ -269,7 +268,7 @@ def filter_variant_domain(qs, variant: Variant):
     return qs
 
 
-def get_gene_symbol_filters(qs, variant: Variant, annotation_version: AnnotationVersion) -> Dict:
+def get_gene_symbol_filters(qs, variant: Variant, annotation_version: AnnotationVersion) -> dict:
     gene_qs_dict = {}
     vav = annotation_version.variant_annotation_version
     for gene_symbol in GeneSymbol.overlapping_variant(variant, vav).order_by("pk"):

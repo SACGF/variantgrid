@@ -9,7 +9,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, List, Dict, Set, Union, Tuple, Iterable, Any
+from typing import Optional, Union, Iterable, Any
 
 from cache_memoize import cache_memoize
 from django.conf import settings
@@ -48,7 +48,7 @@ class OntologyService(models.TextChoices):
     ORPHANET = "ORPHA", "ORPHA"
     MEDGEN = "MedGen", "MedGen"
 
-    EXPECTED_LENGTHS: Dict[str, int] = Constant({
+    EXPECTED_LENGTHS: dict[str, int] = Constant({
         MONDO[0]: 7,
         OMIM[0]: 6,
         HPO[0]: 7,
@@ -58,7 +58,7 @@ class OntologyService(models.TextChoices):
         MEDGEN[0]: None
     })
 
-    IMPORTANCE: Dict[str, int] = Constant({
+    IMPORTANCE: dict[str, int] = Constant({
         MONDO[0]: 2,
         OMIM[0]: 3,
         HPO[0]: 4,  # put HPO relationships last as they occasionally spam OMIM
@@ -68,7 +68,7 @@ class OntologyService(models.TextChoices):
         MEDGEN[0]: 7
     })
 
-    URLS: Dict[str, str] = Constant({
+    URLS: dict[str, str] = Constant({
         MONDO[0]: "https://monarchinitiative.org/disease/MONDO:${1}",
         OMIM[0]: "http://www.omim.org/entry/${1}",
         HPO[0]: "https://hpo.jax.org/app/browse/term/HP:${1}",
@@ -78,14 +78,14 @@ class OntologyService(models.TextChoices):
         MEDGEN[0]: "https://www.ncbi.nlm.nih.gov/medgen/${1}"
     })
 
-    LOCAL_ONTOLOGY_PREFIXES: Set[str] = Constant({
+    LOCAL_ONTOLOGY_PREFIXES: set[str] = Constant({
         MONDO[0],
         OMIM[0],
         HPO[0],
         HGNC[0]
     })
 
-    CONDITION_ONTOLOGIES: Set[str] = Constant({
+    CONDITION_ONTOLOGIES: set[str] = Constant({
         MONDO[0],
         OMIM[0],
         HPO[0],
@@ -174,7 +174,7 @@ class GeneDiseaseClassification(models.TextChoices):
         raise ValueError(f"No GeneDiseaseClassification for {label}")
 
     @staticmethod
-    def get_above_min(min_classification: str) -> List[str]:
+    def get_above_min(min_classification: str) -> list[str]:
         classifications = []
         for e in reversed(GeneDiseaseClassification):
             classifications.append(e.label)
@@ -519,14 +519,14 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
         return None
 
     @staticmethod
-    def split_hpo_omim_mondo(ontology_term_ids: Iterable[str]) -> Tuple[QuerySet, QuerySet, QuerySet]:
+    def split_hpo_omim_mondo(ontology_term_ids: Iterable[str]) -> tuple[QuerySet, QuerySet, QuerySet]:
         hpo_qs = OntologyTerm.objects.filter(pk__in=ontology_term_ids, ontology_service=OntologyService.HPO)
         omim_qs = OntologyTerm.objects.filter(pk__in=ontology_term_ids, ontology_service=OntologyService.OMIM)
         mondo_qs = OntologyTerm.objects.filter(pk__in=ontology_term_ids, ontology_service=OntologyService.MONDO)
         return hpo_qs, omim_qs, mondo_qs
 
     @staticmethod
-    def split_hpo_omim_mondo_as_dict(ontology_term_ids: Iterable[str]) -> Dict[str, QuerySet]:
+    def split_hpo_omim_mondo_as_dict(ontology_term_ids: Iterable[str]) -> dict[str, QuerySet]:
         hpo_qs, omim_qs, mondo_qs = OntologyTerm.split_hpo_omim_mondo(ontology_term_ids)
         return {"HPO": hpo_qs, "OMIM": omim_qs, "MONDO": mondo_qs}
 
@@ -615,7 +615,7 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
         return OntologyTermRelation._as_ontology(term, OntologyService.OMIM)
 
     @staticmethod
-    def relations_of(term: OntologyTerm, otr_qs: Optional[QuerySet['OntologyTermRelation']] = None) -> List['OntologyTermRelation']:
+    def relations_of(term: OntologyTerm, otr_qs: Optional[QuerySet['OntologyTermRelation']] = None) -> list['OntologyTermRelation']:
         def sort_relationships(rel1, rel2):
             other1 = rel1.other_end(term)
             other2 = rel2.other_end(term)
@@ -649,7 +649,7 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
         return moi_classifications
 
     @staticmethod
-    def get_moi_summary(moi_classifications, valid_classifications) -> List[str]:
+    def get_moi_summary(moi_classifications, valid_classifications) -> list[str]:
         moi_summary = []
         for moi, classifications in moi_classifications.items():
             classification_submitters = []
@@ -661,7 +661,7 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
         return moi_summary
 
 
-OntologyList = Optional[Union[QuerySet, List[OntologyTerm]]]
+OntologyList = Optional[Union[QuerySet, list[OntologyTerm]]]
 
 
 class OntologyVersion(TimeStampedModel):
@@ -760,7 +760,7 @@ class OntologyVersion(TimeStampedModel):
                                                          extra__strongest_classification__isnull=False)
 
     @cache_memoize(WEEK_SECS)
-    def moi_and_submitters(self) -> Tuple[List[str], List[str]]:
+    def moi_and_submitters(self) -> tuple[list[str], list[str]]:
         """ Cached lists of MOI/Submitters from GenCC gene/disease extra JSON """
         moi = set()
         submitters = set()
@@ -771,7 +771,7 @@ class OntologyVersion(TimeStampedModel):
         return list(sorted(moi)), list(sorted(submitters))
 
     @cache_memoize(DAY_SECS)
-    def cached_gene_symbols_for_terms_tuple(self, terms_tuple: Tuple[int]) -> QuerySet:
+    def cached_gene_symbols_for_terms_tuple(self, terms_tuple: tuple[int]) -> QuerySet:
         """ Slightly restricted signature so we can cache it """
         return self.gene_symbols_for_terms(terms_tuple)
 
@@ -795,7 +795,7 @@ class OntologyVersion(TimeStampedModel):
                                                    min_classification=min_classification, otr_qs=otr_qs)
 
     def gene_disease_relations(self, gene_symbol: Union[str, GeneSymbol],
-                               min_classification: GeneDiseaseClassification = None) -> List[OntologyTermRelation]:
+                               min_classification: GeneDiseaseClassification = None) -> list[OntologyTermRelation]:
         snake = self.terms_for_gene_symbol(gene_symbol, OntologyService.MONDO,
                                            max_depth=0, min_classification=min_classification)
         return snake.leaf_relations(ontology_relation=OntologyRelation.RELATED)
@@ -844,7 +844,7 @@ class OntologySnake:
     """
 
     def __init__(self, source_term: OntologyTerm, leaf_term: Optional[OntologyTerm] = None,
-                 paths: Optional[List[OntologyTermRelation]] = None):
+                 paths: Optional[list[OntologyTermRelation]] = None):
         self.source_term = source_term
         self.leaf_term = leaf_term or source_term
         self.paths = paths or []
@@ -866,8 +866,8 @@ class OntologySnake:
         new_paths.append(relationship)
         return OntologySnake(source_term=self.source_term, leaf_term=new_leaf, paths=new_paths)
 
-    def show_steps(self) -> List[OntologySnakeStep]:
-        steps: List[OntologySnakeStep] = []
+    def show_steps(self) -> list[OntologySnakeStep]:
+        steps: list[OntologySnakeStep] = []
         node = self.source_term
         for path in self.paths:
             node = path.other_end(node)
@@ -906,24 +906,24 @@ class OntologySnake:
         return self.show_steps()[0].relation.from_import.import_source
 
     @staticmethod
-    def check_if_ancestor(descendant: OntologyTerm, ancestor: OntologyTerm, max_levels=4) -> List['OntologySnake']:
+    def check_if_ancestor(descendant: OntologyTerm, ancestor: OntologyTerm, max_levels=4) -> list['OntologySnake']:
         if ancestor == descendant:
             return OntologySnake(source_term=ancestor, leaf_term=descendant)
 
         if descendant.ontology_service != ancestor.ontology_service:
             raise ValueError(f"Can only check for ancestry within the same ontology service, not {descendant.ontology_service} vs {ancestor.ontology_service}")
 
-        seen: Set[OntologyTerm] = {descendant}
-        new_snakes: List[OntologySnake] = list([OntologySnake(source_term=descendant)])
-        valid_snakes: List[OntologySnake] = []
+        seen: set[OntologyTerm] = {descendant}
+        new_snakes: list[OntologySnake] = list([OntologySnake(source_term=descendant)])
+        valid_snakes: list[OntologySnake] = []
         level = 0
         while new_snakes:
             level += 1
-            snakes_by_leaf: Dict[OntologyTerm, OntologySnake] = {}
+            snakes_by_leaf: dict[OntologyTerm, OntologySnake] = {}
             for snake in new_snakes:
                 snakes_by_leaf[snake.leaf_term] = snake
 
-            new_snakes: List[OntologySnake] = []
+            new_snakes: list[OntologySnake] = []
             for relationship in OntologyTermRelation.objects\
                     .filter(source_term__in=snakes_by_leaf.keys(), relation=OntologyRelation.IS_A)\
                     .exclude(dest_term__in=seen):
@@ -942,7 +942,7 @@ class OntologySnake:
         return []
 
     @staticmethod
-    def all_descendants_of(term: OntologyTerm, limit: int = 100, otr_qs: QuerySet[OntologyTermRelation] = None) -> Tuple[List[OntologyTermDescendant], bool]:
+    def all_descendants_of(term: OntologyTerm, limit: int = 100, otr_qs: QuerySet[OntologyTermRelation] = None) -> tuple[list[OntologyTermDescendant], bool]:
         """
         :param term: The term to find all descendants of
         :param limit: The maximum number of results returned
@@ -952,9 +952,9 @@ class OntologySnake:
         if otr_qs is None:
             otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
 
-        review_terms: Set[OntologyTerm] = {term}
-        reviewed_terms: Set[OntologyTerm] = {term}
-        results: List[OntologyTermDescendant] = []
+        review_terms: set[OntologyTerm] = {term}
+        reviewed_terms: set[OntologyTerm] = {term}
+        results: list[OntologyTermDescendant] = []
 
         depth = 1
         while review_terms:
@@ -992,10 +992,10 @@ class OntologySnake:
             otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
             # otr_qs = OntologyTermRelation.objects.all()
 
-        seen: Set[OntologyTerm] = set()
+        seen: set[OntologyTerm] = set()
         seen.add(term)
-        new_snakes: List[OntologySnake] = list([OntologySnake(source_term=term)])
-        valid_snakes: List[OntologySnake] = []
+        new_snakes: list[OntologySnake] = list([OntologySnake(source_term=term)])
+        valid_snakes: list[OntologySnake] = []
 
         relation_q_list = [
             # the list of relationships below is hardly complete for stopping MONDO <-> OMIM, that's done as an extra step
@@ -1008,9 +1008,9 @@ class OntologySnake:
         iteration = -1
         while new_snakes:
             iteration += 1
-            snakes: List[OntologySnake] = list(new_snakes)
-            new_snakes: List[OntologySnake] = []
-            by_leafs: Dict[OntologyTerm, OntologySnake] = {}
+            snakes: list[OntologySnake] = list(new_snakes)
+            new_snakes: list[OntologySnake] = []
+            by_leafs: dict[OntologyTerm, OntologySnake] = {}
             for snake in snakes:
                 if existing := by_leafs.get(snake.leaf_term):
                     if len(snake.paths) < len(existing.paths):
@@ -1056,7 +1056,7 @@ class OntologySnake:
         return ~Q(from_import__import_source='gencc') | Q(extra__strongest_classification__in=gencc_classifications)
 
     @staticmethod
-    def mondo_terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol]) -> Set[OntologyTerm]:
+    def mondo_terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol]) -> set[OntologyTerm]:
         gene_ontology = OntologyTerm.get_gene_symbol(gene_symbol)
         from ontology.panel_app_ontology import update_gene_relations
         update_gene_relations(gene_symbol)
@@ -1138,7 +1138,7 @@ class OntologySnakes:
     def __bool__(self):
         return bool(self.snakes)
 
-    def __init__(self, snakes: List[OntologySnake]):
+    def __init__(self, snakes: list[OntologySnake]):
         self.snakes = snakes
 
     def __iter__(self):
@@ -1150,10 +1150,10 @@ class OntologySnakes:
     def __getitem__(self, item):
         return self.snakes[item]
 
-    def leafs(self) -> List[OntologyTerm]:
+    def leafs(self) -> list[OntologyTerm]:
         return list(sorted({snake.leaf_term for snake in self}))
 
-    def leaf_relations(self, ontology_relation: str = None) -> List[OntologyTermRelation]:
+    def leaf_relations(self, ontology_relation: str = None) -> list[OntologyTermRelation]:
         relations = {snake.leaf_relationship for snake in self}
         if ontology_relation:
             relations = {otr for otr in relations if otr.relation == ontology_relation}
@@ -1164,7 +1164,7 @@ class SingleTermH:
 
     def __init__(self, term: OntologyTerm):
         self.term = term
-        self.children: Set[SingleTermH] = set()
+        self.children: set[SingleTermH] = set()
         self.depth = 99
         self.resolved = False
 
@@ -1195,7 +1195,7 @@ class AncestorCalculator:
                 raise ValueError(f"Can only find common ancestor of MONDO & HPO, not {ontology_service}")
 
         self.base_terms = terms
-        self.term_hs: Dict[OntologyTerm, SingleTermH] = dict()
+        self.term_hs: dict[OntologyTerm, SingleTermH] = dict()
         for term in terms:
             self.get_term(term)
         self.processed = False

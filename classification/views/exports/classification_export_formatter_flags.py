@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, List, Iterator
+from typing import Optional, Iterator
 
 from django.http import HttpRequest
 
@@ -80,7 +80,7 @@ class ClassificationExportFormatterFlags(ClassificationExportFormatter):
             classification_filter=ClassificationFilter.from_request(request)
         )
 
-    def header(self) -> List[str]:
+    def header(self) -> list[str]:
         return [delimited_row(ProblemRow.csv_header(), delimiter=',')]
 
     def iterate_problems(self, ci: ClassificationIssue) -> Iterator[Problem]:
@@ -118,8 +118,8 @@ class ClassificationExportFormatterFlags(ClassificationExportFormatter):
                 for error in errors:
                     yield Problem(code="Variant Matching", message=f"{error.category_pretty} {error.field_pretty}")
 
-    def row(self, data: AlleleData) -> List[str]:
-        output: List[str] = []
+    def row(self, data: AlleleData) -> list[str]:
+        output: list[str] = []
         for row in data.all_cms:
             if row.withdrawn:
                 continue

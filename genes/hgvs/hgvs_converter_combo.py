@@ -1,5 +1,4 @@
 import logging
-from typing import Tuple
 
 from genes.hgvs import HGVSVariant, HGVSException
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele
@@ -57,7 +56,7 @@ class ComboCheckerHGVSConverter(HGVSConverter):
     def variant_coordinate_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
         return self._call_converters("variant_coordinate_to_c_hgvs", vc, transcript_version)
 
-    def hgvs_to_variant_coordinate_and_reference_match(self, hgvs_string: str, transcript_version) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
+    def hgvs_to_variant_coordinate_and_reference_match(self, hgvs_string: str, transcript_version) -> tuple[VariantCoordinate, HgvsMatchRefAllele]:
         return self._call_converters("hgvs_to_variant_coordinate_and_reference_match", hgvs_string, transcript_version)
 
     def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:

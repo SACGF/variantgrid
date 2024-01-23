@@ -1,6 +1,6 @@
 import re
 from collections import defaultdict
-from typing import List, Optional
+from typing import Optional
 
 from django.http import HttpRequest
 from django.urls.base import reverse
@@ -105,7 +105,7 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
     def extension(self) -> str:
         return "csv"
 
-    def header(self) -> List[str]:
+    def header(self) -> list[str]:
         if self.classification_filter.include_sources and len(self.classification_filter.include_sources) == 2:
             lab_names = sorted([str(lab) for lab in self.classification_filter.include_sources])
             return [delimited_row(['Allele URL', 'Patient_Id', lab_names[0], lab_names[1],
@@ -123,15 +123,15 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
         else:
             raise ValueError("Must specify 2 labs to compare")
 
-    def footer(self) -> List[str]:
+    def footer(self) -> list[str]:
         return []
 
-    def row(self, allele_data: AlleleData) -> List[str]:
+    def row(self, allele_data: AlleleData) -> list[str]:
 
         lab1_comment_data = defaultdict(list)
         lab2_comment_data = defaultdict(list)
 
-        rows: List[str] = []
+        rows: list[str] = []
         lab1 = set()
         lab2 = set()
         message = ''

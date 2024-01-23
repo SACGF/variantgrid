@@ -1,5 +1,3 @@
-from typing import List, Dict
-
 from django.db.models import QuerySet
 
 from classification.enums import EvidenceKeyValueType
@@ -8,8 +6,8 @@ from classification.models import EvidenceKey, Classification, ClassificationMod
 
 class EvidenceKeyToUnit:
 
-    def __init__(self, key_names: List[str]):
-        self.e_keys: List[EvidenceKey] = []
+    def __init__(self, key_names: list[str]):
+        self.e_keys: list[EvidenceKey] = []
         for key_name in key_names:
             e_key = EvidenceKey.objects.get(pk=key_name)
             self.e_keys.append(e_key)
@@ -20,10 +18,10 @@ class EvidenceKeyToUnit:
         self.migrate(qs=Classification.objects.all())
 
     def migrate(self, qs: QuerySet, dry_run: bool = False):
-        # changes: List[str] = []
+        # changes: list[str] = []
         c: Classification
         for c in qs:
-            converted_in_version: Dict[str, int] = {}
+            converted_in_version: dict[str, int] = {}
             cm: ClassificationModification
             for cm in ClassificationModification.objects.filter(classification__id=c.id).order_by('-id'):
                 if evidence := cm.delta:

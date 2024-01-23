@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
-from typing import List, Optional, Dict, Set, Any
+from typing import Optional, Any
 
 from django.conf import settings
 from django.http import HttpRequest
@@ -61,7 +61,7 @@ class FormatDetailsCSV:
         )
 
     @property
-    def ignore_evidence_keys(self) -> Set[str]:
+    def ignore_evidence_keys(self) -> set[str]:
         if self.exclude_transient:
             return {
                 "owner",
@@ -199,7 +199,7 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
 
     def __init__(self, classification_filter: ClassificationFilter, format_details: FormatDetailsCSV):
         self.format_details = format_details
-        self.error_rows: List[str] = []
+        self.error_rows: list[str] = []
         self.e_keys = EvidenceKeyMap.cached()
         self.grouping_utils = ClassificationGroupUtils()
         super().__init__(classification_filter=classification_filter)
@@ -236,17 +236,17 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
     def extension(self) -> str:
         return "csv"
 
-    def header(self) -> List[str]:
+    def header(self) -> list[str]:
         header = RowID.csv_header(self._categories) + ClassificationMeta.csv_header(self._categories) + self.used_keys.header()
         return [delimited_row(header, delimiter=',')]
 
-    def row(self, allele_data: AlleleData) -> List[str]:
+    def row(self, allele_data: AlleleData) -> list[str]:
         # record error to report them in the footer
         if issues := allele_data.issues:
             for issue in issues:
                 if not issue.withdrawn:
                     self.error_rows.append(self.to_row(issue.classification,  allele_data=allele_data, message=issue.message))
-        rows: List[str] = []
+        rows: list[str] = []
         for vcm in allele_data.cms:
             rows.append(self.to_row(vcm, allele_data=allele_data))
 
@@ -265,7 +265,7 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
             )
 
     @cached_property
-    def _categories(self) -> Optional[Dict]:
+    def _categories(self) -> Optional[dict]:
         categories = {}
         if self.format_details.exclude_transient:
             categories["transient"] = None

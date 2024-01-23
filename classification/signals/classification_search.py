@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Optional, List
+from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -73,7 +73,7 @@ def classification_search(search_input: SearchInputInstance):
     yield Classification.objects.filter(Q(pk__in=cm_ids) | Q(pk__in=cm_source_ids))
 
 
-def _allele_preview_classifications_extra(user: User, obj: Allele, genome_build: GenomeBuild) -> List[PreviewKeyValue]:
+def _allele_preview_classifications_extra(user: User, obj: Allele, genome_build: GenomeBuild) -> list[PreviewKeyValue]:
     cms = ClassificationModification.latest_for_user(user=user, allele=obj)
     extras = []
     hgvs_extras = []
@@ -96,7 +96,7 @@ def _allele_preview_classifications_extra(user: User, obj: Allele, genome_build:
     return extras + hgvs_extras
 
 
-def _variant_hgvs_extra(variant: Variant, genome_build: GenomeBuild) -> List[PreviewKeyValue]:
+def _variant_hgvs_extra(variant: Variant, genome_build: GenomeBuild) -> list[PreviewKeyValue]:
     hgvs_extras = []
     if c_hgvs := variant.get_canonical_c_hgvs(genome_build):
         hgvs_extras.append(PreviewKeyValue(None, c_hgvs, dedicated_row=True))

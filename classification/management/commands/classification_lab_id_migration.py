@@ -2,7 +2,6 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import List, Dict
 
 from django.core.management import BaseCommand
 
@@ -56,7 +55,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         lab_id = options["lab"]
         lab = Lab.objects.get(group_name=lab_id)
-        clash_dict: Dict[str, List[Classification]] = defaultdict(list)
+        clash_dict: dict[str, list[Classification]] = defaultdict(list)
 
         classification: Classification
         for classification in Classification.objects.filter(lab=lab).iterator():

@@ -1,6 +1,6 @@
 from enum import Enum, auto
 from functools import cached_property
-from typing import TypedDict, Optional, Tuple
+from typing import TypedDict, Optional
 
 import requests
 from django.conf import settings
@@ -149,7 +149,7 @@ class ClinVarExportSync:
             response_status_code=response.status_code
         )
 
-    def next_request(self, batch: ClinVarExportBatch) -> Tuple[ClinVarExportRequest, ClinVarResponseOutcome]:
+    def next_request(self, batch: ClinVarExportBatch) -> tuple[ClinVarExportRequest, ClinVarResponseOutcome]:
         clinvar_request: ClinVarExportRequest
         if not batch.submission_identifier:
             batch.status = ClinVarExportBatchStatus.UPLOADING

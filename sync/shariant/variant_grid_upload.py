@@ -1,5 +1,5 @@
 import socket
-from typing import Dict, Iterable, List, TypeVar, Union
+from typing import Iterable, TypeVar, Union
 
 from django.db.models import QuerySet
 
@@ -20,7 +20,7 @@ from sync.sync_runner import register_sync_runner, SyncRunner, SyncRunInstance
 SHARIANT_PRIVATE_FIELDS = ['patient_id', 'family_id', 'sample_id', 'patient_summary', 'internal_use', 'variant_type', 'age_units']
 
 
-def insert_nones(data: Dict) -> Dict:
+def insert_nones(data: dict) -> dict:
     for e_key in EvidenceKeyMap.instance().all_keys:
         key = e_key.key
         if key not in data:
@@ -31,7 +31,7 @@ def insert_nones(data: Dict) -> Dict:
 T = TypeVar("T")
 
 
-def batch_iterator_end(iterable: Iterable[T], batch_size: int = 10) -> Iterable[Union[List[T], bool]]:
+def batch_iterator_end(iterable: Iterable[T], batch_size: int = 10) -> Iterable[Union[list[T], bool]]:
     """
     Creates an iterator of list of T from an iterator of T, as well as providing a boolean to indicate if
     this is the final batch
@@ -91,7 +91,7 @@ class VariantGridUploadSyncer(SyncRunner):
 
         return qs
 
-    def classification_to_json(self, vcm: ClassificationModification) -> Dict:
+    def classification_to_json(self, vcm: ClassificationModification) -> dict:
         raw_json = vcm.as_json(ClassificationJsonParams(current_user=admin_bot(), include_data=True, include_messages=False, strip_complicated=True, api_version=2))
         formatted_json = {}
 

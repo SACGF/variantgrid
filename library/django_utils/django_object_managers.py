@@ -1,6 +1,6 @@
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
-from typing import Dict, Any, Optional
+from typing import Any, Optional
 
 from django.conf import settings
 from django.db.models import Manager, QuerySet
@@ -18,7 +18,7 @@ class CachedQuery:
         return f"{self.model} {self.args} {self.kwargs}"
 
 
-_CACHED_QUERIES: Dict[CachedQuery, Any] = {}
+_CACHED_QUERIES: dict[CachedQuery, Any] = {}
 # TODO, could make this a LRU cache so it doesn't grow infinitely for larger models
 
 

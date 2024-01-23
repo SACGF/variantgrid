@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Dict, List, Tuple, Optional
+from typing import Optional
 
 import pandas as pd
 from django.conf import settings
@@ -138,7 +138,7 @@ class VariantGrid(AbstractVariantGrid):
         msg = f"{column_name} not found in grid column model"
         raise PermissionDenied(msg)
 
-    def _get_fields_and_overrides(self, node: AnalysisNode, af_show_in_percent: bool) -> Tuple[List, Dict]:
+    def _get_fields_and_overrides(self, node: AnalysisNode, af_show_in_percent: bool) -> tuple[list, dict]:
         ccc = node.analysis.custom_columns_collection
         annotation_version = node.analysis.annotation_version
         fields, overrides, sample_columns_position = get_custom_column_fields_override_and_sample_position(ccc, annotation_version)
@@ -158,7 +158,7 @@ class VariantGrid(AbstractVariantGrid):
         return fields, overrides
 
     @staticmethod
-    def _get_sample_columns_server_side_formatter(sample: Sample, packed_data_replace: Dict,
+    def _get_sample_columns_server_side_formatter(sample: Sample, packed_data_replace: dict,
                                                   column, i: int, af_show_in_percent: bool):
         """ A function to capture loop variable """
 
@@ -450,7 +450,7 @@ class NodeGeneDiseaseClassificationGenesGrid(DataFrameJqGrid):
         super().__init__()
         self.node = get_node_subclass_or_404(user, node_id, version=version)
 
-    def _get_ontology_term_relations(self) -> List[OntologyTermRelation]:
+    def _get_ontology_term_relations(self) -> list[OntologyTermRelation]:
         return self.node.get_gene_disease_relations()
 
     def get_dataframe(self):
@@ -505,7 +505,7 @@ class NodeGeneListGenesColumns(GeneListGenesColumns):
         It's assumed that if someone added the gene list via auto-complete then they give people who can see
         that analysis permissions (according to analysis not gene list) """
 
-    def _get_gene_annotation_releases(self) -> List['GeneAnnotationRelease']:
+    def _get_gene_annotation_releases(self) -> list['GeneAnnotationRelease']:
         analysis_id = self.get_query_param("analysis_id")
         analysis = Analysis.get_for_user(self.user, pk=analysis_id)
         return [analysis.gene_annotation_release]

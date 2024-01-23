@@ -2,7 +2,7 @@ import itertools
 from abc import ABC
 from dataclasses import dataclass
 from datetime import timedelta, datetime
-from typing import List, Union, Optional, Type
+from typing import Union, Optional, Type
 
 import django.dispatch
 from django.db.models import Model, Q
@@ -34,7 +34,7 @@ class HealthCheckStat(ABC):
         return False
 
     @classmethod
-    def to_lines(cls, items: List, health_request: HealthCheckRequest) -> List[str]:
+    def to_lines(cls, items: list, health_request: HealthCheckRequest) -> list[str]:
         # given a list of items of this class, generate lines of output
         return [str(item) for item in items]
 
@@ -58,7 +58,7 @@ class HealthCheckRecentActivity(HealthCheckStat):
     sub_type: Optional[str] = None   # if we're talking about created/updated or deleted
     extra: Optional[str] = None   # extra text (not used for grouping)
     stand_alone: bool = False  # should this always be reported on in its own line
-    preview: Optional[List[PreviewData]] = None
+    preview: Optional[list[PreviewData]] = None
 
     # Consider this taking a QuerySet of the objects instead
     # that way Server Status web page could use them
@@ -104,7 +104,7 @@ class HealthCheckRecentActivity(HealthCheckStat):
             model: Type[Model],
             emoji: str,
             created: bool = False,
-            modified: bool = False) -> List['HealthCheckRecentActivity']:
+            modified: bool = False) -> list['HealthCheckRecentActivity']:
         """
         Makes a recent activity record for a given model
         :param health_request: The request that gives us the time window
@@ -152,14 +152,14 @@ class HealthCheckRecentActivity(HealthCheckStat):
         return response
 
     @classmethod
-    def to_lines(cls, items: List['HealthCheckRecentActivity'], health_request: HealthCheckRequest) -> List[str]:
+    def to_lines(cls, items: list['HealthCheckRecentActivity'], health_request: HealthCheckRequest) -> list[str]:
         """
         Display standalone lines at the front, and then non-zero items per line, then all the zeros in one line
         """
         items = sorted(items, key=lambda hc: (hc.name, hc.sub_type))
-        zeros: List[HealthCheckRecentActivity] = []
-        stand_alone: List[HealthCheckRecentActivity] = []
-        values: List[HealthCheckRecentActivity] = []
+        zeros: list[HealthCheckRecentActivity] = []
+        stand_alone: list[HealthCheckRecentActivity] = []
+        values: list[HealthCheckRecentActivity] = []
         for item in items:
             if item.stand_alone:
                 stand_alone.append(item)
@@ -292,8 +292,8 @@ class HealthCheckAge(HealthCheckStat):
         return 4
 
     @classmethod
-    def to_lines(cls, items: List['HealthCheckAge'], health_request: HealthCheckRequest) -> List[str]:
-        lines: List[str] = []
+    def to_lines(cls, items: list['HealthCheckAge'], health_request: HealthCheckRequest) -> list[str]:
+        lines: list[str] = []
         items = sorted(items, key=lambda hc: (hc.warning_age, hc.age_in_days, hc.name))
         for warning_age, warning_age_grouped in itertools.groupby(items, key=lambda hc: hc.warning_age):
             for current_age, current_and_warning_grouped in itertools.groupby(warning_age_grouped, key=lambda hc: hc.age_in_days):
@@ -336,7 +336,7 @@ def populate_health_check(notification: NotificationBuilder, since: Optional[dat
         else:
             results.extend(result if isinstance(result, list) else [result])
 
-    checks: List[HealthCheckStat] = flatten_nested_lists(results)
+    checks: list[HealthCheckStat] = flatten_nested_lists(results)
     checks.sort(key=lambda hc: hc.sort_order())
 
     recent_lines = []

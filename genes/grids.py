@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Dict, Any, Optional, List
+from typing import Any, Optional
 
 from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
@@ -44,7 +44,7 @@ class GeneListColumns(DatatableConfig[GeneList]):
         ]
 
     @staticmethod
-    def render_import_status(row: Dict[str, Any]):
+    def render_import_status(row: dict[str, Any]):
         return ImportStatus(row["import_status"]).label
 
     def get_initial_queryset(self) -> QuerySet[GeneList]:
@@ -74,7 +74,7 @@ class GeneListGenesColumns(DatatableConfig[GeneListGeneSymbol]):
             self.annotation_releases[field_name] = release
             self.rich_columns.append(RichColumn(field_name, name=str(release), orderable=True))
 
-    def _get_gene_annotation_releases(self) -> List['GeneAnnotationRelease']:
+    def _get_gene_annotation_releases(self) -> list['GeneAnnotationRelease']:
         return GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds()
 
     def _get_gene_list(self):
@@ -236,7 +236,7 @@ class CanonicalTranscriptCollectionColumns(DatatableConfig[CanonicalTranscriptCo
         ]
 
     @staticmethod
-    def render_annotation_consortium(row: Dict[str, Any]):
+    def render_annotation_consortium(row: dict[str, Any]):
         return AnnotationConsortium(row["annotation_consortium"]).label
 
     def get_initial_queryset(self) -> QuerySet[GeneList]:
@@ -262,7 +262,7 @@ class CanonicalTranscriptColumns(DatatableConfig[CanonicalTranscript]):
         ]
 
     @staticmethod
-    def render_annotation_consortium(row: Dict[str, Any]):
+    def render_annotation_consortium(row: dict[str, Any]):
         return AnnotationConsortium(row["annotation_consortium"]).label
 
     def get_initial_queryset(self) -> QuerySet[GeneList]:
@@ -344,7 +344,7 @@ class GeneSymbolWikiColumns(DatatableConfig[GeneSymbolWiki]):
         ]
 
     @staticmethod
-    def render_gene_symbol(row: Dict[str, Any]) -> JsonDataType:
+    def render_gene_symbol(row: dict[str, Any]) -> JsonDataType:
         gene_symbol = row["gene_symbol"]
         return {"id": gene_symbol}
 

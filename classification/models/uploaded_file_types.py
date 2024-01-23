@@ -6,7 +6,7 @@ import tarfile
 from abc import ABC, abstractmethod
 from os import PathLike
 from pathlib import Path
-from typing import Iterator, Optional, Union, List
+from typing import Iterator, Optional, Union
 from zipfile import ZipFile
 
 
@@ -91,7 +91,7 @@ class FileHandle(ABC):
         pass
 
     @abstractmethod
-    def list(self) -> List['FileHandle']:
+    def list(self) -> list['FileHandle']:
         pass
 
     @property
@@ -148,7 +148,7 @@ class FileHandleS3(FileHandle):
     def sub_file(self, sub_file: str) -> 'FileHandleS3':
         return FileHandleS3(media_storage=self._media_storage, file=self.sub_path(sub_file))
 
-    def list(self) -> List['FileHandleS3']:
+    def list(self) -> list['FileHandleS3']:
         _, files = self._media_storage.listdir(self.file)
         return [self.sub_file(file) for file in files]
 

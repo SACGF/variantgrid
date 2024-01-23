@@ -3,7 +3,7 @@ import itertools
 import re
 from dataclasses import dataclass, field
 from html import escape
-from typing import List, Optional, Any, Pattern
+from typing import Optional, Any, Pattern
 
 from django.utils.safestring import SafeString
 
@@ -42,7 +42,7 @@ class DiffBuilder:
     # TODO, rather than trying to do a bunch of smarts in append() maybe all the smarts are best saved for optimize
 
     def __init__(self):
-        self.diff_segments: List[DiffTextSegment] = []
+        self.diff_segments: list[DiffTextSegment] = []
         self.same_text = ''
         self.add_text = ''
         self.sub_text = ''
@@ -58,7 +58,7 @@ class DiffBuilder:
         self.add_text = ''
         self.same_text = ''
 
-    def optimize_add(self, subtract: str, add: str) -> List[DiffTextSegment]:
+    def optimize_add(self, subtract: str, add: str) -> list[DiffTextSegment]:
         prefix_same: str = ''
         suffix_same: str = ''
         while subtract and add and subtract[0] == add[0]:
@@ -69,7 +69,7 @@ class DiffBuilder:
         #     suffix_same += subtract[-1]
         #     subtract = subtract[:-1]
         #     add = add[:-1]
-        items: List[DiffTextSegment] = []
+        items: list[DiffTextSegment] = []
         if prefix_same:
             items.append(DiffTextSegment(operation=' ', text=prefix_same))
         if subtract:
@@ -144,7 +144,7 @@ class DiffBuilder:
 
 def diff_text(a: str, b: str) -> DiffBuilder:
 
-    def _tokenize(text: str) -> List[str]:
+    def _tokenize(text: str) -> list[str]:
         return re.split(r'(\s)', text)
 
     diff_builder = DiffBuilder()
@@ -164,9 +164,9 @@ class MultiDiffInput:
 @dataclass(frozen=True)
 class MultiDiffOutput:
     input: MultiDiffInput
-    parts: Optional[List[str]]
+    parts: Optional[list[str]]
     matched: Optional[bool]
-    diffs: List[DiffTextSegment] = field(default_factory=list)
+    diffs: list[DiffTextSegment] = field(default_factory=list)
     matches_reference: bool = False
 
     @property
@@ -207,7 +207,7 @@ class MultiDiffOutput:
         text = input.text or ''
         matches_reference = text and reference and text == reference.text
 
-        parts: List[str]
+        parts: list[str]
         if match := pattern.match(text):
             parts = list(match.groups())
             return MultiDiffOutput(
@@ -228,7 +228,7 @@ class MultiDiffOutput:
 class MultiDiff:
 
     @staticmethod
-    def diff_index(parts: List[str]) -> Optional[int]:
+    def diff_index(parts: list[str]) -> Optional[int]:
         for index, by_the_letter in enumerate(itertools.zip_longest(*parts, fillvalue='$')):
             if any(x != first(by_the_letter) for x in by_the_letter):
                 return index
@@ -237,7 +237,7 @@ class MultiDiff:
     def __init__(self, re_parts: Pattern):
         self.re_parts = re_parts
 
-    def diffs(self, compare: List[MultiDiffInput]) -> List[MultiDiffOutput]:
+    def diffs(self, compare: list[MultiDiffInput]) -> list[MultiDiffOutput]:
         length = len(compare)
         if length == 0:
             return []

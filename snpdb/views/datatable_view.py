@@ -6,7 +6,7 @@ import operator
 from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property, reduce
-from typing import List, Dict, Optional, Any, Callable, Union, TypeVar, Generic, Type
+from typing import Optional, Any, Callable, Union, TypeVar, Generic, Type
 
 from django.contrib.auth.models import User
 from django.db import models
@@ -32,7 +32,7 @@ class CellData:
     Parameter to be passed to server side renders,
     call .value to get the single column, otherwise can inspect columns
     """
-    all_data: Dict[str, Any]
+    all_data: dict[str, Any]
     key: Optional[str]
 
     @property
@@ -64,8 +64,8 @@ class RichColumn:
     def __init__(self,
                  key: Optional[str] = None,
                  name: str = None,
-                 sort_keys: List[str] = None,
-                 search: Optional[Union[bool, List[str]]] = None,
+                 sort_keys: list[str] = None,
+                 search: Optional[Union[bool, list[str]]] = None,
                  label: str = None,
                  orderable: bool = None,
                  enabled: bool = True,
@@ -76,7 +76,7 @@ class RichColumn:
                  visible: bool = True,
                  detail: bool = False,
                  css_class: str = None,
-                 extra_columns: Optional[List[str]] = None):
+                 extra_columns: Optional[list[str]] = None):
         """
         :param key: A column name to be retrieved and returned and sorted on
         :param name: A name to be shared between both client and server for this value
@@ -145,12 +145,12 @@ class RichColumn:
             key = f'-{key}'
         return key
 
-    def sort_string(self, desc: bool) -> List[str]:
+    def sort_string(self, desc: bool) -> list[str]:
         use_keys = self.sort_keys or [self.key]
         return [self.sort_key(key, desc) for key in use_keys]
 
     @property
-    def value_columns(self) -> List[str]:
+    def value_columns(self) -> list[str]:
         columns = []
         if key := self.key:
             columns.append(key)
@@ -176,10 +176,10 @@ class DatatableConfig(Generic[DC]):
     """
     search_box_enabled = False
     download_csv_button_enabled = False
-    rich_columns: List[RichColumn]  # columns for display
+    rich_columns: list[RichColumn]  # columns for display
     expand_client_renderer: Optional[str] = None  # if provided, will expand rows and render content with this JavaScript method
 
-    def value_columns(self) -> List[str]:
+    def value_columns(self) -> list[str]:
         column_names = list(itertools.chain(*[rc.value_columns for rc in self.rich_columns if rc.enabled]))
         all_columns = list(set(column_names))
         return all_columns
@@ -197,7 +197,7 @@ class DatatableConfig(Generic[DC]):
         return self.enabled_columns.index(rc)
 
     @cached_property
-    def enabled_columns(self) -> List[RichColumn]:
+    def enabled_columns(self) -> list[RichColumn]:
         return [rc for rc in self.rich_columns if rc.enabled]
 
     def get_initial_queryset(self) -> QuerySet[DC]:
@@ -209,7 +209,7 @@ class DatatableConfig(Generic[DC]):
         for rich_col in self.enabled_columns:  # TODO do we want to check not enabled columns too?
             search_cols = search_cols.union(rich_col.search)
 
-        filters: List[Q] = []
+        filters: list[Q] = []
         for search_col in search_cols:
             filters.append(Q(**{f'{search_col}__icontains': search_string}))
         or_filter = reduce(operator.or_, filters)
@@ -252,7 +252,7 @@ class DatatableConfig(Generic[DC]):
 
         return self._querydict.get(param)
 
-    def get_query_json(self, param: str) -> Optional[Dict]:
+    def get_query_json(self, param: str) -> Optional[dict]:
         """
         like get_query_param but parses the value as JSON
         :param param: the key of the param
@@ -302,7 +302,7 @@ class DatatableConfig(Generic[DC]):
         """
         pass
 
-    def view_primary_key(self, row: Dict[str, Any]) -> JsonDataType:
+    def view_primary_key(self, row: dict[str, Any]) -> JsonDataType:
         """ Relies on being 'id' and object defining get_absolute_url  """
         qs = self.get_initial_queryset()
         primary_key_name = qs.model._meta.pk.name
@@ -352,7 +352,7 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
             value = value.timestamp()
         return value
 
-    def render_cell(self, row: Dict, column: RichColumn) -> JsonDataType:
+    def render_cell(self, row: dict, column: RichColumn) -> JsonDataType:
         """ Renders a column on a row. column can be given in a module notation eg. document.invoice.type """
         if column.renderer:
             render_data = CellData(all_data=row, key=column.key)
@@ -437,7 +437,7 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
         if config.default_sort_order_column:
             data["order"] = [[config.column_index(config.default_sort_order_column), "asc" if config.default_sort_order_column.default_sort != SortOrder.DESC else "desc"]]
 
-        columns: List[JsonObjType] = []
+        columns: list[JsonObjType] = []
         for rc in config.enabled_columns:
             columns.append({
                 "data": rc.name,

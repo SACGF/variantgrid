@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Iterable, List, Union, Set, Dict, Tuple
+from typing import Optional, Iterable, Union
 
 from django.utils.safestring import SafeString
 
@@ -90,7 +90,7 @@ class CriteriaStrength:
         return format(self)
 
     @property
-    def _sort_key(self) -> Tuple[int, str]:
+    def _sort_key(self) -> tuple[int, str]:
         index = 0
         try:
             index = CriteriaEvaluation.ALL_STRENGTHS.index(self.strength)
@@ -170,7 +170,7 @@ class CriteriaStrengths:
         return self.strength_map.values()
 
     @property
-    def strength_list_met(self) -> List[CriteriaStrength]:
+    def strength_list_met(self) -> list[CriteriaStrength]:
         return [cs for cs in self.strengths if CriteriaEvaluation.is_met(cs.strength)]
 
     def summary_string(self, acmg_only: bool = True):
@@ -187,7 +187,7 @@ class CriteriaStrengths:
     def has_criteria(self):
         return any(s.is_met for s in self.strengths)
 
-    def __getitem__(self, item) -> Union[None, CriteriaStrength, List[CriteriaStrength]]:
+    def __getitem__(self, item) -> Union[None, CriteriaStrength, list[CriteriaStrength]]:
         if hasattr(self, item):
             return getattr(self, item)
         if isinstance(item, str):
@@ -223,7 +223,7 @@ class CriteriaStrengths:
 @dataclass(frozen=True)
 class CriteriaCompare:
     any_not_met: bool
-    strength_counts: Dict[CriteriaStrength, int]
+    strength_counts: dict[CriteriaStrength, int]
 
     @property
     def has_value(self):
@@ -231,7 +231,7 @@ class CriteriaCompare:
 
     @property
     def direction(self) -> str:
-        directions: Set[str] = set()
+        directions: set[str] = set()
         for strength in self.strength_counts.keys():
             directions.add(strength.strength_direction)
         if len(directions) != 1:
@@ -296,11 +296,11 @@ class CriteriaCompare:
 
 
 class CriteriaSummarizer:
-    def __init__(self, strengths: List[CriteriaStrengths]):
+    def __init__(self, strengths: list[CriteriaStrengths]):
         self.strengths = strengths
 
     def __getitem__(self, item: str):
-        strength_counts: Dict[CriteriaStrength, int] = defaultdict(int)
+        strength_counts: dict[CriteriaStrength, int] = defaultdict(int)
         any_not_met = False
 
         for strengths in self.strengths:

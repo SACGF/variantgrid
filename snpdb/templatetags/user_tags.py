@@ -1,7 +1,7 @@
 import datetime
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Dict, Union, Any
+from typing import Union, Any
 
 from django import template
 from django.contrib.auth.models import User
@@ -80,7 +80,7 @@ def user(context, u: User, show_avatar=False, show_email=False, show_last_login=
 
         @cached_property
         def user_settings(self) -> UserSettings:
-            user_cache: Dict[int, UserSettings] = self.context.get("_user_cache")
+            user_cache: dict[int, UserSettings] = self.context.get("_user_cache")
             if not user_cache:
                 user_cache = {}
                 self.context["_user_cache"] = user_cache

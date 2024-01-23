@@ -3,7 +3,7 @@ import enum
 import re
 from dataclasses import dataclass
 from functools import cached_property
-from typing import List, Optional
+from typing import Optional
 
 from Bio.Data.IUPACData import protein_letters_1to3_extended
 from django.conf import settings
@@ -28,7 +28,7 @@ class CHGVSDiff(enum.Flag):
     DIFF_RAW_CGVS_EXPANDED = enum.auto()
 
 
-def chgvs_diff_description(chgvsdiff: CHGVSDiff, include_minor=False) -> List[str]:
+def chgvs_diff_description(chgvsdiff: CHGVSDiff, include_minor=False) -> list[str]:
     diff_list = []
     if chgvsdiff & CHGVSDiff.DIFF_TRANSCRIPT_ID:
         diff_list.append('Different transcript identifier')

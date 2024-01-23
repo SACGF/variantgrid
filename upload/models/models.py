@@ -4,7 +4,7 @@ import re
 import shutil
 from collections import namedtuple
 from functools import cached_property
-from typing import Dict, List, Optional, Set, Union
+from typing import Optional, Union
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -209,7 +209,7 @@ class UploadPipeline(models.Model):
                 pass
         return None
 
-    def get_errors(self, hide_accepted=True) -> List:
+    def get_errors(self, hide_accepted=True) -> list:
         errors = []
         if self.status == ProcessingStatus.ERROR:
             # Make a fake one for template
@@ -220,7 +220,7 @@ class UploadPipeline(models.Model):
         errors.extend(self._get_vcf_import_info(VCFImportInfoSeverity.ERROR, hide_accepted=hide_accepted))
         return errors
 
-    def get_warnings(self, hide_accepted=True, include_vcf=True) -> List:
+    def get_warnings(self, hide_accepted=True, include_vcf=True) -> list:
         warnings = self._get_vcf_import_info(VCFImportInfoSeverity.WARNING, hide_accepted=hide_accepted)
         if include_vcf:
             if vcf := self.vcf:
@@ -430,7 +430,7 @@ class UploadedVCF(models.Model):
     def get_data(self) -> VCF:
         return self.vcf
 
-    def get_upload_context(self) -> Dict:
+    def get_upload_context(self) -> dict:
         """ Dict for displaying JFU upload widget """
         context = {}
         if self.vcf:
@@ -593,7 +593,7 @@ class ModifiedImportedVariant(models.Model):
         raise ValueError(f"{old_variant} didn't match regex {ModifiedImportedVariant.VT_OLD_VARIANT_PATTERN}")
 
     @staticmethod
-    def format_old_variant(old_variant: str, genome_build: GenomeBuild) -> List[str]:
+    def format_old_variant(old_variant: str, genome_build: GenomeBuild) -> list[str]:
         """ We need consistent formatting (case and use of chrom) so we can retrieve it easily.
             May return multiple values """
         formatted_old_variants = []
@@ -605,7 +605,7 @@ class ModifiedImportedVariant(models.Model):
         return formatted_old_variants
 
     @staticmethod
-    def _split_old_variant(old_variant) -> List[str]:
+    def _split_old_variant(old_variant) -> list[str]:
         """ VT decompose writes OLD_VARIANT as comma separated, but if not decomposed (eg someone uploads already
             normalized) could be multi-alt that looks like 5:132240059:CT/CTT/T """
         old_variants = []
@@ -651,7 +651,7 @@ class ModifiedImportedVariant(models.Model):
         return Variant.objects.filter(modifiedimportedvariant__old_variant_formatted__startswith=old_variant).distinct()
 
     @classmethod
-    def get_other_loci_variants_by_multiallelic(cls, variant: Variant) -> Dict[str, Set['ModifiedImportedVariant']]:
+    def get_other_loci_variants_by_multiallelic(cls, variant: Variant) -> dict[str, set['ModifiedImportedVariant']]:
         """ Variants that were once on the same row of a VCF but were split into separate loci """
 
         miv_qs = variant.modifiedimportedvariant_set.filter(old_multiallelic__isnull=False)
@@ -696,7 +696,7 @@ class UploadSettings(models.Model):
     INTERNAL_TYPES = {UploadedFileTypes.LIFTOVER, UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY}
 
     @cached_property
-    def file_types(self) -> Set:
+    def file_types(self) -> set:
         return set(self.uploadsettingsfiletype_set.values_list("file_type", flat=True))
 
     def file_types_description(self) -> str:
@@ -708,7 +708,7 @@ class UploadSettings(models.Model):
         return description
 
     @property
-    def non_internal_types(self) -> Set:
+    def non_internal_types(self) -> set:
         return set(UploadedFileTypes) - self.INTERNAL_TYPES
 
     def create_default_visible_file_types(self):

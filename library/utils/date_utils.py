@@ -1,6 +1,6 @@
 import time
 from datetime import date, datetime, timedelta
-from typing import Optional, Tuple, List
+from typing import Optional
 
 from dateutil import tz
 from django.utils import timezone
@@ -29,7 +29,7 @@ def calculate_age(born: datetime, died: Optional[datetime] = None) -> int:
     return age
 
 
-def get_month_and_year(run_date) -> Tuple[int, int]:
+def get_month_and_year(run_date) -> tuple[int, int]:
     run_date_str = "%d" % int(run_date)
     parts = [run_date_str[i:i + 2] for i in range(0, len(run_date_str), 2)]
     return int(parts[1]), int(parts[0])
@@ -55,7 +55,7 @@ def get_months_since(start_month: int, start_year: int, month: int, year: int) -
     return (year - start_year) * 12 + month - start_month
 
 
-def month_range(start_month: int, start_year: int, offset_start: int, offset_end: int, fmt=year_month_string) -> List[str]:
+def month_range(start_month: int, start_year: int, offset_start: int, offset_end: int, fmt=year_month_string) -> list[str]:
     num_months = offset_end - offset_start
     labels = [fmt(start_year + (start_month + i) // 12, 1 + (start_month + i) % 12) for i in range(-1, num_months)]
     return labels

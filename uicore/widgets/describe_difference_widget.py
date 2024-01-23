@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Dict
+from typing import Optional
 
 from django.core.exceptions import ValidationError
 from django.db.models import TextChoices
@@ -19,7 +19,7 @@ class DescribeDifference:
     resolution: Optional[DifferenceResolution] = None
 
     @staticmethod
-    def from_json(data: Dict) -> 'DescribeDifference':
+    def from_json(data: dict) -> 'DescribeDifference':
         if not data:
             return DescribeDifference()
         return DescribeDifference(

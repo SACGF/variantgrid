@@ -1,5 +1,4 @@
 import logging
-from typing import List
 
 from django.db.models.query_utils import Q
 
@@ -15,7 +14,7 @@ from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
 
 
-def get_manual_variant_coordinates(mve: ManualVariantEntry) -> List[VariantCoordinate]:
+def get_manual_variant_coordinates(mve: ManualVariantEntry) -> list[VariantCoordinate]:
     """ List as dbSNP can return multiple values """
     variant_coordinates = []
     if mve.entry_type == ManualVariantEntryType.DBSNP:
@@ -49,7 +48,7 @@ class ManualVariantsPostInsertTask(ImportVCFStepTask):
                 mvec_id_by_variant_hash[variant_hash] = mve.pk
 
         logging.info("%d variant hashes", len(variant_coordinate_by_hash))
-        created_manual_variants: List[CreatedManualVariant] = []
+        created_manual_variants: list[CreatedManualVariant] = []
         variant_pk_lookup.batch_check()
         for variant_hash, variant_pk in variant_pk_lookup.variant_pk_by_hash.items():
             variant_coordinate = variant_coordinate_by_hash[variant_hash]

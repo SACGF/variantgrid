@@ -1,9 +1,9 @@
 """ A list of (Google) search terms for a variant """
 from collections import defaultdict
-from typing import Tuple, List, Optional
+from typing import Optional
 
 
-def _get_gene_and_terms(hgvs_matcher, vta, c_hgvs=True, extra_terms: Optional[List[str]] = None) -> Tuple[str, List]:
+def _get_gene_and_terms(hgvs_matcher, vta, c_hgvs=True, extra_terms: Optional[list[str]] = None) -> tuple[str, list]:
     from genes.hgvs import HGVSException
 
     gene_symbol = None
@@ -49,7 +49,7 @@ def _get_gene_and_terms(hgvs_matcher, vta, c_hgvs=True, extra_terms: Optional[Li
     return gene_symbol, terms
 
 
-def _get_search_terms(variant_transcripts_list: List, formatter: str = None, **kwargs):
+def _get_search_terms(variant_transcripts_list: list, formatter: str = None, **kwargs):
     from genes.hgvs import HGVSMatcher
 
     hgvs_matcher = None
@@ -79,7 +79,7 @@ def _get_search_terms(variant_transcripts_list: List, formatter: str = None, **k
     return " OR ".join([f"({s})" for s in searches])
 
 
-def get_variant_search_terms(variant_transcripts_list: List, extra_terms: Optional[List[str]] = None):
+def get_variant_search_terms(variant_transcripts_list: list, extra_terms: Optional[list[str]] = None):
     """
     Examples:
 
@@ -98,7 +98,7 @@ def get_variant_search_terms(variant_transcripts_list: List, extra_terms: Option
     return _get_search_terms(variant_transcripts_list, formatter='"%s"', extra_terms=extra_terms)
 
 
-def get_variant_pubmed_search_terms(variant_transcripts_list: List):
+def get_variant_pubmed_search_terms(variant_transcripts_list: list):
     """ Examples:
 
             (CFTR) AND ((Arg117His) OR (R117H))

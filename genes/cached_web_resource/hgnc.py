@@ -3,7 +3,6 @@
     Example JSON record at bottom of file
 """
 import logging
-from typing import Set, List
 
 import requests
 
@@ -42,7 +41,7 @@ def store_hgnc_from_web(cached_web_resource: CachedWebResource):
     cached_web_resource.save()
 
 
-def save_hgnc_records(existing_hgnc_ids: Set, records: List):
+def save_hgnc_records(existing_hgnc_ids: set, records: list):
     hgnc_status_lookup = invert_dict(dict(HGNCStatus.choices))
     hgnc_gene_names_new = []
     hgnc_gene_names_update = []

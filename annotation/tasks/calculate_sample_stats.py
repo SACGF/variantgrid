@@ -1,7 +1,7 @@
 import logging
 import time
 from collections import defaultdict
-from typing import Tuple, Dict, Optional
+from typing import Optional
 
 import celery
 from django.conf import settings
@@ -60,7 +60,7 @@ def _get_sample_stats_code_version() -> SampleStatsCodeVersion:
     return code_version
 
 
-def _create_stats_per_sample(vcf: VCF, annotation_version) -> Tuple[Dict, Optional[Dict]]:
+def _create_stats_per_sample(vcf: VCF, annotation_version) -> tuple[dict, Optional[dict]]:
     vav_kwargs = {"variant_annotation_version": annotation_version.variant_annotation_version}
     ega_kwargs = {"gene_annotation_version": annotation_version.gene_annotation_version}
     cv_kwargs = {"clinvar_version": annotation_version.clinvar_version}

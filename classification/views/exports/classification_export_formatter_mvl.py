@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
-from typing import List, Any
+from typing import Any
 
 from django.http import HttpRequest
 from django.template.loader import render_to_string
@@ -126,8 +126,8 @@ class MVLClinicalSignificance:
     :var alissa: The overall value to be reported to Alissa
     """
     alissa: str
-    special: List[str]
-    all: List[str]
+    special: list[str]
+    all: list[str]
 
     @staticmethod
     def from_data(mvl_data: MVLCHGVSData):
@@ -237,8 +237,8 @@ class MVLEntry(ExportRow):
             group_utils=self.mvl_data.group_utils
         )
 
-    def warnings(self) -> List[str]:
-        warnings: List[str] = []
+    def warnings(self) -> list[str]:
+        warnings: list[str] = []
 
         if self.data.different_chgvs:
             warnings.append('Warning <b>c.hgvs representations are different across transcript versions</b>')
@@ -374,7 +374,7 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
         else:
             return ""
 
-    def footer(self) -> List[str]:
+    def footer(self) -> list[str]:
         if self.file_format == FormatDetailsMVLFileFormat.JSON:
             return ["]}"]
         elif self.file_format == FormatDetailsMVLFileFormat.HTML:
@@ -382,7 +382,7 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
         else:
             return []
 
-    def row(self, allele_data: AlleleData) -> List[str]:
+    def row(self, allele_data: AlleleData) -> list[str]:
         c_datas = CHGVSData.split_into_c_hgvs(allele_data, use_full=True)
 
         if self.file_format == FormatDetailsMVLFileFormat.HTML:
@@ -412,7 +412,7 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
                 categories={"format": "tsv"}
             ))
         elif self.file_format == FormatDetailsMVLFileFormat.JSON:
-            output: List[str] = []
+            output: list[str] = []
             for c_data in c_datas:
                 export_row = MVLCHGVSData(
                     c_data,

@@ -1,5 +1,4 @@
 import os
-from typing import List
 
 from django.conf import settings
 from django.test import TestCase
@@ -14,7 +13,7 @@ class TestClinVarXmlParser(TestCase):
 
     def _check_valid(self, filename: str):
         xml_file = os.path.join(TEST_DATA_DIR, filename)
-        records: List[ClinVarRecord]
+        records: list[ClinVarRecord]
         with open(xml_file, "rb") as xml_input:
             records = ClinVarXmlParserViaRCVs.load_from_input(xml_input)
 

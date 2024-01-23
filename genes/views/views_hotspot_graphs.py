@@ -1,6 +1,6 @@
 import uuid
 from functools import cached_property
-from typing import Tuple, List, Optional, Dict
+from typing import Optional
 
 from django.conf import settings
 from django.db.models.aggregates import Count
@@ -41,7 +41,7 @@ class HotspotGraphView(TemplateView):
                          varianttranscriptannotation__transcript_version=transcript_version,
                          varianttranscriptannotation__protein_position__isnull=False)
 
-    def _get_values(self, transcript_version) -> Tuple[int, str, str, str, int]:
+    def _get_values(self, transcript_version) -> tuple[int, str, str, str, int]:
         """ :returns hgvs_p, pp, consequence, count, gnomad_af """
         qs = self._get_variant_queryset(transcript_version)
         qs, vzcc = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
@@ -65,7 +65,7 @@ class HotspotGraphView(TemplateView):
         return "gene_symbol_transcript_version_hotspot_graph"
 
     @cached_property
-    def _pick_transcripts(self) -> Tuple[Optional[TranscriptVersion], str, List[Tuple[str, bool, str, str]], Dict]:
+    def _pick_transcripts(self) -> tuple[Optional[TranscriptVersion], str, list[tuple[str, bool, str, str]], dict]:
         """
             The transcript diagram is built via transcript_version.get_domains()
             which uses PfamSequenceIdentifier (linked to transcript and has a version number)
@@ -206,7 +206,7 @@ class ClassificationsHotspotGraphView(HotspotGraphView):
         vcm_qs = ClassificationModification.latest_for_user(self.request.user, published=True)
         return Classification.objects.filter(classificationmodification__in=vcm_qs)
 
-    def _get_values(self, transcript_version) -> Tuple[int, str, str, str, int]:
+    def _get_values(self, transcript_version) -> tuple[int, str, str, str, int]:
         """ :returns hgvs_p, pp, consequence, count, gnomad_af """
         qs = self._get_variant_queryset(transcript_version)
         vc_qs = self._get_classifications()

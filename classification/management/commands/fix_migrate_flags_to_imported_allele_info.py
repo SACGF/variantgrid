@@ -2,7 +2,7 @@ import itertools
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Dict, List, Optional, Set
+from typing import Optional
 
 from classification.models import Classification, ImportedAlleleInfo
 from flags.models import FlagComment, FlagType, FlagStatus
@@ -53,9 +53,9 @@ class CHGVSFlagData:
     def __init__(self, identifier: CHGVSIdentifier):
         self.identifier = identifier
 
-        self.open_flags: Set[str] = set()
-        self.manually_closed_flags: Set[str] = set()
-        self.comments: List[FlagComment] = []
+        self.open_flags: set[str] = set()
+        self.manually_closed_flags: set[str] = set()
+        self.comments: list[FlagComment] = []
 
     def add_comment(self, flag_comment: FlagComment):
         flag_type = flag_comment.flag.flag_type.pk
@@ -67,7 +67,7 @@ class CHGVSFlagData:
             self.open_flags.add(flag_type)
 
     @property
-    def closed_flags(self) -> Set[str]:
+    def closed_flags(self) -> set[str]:
         return self.manually_closed_flags - self.open_flags
 
 
@@ -84,17 +84,17 @@ class AlleleData:
         self.flag_datas.append(new_flag_data)
         return new_flag_data
 
-    def all_flag_data_for_c_hgvs(self, identifier: CHGVSIdentifier) -> List[CHGVSFlagData]:
+    def all_flag_data_for_c_hgvs(self, identifier: CHGVSIdentifier) -> list[CHGVSFlagData]:
         return [fd for fd in self.flag_datas if fd.identifier.fuzzy_matches(identifier)]
 
 
 class FlagDatabase:
 
     def __init__(self):
-        self.allele_to_flags: Dict[int, AlleleData] = defaultdict(AlleleData)
+        self.allele_to_flags: dict[int, AlleleData] = defaultdict(AlleleData)
 
     @cached_property
-    def flag_collection_to_identifier(self) -> Dict[int, AlleleIdentifier]:
+    def flag_collection_to_identifier(self) -> dict[int, AlleleIdentifier]:
         # flag collection to identifier
         flag_collection_to_allele_identifier = dict()
 
@@ -122,7 +122,7 @@ class FlagDatabase:
     def flag_data_for_identifier(self, allele_identifier: AlleleIdentifier) -> CHGVSFlagData:
         return self.allele_to_flags[allele_identifier.allele_id].flag_data_for_identifier(identifier=allele_identifier.identifier)
 
-    def all_flag_data_for_c_hgvs(self, allele_identifier: AlleleIdentifier) -> List[CHGVSFlagData]:
+    def all_flag_data_for_c_hgvs(self, allele_identifier: AlleleIdentifier) -> list[CHGVSFlagData]:
         return self.allele_to_flags[allele_identifier.allele_id].all_flag_data_for_c_hgvs(allele_identifier.identifier)
 
     def populate(self):

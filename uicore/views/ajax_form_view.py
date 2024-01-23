@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import TypeVar, Dict, Generic, Callable, Optional, Tuple
+from typing import TypeVar, Generic, Callable, Optional
 
 from django.db.models import Model
 from django.http import HttpResponse, HttpRequest
@@ -47,12 +47,12 @@ class LazyRender(Generic[T]):
     Has a successful save on the form just occurred
     """
 
-    static_context: Optional[Dict] = None
+    static_context: Optional[dict] = None
     """
     A dictionary that can be passed into the constructor that will be part of the context provided to the template
     """
 
-    dynamic_context: Optional[Callable[[HttpRequest], Dict]] = None
+    dynamic_context: Optional[Callable[[HttpRequest], dict]] = None
     """
     A callable that takes a request and produces a dictionary for context. Is combined with static context.
     """
@@ -69,7 +69,7 @@ class LazyRender(Generic[T]):
             use_context[self.core_object_name] = self.core_object
         return use_context
 
-    def _wrap(self, mode: AjaxFormMode, saved: bool = False) -> Tuple[str, AjaxFormMode, str]:
+    def _wrap(self, mode: AjaxFormMode, saved: bool = False) -> tuple[str, AjaxFormMode, str]:
         """
         Produces:
         starting HTML
@@ -129,7 +129,7 @@ class AjaxFormView(View, Generic[T]):
     """
 
     @classmethod
-    def lazy_render(cls, obj: T, context: Optional[Dict] = None) -> LazyRender:
+    def lazy_render(cls, obj: T, context: Optional[dict] = None) -> LazyRender:
         """
         This method can be called to give a LazyRender that can be embedded as needed
         or it can be called by this view on get/post followed by .render()

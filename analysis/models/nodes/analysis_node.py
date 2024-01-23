@@ -5,7 +5,7 @@ from collections import defaultdict
 from functools import cached_property, reduce
 from random import random
 from time import time
-from typing import Tuple, Sequence, List, Dict, Optional, Set
+from typing import Sequence, Optional
 
 from cache_memoize import cache_memoize
 from celery.canvas import Signature
@@ -120,7 +120,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         else:
             raise NodeNotFoundException(self.pk)
 
-    def _get_cohorts_and_sample_visibility_for_node(self) -> Tuple[Sequence[Cohort], Dict]:
+    def _get_cohorts_and_sample_visibility_for_node(self) -> tuple[Sequence[Cohort], dict]:
         """ Visibility = can see on grid """
         return [], {}
 
@@ -137,7 +137,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         self.analysis.check_valid()
         return get_variant_queryset_for_annotation_version(self.analysis.annotation_version)
 
-    def get_cohorts_and_sample_visibility(self, sort=True) -> Tuple[Sequence[Cohort], Dict]:
+    def get_cohorts_and_sample_visibility(self, sort=True) -> tuple[Sequence[Cohort], dict]:
         """ Returns all node + ancestor cohorts (and visibilities of their samples)
 
             The underlying data for all samples/cohorts/sub-cohorts/trios/pedigrees is Cohorts, so need to know which
@@ -159,7 +159,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         return cohorts, visibility
 
     @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.pk, s.version))
-    def get_sample_ids(self) -> List[Sample]:
+    def get_sample_ids(self) -> list[Sample]:
         return [s.pk for s in self.get_samples()]
 
     def get_samples_from_node_only_not_ancestors(self):
@@ -187,7 +187,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             proband_sample = proband_samples.pop()
         return proband_sample
 
-    def get_samples(self) -> List[Sample]:
+    def get_samples(self) -> list[Sample]:
         """ Return all ancestor samples for a node"""
         cohorts, visibility = self.get_cohorts_and_sample_visibility(sort=False)
         return self._get_visible_samples_from_cohort(cohorts, visibility)
@@ -264,7 +264,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             AnalysisNode.throw_errors_exception(errors)
         return parents
 
-    def get_non_empty_parents(self, require_parents_ready=True) -> List['AnalysisNode']:
+    def get_non_empty_parents(self, require_parents_ready=True) -> list['AnalysisNode']:
         """ Returns non-empty (count > 0) parents.
             If require_parents_ready=True, die if parents not ready
             Otherwise, return them as we don't know if they're empty or not """
@@ -294,7 +294,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             raise ValueError(msg)
         return parents[0]
 
-    def get_single_parent_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def get_single_parent_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         arg_q_dict = {}
         parent = self.get_single_parent()
         if parent.is_ready():
@@ -320,11 +320,11 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             raise ValueError("get_single_parent_contigs called when single parent not ready!!!")
         return contigs
 
-    def _get_kwargs_for_parent_annotation_kwargs(self, **kwargs) -> Dict:
+    def _get_kwargs_for_parent_annotation_kwargs(self, **kwargs) -> dict:
         """ Use this to pass messages up through to parents """
         return {}
 
-    def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
+    def _get_annotation_kwargs_for_node(self, **kwargs) -> dict:
         """ Override this method per-node.
             Any key/values in here MUST be consistent - as annotation_kwargs from multiple
             nodes may be combined in the MergeNode
@@ -339,7 +339,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             return any(parent._has_common_variants() for parent in self.get_non_empty_parents())
         return True
 
-    def get_annotation_kwargs(self, **kwargs) -> Dict:
+    def get_annotation_kwargs(self, **kwargs) -> dict:
         """ Passed to Variant QuerySet annotate()
             Can be used w/FilteredRelation to force a join to a partition, in which case you need to use
             the alias given in annotate. @see https://github.com/SACGF/variantgrid/wiki/Data-Partitioning """
@@ -391,7 +391,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
                 self.merge_arg_q_dicts(arg_q_dict, node_arg_q_dict)
         return arg_q_dict
 
-    def get_arg_q_dict(self, disable_cache=False) -> Dict[Optional[str], Dict[str, Q]]:
+    def get_arg_q_dict(self, disable_cache=False) -> dict[Optional[str], dict[str, Q]]:
         """ A Django Q object representing the Variant filters for this node.
             This is the method to override in subclasses - not get_queryset()
 
@@ -400,7 +400,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         # We need this for node counts, and doing a grid query (each page) - and it can take a few secs to generate
         # for some nodes (Comp HET / pheno) so cache it
         cache_key = self._get_cache_key() + f"q_cache={disable_cache}"
-        arg_q_dict: Dict[Optional[str], Dict[str, Q]] = {}
+        arg_q_dict: dict[Optional[str], dict[str, Q]] = {}
         if self._cache_node_q:
             arg_q_dict = cache.get(cache_key)
 
@@ -423,11 +423,11 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
                     log_traceback()
         return arg_q_dict
 
-    def get_contigs(self) -> Set[Contig]:
+    def get_contigs(self) -> set[Contig]:
         """ A set of contigs that contain variants for the node """
 
         cache_key = self._get_cache_key() + "_contigs"
-        contigs: Set[Contig] = cache.get(cache_key)
+        contigs: set[Contig] = cache.get(cache_key)
 
         if contigs is None:
             if self.has_input():
@@ -450,7 +450,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             return self.get_single_parent_arg_q_dict()
         raise NotImplementedError("Implement a non-default 'get_parent_arg_q_dict' if you have more than 1 parent")
 
-    def get_parent_contigs(self) -> Set[Contig]:
+    def get_parent_contigs(self) -> set[Contig]:
         contigs = set()
         for parent in self.get_non_empty_parents():
             contigs.update(parent.get_contigs())
@@ -481,7 +481,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         return NodeCache.objects.filter(node_version=self.node_version,
                                         variant_collection__status=ProcessingStatus.SUCCESS).first()
 
-    def _get_node_cache_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def _get_node_cache_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         arg_q_dict = {}
         if self.node_cache:
             arg_q_dict = self.node_cache.variant_collection.get_arg_q_dict()
@@ -504,14 +504,14 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         """
         return self.get_identifier()
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         """ By default - we assume node implements _get_node_q and none of the filters apply to annotations """
         node_arg_q_dict = {}
         if node_q := self._get_node_q():
             node_arg_q_dict[None] = {self._get_node_q_hash(): node_q}
         return node_arg_q_dict
 
-    def _get_node_contigs(self) -> Optional[Set[Contig]]:
+    def _get_node_contigs(self) -> Optional[set[Contig]]:
         """ Return the contigs we filter for in this node. None means we don't know how to describe that """
         return None
 
@@ -624,7 +624,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         """ Used in create node dropdown """
         raise NotImplementedError()
 
-    def _get_genome_build_errors(self, field_name, field_genome_build: GenomeBuild) -> List:
+    def _get_genome_build_errors(self, field_name, field_genome_build: GenomeBuild) -> list:
         """ Used to quickly add errors about genome build mismatches
             This only happens in templates (ran template on sample with different build than hardcoded data)
             In normal analyses, autocomplete restrictions should not allow you to configure data from other builds """
@@ -634,7 +634,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             errors.append(msg)
         return errors
 
-    def _get_configuration_errors(self) -> List:
+    def _get_configuration_errors(self) -> list:
         return []
 
     def get_parents_and_errors(self):
@@ -643,12 +643,12 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             return self.get_parent_subclasses_and_errors()
         return [], []
 
-    def _get_analysis_errors(self) -> List[str]:
+    def _get_analysis_errors(self) -> list[str]:
         if self._cached_analysis_errors is None:
             self._cached_analysis_errors = self.analysis.get_errors()
         return self._cached_analysis_errors
 
-    def get_warnings(self) -> List[str]:
+    def get_warnings(self) -> list[str]:
         return []
 
     def get_errors(self, include_parent_errors=True, flat=False):
@@ -1108,7 +1108,7 @@ class NodeCache(models.Model):
     variant_collection = models.OneToOneField(VariantCollection, on_delete=CASCADE)
 
     @staticmethod
-    def get_or_create_for_node(node: AnalysisNode) -> Tuple['NodeCache', bool]:
+    def get_or_create_for_node(node: AnalysisNode) -> tuple['NodeCache', bool]:
         variant_collection = VariantCollection.objects.create(name=f"NodeCache {node.node_version}")
         defaults = {"variant_collection": variant_collection}
         node_cache, created = thread_safe_unique_together_get_or_create(NodeCache, node_version=node.node_version,
@@ -1251,7 +1251,7 @@ class NodeAlleleFrequencyFilter(models.Model):
         return af_q
 
     @staticmethod
-    def get_sample_arg_q_dict(node: AnalysisNode, sample: Sample) -> Dict[Optional[str], Dict[str, Q]]:
+    def get_sample_arg_q_dict(node: AnalysisNode, sample: Sample) -> dict[Optional[str], dict[str, Q]]:
         arg_q_dict = {}
         if sample:
             try:

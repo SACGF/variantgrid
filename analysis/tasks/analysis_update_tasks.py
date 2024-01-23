@@ -4,7 +4,6 @@ import operator
 import uuid
 from collections import defaultdict
 from functools import reduce
-from typing import List, Set
 
 import celery
 import networkx as nx
@@ -35,7 +34,7 @@ def create_and_launch_analysis_tasks(analysis_id, run_async=True):
                 raise Exception(result.result)
 
 
-def _get_analysis_update_tasks(analysis_id) -> List:
+def _get_analysis_update_tasks(analysis_id) -> list:
     """ Runs update tasks on nodes that have status=DIRTY """
 
     tasks = []
@@ -117,7 +116,7 @@ def _get_celery_workflow_task(groups):
     return task
 
 
-def _add_jobs_for_group(nodes_to_update, dependencies, grp, groups, existing_cache_jobs) -> Set:
+def _add_jobs_for_group(nodes_to_update, dependencies, grp, groups, existing_cache_jobs) -> set:
     cache_jobs = set()
     after_jobs = []
     jobs = []

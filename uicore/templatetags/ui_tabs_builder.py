@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Any, Optional
+from typing import Any, Optional
 
 from django import template
 from django.http import HttpRequest
@@ -37,7 +37,7 @@ class TabBuilder:
         self.tab_set = tab_set
         self.rendered = False
         self.active_tab = 0
-        self.tabs: List[TabBuilderTab] = []
+        self.tabs: list[TabBuilderTab] = []
 
     def __del__(self):
         if not self.rendered:

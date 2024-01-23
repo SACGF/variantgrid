@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Dict, Optional, List, Any, Set, Iterable, TypedDict
+from typing import Optional, Any, Iterable, TypedDict
 
 import requests
 from django.urls import reverse
@@ -15,7 +15,7 @@ from ontology.models import OntologyTerm, OntologyService, OntologySnake, GeneDi
 
 class OntologySnakeJson(TypedDict):
     via: str
-    extra: Optional[Dict[Any, Any]]
+    extra: Optional[dict[Any, Any]]
     relation: str
     source: str
 
@@ -26,13 +26,13 @@ class OntologyMatch:
         self.term = OntologyTerm.get_or_stub(term_id)
         self.selected: bool = False  # has the user selected this term for whatever context this is
         self.direct_reference: bool = False  # was this term referenced by ID directly, e.g. text is "patient has MONDO:123456" and this is "MONDO:123456"
-        self.gene_relationships: List[OntologySnake] = []  # in what ways is this related to the gene in question (assuming there is a gene in question)
+        self.gene_relationships: list[OntologySnake] = []  # in what ways is this related to the gene in question (assuming there is a gene in question)
         self.search_engine_score: Optional[int] = None  # was this found from doing a text search on 3rd party search, and if so, what's its ranking
 
     def optimize(self):
         # only have 1 relationship from each source
         if self.gene_relationships:
-            relationships_by_source: Dict[str, OntologySnake] = {}
+            relationships_by_source: dict[str, OntologySnake] = {}
             for snake in self.gene_relationships:
                 import_source = snake.start_source
                 if existing := relationships_by_source.get(import_source):
@@ -81,7 +81,7 @@ class OntologyMatch:
             source=last_step.relation.from_import.context
         )
 
-    def as_json(self) -> Dict:
+    def as_json(self) -> dict:
 
         data = {
             "id": self.term.id,
@@ -150,7 +150,7 @@ class SearchText:  # TODO shold be renamed ConditionSearchText
         return ROMAN.get(numeral, numeral)
 
     @staticmethod
-    def tokenize_condition_text(text: str, deplural=False, deroman=False) -> Set[str]:
+    def tokenize_condition_text(text: str, deplural=False, deroman=False) -> set[str]:
         if text is None:
             return set()
         ignore_me = [";", "-", "{", "}", "(", ")"]
@@ -172,9 +172,9 @@ class SearchText:  # TODO shold be renamed ConditionSearchText
     def __init__(self, text: str):
         self.raw = text
         self.prefix = None
-        self.prefix_terms: Set[str] = set()
+        self.prefix_terms: set[str] = set()
         self.suffix = None
-        self.suffix_terms: Set[str] = set()
+        self.suffix_terms: set[str] = set()
 
         normal_text = normalize_condition_text(text)
         if sub_type_match := SUB_TYPE.match(normal_text):
@@ -196,7 +196,7 @@ class SearchText:  # TODO shold be renamed ConditionSearchText
         return ", ".join(sorted(list(self.suffix_terms)))
 
     @property
-    def all_terms(self) -> Set[str]:
+    def all_terms(self) -> set[str]:
         return self.prefix_terms.union(self.suffix_terms)
 
     def matches(self, term: OntologyTerm) -> Optional[MatchInfo]:
@@ -238,8 +238,8 @@ class OntologyMatching:
     """
 
     def __init__(self, search_term: Optional[str] = None, gene_symbol: Optional[str] = None):
-        self.term_map: Dict[str, OntologyMatch] = {}
-        self.errors: List[str] = []
+        self.term_map: dict[str, OntologyMatch] = {}
+        self.errors: list[str] = []
         self.search_text: Optional[SearchText] = None
         self.sub_type = None
         if search_term:
@@ -294,7 +294,7 @@ class OntologyMatching:
         return {"errors": self.errors, "terms": [value.as_json() for value in self]}
 
     @staticmethod
-    def from_search(search_text: str, gene_symbol: Optional[str], selected: Optional[List[str]] = None) -> 'OntologyMatching':
+    def from_search(search_text: str, gene_symbol: Optional[str], selected: Optional[list[str]] = None) -> 'OntologyMatching':
         search_text = empty_to_none(search_text)
         ontology_matches = OntologyMatching(search_term=search_text, gene_symbol=gene_symbol)
         ontology_matches.populate_relationships()  # find all terms linked to the gene_symbol (if there is one)

@@ -3,7 +3,7 @@ import os
 import re
 import sys
 import traceback
-from typing import Any, List
+from typing import Any
 
 import cyvcf2
 from django.conf import settings
@@ -167,7 +167,7 @@ def create_vcf_from_vcf(upload_step, vcf_reader) -> VCF:
     return vcf
 
 
-def _get_vcf_sample_names(vcf, vcf_reader) -> List[str]:
+def _get_vcf_sample_names(vcf, vcf_reader) -> list[str]:
     if vcf.genotype_samples > 0:
         sample_names = vcf_reader.samples
     else:  # Need at least 1 sample per VCF

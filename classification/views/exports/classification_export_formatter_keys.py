@@ -1,5 +1,5 @@
 import json
-from typing import List, Optional, Dict, Any
+from typing import Optional, Any
 
 from django.http import HttpRequest
 
@@ -26,7 +26,7 @@ class ValueExample:
         self.count = 1
         self.example_source = example_source
 
-    def to_json(self) -> Dict:
+    def to_json(self) -> dict:
         data = {"value": self.value, "count": self.count}
         return data
 
@@ -37,7 +37,7 @@ class ValueCounter:
         self.used = 0
         self.unused = 0
         self.others = 0
-        self.examples: Optional[Dict[str, ValueExample]] = None
+        self.examples: Optional[dict[str, ValueExample]] = None
 
     def _count_example(self, value: Any, example_source: Optional[Any] = None, from_part: bool = False):
         key = str(value)
@@ -85,7 +85,7 @@ class ValueCounter:
                 self.others += 1
 
     def to_json(self):
-        data: Dict = {}
+        data: dict = {}
         if self.used:
             percent = (self.used / (self.used + self.unused)) * 100
             data["used_percentage"] = f"{percent:.2f}%"
@@ -114,7 +114,7 @@ class KeyCount:
         self.values = ValueCounter()
         self.notes = ValueCounter()
         self.explain = ValueCounter()
-        self.dbrefs: Dict[str, int] = {}
+        self.dbrefs: dict[str, int] = {}
 
     def count(self, blob: Optional[VCBlobDict], source: Any):
         if not blob:
@@ -152,7 +152,7 @@ class ClassificationExportFormatterKeys(ClassificationExportFormatter):
     """
 
     def __init__(self, classification_filter: ClassificationFilter):
-        key_counters: Dict[str, KeyCount] = {}
+        key_counters: dict[str, KeyCount] = {}
         for e_key in EvidenceKeyMap.instance().all_keys:
             key_counters[e_key.key] = KeyCount(e_key=e_key)
         self.key_counters = key_counters
@@ -167,10 +167,10 @@ class ClassificationExportFormatterKeys(ClassificationExportFormatter):
             classification_filter=classification_filter
         )
 
-    def header(self) -> List[str]:
+    def header(self) -> list[str]:
         return []
 
-    def row(self, data: AlleleData) -> List[str]:
+    def row(self, data: AlleleData) -> list[str]:
         self.rows_with_errors += len([issue for issue in data.all_cms if issue.validation_include])
         for ci in data.all_cms:
             if ci.withdrawn:
@@ -187,7 +187,7 @@ class ClassificationExportFormatterKeys(ClassificationExportFormatter):
                 counter.count(blob, source=classification.id)
         return []
 
-    def footer(self) -> List[str]:
+    def footer(self) -> list[str]:
         self.row_count = 1
         data = {}
         for key, value in self.key_counters.items():

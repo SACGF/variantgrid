@@ -1,7 +1,7 @@
 import csv
 import io
 import re
-from typing import List, Iterable
+from typing import Iterable
 
 from django.db.models import OrderBy
 from django.db.models.expressions import RawSQL
@@ -29,7 +29,7 @@ class RedcapGroup:
 
     def __init__(self, group_on_value):
         self.group_on_value = group_on_value
-        self.data: List[ClassificationModification] = []
+        self.data: list[ClassificationModification] = []
 
     def __bool__(self):
         return bool(self.data)
@@ -70,7 +70,7 @@ class ClassificationExportFormatterRedCap(ClassificationExportFormatter):
     def extension(self) -> str:
         return "csv"
 
-    def header(self) -> List[str]:
+    def header(self) -> list[str]:
         out = io.StringIO()
         writer = csv.writer(out, delimiter=',')
 
@@ -84,7 +84,7 @@ class ClassificationExportFormatterRedCap(ClassificationExportFormatter):
         writer.writerow(header_array)
         return [out.getvalue()]
 
-    def row(self, allele_data: AlleleData) -> List[str]:
+    def row(self, allele_data: AlleleData) -> list[str]:
         raise ValueError("row() is not supported in REDCap Export")
 
     def redcap_rows(self) -> Iterable[RedcapGroup]:
@@ -105,7 +105,7 @@ class ClassificationExportFormatterRedCap(ClassificationExportFormatter):
         if group:
             yield group
 
-    def row_generator(self) -> Iterable[List[str]]:
+    def row_generator(self) -> Iterable[list[str]]:
         for group in self.redcap_rows():
             row_values = [group.group_on_value, len(group.data)]
             for idx, vcm in enumerate(group.data):
@@ -129,7 +129,7 @@ REDCAP_PREFIX = 'vc_'
 class RedcapDefinition:
 
     @staticmethod
-    def header_row() -> List[str]:
+    def header_row() -> list[str]:
         return [
             'Variable / Field Name',
             'Form Name',

@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import List, Dict, Iterable, Set, Tuple, Any
+from typing import Iterable, Any
 
 from annotation.models import Citation, CitationFetchRequest
 from annotation.models.models_citations import CitationIdNormalized, CitationSource
@@ -15,7 +15,7 @@ from library.log_utils import report_message
 class CitationCounter:
 
     def __init__(self):
-        self.all_citations: Dict[CitationIdNormalized, Set[str]] = defaultdict(set)
+        self.all_citations: dict[CitationIdNormalized, set[str]] = defaultdict(set)
 
     def reference_citations(self, cm: ClassificationModification):
         for db_ref in cm.db_refs:
@@ -26,10 +26,10 @@ class CitationCounter:
                 )
                 self.all_citations[citation_id].add(str(cm.classification.lab))
 
-    def citation_ids(self) -> List[str]:
+    def citation_ids(self) -> list[str]:
         return [citation_id.full_id for citation_id in sorted(set(self.all_citations.keys()))]
 
-    def ordered_references(self) -> Iterable[Tuple[Citation, List[Any]]]:
+    def ordered_references(self) -> Iterable[tuple[Citation, list[Any]]]:
         citation_response = CitationFetchRequest.fetch_all_now(list(self.all_citations.keys()))
         for key in sorted(set(self.all_citations.keys())):
             labs = self.all_citations.get(key)
@@ -56,7 +56,7 @@ class CHGVSData:
 
     chgvs: CHGVS
     different_chgvs: bool = False
-    cms: List[ClassificationModification] = field(default_factory=list)
+    cms: list[ClassificationModification] = field(default_factory=list)
 
     @property
     def last_updated(self):
@@ -73,7 +73,7 @@ class CHGVSData:
         :param use_full: Should the c.hgvs use explicit bases when optional (required by Alissa)
         :return: An array of c.hgvs based data, most often will only be 1 record
         """
-        by_versionless_transcript: Dict[str, TranscriptGroup] = defaultdict(TranscriptGroup)
+        by_versionless_transcript: dict[str, TranscriptGroup] = defaultdict(TranscriptGroup)
 
         genome_build = allele_data.source.genome_build
         for vcm in allele_data.cms:

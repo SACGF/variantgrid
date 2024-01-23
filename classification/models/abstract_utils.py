@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import TypeVar, Generic, List, Optional, Set, Hashable
+from typing import TypeVar, Generic, Optional, Hashable
 
 
 CandidateType = TypeVar("CandidateType")
@@ -13,10 +13,10 @@ class ConsolidatingMerger(Generic[EstablishedType, CandidateType]):
     """
 
     def __init__(self):
-        self.collapsed_new_candidates: List[CandidateType] = []
+        self.collapsed_new_candidates: list[CandidateType] = []
 
     @abstractmethod
-    def retrieve_established(self) -> Set[EstablishedType]:
+    def retrieve_established(self) -> set[EstablishedType]:
         """
         Groups already associated with this bit of data that need to be migrated with the data from new_groups
         """
@@ -45,7 +45,7 @@ class ConsolidatingMerger(Generic[EstablishedType, CandidateType]):
         with each other, we only want one of them too.
         Store against the most general condition, so the order of add_group shouldn't matter
         """
-        resulting_candidates: List[CandidateType] = []
+        resulting_candidates: list[CandidateType] = []
         for existing in self.collapsed_new_candidates:
             if merged := self.combine_candidates_if_possible(existing, candidate):
                 candidate = merged

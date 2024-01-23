@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import Optional
 
 from django import forms
 from django.http import HttpRequest
@@ -44,7 +44,7 @@ class MatcherOutput:
 class MatcherOutputs:
 
     def __init__(self, genome_build: GenomeBuild, hgvs: str):
-        self.all_output: List[MatcherOutput] = []
+        self.all_output: list[MatcherOutput] = []
         self.genome_build = genome_build
         self.hgvs = hgvs
 

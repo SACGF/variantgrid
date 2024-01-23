@@ -1,6 +1,5 @@
 import operator
 from functools import reduce
-from typing import Set
 
 from django.db.models import QuerySet
 from django.db.models.query_utils import Q
@@ -22,7 +21,7 @@ def get_variant_queryset_for_gene_symbol(gene_symbol: GeneSymbol, annotation_ver
     """
     # People often search for a gene symbol that exists in a different genome build
     # so we need to retrieve all the genes that have ever been associated with the symbol
-    genes: Set[Gene]
+    genes: set[Gene]
     if traverse_aliases:
         genes = gene_symbol.alias_meta.genes
     else:

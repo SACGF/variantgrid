@@ -7,7 +7,7 @@ import traceback
 from enum import Enum, auto
 from functools import partial
 from subprocess import Popen
-from typing import List, Optional, Dict, Callable
+from typing import Optional, Callable
 
 import requests
 
@@ -32,7 +32,7 @@ print_light_gray = partial(print_color, "\033[97m")
 print_black = partial(print_color, "\033[98m")
 
 
-def substitute_aliases(args: List[str]):
+def substitute_aliases(args: list[str]):
     return [COMMAND_ALIASES.get(arg, arg) for arg in args]
 
 
@@ -68,7 +68,7 @@ class SubMigration:
         self.task_id = None
         self.notes = None
 
-    def using(self, key: Optional[str] = None, task_id: Optional[str] = None, notes: Optional[List[str]] = None):
+    def using(self, key: Optional[str] = None, task_id: Optional[str] = None, notes: Optional[list[str]] = None):
         if key:
             self.key = key
         if task_id:
@@ -122,7 +122,7 @@ class ManualSubMigration(SubMigration):
 
 class GitSubMigration(SubMigration):
 
-    def __init__(self, args: List[str]):
+    def __init__(self, args: list[str]):
         super().__init__()
         self.args = args
 
@@ -144,12 +144,12 @@ class GitSubMigration(SubMigration):
 
 class CommandSubMigration(SubMigration):
 
-    def __init__(self, args: List[str]):
+    def __init__(self, args: list[str]):
         super().__init__()
         self.args = args
 
     @property
-    def effective_args(self) -> List[str]:
+    def effective_args(self) -> list[str]:
         return substitute_aliases(self.args)
 
     def run(self) -> MigrationResult:
@@ -167,21 +167,21 @@ class CommandSubMigration(SubMigration):
         return " ".join(self.effective_args)
 
     @staticmethod
-    def manage_py(args: List[str]):
+    def manage_py(args: list[str]):
         use_args = ["python", "manage.py"]
         use_args.extend(args)
         return CommandSubMigration(args=use_args)
 
     @staticmethod
-    def bash(args: List[str]):
+    def bash(args: list[str]):
         return CommandSubMigration(args=args)
 
     @staticmethod
-    def git(args: List[str]):
+    def git(args: list[str]):
         return GitSubMigration(args=args)
 
     @staticmethod
-    def script(args: List[str]):
+    def script(args: list[str]):
         args[0] = f"./scripts/{args[0]}"
         return CommandSubMigration(args)
 
@@ -222,7 +222,7 @@ class Migrator:
 
         return MigrationResult.success()
 
-    STANDARD_MIGRATIONS: List[SubMigration] = [
+    STANDARD_MIGRATIONS: list[SubMigration] = [
         CommandSubMigration.git(["pull"]).using(key="g", task_id="git*pull"),
         CommandSubMigration.manage_py(["migrate"]).using(key="m", task_id="manage*migrate"),
         CommandSubMigration.manage_py(["collectstatic_js_reverse"]).using(key="r",
@@ -246,7 +246,7 @@ class Migrator:
 
     def refresh_migrations(self):
         try:
-            migrations: List[SubMigration] = self.standard_migrations
+            migrations: list[SubMigration] = self.standard_migrations
 
             command = substitute_aliases(["python", "manage.py", "manual_outstanding"])
             self.has_custom_migrations = False
@@ -279,7 +279,7 @@ class Migrator:
         return Git().hash
 
     @staticmethod
-    def subcommand_for_json(task: Dict) -> SubMigration:
+    def subcommand_for_json(task: dict) -> SubMigration:
         task_id = task["id"]
         category = task["category"]
         line = task["line"]
@@ -339,10 +339,10 @@ class Migrator:
 
         self.run_and_callback(migrations=self.standard_migrations, callback=on_complete)
 
-    def run_and_re_prompt(self, migrations: List[SubMigration]):
+    def run_and_re_prompt(self, migrations: list[SubMigration]):
         self.run_and_callback(migrations, lambda _: self.prompt())
 
-    def run_and_callback(self, migrations: List[SubMigration], callback: Callable[[bool], None]):
+    def run_and_callback(self, migrations: list[SubMigration], callback: Callable[[bool], None]):
         migration: Optional[SubMigration] = None
         if migrations:
             migration = migrations.pop(0)

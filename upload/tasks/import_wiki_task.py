@@ -1,5 +1,4 @@
 import logging
-from typing import Tuple, List
 
 import pandas as pd
 from dateutil import parser
@@ -18,7 +17,7 @@ from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
 
 
-def _process_imported_wiki(uploaded_file) -> Tuple[ImportedWikiCollection, List[ImportedWiki]]:
+def _process_imported_wiki(uploaded_file) -> tuple[ImportedWikiCollection, list[ImportedWiki]]:
     df = pd.read_csv(uploaded_file.get_filename())
     df = df_nan_to_none(df)
 

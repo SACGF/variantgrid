@@ -3,7 +3,7 @@ import json
 import re
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Iterable, Optional, Any, Type, Dict, List, Iterator
+from typing import Iterable, Optional, Any, Type, Iterator
 
 from dateutil.tz import gettz
 from django.conf import settings
@@ -21,7 +21,7 @@ class ExportDataType(str, Enum):
     any = "any"
 
 
-def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None, categories: Dict[str, Any] = None, data_type: ExportDataType = ExportDataType.any):
+def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None, categories: dict[str, Any] = None, data_type: ExportDataType = ExportDataType.any):
     """
     Extend ExportRow and annotate methods with export_column.
     The order of defined methods determines the order that the results will appear in an export file
@@ -99,7 +99,7 @@ class ExportSettings:
 class ExportRow:
 
     @staticmethod
-    def get_export_methods(klass, categories: Optional[Dict[str, Any]] = None):
+    def get_export_methods(klass, categories: Optional[dict[str, Any]] = None):
         # TODO, provide export_methods in ExportRow but still work out if we need to search or not
         if not hasattr(klass, 'export_methods'):
             export_methods = [func for _, func in inspect.getmembers(klass, lambda x: getattr(x, 'is_export', False))]
@@ -146,7 +146,7 @@ class ExportRow:
             yield row_data
 
     @classmethod
-    def csv_generator(cls, data: Iterable[Any], delimiter=',', include_header=True, categories: Optional[Dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> Iterator[str]:
+    def csv_generator(cls, data: Iterable[Any], delimiter=',', include_header=True, categories: Optional[dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> Iterator[str]:
         if not export_settings:
             export_settings = ExportSettings.get_for_request()
         try:
@@ -163,7 +163,7 @@ class ExportRow:
     # Warning: We don't actually do anything with the formatting of JSON objects
 
     @classmethod
-    def json_generator(cls, data: Iterable[Any], records_key: str = "records", categories: Optional[Dict[str, Any]] = None) -> Iterator[str]:
+    def json_generator(cls, data: Iterable[Any], records_key: str = "records", categories: Optional[dict[str, Any]] = None) -> Iterator[str]:
         """
         :param data: Iterable data of either cls or that can be passed to cls's constructor
         :param records_key:
@@ -192,7 +192,7 @@ class ExportRow:
             raise
 
     @classmethod
-    def csv_header(cls, categories: Optional[Dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> List[str]:
+    def csv_header(cls, categories: Optional[dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> list[str]:
         if not export_settings:
             export_settings = ExportSettings.get_for_request()
         row = []
@@ -207,7 +207,7 @@ class ExportRow:
                 row.append(label)
         return row
 
-    def to_csv(self, categories: Optional[Dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> List[str]:
+    def to_csv(self, categories: Optional[dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> list[str]:
         if not export_settings:
             export_settings = ExportSettings.get_for_request()
         row = []
@@ -224,7 +224,7 @@ class ExportRow:
                 row.append(result)
         return row
 
-    def to_json(self, categories: Optional[Dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> JsonObjType:
+    def to_json(self, categories: Optional[dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> JsonObjType:
         if not export_settings:
             export_settings = ExportSettings.get_for_request()
         row = {}
@@ -249,14 +249,14 @@ class ExportRow:
         return row
 
     @classmethod
-    def streaming(cls, request: HttpRequest, data: Iterable[Any], filename: str, categories: Optional[Dict[str, Any]] = None):
+    def streaming(cls, request: HttpRequest, data: Iterable[Any], filename: str, categories: Optional[dict[str, Any]] = None):
         if request.GET.get('format') == 'json':
             return cls.streaming_json(data, filename, categories=categories)
         else:
             return cls.streaming_csv(data, filename, categories=categories)
 
     @classmethod
-    def streaming_csv(cls, data: Iterable[Any], filename: str, categories: Optional[Dict[str, Any]] = None):
+    def streaming_csv(cls, data: Iterable[Any], filename: str, categories: Optional[dict[str, Any]] = None):
         date_str = local_date_string()
 
         response = StreamingHttpResponse(cls.csv_generator(data, categories=categories), content_type='text/csv')
@@ -264,7 +264,7 @@ class ExportRow:
         return response
 
     @classmethod
-    def streaming_json(cls, data: Iterable[Any], filename: str, records_key: str = None, categories: Optional[Dict[str, Any]] = None):
+    def streaming_json(cls, data: Iterable[Any], filename: str, records_key: str = None, categories: Optional[dict[str, Any]] = None):
         date_str = local_date_string()
 
         if not records_key:

@@ -2,7 +2,7 @@ import operator
 from collections import defaultdict
 from datetime import date
 from functools import reduce
-from typing import Optional, Set, List, Dict
+from typing import Optional
 
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
@@ -38,7 +38,7 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
     def modifies_parents(self):
         return bool(self.get_gene_disease_relations())
 
-    def get_gene_disease_relations(self) -> List[OntologyTermRelation]:
+    def get_gene_disease_relations(self) -> list[OntologyTermRelation]:
         """ Filtered by node settings """
         gene_disease_relations = []
         ontology_terms = self._get_all_ontology_term_ids()
@@ -99,7 +99,7 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
         gene_symbols_qs = self.get_gene_symbols_qs()
         return self.analysis.gene_annotation_release.genes_for_symbols(gene_symbols_qs)
 
-    def _get_zygosities(self, moi: str) -> Set[str]:
+    def _get_zygosities(self, moi: str) -> set[str]:
         het_or_hom = {Zygosity.HET, Zygosity.HOM_ALT}
         recessive_zygosities = {Zygosity.HOM_ALT}
         if self.require_zygosity:
@@ -135,7 +135,7 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
             q = Q(**{f"{field}__in": zygosities})
         return q
 
-    def _get_genes_q_from_hgnc(self, hgnc_names: Set[str]):
+    def _get_genes_q_from_hgnc(self, hgnc_names: set[str]):
         gene_symbols_qs = GeneSymbol.objects.filter(symbol__in=hgnc_names)
         gene_qs = self.analysis.gene_annotation_release.genes_for_symbols(gene_symbols_qs)
         variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
@@ -148,7 +148,7 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
                 moi_genes[source["mode_of_inheritance"]].add(otr.dest_term.name)
         return moi_genes
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         arg_q_dict = {}
         if self.sample:
             moi_genes = self._get_moi_genes()
@@ -169,7 +169,7 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
             arg_q_dict[None] = {str(q_genes): q_genes}
         return arg_q_dict
 
-    def _get_node_contigs(self) -> Optional[Set[Contig]]:
+    def _get_node_contigs(self) -> Optional[set[Contig]]:
         contig_qs = Contig.objects.filter(transcriptversion__genome_build=self.analysis.genome_build,
                                           transcriptversion__gene_version__gene__in=self._get_gene_qs())
         return set(contig_qs.distinct())

@@ -4,7 +4,7 @@ import re
 from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import cached_property
-from typing import List, Optional, Dict, Callable, Tuple
+from typing import Optional, Callable
 
 from Bio import Entrez
 from Bio.Data.IUPACData import protein_letters_1to3
@@ -132,7 +132,7 @@ class ClinVar(models.Model):
     drug_response = models.BooleanField(default=False)
 
     @property
-    def clinvar_disease_database_terms(self) -> List[str]:
+    def clinvar_disease_database_terms(self) -> list[str]:
         if db_name_text := self.clinvar_disease_database_name:
             def fix_name(name: str):
                 name = name.strip()
@@ -149,7 +149,7 @@ class ClinVar(models.Model):
         return []
 
     @property
-    def clinvar_clinical_sources_list(self) -> List[str]:
+    def clinvar_clinical_sources_list(self) -> list[str]:
         if clinvar_clinical_sources := self.clinvar_clinical_sources:
             return [name.strip() for name in clinvar_clinical_sources.split("|")]
         return []
@@ -174,7 +174,7 @@ class ClinVar(models.Model):
         return CitationFetchRequest.fetch_all_now(Citation.objects.filter(clinvarcitation__in=cvc_qs))
 
     @property
-    def citation_ids(self) -> List[str]:
+    def citation_ids(self) -> list[str]:
         return sorted(set(ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
                                        clinvar_allele_id=self.clinvar_allele_id).values_list('citation_id', flat=True)))
 
@@ -202,10 +202,10 @@ class ClinVarRecordCollection(TimeStampedModel):
     max_stars = models.IntegerField(blank=True, null=True)
     expert_panel = models.OneToOneField('ClinVarRecord', on_delete=SET_NULL, null=True, blank=True)
 
-    def records_with_min_stars(self, min_stars: int) -> List['ClinVarRecord']:
+    def records_with_min_stars(self, min_stars: int) -> list['ClinVarRecord']:
         return list(sorted(self.clinvarrecord_set.filter(stars__gte=min_stars), reverse=True))
 
-    def update_with_records_and_save(self, records: List['ClinVarRecord']):
+    def update_with_records_and_save(self, records: list['ClinVarRecord']):
         records = list(sorted(records, reverse=True))
         self.clinvarrecord_set.all().delete()
         for record in records:
@@ -548,7 +548,7 @@ class VariantAnnotationVersion(SubVersionPartition):
         """ Often you don't care what annotation version you use, only that variant annotation version is this one """
         return self.annotationversion_set.last()
 
-    def get_pathogenic_prediction_funcs(self) -> Dict[str, Callable]:
+    def get_pathogenic_prediction_funcs(self) -> dict[str, Callable]:
         if self.columns_version == 1:
             return {
                 'sift': lambda d: d in SIFTPrediction.get_damage_or_greater_levels(),
@@ -580,7 +580,7 @@ class VariantAnnotationVersion(SubVersionPartition):
         return description
 
     @cached_property
-    def _vep_config(self) -> Dict:
+    def _vep_config(self) -> dict:
         return self.genome_build.settings["vep_config"]
 
     @cached_property
@@ -600,7 +600,7 @@ class VariantAnnotationVersion(SubVersionPartition):
         return self._vep_config.get("phylop46way")
 
     @cached_property
-    def _gene_annotation_release_and_gff_url(self) -> Tuple[Optional[str], Optional[str]]:
+    def _gene_annotation_release_and_gff_url(self) -> tuple[Optional[str], Optional[str]]:
         release = None
         gff_url = None
         # See issue: https://github.com/Ensembl/ensembl-vep/issues/833 - perhaps this can be done more easily now
@@ -1100,7 +1100,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return VariantAnnotation.GNOMAD_FIELDS.get(population)
 
     @cached_property
-    def transcript_annotation(self) -> List['VariantTranscriptAnnotation']:
+    def transcript_annotation(self) -> list['VariantTranscriptAnnotation']:
         return self.variant.varianttranscriptannotation_set.filter(version=self.version)
 
     def get_search_terms(self):
@@ -1257,7 +1257,7 @@ class AnnotationVersion(models.Model):
     ontology_version = models.ForeignKey(OntologyVersion, null=True, on_delete=PROTECT)
 
     @property
-    def sub_annotations_inheritance_partitioning(self) -> List[str]:
+    def sub_annotations_inheritance_partitioning(self) -> list[str]:
         """ Old style Postgres partitions (inherits) """
         _sub_list = ['variant_annotation_version', 'clinvar_version', 'human_protein_atlas_version']
         if settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED:
@@ -1265,7 +1265,7 @@ class AnnotationVersion(models.Model):
         return _sub_list
 
     @property
-    def sub_annotations(self) -> List[str]:
+    def sub_annotations(self) -> list[str]:
         _sub_declarative_partitioning_list = ['ontology_version']
         return self.sub_annotations_inheritance_partitioning + _sub_declarative_partitioning_list
 

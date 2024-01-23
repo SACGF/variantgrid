@@ -1,7 +1,6 @@
 import os.path
 import re
 from importlib import metadata
-from typing import Tuple
 
 from bioutils.sequences import reverse_complement
 from django.conf import settings
@@ -162,7 +161,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
             var_c.gene = gene_symbol.symbol
         return BioCommonsHGVSVariant(var_c)
 
-    def hgvs_to_variant_coordinate_and_reference_match(self, hgvs_string: str, transcript_version=None) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
+    def hgvs_to_variant_coordinate_and_reference_match(self, hgvs_string: str, transcript_version=None) -> tuple[VariantCoordinate, HgvsMatchRefAllele]:
         var_g, matches_reference = self._hgvs_to_g_hgvs(hgvs_string)
         try:
             (chrom, start, ref, alt, typ) = self.babelfish.hgvs_to_vcf(var_g)
@@ -189,7 +188,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
         return transcript_accession
 
     @staticmethod
-    def _strip_common_prefix(ref: str, alt: str) -> Tuple[str, str]:
+    def _strip_common_prefix(ref: str, alt: str) -> tuple[str, str]:
         if common_prefix := os.path.commonprefix((ref, alt)):
             i = len(common_prefix)
             ref = ref[i:]
@@ -205,7 +204,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
         var_m.type = 'g'
         return var_m
 
-    def _hgvs_to_g_hgvs(self, hgvs_string: str) -> Tuple[SequenceVariant, HgvsMatchRefAllele]:
+    def _hgvs_to_g_hgvs(self, hgvs_string: str) -> tuple[SequenceVariant, HgvsMatchRefAllele]:
         CONVERT_TO_G = {
             'c': self.am.c_to_g,
             'n': self.am.n_to_g,

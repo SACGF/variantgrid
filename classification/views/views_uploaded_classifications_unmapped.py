@@ -1,6 +1,6 @@
 import datetime
 from dataclasses import dataclass
-from typing import List, Iterable, Any, Dict, Optional, Set
+from typing import Iterable, Any, Optional
 
 import django
 from django.contrib import messages
@@ -28,7 +28,7 @@ from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 class UploadedClassificationsUnmappedColumns(DatatableConfig[UploadedClassificationsUnmapped]):
 
-    def effective_date_set(self, row: Dict[str, Any]):
+    def effective_date_set(self, row: dict[str, Any]):
         return (row.get('effective_modified') or row.get('created')).timestamp()
 
     def __init__(self, request):
@@ -175,12 +175,12 @@ class UploadedClassificationsUnmappedView(View):
         selected_lab = lab_picker.selected_lab
         if upload_location := empty_to_none(selected_lab.upload_location):
             if server_address := resolve_uploaded_url_to_handle(upload_location):
-                existing: Set[FileMeta] = set()
+                existing: set[FileMeta] = set()
                 for unmapped in UploadedClassificationsUnmapped.objects.filter(lab=selected_lab):
                     if meta := FileMeta.from_unmapped(unmapped):
                         existing.add(meta)
 
-                server_files: List[FileHandle] = []
+                server_files: list[FileHandle] = []
                 for file in server_address.list():
                     meta = FileMeta.from_file_handle(file)
                     if meta not in existing:

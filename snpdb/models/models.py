@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property, total_ordering
 from re import RegexFlag
-from typing import List, TypedDict, Optional
+from typing import TypedDict, Optional
 
 from celery.result import AsyncResult
 from django.conf import settings
@@ -213,11 +213,11 @@ class Organization(models.Model, PreviewModelMixin):
         return self.short_name or self.name
 
     @cached_property
-    def classifying_labs(self) -> List['Lab']:
+    def classifying_labs(self) -> list['Lab']:
         return [lab for lab in self.lab_set.all().order_by('name') if lab.total_classifications > 0]
 
     @cached_property
-    def sharing_labs(self) -> List['Lab']:
+    def sharing_labs(self) -> list['Lab']:
         return [lab for lab in self.lab_set.all().order_by('name') if lab.total_shared_classifications > 0]
 
     def is_member(self, user: User) -> bool:
@@ -507,10 +507,10 @@ class Lab(models.Model, PreviewModelMixin):
         return self.group.user_set.filter(is_active=True)
 
     @cached_property
-    def lab_users(self) -> List[LabUser]:
+    def lab_users(self) -> list[LabUser]:
         users = list(self.group.user_set.filter(is_active=True))
         heads = set(self.labhead_set.values_list('user_id', flat=True))
-        lab_users: List[LabUser] = []
+        lab_users: list[LabUser] = []
         for user in users:
             role = 'user'
             if user.id in heads:
@@ -657,8 +657,8 @@ class SiteMessage(models.Model):
     date_time = models.DateTimeField(null=True, blank=True)
 
     @staticmethod
-    def _get_site_messages() -> List[SiteMessageDict]:
-        site_messages: List[SiteMessageDict] = []
+    def _get_site_messages() -> list[SiteMessageDict]:
+        site_messages: list[SiteMessageDict] = []
         if settings.SITE_MESSAGE:
             site_messages.append({
                 "message": settings.SITE_MESSAGE
@@ -675,7 +675,7 @@ class SiteMessage(models.Model):
         return site_messages
 
     @staticmethod
-    def get_site_messages() -> List[SiteMessageDict]:
+    def get_site_messages() -> list[SiteMessageDict]:
         """ This is cached as otherwise we'd be introducing a DB query for every page """
         SITE_MESSAGE_KEY = "variantgrid_site_message"
         site_message_dict = None

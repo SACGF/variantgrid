@@ -1,5 +1,3 @@
-from typing import List
-
 from django.dispatch import receiver
 
 from classification.enums import ShareLevel
@@ -18,7 +16,7 @@ Reports information about classifications to the Slack health report
 
 @receiver(signal=health_check_signal)
 def allele_info_health_check(sender, health_request: HealthCheckRequest, **kwargs):
-    output: List[HealthCheckStat] = []
+    output: list[HealthCheckStat] = []
 
     last_failures = ImportedAlleleInfo.objects.filter(
         latest_validation__created__gte=health_request.since,
@@ -46,7 +44,7 @@ def allele_info_health_check(sender, health_request: HealthCheckRequest, **kwarg
 
 @receiver(signal=health_check_overall_stats_signal)
 def allele_info_overall_stats(sender, **kwargs):
-    output: List[HealthCheckStat] = []
+    output: list[HealthCheckStat] = []
 
     for status in [ImportedAlleleInfoStatus.PROCESSING, ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD]:
         not_complete = ImportedAlleleInfo.objects.filter(status=status).count()

@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import Optional, List, Union
+from typing import Optional, Union
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
@@ -114,11 +114,11 @@ class ConditionTextMatchingAPI(APIView):
 
         data = request.data.get("changes")
         ctm: Optional[ConditionTextMatch] = None
-        all_errors: List[str] = []
+        all_errors: list[str] = []
         for update in data:
             terms = update.get('terms')
-            valid_terms: List[str] = []
-            errors: List[str] = []
+            valid_terms: list[str] = []
+            errors: list[str] = []
             if terms:
                 terms = [term.strip() for term in terms]
                 for term in terms:

@@ -2,7 +2,6 @@ import logging
 from dataclasses import field, dataclass
 from datetime import datetime, timedelta
 from functools import reduce
-from typing import List, Dict
 
 from library.utils import time_since
 
@@ -18,7 +17,7 @@ def get_and_log_time_since(start: datetime, name='') -> timedelta:
 @dataclass
 class DebugTime:
     description: str
-    durations: List[timedelta] = field(default_factory=list)
+    durations: list[timedelta] = field(default_factory=list)
     occurrences: int = 0
 
     def tick(self, duration: timedelta):
@@ -40,7 +39,7 @@ class DebugTimer:
 
     def __init__(self):
         self.start = datetime.now()
-        self.times: Dict[str, DebugTime] = {}
+        self.times: dict[str, DebugTime] = {}
 
     def tick(self, description: str):
         now = datetime.now()

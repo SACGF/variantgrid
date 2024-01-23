@@ -2,7 +2,6 @@ import logging
 import os
 import re
 from shlex import shlex
-from typing import Dict
 
 from django.conf import settings
 
@@ -221,7 +220,7 @@ def get_vep_version(genome_build: GenomeBuild, annotation_consortium):
     return get_vep_version_from_vcf(output_filename)
 
 
-def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: Dict) -> Dict:
+def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: dict) -> dict:
     def vep_int_version(vep_string_version):
         m = re.match(r"v(\d+)", vep_string_version)
         return int(m.group(1))

@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Dict, List
+from typing import Optional
 
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationLabSummary, DiscordanceReport, ClassificationLabSummaryEntry, \
@@ -12,7 +12,7 @@ from snpdb.models import Lab
 
 @dataclass(frozen=True)
 class DiscordanceLabSummary(ClassificationLabSummary):
-    drcs: List[DiscordanceReportClassification]
+    drcs: list[DiscordanceReportClassification]
     triage: Optional[DiscordanceReportTriage] = None
 
     @cached_property
@@ -31,8 +31,8 @@ class DiscordanceLabSummary(ClassificationLabSummary):
         )
 
     @staticmethod
-    def for_discordance_report(discordance_report: DiscordanceReport, perspective: LabPickerData) -> List['DiscordanceLabSummary']:
-        group_counts: Dict[ClassificationLabSummaryEntry, List[DiscordanceReportClassification]] = defaultdict(list)
+    def for_discordance_report(discordance_report: DiscordanceReport, perspective: LabPickerData) -> list['DiscordanceLabSummary']:
+        group_counts: dict[ClassificationLabSummaryEntry, list[DiscordanceReportClassification]] = defaultdict(list)
         for drc in DiscordanceReportClassification.objects.filter(report=discordance_report).select_related(
                 'classification_original',
                 'classification_original__classification',
@@ -64,14 +64,14 @@ class DiscordanceLabSummary(ClassificationLabSummary):
                 pending=pending
             )].append(drc)
 
-        dlses: List[DiscordanceLabSummary] = list(sorted([DiscordanceLabSummary(
+        dlses: list[DiscordanceLabSummary] = list(sorted([DiscordanceLabSummary(
             group=group,
             is_internal=group.lab in perspective.labs_if_not_admin,
             count=len(drcs),
             drcs=drcs
         ) for group, drcs in group_counts.items()]))
 
-        triage_by_lab: Dict[Lab, DiscordanceReportTriage] = {}
+        triage_by_lab: dict[Lab, DiscordanceReportTriage] = {}
         for triage in discordance_report.discordancereporttriage_set.select_related('lab').all():
             triage_by_lab[triage.lab] = triage
 

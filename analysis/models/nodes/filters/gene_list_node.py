@@ -1,6 +1,6 @@
 import logging
 from functools import cached_property
-from typing import Optional, List, Set
+from typing import Optional
 
 from django.db import models
 from django.db.models import Q
@@ -76,7 +76,7 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
             q_gl = ~q_gl
         return q_gl
 
-    def _get_node_contigs(self) -> Optional[Set[Contig]]:
+    def _get_node_contigs(self) -> Optional[set[Contig]]:
         if self.exclude:
             return None  # No way to know
 
@@ -106,7 +106,7 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
             gene_names_set.update(gene_list.get_gene_names())
         return list(sorted(gene_names_set))
 
-    def _get_gene_list_names(self) -> List[str]:
+    def _get_gene_list_names(self) -> list[str]:
         gene_list_names = []
         if self.accordion_panel == self.PANEL_APP_GENE_LIST:
             # Panel App Panel may not have been saved here, so we don't know what version it is
@@ -211,7 +211,7 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
 
         super()._load()
 
-    def _get_configuration_errors(self) -> List:
+    def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
         if self.pk:
             gene_lists_to_validate = []

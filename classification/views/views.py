@@ -2,7 +2,7 @@ import json
 import mimetypes
 import re
 from datetime import datetime
-from typing import Optional, List, Set, Dict, Any
+from typing import Optional, Any
 
 import rest_framework
 from crispy_forms.bootstrap import FieldWithButtons
@@ -69,7 +69,7 @@ def activity(request, user_id: Optional[int] = None, lab_id: Optional[int] = Non
 
     user: Optional[User] = None
     lab: Optional[Lab] = None
-    classifications: Optional[List[Classification]] = None
+    classifications: Optional[list[Classification]] = None
     base_url: Optional[str] = None
     page_title = 'Classification Activity'
     if user_id:
@@ -540,8 +540,8 @@ def classification_file_delete(request, pk):
     return JFUResponse(request, success)
 
 
-def get_classification_attachment_file_dicts(classification) -> List[Dict]:
-    file_dicts: List[Dict] = []
+def get_classification_attachment_file_dicts(classification) -> list[dict]:
+    file_dicts: list[dict] = []
     vca: ClassificationAttachment
     for vca in classification.classificationattachment_set.all():
         file_dicts.append(vca.get_file_dict())
@@ -748,12 +748,12 @@ def clin_sig_change_data(request):
             flag_comment: FlagComment
             cs_from: str = 'ERROR'
             cs_to: str = 'ERROR'
-            comments: List[str] = []
+            comments: list[str] = []
             resolution: Optional[str] = 'In Progress'
             classification_created: datetime
             date_raised: datetime = flag.created
-            discordance_dates: List[datetime] = []
-            other_labs: Set[Lab] = set()
+            discordance_dates: list[datetime] = []
+            other_labs: set[Lab] = set()
 
             c_hgvs = source.get_c_hgvs(genome_build=GenomeBuildManager.get_current_genome_build())
             org = source.lab.organization.name

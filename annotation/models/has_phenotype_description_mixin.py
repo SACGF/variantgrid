@@ -1,5 +1,3 @@
-from typing import List
-
 from django.db.models import QuerySet
 
 
@@ -36,7 +34,7 @@ class HasPhenotypeDescriptionMixin:
             return self.phenotype_description_relation.phenotype_description
         return None
 
-    def get_ontology_term_ids(self) -> List[str]:
+    def get_ontology_term_ids(self) -> list[str]:
         if self.phenotype_description:
             terms = self.phenotype_description.get_ontology_term_ids()
         else:

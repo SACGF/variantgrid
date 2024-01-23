@@ -1,7 +1,7 @@
 import logging
 import os
 import subprocess
-from typing import Optional, List
+from typing import Optional
 
 from django.conf import settings
 from django.db import models
@@ -56,7 +56,7 @@ class IntersectionNode(AnalysisNode):
     def use_cache(self):
         return super().use_cache or self.valid_selected_genomic_intervals_collection()
 
-    def _get_configuration_errors(self) -> List:
+    def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
         if self.genomic_intervals_collection:
             errors.extend(self._get_genome_build_errors("genomic_intervals_collection",

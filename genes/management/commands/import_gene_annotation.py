@@ -1,6 +1,5 @@
 import json
 import logging
-from typing import Dict
 
 from django.core.management.base import BaseCommand
 from django.db.models import Max
@@ -164,7 +163,7 @@ class Command(BaseCommand):
             if not auto_linked:
                 print("Release not linked - you will have to manually do so via Django Admin")
 
-    def _import_merged_data(self, genome_build: GenomeBuild, annotation_consortium, cdot_data: Dict, cdot_version):
+    def _import_merged_data(self, genome_build: GenomeBuild, annotation_consortium, cdot_data: dict, cdot_version):
         print(f"importing {genome_build}/{annotation_consortium}")
 
         known_uc_gene_symbols = set(GeneSymbol.objects.annotate(uc_symbol=Upper("symbol")).values_list("uc_symbol", flat=True))

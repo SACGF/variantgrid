@@ -1,5 +1,4 @@
 import uuid
-from typing import List
 
 import pandas as pd
 
@@ -28,7 +27,7 @@ def write_trio_ped(filename, proband, proband_sex, father, father_affected, moth
     write_ped_from_df(filename, df, family_code=family_code)
 
 
-def write_unrelated_ped(filename, samples_names: List[str], family_code=None):
+def write_unrelated_ped(filename, samples_names: list[str], family_code=None):
     unrelated_data = [{"sample": s} for s in samples_names]
     df = pd.DataFrame.from_records(unrelated_data, columns=PED_COLUMNS)
     write_ped_from_df(filename, df, family_code=family_code)

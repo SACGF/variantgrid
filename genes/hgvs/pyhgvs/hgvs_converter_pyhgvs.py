@@ -1,6 +1,6 @@
 import sys
 from importlib import metadata
-from typing import Tuple, Optional
+from typing import Optional
 
 import pyhgvs
 from django.conf import settings
@@ -140,7 +140,7 @@ class PyHGVSConverter(HGVSConverter):
                                                 pyhgvs_transcript, max_allele_length=sys.maxsize)
         return PyHGVSVariant(hgvs_name)
 
-    def hgvs_to_variant_coordinate_and_reference_match(self, hgvs_string: str, transcript_version) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
+    def hgvs_to_variant_coordinate_and_reference_match(self, hgvs_string: str, transcript_version) -> tuple[VariantCoordinate, HgvsMatchRefAllele]:
         pyhgvs_transcript = None
         hgvs_name = self._hgvs_name(hgvs_string)
 

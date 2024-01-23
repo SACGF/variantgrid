@@ -1,6 +1,6 @@
 import json
 import urllib
-from typing import List, Optional, Dict
+from typing import Optional
 
 import requests
 from django.conf import settings
@@ -54,7 +54,7 @@ class Keycloak:
 
         response.raise_for_status()
 
-    def check_groups(self, groups: List[str]) -> List[str]:
+    def check_groups(self, groups: list[str]) -> list[str]:
         groups.sort()
         response = requests.get(
             auth=self.connector.auth,
@@ -64,7 +64,7 @@ class Keycloak:
         group_array = json.loads(response.text)
         group_dict = {}
 
-        def recurse_subgroups(sub_groups: List[dict]):
+        def recurse_subgroups(sub_groups: list[dict]):
             if sub_groups:
                 for g in sub_groups:
                     group_dict[g.get('path')] = g.get('id')
@@ -104,7 +104,7 @@ class Keycloak:
 
         return [group_dict[gp] for gp in groups]
 
-    def existing_user(self, email: str) -> Optional[Dict]:
+    def existing_user(self, email: str) -> Optional[dict]:
         params = {'email': email}
         params_str = urllib.parse.urlencode(params)
         response = requests.get(

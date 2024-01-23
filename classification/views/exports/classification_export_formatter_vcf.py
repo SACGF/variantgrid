@@ -2,7 +2,6 @@ import re
 import urllib
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Dict
 
 from django.conf import settings
 from django.contrib.sites.models import Site
@@ -81,7 +80,7 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
             value = value.replace(',', '.')
             return value
 
-    def header(self) -> List[str]:
+    def header(self) -> list[str]:
         out = []
         out += [
             '##fileformat=VCFv4.1',
@@ -127,7 +126,7 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
         out += [delimited_row(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO'], delimiter='\t')]
         return out
 
-    def row(self, data: AlleleData) -> List[str]:
+    def row(self, data: AlleleData) -> list[str]:
         if (vcms := data.cms) and (target_variant := data.cached_variant) and (locus := target_variant.locus) and (contig := locus.contig):
             cols = []
 
@@ -144,11 +143,11 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
             info += f';url={self.vcf_safe(url)}'
 
             # add lab names, and also calculate if we have conflicting classifications and include that flag if appropriate
-            cs_counts: Dict[str, int] = {}
-            lab_names: List[str] = []
-            c_hgvses: List[str] = []
-            discordances: List[str] = []
-            conditions: List[str] = []
+            cs_counts: dict[str, int] = {}
+            lab_names: list[str] = []
+            c_hgvses: list[str] = []
+            discordances: list[str] = []
+            conditions: list[str] = []
 
             def vcf_tidy(text: str):
                 text = re.sub('[^0-9a-zA-Z]+', ' ', text)

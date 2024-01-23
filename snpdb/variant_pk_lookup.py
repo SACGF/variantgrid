@@ -6,7 +6,7 @@ The original implementation RedisVariantPKLookup used Redis to store a hash, was
 import logging
 import os
 from collections import defaultdict
-from typing import List, Iterable, Tuple
+from typing import Iterable
 
 from django.db.models import Q, Value, TextField
 from django.db.models.aggregates import Max
@@ -22,10 +22,10 @@ class VariantPKLookup:
         self.genome_build = genome_build
         self._working_dir = working_dir
         self._file_batch_id = 0
-        self.variant_hashes: List[str] = []  # Variant hash and coordinate lists are kept in sync
-        self.variant_coordinates: List[VariantCoordinate] = []
+        self.variant_hashes: list[str] = []  # Variant hash and coordinate lists are kept in sync
+        self.variant_coordinates: list[VariantCoordinate] = []
         self.variant_pk_by_hash = {}
-        self.unknown_variant_coordinates: List[VariantCoordinate] = []
+        self.unknown_variant_coordinates: list[VariantCoordinate] = []
 
         if genome_build:
             self.chrom_contig_id_mappings = genome_build.get_chrom_contig_id_mappings()
@@ -58,7 +58,7 @@ class VariantPKLookup:
 
         return [contig_hashes[h[0]].get("_".join([str(s) for s in h[1:]])) for h in hashes]
 
-    def _get_variant_ids(self, variant_hashes: Iterable) -> List[str]:
+    def _get_variant_ids(self, variant_hashes: Iterable) -> list[str]:
         annotate_kwargs = {
             "hash": Concat("locus__position", Value("_"), "end", Value("_"), "locus__ref_id", Value("_"), "alt_id",
                            output_field=TextField())
@@ -70,7 +70,7 @@ class VariantPKLookup:
 
         return self._get_ids_for_hashes(variant_hashes, get_queryset)
 
-    def get_variant_ids(self, variant_hashes: Iterable, validate_not_null=True) -> List[str]:
+    def get_variant_ids(self, variant_hashes: Iterable, validate_not_null=True) -> list[str]:
         variant_ids = self._get_variant_ids(variant_hashes)
         if validate_not_null:
             if not all(variant_ids):  # Quick test if ok
@@ -80,7 +80,7 @@ class VariantPKLookup:
                         raise ValueError(f"Variant hash {variant_hash} had no PK in DB!")
         return variant_ids
 
-    def _get_loci_ids(self, loci_hashes: Iterable) -> List[str]:
+    def _get_loci_ids(self, loci_hashes: Iterable) -> list[str]:
         annotate_kwargs = {
             "hash": Concat("position", Value("_"), "ref_id",
                            output_field=TextField())
@@ -92,7 +92,7 @@ class VariantPKLookup:
 
         return self._get_ids_for_hashes(loci_hashes, get_queryset)
 
-    def get_loci_ids(self, loci_hashes: Iterable, validate_not_null=True) -> List[str]:
+    def get_loci_ids(self, loci_hashes: Iterable, validate_not_null=True) -> list[str]:
         loci_ids = self._get_loci_ids(loci_hashes)
         if validate_not_null:
             if not all(loci_ids):  # Quick test if ok
@@ -102,7 +102,7 @@ class VariantPKLookup:
                         raise ValueError(f"Loci hash {loci_hash} had no PK in DB!")
         return loci_ids
 
-    def filter_non_reference(self, variant_hashes, variant_ids) -> List:
+    def filter_non_reference(self, variant_hashes, variant_ids) -> list:
         return [vh_vi[1] for vh_vi in zip(variant_hashes, variant_ids) if vh_vi[0][3] != self.reference_seq_id]
 
     def get_variant_coordinate_hash(self, variant_coordinate: VariantCoordinate):
@@ -171,14 +171,14 @@ class VariantPKLookup:
     def _get_csv_filename(self, prefix) -> str:
         return os.path.join(self._working_dir, f"{prefix}_{self._file_batch_id}.csv")
 
-    def _insert_new_loci(self, new_loci_rows: List[Tuple]):
+    def _insert_new_loci(self, new_loci_rows: list[tuple]):
         logging.info("1st new_loci_rows: %r", str(new_loci_rows[0]))
         unknown_loci_filename = self._get_csv_filename("unknown_loci")
         sql_copy_files.write_sql_copy_csv(new_loci_rows, unknown_loci_filename)
         logging.info("wrote loci file: %s", unknown_loci_filename)
         sql_copy_files.loci_sql_copy_csv(unknown_loci_filename)
 
-    def _insert_new_variants(self, new_variant_rows: List[Tuple]):
+    def _insert_new_variants(self, new_variant_rows: list[tuple]):
         logging.info("1st unknown variant: locus_id, alt_id, end : %s", str(new_variant_rows[0]))
         unknown_variants_filename = self._get_csv_filename("unknown_variants")
         sql_copy_files.write_sql_copy_csv(new_variant_rows, unknown_variants_filename)

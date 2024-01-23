@@ -1,7 +1,6 @@
 import json
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Dict
 
 from django.dispatch import receiver
 from django.template import loader
@@ -20,7 +19,7 @@ class PendingChange:
     to_cs: str
 
     @staticmethod
-    def from_dict(data: Dict):
+    def from_dict(data: dict):
         return PendingChange(
             lab=Lab.objects.filter(group_name=data.get("lab")).first(),
             from_cs=data.get("from"),

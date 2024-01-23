@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Set, Optional, List
+from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -38,7 +38,7 @@ def update_clinical_contexts_when_allele_changes(sender, allele_info: ImportedAl
         classification: Classification
         matched: bool
 
-    modified_clinical_contexts: dict[ClinicalContext, List[ClassificationMatched]] = defaultdict(list)
+    modified_clinical_contexts: dict[ClinicalContext, list[ClassificationMatched]] = defaultdict(list)
     for classification in allele_info.classification_set.all():
 
         contexts_changed = False
@@ -138,7 +138,7 @@ def published(sender,
     cs = EvidenceKey.objects.get(pk=SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(
         classification.evidence.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)) or 'Unclassified'
 
-    diff_keys: Set[str] = set()
+    diff_keys: set[str] = set()
     if not first_publish:
         if previously_published:
             keys = set(newly_published.evidence) | set(previously_published.evidence)

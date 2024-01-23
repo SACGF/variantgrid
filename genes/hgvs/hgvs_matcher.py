@@ -2,7 +2,7 @@ import logging
 import re
 import sys
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Union
 
 from django.conf import settings
 from django.core.cache import cache
@@ -47,7 +47,7 @@ class VariantCoordinateAndDetails(FormerTuple):
     matches_reference: Union[bool, HgvsMatchRefAllele]
 
     @property
-    def as_tuple(self) -> Tuple:
+    def as_tuple(self) -> tuple:
         return self.variant_coordinate, self.transcript_accession, self.kind, self.method, self.matches_reference
 
 
@@ -154,7 +154,7 @@ class HGVSMatcher:
                 return hgvs_variant, transcript_version
         return None, None
 
-    def _lrg_get_variant_tuple_used_transcript_method_and_matches_reference(self, hgvs_variant: HGVSVariant) -> Tuple[VariantCoordinate, str, str, Union[bool, HgvsMatchRefAllele]]:
+    def _lrg_get_variant_tuple_used_transcript_method_and_matches_reference(self, hgvs_variant: HGVSVariant) -> tuple[VariantCoordinate, str, str, Union[bool, HgvsMatchRefAllele]]:
         lrg_transcript_accession = hgvs_variant.transcript
         new_hgvs_variant, transcript_version = self._get_renamed_lrg_transcript_hgvs_variant_and_transcript_version(self.genome_build, hgvs_variant)
         if new_hgvs_variant:
@@ -230,7 +230,7 @@ class HGVSMatcher:
     def create_hgvs_variant(self, hgvs_string) -> HGVSVariant:
         return self.hgvs_converter.create_hgvs_variant(hgvs_string)
 
-    def filter_best_transcripts_and_method_by_accession(self, transcript_accession, prefer_local=True, closest=False) -> List[Tuple[TranscriptVersion, str]]:
+    def filter_best_transcripts_and_method_by_accession(self, transcript_accession, prefer_local=True, closest=False) -> list[tuple[TranscriptVersion, str]]:
         """ Get the best transcripts you'd want to match a HGVS against - assuming you will try multiple in order """
 
         transcript_id: str
@@ -292,7 +292,7 @@ class HGVSMatcher:
         matches_reference = None
         hgvs_variant = self.create_hgvs_variant(hgvs_string)
         kind = hgvs_variant.kind
-        error_messages: List[str] = []
+        error_messages: list[str] = []
         combined_error_message = None
 
         if transcript_is_lrg(transcript_accession):
@@ -369,7 +369,7 @@ class HGVSMatcher:
         accession = self.hgvs_converter.get_transcript_accession(hgvs_string)
         return TranscriptVersion.get_transcript_id_and_version(accession)
 
-    def _lrg_variant_coordinate_to_hgvs(self, variant_coordinate: VariantCoordinate, lrg_identifier: str = None) -> Tuple[HGVSVariant, str]:
+    def _lrg_variant_coordinate_to_hgvs(self, variant_coordinate: VariantCoordinate, lrg_identifier: str = None) -> tuple[HGVSVariant, str]:
         if transcript_version := LRGRefSeqGene.get_transcript_version(self.genome_build, lrg_identifier):
             if transcript_version.hgvs_ok:
                 hgvs_variant, hgvs_method = self._variant_coordinate_to_hgvs_and_method(variant_coordinate, transcript_version.accession)
@@ -395,7 +395,7 @@ class HGVSMatcher:
         raise ValueError(f"Could not convert {variant_coordinate} to HGVS using '{lrg_identifier}': {problem_str}")
 
     def _variant_coordinate_to_hgvs_and_method(self, variant_coordinate: VariantCoordinate,
-                                               transcript_accession: str = None) -> Tuple[HGVSVariant, str]:
+                                               transcript_accession: str = None) -> tuple[HGVSVariant, str]:
         """
             returns (hgvs, method) - hgvs is c.HGVS is transcript provided, g.HGVS if not
 
@@ -511,7 +511,7 @@ class HGVSMatcher:
             report_exc_info()
         return None
 
-    def clean_hgvs(self, hgvs_string) -> Tuple[str, List[str]]:
+    def clean_hgvs(self, hgvs_string) -> tuple[str, list[str]]:
         search_messages = []
         cleaned_hgvs = clean_string(hgvs_string)  # remove non-printable characters
         cleaned_hgvs = cleaned_hgvs.replace(" ", "")  # No whitespace in HGVS
@@ -572,7 +572,7 @@ class HGVSMatcher:
         return cleaned_hgvs, search_messages
 
     @staticmethod
-    def fix_gene_transcript(hgvs_string: str) -> Tuple[str, List[str]]:
+    def fix_gene_transcript(hgvs_string: str) -> tuple[str, list[str]]:
         """ Fix common case of 'GATA2(NM_032638.5):c.1082G>C' and lower case transcript IDs """
 
         fixed_messages = []
@@ -617,7 +617,7 @@ class HGVSMatcher:
         fixed_hgvs_string = f"{prefix}:{allele}"
         return fixed_hgvs_string, fixed_messages
 
-    def get_gene_symbol_or_alias_if_no_transcript(self, hgvs_string: str) -> Tuple[Optional[GeneSymbol], Optional[GeneSymbolAlias]]:
+    def get_gene_symbol_or_alias_if_no_transcript(self, hgvs_string: str) -> tuple[Optional[GeneSymbol], Optional[GeneSymbolAlias]]:
         """ If HGVS uses gene symbol instead of transcript, return symbol """
         # pyhgvs sets to gene, Biocommons always uses as transcript
         hgvs_variant = self.create_hgvs_variant(hgvs_string)

@@ -1,5 +1,3 @@
-from typing import Dict
-
 from django.conf import settings
 from django.contrib.auth.models import User
 
@@ -12,7 +10,7 @@ class VariantResolver:
 
     def __init__(self, user: User, limit: int = 100):
         self.user = user
-        self.ci_by_gb: Dict[GenomeBuild, ClassificationImport] = {}
+        self.ci_by_gb: dict[GenomeBuild, ClassificationImport] = {}
         self.pending_count = 0
         self.all_count = 0
         self.limit = limit

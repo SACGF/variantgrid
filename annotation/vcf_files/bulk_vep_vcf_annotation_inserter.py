@@ -3,7 +3,7 @@ import operator
 import shutil
 from collections import defaultdict
 from functools import cached_property, reduce
-from typing import Tuple, Optional
+from typing import Optional
 
 from django.conf import settings
 from django.db.models import Q
@@ -385,7 +385,7 @@ class BulkVEPVCFAnnotationInserter:
                 logging.warning(f"Could not find gene_id: '{vep_gene}'")
         return gene_id
 
-    def get_transcript_and_version_ids(self, vep_transcript_data) -> Tuple[Optional[str], Optional[str]]:
+    def get_transcript_and_version_ids(self, vep_transcript_data) -> tuple[Optional[str], Optional[str]]:
         transcript_id = None
         transcript_version_id = None
         vep_feature_type = vep_transcript_data[VEPColumns.FEATURE_TYPE]

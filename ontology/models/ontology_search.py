@@ -1,6 +1,6 @@
 import re
 from functools import partial
-from typing import Optional, List
+from typing import Optional
 
 from django.db.models.functions import Lower
 
@@ -11,7 +11,7 @@ from snpdb.search import search_receiver, SearchInputInstance, SearchExample, HA
 
 
 def validate_ontology(term: OntologyTerm, preview_proxy: Optional[PreviewProxyModel] = None) -> SearchResult:
-    messages: List[SearchMessage] = []
+    messages: list[SearchMessage] = []
     if term.ontology_service not in OntologyService.LOCAL_ONTOLOGY_PREFIXES:
         messages = [SearchMessage(f"We do not store {term.ontology_service} locally. The resulting ontology page will only provide external links.")]
     elif term.is_stub:

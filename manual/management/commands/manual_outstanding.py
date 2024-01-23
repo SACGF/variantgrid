@@ -4,7 +4,6 @@ from django.core.management import CommandParser
 from django.core.management.base import BaseCommand
 
 from manual.models import ManualMigrationOutstanding
-
 from variantgrid.settings.components.secret_settings import get_secret
 
 

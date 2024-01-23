@@ -1,7 +1,7 @@
 import logging
 import re
 from collections import defaultdict
-from typing import List, Dict, Tuple, Any, Optional
+from typing import Any, Optional
 
 import Levenshtein
 
@@ -10,8 +10,8 @@ from library.utils import is_not_none
 from ontology.models import OntologyTerm, OntologyService
 
 CodePK = Any
-CodePKLookups = Dict[CodePK, str]
-OntologyResults = Tuple[str, List[CodePK]]
+CodePKLookups = dict[CodePK, str]
+OntologyResults = tuple[str, list[CodePK]]
 
 HPO_PATTERN = re.compile(r"HP:(\d{7})$")
 HPO_TYPO_PATTERN = re.compile(r"HPO:(\d{7})$")
@@ -103,12 +103,12 @@ class PhenotypeMatcher:
         special_case_lookups = self._get_special_case_lookups(hpo_pks, omim_pks, self.hgnc_records)
         self.hardcoded_lookups, self.case_insensitive_lookups, self.disease_families = special_case_lookups
 
-    def get_matches(self, words_and_spans_subset) -> List[str]:
+    def get_matches(self, words_and_spans_subset) -> list[str]:
         words = [ws[0] for ws in words_and_spans_subset]
         text = ' '.join(words)
         lower_text = text.lower()
 
-        ontology_term_ids: List[str] = []
+        ontology_term_ids: list[str] = []
         special_case_match = self._get_special_case_match(text)
         if any(special_case_match):
             ontology_term_ids = special_case_match
@@ -143,7 +143,7 @@ class PhenotypeMatcher:
 
         return ontology_term_ids
 
-    def _get_special_case_match(self, text) -> List[str]:
+    def _get_special_case_match(self, text) -> list[str]:
         ontology_term_ids = []
 
         hl = self.hardcoded_lookups.get(text)
@@ -205,7 +205,7 @@ class PhenotypeMatcher:
         return lower_text in cls.COMMON_WORDS
 
     @staticmethod
-    def calculate_match_distance(words: List[str]) -> int:
+    def calculate_match_distance(words: list[str]) -> int:
         """ by default we match on 1 - however we may want to be a bit lax sometimes """
         num_ae_words = 0
         for w in words:
@@ -214,7 +214,7 @@ class PhenotypeMatcher:
         return distance
 
     @staticmethod
-    def get_id_from_multi_word_fuzzy_match(lookup: CodePKLookups, words: List[str], text: str, distance: int = 1) -> Optional[CodePK]:
+    def get_id_from_multi_word_fuzzy_match(lookup: CodePKLookups, words: list[str], text: str, distance: int = 1) -> Optional[CodePK]:
         potentials: CodePKLookups = {}
         min_length = len(text) - distance
         max_length = len(text) + distance
@@ -227,7 +227,7 @@ class PhenotypeMatcher:
         return PhenotypeMatcher.get_id_from_fuzzy_match(potentials, text, distance)
 
     @staticmethod
-    def get_id_from_single_word_fuzzy_match(single_words_by_length: Dict[int, CodePKLookups], text: str,
+    def get_id_from_single_word_fuzzy_match(single_words_by_length: dict[int, CodePKLookups], text: str,
                                             distance: int = 1) -> Optional[CodePK]:
         text_length = len(text)
         potentials: CodePKLookups = {}
@@ -259,7 +259,7 @@ class PhenotypeMatcher:
         return False
 
     @staticmethod
-    def _create_word_lookups(records: CodePKLookups) -> Dict[str, Dict]:
+    def _create_word_lookups(records: CodePKLookups) -> dict[str, dict]:
         word_lookup = defaultdict(dict)
 
         for text, obj in records.items():
@@ -313,7 +313,7 @@ class PhenotypeMatcher:
         hpo_pks.update(new_entries)
 
     @staticmethod
-    def _get_ontology_pks_by_term(ontology_service: OntologyService) -> Dict[str, str]:
+    def _get_ontology_pks_by_term(ontology_service: OntologyService) -> dict[str, str]:
         ot_pks = {}
         ontology_term_qs = OntologyTerm.objects.filter(ontology_service=ontology_service)
         for pk, name, aliases in ontology_term_qs.values_list('pk', 'name', "aliases"):
@@ -360,7 +360,7 @@ class PhenotypeMatcher:
         return omim_pks_by_term
 
     @staticmethod
-    def _get_special_case_lookups(hpo_pks, omim_pks, gene_symbol_records) -> Tuple[Dict, Dict, Dict]:
+    def _get_special_case_lookups(hpo_pks, omim_pks, gene_symbol_records) -> tuple[dict, dict, dict]:
         def load_omim_by_name(description: str) -> OntologyResults:
             omim_pk = omim_pks[description.lower()]
             return OntologyService.OMIM, [omim_pk]
@@ -370,7 +370,7 @@ class PhenotypeMatcher:
             return OntologyService.HPO, [hpo_pk]
 
         def load_hpo_list_by_names(hpo_name_list) -> OntologyResults:
-            hpo_list: List[CodePK] = []
+            hpo_list: list[CodePK] = []
             for hpo_name in hpo_name_list:
                 _, hpo = load_hpo_by_name(hpo_name)
                 hpo_list.extend(hpo)
@@ -380,7 +380,7 @@ class PhenotypeMatcher:
             gene_symbol_id = gene_symbol_records[gene_symbol.lower()]
             return OntologyService.HGNC, [gene_symbol_id]
 
-        def load_genes_by_name(gene_symbols_list: List[str]) -> OntologyResults:
+        def load_genes_by_name(gene_symbols_list: list[str]) -> OntologyResults:
             genes_list = []
             for gene_symbol in gene_symbols_list:
                 _, genes = load_gene_by_name(gene_symbol)

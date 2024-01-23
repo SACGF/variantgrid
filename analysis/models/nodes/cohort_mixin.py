@@ -1,7 +1,7 @@
 import operator
 import re
 from functools import reduce
-from typing import List, Dict, Optional, Tuple
+from typing import Optional
 
 from django.db.models import Q
 
@@ -43,7 +43,7 @@ class CohortMixin:
             cdc = None
         return cdc
 
-    def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
+    def _get_annotation_kwargs_for_node(self, **kwargs) -> dict:
         annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
         if cgc := self.cohort_genotype_collection:
             annotation_kwargs.update(cgc.get_annotation_kwargs(**kwargs))
@@ -93,11 +93,11 @@ class CohortMixin:
     def any_germline_count_column(self):
         return self.count_column_prefix + "any_germline"
 
-    def _get_q_and_list(self) -> List[Q]:
+    def _get_q_and_list(self) -> list[Q]:
         """ Collects node editor filters. Overridden below """
         return self.get_allele_frequency_q_list()
 
-    def get_cohort_and_arg_q_dict(self) -> Tuple[Cohort, Dict[Optional[str], Dict[str, Q]]]:
+    def get_cohort_and_arg_q_dict(self) -> tuple[Cohort, dict[Optional[str], dict[str, Q]]]:
         arg_q_dict = {}
         cohort = self._get_cohort()
         if cohort:
@@ -146,7 +146,7 @@ class CohortMixin:
             q_and.append(GroupOperation.reduce(filters, naff.group_operation))
         return q_and
 
-    def get_vcf_locus_filters_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def get_vcf_locus_filters_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         arg_q_dict = {}
         if self.has_filters:
             vcf = self._get_vcf()
@@ -223,7 +223,7 @@ class CohortMixin:
 
         return extra_colmodel_overrides
 
-    def _get_configuration_errors(self) -> List:
+    def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
         if vcf := self._get_vcf():
             try:
@@ -242,7 +242,7 @@ class CohortMixin:
 class SampleMixin(CohortMixin):
     """ Adds sample to query via annotation kwargs, must have a "sample" field """
 
-    def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
+    def _get_annotation_kwargs_for_node(self, **kwargs) -> dict:
         kwargs["override"] = False
         annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
         if self.sample:

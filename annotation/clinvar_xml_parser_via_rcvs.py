@@ -1,5 +1,4 @@
 import json
-from typing import List
 
 from Bio import Entrez
 
@@ -23,9 +22,9 @@ class ClinVarXmlParserViaRCVs(ClinVarXmlParser):
         json_data = json.loads(cv_handle.read())
         cv_handle.close()
 
-        all_urls: List[str] = [f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id={clinvar_variation_id}&retmode=json"]
-        all_rcvs: List[str] = []
-        parsed_results: List[ClinVarRecord] = []
+        all_urls: list[str] = [f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=clinvar&id={clinvar_variation_id}&retmode=json"]
+        all_rcvs: list[str] = []
+        parsed_results: list[ClinVarRecord] = []
         if result := json_data.get("result"):
             if uuids := result.get("uids"):
                 if uuid_data := result.get(uuids[0]):

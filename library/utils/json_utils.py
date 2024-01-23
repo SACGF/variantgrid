@@ -3,7 +3,7 @@ from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import cached_property
-from typing import Union, Dict, Any, List, Mapping
+from typing import Union, Any, Mapping
 
 
 # Inclusion of this code snippet will cause "to_json()" to be called on classes by the JSONEncoder, allowing them to become serializable
@@ -18,8 +18,8 @@ json.JSONEncoder.default = _default
 
 # JSON Types, just useful for documenting
 JsonPrimitiveType = Union[str, int, float, bool, None]
-JsonObjType = Dict[JsonPrimitiveType, 'JsonDataType']
-JsonListType = List['JSonDataType']
+JsonObjType = dict[JsonPrimitiveType, 'JsonDataType']
+JsonListType = list['JSonDataType']
 JsonDataType = Union[JsonListType, JsonObjType, JsonPrimitiveType]
 
 
@@ -123,7 +123,7 @@ class JsonPathId(JsonPathPart):
 
 @dataclass(frozen=True, repr=False)
 class JsonDiff:
-    json_path: List[JsonPathPart]
+    json_path: list[JsonPathPart]
     a: JsonDataType
     b: JsonDataType
 
@@ -145,7 +145,7 @@ class JsonDiff:
 
 class JsonDiffs:
 
-    def __init__(self, json_diffs: List[JsonDiff]):
+    def __init__(self, json_diffs: list[JsonDiff]):
         self.json_diffs = json_diffs
 
     def __bool__(self):
@@ -162,13 +162,13 @@ class JsonDiffs:
 
     @staticmethod
     def differences(obj1: JsonDataType, obj2: JsonDataType) -> 'JsonDiffs':
-        diffs: List['JsonDiff'] = []
+        diffs: list['JsonDiff'] = []
         JsonDiffs._differences(obj1, obj2, [], diffs)
         diffs.sort()
         return JsonDiffs(diffs)
 
     @staticmethod
-    def _differences(obj1: JsonDataType, obj2: JsonDataType, path: List[JsonPathPart], diffs: List[JsonDiff]) -> None:
+    def _differences(obj1: JsonDataType, obj2: JsonDataType, path: list[JsonPathPart], diffs: list[JsonDiff]) -> None:
         if obj1 == obj2:
             return
 

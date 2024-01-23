@@ -1,6 +1,5 @@
 #
 import logging
-from typing import Tuple, List
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Max
@@ -40,7 +39,7 @@ def check_valid_count_ops(operation):
         raise ValueError(msg)
 
 
-def _get_update_sql_and_params(collection: VariantZygosityCountCollection, vcf: VCF, operation, sample=None) -> Tuple[str, List]:
+def _get_update_sql_and_params(collection: VariantZygosityCountCollection, vcf: VCF, operation, sample=None) -> tuple[str, list]:
     extra_where_sql = ""
     cgc = vcf.cohort.cohort_genotype_collection
     if sample:

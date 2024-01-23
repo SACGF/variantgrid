@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from io import StringIO
-from typing import Optional, List, Iterator, Tuple, Any, Callable, Iterable
+from typing import Optional, Iterator, Any, Callable, Iterable
 
 from django.http import HttpResponse, StreamingHttpResponse
 from django.http.response import HttpResponseBase
@@ -54,7 +54,7 @@ class ClassificationExportFormatter(ABC):
         :param extension_override: If creating a wrapper file, e.g. "zip"
         :return: The appropriate filename
         """
-        filename_parts: List[str] = [self.classification_filter.file_prefix]
+        filename_parts: list[str] = [self.classification_filter.file_prefix]
         if self.classification_filter.file_include_date:
             filename_parts.append(self.classification_filter.date_str)
 
@@ -119,17 +119,17 @@ class ClassificationExportFormatter(ABC):
         """
         pass
 
-    def _peekable_data(self) -> peekable:  # peekable[List[str]]
+    def _peekable_data(self) -> peekable:  # peekable[list[str]]
         return peekable(self.row_generator())
 
-    def with_new_lines(self, data: List[str]) -> List[str]:
+    def with_new_lines(self, data: list[str]) -> list[str]:
         if data:
             return [row + ("" if row.endswith("\n") else "\n") for row in data]
         else:
             return []
 
-    def _yield_streaming_entry_str(self, source: peekable) -> Iterator[List[str]]:
-        # source should be a peekable of List[str]
+    def _yield_streaming_entry_str(self, source: peekable) -> Iterator[list[str]]:
+        # source should be a peekable of list[str]
         # yield's a file's worth of data (in several chunks)
 
         if header := self.with_new_lines(self.header()):
@@ -178,7 +178,7 @@ class ClassificationExportFormatter(ABC):
         for entry in self._yield_streaming_entry_str(source):
             yield "\n".join(entry).encode()
 
-    def _yield_streaming_zip_entries(self) -> Iterator[Tuple[str, datetime, int, Any, bytes]]:
+    def _yield_streaming_zip_entries(self) -> Iterator[tuple[str, datetime, int, Any, bytes]]:
         modified_at = datetime.now()
         perms = 0o600
         try:
@@ -269,7 +269,7 @@ class ClassificationExportFormatter(ABC):
         """
         pass
 
-    def batch_pre_cache(self) -> Optional[Callable[[List[AlleleData]], None]]:
+    def batch_pre_cache(self) -> Optional[Callable[[list[AlleleData]], None]]:
         """
         If there's some data you'll have to fetch for every row, you can alternatively fetch all the ones you need given
         a batch to reduce database calls
@@ -277,14 +277,14 @@ class ClassificationExportFormatter(ABC):
         """
         return None
 
-    def header(self) -> List[str]:
+    def header(self) -> list[str]:
         """
         Return rows to start each file, typically 0 to 1 line
         :return: A list of rows to be \n at the top of each file
         """
         return []
 
-    def row_generator(self) -> Iterable[List[str]]:
+    def row_generator(self) -> Iterable[list[str]]:
         for allele_data in self.classification_filter.allele_data_filtered_pre_processed(self.batch_pre_cache()):
 
             if row_limit := self.classification_filter.row_limit:
@@ -299,14 +299,14 @@ class ClassificationExportFormatter(ABC):
                 # whereas None indicates end of the file
 
     @abstractmethod
-    def row(self, allele_data: AlleleData) -> List[str]:
+    def row(self, allele_data: AlleleData) -> list[str]:
         """
         Return the row or rows that represent this AlleleData
         :param allele_data: All the valid classifications for an Allele
         """
         pass
 
-    def footer(self) -> List[str]:
+    def footer(self) -> list[str]:
         """
         Return rows to end each file, typically 0
         :return: A list of rows to be \n at the bottom of each file

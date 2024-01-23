@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import Union
 
 from django.contrib.auth.models import User, Group
 from django.db import models
@@ -95,7 +95,7 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         return tags_qs.distinct()
 
     @staticmethod
-    def variants_for_build_q(genome_build, tags_qs, tag_ids: List[str]) -> Q:
+    def variants_for_build_q(genome_build, tags_qs, tag_ids: list[str]) -> Q:
         if tags_qs is None:
             tags_qs = VariantTag.objects.all()
         if tag_ids:

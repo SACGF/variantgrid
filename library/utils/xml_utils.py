@@ -1,5 +1,5 @@
 import inspect
-from typing import List, Callable, Optional
+from typing import Callable, Optional
 
 from lxml import etree
 
@@ -41,10 +41,10 @@ class PP:
 
 class PathPredicates:
 
-    def __init__(self, path: List):
+    def __init__(self, path: list):
         self._path = [PP.convert(elem) for elem in path]
 
-    def with_prefix(self, prefix: List) -> 'PathPredicates':
+    def with_prefix(self, prefix: list) -> 'PathPredicates':
         return PathPredicates(path=prefix + self._path)
 
     def queue_test(self, elem) -> Optional['PathPredicates']:
@@ -109,7 +109,7 @@ class XmlParser:
     """
 
     @classmethod
-    def get_parser_methods(cls, prefix: List):
+    def get_parser_methods(cls, prefix: list):
         if not hasattr(cls, 'parser_methods'):
             parser_methods = [func for _, func in inspect.getmembers(cls, lambda x: getattr(x, 'is_parser', False))]
             cls.parser_methods = [ParserMethod(method=pm, path=pm.path.with_prefix(prefix), on_start=pm.on_start) for pm in parser_methods]
@@ -120,11 +120,11 @@ class XmlParser:
         return cls.parser_methods
 
     # determine if we only save tagName
-    def __init__(self, prefix: Optional[List] = None):
+    def __init__(self, prefix: Optional[list] = None):
         self._prefix = prefix or []
-        self._stack: List = []
-        self._candidates: List[List[Callable]] = []
-        self._execute: List[List[Callable]] = []
+        self._stack: list = []
+        self._candidates: list[list[Callable]] = []
+        self._execute: list[list[Callable]] = []
         self._yieldable: Optional = None
 
     def set_yieldable(self, obj):

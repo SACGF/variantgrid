@@ -1,6 +1,6 @@
 from enum import Enum
 from functools import cached_property
-from typing import Set, Optional, List, Dict, Tuple, Any, Union
+from typing import Optional, Any, Union
 
 import django.dispatch
 from django.conf import settings
@@ -112,7 +112,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         return f"({self.pk}) Discordance Report ({self.clinical_context.allele:CA}) {self.get_resolution_display() or 'Discordant'}"
 
     @property
-    def metrics_logging_key(self) -> Tuple[str, Any]:
+    def metrics_logging_key(self) -> tuple[str, Any]:
         return "discordance_report_id", self.pk
 
     @property
@@ -178,7 +178,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
             existing_vms.add(drc.classification_original.classification_id)
             existing_labs.add(drc.classification_original.classification.lab)
 
-        newly_added_labs: Set[Lab] = set()
+        newly_added_labs: set[Lab] = set()
         for vcm_id in self.clinical_context.classifications_qs.values_list('id', flat=True):
             if vcm_id in existing_vms:
                 existing_vms.remove(vcm_id)
@@ -219,11 +219,11 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
                 )
 
     @property
-    def all_actively_involved_labs(self) -> Set[Lab]:
+    def all_actively_involved_labs(self) -> set[Lab]:
         return {lab for lab, status in self.involved_labs.items() if status == DiscordanceReport.LabInvolvement.ACTIVE}
 
     @property
-    def reviewing_labs(self) -> Set[Lab]:
+    def reviewing_labs(self) -> set[Lab]:
         return self.all_actively_involved_labs
 
     def post_review_url(self, review: Review) -> str:
@@ -240,7 +240,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         return False
 
     @cached_property
-    def discordance_report_classifications(self) -> List['DiscordanceReportClassification']:
+    def discordance_report_classifications(self) -> list['DiscordanceReportClassification']:
         return list(self.discordancereportclassification_set.select_related(
             'classification_original__classification__clinical_context',
             'classification_final__classification',
@@ -251,8 +251,8 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         ).all())
 
     @cached_property
-    def involved_labs(self) -> Dict[Lab, LabInvolvement]:
-        lab_status: Dict[Lab, DiscordanceReport.LabInvolvement] = {}
+    def involved_labs(self) -> dict[Lab, LabInvolvement]:
+        lab_status: dict[Lab, DiscordanceReport.LabInvolvement] = {}
         for drc in self.discordance_report_classifications:
             effective_c: Classification = drc.classification_effective.classification
             lab = effective_c.lab
@@ -316,7 +316,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
             # what was once "continued discordance" is concordant, re-open so we can instantly close it
             return True
 
-        existing_labs: Set[Lab] = set()
+        existing_labs: set[Lab] = set()
         for drc in self.discordance_report_classifications:
             existing_labs.add(drc.classification_original.classification.lab)
 
@@ -366,7 +366,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
     def apply_flags_to_context(clinical_context: ClinicalContext):
         # this is now the one function that applies and closes discordance flags
         # to classifications and clinical contexts
-        discordant_classifications: Set[int] = set()
+        discordant_classifications: set[int] = set()
         is_in_discordance = False
         if latest_report := DiscordanceReport.latest_report(clinical_context):
             if latest_report.is_important:
@@ -400,7 +400,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
             raise ValueError("Can only apply_flags on the latest discordance report for any clinical context")
         DiscordanceReport.apply_flags_to_context(self.clinical_context)
 
-    def actively_discordant_classification_ids(self) -> Set[int]:
+    def actively_discordant_classification_ids(self) -> set[int]:
         if not self.is_important:
             return set()
         classifications = set()
@@ -410,7 +410,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         return classifications
 
     @property
-    def all_classification_modifications(self) -> List[ClassificationModification]:
+    def all_classification_modifications(self) -> list[ClassificationModification]:
         return [drc.classification_effective for drc in self.discordance_report_classifications]
 
     @cached_property
@@ -424,7 +424,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
                         return True
         return False
 
-    def all_c_hgvs(self, genome_build: Optional[GenomeBuild] = None) -> List[CHGVS]:
+    def all_c_hgvs(self, genome_build: Optional[GenomeBuild] = None) -> list[CHGVS]:
         if not genome_build:
             genome_build = GenomeBuildManager.get_current_genome_build()
         c_hgvs = set()

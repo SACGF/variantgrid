@@ -4,7 +4,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Dict, Any, Optional, Iterable, List
+from typing import Any, Optional, Iterable
 
 from django.contrib import messages
 from django.db.models import QuerySet, When, Value, Case, IntegerField, Count, Q, TextField
@@ -79,7 +79,7 @@ def clinvar_export_batch_detail(request, clinvar_export_batch_id: int):
     })
 
 
-def _export_id_to_batch_ids(qs: QuerySet[ClinVarExport]) -> Dict[int, List[int]]:
+def _export_id_to_batch_ids(qs: QuerySet[ClinVarExport]) -> dict[int, list[int]]:
     export_to_batches = defaultdict(list)
     for export_id, batch_id in ClinVarExportSubmission.objects.filter(
         clinvar_export__in=qs.values_list("id", flat=True)).order_by(
@@ -90,7 +90,7 @@ def _export_id_to_batch_ids(qs: QuerySet[ClinVarExport]) -> Dict[int, List[int]]
 
 class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
 
-    def render_allele(self, row: Dict[str, Any]) -> str:
+    def render_allele(self, row: dict[str, Any]) -> str:
         allele = allele_for(row["clinvar_allele__allele"])
         return f"{allele:CA}"
 
@@ -138,7 +138,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
             else:
                 c_hgvs_str = row["classification_based_on__classification__allele_info__grch38__c_hgvs"]
 
-            data: Dict[str, Any]
+            data: dict[str, Any]
             c_hgvs = CHGVS(c_hgvs_str)
             if c_hgvs.raw_c != c_hgvs.full_c_hgvs:
                 data = {
@@ -258,7 +258,7 @@ def clinvar_export_history(request: HttpRequest, clinvar_export_id: int) -> Http
 @dataclass
 class ClinVarExportSummaryData:
     clinvar_export: ClinVarExport
-    batch_ids: Optional[List[int]]
+    batch_ids: Optional[list[int]]
 
 
 class ClinVarExportSummary(ExportRow):
@@ -387,7 +387,7 @@ class ClinVarExportSummary(ExportRow):
 
     @export_column("Messages")
     def messages(self):
-        all_messages: List[str] = []
+        all_messages: list[str] = []
         if clinvar_error := self.clinvar_export.last_submission_error:
             all_messages.append(f"(CLINVAR ERROR) {clinvar_error}")
 
@@ -549,7 +549,7 @@ class ClinVarMatchView(RequireSuperUserView, View):
         clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
         clinvar_key.check_user_can_access(request.user)
 
-        clinvar_legacy_rows: List[ClinVarLegacyRow] = []
+        clinvar_legacy_rows: list[ClinVarLegacyRow] = []
         try:
             file_obj = io.StringIO(request.FILES.get('file').read().decode("utf-8"))
             clinvar_legacy_rows = list(ClinVarLegacyRow.load_file(file_obj, clinvar_key))
@@ -571,7 +571,7 @@ def clinvar_match_detail(request, clinvar_key_id: str):
     data_str = request.GET.get('data_str')
 
     legacy_row = ClinVarLegacyRow.from_data_str(clinvar_key, data_str)
-    matches: List[ClinVarLegacyMatches] = legacy_row.find_variant_grid_allele() if data_str else []
+    matches: list[ClinVarLegacyMatches] = legacy_row.find_variant_grid_allele() if data_str else []
 
     # see if we match to a ClinVarExport, but not using SCV
     # implying that the SCV might need to be copied over

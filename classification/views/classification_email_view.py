@@ -1,7 +1,7 @@
 import collections
 import unicodedata
 from functools import cached_property
-from typing import List, Optional
+from typing import Optional
 
 import celery
 from django.conf import settings
@@ -89,7 +89,7 @@ class EmailSummaryData:
 
     def __init__(self, perspective: LabPickerData):
         labs = sorted(perspective.selected_labs)
-        self.lab_summaries: List[EmailLabSummaryData] = [EmailLabSummaryData(lab=lab, user=perspective.user) for lab in labs]
+        self.lab_summaries: list[EmailLabSummaryData] = [EmailLabSummaryData(lab=lab, user=perspective.user) for lab in labs]
 
 
 @celery.shared_task

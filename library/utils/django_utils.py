@@ -1,4 +1,4 @@
-from typing import Dict, Optional, TypeVar
+from typing import Optional, TypeVar
 
 from django.db.models import Model
 from django.http import HttpRequest, HttpResponse
@@ -13,7 +13,7 @@ def is_ajax(request: HttpRequest):
 def render_ajax_view(
         request: HttpRequest,
         template_name: str,
-        context: Dict,
+        context: dict,
         menubar: Optional[str] = None) -> HttpResponse:
     if not context:
         context = {}

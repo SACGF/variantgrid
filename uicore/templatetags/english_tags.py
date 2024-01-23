@@ -1,4 +1,4 @@
-from typing import Optional, List, Union
+from typing import Optional, Union
 
 from django import template
 from django.db.models import QuerySet
@@ -8,7 +8,7 @@ from library.utils import pretty_label
 register = template.Library()
 
 
-def count_items(items: Union[List, QuerySet, int]) -> int:
+def count_items(items: Union[list, QuerySet, int]) -> int:
     item_count: int
     if hasattr(items, '__len__'):
         item_count = len(items)
@@ -21,7 +21,7 @@ def count_items(items: Union[List, QuerySet, int]) -> int:
 
 
 @register.simple_tag()
-def count(items: Union[List, QuerySet, int], singular: str, plural: Optional[str] = None):
+def count(items: Union[list, QuerySet, int], singular: str, plural: Optional[str] = None):
     """
     Possibly not the best name, but allows you to change the English on the basis of if you're dealing with singular or plural
     so you don't have to do "item(s)"
@@ -41,7 +41,7 @@ def count(items: Union[List, QuerySet, int], singular: str, plural: Optional[str
 
 
 @register.simple_tag()
-def plural(items: Union[List, QuerySet, int], singular: str = "", plural: str = "s"):
+def plural(items: Union[list, QuerySet, int], singular: str = "", plural: str = "s"):
     if count_items(items) == 1:
         return singular
     return plural

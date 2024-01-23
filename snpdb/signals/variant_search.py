@@ -3,7 +3,7 @@ import logging
 import re
 from collections import defaultdict
 from itertools import zip_longest
-from typing import Optional, List, Iterable, Union, Dict, Callable
+from typing import Optional, Iterable, Union, Callable
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -311,7 +311,7 @@ def search_variant_db_snp(search_input: SearchInputInstance):
 def _search_hgvs_using_gene_symbol(
         hgvs_matcher: HGVSMatcher,
         gene_symbol: GeneSymbol,
-        search_messages: List[SearchMessage],
+        search_messages: list[SearchMessage],
         hgvs_string: str,
         user: User,
         genome_build: GenomeBuild,
@@ -319,8 +319,8 @@ def _search_hgvs_using_gene_symbol(
 
     search_messages.append(SearchMessage(f'HGVS requires transcript, given symbol "{gene_symbol}"'))
     # Group results + hgvs by result.identifier
-    results_by_variant_identifier: Dict[str, List[SearchResult]] = defaultdict(list)
-    transcript_accessions_by_variant_identifier: Dict[str, List] = defaultdict(list)
+    results_by_variant_identifier: dict[str, list[SearchResult]] = defaultdict(list)
+    transcript_accessions_by_variant_identifier: dict[str, list] = defaultdict(list)
     hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_string)
     hgvs_variant.gene = None
 
@@ -445,8 +445,8 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         yield SearchMessageOverall(f'Cleaned hgvs from \n"{hgvs_string}" to\n"{clean_hgvs_string}"', severity=LogLevel.INFO)
         hgvs_string = clean_hgvs_string
 
-    search_messages: List[SearchMessage] = []  # [SearchMessage(m) for m in hgvs_search_messages]
-    reference_message: List[SearchMessage] = []
+    search_messages: list[SearchMessage] = []  # [SearchMessage(m) for m in hgvs_search_messages]
+    reference_message: list[SearchMessage] = []
 
     try:
         variant_tuple, used_transcript_accession, kind, method, matches_reference = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string)

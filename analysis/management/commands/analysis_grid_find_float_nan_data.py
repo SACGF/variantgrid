@@ -1,6 +1,5 @@
 import operator
 from functools import reduce
-from typing import List, Tuple
 
 import numpy as np
 from django.core.management.base import BaseCommand
@@ -36,7 +35,7 @@ class Command(BaseCommand):
             print(f"Query was {qs.count()} records...")
 
     @staticmethod
-    def _get_float_paths(annotation_version) -> Tuple[AnalysisNode, List[float]]:
+    def _get_float_paths(annotation_version) -> tuple[AnalysisNode, list[float]]:
         user = admin_bot()
         all_columns = CustomColumnsCollection.objects.get(name='All columns')
         node = AnalysisNode.objects.filter(analysis__annotation_version=annotation_version).select_subclasses().first()

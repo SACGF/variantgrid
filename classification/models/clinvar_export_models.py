@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, List, Iterable, Dict
+from typing import Optional, Iterable
 
 from django.db import models, transaction
 from django.db.models import QuerySet, TextChoices
@@ -95,7 +95,7 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
     def last_submission_error(self) -> Optional[str]:
         if last_submission := self.last_submission:
             if response_json := last_submission.response_json:
-                all_errors: List[str] = []
+                all_errors: list[str] = []
                 if errors_list := response_json.get('errors'):
                     for error in errors_list:
                         if output := error.get('output'):
@@ -136,7 +136,7 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
         return ConditionResolved.from_dict(self.condition)
 
     @property
-    def citation_ids(self) -> List[str]:
+    def citation_ids(self) -> list[str]:
         if body := self.submission_body.pure_json():
             if clin_sig := body.get("clinicalSignificance"):
                 if citation := clin_sig.get("citation"):
@@ -293,7 +293,7 @@ class ClinVarExportBatch(TimeStampedModel):
 
     @staticmethod
     @transaction.atomic()
-    def create_batches(qs: QuerySet[ClinVarExport], force_update: bool = False) -> List['ClinVarExportBatch']:
+    def create_batches(qs: QuerySet[ClinVarExport], force_update: bool = False) -> list['ClinVarExportBatch']:
         batch_maker = ClinVarExportBatches()
         qs = qs.select_related('clinvar_allele', 'clinvar_allele__clinvar_key')
         if not force_update:
@@ -369,10 +369,10 @@ class ClinVarExportBatchGrouping:
 class ClinVarExportBatches:
 
     def __init__(self):
-        self.all_batches: List[ClinVarExportBatch] = []
+        self.all_batches: list[ClinVarExportBatch] = []
 
-        self.group_batches: Dict[ClinVarExportBatchGrouping, ClinVarExportBatch] = {}
-        self.batch_size: Dict[ClinVarExportBatchGrouping, int] = {}
+        self.group_batches: dict[ClinVarExportBatchGrouping, ClinVarExportBatch] = {}
+        self.batch_size: dict[ClinVarExportBatchGrouping, int] = {}
         self.skipped_records: int = 0
 
     def add_record(self, record: ClinVarExport, force_update: bool = False):

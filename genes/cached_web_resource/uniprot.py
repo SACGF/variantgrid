@@ -3,7 +3,6 @@ import gzip
 import logging
 from collections import defaultdict
 from io import BytesIO, TextIOWrapper
-from typing import Dict
 
 from Bio import SwissProt
 
@@ -54,7 +53,7 @@ def store_uniprot(cached_web_resource: CachedWebResource, file_object):
     cached_web_resource.save()
 
 
-def extract_uniprot_sprot(f) -> Dict:
+def extract_uniprot_sprot(f) -> dict:
     """ Based on Jinghua (Frank) Feng's code - construct gene reference data  """
     reader = SwissProt.parse(f)
 

@@ -1,6 +1,5 @@
 import abc
 from enum import Enum
-from typing import Tuple
 
 from genes.hgvs import HGVSVariant
 from snpdb.models import GenomeBuild, VariantCoordinate
@@ -61,7 +60,7 @@ class HGVSConverter(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def hgvs_to_variant_coordinate_and_reference_match(self, hgvs_string: str, transcript_version) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
+    def hgvs_to_variant_coordinate_and_reference_match(self, hgvs_string: str, transcript_version) -> tuple[VariantCoordinate, HgvsMatchRefAllele]:
         pass
 
     @abc.abstractmethod

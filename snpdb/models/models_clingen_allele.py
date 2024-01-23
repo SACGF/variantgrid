@@ -1,7 +1,7 @@
 import logging
 import re
 from functools import cached_property
-from typing import Dict, Optional, Tuple
+from typing import Optional
 
 from django.conf import settings
 from django.db import models
@@ -62,7 +62,7 @@ class ClinGenAllele(TimeStampedModel):
         return ClinGenAllele.get_id_from_code(code) >= 0
 
     @cached_property
-    def transcript_alleles_by_transcript_accession(self) -> Dict[str, Dict]:
+    def transcript_alleles_by_transcript_accession(self) -> dict[str, dict]:
         ta_by_tv = {}
         if transcript_alleles := self.api_response.get("transcriptAlleles"):
             for ta in transcript_alleles:
@@ -72,7 +72,7 @@ class ClinGenAllele(TimeStampedModel):
         return ta_by_tv
 
     @cached_property
-    def transcript_alleles_by_transcript(self) -> Dict[str, Dict]:
+    def transcript_alleles_by_transcript(self) -> dict[str, dict]:
         """ Version stripped off """
         ta_by_t = {}
         for transcript_accession, ta in self.transcript_alleles_by_transcript_accession.items():
@@ -80,7 +80,7 @@ class ClinGenAllele(TimeStampedModel):
             ta_by_t[transcript_id] = ta
         return ta_by_t
 
-    def _get_transcript_allele(self, transcript_accession, match_version=True) -> Optional[Dict]:
+    def _get_transcript_allele(self, transcript_accession, match_version=True) -> Optional[dict]:
         if match_version:
             ta = self.transcript_alleles_by_transcript_accession.get(transcript_accession)
         else:
@@ -145,8 +145,8 @@ class ClinGenAllele(TimeStampedModel):
                             logging.warning(e_no_transcript)
         return hgvs_variant
 
-    def _get_raw_hgvs_and_data(self, transcript_accession, match_version=True) -> Tuple[Optional[str],
-                                                                                        Optional[Dict]]:
+    def _get_raw_hgvs_and_data(self, transcript_accession, match_version=True) -> tuple[Optional[str],
+                                                                                        Optional[dict]]:
         if ta := self._get_transcript_allele(transcript_accession, match_version):
             transcript_id = ClinGenAllele._strip_transcript_version(transcript_accession)
             for t_hgvs in ta["hgvs"]:

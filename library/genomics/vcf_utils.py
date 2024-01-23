@@ -2,7 +2,6 @@ import operator
 import os
 import re
 from collections import defaultdict
-from typing import Tuple
 
 import cyvcf2
 import vcf
@@ -68,7 +67,7 @@ def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=Fal
             f.write(line + "\n")
 
 
-def get_variant_caller_and_version_from_vcf(filename) -> Tuple[str, str]:
+def get_variant_caller_and_version_from_vcf(filename) -> tuple[str, str]:
     variant_caller = None
     version = None
 

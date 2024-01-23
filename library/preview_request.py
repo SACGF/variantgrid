@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
-from typing import Optional, Union, Any, Set, List, Callable, Type
+from typing import Optional, Union, Any, Callable, Type
 
 from django.db.models import Model
 from django.dispatch import Signal
@@ -131,11 +131,11 @@ class PreviewModelMixin:
             title: Optional[str] = None,
             icon: Optional[str] = None,
             summary: Optional[Union[str, SafeString]] = None,
-            summary_extra: Optional[List[PreviewKeyValue]] = None,
+            summary_extra: Optional[list[PreviewKeyValue]] = None,
             internal_url: Optional[str] = None,
             external_url: Optional[str] = None,
-            genome_builds: Optional[Set['GenomeBuild']] = None,
-            annotation_consortia: Optional[Set['AnnotationConsortium']] = None
+            genome_builds: Optional[set['GenomeBuild']] = None,
+            annotation_consortia: Optional[set['AnnotationConsortium']] = None
     ) -> 'PreviewData':
         if summary:
             if not summary_extra:
@@ -173,11 +173,11 @@ class PreviewData:
     identifier: str
     title: Optional[str] = None
     icon: Optional[str] = None
-    summary_extra: Optional[List[PreviewKeyValue]] = None
+    summary_extra: Optional[list[PreviewKeyValue]] = None
     internal_url: Optional[str] = None
     external_url: Optional[str] = None
-    genome_builds: Optional[Set['GenomeBuild']] = None
-    annotation_consortia: Optional[Set['AnnotationConsortium']] = None
+    genome_builds: Optional[set['GenomeBuild']] = None
+    annotation_consortia: Optional[set['AnnotationConsortium']] = None
     obj: Optional[Any] = None
     is_operation: bool = False  # indicates that the preview data is the preview of an operation to create the data
 
@@ -188,11 +188,11 @@ class PreviewData:
             identifier: Optional[str] = None,
             title: Optional[str] = None,
             icon: Optional[str] = None,
-            summary_extra: Optional[List[PreviewKeyValue]] = None,
+            summary_extra: Optional[list[PreviewKeyValue]] = None,
             internal_url: Optional[str] = None,
             external_url: Optional[str] = None,
-            genome_builds: Optional[Set['GenomeBuild']] = None,
-            annotation_consortia: Optional[Set['AnnotationConsortium']] = None,
+            genome_builds: Optional[set['GenomeBuild']] = None,
+            annotation_consortia: Optional[set['AnnotationConsortium']] = None,
             is_operation: bool = False):
 
         if category is None:

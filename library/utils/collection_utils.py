@@ -5,8 +5,7 @@ from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import islice
-from typing import Iterable, Iterator, List, TypeVar, Any, Generic, Set, Callable, Tuple, Optional, Dict, Sequence, \
-    Union
+from typing import Iterable, Iterator, TypeVar, Any, Generic, Callable, Optional, Sequence, Union
 
 from django.utils.functional import SimpleLazyObject
 
@@ -14,7 +13,7 @@ DictKey = TypeVar("DictKey")
 DictVal = TypeVar("DictVal")
 
 
-def invert_dict(source_dict: Dict[DictKey, DictVal]) -> Dict[DictVal, DictKey]:
+def invert_dict(source_dict: dict[DictKey, DictVal]) -> dict[DictVal, DictKey]:
     return {v: k for k, v in source_dict.items()}
 
 
@@ -27,7 +26,7 @@ def invert_dict_of_lists(source_dict):
 
 
 # From https://stackoverflow.com/a/26496899
-def defaultdict_to_dict(d: defaultdict) -> Dict:
+def defaultdict_to_dict(d: defaultdict) -> dict:
     if isinstance(d, defaultdict):
         d = {k: defaultdict_to_dict(v) for k, v in d.items()}
     return d
@@ -39,7 +38,7 @@ def sorted_nicely(l: Iterable) -> Sequence:
     def convert(text: str) -> Union[int, str]:
         return int(text) if text.isdigit() else text
 
-    def alphanum_key(key: str) -> List[str]:
+    def alphanum_key(key: str) -> list[str]:
         return [convert(c) for c in re.split('([0-9]+)', key)]
 
     return sorted(l, key=alphanum_key)
@@ -65,7 +64,7 @@ def get_single_element(sequence: Sequence[T]) -> T:
     return next(iter(sequence))
 
 
-def nest_dict(flat_dict: Dict[DictKey, DictVal]) -> Dict[DictKey, DictVal]:
+def nest_dict(flat_dict: dict[DictKey, DictVal]) -> dict[DictKey, DictVal]:
     """
     :param flat_dict: A dictionary where all the keys are in the format of "a.b": x, "a.c": y
     :return: A nested dictionary e.g. {"a": {"b": x}, {"c": y}}
@@ -85,14 +84,14 @@ def nest_dict(flat_dict: Dict[DictKey, DictVal]) -> Dict[DictKey, DictVal]:
     return nested
 
 
-def iter_fixed_chunks(iterable: Iterable[T], chunk_size: int) -> Iterator[Tuple[T]]:
+def iter_fixed_chunks(iterable: Iterable[T], chunk_size: int) -> Iterator[tuple[T]]:
     """ https://stackoverflow.com/a/22045226 """
     it = iter(iterable)
     return iter(lambda: tuple(islice(it, chunk_size)), ())
 
 
-def batch_iterator(iterable: Iterable[T], batch_size: int = 10) -> Iterator[List[T]]:
-    batch: List[T] = []
+def batch_iterator(iterable: Iterable[T], batch_size: int = 10) -> Iterator[list[T]]:
+    batch: list[T] = []
     for record in iterable:
         batch.append(record)
         if len(batch) >= batch_size:
@@ -110,7 +109,7 @@ Data = TypeVar("Data")
 @dataclass
 class Group(Generic[Key, Value]):
     key: Key
-    values: Set[Value]
+    values: set[Value]
 
     @property
     def values_list(self):
@@ -120,19 +119,19 @@ class Group(Generic[Key, Value]):
         return self.key < other.key
 
 
-def group_data(data: Iterable[Data], key_func: Callable[[Data], Tuple[Key, Value]]) -> List[Group[Key, Value]]:
+def group_data(data: Iterable[Data], key_func: Callable[[Data], tuple[Key, Value]]) -> list[Group[Key, Value]]:
     # deprecated, use itertools groupby
     group_dict = defaultdict(set)
     for element in data:
         key, value = key_func(element)
         group_dict[key].add(value)
-    flat: List[Group[Key, Value]] = []
+    flat: list[Group[Key, Value]] = []
     for key, values in group_dict.items():
         flat.append(Group(key, values))
     return flat
 
 
-def group_by_key(qs: Iterable, key: Callable) -> Iterator[Tuple[Any, List]]:
+def group_by_key(qs: Iterable, key: Callable) -> Iterator[tuple[Any, list]]:
     """
     Provide a sorted iterable value (like a queryset) and an attrgetter for getting values from it.
     Each time the attrgetter returns a value different from before, it will return a list
@@ -215,7 +214,7 @@ class IterableStitcher(Generic[T], Iterable[T]):
             def preview(self):
                 return self.cache
 
-        def __init__(self, iterables: List[Iterable[T]], comparison: Callable[[T, T], bool]):
+        def __init__(self, iterables: list[Iterable[T]], comparison: Callable[[T, T], bool]):
             self.iterators = [self._CachedIterator(iterable) for iterable in iterables]
             self.comparison = comparison
 
@@ -235,7 +234,7 @@ class IterableStitcher(Generic[T], Iterable[T]):
             min_ci.fetch_next()
             return min_value
 
-    def __init__(self, iterables: List[Iterable[T]], comparison=operator.__lt__):
+    def __init__(self, iterables: list[Iterable[T]], comparison=operator.__lt__):
         self.iterables = iterables
         self.comparison = comparison
 
@@ -245,7 +244,7 @@ class IterableStitcher(Generic[T], Iterable[T]):
 
 class LimitedCollection(Generic[T]):
 
-    def __init__(self, data: List[T], limit: int):
+    def __init__(self, data: list[T], limit: int):
         if data is None:
             data = []
         self.true_count = len(data)
@@ -275,14 +274,14 @@ class LimitedCollection(Generic[T]):
         return self.true_count > 0
 
 
-def segment(iterable: Iterable[T], filter_func: Callable[[T], bool]) -> Tuple[List[T], List[T]]:
+def segment(iterable: Iterable[T], filter_func: Callable[[T], bool]) -> tuple[list[T], list[T]]:
     """
     :param iterable An iterable bunch of data to be split into two
     :param filter_func A filter to run over each element of iterable, to put it into a pass or fail list
     :returns two lists, the first being elements that passed the filter, the second being ones that failed
     """
-    passes: List[T] = []
-    fails: List[T] = []
+    passes: list[T] = []
+    fails: list[T] = []
     for element in iterable:
         if filter_func(element):
             passes.append(element)
@@ -291,7 +290,7 @@ def segment(iterable: Iterable[T], filter_func: Callable[[T], bool]) -> Tuple[Li
     return passes, fails
 
 
-def flatten_nested_lists(iterable) -> List:
+def flatten_nested_lists(iterable) -> list:
     # collapses lists of lists, and filters out Nones
     def _flatten_generator(flatten_me):
         for item in flatten_me:
@@ -307,9 +306,9 @@ def flatten_nested_lists(iterable) -> List:
 ListItem = TypeVar("ListItem")
 
 
-def remove_duplicates_from_list(source_list: List[ListItem]) -> List[ListItem]:
-    seen: Set[ListItem] = set()
-    output: List[ListItem] = []
+def remove_duplicates_from_list(source_list: list[ListItem]) -> list[ListItem]:
+    seen: set[ListItem] = set()
+    output: list[ListItem] = []
     for item in source_list:
         if item not in seen:
             seen.add(item)
@@ -362,7 +361,7 @@ class LazyAttribute:
         return attr
 
     @staticmethod
-    def lazy_context(obj: Any, attributes: List[str]) -> Dict[str, SimpleLazyObject]:
+    def lazy_context(obj: Any, attributes: list[str]) -> dict[str, SimpleLazyObject]:
         """
         Create a dict used for contexts retrieve attributes from obj and having them only
         evaluate when the template first mentions them
@@ -400,7 +399,7 @@ class FormerTuple(ABC):
 
     @property
     @abc.abstractmethod
-    def as_tuple(self) -> Tuple:
+    def as_tuple(self) -> tuple:
         pass
 
     def __iter__(self):

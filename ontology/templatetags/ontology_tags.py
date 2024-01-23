@@ -1,7 +1,7 @@
 import itertools
 import uuid
 from dataclasses import dataclass
-from typing import Optional, Union, Iterable, List, Iterator
+from typing import Optional, Union, Iterable, Iterator
 
 from django.template import Library
 
@@ -73,7 +73,7 @@ def ontology_relationship_row(relationship: OntologyTermRelation, reference_term
 
 @dataclass
 class GroupedSnakes:
-    snakes: List[OntologySnake]
+    snakes: list[OntologySnake]
     destination: OntologyTerm
 
 
@@ -84,7 +84,7 @@ class GroupedSnakeRow:
     weak: Optional[bool]
 
     @staticmethod
-    def yield_snakes(grouped_snakes: List['GroupedSnakes']) -> Iterator['GroupedSnakeRow']:
+    def yield_snakes(grouped_snakes: list['GroupedSnakes']) -> Iterator['GroupedSnakeRow']:
         for grouped_snake in grouped_snakes:
             is_first = True
             for snake in grouped_snake.snakes:
@@ -100,7 +100,7 @@ class GroupedSnakeRow:
 @register.inclusion_tag("ontology/tags/ontology_snake_table.html")
 def ontology_snake_table(snakes: Iterable[OntologySnake], reference_term: Optional[OntologyTerm]):
 
-    grouped: List[GroupedSnakes] = []
+    grouped: list[GroupedSnakes] = []
 
     is_gene = reference_term.ontology_service == OntologyService.HGNC
 

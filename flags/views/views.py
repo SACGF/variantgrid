@@ -1,6 +1,6 @@
 import datetime
 from collections import defaultdict
-from typing import Iterable, Dict, Any, Union, List, Optional
+from typing import Iterable, Any, Union, Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -23,7 +23,7 @@ class CommentDetails:
         self.helper = helper
         self.detailed = False
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         status = None
         resolution = self.comment.resolution
         if resolution:
@@ -62,12 +62,12 @@ class FlagHelper:
 
         self.since = None
         self.user = user
-        self.flag_collections: List[FlagCollection] = flag_collections
-        self.flag_types: Dict[Any, FlagType] = {}
-        self.flag_resolutions: Dict[Any, FlagResolution] = {}
-        self.flags: Dict[Any, Flag] = {}
-        self.flag_comments: Dict[Any, CommentDetails] = {}
-        self.users: Dict[int, User] = {}
+        self.flag_collections: list[FlagCollection] = flag_collections
+        self.flag_types: dict[Any, FlagType] = {}
+        self.flag_resolutions: dict[Any, FlagResolution] = {}
+        self.flags: dict[Any, Flag] = {}
+        self.flag_comments: dict[Any, CommentDetails] = {}
+        self.users: dict[int, User] = {}
         self.created_flag_id: Optional[int] = None
 
         self._include_collections = False

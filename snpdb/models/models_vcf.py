@@ -2,7 +2,7 @@ import logging
 import operator
 from collections import namedtuple
 from functools import cached_property, reduce
-from typing import Dict, List, Tuple, Optional, Union
+from typing import Optional, Union
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -159,7 +159,7 @@ class VCF(models.Model, PreviewModelMixin):
     def get_absolute_url(self):
         return reverse('view_vcf', kwargs={"vcf_id": self.pk})
 
-    def get_warnings(self) -> List:
+    def get_warnings(self) -> list:
         VCFImportWarning = namedtuple('VCFImportWarning', ['message', 'has_more_details'])
         warnings = []
         if self.import_status == ImportStatus.REQUIRES_USER_INPUT and self.genome_build is None:
@@ -175,7 +175,7 @@ class VCF(models.Model, PreviewModelMixin):
         return self.genotype_samples > 0
 
     @cached_property
-    def samples_by_vcf_name(self) -> Dict[str, 'Sample']:
+    def samples_by_vcf_name(self) -> dict[str, 'Sample']:
         return {s.vcf_sample_name: s for s in self.sample_set.all()}
 
     def get_sample_ids(self):
@@ -389,14 +389,14 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
     def zygosity_alias(self):
         return f"sample_{self.pk}"
 
-    def get_annotation_kwargs(self, **kwargs) -> Dict:
+    def get_annotation_kwargs(self, **kwargs) -> dict:
         """ For annotating Variant queries """
         cgc = self.cohort_genotype_collection
         i = cgc.get_sql_index_for_sample_id(self.pk)
         sample_zygosity = Substr(f"{cgc.cohortgenotype_alias}__samples_zygosity", i, length=1)
         return {self.zygosity_alias: sample_zygosity}
 
-    def get_cohort_genotype_alias_and_field(self, field_name) -> Tuple[str, str]:
+    def get_cohort_genotype_alias_and_field(self, field_name) -> tuple[str, str]:
         if not field_name.startswith("samples_"):
             field_name = f"samples_{field_name}"
 
@@ -464,7 +464,7 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
         sample_mask = vcfs_marked_for_deletion & not_already_deleting
         return Sample.objects.filter(sample_mask).update(import_status=ImportStatus.MARKED_FOR_DELETION)
 
-    def get_bam_files(self) -> List[str]:
+    def get_bam_files(self) -> list[str]:
         sfp_qs = SampleFilePath.objects.filter(sample=self, file_type=SampleFileType.BAM)
         return list(sfp_qs.values_list("file_path", flat=True))
 

@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict
+from typing import Optional
 
 from django.db import models
 from django.db.models.deletion import SET_NULL
@@ -17,7 +17,7 @@ class ZygosityNode(AncestorSampleMixin, AnalysisNode):
     zygosity = models.CharField(max_length=1, choices=ZygosityNodeZygosity.CHOICES, null=True)
     exclude = models.BooleanField(default=False)
 
-    def _get_configuration_errors(self) -> List:
+    def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
         if not self.sample:
             errors.append("No sample selected.")
@@ -29,7 +29,7 @@ class ZygosityNode(AncestorSampleMixin, AnalysisNode):
     def get_zygosity_name(self):
         return dict(ZygosityNodeZygosity.CHOICES)[self.zygosity]
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         if self.zygosity == ZygosityNodeZygosity.MULTIPLE_HIT:
             parent = self.get_single_parent()
             # Need to pass in kwargs in case we have parent (eg VennNode) that doesn't have needed annotation kwargs

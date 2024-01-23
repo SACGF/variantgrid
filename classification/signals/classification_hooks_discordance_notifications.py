@@ -1,4 +1,4 @@
-from typing import Optional, List, Set
+from typing import Optional
 
 from django.conf import settings
 from django.db import transaction
@@ -59,17 +59,17 @@ def send_prepared_discordance_notifications(outstanding_notifications: Optional[
             lab = Lab.objects.get(pk=lab_id)
             user_perspective = LabPickerData.for_lab(lab=lab)
 
-            outstanding_lab_discordance_notifications: List[DiscordanceNotification] = list(outstanding_notifications.filter(lab=lab))
+            outstanding_lab_discordance_notifications: list[DiscordanceNotification] = list(outstanding_notifications.filter(lab=lab))
             current_date = timezone.now()
 
-            unique_ids: Set[int] = set()
+            unique_ids: set[int] = set()
             for outstanding_notification in outstanding_lab_discordance_notifications:
                 outstanding_notification.notification_sent_date = current_date
                 dr_id = outstanding_notification.discordance_report_id
                 unique_ids.add(dr_id)
 
-            dr_ids: List[int] = list(sorted(unique_ids))
-            drs: List[DiscordanceReport] = DiscordanceReport.objects.filter(pk__in=dr_ids).order_by('pk')
+            dr_ids: list[int] = list(sorted(unique_ids))
+            drs: list[DiscordanceReport] = DiscordanceReport.objects.filter(pk__in=dr_ids).order_by('pk')
 
             dr_count = len(dr_ids)
             if dr_count > 6:

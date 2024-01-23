@@ -1,5 +1,3 @@
-from typing import List
-
 from django.db import models
 
 from library.utils import Constant
@@ -196,7 +194,7 @@ class ClinVarReviewStatus(models.TextChoices):
         return ClinVarReviewStatus.STARS[self.value]
 
     @staticmethod
-    def statuses_gte_stars(min_stars: int) -> List['ClinVarReviewStatus']:
+    def statuses_gte_stars(min_stars: int) -> list['ClinVarReviewStatus']:
         statuses = []
         for rs, stars in ClinVarReviewStatus.STARS.items():
             if stars >= min_stars:

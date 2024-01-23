@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Any
 
 from django.conf import settings
 from django.contrib import messages
@@ -23,7 +23,7 @@ from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 class MigrationAttemptColumns(DatatableConfig[ManualMigrationAttempt]):
 
-    def render_task(self, row: Dict[str, Any]) -> str:
+    def render_task(self, row: dict[str, Any]) -> str:
         task_id = row["task_id"]
         return ManualMigrationTask.describe_manual(task_id)
 

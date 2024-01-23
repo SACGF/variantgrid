@@ -7,7 +7,7 @@ import traceback
 from abc import ABC, abstractmethod
 from logging import StreamHandler
 from re import Match
-from typing import Dict, Optional, List, Tuple, Any, Union
+from typing import Optional, Any, Union
 
 import markdown
 import requests
@@ -37,7 +37,7 @@ def get_current_logged_in_user() -> Optional[User]:
     return user
 
 
-def report_event(name: str, request: Request = None, extra_data: Dict = None):
+def report_event(name: str, request: Request = None, extra_data: dict = None):
     rollbar.report_message(message=name,
                            level='info',
                            request=request,
@@ -185,7 +185,7 @@ class NotificationBuilder:
             raise NotImplementedError(f"{self} has not implemented as_html method")
 
         @abstractmethod
-        def as_slack(self) -> Union[Dict, List]:
+        def as_slack(self) -> Union[dict, list]:
             raise NotImplementedError(f"{self} has not implemented as_slack method")
 
     class HeaderBlock(Block):
@@ -212,18 +212,18 @@ class NotificationBuilder:
     class FieldsBlock(Block):
 
         def __init__(self):
-            self.fields: List[Union[str, Any]] = []
+            self.fields: list[Union[str, Any]] = []
 
         def add_field(self, label: str, value: str):
             self.fields.append((label, value))
 
         def as_text(self):
-            def as_line(field: Tuple[str, Any]):
+            def as_line(field: tuple[str, Any]):
                 return f"{field[0]}: {field[1]}"
             return "\n".join(as_line(field) for field in self.fields)
 
         def as_html(self):
-            def as_field(field: Tuple[str, Any]):
+            def as_field(field: tuple[str, Any]):
                 return f"<p><span style='color:#888'>{NotificationBuilder.slack_markdown_to_html(field[0])}:</span><br/><span style='font-family:monospace'>{NotificationBuilder.slack_markdown_to_html(field[1])}</span></p>"
 
             return "".join([as_field(field) for field in self.fields])
@@ -231,13 +231,13 @@ class NotificationBuilder:
         def as_slack(self):
             blocks = []
 
-            def as_field(the_field: Tuple[str, Any]):
+            def as_field(the_field: tuple[str, Any]):
                 return {
                     "type": "mrkdwn",
                     "text": f"*{the_field[0]}:*\n{the_field[1]}"
                 }
 
-            def add_field_list(fields: List[Tuple[str, Any]]):
+            def add_field_list(fields: list[tuple[str, Any]]):
                 if fields:
                     blocks.append({
                         "type": "section",
@@ -295,7 +295,7 @@ class NotificationBuilder:
         :param message: WARNING, this is ignored for Slack Notifications (maybe turn into a header?)
         """
         self.message = message
-        self.blocks: List[NotificationBuilder.Block] = []
+        self.blocks: list[NotificationBuilder.Block] = []
         self.sent = False
 
     def _last_block(self) -> Optional[Block]:
@@ -347,8 +347,8 @@ class NotificationBuilder:
     def webhook_url(self) -> Optional[str]:
         return None
 
-    def as_slack(self) -> List:
-        slack_blocks: List = []
+    def as_slack(self) -> list:
+        slack_blocks: list = []
         for block in self.blocks:
             slack_bit = block.as_slack()
             if isinstance(slack_bit, dict):
@@ -409,7 +409,7 @@ def slack_bot_username():
 
 def send_notification(
         message: str,
-        blocks: Optional[List] = None,
+        blocks: Optional[list] = None,
         slack_webhook_url: Optional[str] = None):
     """
     Sends a message to your notification service, currently Slack centric.

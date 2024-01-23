@@ -2,7 +2,7 @@ import itertools
 import json
 import logging
 from collections import OrderedDict, defaultdict
-from typing import Iterable, Tuple
+from typing import Iterable
 
 import pandas as pd
 from celery.result import AsyncResult
@@ -298,7 +298,7 @@ def get_patient_upload_csv_for_vcf(request, pk):
     return get_patient_upload_csv(filename, sample_qs)
 
 
-def _sample_stats(sample) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def _sample_stats(sample) -> tuple[pd.DataFrame, pd.DataFrame]:
     annotation_version = AnnotationVersion.latest(sample.genome_build)
     STATS = {
         "Total": (SampleStats, SampleStatsPassingFilter, set()),

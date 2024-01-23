@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Dict, List, Optional
+from typing import Optional
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
@@ -62,7 +62,7 @@ class ExcludeRecord:
     Performs the calculation to see if a record should be excluded (and can update the flag status if asked)
     """
 
-    def __init__(self, record: ClassificationModification, matches_ignores: List[ClinVarKeyExcludePattern]):
+    def __init__(self, record: ClassificationModification, matches_ignores: list[ClinVarKeyExcludePattern]):
         self.record = record
         self.matches_ignores = matches_ignores
 
@@ -135,16 +135,16 @@ class ClinVarExcludePatternUtil:
 
     def __init__(self, clinvar_key: ClinVarKey):
         self.clinvar_key = clinvar_key
-        self.exclude_patterns: List[ClinVarKeyExcludePattern] = list(clinvar_key.clinvarkeyexcludepattern_set.all())
+        self.exclude_patterns: list[ClinVarKeyExcludePattern] = list(clinvar_key.clinvarkeyexcludepattern_set.all())
 
-    def matching_exclude_patterns(self, record: EvidenceMixin) -> Optional[List[ClinVarKeyExcludePattern]]:
+    def matching_exclude_patterns(self, record: EvidenceMixin) -> Optional[list[ClinVarKeyExcludePattern]]:
         """
         Return list of exclude patterns that the record has failed
         """
         if not self.exclude_patterns:
             return None
 
-        matching_patterns: List[ClinVarKeyExcludePattern] = []
+        matching_patterns: list[ClinVarKeyExcludePattern] = []
         for pattern in self.exclude_patterns:
             value = record.get(pattern.evidence_key)
             if pattern.should_exclude(str(value)):
@@ -161,7 +161,7 @@ class ClinVarExcludePatternUtil:
     def ignore_pattern_for(self, record: ClassificationModification) -> ExcludeRecord:
         return ExcludeRecord(record, self.matching_exclude_patterns(record))
 
-    def run_all(self, apply: bool) -> Dict[ExcludeStatus, List[int]]:
+    def run_all(self, apply: bool) -> dict[ExcludeStatus, list[int]]:
         """
         Evaluate all the classifications for the ClinVarKey
         @param apply: If true update the flags, if false just report on what changes would take place

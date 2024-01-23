@@ -1,6 +1,5 @@
 import operator
 from functools import cached_property, reduce
-from typing import List
 
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
@@ -22,7 +21,7 @@ class TagNode(AnalysisNode):
         return True
 
     @cached_property
-    def tag_ids(self) -> List[str]:
+    def tag_ids(self) -> list[str]:
         # This is called when Node is being initialised to set the name
         if self.pk is None:
             return []

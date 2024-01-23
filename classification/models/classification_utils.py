@@ -3,7 +3,7 @@ import operator
 from dataclasses import dataclass
 from enum import Enum
 from functools import reduce
-from typing import List, Set, Optional, Union, Any, Dict, Iterable
+from typing import Optional, Union, Any, Iterable
 
 from django.contrib.auth.models import User
 from django.db.models import Q
@@ -45,9 +45,9 @@ class ClassificationPatchStatus(str, Enum):
 class ClassificationPatchResponse(VarsDict):
 
     def __init__(self):
-        self.warnings: List[PatchMessage] = []
-        self.modified_keys: Set[str] = set()
-        self.classification_json: Optional[Dict] = None
+        self.warnings: list[PatchMessage] = []
+        self.modified_keys: set[str] = set()
+        self.classification_json: Optional[dict] = None
         self.internal_error: Optional[Any] = None
         self.withdrawn = None
         self.deleted = None
@@ -107,7 +107,7 @@ class ValidationMerger:
     """
 
     @staticmethod
-    def union_send_responses(tuples: List) -> 'ValidationMerger':
+    def union_send_responses(tuples: list) -> 'ValidationMerger':
         validations = [v[1] for v in tuples]
         merged = ValidationMerger()
         for vm in validations:
@@ -198,7 +198,7 @@ class ClassificationJsonParams:
                  include_messages=True,
                  strip_complicated=False,
                  api_version=1,
-                 hardcode_extra_data: Dict = None,
+                 hardcode_extra_data: dict = None,
                  fix_data_types=False):
         """
         :param current_user: The user who will be consuming this data
@@ -290,7 +290,7 @@ class PatchMeta:
         """
         return self.revalidate_all or key in self.modified_keys
 
-    def intersection_modified(self, key_set: Set[str]) -> Set[str]:
+    def intersection_modified(self, key_set: set[str]) -> set[str]:
         """
         Performs is_modified but over a set
         :param key_set: The set of str evidence keys we're asking about

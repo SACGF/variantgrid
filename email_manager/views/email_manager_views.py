@@ -1,5 +1,3 @@
-from typing import List
-
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db.models import QuerySet, Q
@@ -22,7 +20,7 @@ def email_detail(request, email_id: int):
     email_log = EmailLog.objects.get(pk=email_id)
     recipients = [address.strip() for address in email_log.recipient_list.split(";")]
     recipients = [address for address in recipients if address]
-    users: List[User] = list(User.objects.filter(email__in=recipients).order_by('email').all())
+    users: list[User] = list(User.objects.filter(email__in=recipients).order_by('email').all())
     unrecognised_emails = set(recipients)
     check_user: User
     for check_user in users:

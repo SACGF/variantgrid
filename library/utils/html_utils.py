@@ -2,7 +2,7 @@ import html
 import re
 import uuid
 from html import escape
-from typing import Optional, Set, Dict
+from typing import Optional
 
 from bs4 import BeautifulSoup
 from django.utils.safestring import mark_safe, SafeString
@@ -33,7 +33,7 @@ def html_link(url: str, title: str) -> SafeString:
 EXPECTED_HTML_TAGS_SINGLE_LINE = {'div', 'b', 'i', 'u', 'strong', 'em', 'sup', 'sub'}
 
 
-def cautious_attempt_html_to_text(text: str, whitelist: Set[str] = None) -> str:
+def cautious_attempt_html_to_text(text: str, whitelist: set[str] = None) -> str:
     """
     Given some text, and an expected whitelist of tags, will convert the text from possible HTML content to plain text.
     Converts things like &#039; to ' and will strip out expected tags, if a tag is found that's not in the whitelist
@@ -98,7 +98,7 @@ class IconWithTooltip:
             title = f'title="{escape(tooltip)}"'
         return SafeString(f'<i class="{escape(self.icon)}" {title}></i>')
 
-    def as_json(self) -> Dict:
+    def as_json(self) -> dict:
         return {
             "icon": self.icon,
             "tooltip": self.tooltip

@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 
 from django.conf import settings
 from django.db import models
@@ -60,7 +60,7 @@ class SyncDestination(models.Model):
         return sd_info
 
     @staticmethod
-    def get_reports() -> List:
+    def get_reports() -> list:
         reports = []
         for sd in SyncDestination.objects.order_by("pk").all():
             if report := sd.report():

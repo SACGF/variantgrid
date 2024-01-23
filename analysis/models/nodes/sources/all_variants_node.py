@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import Optional, List, Dict
+from typing import Optional
 
 from django.db import models
 from django.db.models import Q, CASCADE, SET_NULL
@@ -18,20 +18,20 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
     min_inputs = 0
     max_inputs = 0
 
-    def get_warnings(self) -> List[str]:
+    def get_warnings(self) -> list[str]:
         warnings = super().get_warnings()
         if msg := self.get_min_above_max_warning_message(self.num_samples_for_build):
             warnings.append(msg)
         return warnings
 
-    def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
+    def _get_annotation_kwargs_for_node(self, **kwargs) -> dict:
         annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
         if self.get_zygosity_count_arg_q_dict():
             vzcc = VariantZygosityCountCollection.get_global_germline_counts()
             annotation_kwargs.update(vzcc.get_annotation_kwargs(**kwargs))
         return annotation_kwargs
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         """ Restrict to analysis genome build """
 
         q_contigs = Variant.get_contigs_q(self.analysis.genome_build)
@@ -71,7 +71,7 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
         method_summary = f"{class_name}, date={self.modified}, max_variant={max_id}"
         return method_summary
 
-    def _get_configuration_errors(self) -> List:
+    def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
         if not self.max_variant:
             errors.append("Not Saved")

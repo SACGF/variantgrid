@@ -3,7 +3,7 @@ import os
 import shutil
 import uuid
 from subprocess import CalledProcessError
-from typing import List, Iterable
+from typing import Iterable
 
 from django.conf import settings
 from django.db import models
@@ -31,10 +31,10 @@ class AbstractSomalierModel(TimeStampedModel):
     def get_samples(self) -> Iterable[Sample]:
         raise NotImplementedError()
 
-    def get_sample_somalier_filenames(self) -> List[str]:
+    def get_sample_somalier_filenames(self) -> list[str]:
         return [AbstractSomalierModel.sample_filename(s) for s in self.get_samples()]
 
-    def execute(self, command: List[str], **kwargs):
+    def execute(self, command: list[str], **kwargs):
         """ Executes code and handles saving errors """
 
         cmd = " ".join(command)
@@ -213,7 +213,7 @@ def somalier_relate_pre_delete_handler(sender, instance, **kwargs):  # pylint: d
 
 
 class SomalierAllSamplesRelate(SomalierRelate):
-    def get_sample_somalier_filenames(self) -> List[str]:
+    def get_sample_somalier_filenames(self) -> list[str]:
         cfg = SomalierConfig()
         return [f"{cfg['vcf_base_dir']}/**/*.somalier"]  # Wild card
 

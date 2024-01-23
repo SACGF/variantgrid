@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import timedelta, datetime
 from enum import Enum
 from functools import cached_property
-from typing import Optional, Dict, List, TypeVar, Generic, Iterable, Type, Tuple
+from typing import Optional, TypeVar, Generic, Iterable, Type
 
 from django.db.models import Model
 from django.utils import timezone
@@ -65,7 +65,7 @@ class CachedObj(Generic[T]):
             self.obj.modified = timezone.now()
 
     @staticmethod
-    def bulk_apply(model: Type[Model], cache: Iterable['CachedObj'], fields: List[str], verbose=False):
+    def bulk_apply(model: Type[Model], cache: Iterable['CachedObj'], fields: list[str], verbose=False):
         created = [c.obj for c in cache if c.status == ModifiedStatus.CREATED]
         modified = [c.obj for c in cache if c.status == ModifiedStatus.MODIFIED]
         if verbose:
@@ -102,8 +102,8 @@ class OntologyBuilder:
             self.previous_import = None  # if previous import was done with an older version of the import code, don't count it
 
         self.full_cache = False
-        self.terms: Dict[str, CachedObj[OntologyTerm]] = {}
-        self.relations: Dict[RelationKey, CachedObj[OntologyTermRelation]] = {}
+        self.terms: dict[str, CachedObj[OntologyTerm]] = {}
+        self.relations: dict[RelationKey, CachedObj[OntologyTermRelation]] = {}
 
     def ensure_old(self, max_age: timedelta):
         """
@@ -186,7 +186,7 @@ class OntologyBuilder:
         self.relations[rk] = new_r
         return new_r
 
-    def add_ontology_relation(self, source_term_id: str, dest_term_id: str, relation: str, extra: Optional[Dict] = None):
+    def add_ontology_relation(self, source_term_id: str, dest_term_id: str, relation: str, extra: Optional[dict] = None):
         rk = RelationKey(source=source_term_id, dest=dest_term_id, relation=relation)
         cached = self._fetch_relation(rk)
         cached.modify(self._ontology_import)
@@ -196,11 +196,11 @@ class OntologyBuilder:
                  term_id: str,
                  name: str,
                  definition: Optional[str] = None,
-                 extra: Optional[Dict] = None,
-                 aliases: Optional[List[str]] = None,
+                 extra: Optional[dict] = None,
+                 aliases: Optional[list[str]] = None,
                  primary_source: bool = True,
                  status: Optional[OntologyTermStatus] = None,
-                 trusted_source: bool = True) -> Tuple[OntologyTerm, bool]:
+                 trusted_source: bool = True) -> tuple[OntologyTerm, bool]:
         """
         Returns OntologyTerm and boolean indicated True for created, False for already existed
         TODO: The created boolean will return True on multiple requests to add_term with the same import_builder

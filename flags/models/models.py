@@ -3,7 +3,7 @@ import logging
 from collections import defaultdict
 from functools import cached_property, total_ordering, reduce
 from operator import __and__
-from typing import Tuple, List, Optional, Union, Dict, Iterable, Any, TypeVar
+from typing import Optional, Union, Iterable, Any, TypeVar
 
 import django.dispatch
 from django.contrib.auth.models import User
@@ -192,9 +192,9 @@ class Flag(TimeStampedModel):
 
 class FlagInfos:
 
-    def __init__(self, flag_collections: List['FlagCollection'], flags: Iterable['Flag']):
+    def __init__(self, flag_collections: list['FlagCollection'], flags: Iterable['Flag']):
         self.flag_collections = flag_collections
-        self.flags_for_collection: Dict[Any, List[Flag]] = defaultdict(list)
+        self.flags_for_collection: dict[Any, list[Flag]] = defaultdict(list)
         for flag in flags:
             self.flags_for_collection[flag.collection_id].append(flag)
         self._flagc_dict = {}
@@ -215,7 +215,7 @@ class FlagInfos:
 
     """
     # if we want to go back to providing extra info on the flag level
-    def set_extra_flag_info(self, flag: Flag, extra_info: Dict[str,Any]):
+    def set_extra_flag_info(self, flag: Flag, extra_info: dict[str,Any]):
         self._flag_extra_info[flag.id] = extra_info
     """
 
@@ -225,7 +225,7 @@ class FlagInfos:
         sub_flags = extra_info['sub_flags']
         sub_flags.append({'label': label, 'letter': letter})
 
-    def extra_flag_info(self, flag: Flag) -> Dict[str, Any]:
+    def extra_flag_info(self, flag: Flag) -> dict[str, Any]:
         return self._flag_extra_info.get(flag.id, {})
 
 
@@ -314,14 +314,14 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
     QST = TypeVar("QST", bound='FlagsMixin')
 
     @staticmethod
-    def filter_for_open_flags(qs: QuerySet[QST], flag_types: Optional[List[FlagType]] = None) -> QuerySet[QST]:
+    def filter_for_open_flags(qs: QuerySet[QST], flag_types: Optional[list[FlagType]] = None) -> QuerySet[QST]:
         """
         @deprecated use filter_for_flags
         """
         return FlagCollection.filter_for_flags(qs=qs, flag_types=flag_types, open_only=True)
 
     @staticmethod
-    def filter_for_flags(qs: QuerySet[QST], flag_types: Optional[List[FlagType]] = None, open_only: bool = True) -> QuerySet[QST]:
+    def filter_for_flags(qs: QuerySet[QST], flag_types: Optional[list[FlagType]] = None, open_only: bool = True) -> QuerySet[QST]:
         """
         Takes the QuerySet and returns a filtered version where the item contain at least one of the provided flag_types
         e.g. if you passed in a QuerySet of Alleles and a missing 38 flag type, the resulting QuerySet will still be Alleles
@@ -343,7 +343,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             comment: Optional[str] = None,
             user: Optional[User] = None,
             resolution: Optional[FlagResolution] = None,
-            data: Optional[Dict] = None) -> int:
+            data: Optional[dict] = None) -> int:
         """
         For admin usage, closes all open flags of a certain type
         @param flag_type close all flags of this type
@@ -420,7 +420,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             add_comment_if_open: bool = False,
             data: Optional[dict] = None,
             close_other_data: bool = False,
-            only_if_new: bool = False) -> Tuple[Flag, bool]:
+            only_if_new: bool = False) -> tuple[Flag, bool]:
         """
         Returns the existing open flag or returns a new one
         :param flag_type: The type of flag to create
@@ -525,7 +525,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
     # it properly one day)
 
 
-def fetch_flag_infos(flag_collections: List[FlagCollection], flags: Iterable[Flag], user: User = None) -> FlagInfos:
+def fetch_flag_infos(flag_collections: list[FlagCollection], flags: Iterable[Flag], user: User = None) -> FlagInfos:
     flag_infos = FlagInfos(flag_collections=flag_collections, flags=flags)
     flag_collection_extra_info_signal.send(sender=FlagCollection, flag_infos=flag_infos, user=user)
     return flag_infos
@@ -580,7 +580,7 @@ class FlagsMixin(models.Model):
             flag_type: FlagType,
             comment: Optional[str] = None,
             resolution: Optional[FlagResolution] = None,
-            data: Optional[Dict] = None):
+            data: Optional[dict] = None):
         if not self.flag_collection:
             return False
         fc = self.flag_collection_safe

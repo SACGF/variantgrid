@@ -1,6 +1,6 @@
 import json
 from datetime import timedelta
-from typing import Set, Union, Dict, Optional
+from typing import Union, Optional
 
 from django.contrib import admin, messages
 from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter, DateFieldListFilter
@@ -532,7 +532,7 @@ class EvidenceKeyAdmin(ModelAdminBasics):
 
         self.message_user(request, str(good_count) + " keys passed validation")
 
-    def widget_overrides(self) -> Dict[str, Widget]:
+    def widget_overrides(self) -> dict[str, Widget]:
         return {
             'key': admin.widgets.AdminTextInputWidget(),
             'label': admin.widgets.AdminTextInputWidget(),
@@ -703,8 +703,8 @@ class DiscordanceReportAdminExport(ExportRow):
     @export_column("Umbrella Condition")
     def _umbrella_condition(self):
         umbrellas = ""
-        conditions: Set[OntologyTerm] = set()
-        unresolved_conditions: Set[str] = set()
+        conditions: set[OntologyTerm] = set()
+        unresolved_conditions: set[str] = set()
         for summary in self.summaries:
             for drc in summary.drcs:
                 has_resolved_conditions = False
@@ -858,7 +858,7 @@ class DiscordanceReportAdmin(ModelAdminBasics):
 
     @admin_list_column()
     def labs(self, obj: DiscordanceReport) -> str:
-        labs: Set[Lab] = set()
+        labs: set[Lab] = set()
         drc: DiscordanceReportClassification
         for drc in obj.discordancereportclassification_set.all():
             if c := drc.classification_original.classification:

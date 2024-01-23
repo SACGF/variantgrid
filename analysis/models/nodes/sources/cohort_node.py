@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import Dict, Optional, List
+from typing import Optional
 
 from django.db import models
 from django.db.models import Q
@@ -33,7 +33,7 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
     class Meta:
         abstract = True
 
-    def _get_q_and_list(self) -> List[Q]:
+    def _get_q_and_list(self) -> list[Q]:
         q_and = super()._get_q_and_list()
 
         cohort = self._get_cohort()
@@ -65,7 +65,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
     min_inputs = 0
     max_inputs = 0
 
-    def get_warnings(self) -> List[str]:
+    def get_warnings(self) -> list[str]:
         warnings = super().get_warnings()
         if self.cohort and self.accordion_panel == self.COUNT:
             if msg := self.get_min_above_max_warning_message(self.cohort.sample_count):
@@ -87,7 +87,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
                 pass
         return cohorts, visibility
 
-    def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
+    def _get_annotation_kwargs_for_node(self, **kwargs) -> dict:
         annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
 
         if self.cohort:
@@ -117,14 +117,14 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
             annotation_kwargs[self.any_zygosity_count_column] = hom_and_het + F(self.ref_count_column)
         return annotation_kwargs
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         cohort, arg_q_dict = self.get_cohort_and_arg_q_dict()
         if cohort:
             self.merge_arg_q_dicts(arg_q_dict, self.get_vcf_locus_filters_arg_q_dict())
             self.merge_arg_q_dicts(arg_q_dict, self.get_cohort_settings_arg_q_dict(cohort))
         return arg_q_dict
 
-    def get_cohort_settings_arg_q_dict(self, cohort) -> Dict[Optional[str], Dict[str, Q]]:
+    def get_cohort_settings_arg_q_dict(self, cohort) -> dict[Optional[str], dict[str, Q]]:
         arg_q_dict = {}
         if self.accordion_panel == self.COUNT:
             # Use minimum filters even for sub-cohorts as the min will always be above sub-cohort min
@@ -138,7 +138,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
         return arg_q_dict
 
     @cached_property
-    def simple_zygosity_columns(self) -> Dict:
+    def simple_zygosity_columns(self) -> dict:
         return {
             SimpleZygosity.REF: self.ref_count_column,
             SimpleZygosity.HET: self.het_count_column,
@@ -156,7 +156,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
             min_count = 1
         return min_count
 
-    def _get_simple_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def _get_simple_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         arg_q_dict = {}
         if self.zygosity:
             if min_count := self._get_simple_zygosity_min_count():
@@ -173,7 +173,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
                 description = f"{zyg.label} >= {min_count}"
         return description
 
-    def _get_per_sample_zygosity_arg_q_dict(self, cgc: CohortGenotypeCollection) -> Dict[Optional[str], Dict[str, Q]]:
+    def _get_per_sample_zygosity_arg_q_dict(self, cgc: CohortGenotypeCollection) -> dict[Optional[str], dict[str, Q]]:
         sample_zygosities_dict = {}
 
         # Start with zygosity_sample_matches of all dots (as need to handle all
@@ -199,7 +199,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
     def _get_cohort_per_sample_zygosity_description(self) -> str:
         return "Per Sample Zygosity"
 
-    def _get_description(self) -> List[str]:
+    def _get_description(self) -> list[str]:
         description_list = []
         if self.cohort:
             if self.accordion_panel == self.COUNT:
@@ -235,7 +235,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
     def get_node_class_label():
         return "Cohort"
 
-    def _get_configuration_errors(self) -> List:
+    def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
         if not self.cohort:
             errors.append("No cohort selected.")

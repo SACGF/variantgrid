@@ -1,6 +1,5 @@
 import re
 from datetime import datetime, timedelta
-from typing import List
 from urllib.parse import unquote_plus
 
 from django.conf import settings
@@ -143,7 +142,7 @@ def export_view_redirector(request: HttpRequest) -> Response:
             except:
                 exclude_list.append(f'Unknown org : {org_group}')
 
-    def to_lab_names(lab_string) -> List[str]:
+    def to_lab_names(lab_string) -> list[str]:
         lab_list = []
         if lab_string:
             for lab_group in [l.strip() for l in lab_string.split(',')]:
@@ -181,14 +180,14 @@ def export_view_redirector(request: HttpRequest) -> Response:
 class ClassificationApiExportView(APIView):
 
     @staticmethod
-    def string_to_labs(lab_str: str) -> List[Lab]:
+    def string_to_labs(lab_str: str) -> list[Lab]:
         parts = [l.strip() for l in lab_str.split(',')]
         labs = [Lab.objects.filter(group_name=lab_str).first() for lab_str in parts]
         labs = [l for l in labs if l]
         return labs
 
     @staticmethod
-    def string_to_orgs(lab_str: str) -> List[Organization]:
+    def string_to_orgs(lab_str: str) -> list[Organization]:
         parts = [l.strip() for l in lab_str.split(',')]
         orgs = [Organization.objects.filter(group_name=lab_str).first() for lab_str in parts]
         orgs = [o for o in orgs if o]

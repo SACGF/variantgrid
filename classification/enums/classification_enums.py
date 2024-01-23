@@ -1,7 +1,7 @@
 import typing
 from enum import Enum
 from functools import total_ordering
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from django.contrib.auth.models import User
 from django.db.models import TextChoices
@@ -195,8 +195,8 @@ _ShareLevelData = typing.NamedTuple('ShareLevelData', [('index', int), ('label',
 @total_ordering
 class ShareLevel(ChoicesEnum):
     _ignore_ = ['ALL_LEVELS', 'DISCORDANT_LEVEL_KEYS']
-    ALL_LEVELS: List['ShareLevel'] = []
-    DISCORDANT_LEVEL_KEYS: List[str] = []
+    ALL_LEVELS: list['ShareLevel'] = []
+    DISCORDANT_LEVEL_KEYS: list[str] = []
 
     # These strings have to be <= 16 characters for choice field
     CURRENT_USER = 'user'
@@ -255,7 +255,7 @@ class ShareLevel(ChoicesEnum):
         return self.value
 
     @staticmethod
-    def same_and_higher(level: 'ShareLevel') -> List['ShareLevel']:
+    def same_and_higher(level: 'ShareLevel') -> list['ShareLevel']:
         return [iter_level for iter_level in ShareLevel.ALL_LEVELS if iter_level.index >= level.index]
 
     @staticmethod

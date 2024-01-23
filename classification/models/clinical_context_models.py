@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
-from typing import List, Optional, Iterable, Set, Dict
+from typing import Optional, Iterable
 
 import django.dispatch
 from django.conf import settings
@@ -164,7 +164,7 @@ class DiscordanceStatus:
                                                 flag_type=classification_flag_types.classification_pending_changes,
                                                 resolution__status=FlagStatus.OPEN):
 
-            clin_sig_overrides: Dict[int, str] = {}
+            clin_sig_overrides: dict[int, str] = {}
             for flag in pending_flags:
                 clin_sig_overrides[flag_collections[flag.collection_id].pk] = flag.data.get(
                     ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) or None
@@ -184,12 +184,12 @@ class DiscordanceStatus:
 
     @staticmethod
     def _calculate_rows(rows: Iterable[_DiscordanceCalculationRow]) -> 'DiscordanceStatus':
-        cs_scores: Set[int] = set()  # clin sig to score, all VUSs are 3
-        cs_vuses: Set[int] = set()  # all the different VUS A,B,C values
-        cs_values: Set[str] = set()   # all the different clinical sig values
-        shared_labs: Set[Lab] = set()   # all the sharing labs
-        all_labs: Set[Lab] = set()   # all labs involved (sharing and not sharing, only sharing records determine the status)
-        ignored_clin_sigs: Set[str] = set()  # all clin sigs that we came across but
+        cs_scores: set[int] = set()  # clin sig to score, all VUSs are 3
+        cs_vuses: set[int] = set()  # all the different VUS A,B,C values
+        cs_values: set[str] = set()   # all the different clinical sig values
+        shared_labs: set[Lab] = set()   # all the sharing labs
+        all_labs: set[Lab] = set()   # all labs involved (sharing and not sharing, only sharing records determine the status)
+        ignored_clin_sigs: set[str] = set()  # all clin sigs that we came across but
 
         level: Optional[DiscordanceLevel]
         counted_classifications = 0
@@ -428,7 +428,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         return Classification.objects.filter(clinical_context=self)
 
     @property
-    def classification_modifications(self) -> List[ClassificationModification]:
+    def classification_modifications(self) -> list[ClassificationModification]:
         return list(ClassificationModification.objects.filter(
             is_last_published=True,
             classification__in=self.classifications_qs

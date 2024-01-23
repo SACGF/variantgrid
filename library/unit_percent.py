@@ -1,5 +1,4 @@
 from functools import partial
-from typing import List
 
 
 def convert_from_percent_to_unit(percent, missing_value=None):
@@ -26,7 +25,7 @@ def server_side_format_percent(val, missing_value=None):
     return display_value
 
 
-def _get_formatters(source_in_percent, dest_in_percent, missing_value=None) -> List:
+def _get_formatters(source_in_percent, dest_in_percent, missing_value=None) -> list:
     formatters = []
 
     if dest_in_percent:

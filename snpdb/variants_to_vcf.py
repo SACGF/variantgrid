@@ -1,6 +1,5 @@
 import re
 from collections import Counter
-from typing import Dict
 
 from bgzip import BGZipWriter
 
@@ -96,7 +95,7 @@ def write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_
     return _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict=info_dict)
 
 
-def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample_name_func=None) -> Dict[Sample, Counter]:
+def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample_name_func=None) -> dict[Sample, Counter]:
     """ Returns dict of zygosity counts written to file """
     if sample_name_func is None:
         def sample_name_func(s):

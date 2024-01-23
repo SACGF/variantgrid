@@ -2,7 +2,6 @@ import re
 from collections import defaultdict
 from functools import cached_property
 from itertools import chain
-from typing import Set, List, Dict
 
 import nltk
 from django.http import HttpRequest
@@ -37,7 +36,7 @@ class ClassificationSpellingRow(ExportRow):
         return self.cm.get(SpecialEKeys.INTERPRETATION_SUMMARY)
 
     @staticmethod
-    def fix_word_token(word) -> List[str]:
+    def fix_word_token(word) -> list[str]:
         for bad_char in RE_HAS_BAD_CHAR.finditer(word):
             return []
         if "/" in word:
@@ -47,7 +46,7 @@ class ClassificationSpellingRow(ExportRow):
         return [word for word in words if len(word) >= 4]
 
     @cached_property
-    def suspect_words_set(self) -> Set[str]:
+    def suspect_words_set(self) -> set[str]:
         if interpretation_summary := self.cm.get(SpecialEKeys.INTERPRETATION_SUMMARY):
             words = nltk.word_tokenize(interpretation_summary)
             words_2d = [ClassificationSpellingRow.fix_word_token(word) for word in words]
@@ -74,7 +73,7 @@ class ClassificationExportFormatterSpelling(ClassificationExportFormatter):
     def __init__(self, classification_filter: ClassificationFilter):
         from spellchecker import SpellChecker
         self.spell = SpellChecker()
-        self.suspect_count: Dict[str, int] = defaultdict(int)
+        self.suspect_count: dict[str, int] = defaultdict(int)
         super().__init__(classification_filter=classification_filter)
 
     def content_type(self) -> str:
@@ -83,18 +82,18 @@ class ClassificationExportFormatterSpelling(ClassificationExportFormatter):
     def extension(self) -> str:
         return "csv"
 
-    def header(self) -> List[str]:
+    def header(self) -> list[str]:
         return [delimited_row(ClassificationSpellingRow.csv_header(), ",")]
 
-    def footer(self) -> List[str]:
+    def footer(self) -> list[str]:
         suspect_count_list = [(word, count) for word, count in self.suspect_count.items()]
         suspect_count_list.sort(key=lambda x: x[1], reverse=True)
         return [delimited_row([
             "", "", "Total Classifications Occurred In", "\n".join(f"{wc[0]}: {wc[1]}" for wc in suspect_count_list)
         ])]
 
-    def row(self, allele_data: AlleleData) -> List[str]:
-        rows: List[str] = []
+    def row(self, allele_data: AlleleData) -> list[str]:
+        rows: list[str] = []
         for cm in allele_data.cms:
             spelling_row = ClassificationSpellingRow(cm, self.spell)
             for suspect_word in spelling_row.suspect_words_set:

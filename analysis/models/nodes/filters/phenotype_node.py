@@ -2,7 +2,7 @@ import hashlib
 import logging
 import operator
 from functools import cached_property, reduce
-from typing import Optional, Set, Tuple, List
+from typing import Optional
 
 from cache_memoize import cache_memoize
 from django.db import models
@@ -130,7 +130,7 @@ class PhenotypeNode(AnalysisNode):
             q = None
         return q
 
-    def _get_node_contigs(self) -> Optional[Set[Contig]]:
+    def _get_node_contigs(self) -> Optional[set[Contig]]:
         contig_qs = Contig.objects.filter(transcriptversion__genome_build=self.analysis.genome_build,
                                           transcriptversion__gene_version__gene__in=self.get_gene_qs())
         return set(contig_qs.distinct())
@@ -149,7 +149,7 @@ class PhenotypeNode(AnalysisNode):
         return method_summary
 
     @cached_property
-    def _short_and_long_descriptions(self) -> Tuple[List[str], List[str]]:
+    def _short_and_long_descriptions(self) -> tuple[list[str], list[str]]:
         long_descriptions = []
         short_descriptions = []
 
@@ -201,7 +201,7 @@ class PhenotypeNode(AnalysisNode):
             copy.phenotypenodeontologyterm_set.create(ontology_term=phenotype_ot.ontology_term)
         return copy
 
-    def get_warnings(self) -> List[str]:
+    def get_warnings(self) -> list[str]:
         node_warnings = []
 
         # This uses the same method as gene filter (special_case_gene_symbols_for_hpo_and_omim) though with individual

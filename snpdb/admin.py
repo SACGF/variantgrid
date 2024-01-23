@@ -1,5 +1,4 @@
 import re
-from typing import List
 
 from django.contrib import admin, messages
 from django.contrib.admin.widgets import AdminTextInputWidget
@@ -41,7 +40,7 @@ class AlleleAdmin(ModelAdminBasics):
 
     @admin_list_column()
     def variants(self, obj: Allele):
-        genome_builds: List[GenomeBuild] = []
+        genome_builds: list[GenomeBuild] = []
         for va in VariantAllele.objects.filter(allele=obj).order_by('genome_build'):
             genome_builds.append(va.genome_build)
         if genome_builds:

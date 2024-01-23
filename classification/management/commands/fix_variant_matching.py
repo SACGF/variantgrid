@@ -74,7 +74,7 @@ class Command(BaseCommand):
 
         # row_count = 0
         # batch_size = 50
-        # import_keys: Optional[Set[str]] = None
+        # import_keys: Optional[set[str]] = None
         # if mode_missing:
         #     batch_size = 1
         # elif mode_file:
@@ -100,7 +100,7 @@ class Command(BaseCommand):
         #
         # # setup a temporary import so discordance notifications are not sent out
         # try:
-        #     batch: List[Classification] = []
+        #     batch: list[Classification] = []
         #     for c in qs:
         #         if import_keys is not None:
         #             import_key = f"{c.get(SpecialEKeys.GENOME_BUILD) or ''}#{c.get(SpecialEKeys.C_HGVS) or ''}"
@@ -183,8 +183,8 @@ class Command(BaseCommand):
 
     def handle_validation(self):
         FlagDatabase.run()
-        # def get_flag_comments(flag_type: FlagType, resolution_id: str) -> Dict[int, FlagComment]:
-        #     flag_dict: Dict[int, FlagComment] = {}
+        # def get_flag_comments(flag_type: FlagType, resolution_id: str) -> dict[int, FlagComment]:
+        #     flag_dict: dict[int, FlagComment] = {}
         #     manual_closed_flag_comments = FlagComment.objects.filter(
         #         flag__flag_type=flag_type,
         #         resolution__id=resolution_id).exclude(user=admin_bot()) \
@@ -311,11 +311,11 @@ class Command(BaseCommand):
             iai.apply_validation(force_update=True)
             iai.save()
 
-    # def handle_batch(self, batch: List[Classification]):
+    # def handle_batch(self, batch: list[Classification]):
     #     ClassificationImportRun.record_classification_import("variant_rematching", len(batch))
     #     user = admin_bot()
     #     if batch:
-    #         imports_by_genome: Dict[int, ClassificationImport] = {}
+    #         imports_by_genome: dict[int, ClassificationImport] = {}
     #         for vc in batch:
     #             try:
     #                 genome_build = vc.get_genome_build()

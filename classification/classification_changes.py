@@ -1,7 +1,7 @@
 import operator
 from datetime import datetime
 from functools import total_ordering
-from typing import Any, List, Optional, Union
+from typing import Any, Optional, Union
 
 from django.contrib.auth.models import User
 from django.db.models import Q, Subquery
@@ -83,7 +83,7 @@ class ClassificationChanges:
         evidence = prev.evidence if prev else {}
         delta = vcm.delta
 
-        changes: List[ClassificationChange] = []
+        changes: list[ClassificationChange] = []
 
         def append_change(key, attribute, original_val, value):
             if original_val == value:
@@ -116,11 +116,11 @@ class ClassificationChanges:
 
     @staticmethod
     def list_changes(
-            classifications: Optional[List[Classification]] = None,
+            classifications: Optional[list[Classification]] = None,
             latest_date: Optional[datetime] = None,
             for_user: Optional[User] = None,
             for_lab: Optional[Lab] = None,
-            limit=100) -> List['ClassificationChanges']:
+            limit=100) -> list['ClassificationChanges']:
         if not latest_date:
             latest_date = now()
 
@@ -180,7 +180,7 @@ class ClassificationChanges:
                  record: Union[Classification, Allele],
                  date: datetime,
                  user: User,
-                 changes: List[ClassificationChange],
+                 changes: list[ClassificationChange],
                  is_creation: bool,
                  ignore_before: bool = False,
                  source: str = None,

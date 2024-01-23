@@ -1,5 +1,4 @@
 import logging
-from typing import Tuple
 
 from celery.result import AsyncResult
 
@@ -24,7 +23,7 @@ def get_upload_processing_task(file_type, upload_pipeline):
     raise ValueError(f"No ImportTaskFactory found for file type '{file_type}'")
 
 
-def process_uploaded_file(uploaded_file, run_async=True) -> Tuple[UploadPipeline, AsyncResult]:
+def process_uploaded_file(uploaded_file, run_async=True) -> tuple[UploadPipeline, AsyncResult]:
     """ returns (UploadPipeline, result) """
     logging.debug("process_uploaded_file: filetype = %s", uploaded_file.file_type)
 
@@ -40,7 +39,7 @@ def process_uploaded_file(uploaded_file, run_async=True) -> Tuple[UploadPipeline
 
 
 def process_upload_pipeline(upload_pipeline: UploadPipeline,
-                            run_async=True) -> Tuple[UploadPipeline, AsyncResult]:
+                            run_async=True) -> tuple[UploadPipeline, AsyncResult]:
     """ Reuses the same upload_pipeline - relies on uploaded_file being set """
 
     if not upload_pipeline.uploaded_file:
@@ -80,7 +79,7 @@ def process_upload_pipeline(upload_pipeline: UploadPipeline,
     return upload_pipeline, result
 
 
-def process_vcf_file(vcf_filename, name, user, import_source, run_async=True, file_type=UploadedFileTypes.VCF) -> Tuple[UploadPipeline, AsyncResult]:
+def process_vcf_file(vcf_filename, name, user, import_source, run_async=True, file_type=UploadedFileTypes.VCF) -> tuple[UploadPipeline, AsyncResult]:
     logging.info("process_vcf_file, path=%s", vcf_filename)
     uploaded_file = UploadedFile.objects.create(path=vcf_filename,
                                                 import_source=import_source,

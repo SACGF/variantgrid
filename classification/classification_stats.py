@@ -1,6 +1,6 @@
 import operator
 from collections import Counter, defaultdict
-from typing import Dict, List, Optional, Set, Any, Iterable
+from typing import Optional, Any, Iterable
 
 import numpy as np
 from django.conf import settings
@@ -15,10 +15,10 @@ from library.django_utils import get_field_counts
 from snpdb.models import Lab
 
 
-def get_classification_counts(user: User, show_unclassified=True, unique_alleles=False) -> Dict[str, int]:
+def get_classification_counts(user: User, show_unclassified=True, unique_alleles=False) -> dict[str, int]:
     qs = get_visible_classifications_qs(user)
 
-    field_counts: Dict[str, int]
+    field_counts: dict[str, int]
     if unique_alleles:
         keys = set(ClinicalSignificance.LABELS.keys())
         if not show_unclassified:
@@ -39,8 +39,8 @@ def get_classification_counts(user: User, show_unclassified=True, unique_alleles
     return classification_counts
 
 
-def get_classification_counts_allele(qs: QuerySet[ClassificationModification], field: str, possible_values: Iterable[Any]) -> Dict[Any, int]:
-    counts: Dict[Any, int] = {}
+def get_classification_counts_allele(qs: QuerySet[ClassificationModification], field: str, possible_values: Iterable[Any]) -> dict[Any, int]:
+    counts: dict[Any, int] = {}
 
     # django doesn't support query set annotations and distinct() at the same time, so have to do this as multiple requests
     qs = qs.order_by('classification__allele_info__allele_id', '-created').distinct('classification__allele_info__allele_id')
@@ -77,11 +77,11 @@ def get_visible_classifications_qs(user: User) -> QuerySet[ClassificationModific
 def get_grouped_classification_counts(user: User,
                                       field: str,
                                       evidence_key: Optional[str] = None,
-                                      field_labels: Optional[Dict[str, str]] = None,
+                                      field_labels: Optional[dict[str, str]] = None,
                                       max_groups=10,
                                       show_unclassified=True,
-                                      norm_factor: Dict[str, float] = None,
-                                      allele_level: bool = False) -> List[Dict[str, Dict]]:
+                                      norm_factor: dict[str, float] = None,
+                                      allele_level: bool = False) -> list[dict[str, dict]]:
     """ :param user: User used to check visibility of classifications
         :param field: the value we're extracting from evidence to group on (from Classification)
         :param evidence_key: label from ekey lookup
@@ -101,7 +101,7 @@ def get_grouped_classification_counts(user: User,
 
     counts = Counter()
     classification_counts = defaultdict(Counter)
-    seen_alleles: Dict[str, Set[int]] = defaultdict(set)
+    seen_alleles: dict[str, set[int]] = defaultdict(set)
 
     for clinical_significance, field, allele in values_qs:
 
@@ -154,7 +154,7 @@ def get_grouped_classification_counts(user: User,
     return data
 
 
-def get_criteria_counts(user: User, evidence_field: str) -> Dict[str, List[Dict]]:
+def get_criteria_counts(user: User, evidence_field: str) -> dict[str, list[dict]]:
     acmg_labels = dict((e.key, e.pretty_label) for e in EvidenceKeyMap.instance().acmg_criteria())
     n = len(acmg_labels)
     acmg_met_not_met_by_significance = defaultdict(lambda: (np.zeros(n), np.zeros(n), np.zeros(n)))

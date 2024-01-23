@@ -1,7 +1,7 @@
 import logging
 import re
 from functools import cached_property
-from typing import Optional, Tuple, Iterable, Set, Union, Dict, Any, List
+from typing import Optional, Iterable, Union, Any
 
 import pydantic
 from django.conf import settings
@@ -126,7 +126,7 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
         if va := self.variant_alleles().filter(genome_build=genome_build).first():
             return va.variant
 
-    def get_liftover_tuple(self, genome_build: GenomeBuild) -> Tuple[AlleleConversionTool,
+    def get_liftover_tuple(self, genome_build: GenomeBuild) -> tuple[AlleleConversionTool,
                                                                      Union[int, 'VariantCoordinate']]:
         """ Used by to write VCF coordinates during liftover. Can be slow (API call)
             If you know a VariantAllele exists for your build, use variant_for_build(genome_build).as_tuple() """
@@ -263,7 +263,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
     alt: str
 
     @property
-    def as_tuple(self) -> Tuple:
+    def as_tuple(self) -> tuple:
         return self.chrom, self.start, self.end, self.ref, self.alt
 
     def __str__(self):
@@ -498,7 +498,7 @@ class Variant(PreviewModelMixin, models.Model):
         return qs.annotate(**kwargs)
 
     @staticmethod
-    def validate(genome_build, chrom, position) -> List[str]:
+    def validate(genome_build, chrom, position) -> list[str]:
         errors = []
         try:
             contig = genome_build.chrom_contig_mappings[chrom]
@@ -533,7 +533,7 @@ class Variant(PreviewModelMixin, models.Model):
                                    **dict(zip(params, variant_coordinate)))
 
     @cached_property
-    def genome_builds(self) -> Set['GenomeBuild']:
+    def genome_builds(self) -> set['GenomeBuild']:
         gbc_qs = GenomeBuildContig.objects.filter(genome_build__in=GenomeBuild.builds_with_annotation(),
                                                   contig__locus__variant=self)
         return {gbc.genome_build for gbc in gbc_qs}
@@ -600,7 +600,7 @@ class Variant(PreviewModelMixin, models.Model):
     def can_have_annotation(self) -> bool:
         return not self.is_reference
 
-    def as_tuple(self) -> Tuple[str, int, int, str, str]:
+    def as_tuple(self) -> tuple[str, int, int, str, str]:
         return self.locus.contig.name, self.locus.position, self.end, self.locus.ref.seq, self.alt.seq
 
     def is_abbreviated(self):
@@ -626,7 +626,7 @@ class Variant(PreviewModelMixin, models.Model):
         return None
 
     @property
-    def metrics_logging_key(self) -> Tuple[str, Any]:
+    def metrics_logging_key(self) -> tuple[str, Any]:
         if allele := self.allele:
             return "allele_id", allele.pk
         return "variant_id", self.pk
@@ -746,7 +746,7 @@ class VariantCollection(RelatedModelsPartitionModel):
         vcr_condition = Q(variantcollectionrecord__variant_collection=self)
         return {self.variant_collection_alias: FilteredRelation('variantcollectionrecord', condition=vcr_condition)}
 
-    def get_arg_q_dict(self) -> Dict[Optional[str], Set[Q]]:
+    def get_arg_q_dict(self) -> dict[Optional[str], set[Q]]:
         if self.status != ProcessingStatus.SUCCESS:
             raise ValueError(f"{self}: status {self.get_status_display()} != SUCCESS")
 

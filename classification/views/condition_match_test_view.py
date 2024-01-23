@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
-from typing import Optional, List
+from typing import Optional
 
 from django.contrib import messages
 from django.db.models import Q
@@ -114,7 +114,7 @@ class _DescendantTermCheck:
 
 @dataclass
 class _DescendantTermChecks:
-    descendants: List[_DescendantTermCheck]
+    descendants: list[_DescendantTermCheck]
     limited_to: Optional[int]
 
     def __bool__(self):
@@ -142,7 +142,7 @@ class _SuggestionDetail:
     def descendants(self) -> _DescendantTermChecks:
         descendants, truncated_results = OntologySnake.all_descendants_of(self.term,
                                                                           limit=_TRUNCATE_DESCENDANTS_TO)
-        suggestion_descendants: List[_DescendantTermCheck] = [_DescendantTermCheck(descendant, gene_symbol=self.gene_symbol) for descendant in descendants]
+        suggestion_descendants: list[_DescendantTermCheck] = [_DescendantTermCheck(descendant, gene_symbol=self.gene_symbol) for descendant in descendants]
         return _DescendantTermChecks(
             descendants=suggestion_descendants,
             limited_to=_TRUNCATE_DESCENDANTS_TO if truncated_results else None
@@ -159,7 +159,7 @@ def condition_match_test_view(request):
     user_search_results: Optional[OntologyMatching] = None
     attempted = False
     suggestion: Optional[ConditionMatchingSuggestion] = None
-    suggestion_details: List[_SuggestionDetail] = []
+    suggestion_details: list[_SuggestionDetail] = []
     gene_symbol: Optional[GeneSymbol] = None
 
     valid = False
@@ -171,7 +171,7 @@ def condition_match_test_view(request):
                 messages.add_message(request, messages.WARNING, f"Could not find Gene Symbol '{gene_symbol_str}'")
                 valid = False
 
-    descendants: List[_DescendantTermCheck] = []
+    descendants: list[_DescendantTermCheck] = []
     if valid:
         user_search_results = OntologyMatching.from_search(condition_text, gene_symbol_str)
         for error in user_search_results.errors:

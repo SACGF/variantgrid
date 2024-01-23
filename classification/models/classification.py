@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 from functools import cached_property
-from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict, Tuple, Set
+from typing import Any, Union, Optional, Iterable, Callable, Mapping, TypedDict
 
 import django.dispatch
 from datetimeutc.fields import DateTimeUTCField
@@ -219,13 +219,13 @@ class ConditionResolvedDict(TypedDict, total=False):
     """
     display_text: str  # plain text to show to users if not in a position to render links
     sort_text: str  # lower case representation of description
-    resolved_terms: List[ConditionResolvedTermDict]
+    resolved_terms: list[ConditionResolvedTermDict]
     resolved_join: str
 
 
 @dataclass(frozen=True)
 class ConditionResolved:
-    terms: List[OntologyTerm]
+    terms: list[OntologyTerm]
     join: Optional['MultiCondition'] = None
     plain_text: Optional[str] = field(default=None)  # fallback, not populated in all contexts
 
@@ -350,7 +350,7 @@ class ConditionResolved:
                 join = self.join or MultiCondition.NOT_DECIDED
                 text = f"{text}; {self.join.label}"
 
-            resolved_term_dicts: List[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in
+            resolved_term_dicts: list[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in
                                                                     self.terms]
 
             jsoned: ConditionResolvedDict = {
@@ -545,7 +545,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return None
 
     @property
-    def metrics_logging_key(self) -> Tuple[str, Any]:
+    def metrics_logging_key(self) -> tuple[str, Any]:
         return "classification_id", self.pk
 
     @property
@@ -611,7 +611,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return qs.exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
 
     @staticmethod
-    def dashboard_report_classifications_of_interest(since) -> List[ClassificationOutstandingIssues]:
+    def dashboard_report_classifications_of_interest(since) -> list[ClassificationOutstandingIssues]:
         min_age = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(
             minutes=2)  # give records 2 minutes to matching properly before reporting
 
@@ -625,7 +625,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         coi_qs = Classification.objects.filter(flag_q | (time_range_q & missing_chgvs_q))
         coi_qs = coi_qs.order_by('-pk').select_related('lab', 'flag_collection')
 
-        summaries: List[ClassificationOutstandingIssues] = []
+        summaries: list[ClassificationOutstandingIssues] = []
         c: Classification
         for c in coi_qs:
             coi = ClassificationOutstandingIssues(c)
@@ -767,7 +767,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def ensure_allele_info(self) -> Optional[ImportedAlleleInfo]:
         return self.ensure_allele_info_with_created()[0]
 
-    def ensure_allele_info_with_created(self, force_allele_info_update_check: bool = False) -> Tuple[Optional[ImportedAlleleInfo], bool]:
+    def ensure_allele_info_with_created(self, force_allele_info_update_check: bool = False) -> tuple[Optional[ImportedAlleleInfo], bool]:
         created = False
         if not self.allele_info or force_allele_info_update_check:
             try:
@@ -902,7 +902,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def create(user: User,
                lab: Lab,
                lab_record_id: Optional[str] = None,
-               data: Optional[Dict[str, Any]] = None,
+               data: Optional[dict[str, Any]] = None,
                save: bool = True,
                source: SubmissionSource = SubmissionSource.VARIANT_GRID,
                make_fields_immutable=False,
@@ -964,7 +964,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if fix_permissions:
             self.fix_permissions()
 
-    def get_key_errors(self) -> Dict[str, Dict]:
+    def get_key_errors(self) -> dict[str, dict]:
         """
         Returns a dict of key to validation error (first error in the case
         of multiple errors for one key).
@@ -995,7 +995,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return None
 
     @staticmethod
-    def match_option(options, check_value) -> Optional[Dict[str, str]]:
+    def match_option(options, check_value) -> Optional[dict[str, str]]:
         for option in options:
             option_value = option.get('key')
 
@@ -1030,12 +1030,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return None
 
     @staticmethod
-    def process_option_values(cell: VCDataCell, values: List[Any]) -> Optional[List[str]]:
+    def process_option_values(cell: VCDataCell, values: list[Any]) -> Optional[list[str]]:
         e_key = cell.e_key
         options = e_key.virtual_options or []
         # Do a case-insensitive check for each value against the key and any aliases
         # if there's a match to any of those, normalise back to the key (with the case of the key)
-        results: List[str] = []
+        results: list[str] = []
         # remove duplicates
         values = list(set(values))
         for check_value in values:
@@ -1170,7 +1170,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             elif e_key.value_type in (EvidenceKeyValueType.MULTISELECT,
                                       EvidenceKeyValueType.SELECT,
                                       EvidenceKeyValueType.CRITERIA):
-                parts: List[Any]
+                parts: list[Any]
                 if isinstance(value, str):
                     if e_key.value_type == EvidenceKeyValueType.MULTISELECT and '|_' in str(value):
                         parts = value.split('|_')
@@ -1389,7 +1389,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @transaction.atomic()
     def patch_value(self,
-                    patch: Dict[str, Any],
+                    patch: dict[str, Any],
                     clear_all_fields: bool = False,
                     user: Optional[User] = None,
                     source: SubmissionSource = None,
@@ -1399,7 +1399,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     remove_api_immutable=False,
                     initial_data=False,
                     revalidate_all=False,
-                    ignore_if_only_patching: Optional[Set[str]] = None) -> ClassificationPatchResponse:
+                    ignore_if_only_patching: Optional[set[str]] = None) -> ClassificationPatchResponse:
         """
             Creates a new ClassificationModification if the patch values are different to the current values
             Patching a value with the same value has no effect
@@ -1712,7 +1712,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return records
 
     @staticmethod
-    def validate_evidence(evidence: dict) -> List[Dict]:
+    def validate_evidence(evidence: dict) -> list[dict]:
         messages = []
 
         for key, blob in evidence.items():
@@ -1752,7 +1752,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                             return True
         return False
 
-    def validate(self) -> List[Dict]:
+    def validate(self) -> list[dict]:
         return Classification.validate_evidence(self.evidence)
 
     @staticmethod
@@ -1991,7 +1991,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return ShareLevel.ALL_USERS
         return ShareLevel.PUBLIC
 
-    def get_visible_evidence(self, evidence, lowest_share_level: ShareLevel) -> Dict[str, Dict]:
+    def get_visible_evidence(self, evidence, lowest_share_level: ShareLevel) -> dict[str, dict]:
         """ Driven by EvidenceKey.max_share_level """
 
         if lowest_share_level.index == 0:  # No restrictions
@@ -2007,7 +2007,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 visible_evidence[k] = {'value': "(hidden)", 'hidden': True}
         return visible_evidence
 
-    def get_allele_info_dict(self) -> Optional[Dict[str, Any]]:
+    def get_allele_info_dict(self) -> Optional[dict[str, Any]]:
         allele_info_dict = {}
         if allele_info := self.allele_info:
             resolved_dict = {
@@ -2147,8 +2147,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             variant_annotation = variant.variantannotation_set.filter(version=variant_annotation_version).first()
         return variant_annotation
 
-    def c_hgvs_all(self) -> List[CHGVS]:
-        all_chgvs: List[CHGVS] = []
+    def c_hgvs_all(self) -> list[CHGVS]:
+        all_chgvs: list[CHGVS] = []
         for genome_build in GenomeBuild.builds_with_annotation_cached():
             if text := self.get_c_hgvs(genome_build):
                 chgvs = CHGVS(full_c_hgvs=text)
@@ -2493,7 +2493,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                                                          created__lt=self.created).count()
 
     @property
-    def evidence(self) -> Dict[str, Dict]:
+    def evidence(self) -> dict[str, dict]:
         if self.cached_evidence is None:
             if self.published_evidence is not None:
                 self.cached_evidence = self.published_evidence
@@ -2516,7 +2516,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                 self.cached_evidence = data
         return self.cached_evidence
 
-    def get_visible_evidence(self, user: User) -> Dict[str, Dict]:
+    def get_visible_evidence(self, user: User) -> dict[str, dict]:
         """ Driven by EvidenceKey.max_share_level """
         lowest_share_level = self.classification.lowest_share_level(user)
         return self.classification.get_visible_evidence(self.evidence, lowest_share_level)
@@ -2624,7 +2624,7 @@ class ClassificationConsensus:
             return {}
 
         evidence = self.vcm.published_evidence
-        consensus: Dict[str, Any] = {}
+        consensus: dict[str, Any] = {}
         for key in (ekey.key for ekey in keys.all_keys if ekey.copy_consensus):
             for part in ['value', 'note']:
                 blob = evidence.get(key)
@@ -2635,7 +2635,7 @@ class ClassificationConsensus:
                     continue
                 consensus[key + '.' + part] = part_value
 
-        patch: Dict[str, Dict[str, Any]] = nest_dict(consensus)
+        patch: dict[str, dict[str, Any]] = nest_dict(consensus)
         return patch
 
 

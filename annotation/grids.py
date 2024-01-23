@@ -1,6 +1,6 @@
 import json
 from datetime import timedelta
-from typing import Dict, Any
+from typing import Any
 
 from django.db.models import QuerySet, ExpressionWrapper, F, fields
 
@@ -14,11 +14,11 @@ from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, C
 class AnnotationRunColumns(DatatableConfig):
 
     @staticmethod
-    def status(row: Dict[str, Any]):
+    def status(row: dict[str, Any]):
         return AnnotationStatus(row["status"]).label
 
     @staticmethod
-    def pipeline_type(row: Dict[str, Any]):
+    def pipeline_type(row: dict[str, Any]):
         return VariantAnnotationPipelineType(row["pipeline_type"]).label
 
     @staticmethod

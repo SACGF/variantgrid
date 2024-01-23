@@ -1,6 +1,6 @@
 import copy
 from dataclasses import dataclass
-from typing import List, Tuple, Any
+from typing import Any
 
 from django.core.exceptions import ValidationError
 from django.db.models import Model
@@ -56,8 +56,8 @@ class RadioOtherWidget(ChoiceWidget):
         context["widget"]["other"] = other_option
         return context
 
-    def other_options(self, name: str, value: List[str], attrs) -> Tuple[List[OptionData], OptionData]:
-        option_datas: List[OptionData] = []
+    def other_options(self, name: str, value: list[str], attrs) -> tuple[list[OptionData], OptionData]:
+        option_datas: list[OptionData] = []
         value_set = set(value)
         if '' in value_set:
             value_set.remove('')

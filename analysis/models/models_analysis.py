@@ -1,6 +1,6 @@
 from collections import defaultdict
 from functools import cached_property
-from typing import Tuple, Dict, List, Union
+from typing import Union
 
 from django.apps import apps
 from django.conf import settings
@@ -122,7 +122,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         for e in self.get_errors():
             raise ValueError(e)
 
-    def get_errors(self) -> List[str]:
+    def get_errors(self) -> list[str]:
         errors = []
         for field in ['custom_columns_collection', 'annotation_version']:
             field_fk = f"{field}_id"  # Avoid fetching related object
@@ -143,7 +143,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
             errors.append(str(ve))
         return errors
 
-    def get_warnings(self) -> List[str]:
+    def get_warnings(self) -> list[str]:
         warnings = []
         if self.annotation_version:
             try:
@@ -193,7 +193,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
 
         AbstractNodeCountSettings.save_count_configs_from_array(record_set, node_counts_array)
 
-    def get_samples(self) -> List[Sample]:
+    def get_samples(self) -> list[Sample]:
         samples = set()
         for node in self.analysisnode_set.filter(analysisnode_parent__isnull=True).select_subclasses():
             samples.update(node.get_samples_from_node_only_not_ancestors())
@@ -222,7 +222,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         topo_sorted = get_toposorted_nodes(nodes_qs)
 
         # Still need to copy the edges. Probably need to build up a table of old vs new
-        old_version_and_new_mapping: Dict[Tuple] = {}
+        old_version_and_new_mapping: dict[tuple] = {}
         old_new_map = {}
 
         nodes = []
@@ -261,7 +261,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
 
         return analysis_copy
 
-    def get_toolbar_warnings(self, user: User) -> List[str]:
+    def get_toolbar_warnings(self, user: User) -> list[str]:
         """ Warnings for top toolbar """
         warnings = []
         if self.lock_input_sources:
@@ -496,7 +496,7 @@ class AnalysisTemplateRun(TimeStampedModel):
         assign_permission_to_user_and_groups(user, analysis)
         return AnalysisTemplateRun.objects.create(template_version=template_version, analysis=analysis)
 
-    def populate_arguments(self, data: Dict):
+    def populate_arguments(self, data: dict):
         for av in AnalysisVariable.objects.filter(node__analysis=self.analysis):
             if obj := data.get(av.field):
                 # If variable is a model instance - need to load object

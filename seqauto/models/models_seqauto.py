@@ -5,7 +5,7 @@ import re
 import shutil
 from datetime import datetime
 from functools import cached_property
-from typing import List, Optional
+from typing import Optional
 
 from django.conf import settings
 from django.contrib import messages
@@ -910,7 +910,7 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
         return False
 
     @staticmethod
-    def get_paths_from_sample_sheet(sample_sheet) -> List[str]:
+    def get_paths_from_sample_sheet(sample_sheet) -> list[str]:
         enrichment_kit = sample_sheet.sequencing_run.enrichment_kit
         pattern_list = None
         if enrichment_kit:
@@ -1058,7 +1058,7 @@ class QCExecSummary(SeqAutoRecord):
     ts_to_tv_ratio = models.FloatField(null=True)
     uniformity_of_coverage = models.FloatField()
 
-    def get_coverage_columns(self) -> List[str]:
+    def get_coverage_columns(self) -> list[str]:
         COVERAGE_COLUMNS = [
             "percent_10x_goi",
             "percent_20x_goi",

@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum
 from functools import cached_property
 from itertools import groupby
-from typing import Set, Optional, List, Tuple, Callable
+from typing import Optional, Callable
 
 from django.http import HttpRequest
 from django.urls import reverse
@@ -94,18 +94,18 @@ class ClinVarCompareRow(ExportRow):
                     return gene_symbol
 
     @cached_property
-    def server_clinical_significance_set(self) -> Set[str]:
-        cs_set: Set[str] = set()
+    def server_clinical_significance_set(self) -> set[str]:
+        cs_set: set[str] = set()
         for cm in self.allele_group.cms_regardless_of_issues:
             if classified := cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE):
                 cs_set.add(classified)
         return cs_set
 
     @cached_property
-    def clinvar_clinical_significance_set(self) -> Tuple[Set[str], Set[str]]:
+    def clinvar_clinical_significance_set(self) -> tuple[set[str], set[str]]:
         clinvar: ClinVar
-        cs_set: Set[str] = set()
-        unknown_set: Set[str] = set()
+        cs_set: set[str] = set()
+        unknown_set: set[str] = set()
         if clinvar := self.clinvar:
             if cs := clinvar.clinical_significance:
                 cs = cs.replace(",", "|")
@@ -158,9 +158,9 @@ class ClinVarCompareRow(ExportRow):
 
     @export_column("Comparison")
     def diff_value(self) -> ClinVarCompareValue:
-        our_clins: Set[str] = self.server_clinical_significance_set
-        clinvar_clins: Set[str]
-        clinvar_unknown_clins: Set[str]
+        our_clins: set[str] = self.server_clinical_significance_set
+        clinvar_clins: set[str]
+        clinvar_unknown_clins: set[str]
         clinvar_clins, clinvar_unknown_clins = self.clinvar_clinical_significance_set
 
         if (not clinvar_clins) and (not clinvar_unknown_clins):
@@ -218,9 +218,9 @@ class ClassificationExportFormatterClinVarCompare(ClassificationExportFormatter)
             classification_filter=ClassificationFilter.from_request(request)
         )
 
-    def batch_pre_cache(self) -> Optional[Callable[[List[AlleleData]], None]]:
+    def batch_pre_cache(self) -> Optional[Callable[[list[AlleleData]], None]]:
         # do we want to try all clinvar versions?
-        def handle_batch(batch: List[AlleleData]):
+        def handle_batch(batch: list[AlleleData]):
             variant_to_batches = {}
             for ad in batch:
                 if allele := ad.allele:
@@ -237,7 +237,7 @@ class ClassificationExportFormatterClinVarCompare(ClassificationExportFormatter)
         return handle_batch
 
     @cached_property
-    def clinvar_versions(self) -> List[ClinVarVersion]:
+    def clinvar_versions(self) -> list[ClinVarVersion]:
         versions = []
         for genome_build in GenomeBuild.builds_with_annotation():
             if clinvar_version := ClinVarVersion.objects.filter(genome_build=genome_build).order_by('-created').first():
@@ -250,10 +250,10 @@ class ClassificationExportFormatterClinVarCompare(ClassificationExportFormatter)
     def extension(self) -> str:
         return "csv"
 
-    def header(self) -> List[str]:
+    def header(self) -> list[str]:
         return [delimited_row(ClinVarCompareRow.csv_header())]
 
-    def row(self, allele_data: AlleleData) -> List[str]:
+    def row(self, allele_data: AlleleData) -> list[str]:
         if allele_data.allele_id:
             return [delimited_row(ClinVarCompareRow(allele_data).to_csv())]
         else:
@@ -268,7 +268,7 @@ class ClinVarExpertCompareRow(ExportRow):
 
     def __init__(self,
                  allele_group: AlleleData,
-                 cms: List[ClassificationModification],
+                 cms: list[ClassificationModification],
                  clinvar: ClinVar,
                  clinvar_expert_record: ClinVarRecord):
 
@@ -307,8 +307,8 @@ class ClinVarExpertCompareRow(ExportRow):
                     return gene_symbol
 
     @cached_property
-    def server_clinical_significance_set(self) -> Set[str]:
-        cs_set: Set[str] = set()
+    def server_clinical_significance_set(self) -> set[str]:
+        cs_set: set[str] = set()
         for cm in self.cms:
             if classified := cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE):
                 cs_set.add(classified)
@@ -394,10 +394,10 @@ class ClassificationExportFormatterClinVarCompareExpert(ClassificationExportForm
     def extension(self) -> str:
         return "csv"
 
-    def header(self) -> List[str]:
+    def header(self) -> list[str]:
         return [delimited_row(ClinVarExpertCompareRow.csv_header())]
 
-    def row(self, allele_data: AlleleData) -> List[str]:
+    def row(self, allele_data: AlleleData) -> list[str]:
         rows = []
         if allele_data.allele_id:
             clinvar_record: ClinVar

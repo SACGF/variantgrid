@@ -1,5 +1,3 @@
-from typing import List
-
 from cache_memoize import cache_memoize
 from django.contrib.auth.models import User
 from django.db import models
@@ -43,7 +41,7 @@ class PhenotypeDescription(models.Model):
         return results
 
     @cache_memoize(timeout=DAY_SECS, args_rewrite=lambda s: (s.pk, ))
-    def get_ontology_term_ids(self) -> List[int]:
+    def get_ontology_term_ids(self) -> list[int]:
         ot_qs = self.textphenotypesentence_set.filter(text_phenotype__textphenotypematch__ontology_term__isnull=False)
         # Sort so can be cached
         ot_qs = ot_qs.order_by("text_phenotype__textphenotypematch__ontology_term_id")

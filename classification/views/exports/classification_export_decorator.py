@@ -1,4 +1,4 @@
-from typing import Callable, Dict
+from typing import Callable
 
 from django.http import HttpRequest
 
@@ -7,7 +7,7 @@ from classification.views.exports.classification_export_formatter import Classif
 ExportFormatterFactory = Callable[[HttpRequest], ClassificationExportFormatter]
 
 
-_classification_export_registry: Dict[str, ExportFormatterFactory] = {}
+_classification_export_registry: dict[str, ExportFormatterFactory] = {}
 
 
 class UnsupportedExportType(Exception):

@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Any
 
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.db.models import TextField, QuerySet
@@ -205,7 +205,7 @@ class EnrichmentKitColumns(DatatableConfig[EnrichmentKit]):
                        label="Obsolete", orderable=True)
         ]
 
-    def render_enrichment_kit_type(self, row: Dict[str, Any]) -> JsonDataType:
+    def render_enrichment_kit_type(self, row: dict[str, Any]) -> JsonDataType:
         label = ""
         if enrichment_kit_type := row['enrichment_kit_type']:
             ekt = EnrichmentKitType(enrichment_kit_type)

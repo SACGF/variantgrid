@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Set
+from typing import Optional
 
 from classification.enums import ShareLevel
 from classification.views.exports import ClassificationExportFormatterMVL
@@ -196,7 +196,7 @@ class AlissaUploadSyncer(SyncRunner):
             def _message(self):
                 return self.message
 
-        all_issues: Set[AlissaRowInfoExport] = set()
+        all_issues: set[AlissaRowInfoExport] = set()
 
         for response_dict in sync_run.meta.get("responses", {}):
             for info_line in response_dict.get("infos", []):

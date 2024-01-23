@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import logging
-from typing import Set
 
 import pandas as pd
 
@@ -32,7 +31,7 @@ def store_clinvar_citations_from_web(cached_web_resource):
     clinvar_citations_collection = ClinVarCitationsCollection.objects.create(cached_web_resource=cached_web_resource)
 
     rows = []
-    citation_ids: Set[CitationIdNormalized] = set()
+    citation_ids: set[CitationIdNormalized] = set()
     for _, row in df.iterrows():
         citation_source = row[CITATION_SOURCE]
 

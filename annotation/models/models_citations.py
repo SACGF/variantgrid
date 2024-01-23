@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
 from functools import cached_property
-from typing import Optional, Iterable, List, Dict, Set, Union, Any, Iterator, Tuple
+from typing import Optional, Iterable, Union, Any, Iterator
 
 from Bio import Entrez, Medline
 from django.db import models
@@ -133,7 +133,7 @@ class Citation(TimeStampedModel, PreviewModelMixin):
         return self.id.replace(":", ": ")
 
     @property
-    def _first_and_single_author(self) -> Tuple[str, bool]:
+    def _first_and_single_author(self) -> tuple[str, bool]:
         first_author = self.authors_short
         single_author = self.authors_short == self.authors
         if self.authors and not first_author:
@@ -174,7 +174,7 @@ class Citation(TimeStampedModel, PreviewModelMixin):
     def preview(self) -> PreviewData:
         full_title: str
         if not self.error:
-            text_segments: List[str] = []
+            text_segments: list[str] = []
 
             if author_short := self.authors_short:
                 text_segments.append(author_short)
@@ -357,7 +357,7 @@ class CitationFetchEntry:
     The corresponding Citation record
     """
 
-    requested_ids: Set[Any] = field(default_factory=set)
+    requested_ids: set[Any] = field(default_factory=set)
     """
     Used to link what was requested to what we respond with.
     e.g. if an API requested an array of ID strings including "PubMed:   2343223", and the resulting normalised_id, citation don't match
@@ -421,16 +421,16 @@ class CitationFetchResponse:
     Wraps the citations returned from a CitationFetchRequest
     """
 
-    def __init__(self, entries: List[CitationFetchEntry]):
+    def __init__(self, entries: list[CitationFetchEntry]):
         self.all_entries = entries
-        requested_to_fetch: Dict[Any, CitationFetchEntry] = dict()
+        requested_to_fetch: dict[Any, CitationFetchEntry] = dict()
         for fetch in entries:
             for requested_id in fetch.requested_ids:
                 requested_to_fetch[requested_id] = fetch
         self.requested_to_fetch = requested_to_fetch
 
     @property
-    def all_citations(self) -> List[Citation]:
+    def all_citations(self) -> list[Citation]:
         return [entry.citation for entry in self.all_entries]
 
     def for_requested(self, citation_id: CitationRequest) -> Citation:
@@ -464,12 +464,12 @@ class CitationFetchRequest:
     """
 
     def __init__(self, cache_age: Optional[timedelta] = None):
-        self.id_to_fetch: Dict[CitationIdNormalized, CitationFetchEntry] = dict()
+        self.id_to_fetch: dict[CitationIdNormalized, CitationFetchEntry] = dict()
         """
         Keeps a dict of all normalized IDs to FetchEntries but only for records
         """
 
-        self.error_fetches: List[CitationFetchEntry] = []
+        self.error_fetches: list[CitationFetchEntry] = []
         """
         FetchEntries that are too invalid to request from Entrez
         """
@@ -490,7 +490,7 @@ class CitationFetchRequest:
         return CitationFetchResponse(cfr._all_citation_fetches + cfr.error_fetches)
 
     @staticmethod
-    def get_unfetched_citations(citation_ids: Iterable[CitationRequest]) -> List[Citation]:
+    def get_unfetched_citations(citation_ids: Iterable[CitationRequest]) -> list[Citation]:
         """
         Return Citation objects, but don't attempt to populate from Entrez (records might already be populated)
         """
@@ -579,7 +579,7 @@ class CitationFetchRequest:
             citations = Citation.objects.filter(
                 id__in=[fetch.normalised_id.full_id for fetch in fetch_needing_citations]
             )
-            citations_by_id: Dict[str, Citation] = {citation.pk: citation for citation in citations}
+            citations_by_id: dict[str, Citation] = {citation.pk: citation for citation in citations}
             for fetch in fetch_needing_citations:
                 if existing := citations_by_id.get(fetch.normalised_id.full_id):
                     fetch.citation = existing
@@ -648,7 +648,7 @@ class CitationFetchRequest:
             return entry.citation
         return None
 
-    def _load_from_entrez(self, entrez_db: EntrezDbType, ids: List[CitationIdNormalized]):
+    def _load_from_entrez(self, entrez_db: EntrezDbType, ids: list[CitationIdNormalized]):
         """
         Requests citation data from Entrez, populates via fetch _fetch_to_populate
         :param entrez_db: Must be EntrezDb.PMID or EntrezDb.PubMed

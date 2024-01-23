@@ -6,7 +6,7 @@ import operator
 import os
 from collections import defaultdict
 from functools import reduce
-from typing import Dict, List, Tuple, Any, Union
+from typing import Any, Union
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -28,7 +28,7 @@ from upload.upload_processing import process_upload_pipeline
 def create_liftover_pipelines(user: User, allele_source: AlleleSource,
                               import_source: ImportSource,
                               inserted_genome_build: GenomeBuild,
-                              destination_genome_builds: List[GenomeBuild] = None):
+                              destination_genome_builds: list[GenomeBuild] = None):
     """ Creates and runs a liftover pipeline for each destination GenomeBuild (default = all other builds) """
 
     build_liftover_vcf_tuples = _get_build_liftover_tuples(allele_source, inserted_genome_build, destination_genome_builds)
@@ -67,12 +67,12 @@ def create_liftover_pipelines(user: User, allele_source: AlleleSource,
                 process_upload_pipeline(upload_pipeline)
 
 
-VCF_ROW = Tuple[str, int, int, str, str]
-LIFTOVER_TUPLE = List[Union[Tuple[int, int], VCF_ROW]]
+VCF_ROW = tuple[str, int, int, str, str]
+LIFTOVER_TUPLE = list[Union[tuple[int, int], VCF_ROW]]
 
 
 def _get_build_liftover_tuples(allele_source: AlleleSource, inserted_genome_build: GenomeBuild,
-                               destination_genome_builds: List[GenomeBuild] = None) -> Dict[Any, Dict[Any, LIFTOVER_TUPLE]]:
+                               destination_genome_builds: list[GenomeBuild] = None) -> dict[Any, dict[Any, LIFTOVER_TUPLE]]:
     """ ID column set to allele_id """
     if destination_genome_builds is None:
         destination_genome_builds = GenomeBuild.builds_with_annotation()
@@ -157,7 +157,7 @@ def liftover_alleles(allele_qs, user: User = None):
                                       inserted_genome_build=genome_build)
 
 
-def _liftover_using_same_contig(genome_build, av_tuples: List[Tuple[int, int]]):
+def _liftover_using_same_contig(genome_build, av_tuples: list[tuple[int, int]]):
     """ Special case of e.g. Mitochondria that has the same contig across multiple builds
         we just need to create a VariantAllele object - will already have annotation for both builds """
 

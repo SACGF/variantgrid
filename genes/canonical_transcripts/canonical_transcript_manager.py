@@ -1,4 +1,3 @@
-from typing import Set, Tuple
 
 from django.conf import settings
 
@@ -43,7 +42,7 @@ class CanonicalTranscriptManager:
         return canonical_transcripts
 
     @staticmethod
-    def _create_canonical_transcripts(canonical_collection) -> Tuple[Set, Set]:
+    def _create_canonical_transcripts(canonical_collection) -> tuple[set, set]:
         transcript_ids = set()
         original_transcripts = set()
 

@@ -1,5 +1,5 @@
 import re
-from typing import List, Optional
+from typing import Optional
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
@@ -54,7 +54,7 @@ class DbSNP(TimeStampedModel):
             pass
         return dbsnp
 
-    def get_alleles_for_genome_build(self, genome_build: GenomeBuild) -> List:
+    def get_alleles_for_genome_build(self, genome_build: GenomeBuild) -> list:
         placements_with_allele = self.api_response["primary_snapshot_data"]["placements_with_allele"]
         build_with_patch = genome_build.get_build_with_patch()
 

@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Any
 
 from django.conf import settings
 
@@ -44,8 +44,8 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
                                classification_import: ClassificationImport,
                                upload_step: UploadStep):
         variant_pk_lookup = VariantPKLookup(genome_build)
-        variant_coordinates_by_hash: Dict[Any, VariantCoordinate] = {}
-        allele_info_by_hash: Dict[Any, ImportedAlleleInfo] = {}
+        variant_coordinates_by_hash: dict[Any, VariantCoordinate] = {}
+        allele_info_by_hash: dict[Any, ImportedAlleleInfo] = {}
 
         # TODO, should we filter on matched_variant__isnull=True, or on status, or not filter at all so we can rematch
         no_variant_qs = classification_import.importedalleleinfo_set.all()  # .filter(matched_variant__isnull=True)

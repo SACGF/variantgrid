@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from functools import cached_property
 from itertools import groupby
-from typing import Optional, List, Iterable, TypeVar, Generic, Set, Dict
+from typing import Optional, Iterable, TypeVar, Generic
 
 from django.contrib.auth.models import User
 from more_itertools import first
@@ -30,7 +30,7 @@ D = TypeVar("D")
 @dataclass(frozen=True)
 class MultiValues(Generic[D]):
 
-    values: List[D]
+    values: list[D]
     uniform: bool
 
     def __iter__(self):
@@ -40,7 +40,7 @@ class MultiValues(Generic[D]):
         return len(self.values)
 
     @staticmethod
-    def convert(all_value_sets: List[Set[D]]) -> 'MultiValues[D]':
+    def convert(all_value_sets: list[set[D]]) -> 'MultiValues[D]':
         first_value_set = all_value_sets[0]
         values = list(first_value_set)
         values.sort()
@@ -109,8 +109,8 @@ class ClassificationGroupUtils:
         self.calculate_pending = calculate_pending
 
     @cached_property
-    def _pending_changes_flag_map(self) -> Dict[int, str]:
-        mod_id_to_clin_sig: Dict[int, str] = {}
+    def _pending_changes_flag_map(self) -> dict[int, str]:
+        mod_id_to_clin_sig: dict[int, str] = {}
 
         flags_qs = Flag.objects.filter(
             flag_type=classification_flag_types.classification_pending_changes,
@@ -126,8 +126,8 @@ class ClassificationGroupUtils:
         return mod_id_to_clin_sig
 
     @cached_property
-    def _classification_to_old_clin_sig(self) -> Dict[int, str]:
-        old_ids: Dict[int, str] = {}
+    def _classification_to_old_clin_sig(self) -> dict[int, str]:
+        old_ids: dict[int, str] = {}
         if self._old_modifications:
             for om in self._old_modifications:
                 old_ids[om.classification_id] = om.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
@@ -159,7 +159,7 @@ class ClassificationGroupUtils:
 class ClassificationGroup:
 
     def __init__(self,
-                 group_entries: List[ClassificationGroupEntry],
+                 group_entries: list[ClassificationGroupEntry],
                  genome_build: GenomeBuild,
                  group_id: Optional[int] = None):
 
@@ -207,7 +207,7 @@ class ClassificationGroup:
         return self.most_recent.classification.allele_object
 
     @property
-    def allele_infos(self) -> List[ImportedAlleleInfo]:
+    def allele_infos(self) -> list[ImportedAlleleInfo]:
         return list(sorted({mod.classification.allele_info for mod in self.modifications if mod.classification.allele_info}))
 
     def diff_ids(self) -> str:
@@ -218,8 +218,8 @@ class ClassificationGroup:
         return self.most_recent.get(SpecialEKeys.GENE_SYMBOL)
 
     @property
-    def gene_symbols(self) -> List[GeneSymbol]:
-        gene_symbols: Set[GeneSymbol] = set()
+    def gene_symbols(self) -> list[GeneSymbol]:
+        gene_symbols: set[GeneSymbol] = set()
         for allele_info in self.allele_infos:
             gene_symbols.update(allele_info.gene_symbols )
         return gene_symbols
@@ -252,7 +252,7 @@ class ClassificationGroup:
         return self.most_recent.classification.lab
 
     @property
-    def users(self) -> List[User]:
+    def users(self) -> list[User]:
         data = {cm.classification.user for cm in self.modifications}
         data_list = list(data)
         data_list.sort(key=lambda x: x.username)
@@ -286,7 +286,7 @@ class ClassificationGroup:
         return c_parts
 
     @cached_property
-    def c_hgvses(self) -> List[CHGVS]:
+    def c_hgvses(self) -> list[CHGVS]:
         unique_c = set()
         for ge in self.group_entries:
             unique_c.add(ge.c_hgvs)
@@ -315,7 +315,7 @@ class ClassificationGroup:
     def variant_matching_issues(self) -> bool:
         return not self.most_recent.classification.allele_info.latest_validation.include
 
-    def p_hgvses(self) -> List[PHGVS]:
+    def p_hgvses(self) -> list[PHGVS]:
         unique_p = set()
         for cm in self.modifications:
             if p_hgvs := cm.p_parts:
@@ -330,8 +330,8 @@ class ClassificationGroup:
     @cached_property
     def acmg_criteria(self) -> MultiValues[CriteriaStrength]:
 
-        def criteria_converter(cm: ClassificationModification) -> Set[CriteriaStrength]:
-            strengths: Set[CriteriaStrength] = set()
+        def criteria_converter(cm: ClassificationModification) -> set[CriteriaStrength]:
+            strengths: set[CriteriaStrength] = set()
             for e_key in EvidenceKeyMap.cached().criteria():
                 strength = cm.get(e_key.key)
                 if CriteriaEvaluation.is_met(strength):
@@ -340,7 +340,7 @@ class ClassificationGroup:
 
         return MultiValues.convert([criteria_converter(cm) for cm in self.modifications])
 
-    def _evidence_key_set(self, key: str) -> List[str]:
+    def _evidence_key_set(self, key: str) -> list[str]:
         all_values = set()
         for cm in self.modifications:
             if value := cm.get(key):
@@ -352,11 +352,11 @@ class ClassificationGroup:
         return all_values
 
     @cached_property
-    def zygosities(self) -> List[str]:
+    def zygosities(self) -> list[str]:
         return self._evidence_key_set(SpecialEKeys.ZYGOSITY)
 
     @cached_property
-    def allele_origins(self) -> List[str]:
+    def allele_origins(self) -> list[str]:
         return self._evidence_key_set(SpecialEKeys.ALLELE_ORIGIN)
 
     @cached_property
@@ -390,7 +390,7 @@ class ClassificationGroup:
         plain_text_combined = ", ".join(all_plain_texts) if all_plain_texts else None
         return ConditionResolved(terms=list(all_terms), join=None, plain_text=plain_text_combined)
 
-    # def sub_groups(self) -> Optional[List['ClassificationGroup']]:
+    # def sub_groups(self) -> Optional[list['ClassificationGroup']]:
     #     if len(self.modifications) > 1:
     #         return [ClassificationGroup([cm], genome_build=self.genome_build) for cm in self.modifications]
     #     return None
@@ -410,7 +410,7 @@ class ClassificationGroups:
         if not group_utils:
             group_utils = ClassificationGroupUtils(classification_modifications)
 
-        groups: List[ClassificationGroup] = []
+        groups: list[ClassificationGroup] = []
 
         classification_group_entries = [group_utils.map(m, genome_build) for m in classification_modifications]
         classification_group_entries.sort()

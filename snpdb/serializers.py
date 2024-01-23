@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Any
 
 from django.contrib.auth.models import User
 from rest_framework import serializers
@@ -96,7 +96,7 @@ class VariantAlleleSerializer(serializers.ModelSerializer):
         return obj.get_allele_linking_tool_display()
 
     @staticmethod
-    def data_with_link_data(variant_allele: 'VariantAllele') -> Dict[str, Any]:
+    def data_with_link_data(variant_allele: 'VariantAllele') -> dict[str, Any]:
         variant_data = VariantAlleleSerializer(variant_allele).data
         link_data = variant_link_info(variant_allele.variant, variant_allele.genome_build)
         data = dict(variant_data)

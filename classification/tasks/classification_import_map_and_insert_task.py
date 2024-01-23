@@ -2,7 +2,6 @@ import json
 import pathlib
 import subprocess
 from pathlib import Path
-from typing import List, Dict
 
 import ijson
 from celery import Task
@@ -102,7 +101,7 @@ class ClassificationImportMapInsertTask(Task):
             publish = settings.CLASSIFICATION_OMNI_IMPORTER_PUBLISH_LEVEL
             include_source = settings.CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE
 
-            args: List[str] = [
+            args: list[str] = [
                 settings.CLASSIFICATION_OMNI_IMPORTER_PYTHON_COMMAND, "main.py",
                 "--dir", str(working_sub_folder.absolute()),
                 "--publish", publish,
@@ -177,7 +176,7 @@ class ClassificationImportMapInsertTask(Task):
                 with open(classifications_file, 'r') as file_handle:
                     ClassificationImportMapInsertTask.update_status(upload_file, UploadedClassificationsUnmappedStatus.Importing)
 
-                    def row_generator() -> Dict:
+                    def row_generator() -> dict:
                         nonlocal file_handle
                         for record in ijson.items(file_handle, 'records.item'):
                             yield record

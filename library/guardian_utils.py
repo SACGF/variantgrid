@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Union, List
+from typing import Union
 
 from django.conf import settings
 from django.contrib.auth.models import Group, User
@@ -91,10 +91,10 @@ class DjangoPermission:
     WRITE = 'change'
 
     @staticmethod
-    def perm(obj: Union[Model, List, QuerySet], permission):
+    def perm(obj: Union[Model, list, QuerySet], permission):
         if isinstance(obj, QuerySet):
             klass = obj.model
-        elif isinstance(obj, List):
+        elif isinstance(obj, list):
             klass = obj[0]
         else:
             klass = obj

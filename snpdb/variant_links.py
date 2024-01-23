@@ -1,11 +1,11 @@
-from typing import Dict, Any
+from typing import Any
 
 from snpdb.models import Variant, GenomeBuild
 
 
-def variant_link_info(variant: Variant, genome_build: GenomeBuild) -> Dict[str, Any]:
+def variant_link_info(variant: Variant, genome_build: GenomeBuild) -> dict[str, Any]:
     """ Needs to be passed a VariantAllele """
-    link_data: Dict[str, Any] = {}
+    link_data: dict[str, Any] = {}
     coordinate = variant.coordinate
 
     #FIXME this really needs to refer to SpecialEKeys but can't due to its package

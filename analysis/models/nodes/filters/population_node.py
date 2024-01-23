@@ -1,6 +1,6 @@
 import operator
-from functools import cached_property, reduce
-from typing import Optional, Dict, List
+from functools import reduce
+from typing import Optional
 
 from cache_memoize import cache_memoize
 from django.db import models
@@ -14,7 +14,7 @@ from classification.enums import ClinicalSignificance
 from classification.models.classification import Classification
 from library.constants import MINUTE_SECS
 from patients.models_enums import SimpleZygosity, GnomADPopulation
-from snpdb.models import Sample, VariantZygosityCountCollection
+from snpdb.models import VariantZygosityCountCollection
 
 
 class PopulationNode(AnalysisNode):
@@ -42,7 +42,7 @@ class PopulationNode(AnalysisNode):
         return self.percent != self.EVERYTHING
 
     @property
-    def population_database_fields(self) -> List[str]:
+    def population_database_fields(self) -> list[str]:
         fields = ["gnomad_af", "gnomad_popmax_af", "af_1kg", "af_uk10k", "topmed_af"]
         if self.columns_version >= 3:
             fields += ["gnomad_fafmax_faf95_max", "gnomad_fafmax_faf99_max"]
@@ -62,7 +62,7 @@ class PopulationNode(AnalysisNode):
             node_kwargs["common_variants"] = False
         return node_kwargs
 
-    def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
+    def _get_annotation_kwargs_for_node(self, **kwargs) -> dict:
         annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
         if self.use_internal_counts:
             vzcc = VariantZygosityCountCollection.get_global_germline_counts()
@@ -117,7 +117,7 @@ class PopulationNode(AnalysisNode):
             q = None
         return q
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         node_arg_q_dict = {}
 
         and_q = []
@@ -187,7 +187,7 @@ class PopulationNode(AnalysisNode):
 
     @staticmethod
     @cache_memoize(5 * MINUTE_SECS, args_rewrite=lambda p: (p.pk, p.version))
-    def _get_parent_classified_variant_ids(parent) -> List:
+    def _get_parent_classified_variant_ids(parent) -> list:
         """ Uses parent pk/version so can be shared with siblings. Doesn't use exclude as that ended up being slow """
         qs = parent.get_queryset()
         path_and_likely_path = [ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC]

@@ -1,5 +1,3 @@
-from typing import Dict
-
 from rest_framework import serializers
 
 from analysis.models import AnalysisVariable, FilterNode, FilterNodeItem, PhenotypeNode, BuiltInFilterNode, \
@@ -87,7 +85,7 @@ class AnalysisNodeSerializer(DynamicFieldsModelSerializer):
         return node
 
     @staticmethod
-    def get_node_serializers() -> Dict[str, 'AnalysisNodeSerializer']:
+    def get_node_serializers() -> dict[str, 'AnalysisNodeSerializer']:
         node_serializers = {}
         for serializer_subclass in AnalysisNodeSerializer.__subclasses__():
             model_name = serializer_subclass.Meta.model._meta.label

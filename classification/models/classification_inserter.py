@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Set, Mapping
+from typing import Optional, Mapping
 
 from django.contrib.auth.models import User
 from django.db import transaction
@@ -43,7 +43,7 @@ class BulkClassificationInserter:
     @transaction.atomic
     def insert(
             self,
-            data: Dict,
+            data: dict,
             record_id: Optional[str] = None,
             submission_source: Optional[SubmissionSource] = None,
             import_run: Optional[ClassificationImportRun] = None) -> ClassificationPatchResponse:
@@ -85,7 +85,7 @@ class BulkClassificationInserter:
             record_ref.check_security(must_be_writable=True)
 
             operation: Optional[str] = None
-            operation_data: Optional[Dict] = None
+            operation_data: Optional[dict] = None
 
             # if you say test=true, we just want validation messages back
             save = not data.pop('test', False)
@@ -192,7 +192,7 @@ class BulkClassificationInserter:
 
                         debug_timer.tick("Publish Complete")
                 else:
-                    ignore_if_only_patch: Optional[Set[str]] = None
+                    ignore_if_only_patch: Optional[set[str]] = None
                     # if some updates are not-meaningful and by themselves shouldn't cause a new version of the record to be made
                     # if source == SubmissionSource.API and not force:
                     #     ignore_if_only_patch = {"curation_date", "source_id"}

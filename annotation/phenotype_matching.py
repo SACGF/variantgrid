@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import List, Optional, Iterable
+from typing import Optional, Iterable
 
 import nltk
 from django.db.models import Count
@@ -14,7 +14,7 @@ from patients.models import Patient
 MAX_COMBO_LENGTH = 14  # Checked HPO words in DB
 
 
-def get_word_combos_and_spans(words_and_spans: List, max_combo_length: Optional[int]) -> List:
+def get_word_combos_and_spans(words_and_spans: list, max_combo_length: Optional[int]) -> list:
     combos_and_spans = []
     for i in range(len(words_and_spans)):
         combo_length = len(words_and_spans) - i
@@ -54,7 +54,7 @@ def sub_array_index(array, sub_array):
     return None
 
 
-def parse_words(text_phenotype, input_words_and_spans, phenotype_matcher) -> List:
+def parse_words(text_phenotype, input_words_and_spans, phenotype_matcher) -> list:
     results = []
 
     word_combos_and_spans = get_word_combos_and_spans_sorted_by_length(input_words_and_spans, max_combo_length=MAX_COMBO_LENGTH)
@@ -149,7 +149,7 @@ def word_tokenise_and_spans(txt):
     # {TO: FROM} - These have to be the same size! Then switch them out later
     PRE_SPLIT_REPLACE = {"dv/p": "dv_p"}
 
-    # replace word : List of alternate words to replace
+    # replace word : list of alternate words to replace
     REPLACE_ALTERNATES = {
         "bartter": ["bartters", "bartter's"],
         "bull's eye": ["bullseye"],

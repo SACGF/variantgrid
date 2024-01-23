@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from functools import cached_property, reduce
 from operator import attrgetter
-from typing import List, Optional, Dict, Iterable, Set
+from typing import Optional, Iterable
 
 import requests
 from django.contrib.auth.models import User
@@ -222,7 +222,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         return True
 
     @cached_property
-    def condition_xref_terms(self) -> List[OntologyTerm]:
+    def condition_xref_terms(self) -> list[OntologyTerm]:
         terms = []
         for term_str in self.condition_xrefs:
             try:
@@ -425,8 +425,8 @@ def update_condition_text_match_counts(ct: ConditionText):
     condition count texts are cached in DB, call this method to make sure they're up to date
     does not save after
     """
-    by_id: Dict[int, ConditionTextMatch] = {}
-    classification_related: List[ConditionTextMatch] = []
+    by_id: dict[int, ConditionTextMatch] = {}
+    classification_related: list[ConditionTextMatch] = []
     for ctm in ct.conditiontextmatch_set.all():
         by_id[ctm.id] = ctm
         if ctm.classification_id:
@@ -471,7 +471,7 @@ class ConditionMatchingSuggestion:
         (useful for producing debug files of how we think all condition matching should go)
         """
         self.condition_text_match = condition_text_match
-        self.terms: List[OntologyTerm] = _sort_terms(condition_text_match.condition_xref_terms) if condition_text_match and not ignore_existing else []
+        self.terms: list[OntologyTerm] = _sort_terms(condition_text_match.condition_xref_terms) if condition_text_match and not ignore_existing else []
         """ A list of terms that are being suggested """
 
         self.is_applied = bool(self.terms)
@@ -485,7 +485,7 @@ class ConditionMatchingSuggestion:
         if self.is_applied:
             self.condition_multi_operation = condition_text_match.condition_multi_operation
 
-        self.messages: List[ConditionMatchingMessage] = []
+        self.messages: list[ConditionMatchingMessage] = []
         """ errors, warnings, info to inform the user of - or use to determine if this auto-assign appropriate """
 
         self.validated = False
@@ -501,7 +501,7 @@ class ConditionMatchingSuggestion:
         """ Was this suggestion merged, e.g. if there was an condition text 'BAM' that matched Best At Motoneuron and Blood Attacked Myliver """
 
     @property
-    def term_str_array(self) -> List[str]:
+    def term_str_array(self) -> list[str]:
         """ For saving back to ConditionTextMatches """
         return [term.id for term in self.terms]
 
@@ -574,7 +574,7 @@ class ConditionMatchingSuggestion:
                 self.add_message(ConditionMatchingMessage(severity="error",
                                                           text="Multiple terms provided, requires co-occurring/uncertain"))
 
-            ontology_services: Set[str] = set()
+            ontology_services: set[str] = set()
             for term in terms:
                 ontology_services.add(term.ontology_service)
             if len(ontology_services) > 1:
@@ -756,12 +756,12 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                 text_tokens.discard(matched_term.id.lower())
 
                 # now find all the terms that should be expected in the term
-                term_tokens: Set[str] = set()
+                term_tokens: set[str] = set()
                 term_tokens = SearchText.tokenize_condition_text(normalize_condition_text(matched_term.name),
                                                                  deplural=True, deroman=True)
                 term_tokens.discard(matched_term.id.lower())
 
-                def check_has_non_pr_term(tokens: Set[str]):
+                def check_has_non_pr_term(tokens: set[str]):
                     for term in term_tokens:
                         for non_pr in NON_PR_TERMS:
                             if non_pr in term:
@@ -875,7 +875,7 @@ def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> Co
     return cms
 
 
-def merge_matches(matches: List[ConditionMatchingSuggestion]) -> Optional[ConditionMatchingSuggestion]:
+def merge_matches(matches: list[ConditionMatchingSuggestion]) -> Optional[ConditionMatchingSuggestion]:
     if not matches:
         return None
     if len(matches) == 1:
@@ -955,7 +955,7 @@ def search_suggestion(text: str) -> ConditionMatchingSuggestion:
                 "category": "disease"
             }, timeout=MINUTE_SECS).json().get("docs")
 
-        matches: List[ConditionMatchingSuggestion] = []
+        matches: list[ConditionMatchingSuggestion] = []
         for result in results:
             o_id = result.get('id')
             # result.get('label') gives the label as it's known by the search server
@@ -973,7 +973,7 @@ def search_suggestion(text: str) -> ConditionMatchingSuggestion:
     return ConditionMatchingSuggestion()
 
 
-def _is_descendant_ids(term_ids: Set[int], ancestors_ids: Set[int], seen_ids: Set[int], check_levels: int):
+def _is_descendant_ids(term_ids: set[int], ancestors_ids: set[int], seen_ids: set[int], check_levels: int):
     # TODO move this to OntologyTerm class
     for term in term_ids:
         if term in ancestors_ids:
@@ -993,17 +993,17 @@ def _is_descendant_ids(term_ids: Set[int], ancestors_ids: Set[int], seen_ids: Se
         return _is_descendant_ids(all_parent_terms, ancestors_ids, seen_ids, check_levels - 1)
 
 
-def is_descendant(terms: Set[OntologyTerm], ancestors: Set[OntologyTerm], check_levels: int = 10):
+def is_descendant(terms: set[OntologyTerm], ancestors: set[OntologyTerm], check_levels: int = 10):
     return _is_descendant_ids({term.id for term in terms}, {term.id for term in ancestors}, set(), check_levels)
 
 
-def _sort_terms(terms: Iterable[OntologyTerm]) -> List[OntologyTerm]:
+def _sort_terms(terms: Iterable[OntologyTerm]) -> list[OntologyTerm]:
     # sort by name (so OMIM, MONDO etc will be sorted together)
     # if we don't have a name, then fall back to ontology service, and then index, so DOID:00034 will appear before DOID:400
     return sorted(list(terms), key=attrgetter("name", "ontology_service", "index"))
 
 
-def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> List[ConditionMatchingSuggestion]:
+def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> list[ConditionMatchingSuggestion]:
     suggestions = []
 
     root_level = ct.root
@@ -1027,7 +1027,7 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
     filled_in = ct.conditiontextmatch_set.annotate(condition_xrefs_length=ArrayLength('condition_xrefs'))
     filled_in = filled_in.filter(Q(condition_xrefs_length__gt=0) | Q(parent=root_level)).exclude(gene_symbol=None)
     root_level_terms = root_cms.terms
-    root_level_mondo: Set[OntologyTerm] = {term for term in root_level_terms if term.ontology_service == OntologyService.MONDO}
+    root_level_mondo: set[OntologyTerm] = {term for term in root_level_terms if term.ontology_service == OntologyService.MONDO}
 
     for ctm in filled_in.order_by('gene_symbol'):
         if ctm.condition_xref_terms and not ignore_existing:
@@ -1044,13 +1044,13 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
 
             gene_symbol = ctm.gene_symbol
             if root_level_mondo:
-                gene_level_terms: Set[OntologyTerm] = OntologySnake.mondo_terms_for_gene_symbol(gene_symbol=gene_symbol)
-                matches_gene_level: Set[OntologyTerm] = set()
+                gene_level_terms: set[OntologyTerm] = OntologySnake.mondo_terms_for_gene_symbol(gene_symbol=gene_symbol)
+                matches_gene_level: set[OntologyTerm] = set()
                 for gene_level in gene_level_terms:
                     if is_descendant({gene_level}, root_level_mondo):
                         matches_gene_level.add(gene_level)
 
-                not_root_gene_terms: List[OntologyTerm] = []
+                not_root_gene_terms: list[OntologyTerm] = []
                 for term in matches_gene_level:
                     if term not in root_level_terms:
                         not_root_gene_terms.append(term)
@@ -1177,7 +1177,7 @@ def apply_condition_resolution_to_classifications(ctm: ConditionTextMatch):
         # now to find all condition text matches under this one, that don't have an override
         children = ConditionTextMatch.objects.filter(parent=ctm).select_related("classification")
         while children:
-            new_children: List[ConditionTextMatch] = []
+            new_children: list[ConditionTextMatch] = []
             for child in children:
                 if not child.is_valid:  # if child is valid then it already has a value unaffected by this
                     if classification := child.classification:

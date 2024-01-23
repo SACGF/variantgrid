@@ -16,7 +16,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
-from typing import Dict, List, Optional, Set, Iterator
+from typing import Optional, Iterator
 
 from annotation.models import ClinVar, AnnotationVersion
 from classification.enums import SpecialEKeys
@@ -65,7 +65,7 @@ class ClinVarLegacyMatch:
     This will allow us to match up the two
     """
     clinvar_export: ClinVarExport
-    match_types: Set[ClinVarLegacyExportMatchType]
+    match_types: set[ClinVarLegacyExportMatchType]
 
     @property
     def clinical_significance(self) -> str:
@@ -81,7 +81,7 @@ class ClinVarLegacyMatch:
         return self.clinvar_export.condition_resolved
 
     @cached_property
-    def notes(self) -> List[str]:
+    def notes(self) -> list[str]:
         if errors := self.clinvar_export.all_errors:
             return [error.text for error in errors]
 
@@ -89,9 +89,9 @@ class ClinVarLegacyMatch:
 @dataclass
 class ClinVarLegacyMatches:
     allele: Allele
-    match_types: Set[ClinVarLegacyAlleleMatchType]
-    classifications: List[Classification]
-    clinvar_export_matches: List[ClinVarLegacyMatch]
+    match_types: set[ClinVarLegacyAlleleMatchType]
+    classifications: list[Classification]
+    clinvar_export_matches: list[ClinVarLegacyMatch]
 
 
 CLINICAL_SIGNIFICANCE_MAP = {
@@ -128,7 +128,7 @@ class ClinVarLegacyRow:
     We want to match up the reocrds with ones within
     """
     clinvar_key: ClinVarKey
-    data: Dict[str, str]
+    data: dict[str, str]
 
     @cached_property
     def clinvar_export(self) -> Optional[ClinVarExport]:
@@ -195,7 +195,7 @@ class ClinVarLegacyRow:
     @staticmethod
     def load_file(file, clinvar_key: ClinVarKey) -> Iterator['ClinVarLegacyRow']:
         csv_f = csv.reader(file, delimiter='\t')
-        header_indexes: Dict[str, int] = {}
+        header_indexes: dict[str, int] = {}
         for row in csv_f:
             if not header_indexes:
                 if len(row) > 1 and row[1] == 'VariationID':
@@ -203,7 +203,7 @@ class ClinVarLegacyRow:
                     # don't process the header row itself as data, now skip to the next row
                     header_indexes = {label: index for index, label in enumerate(row)}
             else:
-                row_dict: Dict[str, str] = {}
+                row_dict: dict[str, str] = {}
                 for header_key, index in header_indexes.items():
                     row_dict[header_key] = row[index]
                 yield ClinVarLegacyRow(
@@ -239,8 +239,8 @@ class ClinVarLegacyRow:
         return CLINICAL_SIGNIFICANCE_MAP.get(self.clinical_significance)
 
     @cached_property
-    def ontology_terms(self) -> List[OntologyTerm]:
-        terms: List[OntologyTerm] = []
+    def ontology_terms(self) -> list[OntologyTerm]:
+        terms: list[OntologyTerm] = []
         if condition_identifier := self.condition_identifier.strip():
             if individual_terms := condition_identifier.split(';'):
                 for individual_term in individual_terms:
@@ -257,9 +257,9 @@ class ClinVarLegacyRow:
                         pass
         return terms
 
-    def find_variant_grid_allele(self, force_variant_search: bool = False) -> List[ClinVarLegacyMatches]:
+    def find_variant_grid_allele(self, force_variant_search: bool = False) -> list[ClinVarLegacyMatches]:
 
-        allele_to_match_types: Dict[Allele, Set[ClinVarLegacyAlleleMatchType]] = defaultdict(set)
+        allele_to_match_types: dict[Allele, set[ClinVarLegacyAlleleMatchType]] = defaultdict(set)
         found_variant_id_match = False
 
         # TODO need to change this to some kind of default genome build
@@ -301,7 +301,7 @@ class ClinVarLegacyRow:
             # allow for some transcript version increases
             if c_hgvs.transcript_parts.version:
                 test_c_hgvs: CHGVS
-                c_hgvs_strs: List[str] = []
+                c_hgvs_strs: list[str] = []
                 for attempt_increase in range(-3, 3):
                     if c_hgvs.transcript_parts.version + attempt_increase >= 1:
                         if test_c_hgvs := c_hgvs.with_transcript_version(c_hgvs.transcript_parts.version + attempt_increase):
@@ -316,12 +316,12 @@ class ClinVarLegacyRow:
         all_matches: [ClinVarLegacyMatches] = []
         for allele, match_types in allele_to_match_types.items():
             classifications = list(Classification.objects.filter(lab__in=self.labs, allele=allele, withdrawn=False))
-            clinvar_export_matches: List[ClinVarLegacyMatch] = []
+            clinvar_export_matches: list[ClinVarLegacyMatch] = []
             if clinvar_allele := ClinVarAllele.objects.filter(allele=allele, clinvar_key=self.clinvar_key).first():
                 if clinvar_exports := ClinVarExport.objects.filter(clinvar_allele=clinvar_allele):
                     for clinvar_export in clinvar_exports:
 
-                        export_match_types: Set[ClinVarLegacyExportMatchType] = set()
+                        export_match_types: set[ClinVarLegacyExportMatchType] = set()
 
                         if classification_based_on := clinvar_export.classification_based_on:
                             clinical_significance = classification_based_on.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)

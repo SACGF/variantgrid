@@ -1,7 +1,7 @@
 import re
 from enum import Enum
 from re import RegexFlag
-from typing import List, Union, Match, Dict, Optional, Set
+from typing import Union, Match, Optional
 
 from annotation.models.models_citations import CitationIdNormalized
 from ontology.models import OntologyService
@@ -17,11 +17,11 @@ class MatchType(Enum):
 
 class DbRefRegex:
 
-    _all_db_ref_regexes: List['DbRefRegex'] = []
+    _all_db_ref_regexes: list['DbRefRegex'] = []
 
     def __init__(self,
                  db: str,
-                 prefixes: Union[str, List[str]],
+                 prefixes: Union[str, list[str]],
                  link: str,
                  match_type: MatchType = MatchType.NUMERIC,
                  min_length: int = 3,
@@ -152,10 +152,10 @@ _entire_until_space = re.compile('(.*?)(?:[)]|\\s|$|[.] )')
 
 class DbRefRegexes:
 
-    def __init__(self, regexes: List[DbRefRegex]):
+    def __init__(self, regexes: list[DbRefRegex]):
         self.regexes = regexes
-        self.prefix_map: Dict[str, DbRefRegex] = {}
-        prefixes: List[str] = []
+        self.prefix_map: dict[str, DbRefRegex] = {}
+        prefixes: list[str] = []
         for regex in self.regexes:
             for prefix in regex.prefixes:
                 prefix = prefix.lower()
@@ -173,7 +173,7 @@ class DbRefRegexes:
             text = f"{before}<a href='{db_match.url}'>{middle}</a>{after}"
         return text
 
-    def search(self, text: str, default_regex: DbRefRegex = None, sort: bool = True) -> List[DbRefRegexResult]:
+    def search(self, text: str, default_regex: DbRefRegex = None, sort: bool = True) -> list[DbRefRegexResult]:
         """
         @param text The text to be searched for ID patterns
         @param default_regex If the field is expected to be a specific kind of id
@@ -182,8 +182,8 @@ class DbRefRegexes:
         it will still work).
         @param sort If true sorts the results by database and id, otherwise leaves them in order of discovery
         """
-        results: List[DbRefRegexResult] = []
-        already_added: Set[DbRefRegexResult] = set()
+        results: list[DbRefRegexResult] = []
+        already_added: set[DbRefRegexResult] = set()
 
         def append_result_if_length(db_regex: DbRefRegex, match: Optional[Match], must_end_in_number: bool = False) -> bool:
             """

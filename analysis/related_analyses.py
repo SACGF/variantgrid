@@ -1,11 +1,10 @@
 from collections import defaultdict
-from typing import Tuple, List
 
 from analysis.models.nodes.analysis_node import Analysis
 from analysis.models.nodes.sources import SampleNode, CohortNode, TrioNode, PedigreeNode
 
 
-def sort_analyses_by_date_and_merge_details(all_analysis_details) -> List[Tuple[Analysis, str]]:
+def sort_analyses_by_date_and_merge_details(all_analysis_details) -> list[tuple[Analysis, str]]:
     sorted_analyses = sorted(all_analysis_details.keys(), key=lambda x: x.created)
 
     analysis_details = []
@@ -16,7 +15,7 @@ def sort_analyses_by_date_and_merge_details(all_analysis_details) -> List[Tuple[
     return analysis_details
 
 
-def get_related_analysis_details_for_samples(user, samples) -> List[Tuple[Analysis, str]]:
+def get_related_analysis_details_for_samples(user, samples) -> list[tuple[Analysis, str]]:
     all_analysis_details = defaultdict(set)
     analyses_ids = Analysis.filter_for_user(user).values_list("pk", flat=True)
 
@@ -27,7 +26,7 @@ def get_related_analysis_details_for_samples(user, samples) -> List[Tuple[Analys
     return sort_analyses_by_date_and_merge_details(all_analysis_details)
 
 
-def get_related_analysis_details_for_cohort(user, cohorts) -> List[Tuple[Analysis, str]]:
+def get_related_analysis_details_for_cohort(user, cohorts) -> list[tuple[Analysis, str]]:
     all_analysis_details = defaultdict(set)
     analyses_ids = Analysis.filter_for_user(user).values_list("pk", flat=True)
 
@@ -37,7 +36,7 @@ def get_related_analysis_details_for_cohort(user, cohorts) -> List[Tuple[Analysi
     return sort_analyses_by_date_and_merge_details(all_analysis_details)
 
 
-def get_related_analysis_details_for_trio(user, trios) -> List[Tuple[Analysis, str]]:
+def get_related_analysis_details_for_trio(user, trios) -> list[tuple[Analysis, str]]:
     all_analysis_details = defaultdict(set)
     analyses_ids = Analysis.filter_for_user(user).values_list("pk", flat=True)
     for trio_node in TrioNode.objects.filter(analysis__in=analyses_ids,
@@ -47,7 +46,7 @@ def get_related_analysis_details_for_trio(user, trios) -> List[Tuple[Analysis, s
     return sort_analyses_by_date_and_merge_details(all_analysis_details)
 
 
-def get_related_analysis_details_for_pedigree(user, pedigrees) -> List[Tuple[Analysis, str]]:
+def get_related_analysis_details_for_pedigree(user, pedigrees) -> list[tuple[Analysis, str]]:
     all_analysis_details = defaultdict(set)
     analyses_ids = Analysis.filter_for_user(user).values_list("pk", flat=True)
     for pedigree_node in PedigreeNode.objects.filter(analysis__in=analyses_ids,

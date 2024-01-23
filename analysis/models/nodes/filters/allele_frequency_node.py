@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict
+from typing import Optional
 
 from django.db import models
 from django.db.models import Q
@@ -13,7 +13,7 @@ class AlleleFrequencyNode(AncestorSampleMixin, AnalysisNode):
     """ AF is stored on NodeAlleleFrequencyFilter so can reuse code for all nodes that have AF filters """
     sample = models.ForeignKey(Sample, null=True, on_delete=SET_NULL)
 
-    def _get_configuration_errors(self) -> List:
+    def _get_configuration_errors(self) -> list:
         errors = super()._get_configuration_errors()
         if not self.sample:
             errors.append("No sample selected.")
@@ -22,7 +22,7 @@ class AlleleFrequencyNode(AncestorSampleMixin, AnalysisNode):
     def modifies_parents(self):
         return NodeAlleleFrequencyFilter.get_sample_arg_q_dict(self, self.sample)
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+    def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         return NodeAlleleFrequencyFilter.get_sample_arg_q_dict(self, self.sample)
 
     def _get_method_summary(self):

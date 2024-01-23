@@ -1,5 +1,4 @@
 import re
-from typing import List
 
 from genes.models import Transcript, TranscriptVersion
 from library.utils import first
@@ -21,7 +20,7 @@ def search_transcript(search_input: SearchInputInstance):
     upper_string = search_input.search_string.upper()
     transcript_id, version = TranscriptVersion.get_transcript_id_and_version(upper_string)
 
-    transcript_version_results: List[TranscriptVersion] = []
+    transcript_version_results: list[TranscriptVersion] = []
 
     if transcript := Transcript.objects.filter(identifier=transcript_id).first():
         if version:

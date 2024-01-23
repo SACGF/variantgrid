@@ -2,7 +2,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
 from itertools import combinations
-from typing import Tuple, List, Optional, Dict, Set, Iterable, Union, Any
+from typing import Optional, Iterable, Union, Any
 
 from django.conf import settings
 from django.contrib import messages
@@ -118,7 +118,7 @@ def view_gene(request, gene_id):
     return render(request, "genes/view_gene.html", context)
 
 
-def _get_omim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol) -> List[Tuple[OntologyTerm, List[OntologyTerm]]]:
+def _get_omim_and_hpo_for_gene_symbol(gene_symbol: GeneSymbol) -> list[tuple[OntologyTerm, list[OntologyTerm]]]:
     omim_and_hpo_for_gene = []
     try:
         # max_depth = 0 for direct links only
@@ -159,7 +159,7 @@ class GeneSymbolViewInfo:
                 self.tool_tips = user_settings.tool_tips
 
     @cached_property
-    def omim_and_hpo_for_gene(self) -> List[Tuple[OntologyTerm, List[OntologyTerm]]]:
+    def omim_and_hpo_for_gene(self) -> list[tuple[OntologyTerm, list[OntologyTerm]]]:
         return _get_omim_and_hpo_for_gene_symbol(self.gene_symbol)
 
     @cached_property
@@ -167,7 +167,7 @@ class GeneSymbolViewInfo:
         return self.gene_symbol.hgnc_set.order_by("status").first()
 
     @cached_property
-    def citations_ids(self) -> List[str]:
+    def citations_ids(self) -> list[str]:
         return sorted(set(Citation.objects.filter(genesymbolcitation__gene_symbol=self.gene_symbol).values_list('id', flat=True)))
 
     @cached_property
@@ -208,7 +208,7 @@ class GeneSymbolViewInfo:
             return gene_version.genome_build
         return self.desired_genome_build
 
-    def warnings(self) -> List[str]:
+    def warnings(self) -> list[str]:
         warnings = []
         if self.gene_version:
             # This page is shown using the users default genome build
@@ -251,7 +251,7 @@ class GeneSymbolViewInfo:
         return self.has_variants.has_classified_variants
 
     @cached_property
-    def consortium_genes_and_aliases(self) -> Dict[str, Set[str]]:
+    def consortium_genes_and_aliases(self) -> dict[str, set[str]]:
         consortium_genes_and_aliases = defaultdict(lambda: defaultdict(set))
         gene: Gene
         for gene in self.gene_symbol.genes:
@@ -260,8 +260,8 @@ class GeneSymbolViewInfo:
         return defaultdict_to_dict(consortium_genes_and_aliases)
 
     @cached_property
-    def gene_external_urls(self) -> Dict[str, str]:
-        gene_external_urls: Dict[str, str] = {}
+    def gene_external_urls(self) -> dict[str, str]:
+        gene_external_urls: dict[str, str] = {}
         for gene in self.gene_symbol.genes:
             gene_external_urls[gene.identifier] = gene.get_external_url()
         return gene_external_urls
@@ -409,7 +409,7 @@ def view_classifications(request, gene_symbol: str, genome_build_name: str):
 @dataclass(frozen=True)
 class GenomeBuildGenes:
     genome_build: GenomeBuild
-    genes: List[Gene]
+    genes: list[Gene]
 
 
 @dataclass(frozen=True)
@@ -423,10 +423,10 @@ class TranscriptVersionDetails:
 def view_transcript(request, transcript_id):
     transcript = get_object_or_404(Transcript, pk=transcript_id)
 
-    gene_by_build: Dict[GenomeBuild, Set[Gene]] = defaultdict(set)
+    gene_by_build: dict[GenomeBuild, set[Gene]] = defaultdict(set)
     transcripts_versions_by_build = defaultdict(dict)
 
-    versions: Set[int] = set()
+    versions: set[int] = set()
     transcript_chroms = set()
     for tv in transcript.transcriptversion_set.order_by("version"):
         gene_by_build[tv.genome_build].add(tv.gene)
@@ -437,7 +437,7 @@ def view_transcript(request, transcript_id):
 
     genome_builds = sorted(gene_by_build.keys())
     genome_build_genes = [GenomeBuildGenes(genome_build, sorted(gene_by_build.get(genome_build))) for genome_build in genome_builds]
-    transcript_version_details: List[TranscriptVersionDetails] = []
+    transcript_version_details: list[TranscriptVersionDetails] = []
 
     build_matcher = {genome_build: HGVSMatcher(genome_build) for genome_build in genome_builds}
     for version in sorted(versions):

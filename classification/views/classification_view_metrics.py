@@ -1,9 +1,9 @@
-import operator
+from collections import defaultdict
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta, datetime
-from functools import cached_property, reduce
-from typing import Any, List, Callable, TypeVar, Generic, Optional, Type
+from functools import cached_property
+from typing import Any, Callable, TypeVar, Generic, Optional, Type
 
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -40,7 +40,7 @@ class Counted(Generic[T]):
 
 @dataclass(frozen=True)
 class ViewMetricsType:
-    counts: List[Counted[Any]]
+    counts: list[Counted[Any]]
     name: str
     model_id: str
 
@@ -82,7 +82,7 @@ class ViewEventCounts:
     def base_filter(self) -> Q:
         return self.base_filter_any_date & Q(created__gte=self.as_of)
 
-    def count_field(self, field_name: str, resolver: Optional[Callable]) -> List[Counted]:
+    def count_field(self, field_name: str, resolver: Optional[Callable]) -> list[Counted]:
         id_to_count = defaultdict(int)
         field_name = f"args__{field_name}"
         for values in ViewEvent.objects \
@@ -111,23 +111,23 @@ class ViewEventCounts:
         return resolver
 
     @cached_property
-    def classification_views(self) -> List[Counted[Classification]]:
+    def classification_views(self) -> list[Counted[Classification]]:
         return self.count_field("classification_id", ViewEventCounts.resolver_for_model(Classification))
 
     @cached_property
-    def discordance_report_views(self) -> List[Counted[Classification]]:
+    def discordance_report_views(self) -> list[Counted[Classification]]:
         return self.count_field("discordance_report_id", ViewEventCounts.resolver_for_model(DiscordanceReport))
 
     @cached_property
-    def allele_views(self) -> List[Counted[Allele]]:
+    def allele_views(self) -> list[Counted[Allele]]:
         return self.count_field("allele_id", ViewEventCounts.resolver_for_model(Allele))
 
     @cached_property
-    def gene_symbol_views(self) -> List[Counted[GeneSymbol]]:
+    def gene_symbol_views(self) -> list[Counted[GeneSymbol]]:
         return self.count_field("gene_symbol", ViewEventCounts.resolver_for_model(GeneSymbol))
 
     @cached_property
-    def page_views(self) -> List[Counted[str]]:
+    def page_views(self) -> list[Counted[str]]:
         id_to_count = defaultdict(int)
         for values in ViewEvent.objects\
                 .values('view_name', 'user')\
@@ -139,7 +139,7 @@ class ViewEventCounts:
         return sorted((Counted(pk, count, None) for pk, count in id_to_count.items()), reverse=True)
 
     @cached_property
-    def active_users(self) -> List[Counted[str]]:
+    def active_users(self) -> list[Counted[str]]:
         id_to_count = defaultdict(int)
         for values in ViewEvent.objects \
                 .values('user')\
@@ -150,7 +150,7 @@ class ViewEventCounts:
 
         return sorted((Counted(pk, count, ViewEventCounts.resolver_for_model(User)) for pk, count in id_to_count.items()), reverse=True)
 
-    def view_metrics(self) -> List[ViewMetricsType]:
+    def view_metrics(self) -> list[ViewMetricsType]:
         return [
             ViewMetricsType(
                 counts=self.gene_symbol_views,

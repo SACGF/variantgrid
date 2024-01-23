@@ -4,7 +4,7 @@ import json
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Optional, Dict
+from typing import Optional
 
 import pandas as pd
 import pronto
@@ -126,7 +126,7 @@ def load_mondo(filename: str, force: bool):
                             extra["synonyms"] = synonyms
 
                         aliases = []
-                        term_relation_types: Dict[str, List[str]] = defaultdict(list)
+                        term_relation_types: dict[str, list[str]] = defaultdict(list)
 
                         for bp in meta.get("basicPropertyValues", []):
                             val = TermId(bp.get("val"))
@@ -528,7 +528,7 @@ def load_omim(filename: str, force: bool):
 
 
 def sync_hgnc():
-    uploads: List[OntologyTerm] = []
+    uploads: list[OntologyTerm] = []
 
     o_import = OntologyImport.objects.create(
         import_source="HGNC Sync",

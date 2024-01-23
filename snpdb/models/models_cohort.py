@@ -1,6 +1,6 @@
 import logging
 from functools import cached_property
-from typing import List, Dict, Union
+from typing import Union
 
 import celery
 from django.contrib.auth.models import User, Group
@@ -419,7 +419,7 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
         # No need to do anything as we're joining to Variant
         return sql
 
-    def get_annotation_kwargs(self, **kwargs) -> Dict:
+    def get_annotation_kwargs(self, **kwargs) -> dict:
         """ For Variant.objects.annotate """
         annotation_kwargs = {}
         already_set = self.cohortgenotype_alias in kwargs.get("existing_annotation_kwargs", set())
@@ -572,7 +572,7 @@ class CohortGenotype(models.Model):
         sample_index = self.collection.get_array_index_for_sample_id(sample.pk)
         return SampleGenotype(self, sample, sample_index)
 
-    def get_sample_genotypes(self) -> List[SampleGenotype]:
+    def get_sample_genotypes(self) -> list[SampleGenotype]:
         sample_genotypes = []
         for i, sample in enumerate(self.collection.cohort.get_samples()):
             sample_genotypes.append(SampleGenotype(self, sample, i))

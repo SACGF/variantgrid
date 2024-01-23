@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import Optional, List, Union
+from typing import Optional, Union
 from urllib.parse import urlencode
 
 from django.db.models import QuerySet, Sum
@@ -65,7 +65,7 @@ class ClassificationDashboard:
         return self.shared_classifications.order_by('allele').distinct('allele').count()
 
     @property
-    def clinvar_keys(self) -> List[ClinVarKey]:
+    def clinvar_keys(self) -> list[ClinVarKey]:
         return sorted(set(lab.clinvar_key for lab in self.lab_picker.selected_labs if lab.clinvar_key))
 
     @cached_property
@@ -108,7 +108,7 @@ class ClassificationDashboard:
         return Classification.objects.filter(withdrawn=False, condition_resolution__isnull=False, lab__in=self.labs).count()
 
     @cached_property
-    def classifications_wout_standard_gene(self) -> List[int]:
+    def classifications_wout_standard_gene(self) -> list[int]:
         linked_classifications = ConditionTextMatch.objects.filter(condition_text__lab__in=self.labs, classification__isnull=False)
         return Classification.objects.filter(withdrawn=False, lab__in=self.labs).exclude(pk__in=Subquery(linked_classifications.values('classification_id'))).order_by('lab', 'created').select_related('lab')
 

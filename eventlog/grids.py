@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Any
 
 from django.db.models import QuerySet
 from django.http import HttpRequest
@@ -11,7 +11,7 @@ from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 class EventColumns(DatatableConfig[Event]):
 
-    def render_data(self, row: Dict[str, Any]):
+    def render_data(self, row: dict[str, Any]):
         if filename := row.get('filename'):
             return filename
         elif detail := row.get('details'):

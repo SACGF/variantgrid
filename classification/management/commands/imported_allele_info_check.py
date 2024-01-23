@@ -1,7 +1,7 @@
 from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Any, List
+from typing import Optional, Any
 
 from django.core.management import BaseCommand
 from django.db.models import Max
@@ -74,7 +74,7 @@ class HgvsSummary(ExportRow):
     transcript: Optional[TranscriptParts] = None
     variant_coordinate: Optional[VariantCoordinate] = None
     c_hgvs: Optional[str] = None
-    errors: List[str] = None
+    errors: list[str] = None
     error_str: Optional[str] = None
 
     @property

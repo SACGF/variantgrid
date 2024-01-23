@@ -19,7 +19,7 @@ import hashlib
 import itertools
 import logging
 import time
-from typing import Dict, List, Tuple, Optional
+from typing import Optional
 
 import requests
 from django.conf import settings
@@ -183,7 +183,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
     logging.debug("ClinGeneAllele %s: %d variants have Alleles, %d without",
                   genome_build, num_existing_records, num_no_record)
 
-    variant_id_allele_error: List[Tuple[int, Allele, Optional[str]]] = []
+    variant_id_allele_error: list[tuple[int, Allele, Optional[str]]] = []
     if num_skip := len(skip_variant_ids_without_alleles):
         logging.debug("%d variants skipping ClingenAlleleRegistry", num_skip)
         empty_alleles = [Allele() for _ in range(num_skip)]
@@ -427,7 +427,7 @@ def get_clingen_allele(code: str, clingen_api: ClinGenAlleleRegistryAPI = None) 
     return clingen_allele
 
 
-def _store_clingen_api_response(api_response_list) -> List[ClinGenAllele]:
+def _store_clingen_api_response(api_response_list) -> list[ClinGenAllele]:
     clingen_allele_list = []
     for api_response in api_response_list:
         clingen_allele_id = ClinGenAllele.get_id_from_response(api_response)
@@ -441,7 +441,7 @@ def _store_clingen_api_response(api_response_list) -> List[ClinGenAllele]:
 
 
 def get_clingen_alleles_from_external_code(er_type: ClinGenAlleleExternalRecordType, external_code,
-                                           clingen_api: ClinGenAlleleRegistryAPI = None) -> List[ClinGenAllele]:
+                                           clingen_api: ClinGenAlleleRegistryAPI = None) -> list[ClinGenAllele]:
     # TODO: We could cache this? At the moment we have to make a new API call every build
     if clingen_api is None:
         clingen_api = ClinGenAlleleRegistryAPI()
@@ -467,7 +467,7 @@ def get_clingen_allele_from_hgvs(hgvs_string, require_allele_id=True,
 
 
 def link_allele_to_existing_variants(allele: Allele, allele_linking_tool,
-                                     known_variants=None) -> Dict[GenomeBuild, VariantAllele]:
+                                     known_variants=None) -> dict[GenomeBuild, VariantAllele]:
     """ known_variants - be able to pass in variants you already know are linked to Allele. Workaround to deal with
         ClinGen Allele registry accepting a coordinate (e.g. NC_000001.10:g.145299792A>G GRCh37) and retrieving record
         CA1051218 but the API response won't have GRCh37 in it! """

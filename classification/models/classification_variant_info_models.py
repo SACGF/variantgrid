@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, List, Dict, Any, TypedDict, Literal, Tuple
+from typing import Optional, Any, TypedDict, Literal
 
 import django.dispatch
 from django.conf import settings
@@ -301,14 +301,14 @@ class ImportedAlleleInfoValidation(TimeStampedModel):
 
     @staticmethod
     def validation_tags_list_from_dict(validation_dict: ImportedAlleleInfoValidationTags):
-        items: List[ImportedAlleleInfoValidationTagEntry] = []
+        items: list[ImportedAlleleInfoValidationTagEntry] = []
         for category, sub_issues_dict in validation_dict.items():
             for field, severity in sub_issues_dict.items():
                 items.append(ImportedAlleleInfoValidationTagEntry(category=category, field=field, severity=severity))
         return sorted(items)
 
     @property
-    def validation_tags_list(self) -> List[ImportedAlleleInfoValidationTagEntry]:
+    def validation_tags_list(self) -> list[ImportedAlleleInfoValidationTagEntry]:
         return ImportedAlleleInfoValidation.validation_tags_list_from_dict(self.validation_tags_typed)
 
     @staticmethod
@@ -411,7 +411,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         return f"{self.imported_genome_build_patch_version} {self.imported_c_hgvs or self.imported_g_hgvs}"
 
     @property
-    def variant_coordinates_imported_and_resolved(self) -> Tuple[VariantCoordinate, VariantCoordinate]:
+    def variant_coordinates_imported_and_resolved(self) -> tuple[VariantCoordinate, VariantCoordinate]:
         imported_vc: Optional[VariantCoordinate] = self.variant_coordinate_obj
         resolved_vc: Optional[VariantCoordinate] = None
 
@@ -527,7 +527,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         return None
 
     @staticmethod
-    def all_chgvs(allele: Allele) -> List[CHGVS]:
+    def all_chgvs(allele: Allele) -> list[CHGVS]:
         all_chgvs = set()
         for iai in allele.importedalleleinfo_set.all():
             for rb in iai.resolved_builds:
@@ -543,7 +543,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             return CHGVS(self.imported_c_hgvs).transcript
 
     @property
-    def gene_symbols(self) -> List[GeneSymbol]:
+    def gene_symbols(self) -> list[GeneSymbol]:
         gene_symbol_set = {build.gene_symbol for build in self.resolved_builds if build.gene_symbol}
         if not gene_symbol_set:
             # only include imported gene symbols if we didn't resolve to real alleles
@@ -554,11 +554,11 @@ class ImportedAlleleInfo(TimeStampedModel):
         return list(sorted(gene_symbol_set))
 
     @property
-    def transcript_versions(self) -> List[TranscriptVersion]:
+    def transcript_versions(self) -> list[TranscriptVersion]:
         return list(sorted({build.transcript_version for build in self.resolved_builds if build.transcript_version}))
 
     @property
-    def transcripts(self) -> List[Transcript]:
+    def transcripts(self) -> list[Transcript]:
         return list(sorted({build.transcript_version.transcript for build in self.resolved_builds if build.transcript_version}))
 
     @staticmethod
@@ -606,7 +606,7 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     @staticmethod
     @timed_cache()
-    def _genome_builds() -> List[GenomeBuild]:
+    def _genome_builds() -> list[GenomeBuild]:
         """ genome builds that the variantgrid instance is supporting """
         return [build for build in GenomeBuild.builds_with_annotation() if build in [GenomeBuild.grch37(), GenomeBuild.grch38()]]
 
@@ -617,7 +617,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         setattr(self, ImportedAlleleInfo.__genome_build_to_attr(key), value)
 
     @property
-    def resolved_builds(self) -> List[ResolvedVariantInfo]:
+    def resolved_builds(self) -> list[ResolvedVariantInfo]:
         return list(ResolvedVariantInfo.objects.filter(allele_info=self).select_related('genome_build'))
 
     def update_variant_coordinate(self):
@@ -657,7 +657,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         return value
 
     @staticmethod
-    def get_or_create(**kwargs: Dict[str, Any]) -> 'ImportedAlleleInfo':
+    def get_or_create(**kwargs: dict[str, Any]) -> 'ImportedAlleleInfo':
         tidied = {key: ImportedAlleleInfo._tidy_input_value(key, value) for key, value in kwargs.items()}
         try:
             allele_info, created = ImportedAlleleInfo.objects.get_or_create(**tidied)

@@ -13,7 +13,6 @@ import gzip
 import os
 from argparse import ArgumentParser
 from datetime import datetime
-from typing import Tuple, List
 
 GNOMAD_V_2_1 = "2.1.1"
 GNOMAD_V_3_1_2 = "3.1.2"
@@ -34,7 +33,7 @@ FILENAMES = {
 
 GENOME_BUILDS = {"GRCh37", "GRCh38"}
 
-def get_infos_for_version(gnomad_version) -> Tuple[List[str], List[str], List[str], List[str]]:
+def get_infos_for_version(gnomad_version) -> tuple[list[str], list[str], list[str], list[str]]:
     # We deliberately leave out AF and "grpmax" stuff as we recalculate that later in 'calculate_allele_frequency'
     info_fields = ['AC', 'AN', "nhomalt", "nonpar"]
     popmax_fields = ["AF_popmax", "AC_popmax", "AN_popmax", "popmax", "nhomalt_popmax"]

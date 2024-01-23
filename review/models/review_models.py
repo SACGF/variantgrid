@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Union, List, Set, Type, Dict
+from typing import Union, Type
 
 import django.dispatch
 from django.contrib.auth.models import User, Group
@@ -86,7 +86,7 @@ class ReviewTopic(TimeStampedModel):
         return self.name
 
     @property
-    def questions(self) -> List['ReviewQuestion']:
+    def questions(self) -> list['ReviewQuestion']:
         return list(self.reviewquestion_set.filter(enabled=True).order_by('order').all())
 
 
@@ -169,7 +169,7 @@ class Review(TimeStampedModel):
     """
     post_review_data = JSONField(default=dict, blank=True)
 
-    def as_json(self) -> Dict:
+    def as_json(self) -> dict:
         return {
             "reviewing_date": f"{self.review_date:%Y-%m-%d}",
             "reviewing_labs": [lab.group_name for lab in self.reviewing_labs.all()],
@@ -202,7 +202,7 @@ class Review(TimeStampedModel):
         return self.reviewing.source_object.post_review_url(review=self)
 
     @property
-    def review_method(self) -> List[ValueOther]:
+    def review_method(self) -> list[ValueOther]:
         if method := self.meeting_meta.get("participants", {}).get("review_method"):
             # original code provided review_method as single select
             if isinstance(method, str):
@@ -211,13 +211,13 @@ class Review(TimeStampedModel):
                 return list(sorted(ValueOther.from_str(m, ReviewMedium) for m in method))
 
     @property
-    def participants(self) -> List[ValueOther]:
+    def participants(self) -> list[ValueOther]:
         if participants := self.meeting_meta.get("participants", {}).get("review_participants"):
             return list(sorted(ValueOther.from_str(p, ReviewParticipants) for p in participants))
         return []
 
     @property
-    def answers(self) -> List[ReviewAnswer]:
+    def answers(self) -> list[ReviewAnswer]:
         if answers := self.meeting_meta.get("answers", {}):
             answer_list = []
             for key, answer in answers.items():
@@ -238,7 +238,7 @@ class Review(TimeStampedModel):
         for caller, result in review_detail_signal.send(sender=self.reviewing.source_object.__class__, instance=self):
             return result
 
-    def complete_with_data_and_save(self, data: Dict):
+    def complete_with_data_and_save(self, data: dict):
         self.post_review_data = data
         self.is_complete = True
         self.save()
@@ -254,7 +254,7 @@ class ReviewableModelMixin(models.Model):
         abstract = True
 
     @property
-    def reviewing_labs(self) -> Set[Lab]:
+    def reviewing_labs(self) -> set[Lab]:
         if hasattr(self, "lab"):
             return {self.lab}
         raise NotImplementedError(f"{self} has not implemented 'reviewing_labs' property")

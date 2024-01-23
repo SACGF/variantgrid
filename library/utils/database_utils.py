@@ -1,4 +1,4 @@
-from typing import Iterable, Optional, Tuple, List, Any, Dict
+from typing import Iterable, Optional, Any
 
 import sqlparse
 from django.db import connection, transaction
@@ -10,7 +10,7 @@ from library.constants import DAY_SECS
 
 
 @transaction.atomic
-def run_sql(sql, params=None) -> Tuple[Any, int]:
+def run_sql(sql, params=None) -> tuple[Any, int]:
     with connection.cursor() as cursor:
         value = cursor.execute(sql, params)  # Remember it only accepts '%s' not %d etc.
         rowcount = cursor.rowcount
@@ -42,7 +42,7 @@ def queryset_to_sql(queryset: QuerySet, pretty=False) -> str:
 
 
 @timed_cache(ttl=DAY_SECS)
-def get_select_from_where_parts_str(sql_str: str) -> Tuple[str, str, str]:
+def get_select_from_where_parts_str(sql_str: str) -> tuple[str, str, str]:
     parsed = sqlparse.parse(sql_str)
     tokens = parsed[0].tokens
     from_token_index = None
@@ -64,13 +64,13 @@ def get_select_from_where_parts_str(sql_str: str) -> Tuple[str, str, str]:
     return str(select_statement), str(from_statement), str(where_statement)
 
 
-def get_queryset_select_from_where_parts(qs: QuerySet) -> Tuple[str, str, str]:
+def get_queryset_select_from_where_parts(qs: QuerySet) -> tuple[str, str, str]:
     """ Returns (select, from, where) """
     sql_str = queryset_to_sql(qs)
     return get_select_from_where_parts_str(sql_str)
 
 
-def get_queryset_column_names(queryset: QuerySet, extra_columns: List[str]) -> List[str]:
+def get_queryset_column_names(queryset: QuerySet, extra_columns: list[str]) -> list[str]:
     extra_names = list(queryset.query.extra_select)
     field_names = list(queryset.query.values_select)
     annotation_names = list(queryset.query.annotation_select)  # aggregate_select => annotation_select in Django 1.8
@@ -83,7 +83,7 @@ def get_cursor_column_names(cursor):
     return [col[0] for col in cursor.description]
 
 
-def dictfetchall(cursor, column_names: Optional[Iterable[str]] = None) -> List[Dict]:
+def dictfetchall(cursor, column_names: Optional[Iterable[str]] = None) -> list[dict]:
     if column_names is None:
         column_names = get_cursor_column_names(cursor)
 
@@ -101,7 +101,7 @@ def iter_db_results(cursor, array_size=1000):
             yield tup
 
 
-def iter_dictfetchall(cursor, column_names: Optional[Iterable[str]] = None) -> Dict:
+def iter_dictfetchall(cursor, column_names: Optional[Iterable[str]] = None) -> dict:
     if column_names is None:
         column_names = get_cursor_column_names(cursor)
 

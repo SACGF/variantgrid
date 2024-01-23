@@ -1,4 +1,4 @@
-from typing import Optional, List, Union, Callable
+from typing import Optional, Union, Callable
 
 from django.db.migrations.operations.base import Operation
 
@@ -59,11 +59,11 @@ class ManualOperation(Operation):
             ManualMigrationRequsted.objects.create(task=task, note=self.note)
 
     @staticmethod
-    def operation_manage(args: List[str], note: Optional[str] = None, test: Callable = None):
+    def operation_manage(args: list[str], note: Optional[str] = None, test: Callable = None):
         return ManualOperation(task_id=ManualOperation._task_id_generate("manage", args), note=note, test=test)
 
     @staticmethod
-    def operation_other(args: List[str], note: Optional[str] = None, test: Callable = None):
+    def operation_other(args: list[str], note: Optional[str] = None, test: Callable = None):
         return ManualOperation(task_id=ManualOperation._task_id_generate("other", args), note=note, test=test)
 
     @staticmethod
@@ -79,7 +79,7 @@ class ManualOperation(Operation):
         return arg
 
     @staticmethod
-    def _task_id_generate(category: str, args: List[str]) -> str:
+    def _task_id_generate(category: str, args: list[str]) -> str:
         if isinstance(args, str):
             args = [args]
         args = [ManualOperation.escape_arg(arg) for arg in args]
@@ -87,5 +87,5 @@ class ManualOperation(Operation):
         return f"{category}*{arg_string}"
 
     @staticmethod
-    def task_id_manage(args: Union[str, List[str]]) -> str:
+    def task_id_manage(args: Union[str, list[str]]) -> str:
         return ManualOperation._task_id_generate(category="manage", args=args)

@@ -1,5 +1,3 @@
-from typing import List
-
 from django.contrib import messages
 from django.views.generic import TemplateView
 
@@ -39,7 +37,7 @@ class OntologyTermView(TemplateView):
 
             if not is_gene:
                 regular_relationships = []
-                all_relationships: List[OntologyTermRelation] = OntologyTermRelation.relations_of(term)
+                all_relationships: list[OntologyTermRelation] = OntologyTermRelation.relations_of(term)
                 relationship_count = len(all_relationships)
                 for relationship in all_relationships:
                     if relationship.relation == OntologyRelation.IS_A:

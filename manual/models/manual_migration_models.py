@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, Any
 
 from dateutil import tz
 from django.db import models
@@ -39,7 +39,7 @@ class ManualMigrationAttempt(TimeStampedModel):
 @dataclass
 class ManualMigrationOutstanding:
     task: ManualMigrationTask
-    outstanding_required: List[ManualMigrationRequired]
+    outstanding_required: list[ManualMigrationRequired]
     last_attempt: Optional[ManualMigrationAttempt]
     last_success: Optional[ManualMigrationAttempt]
 
@@ -68,16 +68,16 @@ class ManualMigrationOutstanding:
         )
 
     @staticmethod
-    def outstanding_tasks() -> List['ManualMigrationOutstanding']:
-        outstandings: List[ManualMigrationOutstanding] = []
+    def outstanding_tasks() -> list['ManualMigrationOutstanding']:
+        outstandings: list[ManualMigrationOutstanding] = []
         for task in ManualMigrationTask.objects.all():
             outstanding = ManualMigrationOutstanding.outstanding_task(task)
             if outstanding:
                 outstandings.append(outstanding)
         return outstandings
 
-    def to_json(self) -> Dict[str, Any]:
-        data: Dict[str, Any] = {}
+    def to_json(self) -> dict[str, Any]:
+        data: dict[str, Any] = {}
         id_split = self.task.id.split("*", maxsplit=1)
         data["id"] = self.task.id
         data["category"] = id_split[0]

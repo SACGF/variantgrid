@@ -1,11 +1,11 @@
 import logging
 import subprocess
-from typing import Tuple, Optional
+from typing import Optional
 
 from django.conf import settings
 
 
-def execute_cmd(cmd: list, **kwargs) -> Tuple[int, Optional[str], Optional[str]]:
+def execute_cmd(cmd: list, **kwargs) -> tuple[int, Optional[str], Optional[str]]:
     shell = kwargs.get("shell", settings.POPEN_SHELL)
 
     if shell:

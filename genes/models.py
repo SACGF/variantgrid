@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from functools import cached_property, total_ordering
 from io import StringIO
-from typing import Tuple, Optional, Dict, List, Set, Union, Iterable, Any
+from typing import Optional, Union, Iterable, Any
 from urllib.error import URLError, HTTPError
 
 import requests
@@ -140,7 +140,7 @@ class HGNC(models.Model):
         return (self.ucsc_ids or '').split(",")
 
     @cached_property
-    def uniprot_list(self) -> List['UniProt']:
+    def uniprot_list(self) -> list['UniProt']:
         ulist = []
         if self.uniprot_ids:
             uniprot_ids = self.uniprot_ids.split(",")
@@ -148,7 +148,7 @@ class HGNC(models.Model):
         return ulist
 
     @staticmethod
-    def id_by_accession(hgnc_prefix=True) -> Dict:
+    def id_by_accession(hgnc_prefix=True) -> dict:
         pk_qs = HGNC.objects.all().values_list("pk", flat=True)
         if hgnc_prefix:
             return {f"HGNC:{pk}": pk for pk in pk_qs}
@@ -189,7 +189,7 @@ class GeneSymbol(models.Model, PreviewModelMixin):
         return GeneSymbol.objects.filter(symbol=symbol_str).first()
 
     @property
-    def metrics_logging_key(self) -> Tuple[str, Any]:
+    def metrics_logging_key(self) -> tuple[str, Any]:
         return "gene_symbol", self.symbol
 
     @property
@@ -202,7 +202,7 @@ class GeneSymbol(models.Model, PreviewModelMixin):
         return Gene.objects.filter(~Q(identifier__startswith="unknown_"), geneversion__gene_symbol=self).distinct()
 
     @cached_property
-    def genes(self) -> List['Gene']:
+    def genes(self) -> list['Gene']:
         # returns cached set of genes associated with this symbol
         # use over get_genes when possible
         return list(self.get_genes().all())
@@ -319,7 +319,7 @@ class GeneSymbolAliasesMeta:
 
     def __init__(self, gene_symbol: GeneSymbol):
         self.gene_symbol = gene_symbol
-        self.alias_list: List[GeneSymbolAliasSummary] = []
+        self.alias_list: list[GeneSymbolAliasSummary] = []
 
         symbol = self.gene_symbol.symbol
 
@@ -349,33 +349,33 @@ class GeneSymbolAliasesMeta:
             )
 
     @cached_property
-    def genes(self) -> Set['Gene']:
+    def genes(self) -> set['Gene']:
         """
         Returns a set of genes associated with all safe aliases to/from the primary Gene Symbol.
         (Even though we only look at "safe" aliases, e.g. ones where each symbol must be a subset of the other,
         looking through these aliases still catch where Refseq assigned a Gene ID to both but Ensembl only assigned
         their Gene ID to one and ignore the other)
         """
-        gene_set: Set[Gene] = set(self.gene_symbol.genes)
+        gene_set: set[Gene] = set(self.gene_symbol.genes)
         for alias_summary in self.alias_list:
             if not alias_summary.different_genes and alias_summary.other_obj:
                 gene_set = gene_set.union(alias_summary.other_obj.genes)
         return gene_set
 
     @cached_property
-    def alias_symbol_strs(self) -> List[str]:
-        gene_symbol_strs: Set[str] = {self.gene_symbol.symbol}
+    def alias_symbol_strs(self) -> list[str]:
+        gene_symbol_strs: set[str] = {self.gene_symbol.symbol}
         for alias_summary in self.alias_list:
             if not alias_summary.different_genes:
                 gene_symbol_strs.add(alias_summary.other_symbol)
         return list(sorted(gene_symbol_strs))
 
     @cached_property
-    def aliases_out(self) -> List[GeneSymbolAliasSummary]:
+    def aliases_out(self) -> list[GeneSymbolAliasSummary]:
         return list(sorted([alias for alias in self.alias_list if not alias.my_symbol_is_main]))
 
     @cached_property
-    def aliases_in(self) -> List[GeneSymbolAliasSummary]:
+    def aliases_in(self) -> list[GeneSymbolAliasSummary]:
         return list(sorted([alias for alias in self.alias_list if alias.my_symbol_is_main]))
 
 
@@ -570,7 +570,7 @@ class GeneVersion(models.Model):
         }
 
     @staticmethod
-    def get_gene_id_and_version(gene_accession: str) -> Tuple[str, Optional[int]]:
+    def get_gene_id_and_version(gene_accession: str) -> tuple[str, Optional[int]]:
         parts = gene_accession.split(".")
         if len(parts) == 2:
             identifier = str(parts[0])
@@ -580,7 +580,7 @@ class GeneVersion(models.Model):
         return identifier, version
 
     @staticmethod
-    def id_by_accession(genome_build: GenomeBuild = None, annotation_consortium=None) -> Dict[str, int]:
+    def id_by_accession(genome_build: GenomeBuild = None, annotation_consortium=None) -> dict[str, int]:
         filter_kwargs = {}
         if genome_build:
             filter_kwargs["genome_build"] = genome_build
@@ -606,7 +606,7 @@ class TranscriptParts(FormerTuple):
     version: Optional[int]
 
     @property
-    def as_tuple(self) -> Tuple:
+    def as_tuple(self) -> tuple:
         return self.identifier, self.version
 
     def __repr__(self):
@@ -641,7 +641,7 @@ class Transcript(models.Model, PreviewModelMixin):
         return self.transcriptversion_set.filter(genome_build=genome_build).order_by("version").last()
 
     @staticmethod
-    def known_transcript_ids(genome_build=None, annotation_consortium=None) -> Set[str]:
+    def known_transcript_ids(genome_build=None, annotation_consortium=None) -> set[str]:
         filter_kwargs = {}
         require_distinct = False
         if genome_build:
@@ -704,7 +704,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         unique_together = ("transcript", "version", "genome_build")
 
     @cached_property
-    def _transcript_regions(self) -> Tuple[List, List, List]:
+    def _transcript_regions(self) -> tuple[list, list, list]:
         """ Returns 5'UTR, CDS, 3'UTR """
         cds_start = self.genome_build_data.get("cds_start")
         cds_end = self.genome_build_data.get("cds_end")
@@ -903,7 +903,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
 
     @staticmethod
     def transcript_versions_by_id(genome_build: GenomeBuild = None, annotation_consortium=None) -> \
-            Dict[str, Dict[str, int]]:
+            dict[str, dict[str, int]]:
         """ {transcript_id: {1: PK of TranscriptVersion.1, 2: PK of TranscriptVersion.2} """
         filter_kwargs = {}
         if genome_build:
@@ -918,7 +918,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         return tv_by_id
 
     @staticmethod
-    def id_by_accession(genome_build: GenomeBuild = None, annotation_consortium=None) -> Dict[str, int]:
+    def id_by_accession(genome_build: GenomeBuild = None, annotation_consortium=None) -> dict[str, int]:
         filter_kwargs = {}
         if genome_build:
             filter_kwargs["genome_build"] = genome_build
@@ -1019,11 +1019,11 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         return transcript_version
 
     @staticmethod
-    def _sum_intervals(intervals: List[Tuple]):
+    def _sum_intervals(intervals: list[tuple]):
         return sum(b - a for a, b in intervals)
 
     @cached_property
-    def genome_build_data(self) -> Dict:
+    def genome_build_data(self) -> dict:
         return self.data["genome_builds"][self.genome_build.name]
 
     @cached_property
@@ -1091,7 +1091,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         return f"{self.chrom}:{self.start + 1}-{self.end} ({self.strand})"
 
     @cached_property
-    def tags(self) -> List[str]:
+    def tags(self) -> list[str]:
         """ 'tag' has been in cdot since 0.2.12 """
         REMOVE_TAGS = {"basic"}  # This is on pretty much every Ensembl transcript
         tag_list = []
@@ -1119,16 +1119,16 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     def is_canonical(self) -> bool:
         return bool(self.canonical_score)
 
-    def get_contigs(self) -> Set[Contig]:
+    def get_contigs(self) -> set[Contig]:
         contigs = {self.genome_build_data["contig"]}
         if other_contigs := self.genome_build_data.get("other_chroms"):
             contigs.update(other_contigs)
         return {self.genome_build.chrom_contig_mappings[c] for c in contigs}
 
-    def get_chromosomes(self) -> Set[str]:
+    def get_chromosomes(self) -> set[str]:
         return {c.name for c in self.get_contigs()}
 
-    def _validate_cdna_match(self) -> List[str]:
+    def _validate_cdna_match(self) -> list[str]:
         cdna_match_errors = []
         if exons := self.genome_build_data.get('exons'):
             # cdna_match = (genomic start, genomic end, cDNA start, cDNA end, gap) (genomic=0 based, transcript=1)
@@ -1211,14 +1211,14 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         return differences
 
     @staticmethod
-    def get_preferred_transcript(data: Dict[str, 'TranscriptVersion']) -> Optional['TranscriptVersion']:
+    def get_preferred_transcript(data: dict[str, 'TranscriptVersion']) -> Optional['TranscriptVersion']:
         for transcript_key in settings.VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES:
             if transcript := data.get(transcript_key):
                 return transcript
         return None
 
     @cached_property
-    def protein_domains_and_accession(self) -> Tuple[QuerySet, str]:
+    def protein_domains_and_accession(self) -> tuple[QuerySet, str]:
         """ Gets custom ProteinDomain if available, falling back on Pfam """
         PD_ARGS = ("protein_domain__name", "protein_domain__description", "start", "end")
         protein_domains = self.proteindomaintranscriptversion_set.all().order_by("start").values_list(*PD_ARGS)
@@ -1383,7 +1383,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             raise NoTranscript(f"Unable to understand Ensembl API response: {data}")
 
     @staticmethod
-    def get_refseq_transcript_versions(transcript_accessions: Iterable[str], entrez_batch_size: int = 100, fail_on_error=True) -> Dict[str, 'TranscriptVersionSequenceInfo']:
+    def get_refseq_transcript_versions(transcript_accessions: Iterable[str], entrez_batch_size: int = 100, fail_on_error=True) -> dict[str, 'TranscriptVersionSequenceInfo']:
         """ Batch method - returns DB copies if we have it, retrieves + stores from API """
         # Find the ones we already have so we don't need to re-retrieve
         all_transcript_accessions = set(transcript_accessions)
@@ -1416,7 +1416,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
         return tvi_by_id
 
     @staticmethod
-    def _insert_from_genbank_handle(handle) -> Dict[str, 'TranscriptVersionSequenceInfo']:
+    def _insert_from_genbank_handle(handle) -> dict[str, 'TranscriptVersionSequenceInfo']:
         new_records = []
         for record in SeqIO.parse(handle, "genbank"):
             # Store raw data so that we can retrieve more stuff from it later
@@ -1460,7 +1460,7 @@ class LRGRefSeqGene(models.Model):
         unique_together = ("lrg", "t")
 
     @staticmethod
-    def get_lrg_and_t(lrg_identifier: str) -> Tuple[str, Optional[str]]:
+    def get_lrg_and_t(lrg_identifier: str) -> tuple[str, Optional[str]]:
         if m := re.match(r"(LRG_\d+)(t\d+)?", lrg_identifier, flags=re.IGNORECASE):
             lrg, t = m.groups()
             lrg = lrg.upper()
@@ -1503,7 +1503,7 @@ class GeneAnnotationRelease(models.Model):
                                    geneversion__releasegeneversion__release=self)
 
     @staticmethod
-    def get_for_latest_annotation_versions_for_builds() -> List['GeneAnnotationRelease']:
+    def get_for_latest_annotation_versions_for_builds() -> list['GeneAnnotationRelease']:
         from annotation.models import VariantAnnotationVersion
         gene_annotation_releases = []
         for genome_build in GenomeBuild.builds_with_annotation().order_by("name"):
@@ -1686,7 +1686,7 @@ class GeneList(TimeStampedModel):
                                                                    genes_qs)
 
     @staticmethod
-    def get_gene_ids_for_gene_lists(release: GeneAnnotationRelease, gene_lists: List['GeneList']):
+    def get_gene_ids_for_gene_lists(release: GeneAnnotationRelease, gene_lists: list['GeneList']):
         """ For GeneList node, we need to get query for multiple lists - and it's much faster to build the merged
             query here, than via joining separate queryset """
         rgs_qs = ReleaseGeneSymbol.objects.filter(release=release, gene_symbol__genelistgenesymbol__gene_list__in=gene_lists)
@@ -1732,7 +1732,7 @@ class GeneList(TimeStampedModel):
         write_perm = DjangoPermission.perm(self, DjangoPermission.WRITE)
         return user_or_group.has_perm(write_perm, self) and not self.locked
 
-    def get_warnings(self, release: GeneAnnotationRelease) -> List[str]:
+    def get_warnings(self, release: GeneAnnotationRelease) -> list[str]:
         counts = {"unmatched symbols": self.unmatched_gene_symbols.count(),
                   "aliased": self.aliased_genes.count(),
                   "unmatched genes": self.unmatched_genes(release).count()}
@@ -2492,7 +2492,7 @@ class GnomADGeneConstraint(models.Model):
 
     @staticmethod
     def get_for_transcript_version_with_method_and_url(transcript_version: TranscriptVersion) \
-            -> Tuple[Optional['GnomADGeneConstraint'], Optional[str], Optional[str]]:
+            -> tuple[Optional['GnomADGeneConstraint'], Optional[str], Optional[str]]:
         """ GnomADGeneConstraint uses Ensembl gene/transcripts - so load the most specific
             possible (transcript version, transcript then symbol) """
         ggc = None

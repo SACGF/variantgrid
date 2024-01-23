@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Optional
+from typing import Optional
 
 import requests
 from rest_framework.exceptions import NotFound
@@ -16,7 +16,7 @@ PANEL_APP_LIST_PANELS_PATH = "/api/v1/panels/"
 PANEL_APP_SEARCH_BY_GENES_BASE_PATH = "/api/v1/genes/"
 
 
-def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbol) -> Optional[Dict]:
+def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbol) -> Optional[dict]:
     url = server.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + str(gene_symbol)
     r = requests.get(url, timeout=MINUTE_SECS)
     results = None
@@ -29,7 +29,7 @@ def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbo
 
 def _get_panel_app_panel_api_json(panel_app_panel):
     r = requests.get(panel_app_panel.url, timeout=MINUTE_SECS)
-    json_data: Dict = r.json()
+    json_data: dict = r.json()
     # Panel App isn't very REST-ful - returns 200 for missing data but we'll return 404
     if detail := json_data.get("detail"):
         if detail == "Not found.":

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Set, Optional
+from typing import Optional
 from unittest import TestCase
 
 from classification.models import ConditionResolved
@@ -36,13 +36,13 @@ class MockCandidate:
 
 class ConditionGroupPrepareMergerTest(ConsolidatingMerger[MockEstablished, MockCandidate]):
 
-    def __init__(self, established_candidates: Set[MockEstablished]):
+    def __init__(self, established_candidates: set[MockEstablished]):
         super().__init__()
         self._established_candidates = established_candidates
-        self._new_established: List[MockEstablished] = []
+        self._new_established: list[MockEstablished] = []
         self.next_id = 100
 
-    def retrieve_established(self) -> Set[MockEstablished]:
+    def retrieve_established(self) -> set[MockEstablished]:
         return set(self._established_candidates)
 
     def establish_new_candidate(self, new_candidate: MockCandidate) -> MockEstablished:
