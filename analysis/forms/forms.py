@@ -162,7 +162,7 @@ class AnalysisTemplateVersionForm(forms.ModelForm):
         widgets = {'analysis_name_template': TextInput()}
 
     def __init__(self, *args, **kwargs):
-        super(AnalysisTemplateVersionForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         for boolean_field in ["appears_in_autocomplete", "appears_in_links",
                               "requires_sample_somatic", "requires_sample_gene_list"]:
             self.fields[boolean_field].required = False
