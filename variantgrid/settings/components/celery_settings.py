@@ -18,10 +18,10 @@ from variantgrid.settings.components.secret_settings import get_secret
 
 
 # Default is guest:guest default account see: https://www.rabbitmq.com/access-control.html
-BROKER_URL = get_secret("CELERY.broker_url")
+CELERY_BROKER_URL = get_secret("CELERY.broker_url")
 
-CELERY_DEFAULT_QUEUE = 'db_workers'
-CELERY_QUEUES = (
+CELERY_TASK_DEFAULT_QUEUE = 'db_workers'
+CELERY_TASK_QUEUES = (
     Queue('analysis_workers', Exchange('analysis_workers'), routing_key='analysis_workers'),
     Queue('annotation_workers', Exchange('annotation_workers'), routing_key='annotation_workers'),
     # db_workers - only use the database, ie don't write to web server filesystem (so it could be moved to diff machine)
@@ -52,7 +52,7 @@ CELERY_WORKER_NAMES = ['annotation_workers', 'db_workers', 'web_workers',
 CELERY_ANALYSIS_WORKER_NAMES = ['analysis_workers']
 CELERY_SEQAUTO_WORKER_NAMES = ['seqauto_single_worker']
 
-CELERY_ROUTES = {
+CELERY_TASK_ROUTES = {
     # Analysis
     'analysis.tasks.karyomapping_tasks.create_genome_karyomapping_for_trio': ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.dummy_task": ANALYSIS_WORKERS,
@@ -143,5 +143,5 @@ CELERY_IMPORTS = (
     'variantopedia.tasks.server_status_tasks',
 )
 
-CELERY_ALWAYS_EAGER = False  # True to execute in http server process (or Eclipse)
+CELERY_TASK_ALWAYS_EAGER = False  # True to execute in http server process (or Eclipse)
 CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/1"
