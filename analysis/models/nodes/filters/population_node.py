@@ -51,7 +51,7 @@ class PopulationNode(AnalysisNode):
     @property
     def has_filtering_allele_frequency(self) -> bool:
         try:
-            return int(float(self.analysis.annotation_version.variant_annotation_version.gnomad)) >= 4
+            return self.analysis.annotation_version.variant_annotation_version.gnomad_major_version >= 4
         except AttributeError as e:
             return False
 

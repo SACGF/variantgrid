@@ -539,6 +539,10 @@ class VariantAnnotationVersion(SubVersionPartition):
     dbnsfp = models.TextField()
     distance = models.IntegerField(default=5000)  # VEP --distance parameter
 
+    @property
+    def gnomad_major_version(self) -> int:
+        return int(self.gnomad.split(".")[0])
+
     @staticmethod
     def latest(genome_build, active=True):
         qs = VariantAnnotationVersion.objects.filter(genome_build=genome_build, active=active)
@@ -1048,7 +1052,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
 
     @property
     def gnomad4_or_later(self) -> bool:
-        return int(self.version.gnomad) >= 4
+        return self.version.gnomad_major_version >= 4
 
     @property
     def has_hemi(self):
