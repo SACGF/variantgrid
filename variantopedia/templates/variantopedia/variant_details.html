@@ -821,6 +821,13 @@ function applyVariantValues() {
                         {% labelled id='cosmic_count' label='COSMIC Sample Count' help=annotation_description.cosmic_count hint="tiny" %}{% endlabelled %}
                         {% labelled id='dbsnp_rs_id' label='dbSNP' help=annotation_description.dbsnp_rs_id hint="tiny" %}{{ variant_annotation.dbsnp_rs_id }}{% endlabelled %}
                         {% labelled id='ensembl_protein' label='Ensembl Protein' help=annotation_description.ensembl_protein hint="tiny" %}{% endlabelled %}
+                        {% labelled id='mave_db_url' label='MaveDB' help=annotation_description.mave_db_url hint='tiny' %}
+                            {% with mave_urls=variant_annotation.get_mave_urls %}
+                                {% for label, url in mave_urls.items %}
+                                    <a target="_blank" class='hover-link' href="{{ url }}">{{ label }}</a>
+                                {% endfor %}
+                            {% endwith %}
+                        {% endlabelled %}
                         {% labelled id='search_terms' label='Search Terms' hint="tiny" %}
                             {% with search_term=variant_annotation.get_search_terms %}
                                 {% if search_term %}

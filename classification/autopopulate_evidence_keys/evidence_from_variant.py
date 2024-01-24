@@ -156,6 +156,10 @@ def pubmed_formatter(value):
     return value
 
 
+def mavedb_formatter(value):
+    return ", ".join(VariantAnnotation.mavedb_urn_to_urls(value).values())
+
+
 def ekey_from_vg_column_formatters():
     # Ekey options automatically split "," into lists - so need to use pipes
     clinvar_review_status_to_vcf_dict = {v: k.replace(",", "|") for k, v in ClinVarReviewStatus.VCF_MAPPINGS.items()}
@@ -167,6 +171,7 @@ def ekey_from_vg_column_formatters():
         "clinvar_preferred_disease_name": clinvar_pipe_formatter,
         "clinvar_review_status": lambda crs: clinvar_review_status_to_vcf_dict.get(crs),
         "fathmm_pred_most_damaging": get_choices_formatter(FATHMMPrediction.CHOICES),
+        "mavedb": mavedb_formatter,
         "molecular_consequence": molecular_consequence_formatter,
         'mutation_assessor': get_choices_formatter(MutationAssessorPrediction.CHOICES),
         'mutation_taster': get_choices_formatter(MutationTasterPrediction.CHOICES),

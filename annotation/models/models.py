@@ -1086,6 +1086,22 @@ class VariantAnnotation(AbstractVariantAnnotation):
             url = f"http://gnomad.broadinstitute.org/variant/{gnomad_variant}?dataset={gnomad_dataset}"
         return url
 
+    @staticmethod
+    def mavedb_urn_to_urls(mavedb_urn: str) -> dict[str, str]:
+        experiment_sets = set()
+        EXPERIMENT_URL_PREFIX = "https://www.mavedb.org/#/experiment-sets/"
+        if mavedb_urn:
+            for urn in mavedb_urn.split("&"):
+                es = urn.rsplit("-", 2)[0]
+                experiment_sets.add(es)
+        return {urn: EXPERIMENT_URL_PREFIX + urn for urn in sorted(experiment_sets)}
+
+    def get_mave_urls(self) -> dict[str, str]:
+        """ dict of label: url
+            MAVE team intend on creating a variant landing page, so we'll replace this with that when ready
+        """
+        return self.mavedb_urn_to_urls(self.mavedb_urn)
+
     @property
     def mmid3_mastermind_urls(self) -> dict:
         return self.get_mmid3_mastermind_urls(self.mastermind_mmid3)
