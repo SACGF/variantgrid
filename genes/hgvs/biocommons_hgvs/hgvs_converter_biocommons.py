@@ -110,6 +110,12 @@ class BioCommonsHGVSConverter(HGVSConverter):
     def _parser_hgvs(hgvs_string: str) -> SequenceVariant:
         """ All calls to parsing go through here """
 
+        if "ins" in hgvs_string:
+            if re.match(".*ins\d+$", hgvs_string):
+                raise HGVSException(f"Insertions require inserted sequence, not an integer length")
+            if re.match(".*ins$", hgvs_string):
+                raise HGVSException(f"Insertions require inserted sequence")
+
         # Biocommons HGVS doesn't accept integers on the end of dups - ie NM_001354689.1(RAF1):c.1_2dup3
         # We want to strip these and raise an error if the span is wrong
         provided_dup_length = None
