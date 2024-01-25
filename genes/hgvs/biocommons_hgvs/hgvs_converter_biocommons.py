@@ -103,7 +103,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
                                  replace_reference=True)
         self.ev = ExtrinsicValidator(self.hdp)
         self.norm_5p = Normalizer(self.hdp, shuffle_direction=5)
-        self.no_validate_normalizer = Normalizer(self.hdp, validate=False,
+        self.no_validate_normalizer = Normalizer(self.hdp, cross_boundaries=True, validate=False,
                                                  variantmapper=VariantMapper(self.hdp, prevalidation_level="NONE"))
 
     @staticmethod
