@@ -161,7 +161,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
             else:
                 var_c = self.am.g_to_n(var_g, transcript_version.accession)
         except HGVSError as e:  # Can be out of bounds etc
-            raise HGVSException from e
+            raise HGVSException(e) from e
 
         if gene_symbol := transcript_version.gene_symbol:
             var_c.gene = gene_symbol.symbol
