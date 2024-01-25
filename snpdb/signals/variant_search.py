@@ -309,46 +309,20 @@ def search_variant_db_snp(search_input: SearchInputInstance):
 
 
 def _search_hgvs_using_gene_symbol(
+        transcript_versions,
+        mane_status_by_transcript,
         hgvs_matcher: HGVSMatcher,
-        gene_symbol: GeneSymbol,
         search_messages: list[SearchMessage],
         hgvs_string: str,
         user: User,
         genome_build: GenomeBuild,
         variant_qs: QuerySet) -> Iterable[Union[SearchResult, SearchMessageOverall]]:
 
-    search_messages.append(SearchMessage(f'HGVS requires transcript, given symbol "{gene_symbol}"'))
     # Group results + hgvs by result.identifier
     results_by_variant_identifier: dict[str, list[SearchResult]] = defaultdict(list)
     transcript_accessions_by_variant_identifier: dict[str, list] = defaultdict(list)
     hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_string)
     hgvs_variant.gene = None
-
-    transcript_versions = set()
-    mane_status_by_transcript = {}
-    other_transcripts_message = None  # Want this to be after transcripts used message
-
-    if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE:
-        # There can be multiple MANE entries (MANE Plus Clinical and MANE Select)
-        for mane in MANE.objects.filter(symbol=gene_symbol):
-            for ac in AnnotationConsortium:
-                if tv := mane.get_transcript_version(ac):
-                    transcript_versions.add(tv)
-                    mane_status_by_transcript[tv.accession] = mane.get_status_display()
-
-    if settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
-        for gene in gene_symbol.genes:
-            tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build, gene_version__gene=gene)
-            # Take latest version for each transcript
-            for tv in tv_qs.order_by("transcript_id", "-version").distinct("transcript_id"):
-                transcript_versions.add(tv)
-    else:
-        tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build, gene_version__gene__in=gene_symbol.genes)
-        transcripts = [tv.transcript for tv in transcript_versions]
-        if num_other := tv_qs.exclude(transcript__in=transcripts).distinct("transcript_id").count():
-            other_transcripts_message = f"Warning: {gene_symbol} has {num_other} other transcripts in " \
-                                        f"{genome_build.name} that may resolve to different coordinates. " \
-                                        f"You may wish to search for the gene symbol to view all results"
 
     # TODO: Sort transcript_versions somehow
     for transcript_version in transcript_versions:
@@ -379,8 +353,6 @@ def _search_hgvs_using_gene_symbol(
         unique_messages = {
             SearchMessage(result_message): True
         }
-        if other_transcripts_message:
-            unique_messages[SearchMessage(other_transcripts_message)] = True
         # Go through messages for each result together, so they stay in same order
         for messages in zip_longest(*[r.messages for r in results_for_record]):
             for m in messages:
@@ -409,6 +381,26 @@ def _search_hgvs_using_gene_symbol(
 
         elif not (settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE or settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS):
             yield SearchMessageOverall("\n".join(messages_as_strs))
+
+
+def _get_search_hgvs_gene_symbol_transcripts(gene_symbol, genome_build):
+    transcript_versions = set()
+    mane_status_by_transcript = {}
+    if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE:
+        # There can be multiple MANE entries (MANE Plus Clinical and MANE Select)
+        for mane in MANE.objects.filter(symbol=gene_symbol):
+            for ac in AnnotationConsortium:
+                if tv := mane.get_transcript_version(ac):
+                    transcript_versions.add(tv)
+                    mane_status_by_transcript[tv.accession] = mane.get_status_display()
+    if settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
+        for gene in gene_symbol.genes:
+            tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build, gene_version__gene=gene)
+            # Take latest version for each transcript
+            for tv in tv_qs.order_by("transcript_id", "-version").distinct("transcript_id"):
+                transcript_versions.add(tv)
+    return transcript_versions, mane_status_by_transcript
+
 
 @search_receiver(
     search_type=Variant,
@@ -474,8 +466,26 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 gene_symbol = alias.gene_symbol
             if gene_symbol:
                 has_results = False
+                msg_hgvs_given_symbol = f'HGVS requires transcript, given symbol "{gene_symbol}"'
+
                 if settings.SEARCH_HGVS_GENE_SYMBOL:
-                    for result in _search_hgvs_using_gene_symbol(hgvs_matcher, gene_symbol, search_messages,
+                    transcript_versions, mane_status_by_transcript = _get_search_hgvs_gene_symbol_transcripts(gene_symbol, genome_build)
+
+                    tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build,
+                                                             gene_version__gene__in=gene_symbol.genes)
+                    transcripts = [tv.transcript for tv in transcript_versions]
+
+                    msg_hgvs_gene_search = msg_hgvs_given_symbol
+                    if tv_qs.exclude(transcript__in=transcripts).distinct("transcript_id").exists():
+                        # We want to make the messages the same for both genome builds, so they are collected into 1
+                        msg_hgvs_gene_search += f"Warning: {gene_symbol} has non-MANE transcripts that may resolve " \
+                                                "to different coordinates. You may wish to search for the gene " \
+                                                "symbol to view all results"
+
+                    yield SearchMessageOverall(msg_hgvs_gene_search, severity=LogLevel.INFO)
+
+                    for result in _search_hgvs_using_gene_symbol(transcript_versions, mane_status_by_transcript,
+                                                                 hgvs_matcher, search_messages,
                                                                  hgvs_string, user, genome_build, variant_qs):
                         if isinstance(result, SearchResult):
                             # don't count SearchMessageOverall as a result
@@ -484,7 +494,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                             # result.messages.append(SearchMessage(str(alias)))
                             yield result
                 else:
-                    yield SearchMessageOverall(f'HGVS requires transcript, given symbol "{gene_symbol}"')
+                    yield SearchMessageOverall(msg_hgvs_given_symbol)
 
                 if has_results:
                     return
