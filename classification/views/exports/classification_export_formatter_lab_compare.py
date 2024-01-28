@@ -15,13 +15,14 @@ from library.utils import ExportRow, export_column, delimited_row
 
 class ClassificationlabCompareRow(ExportRow):
 
-    def __init__(self,  allele_data: AlleleData, lab_1: Optional[str] = None, lab_2: Optional[str] = None,
+    def __init__(self,  allele_data: AlleleData, c_hgvs: Optional[str] = None, lab_1: Optional[str] = None, lab_2: Optional[str] = None,
                  comment: Optional[str] = None, lab_1_authorised_date: Optional[str] = None,
                  lab_2_authorised_date: Optional[str] = None, lab_1_curated_date: Optional[str] = None,
                  lab_2_curated_date: Optional[str] = None, lab_1_interpretation_summary: Optional[str] = None,
                  lab_2_interpretation_summary: Optional[str] = None,
                  patient_id: Optional[str] = None):
         self.AlleleData = allele_data.allele_id
+        self.c_hgvs = c_hgvs
         self.lab1 = lab_1
         self.lab2 = lab_2
         self.comment = comment
@@ -89,6 +90,10 @@ class ClassificationlabCompareRow(ExportRow):
     def patient_id(self):
         return self.Patient_id
 
+    @export_column("C_HGVS")
+    def c_hgvs(self):
+        return self.c_hgvs
+
 
 @register_classification_exporter("lab_compare")
 class ClassificationExportInternalCompare(ClassificationExportFormatter):
@@ -108,7 +113,7 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
     def header(self) -> list[str]:
         if self.classification_filter.include_sources and len(self.classification_filter.include_sources) == 2:
             lab_names = sorted([str(lab) for lab in self.classification_filter.include_sources])
-            return [delimited_row(['Allele URL', 'Patient_Id', lab_names[0], lab_names[1],
+            return [delimited_row(['Allele URL', 'C_HGVS', 'Patient_Id', lab_names[0], lab_names[1],
                                    'Classification',
                                    f'{lab_names[0]} Authorised Date',
                                    f'{lab_names[1]} Authorised Date',
@@ -142,6 +147,7 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
         created_date_lab2 = set()
         interpretation_summary_lab1 = set()
         interpretation_summary_lab2 = set()
+        c_hgvs = ''
 
         if not allele_data.allele_id:
             return []
@@ -153,6 +159,7 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
                 created_by = cm.get('curated_by', '')
                 created_date = cm.get(SpecialEKeys.CURATION_DATE, '')
                 patient_id = cm.get(SpecialEKeys.PATIENT_ID, '')
+                c_hgvs = cm.get(SpecialEKeys.C_HGVS, '')
                 interpretation_summary = cm.get(SpecialEKeys.INTERPRETATION_SUMMARY, '')
                 cs = cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
                 if patient_id != '':
@@ -196,7 +203,7 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
             else:
                 message = 'No Overlap'
 
-            row = ClassificationlabCompareRow(allele_data=allele_data, patient_id=patient_id_set,
+            row = ClassificationlabCompareRow(allele_data=allele_data, c_hgvs=c_hgvs, patient_id=patient_id_set,
                                               lab_1=lab1_set,
                                               lab_2=lab2_set,
                                               lab_1_authorised_date=authorised_date_lab1_set,
@@ -207,7 +214,7 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
                                               lab_2_interpretation_summary=interpretation_summary_lab2_set,
                                               comment=message
                                               )
-            rows.append(delimited_row([row.allele_url(), row.patient_id(),
+            rows.append(delimited_row([row.allele_url(), row.c_hgvs, row.patient_id(),
                                        row.lab_clinical_significance(),
                                        row.lab2_clinical_significance(),
                                        row.difference(lab_name1, lab_name2),
