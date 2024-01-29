@@ -9,6 +9,7 @@ from django.utils.timezone import now
 from frozendict import frozendict
 from model_utils.models import TimeStampedModel
 
+from classification.enums import AlleleOriginBucket
 from classification.models import ClassificationModification, ConditionResolved
 from library.preview_request import PreviewModelMixin, PreviewData, PreviewKeyValue
 from library.utils import first, invalidate_cached_property, JsonObjType
@@ -21,7 +22,9 @@ CLINVAR_EXPORT_CONVERSION_VERSION = 4
 class ClinVarAllele(TimeStampedModel):
     """
     Wraps an Allele with a ClinVarKey to make it easier to keep track of our submissions
-    (Provides a bit of bloat, but does give us allele level data)
+    (Provides a bit of bloat, but does give us allele level data).
+
+    Confusingly, this is not the ID that ClinVar assigns to an allele.
     """
 
     class Meta:
@@ -29,7 +32,7 @@ class ClinVarAllele(TimeStampedModel):
 
     allele = models.ForeignKey(Allele, on_delete=models.CASCADE)
     clinvar_key = models.ForeignKey(ClinVarKey, null=True, blank=True, on_delete=models.CASCADE)
-
+    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, default=AlleleOriginBucket.GERMLINE)
     classifications_missing_condition = models.IntegerField(default=0)
     submissions_valid = models.IntegerField(default=0)
     submissions_invalid = models.IntegerField(default=0)
@@ -53,11 +56,23 @@ class ClinVarExportStatus(models.TextChoices):
 
 
 class ClinVarExport(TimeStampedModel, PreviewModelMixin):
+
+    """
+    Represents a unique entry we plan to upload to ClinVar.
+    Specifically the lab & allele (wrapped up in clinvar_allele), condition, the most up to date representation of the data
+    and a status that describes how the data compares to what we've already sent to ClinVar.
+
+    A ClinVarSubmission is a snapshot of the data we actually intend to send (or have sent) to ClinVar, and they're sent
+    bundled together in a ClinVarExportBatch
+    """
+
     class Meta:
         verbose_name = "ClinVar export"
 
     clinvar_allele = models.ForeignKey(ClinVarAllele, null=True, blank=True, on_delete=models.CASCADE)
+    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, default=AlleleOriginBucket.GERMLINE)
     condition = models.JSONField()
+
     classification_based_on = models.ForeignKey(ClassificationModification, null=True, blank=True, on_delete=models.CASCADE)
     scv = models.TextField(blank=True, default='')
     status = models.CharField(max_length=1, choices=ClinVarExportStatus.choices, default=ClinVarExportStatus.NEW_SUBMISSION)
@@ -119,13 +134,23 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
             return "Submission has Errors"
 
     def __str__(self):
-        parts = [f"ClinVarExport ({self.pk})"]
+        parts = [f"ClinVar Export ({self.pk})"]
+        status = self.get_status_display()
+        if self.classification_based_on_id is None:
+            parts.append("No Valid Classification")
+        else:
+            parts.append(self.get_status_display())
+            status = "No Valid Classification"
         if self.scv:
             parts.append(self.scv)
         return " ".join(parts)
 
     def __repr__(self):
         return str(self)
+
+    @property
+    def clinvar_export_id(self):
+        return f"CE_{self.id}"
 
     @cached_property
     def _condition_resolved(self) -> ConditionResolved:
@@ -155,9 +180,15 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
             self.update()
 
     @staticmethod
-    def new_condition(clinvar_allele: ClinVarAllele, condition: ConditionResolved, candidate: Optional[ClassificationModification]) -> 'ClinVarExport':
+    def new_condition(
+            clinvar_allele: ClinVarAllele,
+            allele_origin_bucket: AlleleOriginBucket,
+            condition: ConditionResolved,
+            candidate: Optional[ClassificationModification]
+    ) -> 'ClinVarExport':
         cc = ClinVarExport(
             clinvar_allele=clinvar_allele,
+            allele_origin_bucket=allele_origin_bucket,
             condition=condition.to_json()
         )
         cc.update_classification(candidate)
@@ -228,6 +259,7 @@ class ClinVarExportBatch(TimeStampedModel):
         verbose_name = "ClinVar export batch"
 
     clinvar_key = models.ForeignKey(ClinVarKey, on_delete=models.CASCADE)
+    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, default=AlleleOriginBucket.GERMLINE)
     submission_version = models.IntegerField()
     status = models.CharField(max_length=1, choices=ClinVarExportBatchStatus.choices, default=ClinVarExportBatchStatus.AWAITING_UPLOAD)
     submission_identifier = models.TextField(null=True, blank=True)
@@ -256,6 +288,10 @@ class ClinVarExportBatch(TimeStampedModel):
                 }
             }]
         }
+
+    @property
+    def clinvar_batch_id(self):
+        return f"CB_{self.id}"
 
     def requests(self) -> Iterable['ClinVarExportRequest']:
         return self.clinvarexportrequest_set.order_by('created')
@@ -363,6 +399,7 @@ class ClinVarExportRequest(TimeStampedModel):
 @dataclass(frozen=True)
 class ClinVarExportBatchGrouping:
     clinvar_key: ClinVarKey
+    allele_origin_bucket: AlleleOriginBucket
     assertion_criteria: frozendict
 
 
@@ -387,12 +424,14 @@ class ClinVarExportBatches:
         else:
             grouping = ClinVarExportBatchGrouping(
                 clinvar_key=data.clinvar_export.clinvar_allele.clinvar_key,
-                assertion_criteria=frozendict(data.assertion_criteria)
+                assertion_criteria=frozendict(data.assertion_criteria),
+                allele_origin_bucket=data.clinvar_export.allele_origin_bucket
             )
             batch = self.group_batches.get(grouping)
             if not batch or self.batch_size.get(grouping, 0) == 10000:
                 batch = ClinVarExportBatch(
                     clinvar_key=grouping.clinvar_key,
+                    allele_origin_bucket=grouping.allele_origin_bucket,
                     submission_version=CLINVAR_EXPORT_CONVERSION_VERSION,
                     assertion_criteria=data.assertion_criteria,
                     release_status="public"

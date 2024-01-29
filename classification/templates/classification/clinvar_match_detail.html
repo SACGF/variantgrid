@@ -4,7 +4,7 @@
     <div class="d-flex {% if not forloop.first %}mt-2{% endif %}" style="align-content: start">
         <div style="width:150px">
         <div><a href="{{ match.allele.get_absolute_url }}">{{ match.allele }}</a></div>
-        <div>Lab Classifications: {{ match.classifications|length }}</div>
+        <div>Lab Classification Records: {{ match.classifications|length }}</div>
         {% for match_type in match.match_types %}
             <div class="text-success">- {{ match_type }}</div>
         {% endfor %}

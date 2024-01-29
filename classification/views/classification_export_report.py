@@ -38,7 +38,7 @@ class ClassificationReport:
     def row_data(self, record: ClassificationModification) -> dict:
         context = {}
         evidence = record.as_json(ClassificationJsonParams(self.user, include_data=True))['data']
-        e_keys = EvidenceKeyMap.instance(lab=record.classification.lab)
+        e_keys = EvidenceKeyMap.instance().with_overrides(record.classification.evidence_key_overrides)
 
         for e_key in e_keys.all_keys:
             blob = evidence.get(e_key.key) or {}

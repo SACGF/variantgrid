@@ -41,7 +41,7 @@
                     <tr>
                         <th>c.HGVS</th>
                         <th>Status</th>
-                        <th class="text-center" style="width:50%">Lab/Clinical Significance</th>
+                        <th class="text-center" style="width:50%">Lab/Classification</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -64,6 +64,9 @@
                                     <td style="border-top:none"></td>
                                 {% endif %}
                                 <td {% if not forloop.first %}style="border-top-style:dashed"{% endif %}>
+                                    {% if grouping.clinical_context %}
+                                        {% clinical_context grouping.clinical_context %}
+                                    {% endif %}
                                     {% if grouping.shared %}
                                         <span class="{{ grouping.status.css_class }}">{{ grouping.status }}</span>
                                         <div>{{ grouping.status.lab_count }} Sharing Lab{% plural grouping.status.lab_count %}</div>

@@ -61,9 +61,10 @@ CONTACT_US_ENABLED = False
 ACCOUNTS_EMAIL = None
 # If you change this value you should run 'recalc' for all ClinicalContexts in admin
 DISCORDANCE_ENABLED = False
-# How long you have to update flags after a discordance is closed for them to still
-# be considered in the report
-DISCORDANCE_REPORT_LEEWAY = 14
+
+ALLELE_ORIGIN_NOT_PROVIDED_BUCKET = "U"
+# If allele origin isn't provided, what bucket do we group it in
+# "U" for Unknown, "G" for Germline, and "S" for Somatic
 
 UNIT_TEST = sys.argv[1:2] == ['test']
 DEBUG = True
@@ -482,7 +483,10 @@ CLASSIFICATION_DASHBOARD_SIZE = 50
 CLASSIFICATION_RECLASSIFICATION_EMAIL = True
 CLASSIFICATION_ID_FILTER = True
 CLASSIFICATION_GRID_SHOW_USERNAME = True
+
+# WARNING the below will be deprecated as it becauses the default
 CLASSIFICATION_GRID_SHOW_ORIGIN = True  # Should Allele origin (e.g. germline/somatic) be shown on the grid
+
 CLASSIFICATION_STATS_USE_SHARED = False  # False=Use visible to user. True = Shared
 CLASSIFICATION_GRID_SHOW_PHGVS = True
 CLASSIFICATION_GRID_SHOW_SAMPLE = True

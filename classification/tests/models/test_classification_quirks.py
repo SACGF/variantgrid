@@ -29,7 +29,7 @@ class ClassificationTestQuirks(TestCase):
             source=SubmissionSource.API,
             make_fields_immutable=False
         )
-        evidence_keys = EvidenceKeyMap.instance(lab=lab)
+        evidence_keys = EvidenceKeyMap.instance().with_overrides(vc.evidence_key_overrides)
         data = VCDataDict(vc.evidence, evidence_keys)
         self.assertEqual(data['bp1'].value, CriteriaEvaluation.BENIGN_SUPPORTING)
         self.assertEqual(data['bp2'].value, CriteriaEvaluation.NOT_MET)
@@ -53,7 +53,7 @@ class ClassificationTestQuirks(TestCase):
             source=SubmissionSource.API,
             make_fields_immutable=False
         )
-        evidence_keys = EvidenceKeyMap.instance(lab=lab)
+        evidence_keys = EvidenceKeyMap.instance().with_overrides(vc.evidence_key_overrides)
         data = VCDataDict(vc.evidence, evidence_keys)
         self.assertTrue(data['affected_status'].has_validation_code(ValidationCode.INVALID_VALUE))
         self.assertEqual(data['ancestry'].value, ['ASJ', 'CA'])
@@ -93,7 +93,7 @@ class ClassificationTestQuirks(TestCase):
             source=SubmissionSource.API,
             make_fields_immutable=True
         )
-        evidence_keys = EvidenceKeyMap.instance(lab=lab)
+        evidence_keys = EvidenceKeyMap.instance().with_overrides(vc.evidence_key_overrides)
         data = VCDataDict(vc.evidence, evidence_keys)
         self.assertTrue(data['genome_build'].has_validation_code(ValidationCode.MANDATORY))  # didn't provide genome build, should be created with man error
         self.assertIsNone(data['gene_symbol'].immutability)  # immutable but not in original submission
@@ -111,7 +111,7 @@ class ClassificationTestQuirks(TestCase):
                 SpecialEKeys.CONDITION: 'yaps'
             }
         )
-        evidence_keys = EvidenceKeyMap.instance(lab=lab)
+        evidence_keys = EvidenceKeyMap.instance().with_overrides(vc.evidence_key_overrides)
         data = VCDataDict(vc.evidence, evidence_keys)
         self.assertEqual(data[SpecialEKeys.C_HGVS].value, 'old_c')  # immutability stopped the update of this value
         self.assertEqual(data[SpecialEKeys.G_HGVS].value, 'gg')

@@ -1,32 +1,33 @@
 {% extends menu_settings_base %}
 {% load ui_utils %}
+{% load user_tags %}
 {% block title %}{{ other_user }} user page.{% endblock %}
 
 {% block submenu_page_content %}
     <div class="container">
         <div class="card">
-            <div class="card-header">View User {% admin_link other_user %}</div>
+            <div class="card-header">User Details {% admin_link other_user %}</div>
             <div class="card-body">
-                {% labelled label="Username" %}{{ other_user }}{% endlabelled %}
-                {% labelled label="Email" %}{{ email }}{% endlabelled %}
+                {% labelled label="User" %}{% user other_user %}{% endlabelled %}
+                {% labelled label="Email" %}{{ other_user.email }}{% endlabelled %}
                 {% labelled label="Phone: #" %}{{ user_contact.phone_number }}{% endlabelled %}
             </div>
             <div class="card-footer link-toolbar">
                 {% if inbox_enabled %}
                     <a href="{% url 'messages_compose_to' recipient=other_user.pk %}">Write internal message</a>
                 {% endif %}
-                <a href="{% url 'activity_user' user_id=other_user.pk %}">View Classification Edits</a>
+                <a href="{% url 'activity_user' user_id=other_user.pk %}">View classification record edits</a>
             </div>
         </div>
+        {% if user != other_user %}
         <div class="card mt-4">
-            <div class="card-header">Shared groups</div>
+            <div class="card-header">Shared Groups</div>
             <div class="card-body">
+                <p>Showing groups that both you <strong>{{ user }}</strong> and <strong>{{ other_user }}</strong> have in common:</p>
                 {% if common_groups %}
-                    <p>You have the following groups in common with {{ other_user }}:</p>
-
                     <ul>
                     {% for g in common_groups %}
-                        <li>{{ g }}</li>
+                        {% if g %}<li>{{ g }}</li>{% endif %}
                     {% endfor %}
                     </ul>
                 {% else %}
@@ -34,6 +35,9 @@
                 {% endif %}
             </div>
         </div>
+        {% else %}
+            <p class="mt-4">Edit your own details <a href="{% url 'view_user_settings' %}">here</a>.</p>
+        {% endif %}
     </div>
 
 {% endblock %}

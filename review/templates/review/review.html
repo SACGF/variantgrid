@@ -79,8 +79,10 @@
                                     </label>
                                 </div>
                                 <div class="col-12 col-md-8 text-left text-break">
-                                    {{ field }}
-                                    {{ field.errors | field_errors }}
+                                    <div id="{{ field.name }}-wrapper">
+                                        {{ field }}
+                                        {{ field.errors | field_errors }}
+                                    </div>
                                 </div>
                             </div>
                         {% else %}
@@ -88,8 +90,10 @@
                                 <div class="col-12 col-md-4 text-md-right align-self-center"></div>
                                 <div class="col-12 col-md-8 text-left text-break">
                                     <hr class="dashed" />
-                                    {{ field }}
-                                    {{ field.errors | field_errors }}
+                                    <div id="{{ field.name }}-wrapper">
+                                        {{ field }}
+                                        {{ field.errors | field_errors }}
+                                    </div>
                                 </div>
                             </div>
                          {% endifchanged %}

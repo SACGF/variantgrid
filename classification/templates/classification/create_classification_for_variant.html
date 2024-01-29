@@ -66,6 +66,7 @@
 
         let url = "{% url 'classification_auto_populate_api' %}";
         let patchDom = $('#auto-populate').LoadingOverlay('show');
+        // let checkedModification = $('#copy_from_vcm_id').is(':checked');
 
         let data = {
             'variant_id': $('#variant_id').val(),
@@ -73,11 +74,8 @@
             'genome_build_name': $('#genome_build_name').val(),
             'refseq_transcript_accession': $('#refseq_transcript_accession').val(),
             'ensembl_transcript_accession': $('#ensembl_transcript_accession').val(),
-            'copy_from_vcm_id': $('#copy_from_vcm_id').is(':checked') ? 'true' : null
+            'copy_from_vcm_id': $('[name="copy_from_vcm_id"]:checked').val() || "0"
         };
-        if ($('#copy_from_vcm_id').is(':checked')) {
-            data.copy_from_vcm_id = $('#copy_from_vcm_id').val();
-        }
         $.ajax({
             type: "GET",
             url: url,
@@ -163,7 +161,8 @@
                     MISSING = '.';
                     let zygosity_html;
                     if (data.zygosity == MISSING) {
-                        zygosity_html = "This sample does not contain the variant.";
+                        zygosity_html = '<div class="my-1"><i class="fas fa-exclamation-triangle text-error"></i> This sample does not contain the variant.</div>';
+                        createClassificationButton.button('disable');
                     } else {
                         zygosity_html = "<b>Zygosity:</b>" + data.zygosity;
                         createClassificationButton.button('enable');
@@ -171,7 +170,7 @@
                     zygositySpan.html(zygosity_html);
                 },
                 error: function(data) {
-                    zygositySpan.html("Error retrieving zygosity!");
+                    zygositySpan.html('<div class="my-1"><i class="fas fa-exclamation-triangle text-error"></i> Error retrieving zygosity!</div>');
                 },
             });
         });
@@ -186,9 +185,9 @@
 {% if error_message %}
     {{ error_message }}
 {% else %}
-    <h3>Create Classification for {{ variant }}</h3>
+    <h3>Create Classification Record for {{ variant }}</h3>
 
-    <a class="hover-link my-2" href="{% url 'view_variant' variant.pk %}">Back to variant page for {{ variant }}.</a>
+    <a class="hover-link my-2" href="{% url 'view_variant' variant.pk %}"><i class="fas fa-angle-left"></i> Back to variant page for {{ variant }}.</a>
     {% page_help 'classification/create_classification_for_variant_help' 'Transcript Choice' %}
 
     <form action="{{ form_post_url }}" class="classification-form" method="POST">
@@ -235,6 +234,30 @@
                     <div>Please fix all errors before creating a classification.</div>
                 {% endif %}
 
+                <hr/>
+                {% labelled label="Copy values from" %}
+                    {% if consensuses %}
+                        <div class="my-2">
+                            <label class="form-check-label">
+                                <input class='auto-pop-field mr-2' type="radio" name="copy_from_vcm_id" id="copy_from_vcm_id" value="0" {% if consensus_default_suggestion == 0 %}checked{% endif %} />
+                                <span class="no-value">Do not copy any values from previous classification records</span>
+                            </label>
+                        </div>
+                    {% endif %}
+                    {% for candidate in consensuses %}
+                        <div class="my-2">
+                            <label class="form-check-label">
+                                <input class='auto-pop-field mr-2' type="radio" name="copy_from_vcm_id" value="{{ candidate.modification.pk }}" {% if consensus_default_suggestion == candidate.modification.pk %}checked{% endif %}/>
+                                <span style="display:inline-block; width:110px">{{ candidate.label }} </span>
+                            </label>
+                            <span class="text-bold text-secondary">:</span> {% classification_quick candidate.modification %}
+                        </div>
+                        {% empty %}
+                        <div class="no-value">No valid candidate classification records available to copy from</div>
+                    {% endfor %}
+                {% endlabelled %}
+
+                {% comment %}
                 {% if consensus.is_valid %}
                     {% labelled label="Latest classification for allele" %}
                         {% classification_quick consensus.vcm %}
@@ -246,14 +269,15 @@
                         </label>
                     {% endlabelled %}
                 {% endif %}
+                {% endcomment %}
             </div>
         </div>
 
         {% page_help page_id='classification/auto_populate_help' title='Auto-populated Data' %}
 
          <p>
-            Based on your selection above, the Variant Classification form will be auto-populated with the contents below.<br/>
-            Please review and then click "Create Classification".
+            Based on your selection above, the Classification Record's form will be auto-populated with the contents below.<br/>
+            Please review and then click "Create Classification Record".
          </p>
          <div class="card">
              <div class="card-header">Auto Populate Data</div>
@@ -264,7 +288,7 @@
         </div>
 
         {% if not lab_error %}
-            <button class="btn btn-primary mt-2" id='create-variant-classification'>Create Classification</button>
+            <button class="btn btn-primary mt-2" id='create-variant-classification'>Create Classification Record</button>
         {% endif %}
     </form>
 {% endif %}

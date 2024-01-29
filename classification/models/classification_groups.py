@@ -63,6 +63,10 @@ class ClassificationGroupEntry:
     def clin_sig(self):
         return self.modification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
+    @property
+    def somatic_clin_sig(self):
+        return self.modification.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
+
     @cached_property
     def c_hgvs(self):
         return ClassificationGroup.c_hgvs_for(self.modification, self.genome_build)
@@ -78,14 +82,15 @@ class ClassificationGroupEntry:
     def grouping_key(self):
         clin_sig_sorter = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter_value
         return (
+            self.modification.classification.clinical_grouping_name or "",
             clin_sig_sorter(self.clin_sig),
             clin_sig_sorter(self.clinical_significance_old),
             clin_sig_sorter(self.clinical_significance_pending),
-            self.modification.classification.clinical_grouping_name,
-            self.modification.classification.lab.organization.name,
-            self.modification.classification.lab.name,
+            self.somatic_clin_sig or "",
+            self.modification.classification.lab.organization.name or "",
+            self.modification.classification.lab.name or "",
             self.c_hgvs,
-            self.condition_sorter
+            self.condition_sorter or ""
         )
 
     @property
@@ -193,6 +198,14 @@ class ClassificationGroup:
         # for the sake of a JavaScript sort
 
     @cached_property
+    def allele_origin_bucket(self):
+        return self.most_recent.classification.allele_origin_bucket
+
+    @cached_property
+    def allele_origin_bucket_display(self):
+        return self.most_recent.classification.get_allele_origin_bucket_display()
+
+    @cached_property
     def clinical_significance_score(self):
         sorter = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter_value
         return sorter(self.clinical_significance_pending if self.clinical_significance_pending else self.clinical_significance)
@@ -232,6 +245,10 @@ class ClassificationGroup:
     @property
     def most_recent(self) -> ClassificationModification:
         return self.modifications[0]
+
+    @cached_property
+    def somatic_clin_sig(self):
+        return self.most_recent.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
 
     @property
     def clinical_significance(self) -> str:
@@ -294,13 +311,14 @@ class ClassificationGroup:
 
     @cached_property
     def variant_sort(self) -> str:
+        prefix = self.clinical_grouping
         if allele_infos := self.allele_infos:
             for allele_info in allele_infos:
                 if variant_info := allele_info[self.genome_build]:
                     if genomic_sort := variant_info.genomic_sort:
-                        return genomic_sort
+                        return prefix + genomic_sort
 
-        return self.c_hgvs.sort_str
+        return prefix + self.c_hgvs.sort_str
 
     @property
     def c_hgvs(self) -> CHGVS:
@@ -338,7 +356,8 @@ class ClassificationGroup:
                     strengths.add(CriteriaStrength(e_key, strength))
             return strengths
 
-        return MultiValues.convert([criteria_converter(cm) for cm in self.modifications])
+        output = MultiValues.convert([criteria_converter(cm) for cm in self.modifications])
+        return output
 
     def _evidence_key_set(self, key: str) -> list[str]:
         all_values = set()

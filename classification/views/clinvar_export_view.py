@@ -4,7 +4,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Optional, Iterable
+from typing import Dict, Any, Optional, Iterable, List, Set
 
 from django.contrib import messages
 from django.db.models import QuerySet, When, Value, Case, IntegerField, Count, Q, TextField
@@ -18,7 +18,7 @@ from django.views.decorators.http import require_POST
 
 from classification.enums import SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
-    EvidenceKeyMap, ClinVarExportStatus, ClinVarExportSubmission
+    EvidenceKeyMap, ClinVarExportStatus, ClinVarExportSubmission, ConditionResolved
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.utils.clinvar_matcher import ClinVarLegacyRow, ClinVarLegacyMatches, ClinVarLegacyExportMatchType
 from classification.views.classification_dashboard_view import ClassificationDashboard
@@ -26,6 +26,7 @@ from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path, require_superuser, RequireSuperUserView
 from library.utils import html_to_text, export_column, ExportRow, local_date_string, ExportDataType, JsonDataType
+from ontology.models import OntologyTerm, AncestorCalculator, OntologyTermRelation
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import ClinVarKey, Lab, Allele, GenomeBuild
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
@@ -41,13 +42,17 @@ class ClinVarExportBatchColumns(DatatableConfig):
     def render_status(self, row: CellData):
         return ClinVarExportBatchStatus(row['status']).label
 
+    def batch_id(self, row: CellData):
+        return row['id']
+
     def __init__(self, request):
         super().__init__(request)
 
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_batch_detail', expected_height=120)
         self.rich_columns = [
-            RichColumn("id", label="ID", orderable=True, default_sort=SortOrder.DESC),
+            RichColumn("id", label="ID", orderable=True, renderer=self.batch_id, client_renderer='batchId', default_sort=SortOrder.DESC),
             RichColumn("clinvar_key", label="ClinVar Key", orderable=True, enabled=False),
+            RichColumn("allele_origin_bucket", label="Allele Origin", orderable=True, client_renderer="render_allele_origin_bucket"),
             RichColumn("created", client_renderer='TableFormat.timestamp', orderable=True),
             RichColumn("record_count", label="Records In Submission", orderable=True),
             RichColumn("status", renderer=self.render_status, orderable=True)
@@ -79,7 +84,7 @@ def clinvar_export_batch_detail(request, clinvar_export_batch_id: int):
     })
 
 
-def _export_id_to_batch_ids(qs: QuerySet[ClinVarExport]) -> dict[int, list[int]]:
+def _export_id_to_batch_ids(qs: QuerySet[ClinVarExport]) -> Dict[int, List[int]]:
     export_to_batches = defaultdict(list)
     for export_id, batch_id in ClinVarExportSubmission.objects.filter(
         clinvar_export__in=qs.values_list("id", flat=True)).order_by(
@@ -90,7 +95,7 @@ def _export_id_to_batch_ids(qs: QuerySet[ClinVarExport]) -> dict[int, list[int]]
 
 class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
 
-    def render_allele(self, row: dict[str, Any]) -> str:
+    def render_allele(self, row: Dict[str, Any]) -> str:
         allele = allele_for(row["clinvar_allele__allele"])
         return f"{allele:CA}"
 
@@ -108,6 +113,9 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
                 # filter rather than just return submissions to make sure user has permission to see items that belong to the batch
                 # also make sure an individual export doesn't have the batch ID
                 return qs.filter(Q(pk__in=submissions) | Q(pk=batch_id))
+            elif search_string.upper().startswith("CE_"):
+                batch_id = search_string[3:]
+                return qs.filter(Q(pk=batch_id))
 
             # if searcing a ClinGenAlleleID
             elif search_string.upper().startswith("CA"):
@@ -138,10 +146,11 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
             else:
                 c_hgvs_str = row["classification_based_on__classification__allele_info__grch38__c_hgvs"]
 
-            data: dict[str, Any]
+            data: Dict[str, Any]
             c_hgvs = CHGVS(c_hgvs_str)
             if c_hgvs.raw_c != c_hgvs.full_c_hgvs:
                 data = {
+                    "allele_origin_bucket": row["allele_origin_bucket"],
                     "genome_build": genome_build,
                     "transcript": c_hgvs.transcript,
                     "gene_symbol": c_hgvs.gene_symbol,
@@ -161,6 +170,12 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
         else:
             return None
 
+    def render_id(self, row: CellData) -> JsonDataType:
+        return {
+            "id": row["id"],
+            "allele_origin_bucket": row["allele_origin_bucket"]
+        }
+
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.export_to_batches = {}
@@ -168,7 +183,14 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
         self.search_box_enabled = True
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_detail')
         self.rich_columns = [
-            RichColumn("id", label="ID", orderable=True, default_sort=SortOrder.DESC),
+            RichColumn("id",
+                       label="ID",
+                       orderable=True,
+                       default_sort=SortOrder.DESC,
+                       client_renderer='renderId',
+                       renderer=self.render_id,
+                       extra_columns=["allele_origin_bucket"]
+            ),
             RichColumn(name="c_hgvs", label='Allele',
                     sort_keys=["classification_based_on__classification__allele_info__grch38__c_hgvs"],
                     extra_columns=[
@@ -237,9 +259,26 @@ def clinvar_export_review(request: HttpRequest, clinvar_export_id: int) -> HttpR
         add_save_message(request, valid=True, name="ClinVarExport")
         return redirect(clinvar_export)
 
+    common_condition: Optional[OntologyTerm] = None
+    clinvar_exports_for_allele = list(ClinVarExport.objects.filter(
+        clinvar_allele_id=clinvar_export.clinvar_allele_id
+    ).exclude(pk=clinvar_export_id).all())
+    if clinvar_exports_for_allele:
+        all_condition_terms: Set[OntologyTerm] = set()
+        clinvar_exports_for_allele.append(clinvar_export)
+        for clinvar_allele in clinvar_exports_for_allele:
+            for term in clinvar_allele.condition_resolved.terms:
+                if mondo := OntologyTermRelation.as_mondo(term):
+                    all_condition_terms.add(mondo)
+
+        clinvar_exports_for_allele = sorted(clinvar_exports_for_allele, key=lambda cve: cve.pk)
+        common_condition = AncestorCalculator.common_ancestor(all_condition_terms)
+
     return render(request, 'classification/clinvar_export.html', context={
         "clinvar_export": clinvar_export,
-        "cm": clinvar_export.classification_based_on
+        "cm": clinvar_export.classification_based_on,
+        "clinvar_exports_for_allele": clinvar_exports_for_allele,
+        "common_condition": common_condition
     })
 
 
@@ -255,17 +294,18 @@ def clinvar_export_history(request: HttpRequest, clinvar_export_id: int) -> Http
     })
 
 
-@dataclass
+@dataclass(frozen=True)
 class ClinVarExportSummaryData:
     clinvar_export: ClinVarExport
-    batch_ids: Optional[list[int]]
+    batch_ids: Optional[List[int]]
 
 
+@dataclass(frozen=True)
 class ClinVarExportSummary(ExportRow):
 
-    def __init__(self, data: ClinVarExportSummaryData):
-        self.clinvar_export = data.clinvar_export
-        self.batch_ids = data.batch_ids
+    clinvar_export: ClinVarExport
+    batch_ids: Optional[List[int]]
+    has_duplicates: bool = False
 
     @property
     def classification(self):
@@ -280,114 +320,125 @@ class ClinVarExportSummary(ExportRow):
                 pass
 
     @export_column("ID")
-    def id(self):
-        return self.clinvar_export.id
+    def _id(self):
+        return self.clinvar_export.clinvar_export_id
 
     @export_column("ClinVar Export URL")
-    def clinvar_export_url(self):
+    def _clinvar_export_url(self):
         return get_url_from_view_path(self.clinvar_export.get_absolute_url())
 
     @export_column("Allele URL")
-    def allele_url(self):
+    def _allele_url(self):
         if modification := self.classification:
             classification = modification.classification
             if allele_id := classification.allele_id:
                 return get_url_from_view_path(reverse('view_allele', kwargs={"allele_id": allele_id}))
 
     @export_column("Classification URL")
-    def classification_url(self):
+    def _classification_url(self):
         if modification := self.classification:
             return get_url_from_view_path(reverse('view_classification', kwargs={"classification_id": modification.id_str}))
 
     @export_column("Record ID")
-    def record_id(self):
+    def _record_id(self):
         if modification := self.classification:
             classification = modification.classification
             return classification.lab.group_name + "/" + classification.lab_record_id
 
+    @export_column("Allele Origin")
+    def _allele_origin(self):
+        return self.clinvar_export.get_allele_origin_bucket_display()
+
     @export_column("Genome Build")
-    def genome_build(self):
+    def _genome_build(self):
         return str(self.genome_build_row) if self.genome_build_row else None
 
     @export_column("ClinGenAllele")
-    def clingen_allele(self):
+    def _clingen_allele(self):
         if modification := self.classification:
             if allele := modification.classification.allele_object:
                 return str(allele.clingen_allele)
 
     @export_column("c.HGVS")
-    def c_hgvs(self):
+    def _c_hgvs(self):
         if genome_build := self.genome_build_row:
             return self.classification.classification.get_c_hgvs(genome_build)
 
     @export_column("Condition Umbrella")
-    def condition_umbrella(self):
+    def _condition_umbrella(self):
         return self.clinvar_export.condition_resolved.as_plain_text
 
     @export_column("Condition")
-    def condition(self):
+    def _condition(self):
         if modification := self.classification:
             return modification.condition_text
 
     @export_column("Affected Status")
-    def affected_status(self):
+    def _affected_status(self):
         if modification := self.classification:
             return EvidenceKeyMap.pretty_value_for(modification, SpecialEKeys.AFFECTED_STATUS)
 
     @export_column("Mode of Inheritance")
-    def mode_of_inheritance(self):
+    def _mode_of_inheritance(self):
         if modification := self.classification:
             return EvidenceKeyMap.pretty_value_for(modification, SpecialEKeys.MODE_OF_INHERITANCE)
 
     @export_column("Clinical Significance")
-    def clinical_significance(self):
+    def _clinical_significance(self):
         if modification := self.classification:
             return EvidenceKeyMap.pretty_value_for(modification, SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
     @export_column("Interpretation Summary")
-    def interpretation_summary(self):
+    def _interpretation_summary(self):
         if classification := self.classification:
             return html_to_text(classification.get(SpecialEKeys.INTERPRETATION_SUMMARY))
 
     @export_column("Curation Date")
-    def curation_date(self):
+    def _curation_date(self):
         if classification := self.classification:
             return EvidenceKeyMap.pretty_value_for(classification, SpecialEKeys.CURATION_DATE)
 
     @export_column("Classification Submitted to $site_name", data_type=ExportDataType.datetime)
-    def classification_imported_created(self):
+    def _classification_imported_created(self):
         if modification := self.classification:
             return modification.created
 
     @export_column("Sync Status")
-    def sync_status(self):
+    def _sync_status(self):
         if self.clinvar_export.status == ClinVarExportStatus.UP_TO_DATE:
             if clinvar_error := self.clinvar_export.last_submission_error:
                 return "ClinVar Error"
         return self.clinvar_export.get_status_display()
 
     @export_column("SCV")
-    def scv(self):
+    def _scv(self):
         return self.clinvar_export.scv
 
     @export_column("Latest Batch ID")
-    def batch_id(self):
+    def _batch_id(self):
         if submission := self.clinvar_export.last_submission:
             return submission.submission_batch_id
 
     @export_column("Latest Batch Status")
-    def batch_status(self):
+    def _batch_status(self):
         if submission := self.clinvar_export.last_submission:
             submission.submission_batch.get_status_display()
 
     @export_column("All Batch IDs")
-    def batch_ids_all(self):
+    def _batch_ids_all(self):
         if batch_ids := self.batch_ids:
             return ",".join(str(batch_id) for batch_id in sorted(batch_ids))
 
+    @export_column("Others for Allele")
+    def _possible_duplicate(self):
+        if self.has_duplicates:
+            duplicates = ClinVarExport.objects.filter(clinvar_allele=self.clinvar_export.clinvar_allele).exclude(
+                pk=self.clinvar_export.pk).order_by('pk')
+            return ", ".join(str(duplicate) for duplicate in duplicates)
+
     @export_column("Messages")
-    def messages(self):
-        all_messages: list[str] = []
+    def _messages(self):
+        all_messages: List[str] = []
         if clinvar_error := self.clinvar_export.last_submission_error:
             all_messages.append(f"(CLINVAR ERROR) {clinvar_error}")
 
@@ -409,19 +460,40 @@ class ClinVarExportSummary(ExportRow):
     #         return json.dumps(json_version.pure_json(), indent=4)
 
 def clinvar_export_download(request: HttpRequest, clinvar_key_id: str) -> HttpResponseBase:
+    # get all the individual rows
     clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
     clinvar_key.check_user_can_access(request.user)
+    qs = ClinVarExport.objects.filter(clinvar_allele__clinvar_key=clinvar_key).order_by('-clinvar_allele__pk')
 
-    qs = ClinVarExport.objects.filter(clinvar_allele__clinvar_key=clinvar_key).order_by('-id')
+    # get all map of export_id to all the batch ids that export id was in
     export_id_to_batch_ids = _export_id_to_batch_ids(qs)
 
-    def rows() -> Iterable[str]:
-        return ClinVarExportSummary.csv_generator(
-            [ClinVarExportSummaryData(ce, export_id_to_batch_ids.get(ce.pk)) for ce in qs]
-        )
+    # get a list of duplicates
+    duplicates = ClinVarExport.objects.filter(
+        # classification_based_on__isnull=False,
+        clinvar_allele__clinvar_key_id=clinvar_key_id
+    ).values('clinvar_allele').annotate(total=Count('clinvar_allele')).order_by('-total')
+
+    has_possible_duplicate_clinvar_allele_id: set[int] = set()
+
+    for duplicate in duplicates:
+        total = duplicate.get("total")
+        if total <= 1:
+            break
+        else:
+            has_possible_duplicate_clinvar_allele_id.add(duplicate.get('clinvar_allele'))
+
+    data_iterator = (
+        ClinVarExportSummary(
+            clinvar_export=ce,
+            batch_ids=export_id_to_batch_ids.get(ce.pk),
+            has_duplicates=ce.clinvar_allele_id in has_possible_duplicate_clinvar_allele_id
+        ) for ce in qs.iterator()
+    )
+    csv_generator = ClinVarExportSummary.csv_generator(data_iterator)
 
     date_str = local_date_string()
-    response = StreamingHttpResponse(rows(), content_type='text/csv')
+    response = StreamingHttpResponse(csv_generator, content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="export_batches_{date_str}.csv"'
     return response
 
@@ -471,6 +543,7 @@ def clinvar_export_refresh(request: HttpRequest, clinvar_key_id: str) -> HttpRes
     clinvar_key = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
     clinvar_key.check_user_can_access(request.user)
     logs = ClinvarExportPrepare.update_export_records_for_keys(clinvar_keys={clinvar_key, })
+    print("\n".join(logs))
     messages.add_message(request, level=messages.INFO, message="Prepare complete")
     # TODO, actually store or display the logs somewhere - against the ClinVarAlleles?
     return redirect(reverse('clinvar_key_summary', kwargs={'clinvar_key_id': clinvar_key_id}))
@@ -489,14 +562,14 @@ def clinvar_export_create_batch(request: HttpRequest, clinvar_key_id: str) -> Ht
         # find the IDs that didn't exist for the lab
         found_ids = set(clinvar_export_qs.values_list('pk', flat=True).all())
         missing = sorted(all_ids - found_ids)
-        messages.add_message(request, level=messages.ERROR, message=f"Could not find some of the IDs for this ClinVarKey - not creating a batch. Missing IDs : {missing}")
+        messages.add_message(request, level=messages.ERROR, message=f"Could not find some of the IDs for this ClinVarKey - not creating a batch. Missing IDs : ({missing})")
     elif id_count == 0:
         messages.add_message(request, level=messages.ERROR, message=f"No IDs provided")
     else:
         batches = ClinVarExportBatch.create_batches(clinvar_export_qs, force_update=True)
         for batch in batches:
             batch_records_count = batch.clinvarexportsubmission_set.count()
-            messages.add_message(request, level=messages.SUCCESS, message=f"Created Export Batch {batch} with {batch_records_count}")
+            messages.add_message(request, level=messages.SUCCESS, message=f"Created Export Batch {batch} with {batch_records_count} records")
             if missing := len(all_ids) - batch_records_count:
                 batch_record_ids = set(batch.clinvarexportsubmission_set.values_list('clinvar_export_id', flat=True).all())
                 missing_ids = sorted(all_ids - batch_record_ids)
@@ -549,7 +622,7 @@ class ClinVarMatchView(RequireSuperUserView, View):
         clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
         clinvar_key.check_user_can_access(request.user)
 
-        clinvar_legacy_rows: list[ClinVarLegacyRow] = []
+        clinvar_legacy_rows: List[ClinVarLegacyRow] = []
         try:
             file_obj = io.StringIO(request.FILES.get('file').read().decode("utf-8"))
             clinvar_legacy_rows = list(ClinVarLegacyRow.load_file(file_obj, clinvar_key))
@@ -571,7 +644,7 @@ def clinvar_match_detail(request, clinvar_key_id: str):
     data_str = request.GET.get('data_str')
 
     legacy_row = ClinVarLegacyRow.from_data_str(clinvar_key, data_str)
-    matches: list[ClinVarLegacyMatches] = legacy_row.find_variant_grid_allele() if data_str else []
+    matches: List[ClinVarLegacyMatches] = legacy_row.find_variant_grid_allele() if data_str else []
 
     # see if we match to a ClinVarExport, but not using SCV
     # implying that the SCV might need to be copied over

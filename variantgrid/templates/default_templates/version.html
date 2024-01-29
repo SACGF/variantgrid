@@ -9,61 +9,67 @@
     <div class="container">
         <h3>VariantGrid Version</h3>
 
-        <form class="mt-4">
-            {% labelled id="git-last-modified" label="Git Modified Date" %}{% timestamp git.last_modified_date time_ago=True %}{% endlabelled %}
-            {% labelled id="git-hash" label="Git Hash" value_css="text-monospace"%}{{ git.hash }}{% endlabelled %}
-            {% labelled id="git-branch" label="Branch" %}
-                {% if git.branch_link %}<a href="{{ git.branch_link }}" target="_blank" class="external-link hover-link">{{ git.branch }}</a>
-                {% else %}{{ git.branch }}
-                {% endif %}
-            {% endlabelled %}
-            {% labelled label="Python Version" admin_only="true" %}{{ python_version }}{% endlabelled %}
-            {% labelled label="Manual Migrations" admin_only="true" %}<a href="{% url 'manual_migrations' %}">Review Manual Migrations</a>{% endlabelled %}
-        </form>
+        <div id="version-details" class="mt-4">
+            <form>
+                {% labelled id="git-last-modified" label="Git Modified Date" %}{% timestamp git.last_modified_date time_ago=True %}{% endlabelled %}
+                {% labelled id="git-hash" label="Git Hash" value_css="text-monospace"%}{{ git.hash }}{% endlabelled %}
+                {% labelled id="git-branch" label="Branch" %}
+                    {% if git.branch_link %}<a href="{{ git.branch_link }}" target="_blank" class="external-link hover-link">{{ git.branch }}</a>
+                    {% else %}{{ git.branch }}
+                    {% endif %}
+                {% endlabelled %}
+                {% labelled label="Python Version" admin_only="true" %}{{ python_version }}{% endlabelled %}
+                {% labelled label="Manual Migrations" admin_only="true" %}<a href="{% url 'manual_migrations' %}">Review Manual Migrations</a>{% endlabelled %}
+            </form>
+        </div>
 
         {% if deployment_history %}
-            <h4>Deployment History</h4>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th style="width:50%">Deployment Date</th>
-                        <th style="width:50%">Git Hash</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for deployment in deployment_history %}
+            <div id="version-deployment-history">
+                <h4>Deployment History</h4>
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td>{% if deployment.created %}{{ deployment.created }}{% else %}In Progress{% endif %}</td>
-                            <td>{% if deployment.git_link %}
-                                <a href="{{ deployment.git_link }}" class="hover-link external-link" target="_blank" title="Show differences between this deployment and current version" data-toggle="tooltip">{{ deployment.git_hash }}</a>
-                                {% else %}{{ deployment.git_hash }}
-                                {% endif %}
-                            </td>
+                            <th style="width:50%">Deployment Date</th>
+                            <th style="width:50%">Git Hash</th>
                         </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {% for deployment in deployment_history %}
+                            <tr>
+                                <td>{% if deployment.created %}{{ deployment.created }}{% else %}In Progress{% endif %}</td>
+                                <td>{% if deployment.git_link %}
+                                    <a href="{{ deployment.git_link }}" class="hover-link external-link" target="_blank" title="Show differences between this deployment and current version" data-toggle="tooltip">{{ deployment.git_hash }}</a>
+                                    {% else %}{{ deployment.git_hash }}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         {% endif %}
 
         {% if user.is_superuser %}
-            <h4 class="admin-only">Users with Weekly Update Emails Enabled</h4>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th style="width:50%">User</th>
-                        <th style="width:50%">Email</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>All</td>
-                        <td><a class="hover-link mail-link" href="mailto:{% for user in weekly_update_users %}{% if not forloop.first %};{% endif %}{{ user.email }}{% endfor %}">Mail {{ weekly_update_users|length }} User(s)</a></td>
-                    </tr>
-                    {% for user in weekly_update_users %}
-                        <tr><td>{{ user.username }}</td><td><a href="mailto:{{ user.email }}" class="hover-link mail-link">{{ user.email }}</a></td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <div id="version-email-list">
+                <h4 class="admin-only">Users with Weekly Update Emails Enabled</h4>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th style="width:50%">User</th>
+                            <th style="width:50%">Email</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>All</td>
+                            <td><a class="hover-link mail-link" href="mailto:{% for user in weekly_update_users %}{% if not forloop.first %};{% endif %}{{ user.email }}{% endfor %}">Mail {{ weekly_update_users|length }} User(s)</a></td>
+                        </tr>
+                        {% for user in weekly_update_users %}
+                            <tr><td>{{ user.username }}</td><td><a href="mailto:{{ user.email }}" class="hover-link mail-link">{{ user.email }}</a></td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         {% endif %}
     </div>
 {% endblock content %}

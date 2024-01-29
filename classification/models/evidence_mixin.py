@@ -1,16 +1,14 @@
 import re
 from functools import cached_property
-from typing import Any, Mapping, Optional, Union, TypedDict
-
+from typing import Dict, Any, Mapping, Optional, Union, List, TypedDict
 from django.conf import settings
-
 from annotation.models import CitationFetchRequest
 from annotation.models.models_citations import CitationFetchResponse
 from classification.criteria_strengths import CriteriaStrength, CriteriaStrengths
 from classification.enums import SpecialEKeys
 from genes.hgvs import CHGVS, PHGVS
 from library.log_utils import report_message
-from library.utils import empty_to_none
+from library.utils import empty_to_none, first
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion
 
 
@@ -35,14 +33,14 @@ class VCBlobDict(TypedDict, total=False):
     note: str
     explain: str
     immutable: str
-    db_refs: list[VCDbRefDict]
-    validation: list[VCValidation]
+    db_refs: List[VCDbRefDict]
+    validation: List[VCValidation]
 
 
 VCStoreValue = VCBlobDict
 VCPatchValue = Union[None, VCStoreValue]
-VCStore = dict[str, VCStoreValue]
-VCPatch = dict[str, VCPatchValue]
+VCStore = Dict[str, VCStoreValue]
+VCPatch = Dict[str, VCPatchValue]
 
 
 class EvidenceMixin:
@@ -109,7 +107,7 @@ class EvidenceMixin:
             raise ValueError("Classification does not have a value for genome build")
 
     @cached_property
-    def db_refs(self) -> list[VCDbRefDict]:
+    def db_refs(self) -> List[VCDbRefDict]:
         all_db_refs = []
         for blob in self._evidence.values():
             db_refs = blob.get('db_refs')
@@ -134,7 +132,7 @@ class EvidenceMixin:
         if not e_keys:
             e_keys = EvidenceKeyMap.instance()
 
-        criteria: list[CriteriaStrength] = []
+        criteria: List[CriteriaStrength] = []
         for ek in e_keys.criteria():
             if strength := self.get(ek.key):
                 criteria.append(CriteriaStrength(ek, strength))
@@ -204,7 +202,7 @@ class EvidenceMixin:
         return key
 
     @staticmethod
-    def to_patch(raw: dict[str, Any]) -> VCPatch:
+    def to_patch(raw: Dict[str, Any]) -> VCPatch:
         """
         Cleans up a dictionary significantly ready for processing.
         Converts keys to numbers and letters, and all whitespace to underscores.
@@ -215,10 +213,13 @@ class EvidenceMixin:
         :param raw: A dictionary, presumably from JSON
         :return: A VCStore where all keys are clean str keys and all values are dicts
         """
+
+        from classification.models import EvidenceKeyMap
+        keys = EvidenceKeyMap.instance()
+
         clean: VCPatch = {}
         for key, value_obj in raw.items():
-            key = EvidenceMixin._clean_key(key)
-
+            key = keys.with_namespace_if_required(EvidenceMixin._clean_key(key))
             if key in clean:
                 report_message(message=f'Multiple keys have been normalised to {key}',
                                extra_data={'raw_keys': list(raw.keys())},

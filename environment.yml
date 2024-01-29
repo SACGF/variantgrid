@@ -57,7 +57,7 @@ dependencies:
       - django-amazon-ses==4.0.1
       - django-storages==1.12.3
       - django_autocomplete_light==3.9.1
-      - django-avatar==7.1.1
+      - django-avatar==8.0.0
       - django_cache_memoize==0.1.10
       - django-compressor==4.3.1
       - django_crispy_forms==2.0
@@ -94,3 +94,4 @@ dependencies:
       - rollbar==0.16.3
       - frozendict==2.3.4
       - pronto==2.4.7  # pronto causes a lot of dependancy issues that we're going to sweep under pip's rug
+      - django_recaptcha==4.0.0

@@ -11,7 +11,7 @@ from django.db.models.query import QuerySet
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 
-from classification.enums import ShareLevel, SpecialEKeys
+from classification.enums import ShareLevel, SpecialEKeys, AlleleOriginBucket
 from classification.enums.clinical_context_enums import ClinicalContextStatus
 from classification.models.classification import Classification, \
     ClassificationModification
@@ -26,11 +26,15 @@ from snpdb.models.models_variant import Allele
 
 clinical_context_signal = django.dispatch.Signal()  # args: "clinical_context", "status", "is_significance_change", "clinical_context_change_data:ClinicalContextChangeData"
 
-# TODO, consider moving this into the clinical significance evidence key options rather than hardcoded
+# TODO, consider moving these into the clinical significance evidence key options rather than hardcoded
 SPECIAL_VUS = {
     'VUS_A': 1,
     'VUS_B': 2,
     'VUS_C': 3
+}
+SPECIAL_CS = {
+    "O": "P",
+    "LO": "LP"
 }
 
 
@@ -45,6 +49,7 @@ class DiscordanceLevel(str, Enum):
     CONCORDANT_AGREEMENT = 'concordant_agreement'  # complete agreement
     CONCORDANT_DIFF_VUS = 'concordant_agreement_diff_vus'  # VUS-A, VUS-B vs VUS-C
     CONCORDANT_CONFIDENCE = 'concordant_confidence'  # Benign vs Likely Benign
+    MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED = 'multiple_records'  # SOmatic before we support discordan
     DISCORDANT = 'discordant'
 
     @property
@@ -61,6 +66,8 @@ class DiscordanceLevel(str, Enum):
             return "Single Shared Submission"
         if self == DiscordanceLevel.DISCORDANT:
             return "Discordant"
+        if self == DiscordanceLevel.MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED:
+            return "Multiple Records"
         return "Unknown"
 
     @property
@@ -143,7 +150,12 @@ class DiscordanceStatus:
         return EvidenceKeyMap.clinical_significance_to_bucket()
 
     @staticmethod
-    def calculate(modifications: Iterable[ClassificationModification], discordance_report: Optional['DiscordanceReport'] = None) -> 'DiscordanceStatus':
+    def calculate(
+            modifications: Iterable[ClassificationModification],
+            allele_origin_bucket: Optional[AlleleOriginBucket],
+            discordance_report: Optional['DiscordanceReport'] = None,
+    ) -> 'DiscordanceStatus':
+
         base_status = DiscordanceStatus._calculate_rows([
             _DiscordanceCalculationRow(
                 lab=vcm.classification.lab,
@@ -151,6 +163,13 @@ class DiscordanceStatus:
                 shared=vcm.share_level_enum.is_discordant_level
             ) for vcm in modifications
         ])
+        # in future there will be a different algorithm to detect discordances in somatic
+        if allele_origin_bucket != AlleleOriginBucket.GERMLINE:
+            # if we're not supporting discordances, no need to check flags or anything else
+            if base_status.level not in (DiscordanceLevel.NO_ENTRIES, DiscordanceLevel.SINGLE_SUBMISSION):
+                base_status.level = DiscordanceLevel.MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED
+            return base_status
+
         if not base_status.is_discordant:
             # no need to check flags for pending changes if we're not discordant when looking at all entries
             # the common case by far
@@ -202,7 +221,7 @@ class DiscordanceStatus:
                     counted_classifications += 1
                     shared_labs.add(row.lab)
                     cs_scores.add(strength)
-                    cs_values.add(clin_sig)
+                    cs_values.add(SPECIAL_CS.get(clin_sig, clin_sig))
                 else:
                     shared_labs.add(row.lab)
                     ignored_clin_sigs.add(clin_sig)
@@ -282,15 +301,29 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
 
     # variant = models.ForeignKey(Variant, on_delete=CASCADE)
     allele = models.ForeignKey(Allele, on_delete=CASCADE)
+    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, null=False, blank=False, default=AlleleOriginBucket.GERMLINE)
     name = models.TextField(null=True, blank=True)
     status = models.TextField(choices=ClinicalContextStatus.CHOICES, null=True, blank=True)
     last_evaluation = models.JSONField(null=True, blank=True)
 
     pending_cause = models.TextField(null=True, blank=True)
     pending_status = models.TextField(choices=ClinicalContextStatus.CHOICES, null=True, blank=True)
+    # note these pending fields are about delayed calculation due to an ongoing import
+    # not to be confused with Classifications with pendings changes
 
     class Meta:
-        unique_together = ('allele', 'name')
+        unique_together = ('allele', 'allele_origin_bucket', 'name')
+        indexes = [
+            models.Index(fields=["name"]),
+            models.Index(fields=["status"])
+        ]
+
+    @property
+    def name_pretty(self):
+        if self.name == ClinicalContext.default_name:
+            return self.allele_origin_bucket.label
+        else:
+            return self.name
 
     def flag_type_context(self) -> FlagTypeContext:
         return FlagTypeContext.objects.get(pk='clinical_context')
@@ -311,13 +344,17 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         return self.discordance_status.pending_concordance
 
     def calculate_discordance_status(self) -> DiscordanceStatus:
-        return DiscordanceStatus.calculate(self.classification_modifications, self.latest_report)
+        return DiscordanceStatus.calculate(
+            modifications=self.classification_modifications,
+            allele_origin_bucket=self.allele_origin_bucket,
+            discordance_report=self.latest_report
+        )
 
     @cached_property
     def discordance_status(self) -> DiscordanceStatus:
         # TODO this is awkwardly named as it calculates (at least the first time)
         # Need to distinguish between this and database cached is_discordant
-        return DiscordanceStatus.calculate(self.classification_modifications, self.latest_report)
+        return self.calculate_discordance_status()
 
     @cached_property
     def relevant_classification_count(self) -> int:
@@ -414,11 +451,6 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
     def is_default(self) -> bool:
         return self.name == ClinicalContext.default_name
 
-    @staticmethod
-    def default_group_for_allele(allele: Allele) -> 'ClinicalContext':
-        dg, _ = ClinicalContext.objects.get_or_create(allele=allele, name=ClinicalContext.default_name)
-        return dg
-
     @property
     def classifications_qs(self) -> QuerySet[Classification]:
         return self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, withdrawn=False)
@@ -442,6 +474,4 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         }
 
     def __str__(self) -> str:
-        if self.is_default:
-            return 'Default Grouping for Allele'
-        return self.name
+        return f"CC {self.get_allele_origin_bucket_display()} {self.name} for {self.allele}"

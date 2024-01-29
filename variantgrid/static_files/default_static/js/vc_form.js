@@ -70,7 +70,7 @@ const VCForm = (function() {
 
         renderReference(ref) {
             let text = ref.id;
-            if (ref.db == "HTTP" || ref.db == "HTTPS") {
+            if (ref.db === "HTTP" || ref.db === "HTTPS") {
                 text = `${ref.db.toLowerCase()}:${ref.idx}`;
             }
 
@@ -191,11 +191,11 @@ const VCForm = (function() {
         generateExportButtons() {
             let wrapper = $('<div>', {html: $('<h5>', {text:'Export as', class: 'mt-4'})});
             let buttons = $('<div>', {class: 'btn-toolbar'}).appendTo(wrapper);
-            let csvButton = $('<button>', {class:'btn btn-outline-primary btn-lg', html: '<i class="fas fa-file-csv"></i> CSV', click: () => {this.csv()}});
+            let csvButton = $('<button>', {class:'btn btn-outline-primary btn-lg', id: 'export-csv', html: '<i class="fas fa-file-csv"></i> CSV', click: () => {this.csv()}});
             csvButton.appendTo(buttons);
 
             if (this.reportEnabled) {
-                let reportButton = $('<button>', {class:'btn btn-outline-primary btn-lg', html: '<i class="far fa-file"></i> Report', click: () => {this.report()}});
+                let reportButton = $('<button>', {class:'btn btn-outline-primary btn-lg', id: 'export-report', html: '<i class="far fa-file"></i> Report', click: () => {this.report()}});
                 reportButton.appendTo(buttons);
             } else {
                 buttons.append($('<div>'));
@@ -207,6 +207,7 @@ const VCForm = (function() {
             let dialogContent = createModalShell('confirmation-modal', headerText, 'lg');
             let dialogBody = dialogContent.find('.modal-body');
             let dialogFooter = dialogContent.find('.modal-footer');
+            let idPrefix = "modal-action";
 
             if (isWithdrawal) {
                 let withdrawReasonDropdown = $('<select class="form-control" id="withdrawReasonDropdown" required></select>');
@@ -233,6 +234,7 @@ const VCForm = (function() {
                 $('<button>', {
                     type: "button",
                     class: "btn btn-secondary",
+                    id: `${idPrefix}-cancel`,
                     'data-dismiss': "modal",
                     text: 'Cancel',
                     click: cancelCallback
@@ -241,6 +243,7 @@ const VCForm = (function() {
                     type: "button",
                     class: "btn btn-primary",
                     text: confirmButtonText,
+                    id: `${idPrefix}-confirm`,
                     click: function () {
                         if (isWithdrawal && !$('#withdrawReasonDropdown').val()) {
                             alert('Please select a withdrawal reason.');
@@ -329,7 +332,7 @@ const VCForm = (function() {
                 if (label.included) {
                     selectionDiv.addClass('included list-group-item-primary');
                     selectionDiv.find('i').removeClass('fa-circle').addClass('fa-check-circle');
-                    selectionDiv.attr('title', 'This classification has already been shared at a higher level');
+                    selectionDiv.attr('title', 'This classification record has already been shared at a higher level');
                 } else {
                     selectionDiv.addClass('list-group-item-action');
                     if (label.current) {
@@ -355,11 +358,11 @@ const VCForm = (function() {
                     });
                 }
             }
-            $('<p>', {text: 'Note that once shared at a certain level, this classification can only be shared at the same or higher level'}).appendTo(dialogBody);
+            $('<p>', {class: 'mt-2', text: 'Note that once shared at a certain level, this classification record can only be shared at the same or higher level'}).appendTo(dialogBody);
 
             dialogFooter.html([
-                $('<button>', {type:"button", class:"btn btn-secondary", 'data-dismiss':"modal", text:'Cancel'}),
-                $('<button>', {type:"button", class:"btn btn-primary", text:'Submit', click: () => {
+                $('<button>', {type:"button", class:"btn btn-secondary", 'data-dismiss':"modal", text:'Cancel', id:'share-cancel'}),
+                $('<button>', {type:"button", class:"btn btn-primary", text:'Submit', id:'share-confirm', click: () => {
                     this.publish(newShareLevel);
                     dialogContent.modal('hide');
                 }})
@@ -422,6 +425,7 @@ const VCForm = (function() {
                                     class: 'mt-1 btn btn-primary w-100',
                                     html: '<i class="fas fa-upload"></i> Submit',
                                     title: 'Submit/Share',
+                                    id :'action-submit',
                                     click: this.share.bind(this)
                                 }).appendTo(quickSubmitWrapper);
                             } else if (this.hasErrors()) {
@@ -443,6 +447,7 @@ const VCForm = (function() {
                         class: 'mt-1 btn btn-primary w-100',
                         html: '<i class="fas fa-stopwatch"></i> Go to Latest Version',
                         title: 'Submit/Share',
+                        id: 'action-latest',
                         click: goToLatest
                     }).appendTo(quickSubmitWrapper);
                 } else {
@@ -465,6 +470,7 @@ const VCForm = (function() {
 
             let butt = $('<button>', {class: 'btn btn-danger btn-lg', html: '<i class="fas fa-trash-alt"></i> Delete', title: 'Delete', click: this.trash.bind(this)});
             if (this.record.withdrawn) {
+                butt.attr('id', 'action-un-withdraw');
                 butt.attr('title', 'Un-withdraw Classification');
                 butt.html('<i class="fas fa-trash-restore-alt"></i> Unwithdraw');
                 butt.removeClass('btn-danger');
@@ -474,6 +480,7 @@ const VCForm = (function() {
                 !this.deleteEnabled) {
                 //butt.attr('title', 'Cannot delete classification after it has been shared with logged in users or 3rd parties');
                 //butt = disableButton(butt);
+                butt.attr('id', 'action-withdraw');
                 butt.attr('title', 'Withdraw Classification');
                 butt.html('<i class="fas fa-trash-alt"></i> Withdraw');
             }
@@ -713,7 +720,7 @@ const VCForm = (function() {
                    return undefined;
                 }
                 // Note custom message has almost no browser support
-                var confirmationMessage = `
+                let confirmationMessage = `
                 You have unsaved changes (they will automatically be uploaded shortly).\n
                 If you leave while changes are being uploaded, they will be lost.`;
                 
@@ -727,8 +734,6 @@ const VCForm = (function() {
         },
         
         updateSendingStatus(delta) {
-            //console.log(`Update sending status delta =`);
-            //console.log(delta);
             Object.assign(this.sendStatus, delta);
             this.updateTitle();
             this.updateSubmitButton();
@@ -744,15 +749,18 @@ const VCForm = (function() {
             if (this.sendStatus.error) {
                 return;
             }
-            var sendingDelta = Object.assign({}, this.delta);
+            let sendingDelta = Object.assign({}, this.delta);
             this.updateSendingStatus({sending: true});
             this.delta = {};
-            
-            var envelope = {
+
+            // have to request config if we change a key responsible for which namespaces get used
+            let requestConfig = !!sendingDelta[SpecialEKeys.ASSERTION_METHOD] || !!sendingDelta[SpecialEKeys.ALLELE_ORIGIN];
+            let envelope = {
                 'id': {'record_id': this.record.id},
                 source: 'form',
                 patch: sendingDelta,
-                return_data: 'changes'
+                return_data: 'changes',
+                config: requestConfig
             };
             if (this.publish_level) {
                 envelope['publish'] = this.publish_level;
@@ -788,6 +796,7 @@ const VCForm = (function() {
                     this.dataUpdated();
                 },
                 success: (record) => {
+                    console.log("Success in post");
                     if (record.deleted) {
                         this.deleted = true;
                         document.location.href = '../../../../classification/classifications';
@@ -798,18 +807,29 @@ const VCForm = (function() {
                         document.location.reload(true);
                         return;
                     }
+
+                    let updateSet = new Set();
+
+                    if (record.config) {
+                        eKeys = eKeysBase.configCopy(record.config);
+                        eKeys.forEach(eKey => {
+                            if (eKey.config_updates) {
+                                let original = jContent.find(`[entry="${eKey.key}"]`);
+                                let replacement = this.createEntry(eKey);
+                                replacement.css('display', original.css('display'));
+                                original.replaceWith(replacement);
+                                updateSet.add(eKey.key);
+                            }
+                        });
+                        this.updateSummaryTable();
+                    }
                     
                     this.publish_level = null;
-                    this.updateSendingStatus({
-                        sending: false, modifications: Object.keys(this.delta).length > 0,
-                        error: null
-                    });
                     record.evidence = this.record.evidence;
                     this.record = record;
                     this.messages = record.messages || [];
                     
                     Object.assign(this.delayedPatch, record.data);
-                    updateSet = new Set();
                     let delayedPatch = {};
                     for (let key of Object.keys(this.delayedPatch)) {
                         if (typeof(this.delta[key]) !== 'undefined') {
@@ -828,7 +848,12 @@ const VCForm = (function() {
                     if (updateSet.size) {
                         this.populateForm(updateSet);
                     }
-                    
+
+                    this.updateSendingStatus({
+                        sending: false, modifications: Object.keys(this.delta).length > 0,
+                        error: null
+                    });
+
                     this.updatePublishHistory();
                     this.updateLinks();
                     this.updateErrors();
@@ -855,6 +880,7 @@ const VCForm = (function() {
         },
 
         updateTitle() {
+            console.log("Updating title");
 
             let appendLabelHeading = (label, valueElement) => {
                 return $('<div>', {class: 'row no-gutters', html:[
@@ -893,54 +919,6 @@ const VCForm = (function() {
                     appendLabelHeading('', $('<a>', {'data-toggle':'ajax-modal', href: Urls.view_imported_allele_info_detail(resolved.allele_info_id), text:'Resolution Details'}));
                 }
             }
-            /*
-            let variantText = this.value(SpecialEKeys.C_HGVS) || this.value(SpecialEKeys.G_HGVS) || this.value(SpecialEKeys.VARIANT_COORDINATE) || 'unknown';
-            let variantIcon = 'fas fa-question-circle';
-
-            let variantTooltip = [];
-            let alleleData = this.record.allele;
-            if (alleleData) {
-                if (alleleData.status && alleleData.status !== "M") {
-                    if (alleleData.status === "F") {
-                        variantIcon = 'text-danger fa-magnifying-glass-chart';
-                    } else {
-                        variantIcon = 'text-warning fa-magnifying-glass-chart';
-                    }
-                }
-
-                let clingen = alleleData.clingen_allele_id || "<span class='no-value'>-</span>";
-                if (clingen) {
-                    variantTooltip.push(`<strong>ClinGen Canonical Allele ID</strong><br/>${clingen}`);
-                }
-
-                variantTooltip.push(`<strong>Imported ${this.value(SpecialEKeys.GENOME_BUILD)}</strong> ${variantText}`);
-
-                let allBuilds = Object.keys(alleleData.genome_builds);
-                allBuilds.sort();
-                for (let genomeBuild of allBuilds) {
-                    let buildData = alleleData.genome_builds[genomeBuild];
-                    variantTooltip.push(`<strong>Resolved ${genomeBuild}</strong> ${buildData.c_hgvs || '<span class="no-value">Could Not Resolve</span>'}`);
-                }
-            }
-
-            let variantElement = null;
-            let alleleVariantData = this.alleleVariantData();
-            if (alleleVariantData.variant_id) {
-                let href = Urls.view_allele_from_variant(alleleVariantData.variant_id);
-                variantElement = $('<a>', {class:'hover-link', text: variantText, href:href});
-                variantElement = $('<span>', {html: [
-                    variantElement,
-                    $('<i>', {class:"fas fa-question-circle hover-detail ml-2", title:'Resolved to', 'data-content':variantTooltip.map(x => `<p>${x}</p>`).join("")})
-                ]})
-            } else {
-                variantElement = $('<span>', {text: variantText});
-            }
-            appendLabelHeading('Variant', variantElement);
-            */
-
-            if (this.record.resolved_condition) {
-                appendLabelHeading('Condition', VCForm.format_condition(this.record.resolved_condition));
-            }
 
             let p_hgvs = this.value(SpecialEKeys.P_HGVS);
             if (p_hgvs) {
@@ -948,10 +926,54 @@ const VCForm = (function() {
                 if (p_dot !== -1) {
                     p_hgvs = p_hgvs.substring(p_dot);
                 }
-                appendLabelHeading('p.hgvs', $('<span>', {text: p_hgvs}));
+                appendLabelHeading('p.HGVS', $('<span>', {text: p_hgvs}));
             }
 
-            appendLabelHeadingForKey(SpecialEKeys.CLINICAL_SIGNIFICANCE, true, 'Clin Sig');
+            let alleleOriginBucket = this.record.allele_origin_bucket;
+            let alleleOriginDisplay = {
+                "U": "not-set",
+                "G": "GERMLINE (default)",
+                "S": "SOMATIC (default)"
+            }[alleleOriginBucket];
+            let alleleOriginValue = this.value(SpecialEKeys.ALLELE_ORIGIN);
+            if (alleleOriginValue) {
+                let eKey = eKeys.key(SpecialEKeys.ALLELE_ORIGIN);
+                alleleOriginDisplay = eKey.prettyValue(alleleOriginValue).val;
+                // TODO hopefully replace this with an attribute of the allele origin drop down
+                // also see classification.py def calc_allele_origin_bucket(self) -> AlleleOriginBucket:
+                if (alleleOriginValue.indexOf('germline') !== -1) {
+                    alleleOriginBucket = "G";
+                } else if (alleleOriginValue.indexOf('somatic') !== -1) {
+                    alleleOriginBucket = "S";
+                } else {
+                    alleleOriginBucket = "U";
+                }
+            }
+
+            let bucketHtml = $(`<div class="allele-origin-box horizontal allele-origin-${alleleOriginBucket}">
+                <div class="allele-origin-text">
+                    ${alleleOriginDisplay}
+                </div>
+            </div>`);
+
+            $('<hr/>').appendTo(jSyncStatus);
+            appendLabelHeading("Origin", bucketHtml);
+
+            appendLabelHeadingForKey(SpecialEKeys.ASSERTION_METHOD, true, "Method")
+
+            if (this.record.resolved_condition) {
+                let label = "Condition";
+                if (alleleOriginBucket === "S") {
+                    label = "Cancer";
+                }
+                appendLabelHeading(label, VCForm.format_condition(this.record.resolved_condition));
+            }
+
+            appendLabelHeadingForKey(SpecialEKeys.CLINICAL_SIGNIFICANCE, true, 'Class.');
+
+            if (this.value(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)) {
+                appendLabelHeadingForKey(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE, true, 'Somatic Sig');
+            }
 
             if (this.record.sample_id) {
                 let href = Urls.view_sample(this.record.sample_id);
@@ -1050,7 +1072,7 @@ const VCForm = (function() {
                     } else if (elem[0].nodeName === 'SPAN') {
                         elem.age('value', val);
                     } else {
-                        if (elem.val().trim() == val) {
+                        if (elem.val().trim() === val) {
                             // don't remove whitespace that the user has entered
                             // e.g. "One day I " would be changed to "One day I" before the user had a chance
                             // to finish (if the auto-update kicked in).
@@ -1081,7 +1103,7 @@ const VCForm = (function() {
                 }
                 
                 // find all the values that have no matching options
-                let customValues = val.filter(v => !options.some(o => o.value == `${v}`));
+                let customValues = val.filter(v => !options.some(o => o.value === `${v}`));
 
                 if (customValues.length) {
                     let appendTo = select;
@@ -1093,7 +1115,7 @@ const VCForm = (function() {
                         appendTo = $('<optgroup>', {label: 'Illegal Value'});
                         select.append(appendTo);
                     }
-                    for (custom of customValues) {
+                    for (const custom of customValues) {
                         appendTo.prepend($('<option>', {value: custom, text: `${custom}`}));
                     }
                 }
@@ -1158,7 +1180,7 @@ const VCForm = (function() {
                 return emptyToNull( (this.data[key] || {}).note );
             }
             note = emptyToNull(note);
-            var noteDiv = $(`#note-${key}`);
+            let noteDiv = $(`#note-${key}`);
 
             this.fixNotePopover(noteDiv, note);
             
@@ -1195,7 +1217,7 @@ const VCForm = (function() {
         },
         
         refs(key) {
-            var blob = this.data[key] || {};
+            let blob = this.data[key] || {};
             return blob.db_refs || [];
         },
 
@@ -1220,11 +1242,12 @@ const VCForm = (function() {
             jClearFilterButton = $(params.clearFilterButton);
             jClearFilterButton.hide();
 
+            eKeysBase = _eKeys;  // so we can copy it again when config changes
             eKeys = _eKeys.configCopy(record.config);
             vcLinks = new VCLinks(eKeys);
             vcform.url = Urls.classification_api();
             vcform.genomeBuild = params.genomeBuild;
-            
+
             this.otherClassificationsSummary = params.otherClassificationsSummary;
             this.reportEnabled = params.reportEnabled;
             this.deleteEnabled = params.deleteEnabled;
@@ -1299,7 +1322,7 @@ const VCForm = (function() {
                 entry.find('input').focus();
                 entry.find('[tabindex]').focus();
             });
-            
+
             jFilterBox.keyup(function() {
                 let filterValue = $(this).val().trim();
                 vcform.filter( filterValue );
@@ -1315,7 +1338,7 @@ const VCForm = (function() {
                 }, 1);
                 jHelp.closest('.card').find('.card-title').text('Filter');
                 jHelp.empty()
-                    .append($('<div>', {class: 'description', html: 'Type in the filter to search on field names<br/>Type * to see the entire populated form at once.<br/>Type ** to see all possible fileds at once.'}));
+                    .append($('<div>', {class: 'description', html: 'Type in the filter to search on field names<br/>Type * to see the entire populated form at once.<br/>Type ** to see all possible fields at once.'}));
             });
 
             this.populateForm();
@@ -1337,6 +1360,7 @@ const VCForm = (function() {
             }
         },
 
+        // The actual show/hide of elements on the form
         filter: function(val) {
             let oldFiltering = filtering;
             let showUploads = null;
@@ -1355,22 +1379,23 @@ const VCForm = (function() {
             val = val.toLowerCase();
             //let inst = jContent.accordion('instance');
             eKeys.forEach(eKey => {
-                if (eKey.exclude_namespace) {
-                    return;
+                let matches = false;
+                if (eKey.exclude_namespace && this.value(eKey.key) == null) {
+                    matches = false;
+                } else {
+                    if (val.length === 0 || val === '**') {
+                        matches = true;
+                    } else if (val === '*') {
+                        matches = this.value(eKey.key) !== null || this.note(eKey.key) !== null || this.severity(eKey.key) !== null;
+                    } else if (eKey.matchesFilter(val)) {
+                        matches = true;
+                    }
                 }
-                var matches = false;
-                if (val.length === 0 || val === '**') {
-                    matches = true;
-                } else if (val === '*') {
-                    matches = this.value(eKey.key) !== null || this.note(eKey.key) !== null || this.severity(eKey.key) !== null;
-                } else if (eKey.matchesFilter(val)) {
-                    matches = true;
-                }
-                var elem = $(`[entry="${eKey.key}"]`);
+                let elem = $(`[entry="${eKey.key}"]`);
 
                 filtered[eKey.key] = !matches;
-                var shouldHide = filtered[eKey.key];
-                
+                let shouldHide = filtered[eKey.key];
+
                 if (!shouldHide &&
                     !filtering &&
                     eKey.hide === true &&
@@ -1378,7 +1403,6 @@ const VCForm = (function() {
                     this.note(eKey.key) === null) {
                     shouldHide = true;
                 }
-
                 if (!shouldHide) {
                     elem.show();
                 } else {
@@ -1423,10 +1447,10 @@ const VCForm = (function() {
         showHideFamilies: function() {
             let showing = {};
             eKeys.forEach(eKey => {
-                if (eKey.exclude_namespace) {
+                if (eKey.exclude_namespace && this.value(eKey.key) == null) {
                     return;
                 }
-                var shouldHide = filtered[eKey.key];
+                let shouldHide = filtered[eKey.key];
                 if (!shouldHide) {
                     showing[eKey.evidence_category] = true;
                 }
@@ -1591,7 +1615,7 @@ const VCForm = (function() {
             let vcform = this;
             let eKey = eKeys.key(key);
 
-            let dialogContent = createModalShell('note',eKey.label);
+            let dialogContent = createModalShell('note',eKey.label, 'lg');
             let body = dialogContent.find('.modal-body');
             $('<p>', {text: 'Edit the note for this field below'}).appendTo(body);
             let textArea = $('<textarea>', {text: this.note(key), class:'form-control', rows:5}).appendTo(body);
@@ -1689,6 +1713,9 @@ const VCForm = (function() {
                 case 'multiple': {
                     let value = this.value(key);
                     let optionSources = eKey.options || [];
+
+                    // move all disabled options to the bottom
+                    optionSources = _.flatten(_.partition(optionSources, o => !o.exclude_namespace));
                     if (type === 'bool') {
                         optionSources = [
                             {key: 'true', label: 'True'},
@@ -1696,36 +1723,57 @@ const VCForm = (function() {
                         ];
                     }
 
-                    let blankOption = optionSources.find(o => !('key' in o));
-                    if (!blankOption) {
-                        optionSources = [{key: '', label: ''}].concat(optionSources);
+                    let optGroups = [];
+
+                    let standardPrefix = ""
+                    let overridePrefix = ""
+                    let emptyValuePrefix = "";
+                    if (type === "crit") {
+                        overridePrefix = "❗";
+                        standardPrefix = "⭐ ";
+                        emptyValuePrefix = "⚪ ";
                     }
 
-                    let optGroups = [];
-                    let options = [];
+                    let blankOption = optionSources.find(o => !('key' in o));
+                    if (!blankOption) {
+                        // optionSources = [{key: '', label: ''}].concat(optionSources);
+                        optGroups.push($('<option>', {value: '', text: ''}));
+                    }
+
+                    let makeOption = (option, overridePrefix) => {
+                        let prefix = "";
+                        if (option.key === "NM" || option.key === "NA") {
+                            prefix = emptyValuePrefix;
+                        } else if (option.key) {
+                            prefix = standardPrefix;
+                        }
+                        if (overridePrefix) {
+                            prefix = overridePrefix;
+                        }
+
+                        let optDom = $('<option>', {
+                            value: option.key || '',
+                            text: prefix + (option.label || EKey.prettyKey(option.key))
+                        });
+                        optDom.prop("disabled", !!option.exclude_namespace);
+
+                        return optDom;
+                    }
 
                     if (optionSources.find(o => o.override)) {
-                        optGroupNormal = optionSources.filter(o => !o.override).map(option => {
-                            return $('<option>', {
-                                value: option.key || '',
-                                text: option.label || EKey.prettyKey(option.key)
-                            });
+                        let optGroupNormal = optionSources.filter(o => !o.override).map(option => {
+                            return makeOption(option);
                         });
-                        optGroupOverride = optionSources.filter(o => o.override).map(option => {
-                            return $('<option>', {
-                                value: option.key || '',
-                                text: option.label || EKey.prettyKey(option.key)
-                            });
+                        let optGroupOverride = optionSources.filter(o => o.override).map(option => {
+                            return makeOption(option, overridePrefix);
                         });
                         optGroups.push($('<optgroup>', {label: 'standard values', html: optGroupNormal}));
                         optGroups.push($('<optgroup>', {label: 'override values', html: optGroupOverride}));
                     } else {
                         options = optionSources.map(option => {
-                            return $('<option>', {
-                                value: option.key || '',
-                                text: option.label || EKey.prettyKey(option.key)
-                            });
+                            return makeOption(option);
                         });
+                        optGroups = optGroups.concat(options);
                     }
 
                     if (eKey.allow_custom_values) {
@@ -1757,7 +1805,7 @@ const VCForm = (function() {
                         if (valueArray.indexOf('!CUSTOM!') !== -1) {
                             valueArray = valueArray.filter(v => v !== '!CUSTOM!');
                             custom = true;
-                            customVal = emptyToNull(prompt('Please enter the custom value'));
+                            let customVal = emptyToNull(prompt('Please enter the custom value'));
                             valueArray.push(customVal);
                         }
 
@@ -1848,8 +1896,8 @@ const VCForm = (function() {
             divy = $(divy);
             let family = divy.attr('family');
             eKeys.forEach(eKey => {
-                if (eKey.evidence_category == family && !eKey.exclude_namespace) {
-                    var entry = this.createEntry(eKey);
+                if (eKey.evidence_category === family) {
+                    const entry = this.createEntry(eKey);
                     divy.append(entry);
                 }
             });
@@ -1865,6 +1913,18 @@ const VCForm = (function() {
                 jFilterBox.val('*');
                 jFilterBox.keyup();
             },0);
+        },
+
+        setAccordionIndex: function(family) {
+            let segment = $(`.card[family=${family}] .collapse`);
+            if (filtering) {
+                this.clearFilter();
+                window.setTimeout(() => {
+                    segment.collapse('show');
+                }, 1);
+            } else {
+                segment.collapse('show');
+            }
         },
 
         hasStrength: function(val) {
@@ -1887,19 +1947,19 @@ const VCForm = (function() {
         },
 
         calculateOverall: function(strs) {
-            var getStr = function(key) {
+            const getStr = function(key) {
                 return strs[key] || 0;
             };
-            let PVS = getStr('PVS');
-            let PS = getStr('PS');
-            let PM = getStr('PM');
-            let PP = getStr('PP');
-            let BA = getStr('BA');
-            let BS = getStr('BS');
-            let BP = getStr('BP');
-            let BM = getStr('BM'); // note this aren't standard, so can't calculate anything with it
-            let BX = getStr('BX');
-            let PX = getStr('PX');
+            const PVS = getStr('PVS');
+            const PS = getStr('PS');
+            const PM = getStr('PM');
+            const PP = getStr('PP');
+            const BA = getStr('BA');
+            const BS = getStr('BS');
+            const BP = getStr('BP');
+            const BM = getStr('BM'); // note this aren't standard, so can't calculate anything with it
+            const BX = getStr('BX');
+            const PX = getStr('PX');
 
             let result = {
                 P: null,
@@ -1994,6 +2054,7 @@ const VCForm = (function() {
         formatOverall: function(result) {
             let footnote = (classification, note) => {
                 let assertionMethod = this.value(SpecialEKeys.ASSERTION_METHOD);
+                // FIXME maybe just check for "ACMG" in assertionMethod
                 let row = $('<span>');
                 if (assertionMethod && assertionMethod.indexOf('VCGS') !== -1) {
                     row.text(`Custom assertion method used.`);
@@ -2017,22 +2078,11 @@ const VCForm = (function() {
             }
             return dom;
         },
-        
-        setAccordionIndex: function(family) {
-            let segment = $(`.card[family=${family}] .collapse`);
-            if (filtering) {
-                this.clearFilter();
-                window.setTimeout(() => {
-                    segment.collapse('show');
-                }, 1);
-            } else {
-                segment.collapse('show');
-            }
-        },
 
         updateSummaryTable: function() {
             let cellCount = {};
             let strengthCount = {};
+            let score = 0;
 
             let familiesWithCrits = {};
             for (let crit of eKeys.criteria()) {
@@ -2045,6 +2095,8 @@ const VCForm = (function() {
                 if (this.hasStrength(val)) {
                     cell += val;
                     strengthCount[val] = (strengthCount[val] || 0) + 1;
+                    let critPoints = EKey.strengthToPoints[val] || 0;
+                    score += critPoints;
                 } else {
                     cell += str;
                 }
@@ -2057,7 +2109,7 @@ const VCForm = (function() {
                 }
                 if (val == null) {
                     cellEntry.possible.push(label);
-                } else if (val == 'N') {
+                } else if (val === 'N') {
                     cellEntry.neutral.push(label);
                 } else if (!this.hasStrength(val)) {
                     cellEntry.notMet.push(label);
@@ -2066,14 +2118,27 @@ const VCForm = (function() {
                 }
             }
 
+            let assertionMethod = this.value(SpecialEKeys.ASSERTION_METHOD);
+            let pointBased = false;
+            // maybe look at the criteria to see if they're point based?
+            if (assertionMethod && assertionMethod.indexOf('horak') !== -1) {
+                pointBased = true;
+            }
+
             let critTable = $('<table>');
             let headerRow = $('<tr>');
             headerRow.append($('<th></th>'));
-            for (key of Object.keys(EKey.critValues)) {
+
+            for (let key of Object.keys(EKey.critValues)) {
                 if (!this.hasStrength(key)) {
                     continue;
                 }
-                let th = $(`<th>`, {text: key, class: 'col-header', title: EKey.critValues[key], 'data-toggle':"tooltip", 'data-placement': 'left'});
+                let label = key;
+                if (pointBased) {
+                    label = `${(EKey.strengthToPoints[key])}`;
+                }
+
+                let th = $(`<th>`, {text: label, class: 'col-header', title: EKey.critValues[key], 'data-toggle':"tooltip", 'data-placement': 'left'});
                 headerRow.append(th);
             }
             critTable.append(headerRow);
@@ -2110,7 +2175,7 @@ const VCForm = (function() {
                         tooltip.push( 'Not Evaluated : ' + values.possible.join(', ') );
                     }
 
-                    let td = $('<td>', {title: tooltip.join('\n')});
+                    let td = $('<td>', {title: tooltip.join('\n'), id:`table-${fam}-${str}`});
                     if (values.actual.length > 0) {
                         let direction = str[0];
                         td.addClass(`${direction}-cell`)
@@ -2133,12 +2198,31 @@ const VCForm = (function() {
                 critTable.append(row);
             });
 
-            let result = this.calculateOverall(strengthCount);
-            let evidenceWeightsDom = $('<div>', {class: 'm-2', text: this.evidenceWeights(strengthCount)});
-            let resultDom = this.formatOverall(result);
+            jCritTable.empty().append(critTable)
 
-            jCritTable.empty().append(critTable).append(evidenceWeightsDom).append(resultDom);
+            if (!pointBased) {
+                let result = this.calculateOverall(strengthCount);
+                let evidenceWeightsDom = $('<div>', {class: 'm-2', text: this.evidenceWeights(strengthCount)});
+                let resultDom = this.formatOverall(result);
+                jCritTable.append(evidenceWeightsDom).append(resultDom);
+            } else {
+                let overallValue;
+                if (score <= -7) {
+                    overallValue = "Benign";
+                } else if (score <= -1) {
+                    overallValue = "Likely Benign";
+                } else if (score <= 5) {
+                    overallValue = "VUS";
+                } else if (score <= 9) {
+                    overallValue = "Likely Oncogenic";
+                } else {
+                    overallValue = "Oncogenic";
+                }
 
+                jCritTable.append(
+                    $('<div>', {class: 'text-center my-2', html:`Calculated Score: ${score} ${overallValue}`})
+                )
+            }
         }
     };
 
@@ -2281,7 +2365,7 @@ VCTable.format_hgvs = (parts) => {
         $('<span>', {class: 'd-block mt-1 text-secondary', text: limitLength(pHgvs)}).appendTo(dom);
     }
     return outterDom;
-}
+};
 
 VCTable.hgvs = (data, type, row) => {
     return VCTable.format_hgvs(data).prop('outerHTML');
@@ -2296,17 +2380,32 @@ VCTable.condition = (data, type, row) => {
 };
 
 VCTable.clinical_significance = (data, type, row) => {
+    let cs = data[SpecialEKeys.CLINICAL_SIGNIFICANCE];
     let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
-    let label = csKey.prettyValue(data);
-    if (data && data.length) {
-        return label.val;
+    let label = csKey.prettyValue(cs);
+
+    let dom = $('<span>', {style:'font-weight:bold;color:#555'});
+
+    if (cs && cs.length) {
+        dom.append(label.val);
     } else {
-        return $('<span>', {class: 'no-value', text: 'Unclassified'}).prop('outerHTML');
+        dom.append($('<span>', {class: 'no-value', text: 'Unclassified'}));
     }
+
+    let scs = data[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE];
+    if (scs) {
+        let scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
+        let scsLabel = scsKey.prettyValue(scs);
+        dom.append('<br/>');
+        dom.append($('<span>', {text:scsLabel.val, 'class': `scs scs-${scsKey}`}));
+    }
+
+    return dom.prop('outerHTML');
 };
 
 VCTable.clinical_significance_td = ( cell, cellData, rowData, rowIndex, colIndex ) => {
-    $(cell).addClass(`text-center cs cs-${(cellData || '').toLowerCase()}`);
+    let cs = cellData[SpecialEKeys.CLINICAL_SIGNIFICANCE];
+    $(cell).addClass(`text-center cs cs-${(cs || '').toLowerCase()}`);
 };
 
 VCTable.evidence_key = (key_name, data, type, row) => {
@@ -2321,12 +2420,39 @@ VCTable.evidence_key = (key_name, data, type, row) => {
     return span.prop('outerHTML');
 };
 
+VCTable.allele_origin_bucket_label = (allele_origin_bucket, override_text = "", alignment="vertical") => {
+    let allele_origin_label = override_text;
+    if (!allele_origin_label) {
+        if (allele_origin_bucket == "S") {
+            allele_origin_label = "SOMATIC"
+        } else if (allele_origin_bucket == "G") {
+            allele_origin_label = "GERMLINE"
+        } else if (allele_origin_bucket == "U") {
+            allele_origin_label = "UNKNOWN"
+        } else {
+            allele_origin_label = "???"
+        }
+    }
+    return $('<div>', {
+        class: `allele-origin-box ${alignment} allele-origin-${allele_origin_bucket}`,
+        html: [
+            $('<div>', {
+                class: 'allele-origin-text',
+                text: allele_origin_label
+            })
+        ]
+    });
+}
+
 VCTable.identifier = (data, type, row) => {
     let id = data.id;
     let org_name = data.org_name;
     let lab_name = data.lab_name;
     let lab_record_id = data.lab_record_id;
     let shareLevel = data.share_level;
+    let allele_origin_bucket = data.allele_origin_bucket;
+
+    let alleleOriginDiv = VCTable.allele_origin_bucket_label(allele_origin_bucket);
 
     let shareInfo = EKeys.shareLevelInfo(shareLevel);
     let icon = $('<img>', {src: shareInfo.icon, class:'share-icon'});
@@ -2358,7 +2484,12 @@ VCTable.identifier = (data, type, row) => {
     } else {
         dom = link;
     }
-    return dom.prop('outerHTML');
+    let indicatorClassName = `allele-origin-indicator allele-origin-horizontal allele-origin-${allele_origin_bucket}`;
+    let fullDom = $('<div>', {style: 'display:flex; flex-direction:row', html:[
+        alleleOriginDiv,
+        dom
+    ]});
+    return fullDom.prop('outerHTML');
 };
 
 VCTable.sample = (sample_name, type, row) => {

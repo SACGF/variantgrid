@@ -5,7 +5,7 @@ from typing import Any, Mapping, TypedDict, Optional
 from annotation.models import CitationFetchRequest
 from annotation.models.models_citations import CitationSource
 from annotation.regexes import db_citation_regexes
-from classification.enums import SpecialEKeys, EvidenceKeyValueType, ShareLevel
+from classification.enums import SpecialEKeys, EvidenceKeyValueType, ShareLevel, AlleleOriginBucket
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
     MultiCondition, ClinVarExport, classification_flag_types, Classification, ClinVarExportStatus, \
     ClinVarExportSubmission, CLINVAR_EXPORT_CONVERSION_VERSION
@@ -15,7 +15,12 @@ from ontology.models import OntologyTerm, OntologyService, OntologyTermStatus
 from snpdb.models import ClinVarKey, ClinVarCitationsModes
 from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
 
-# Code in this file is responsible for converting VariantGrid formatted classifications to ClinVar JSON
+"""
+Code in this file is responsible for converting VariantGrid formatted classifications to ClinVar JSON
+It also applies data level validation
+"""
+
+# ClinVar doesn't accept ENST for example
 CLINVAR_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}
 
 
@@ -65,8 +70,7 @@ class ClinVarExportData:
     """ The record this export data is for """
 
     grouping: ValidatedJson
-    """ The body data we'll be using (could either be as it's cached in the record or what the most up to date grouping
-    header would look like"""
+    """ JSON that has to match between records to be put into the same clinvar batch """
 
     body: ValidatedJson
     """ The body data we'll be using (could either be as it's cached in the record or what the most up to date body
@@ -399,7 +403,11 @@ class ClinVarExportConverter:
                 grouping=ValidatedJson({})
             )
         else:
-            grouping = ValidatedJson({"assertionCriteria": self.json_assertion_criteria})
+            # remove warnings as if two records share the same assertionCriteria but have differently worded
+            # warnings, that shouldn't affect anything
+            grouping = ValidatedJson({
+                "assertionCriteria": self.json_assertion_criteria,
+            }).without_warnings()
 
             data = {}
             data["clinicalSignificance"] = self.json_clinical_significance
@@ -567,10 +575,28 @@ class ClinVarExportConverter:
             data["affectedStatus"] = ValidatedJson(default_affected_status, JsonMessages.info("Using configured default for affected status"))
         else:
             data["affectedStatus"] = ValidatedJson(None, JsonMessages.error("Affected status not provided and no default config provided"))
+
+        attempt_allele_origin_default = True
+        allele_origin_value = ""
+        allele_origin_messages = JSON_MESSAGES_EMPTY
+        if based_on := self.clinvar_export_record.classification_based_on:
+            bucket = based_on.classification.allele_origin_bucket
+            if bucket != AlleleOriginBucket.GERMLINE:
+                attempt_allele_origin_default = False
+
         if allele_origin := self.clinvar_value(SpecialEKeys.ALLELE_ORIGIN).value(single=True, optional=True):
-            data["alleleOrigin"] = allele_origin
-        else:
-            data["alleleOrigin"] = ValidatedJson("germline", JsonMessages.info("Defaulting \"Allele origin\" to \"germline\" as no value provided"))
+            allele_origin_value = allele_origin
+        elif attempt_allele_origin_default:
+            # default allele origin based on bucket if no value is provided (as there is another setting that can mean a blank all
+            if bucket == AlleleOriginBucket.GERMLINE:
+                allele_origin_value = "germline"
+                allele_origin_messages += JsonMessages.info("Defaulting \"Allele origin\" to \"germline\" as no value provided")
+            elif bucket == AlleleOriginBucket.SOMATIC:
+                allele_origin_value = "somatic"
+                allele_origin_messages += JsonMessages.info("Defaulting \"Allele origin\" to \"somatic\" as no value provided")
+
+        data["alleleOrigin"] = ValidatedJson(allele_origin_value, allele_origin_messages)
+
         data["collectionMethod"] = "clinical testing"
         # numberOfIndividuals do we do anything with this?
         return ValidatedJson([data])

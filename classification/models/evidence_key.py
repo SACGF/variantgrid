@@ -1,19 +1,24 @@
 import math
 import re
+from collections import defaultdict
+from copy import deepcopy
+from dataclasses import dataclass, field
 from enum import Enum
 from functools import cached_property
-from typing import Any, Optional, Iterable, Mapping, Union, TypedDict, cast
+from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set, TypedDict, cast
 
+import pydantic
 from django.db import models
 from django.db.models.deletion import SET_NULL
 from django_extensions.db.models import TimeStampedModel
 
+from classification.criteria_strengths import CriteriaStrength
 from classification.enums import CriteriaEvaluation, SubmissionSource, SpecialEKeys
 from classification.enums.classification_enums import EvidenceCategory, \
     EvidenceKeyValueType, ShareLevel
 from classification.models.evidence_mixin import VCBlobDict, VCPatchValue, VCPatch, VCDbRefDict
 from library.cache import timed_cache
-from library.utils import empty_to_none, strip_json
+from library.utils import empty_to_none, strip_json, first
 from snpdb.models import VariantGridColumn, Lab
 
 CLASSIFICATION_VALUE_TOLERANCE = 0.00000001
@@ -51,6 +56,79 @@ class EvidenceKeyOption(TypedDict):
     """
 
 
+class EvidenceKeyOverrides(pydantic.BaseModel):
+    evidence_key_config: dict[str, dict[str, Any]] = field(default_factory=dict)
+    """
+    Entries should confirm to the EvidenceKey JSON but only the elements that require overriding
+    """
+
+    namespaces: set[str] = field(default_factory=set)
+
+    def to_json(self):
+        data = self.evidence_key_config.copy()
+        data["namespaces"] = list(sorted(self.namespaces))
+        return data
+
+    @staticmethod
+    def from_dict(config_dict: Optional[dict[str, Any]]) -> 'EvidenceKeyOverrides':
+        """
+        The dictionary is to have keys that match evidence keys.key
+        and values of either true/false (for visibility) or a JSON representation
+        of parts of an evidence key to override those attributes.
+
+        If there's a key called "namespaces" it's expected to be a list of strings
+        these strings should match the namespace of some evidence keys
+        :param config_dict: A diction of evidence key overrides and namespaces
+        :return: A well structured EvidenceKeyOverrides
+        """
+        if not config_dict:
+            return EvidenceKeyOverrides()
+
+        evidence_key_config: dict[str, dict[str, Any]] = {}
+        namespaces: set[str] = set()
+
+        for key, value in config_dict.items():
+            if key == "namespaces":
+                namespaces = set(value)
+                continue
+            elif isinstance(value, bool):
+                value = {"hide": not value}
+            elif not isinstance(value, dict):
+                raise ValueError(f"Received illegal value for classification config: {key}: {value}")
+            evidence_key_config[key] = value
+
+        return EvidenceKeyOverrides(
+            evidence_key_config=evidence_key_config,
+            namespaces=namespaces
+        )
+
+    @staticmethod
+    def merge(*args: 'EvidenceKeyOverrides') -> 'EvidenceKeyOverrides':
+        """
+        Merges multiple ClassificationConfigs into one. Provide them in increasing priority.
+        Note the evidence key attributes will overwrite each other (only if the attributes
+        match, different attributes will be merged).
+        In addition. namespaces will be unioned together.
+        """
+        evidence_key_config: dict[str, dict[str, Any]] = {}
+        namespaces: set[str] = set()
+
+        for config in reversed(args):
+            for key, value in config.evidence_key_config.items():
+                existing = evidence_key_config.get(key)
+                if existing:
+                    for sub_key, sub_value in value.items():
+                        existing[sub_key] = sub_value
+                else:
+                    evidence_key_config[key] = value.copy()
+            namespaces |= config.namespaces
+
+        return EvidenceKeyOverrides(
+            evidence_key_config=evidence_key_config,
+            namespaces=namespaces
+        )
+
+
 class EvidenceKey(TimeStampedModel):
     key = models.TextField(primary_key=True)
     mandatory = models.BooleanField(default=False)
@@ -83,10 +161,15 @@ class EvidenceKey(TimeStampedModel):
     evidence_category = models.CharField(max_length=3, choices=EvidenceCategory.CHOICES, null=False, blank=False)
     value_type = models.CharField(max_length=1, choices=EvidenceKeyValueType.CHOICES, null=False, blank=True, default=EvidenceKeyValueType.FREE_ENTRY)
 
+    # TODO rename to crit_default_evaluation
     default_crit_evaluation = models.TextField(max_length=3, null=True, blank=True, choices=CriteriaEvaluation.CHOICES)
+    crit_allows_override_strengths = models.BooleanField(default=False, null=False, blank=True)
+    crit_uses_points = models.BooleanField(default=False, null=False, blank=True)
 
     allow_custom_values = models.BooleanField(default=False, null=False, blank=True)
     hide = models.BooleanField(default=False, null=False, blank=True)
+
+    namespace_overrides = models.JSONField(null=True, blank=True)
 
     immutable = models.BooleanField(default=False, null=False, blank=True)
 
@@ -124,14 +207,15 @@ class EvidenceKey(TimeStampedModel):
 
         return lower_key + suffix_str
 
-    def matched_options(self, normal_value_obj) -> list[dict[str, str]]:
+    def matched_options(self, normal_value_obj) -> List[Dict[str, str]]:
         """
         Given a value (or possibly list of values) generate or find the options that match.
         e.g. for the value ["maternal","xsdfdwerew"] for variant inheritance we'd get
         [{"key":"maternal", "value":"Maternal"}, {"key":"xsdfdwerew", "label":"xsdfdwerew"}]
-        With the fist one being the result of a match, and the second on being the result of not being matched
+        See in the 2nd example that we still try to provide an option for unmatched.
         :param normal_value_obj: A value or dict with a key value
-        :return: A list of options that matched
+        :return: A list of options, guarenteed to to be the same length as normal_value_obj if that is a list, otherwise
+        will return a length of 1.
         """
         value: Optional[Any]
         if isinstance(normal_value_obj, Mapping):
@@ -156,7 +240,7 @@ class EvidenceKey(TimeStampedModel):
         return [{'key': value, 'label': value}]
 
     @staticmethod
-    def __special_up_options(options: list[dict[str, Any]], default: str) -> list[EvidenceKeyOption]:
+    def __special_up_options(options: List[Dict[str, Any]], default: str, allow_overrides=True) -> List[EvidenceKeyOption]:
         """
         Converts a CriteriaEvaluation options (e.g. CriteriaEvaluation.BENIGN_OPTIONS) and a default strength (e.g. BM)
         to a list of evidence keys with default and override populated appropriately
@@ -168,30 +252,61 @@ class EvidenceKey(TimeStampedModel):
                 entry['default'] = True
             elif entry.get('key') == 'NM' or entry.get('key') == 'NA':
                 pass
-            else:
+            elif allow_overrides:
                 entry = entry.copy()
                 entry['override'] = True
+            else:
+                continue
+
             use_options.append(entry)
         return use_options
 
-    @property
-    def virtual_options(self) -> Optional[list[EvidenceKeyOption]]:
-        if self.options:
-            return cast(list[EvidenceKeyOption], self.options)
-        if self.value_type == EvidenceKeyValueType.CRITERIA:
-            for criteria in [CriteriaEvaluation.BENIGN_OPTIONS,
-                             CriteriaEvaluation.NEUTRAL_OPTIONS,
-                             CriteriaEvaluation.PATHOGENIC_OPTIONS]:
-                if self.default_crit_evaluation in (o.get('key') for o in criteria):
-                    return EvidenceKey.__special_up_options(criteria, self.default_crit_evaluation)
-            print(f"Warning, could not work out what list {self.default_crit_evaluation} fits into")
+    def _virtual_options_for_criteria(self):
+        default_strengths = None
+        default_crit = self.default_crit_evaluation
+
+        for criteria in [CriteriaEvaluation.BENIGN_OPTIONS,
+                         CriteriaEvaluation.NEUTRAL_OPTIONS,
+                         CriteriaEvaluation.PATHOGENIC_OPTIONS]:
+            if default_crit in (o.get('key') for o in criteria):
+                default_strengths = criteria
+                break
+
+        if not default_strengths:
             return []
+        else:
+            use_options = []
+            for entry in criteria:
+                entry = entry.copy()
+                entry_key = entry.get('key')
+                if entry_key == default_crit:
+                    entry['default'] = True
+                elif entry_key in ('NM', 'NA'):
+                    pass
+                elif self.crit_allows_override_strengths:
+                    entry['override'] = True
+                else:
+                    continue
+
+                if self.crit_uses_points:
+                    if points := CriteriaEvaluation.POINTS.get(entry_key):
+                        entry["label"] = f"Met: {points} Points"
+
+                use_options.append(entry)
+            return use_options
+
+    @property
+    def virtual_options(self) -> Optional[List[EvidenceKeyOption]]:
+        if self.options:
+            return cast(List[EvidenceKeyOption], self.options)
+        if self.value_type == EvidenceKeyValueType.CRITERIA:
+            return self._virtual_options_for_criteria()
 
         return None
 
     @cached_property
-    def _option_indexes(self) -> Optional[dict[str, int]]:
-        index_map: Optional[dict[str, int]] = None
+    def _option_indexes(self) -> Optional[Dict[str, int]]:
+        index_map: Optional[Dict[str, int]] = None
         if options := self.virtual_options:
             index_map = {}
             for index, option in enumerate(options):
@@ -203,12 +318,12 @@ class EvidenceKey(TimeStampedModel):
             return index_map.get(val, 0)
         return val
 
-    def sort_values(self, values: Iterable) -> list:
+    def sort_values(self, values: Iterable) -> List:
         sorter = self.classification_sorter_value
         sorted_list = sorted(values, key=lambda x: (sorter(x), x))
         return sorted_list
 
-    def classification_sorter(self, evidence: dict[str, Any]) -> Union[int, Any]:
+    def classification_sorter(self, evidence: Dict[str, Any]) -> Union[int, Any]:
         """
         Provide .classification_sorter as a Callable[dict aka ClassificationData] -> sortable
         """
@@ -224,13 +339,13 @@ class EvidenceKey(TimeStampedModel):
                         raise ValueError(f'{self.key} option with space in it "{option_key}"')
 
     @property
-    def option_dictionary(self) -> dict[str, str]:
+    def option_dictionary(self) -> Dict[str, str]:
         if options := self.virtual_options:
             return {x.get('key'): x.get('label') for x in options}
         else:
             return {}
 
-    def option_dictionary_property(self, prop: str) -> dict[str, Any]:
+    def option_dictionary_property(self, prop: str) -> Dict[str, Any]:
         if options := self.virtual_options:
             return {x.get('key'): x.get(prop) for x in options if prop in x}
         else:
@@ -255,6 +370,13 @@ class EvidenceKey(TimeStampedModel):
             return None
 
     @property
+    def without_namespace(self) -> str:
+        try:
+            return self.key[self.key.index(':')+1:]
+        except:
+            return self.key
+
+    @property
     def pretty_label(self) -> str:
         if empty_to_none(self.label):
             return self.label
@@ -266,39 +388,6 @@ class EvidenceKey(TimeStampedModel):
             key = key[:1] + '-' + key[2:]
 
         return key[:1].upper() + key[1:].replace('_', ' ')
-
-    @staticmethod
-    def merge_config(config1: dict[str, Any], config2: dict[str, Any]) -> dict[str, Any]:
-        """
-        This method is typically used to merge org and lab config together
-        :param config1 An evidence key config, with key-EvidenceKeyDefinition or key-False (to hide)
-        :param config2 An evidence key config, with key-EvidenceKeyDefinition or key-False (to hide)
-        :return the merging of the two configs
-        """
-        if config1 is None:
-            config1 = {}
-        if config2 is None:
-            config2 = {}
-
-        merged = config1.copy()
-        for key, value in config2.items():
-            if key in merged:
-                existing = merged.get(key)
-                if isinstance(existing, bool) and isinstance(value, bool):
-                    merged[key] = value
-                else:
-                    if isinstance(existing, bool):
-                        existing = {'hide': not existing}
-                    else:
-                        existing = existing.copy()
-                    if isinstance(value, bool):
-                        value = {'hide': not value}
-                    for key2, value2 in value.items():
-                        existing[key2] = value2
-                    merged[key] = existing
-            else:
-                merged[key] = value
-        return merged
 
     def pretty_value(self, normal_value_obj: Any, dash_for_none: bool = False) -> Optional[str]:
         """
@@ -317,7 +406,7 @@ class EvidenceKey(TimeStampedModel):
                 value = [value]
             str_values = []
             for val in value:
-                matched_option: dict
+                matched_option: Dict
                 if val == '' or val is None:
                     matched_option = next((option for option in options if option.get('key') is None or option.get('key') == ''), None)
                 else:
@@ -349,13 +438,15 @@ class EvidenceKey(TimeStampedModel):
             'key': o.get('key'),
             'label': o.get('label'),
             'default': o.get('default'),
-            'override': o.get('override')
+            'override': o.get('override'),
+            'namespace': o.get('namespace')
         } for o in options]
 
     def to_json(self) -> dict:
         return strip_json({
             'key': self.key,
             'allow_custom_values': self.allow_custom_values,
+            'namespace_overrides': self.namespace_overrides,
             'order': self.order,
             'label': self.label,
             'sub_label': self.sub_label,
@@ -395,7 +486,7 @@ class EvidenceKeyMap:
         return EvidenceKeyMap.cached_key(key).pretty_value(item.get(key))
 
     @staticmethod
-    def _ordered_keys() -> list[EvidenceKey]:
+    def __ordered_keys() -> List[EvidenceKey]:
         # sort in code (rather than sql) as pretty_label isn't available normally
         key_entries = list(EvidenceKey.objects.all())
         key_entries.sort(key=lambda k: (k.order, k.pretty_label.lower()))
@@ -415,46 +506,50 @@ class EvidenceKeyMap:
         return ordered_by_category_key_entries
 
     @staticmethod
-    @timed_cache(ttl=60)
-    def instance(lab: Lab = None) -> 'EvidenceKeyMap':
-        return EvidenceKeyMap(lab=lab)
+    def instance() -> 'EvidenceKeyMap':
+        return EvidenceKeyMap(
+            ordered_keys=EvidenceKeyMap.__ordered_keys()
+        )
 
     @staticmethod
     def cached() -> 'EvidenceKeyMap':
         return EvidenceKeyMap.instance()
 
-    def __init__(self, lab: Lab = None):
-        """
-        @param lab If provided the keys will be overridden with org/lab specific config
-        """
-        self.key_dict = {}
-        self.all_keys = EvidenceKeyMap._ordered_keys()
-        self.lab = lab
-        self.namespaces = {None}
+    def __init__(self, ordered_keys: List[EvidenceKey], config: Optional[EvidenceKeyOverrides] = None):
+        if not config:
+            config = EvidenceKeyOverrides()
+        self._ordered_keys = ordered_keys
+        self.key_dict: dict[str, EvidenceKey] = {}
+        self.all_keys: list[EvidenceKey] = []
+        self.un_namespaced: dict[str, list[EvidenceKey]] = defaultdict(list)
 
-        for evidence_key in self.all_keys:
-            self.key_dict[evidence_key.key] = evidence_key
+        for key in ordered_keys:
+            if namespace := key.namespace:
+                self.un_namespaced[key.without_namespace].append(key)
 
-        # update keys to have overridden values
-        if lab:
-            merged = EvidenceKey.merge_config(lab.classification_config, lab.organization.classification_config)
-            if 'namespaces' in merged:
-                self.namespaces = {None}.union(set(merged.pop('namespaces', [])))
+            in_namespace = not key.namespace or key.namespace in config.namespaces
+            override_config = config.evidence_key_config.get(key.key)
+            if not in_namespace or override_config:
+                # keep ordered_keys untouched so we can copy them again with different configs
+                key = deepcopy(key)
+                if not in_namespace:
+                    key.exclude_namespace = True
+                if override_config:
+                    for override_attr, override_val in override_config.items():
+                        setattr(key, override_attr, override_val)
+            self.key_dict[key.key] = key
+            self.all_keys.append(key)
 
-            if merged:
-                for okey, ovalue in merged.items():
-                    ekey = self.get(okey)
-                    if ovalue is False:
-                        ekey.hide = True
-                    elif ovalue is True:
-                        ekey.hide = False
-                    else:
-                        for param, paramv in ovalue.items():
-                            setattr(ekey, param, paramv)
+    def with_namespace_if_required(self, key: str):
+        if key not in self.key_dict and key in self.un_namespaced:
+            key = first(self.un_namespaced.get(key)).key
+        return key
 
-        for evidence_key in self.all_keys:
-            if evidence_key.namespace not in self.namespaces:
-                evidence_key.exclude_namespace = True
+    def with_overrides(self, config: EvidenceKeyOverrides) -> 'EvidenceKeyMap':
+        return EvidenceKeyMap(
+            ordered_keys=self._ordered_keys,
+            config=config
+        )
 
     def get(self, key: str) -> EvidenceKey:
         if key in self.key_dict:
@@ -467,29 +562,29 @@ class EvidenceKeyMap:
     def __contains__(self, item):
         return item in self.key_dict
 
-    def immutable(self) -> list[EvidenceKey]:
+    def immutable(self) -> List[EvidenceKey]:
         return [eKey for eKey in self.all_keys if eKey.immutable]
 
-    def mandatory(self) -> list[EvidenceKey]:
+    def mandatory(self) -> List[EvidenceKey]:
         return [eKey for eKey in self.all_keys if eKey.mandatory]
 
-    def share_level(self, sl: ShareLevel) -> list[EvidenceKey]:
+    def share_level(self, sl: ShareLevel) -> List[EvidenceKey]:
         return [eKey for eKey in self.all_keys if eKey.max_share_level_enum == sl]
 
-    def share_level_and_higher(self, sl: ShareLevel) -> list[EvidenceKey]:
+    def share_level_and_higher(self, sl: ShareLevel) -> List[EvidenceKey]:
         return [eKey for eKey in self.all_keys if eKey.max_share_level_enum in ShareLevel.same_and_higher(sl)]
 
-    def criteria(self) -> list[EvidenceKey]:
+    def criteria(self) -> List[EvidenceKey]:
         """
         :return: A list of ALL criteria EvidenceKeys, includes standard ACMG and custom ones with namespaces
         """
         return [eKey for eKey in self.all_keys if eKey.value_type == EvidenceKeyValueType.CRITERIA]
 
-    def acmg_criteria(self) -> list[EvidenceKey]:
+    def acmg_criteria(self) -> List[EvidenceKey]:
         """
         :return: A list of STANDARD ACMG criteria EvidenceKeys
         """
-        acmg_crit = [eKey for eKey in self.criteria() if eKey.namespace is None]
+        acmg_crit = [eKey for eKey in self.criteria() if eKey.namespace == "acmg"]
         acmg_crit.sort(key=lambda k: k.pretty_label.lower())
         return acmg_crit
 
@@ -627,11 +722,11 @@ class VCDataCell:
         self._ensure_my_data()['note'] = value
 
     @property
-    def db_refs(self) -> Optional[list[VCDbRefDict]]:
+    def db_refs(self) -> Optional[List[VCDbRefDict]]:
         return self._my_data.get('db_refs')
 
     @db_refs.setter
-    def db_refs(self, db_refs: Optional[list[VCDbRefDict]]):
+    def db_refs(self, db_refs: Optional[List[VCDbRefDict]]):
         self._ensure_my_data()['db_refs'] = db_refs
 
     def strip_non_client_submission(self):
@@ -677,7 +772,7 @@ class VCDataCell:
     def __contains__(self, item):
         return item in self._my_data
 
-    def diff(self, dest: Optional['VCDataCell'], ignore_if_omitted: Optional[set[str]] = None) -> dict[str, Any]:
+    def diff(self, dest: Optional['VCDataCell'], ignore_if_omitted: Optional[Set[str]] = None) -> Dict[str, Any]:
         """
         Given two dictionaries, returns only the entries that have changed
         :param dest: Another dict
@@ -739,7 +834,7 @@ class VCDataDict:
     Represents an entire patch or base set of data for EvidenceKeys
     """
 
-    def __init__(self, data: dict[str, Any], evidence_keys: EvidenceKeyMap):
+    def __init__(self, data: Dict[str, Any], evidence_keys: EvidenceKeyMap):
         if not isinstance(data, dict):
             raise ValueError('Data must be of type dict')
         self.data = data

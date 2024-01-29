@@ -14,14 +14,17 @@ let EKey = (function() {
     
         matchesFilter: function(val) {
             if (val.startsWith('#')) {
-                return val.substring(1) == this.key.toLowerCase();
+                return val.substring(1) === this.key.toLowerCase();
             }
-            return this.key.toLowerCase().indexOf(val) != -1 ||
-                this.label.toLowerCase().indexOf(val) != -1;
+            if (this.sub_label != null && this.sub_label.toLowerCase().indexOf(val) !== -1) {
+                return true;
+            }
+            return this.key.toLowerCase().indexOf(val) !== -1 ||
+                this.label.toLowerCase().indexOf(val) !== -1;
         },
     
         matchingOption: function(val) {
-            var options = this.options || [];
+            let options = this.options || [];
             return options.find(o => {
                 if ((val === '' || val === null) && (!('key' in o) || o.key === '')) {
                     return o;
@@ -33,7 +36,7 @@ let EKey = (function() {
         
         namespace: function() {
             let dividerIndex = this.key.indexOf(':');
-            if (dividerIndex == -1) {
+            if (dividerIndex === -1) {
                 return null;
             } else {
                 return this.key.substring(0, dividerIndex);
@@ -54,7 +57,6 @@ let EKey = (function() {
             if (this.value_type === 'S' || this.value_type === 'C' || this.value_type === 'M') {
                 if (val === null) {
                     // check for special blank option
-                    isBlank = true;
                     let matchingOpt = this.matchingOption(val);
                     if (matchingOpt) {
                         val = matchingOpt.label || EKey.prettyKey(matchingOpt.key);
@@ -230,6 +232,7 @@ EKey.critValues = {
     "NA": "Not Applicable",
     "BA": "Benign Standalone",
     "BS": "Benign Strong",
+    // not that "BM" is not a standard strength
     "BP": "Benign Supporting",
     // "BX": "Benign (Unspecified Strength)",
     "N": "Neutral",
@@ -239,6 +242,17 @@ EKey.critValues = {
     "PVS": "Pathogenic Very Strong",
     // "PX": "Pathogenic (Unspecified Strength)"
 };
+
+EKey.strengthToPoints = {
+    "BA": -8,
+    "BS": -4,
+    "BM": -2,
+    "BP": -1,
+    "PP": 1,
+    "PM": 2,
+    "PS": 4,
+    "PVS": 8
+}
 
 EKey.families = {
     V: 'Variant',
@@ -285,11 +299,17 @@ var EKeys = (function() {
             labConfig = labConfig || {};
             let namespaces = new Set(labConfig['namespaces']);
             namespaces.add(null);
-            delete labConfig['namespaces'];
+            // default namespace to include ACMG if we're not horak
+            // as there are plenty of classifications that didn't set an assertion method
+            if (!namespaces.has("horak")) {
+                namespaces.add("acmg");
+            }
+            console.log("Namespaces = ");
+            console.log(namespaces);
 
             return new EKeys(Array.from(this._map.values()).map(ekey => {
                 let config = labConfig[ekey.key];
-                if (config == true || config == false) {
+                if (config === true || config === false) {
                     config = {hide: config};
                 }
                 let exclude_namespace = !namespaces.has(ekey.namespace());
@@ -298,10 +318,29 @@ var EKeys = (function() {
                     config.exclude_namespace = true;
                     config.mandatory = false;   
                 }
+                if (ekey.namespace_overrides) {
+                    config = config || {};
+                    for (let namespace of namespaces) {
+                        let namespace_config = ekey.namespace_overrides[namespace];
+                        if (namespace_config) {
+                            config = Object.assign(config, namespace_config)
+                        }
+                    }
+                    config.config_updates = true;
+                }
+                if (ekey.options && _.some(ekey.options, (input) => {return !!(input.namespace)})) {
+                    config = config || {};
+                    config.config_updates = true;
+                    config.options = _.cloneDeep(ekey.options);
+                    for (let option of config.options) {
+                        if (option.namespace) {
+                            option.exclude_namespace = !namespaces.has(option.namespace);
+                        }
+                    }
+                }
                 if (config) {
-                    data = Object.assign({}, ekey, config);
-                    let newkey = new EKey(data, ekey.index);
-                    return newkey;
+                    let ekeyWithConfig = Object.assign({}, ekey, config);
+                    return new EKey(ekeyWithConfig, ekey.index);
                 } else {
                     return ekey;
                 }
@@ -309,7 +348,7 @@ var EKeys = (function() {
         },
     
         key(key) {
-            var eKey = this._map.get(key);
+            let eKey = this._map.get(key);
             if (!eKey) {
                 eKey = new EKey({key: key}, this._map.length);
                 this._set(eKey);
@@ -319,7 +358,7 @@ var EKeys = (function() {
         
         _set(eKey) {
             this._map.set(eKey.key, eKey);
-            this.hasUnknown = this.hasUnknown || eKey.evidence_category == 'U';
+            this.hasUnknown = this.hasUnknown || eKey.evidence_category === 'U';
         },
         
         forEach(funkey) {
@@ -427,7 +466,7 @@ EKeys.levelToIndex = {
 
 EKeys.shareLevelInfo = function(share_level, record, defaultToInstitution) {
     var base = '/static/icons/share_level/';
-    if (!share_level || share_level == 'user') {
+    if (!share_level || share_level === 'user') {
         return { icon: base + 'draft.png', title: 'Last Edited'};
     }
     
@@ -461,7 +500,7 @@ EKeys.shareLevelInfo = function(share_level, record, defaultToInstitution) {
     if (record) {
         let consider_level = EKeys.levelToIndex[share_level] || 0;
         let current_level = EKeys.levelToIndex[record.publish_level] || (defaultToInstitution ? 1 : 0);
-        content.current = current_level == consider_level;
+        content.current = current_level === consider_level;
         content.included = consider_level < current_level;
     }
     return content;
@@ -492,10 +531,12 @@ EKeys.fixDescription = function(htmlText) {
 
 SpecialEKeys = {};
 SpecialEKeys.ASSERTION_METHOD = 'assertion_method';
+SpecialEKeys.ALLELE_ORIGIN = 'allele_origin';
 SpecialEKeys.GENOME_BUILD = 'genome_build';
 SpecialEKeys.REFSEQ_TRANSCRIPT_ID = 'refseq_transcript_id';
 SpecialEKeys.CONDITION = 'condition';
 SpecialEKeys.CLINICAL_SIGNIFICANCE = 'clinical_significance';
+SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE = 'somatic:clinical_significance';
 SpecialEKeys.GENE_SYMBOL = 'gene_symbol';
 SpecialEKeys.GENE_OMIM_ID = 'gene_omim_id';
 SpecialEKeys.UNIPROT_ID = 'uniprot_id';

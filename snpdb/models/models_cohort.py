@@ -347,7 +347,7 @@ class CohortGenotypeCommonFilterVersion(TimeStampedModel):
     def __str__(self):
         description = f"gnomAD: {self.gnomad_version} AF>{self.gnomad_af_min}"
         if self.clinical_significance_max:
-            description += f" and clinical_significance <= {self.clinical_significance_max}"
+            description += f" and classification <= {self.clinical_significance_max}"
         return description
 
 

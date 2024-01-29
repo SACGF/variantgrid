@@ -1,10 +1,29 @@
 from enum import Enum
+from typing import Set
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 
+from classification.enums import AlleleOriginBucket
 from library.utils import Constant
 
+
+class UserAwardLevel(models.TextChoices):
+    GOLD = "G", "Gold"
+    SILVER = "S", "Silver"
+    BRONZE = "B", "Bronze"
+
+    @property
+    def int_value(self) -> int:
+        if self == UserAwardLevel.GOLD:
+            return 3
+        elif self == UserAwardLevel.SILVER:
+            return 2
+        elif self == UserAwardLevel.BRONZE:
+            return 1
+
+    def __lt__(self, other):
+        return self.int_value < other.int_value
 
 class ImportSource(models.TextChoices):
     """ Keeps track of where uploaded files came from """
@@ -151,6 +170,21 @@ class AlleleConversionTool(models.TextChoices):
             cls.NCBI_REMAP: False
         }
         return IN_DEST_BUILD[conversion_tool]
+
+
+class AlleleOriginFilterDefault(models.TextChoices):
+    SHOW_ALL = "A", "All"
+    GERMLINE = "G", "Germline"
+    SOMATIC = "S", "Somatic"
+
+    @property
+    def buckets(self) -> Set[AlleleOriginBucket]:
+        if self == AlleleOriginFilterDefault.SHOW_ALL:
+            return set(AlleleOriginBucket.values)
+        elif self == AlleleOriginFilterDefault.GERMLINE:
+            return set([AlleleOriginBucket.GERMLINE, AlleleOriginBucket.UNKNOWN])
+        elif self == AlleleOriginFilterDefault.SOMATIC:
+            return set([AlleleOriginBucket.SOMATIC, AlleleOriginBucket.UNKNOWN])
 
 
 class ClinGenAlleleExternalRecordType(Enum):

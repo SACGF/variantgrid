@@ -62,7 +62,7 @@
 
     {% settings_value 'CLASSIFICATION_STATS_USE_SHARED' as use_shared %}
     {% if use_shared %}
-        {% page_help_embedded title="Shared Classifications Over Time" %}
+        {% page_help_embedded title="Shared Classification Records Over Time" %}
             This graphs shows how many shared classifications your lab has submitted over time.
         {% end_page_help_embedded %}
 
@@ -73,14 +73,14 @@
             <label>See recent activity for</label>: {% for lab in dlab.labs %}{% if not forloop.first %}, {% endif %}<a href="{% url 'activity_lab' lab.pk %}">{% lab lab %}</a>{% endfor %}
         </div>
 
-        {% page_help_embedded title="Classification Counts" %}
+        {% page_help_embedded title="Classification Record Counts" %}
             <p>
             See the grand total of classifications provided by your lab, the progress of ClinVar submissions, and a comparison between your lab's classifications and ClinVar's.
             </p>
 
         {% end_page_help_embedded %}
 
-        {% labelled hint="tiny" label="Matched & Shared Classifications" %}
+        {% labelled hint="tiny" label="Matched & Shared Classification Records" %}
             {{ dlab.shared_classifications.count | number:'S' }}
         {% endlabelled %}
 
@@ -88,7 +88,7 @@
             {{ dlab.unique_classified_alleles_count | number:'S' }}
         {% endlabelled %}
         {% if 'clinvar_key_summary'|is_view_enabled %}
-            {% labelled hint="tiny"  label="Classifications Uploaded to Clinvar" %}
+            {% labelled hint="tiny"  label="Classification Records Uploaded to Clinvar" %}
                 {% if dlab.clinvar_keys %}
                     {{ dlab.uploads_to_clinvar_qs.count | number:'S' }}
                     {% for clinvar_key in dlab.clinvar_keys %}
@@ -101,19 +101,19 @@
         {% endif %}
 
         {% if 'condition_matchings_lab'|is_view_enabled %}
-            {% labelled hint="tiny"  label="Classifications without Standard Condition" %}
+            {% labelled hint="tiny"  label="Classification Records without Standard Condition" %}
                 {{ dlab.classifications_wout_standard_text | number:'W' }}
                 <a class="hover-link" href="{% url 'condition_matchings_lab' dlab.lab_picker.selection %}"><small class="form-text">Review your lab's unresolved condition text here</small></a>
             {% endlabelled %}
         {% endif %}
 
         {% labelled hint="tiny" label="Downloads" %}
-            <a href="{{ dlab.compare_to_clinvar_url }}" class="download-link">Classifications compared with ClinVar</a>
+            <a href="{{ dlab.compare_to_clinvar_url }}" class="download-link">Classification Records compared with ClinVar</a>
         {% endlabelled %}
     {% endif %}
 
     {% if 'discordance_report'|is_view_enabled %}
-        {% page_help_embedded title="Discordances Awaiting Triage" %}
+        {% page_help_embedded title="Discordance Reports Awaiting Triage" %}
             <p>Below is a sample of discordances where your lab has a triage pending.</p>
         {% end_page_help_embedded %}
         <div data-toggle="ajax" href="{% url 'classification_dashboard_discordance_detail' dlab.lab_picker.selection %}">
@@ -122,7 +122,7 @@
     {% endif %}
 
 
-    {% page_help_embedded title="Flagged Classifications" %}
+    {% page_help_embedded title="Flagged Classification Records" %}
         <p>
             This section show you how many classifications belonging to your lab(s) that have flags raised against them.<br/>
             Click "Show details" to see the specific classifications.<br/>
@@ -132,14 +132,14 @@
         </p>
     {% end_page_help_embedded %}
 
-    {% labelled hint="tiny" label="Classifications with Pending Changes" %}{{ dlab.counts.pending_changes | number:'W' }}{% endlabelled %}
-    {% labelled hint="tiny" label="Classifications in Internal Review" %}{{ dlab.counts.internal_review | number:'W' }}{% endlabelled %}
-    {% labelled hint="tiny" label="Classifications with Outstanding Clinical Significance Changes" %}{{ dlab.counts.significance_change | number:'W' }}{% endlabelled %}
-    {% labelled hint="tiny" label="Classifications Excluded from ClinVar" %}{{ dlab.counts.clinvar_exclude | number }}{% endlabelled %}
+    {% labelled hint="tiny" label="Records with Pending Changes" %}{{ dlab.counts.pending_changes | number:'W' }}{% endlabelled %}
+    {% labelled hint="tiny" label="Records in Internal Review" %}{{ dlab.counts.internal_review | number:'W' }}{% endlabelled %}
+    {% labelled hint="tiny" label="Records with Outstanding Classification Changes" %}{{ dlab.counts.significance_change | number:'W' }}{% endlabelled %}
+    {% labelled hint="tiny" label=" Records Excluded from ClinVar" %}{{ dlab.counts.clinvar_exclude | number }}{% endlabelled %}
     <hr/>
-    {% labelled hint="tiny" label="Classifications waiting on Variant Matching Review" %}
+    {% labelled hint="tiny" label="Records waiting on Variant Matching Review" %}
         {{ dlab.counts.variant_matching_issues | number:'W' }}
-        <p class="text-info">Classifications waiting on Variant Matching Review require an admin to action</p>
+        <p class="text-info">Classification Records waiting on Variant Matching Review require an admin to action</p>
     {% endlabelled %}
 
     <p><a href="{% url 'classification_dashboard_special_detail' dlab.lab_picker.selection %}" class="toggle-link" data-toggle="ajax-collapse" title="Flagged Classification Records"></a></p>

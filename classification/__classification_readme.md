@@ -36,22 +36,22 @@ The evidence key determines which section of the form the field appears in, orde
 #### Criteria
 
 Criteria is a value type for an evidence key that is given special prominence. For the classic examples see ACMG Curation Guidelines re PM1, PM2, etc.
-Criterias will be given values from Benign Stand Alone, Benign Strong, Benign Moderate, Benign Supporting, Neutral, Pathogenic Supporting etc and typically labs use the accumulation of these to determine the overall clinical significance.
+Criterias will be given values from Benign Stand Alone, Benign Strong, Benign Moderate, Benign Supporting, Neutral, Pathogenic Supporting etc and typically labs use the accumulation of these to determine the overall classification.
 
-#### Clinical Significance
+#### Classification (formerly known as Clinical Significance)
 
 This is the overall value of a classification that goes from Benign, Likely Benign, VUS (Variant of Uncertain Significance), Likely Pathogenic, Pathogenic. In addition, a lot of environments are configured to have different levels of VUS, VUS_A, VUS_B, VUS_C with VUS_B being in the middle and VUS_A being more pathogenic.
 
-The options for the Clinical Significance evidence keys also come with a "bucket" attribute for determining discordance.
+The options for the classification evidence key also come with a "bucket" attribute for determining discordance.
 
 ## Discordance
 
-When two or more classifications for the same Allele have their clinical significances fall into different "buckets" it is considered a Discordance (Discordances can be enabled/disabled in the settings file).
+When two or more classification records for the same allele have their classification fall into different "buckets" it is considered a Discordance (Discordances can be enabled/disabled in the settings file).
 When this is first detected, a DiscordanceReport is created. At the time that all (non-withdrawn) classifications are in the same bucket, the DiscordanceReport is closed.
 
 ### Pending Concordance
 
-When reviewing a DiscordanceReport, users are able to agree to change their clinical significances. This raises pending change flags, with the idea that the users will then change the data in their own curation systems and upload those changes sometime in the future.
+When reviewing a DiscordanceReport, users are able to agree to change their classification. This raises pending change flags, with the idea that the users will then change the data in their own curation systems and upload those changes sometime in the future.
 
 ## Condition Text Matching
 

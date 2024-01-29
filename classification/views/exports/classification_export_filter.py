@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum
 from functools import cached_property, reduce
 from operator import __or__
-from typing import Type, Union, Optional, Iterator, Any, Callable
+from typing import List, Type, Union, Set, Optional, Dict, Iterator, Any, Callable
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -18,7 +18,7 @@ from classification.models import ClassificationModification, Classification, cl
     DiscordanceReport, ClinicalContext, ImportedAlleleInfo
 from flags.models import FlagsMixin, Flag, FlagComment
 from library.utils import batch_iterator, local_date_string, http_header_date_now
-from snpdb.models import GenomeBuild, Lab, Organization, Allele, Variant
+from snpdb.models import GenomeBuild, Lab, Organization, Allele, Variant, AlleleOriginFilterDefault
 
 
 @dataclass
@@ -30,7 +30,7 @@ class ClassificationIssue:
 
     @property
     def message(self) -> Optional[str]:
-        messages: list[str] = []
+        messages: List[str] = []
         if self.withdrawn:
             messages.append("Classification has been withdrawn")
         # if self.transcript_version or self.matching_warning:
@@ -66,7 +66,7 @@ class AlleleData:
     """
     source: 'ClassificationFilter'
     allele_id: int
-    all_cms: list[ClassificationIssue] = field(default_factory=list)  # misleading name, should be all_ci or something
+    all_cms: List[ClassificationIssue] = field(default_factory=list)  # misleading name, should be all_ci or something
 
     def sort(self):
         def record_order(ci: ClassificationIssue):
@@ -76,7 +76,7 @@ class AlleleData:
 
     cached_allele: Optional[Allele] = None
     cached_variant: Optional[Variant] = None
-    cached_data: dict[str, Any] = None
+    cached_data: Dict[str, Any] = None
 
     @staticmethod
     def from_allele_info(source: 'ClassificationFilter', allele_info: ImportedAlleleInfo):
@@ -105,7 +105,7 @@ class AlleleData:
         return False
 
     # @staticmethod
-    # def pre_process(batch: list['AlleleData']):
+    # def pre_process(batch: List['AlleleData']):
     #     if batch:
     #         genome_build = batch[0].genome_build
     #         allele_ids = [ad.allele_id for ad in batch]
@@ -138,16 +138,16 @@ class AlleleData:
         return self.source.genome_build
 
     @property
-    def cms(self) -> list[ClassificationModification]:
+    def cms(self) -> List[ClassificationModification]:
         # The classifications that should be exported (passed validation, not withdrawn)
         return [ci.classification for ci in self.all_cms if not ci.has_issue]
 
     @property
-    def cms_regardless_of_issues(self) -> list[ClassificationModification]:
+    def cms_regardless_of_issues(self) -> List[ClassificationModification]:
         return [ci.classification for ci in self.all_cms]
 
     @property
-    def issues(self) -> list[ClassificationIssue]:
+    def issues(self) -> List[ClassificationIssue]:
         # All Classification Issues that actually have issues
         return [ci for ci in self.all_cms if ci.has_issue]
 
@@ -155,7 +155,7 @@ class AlleleData:
         return bool(self.all_cms)
 
 
-def flag_ids_to(model: Type[FlagsMixin], qs: Union[QuerySet[Flag], QuerySet[FlagComment]]) -> set[int]:
+def flag_ids_to(model: Type[FlagsMixin], qs: Union[QuerySet[Flag], QuerySet[FlagComment]]) -> Set[int]:
     """
     Convert a qs of Flags or FlagComments to ids of Classification/Allele/etc.
     :param model: The Model to get the IDs of e.g. Classification, Allele, assumes the flag qs was for Flags that
@@ -213,8 +213,9 @@ class ClassificationFilter:
 
     user: User
     genome_build: GenomeBuild
-    exclude_sources: Optional[set[Union[Lab, Organization]]] = None
-    include_sources: Optional[set[Lab]] = None
+    allele_origin_filter: AlleleOriginFilterDefault = AlleleOriginFilterDefault.SHOW_ALL
+    exclude_sources: Optional[Set[Union[Lab, Organization]]] = None
+    include_sources: Optional[Set[Lab]] = None
     since: Optional[datetime] = None
     min_share_level: ShareLevel = ShareLevel.LAB
     transcript_strategy: TranscriptStrategy = TranscriptStrategy.ALL
@@ -258,7 +259,7 @@ class ClassificationFilter:
         return local_date_string()
 
     @staticmethod
-    def _string_to_group_name(model: Type[Union[Lab, Organization]], group_names: str) -> Union[set[Lab], set[Organization]]:
+    def _string_to_group_name(model: Type[Union[Lab, Organization]], group_names: str) -> Union[Set[Lab], Set[Organization]]:
         """
         Converts comma separated group names to the org or lab objects.
         Invalid org/lab group names will be ignored
@@ -294,6 +295,9 @@ class ClassificationFilter:
             share_level_str = 'logged_in_users'
         elif share_level_str == 'any':
             share_level_str = 'lab'
+
+        allele_origin_filter = AlleleOriginFilterDefault(request.query_params.get('allele_origin', AlleleOriginFilterDefault.SHOW_ALL.value))
+
         share_level = ShareLevel(share_level_str)
         genome_build = GenomeBuild.get_name_or_alias(build_name)
         transcript_strategy = TranscriptStrategy(request.query_params.get('transcript_strategy', 'all'))
@@ -331,6 +335,7 @@ class ClassificationFilter:
             exclude_sources=exclude_sources,
             include_sources=include_sources,
             genome_build=genome_build,
+            allele_origin_filter=allele_origin_filter,
             min_share_level=share_level,
             transcript_strategy=transcript_strategy,
             since=since,
@@ -351,61 +356,14 @@ class ClassificationFilter:
         else:
             return 'classification__allele_info__grch38__c_hgvs'
 
-    # @cached_property
-    # def _bad_allele_transcripts(self) -> dict[int, set[str]]:
-    #     """
-    #     :return: A dictionary of Allele ID to a set of Transcripts for that allele which has bad flags
-    #     """
-    #
-    #     qs = Flag.objects.filter(
-    #         flag_type=allele_flag_types.allele_37_not_38,
-    #         resolution__status=FlagStatus.OPEN
-    #     ).values_list('collection_id', 'data')
-    #
-    #     allele_to_bad_transcripts: dict[int, set[str]] = defaultdict(set)
-    #     collection_id_to_transcript = defaultdict(set)
-    #     for collection_id, data in qs:
-    #         if data:
-    #             collection_id_to_transcript[collection_id].add(data.get('transcript'))
-    #
-    #     allele_qs = Allele.objects.filter(flag_collection__in=collection_id_to_transcript.keys())\
-    #         .values_list('pk', 'flag_collection_id')
-    #     for pk, collection_id in allele_qs:
-    #         if transcripts := collection_id_to_transcript.get(collection_id):
-    #             allele_to_bad_transcripts[pk].update(transcripts)
-    #
-    #     return allele_to_bad_transcripts
-    #
-    # @cached_property
-    # def _transcript_version_classification_ids(self) -> set[int]:
-    #     """
-    #     Returns a set of classification IDs that have flags that make us want to exclude due to errors
-    #     :return: A set of classification IDs
-    #     """
-    #     return flag_ids_to(
-    #         Classification,
-    #         Flag.objects.filter(
-    #             flag_type=classification_flag_types.transcript_version_change_flag,
-    #             resolution__status=FlagStatus.OPEN
-    #         ))
-    #
-    # @cached_property
-    # def _variant_matching_classification_ids(self) -> set[int]:
-    #     return flag_ids_to(
-    #         Classification,
-    #         Flag.objects.filter(
-    #             flag_type=classification_flag_types.matching_variant_warning_flag,
-    #             resolution__status=FlagStatus.OPEN
-    #         ))
-
     @cached_property
-    def _discordant_classification_ids(self) -> dict[int, DiscordanceReportStatus]:
+    def _discordant_classification_ids(self) -> Dict[int, DiscordanceReportStatus]:
         """
         Returns a set of classification IDs where the classification id discordant
         Ids are not necessarily part of this import
         :return: A set of classification IDs
         """
-        discordance_status: dict[int, DiscordanceReportStatus] = {}
+        discordance_status: Dict[int, DiscordanceReportStatus] = {}
         for cc in ClinicalContext.objects.filter(status=ClinicalContextStatus.DISCORDANT):
             if dr := DiscordanceReport.latest_report(cc):
                 status: Optional[DiscordanceReportStatus]
@@ -426,7 +384,7 @@ class ClassificationFilter:
             return self._discordant_classification_ids.get(cm.classification_id)
 
     @cached_property
-    def _since_flagged_classification_ids(self) -> set[int]:
+    def _since_flagged_classification_ids(self) -> Set[int]:
         """
         TODO rename to indicate this is a flag check only
         Returns classification ids that have had flags change since the since date
@@ -459,11 +417,11 @@ class ClassificationFilter:
         return False
 
     @property
-    def _share_levels(self) -> set[ShareLevel]:
+    def _share_levels(self) -> Set[ShareLevel]:
         """
         :return: A set of all ShareLevels that should be considered
         """
-        share_levels: set[ShareLevel] = set()
+        share_levels: Set[ShareLevel] = set()
         for sl in ShareLevel.ALL_LEVELS:
             if sl >= self.min_share_level:
                 share_levels.add(sl)
@@ -482,6 +440,9 @@ class ClassificationFilter:
 
         if self.min_share_level != ShareLevel.LAB:
             cms = cms.filter(share_level__in=self._share_levels)
+
+        if self.allele_origin_filter and self.allele_origin_filter != AlleleOriginFilterDefault.SHOW_ALL:
+            cms = cms.filter(classification__allele_origin_bucket__in=self.allele_origin_filter.buckets)
 
         if not self.since:
             # only worry about withdrawn if doing 'since' (as we might need to report the withdrawing (json),
@@ -527,7 +488,7 @@ class ClassificationFilter:
 
         if self.transcript_strategy == TranscriptStrategy.REFSEQ:
             from classification.views.classification_export_view import ALISSA_ACCEPTED_TRANSCRIPTS
-            acceptable_transcripts: list[Q] = [
+            acceptable_transcripts: List[Q] = [
                 Q(**{f'{self.c_hgvs_col}__startswith': tran}) for tran in ALISSA_ACCEPTED_TRANSCRIPTS
             ]
             cms = cms.filter(reduce(__or__, acceptable_transcripts))
@@ -577,7 +538,7 @@ class ClassificationFilter:
             if self._passes_since(allele_data):
                 yield allele_data
 
-    def allele_data_filtered_pre_processed(self, batch_processor: Optional[Callable[[list[AlleleData]], None]] = None) -> Iterator[AlleleData]:
+    def allele_data_filtered_pre_processed(self, batch_processor: Optional[Callable[[List[AlleleData]], None]] = None) -> Iterator[AlleleData]:
         for batch in batch_iterator(self._allele_data_filtered(), batch_size=100):
             # AlleleData.pre_process(batch)
             if batch_processor:

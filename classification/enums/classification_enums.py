@@ -14,6 +14,12 @@ CRITERIA_NOT_APPLICABLE = 'NA'
 CRITERIA_NEUTRAL = 'N'
 
 
+class AlleleOriginBucket(TextChoices):
+    GERMLINE = "G", "Germline"
+    SOMATIC = "S", "Somatic"
+    UNKNOWN = "U", "Unknown"
+
+
 class SpecialEKeys:
     AUTOPOPULATE = 'autopopulate'
     VARIANT_COORDINATE = 'variant_coordinate'
@@ -22,6 +28,7 @@ class SpecialEKeys:
     P_HGVS = 'p_hgvs'
     CONDITION = 'condition'
     CLINICAL_SIGNIFICANCE = 'clinical_significance'
+    SOMATIC_CLINICAL_SIGNIFICANCE = 'somatic:clinical_significance'
     CURATION_DATE = 'curation_date'
     CURATION_VERIFIED_DATE = 'curation_verified_date'
     SAMPLE_DATE = 'sample_date'
@@ -115,6 +122,11 @@ class ValidationCode:
     INCONSISTENT_VARIANT = "inconsistent_variant"  # >1 VARIANT_LINKING_KEYS resolved to different coordinate
     UNKNOWN_TRANSCRIPT = "unknown_transcript"
     INTERNAL_ERROR = "internal_error"
+
+    # Missing clinical significance and variant classification
+    MISSING_CLINICAL_SIGNIFICANCE = 'missing_significance'
+    INVALID_FIELD_FOR_SOMATIC = 'invalid_for_somatic'
+    INVALID_FIELD_FOR_GERMLINE = 'invalid_for_germline'
 
 
 class EvidenceCategory:
@@ -436,8 +448,8 @@ class CriteriaEvaluation:
     ]
 
     @staticmethod
-    def is_met(criteria):
-        return criteria and criteria not in {CriteriaEvaluation.NOT_MET, CriteriaEvaluation.NOT_APPLICABLE, CriteriaEvaluation.NEUTRAL}
+    def is_met(criteria) -> bool:
+        return bool(criteria and criteria not in {CriteriaEvaluation.NOT_MET, CriteriaEvaluation.NOT_APPLICABLE, CriteriaEvaluation.NEUTRAL})
 
 
 class WithdrawReason(TextChoices):

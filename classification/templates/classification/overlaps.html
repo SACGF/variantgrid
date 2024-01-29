@@ -6,7 +6,7 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
 <div class="container">
-    {% page_help page_id='classification/overlaps_help' title='Classification Overlaps' %}
+    {% page_help page_id='classification/overlaps_help' title='Classification Record Overlaps' %}
     {% lab_picker data=lab_picker_data %}
 
     <div data-toggle="ajax" href="{% url 'overlaps_detail' lab_picker_data.selection %}">

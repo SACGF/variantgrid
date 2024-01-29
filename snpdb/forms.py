@@ -22,7 +22,8 @@ from library.guardian_utils import DjangoPermission
 from snpdb import models
 from snpdb.models import VCF, Sample, Cohort, UserContact, Tag, UserSettings, GenomicIntervalsCollection, \
     ImportStatus, SettingsInitialGroupPermission, LabUserSettingsOverride, UserSettingsOverride, \
-    OrganizationUserSettingsOverride, CustomColumnsCollection, Project, VariantsType, SampleFilePath
+    OrganizationUserSettingsOverride, CustomColumnsCollection, Project, VariantsType, SampleFilePath, \
+    AlleleOriginFilterDefault
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from uicore.utils.form_helpers import form_helper_horizontal, FormHelperHelper
@@ -412,20 +413,25 @@ class SettingsOverrideForm(BaseModelForm):
                    'default_sort_by_column': ModelSelect2(url='custom_column_autocomplete',
                                                           forward=['columns'],
                                                           attrs={'data-placeholder': 'Column...'}),
-                   'timezone': forms.Select(choices=[(None, "")] + [(tz, tz) for tz in settings.AVAILABLE_TZS], attrs={})
+                   'timezone': forms.Select(choices=[(None, "")] + [(tz, tz) for tz in settings.AVAILABLE_TZS], attrs={}),
+                   "allele_origin_exclude_filter": BlankNullBooleanSelect()
                    }
         labels = {
             "email_weekly_updates": "Email Regular Updates",
             "email_discordance_updates": "Email Discordance Updates",
             "variant_link_in_analysis_opens_new_tab": "Variant Link in Analysis Opens New Tab",
             "tool_tips": "Tooltips",
+            "tag_colors": "Tag Colours",
             "node_debug_tab": "Node Debug Tab",
             "import_messages": "Import Messages",
             "default_sort_by_column": "Default Sort by Column",
             "igv_port": "IGV Port",
             "default_genome_build": "Default Genome Build",
+            "default_allele_origin": "Default Allele Origin Filter",
             "default_lab": "Default Lab",
-            "timezone": "TimeZone (for downloads)"
+            "timezone": "TimeZone (for downloads)",
+            "allele_origin_focus": "Allele Origin focus",
+            "allele_origin_exclude_filter": "Allele Origin (filter by default)"
         }
 
     def __init__(self, *args, **kwargs):

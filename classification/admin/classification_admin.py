@@ -12,6 +12,7 @@ from django.utils.safestring import SafeString
 from annotation.models.models import AnnotationVersion
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
 from classification.classification_import import reattempt_variant_matching
+from classification.enums import WithdrawReason
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
     ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
@@ -22,6 +23,7 @@ from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
 from classification.models.clinical_context_models import ClinicalContextRecalcTrigger, DiscordanceNotification
+from classification.models.clinical_context_utils import update_clinical_context, update_clinical_contexts
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from classification.models.discordance_models_utils import DiscordanceReportRowDataTriagesRowData
 from classification.signals import send_prepared_discordance_notifications
@@ -211,6 +213,7 @@ class ClassificationAdmin(ModelAdminBasics):
         VariantMatchedFilter,
         ClinicalContextFilter,
         ClassificationImportedGenomeBuildFilter,
+        'allele_origin_bucket'
         # ('user', RelatedFieldListFilter),
     )
     search_fields = ('id', 'lab_record_id')
@@ -313,6 +316,10 @@ class ClassificationAdmin(ModelAdminBasics):
         for c in queryset:
             c.fix_permissions(fix_modifications=True)
 
+    @admin_action("Fixes: Clinical Context Germline/Somatic")
+    def fix_clinical_context(self, request, queryset: QuerySet[Classification]):
+        update_clinical_contexts(list(queryset.all()))
+
     @admin_action("Fixes: Revalidate")
     def revalidate(self, request, queryset):
         for vc in queryset:
@@ -385,21 +392,26 @@ class ClassificationAdmin(ModelAdminBasics):
         for vc in queryset:
             vc.patch_value(patch={}, user=request.user, source=SubmissionSource.VARIANT_GRID, remove_api_immutable=True, save=True)
 
-    def set_withdraw(self, request, queryset: QuerySet[Classification], withdraw: bool) -> int:
+    def set_withdraw(self, request, queryset: QuerySet[Classification], withdraw: bool, reason: WithdrawReason.OTHER) -> int:
         count = 0
         for vc in queryset:
             try:
-                actioned = vc.set_withdrawn(user=request.user, withdraw=withdraw)
+                actioned = vc.set_withdrawn(user=request.user, withdraw=withdraw, reason=reason)
                 if actioned:
                     count += 1
             except BaseException:
                 pass
         return count
 
-    @admin_action("State: Withdraw")
-    def withdraw_true(self, request, queryset: QuerySet[Classification]):
+    @admin_action("State: Withdraw (Other)")
+    def withdraw_true_other(self, request, queryset: QuerySet[Classification]):
         count = self.set_withdraw(request, queryset, True)
         self.message_user(request, f"{count} records now newly set to withdrawn")
+
+    @admin_action("State: Withdraw (Duplicate)")
+    def withdraw_true_duplicate(self, request, queryset: QuerySet[Classification]):
+        count = self.set_withdraw(request, queryset, True, reason=WithdrawReason.DUPLICATE)
+        self.message_user(request, f"{count} records now newly set to withdrawn as duplicate")
 
     @admin_action("State: Un-Withdraw")
     def withdraw_false(self, request, queryset):
@@ -457,7 +469,7 @@ class ClassificationImportAdmin(ModelAdminBasics):
 
 @admin.register(ClinicalContext)
 class ClinicalContextAdmin(ModelAdminBasics):
-    list_display = ('id', 'allele', 'name', 'status', 'modified', 'pending_cause', 'pending_status')
+    list_display = ('id', 'allele', 'name', 'status', 'allele_origin_bucket', 'modified', 'pending_cause', 'pending_status')
     search_fields = ('id', 'allele__pk', 'name')
 
     def get_form(self, request, obj=None, **kwargs):
@@ -509,12 +521,13 @@ class EvidenceKeyAdmin(ModelAdminBasics):
     list_filter = (EvidenceKeySectionFilter, MaxShareLevelFilter)
     ordering = ('key',)
     list_display = ('key', 'label', 'value_type', 'max_share_level', 'evidence_category', 'order')
-    search_fields = ('key',)
+    search_fields = ('key', 'label')
 
     fieldsets = (
         ('Basic', {'fields': ('key', 'label', 'sub_label')}),
         ('Position', {'fields': ('hide', 'evidence_category', 'order')}),
-        ('Type', {'fields': ('mandatory', 'value_type', 'options', 'allow_custom_values', 'default_crit_evaluation')}),
+        ('Type', {'fields': ('mandatory', 'value_type', 'options', 'allow_custom_values', 'default_crit_evaluation', 'crit_allows_override_strengths', 'crit_uses_points')}),
+        ('Overrides', {'fields': ('namespace_overrides', )}),
         ('Help', {'fields': ('description', 'examples', 'see')}),
         ('Admin', {'fields': ('max_share_level', 'copy_consensus', 'variantgrid_column', 'immutable')})
     )
@@ -782,11 +795,11 @@ class DiscordanceReportAdminExport(ExportRow):
             condition_rows.append(", ".join(sorted(conditions)))
         return "\n".join(condition_rows)
 
-    @export_column("Clinical Significances (Original)")
+    @export_column("Classification (Original)")
     def _cs_original(self):
         return "\n".join(str(summary.clinical_significance_from) for summary in self.summaries)
 
-    @export_column("Clinical Significances (Current)")
+    @export_column("Classification (Current)")
     def _cs_current(self):
         return "\n".join(str(summary.clinical_significance_to) for summary in self.summaries)
 
@@ -830,7 +843,7 @@ class DiscordanceReportAdmin(ModelAdminBasics):
         cc = obj.clinical_context
         return str(cc.allele.clingen_allele)
 
-    @admin_list_column("Clinical Significances")
+    @admin_list_column("Classifications")
     def clinical_sigs(self, obj: DiscordanceReport) -> str:
         clinical_sigs = set()
         for dr in DiscordanceReportClassification.objects.filter(report=obj):

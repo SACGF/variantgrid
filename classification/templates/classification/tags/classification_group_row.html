@@ -8,17 +8,26 @@
 
 
 <tr class="{{ row_class }}" style="{% if group.clinical_grouping == "not-shared" %}opacity:0.5;{% endif %}{% if group.is_withdrawn %}text-decoration:line-through;{% endif %}cursor:pointer">
-    <td class="dt-id toggle-link" style="width:150px;" data-order="{% if group.clinical_grouping == "not-shared" %}AA{% endif %}{{ group.lab.name }}">
-        {% if group.clinical_grouping != "default" %}
-            <span class="font-weight-bold text-secondary text-uppercase">{{ group.clinical_grouping }} </span>
-        {% endif %}
-        &#32;<span class="font-weight-bold">{% lab group.lab %}</span>
-        {% if show_username %}
-            {% for user in group.users %}
-                <div class="text-secondary mt-1">{{ user.username }}</div>
-            {% endfor %}
-        {% endif %}
-        {% if group.count > 1 %}<div class="font-weight-bold font-size-small mt-1">{{ group.count }} records</div>{% endif %}
+    <td class="dt-id toggle-link" style="width:150px;" data-order="{% if group.clinical_grouping == "not-shared" %}AA{% endif %}{{ group.lab.name }}{{ group.clinical_grouping }}">
+        <div style="display:flex; flex-direction: row; position: relative; top:-10px; left: 5px;">
+            <div class="allele-origin-box vertical allele-origin-{{ group.allele_origin_bucket }}">
+                <div class="allele-origin-text">{{ group.allele_origin_bucket_display }}</div>
+            </div>
+            <div>
+                {% comment %}
+                {% if group.clinical_grouping != "default" %}
+                    <span class="font-weight-bold text-secondary text-uppercase">{{ group.clinical_grouping }} </span>
+                {% endif %}
+                {% endcomment %}
+                &#32;<span class="font-weight-bold">{% lab group.lab %}</span>
+                {% if show_username %}
+                    {% for user in group.users %}
+                        <div class="text-secondary mt-1">{{ user.username }}</div>
+                    {% endfor %}
+                {% endif %}
+                {% if group.count > 1 %}<div class="font-weight-bold font-size-small mt-1">{{ group.count }} records</div>{% endif %}
+            </div>
+        </div>
     </td>
     <td data-order="{{ group.variant_sort }}">
         {% for c_hgvs in group.c_hgvses %}
@@ -42,16 +51,19 @@
             {% endif %}
         {% endcomment %}
     </td>
-    <td style="width:100px;" class="cs-{{ group.clinical_significance_effective|lower }} text-center" data-order="{{ group.clinical_significance_score }}">
+    <td style="width:100px; font-weight: bold; color: #555;" class="cs-{{ group.clinical_significance_effective|lower }} text-center" data-order="{{ group.clinical_significance_score }}{{ group.clinical_grouping }}">
         {% if group.clinical_significance_old %}
             <div><del>{% if group.clinical_significance_old %}{{ group.clinical_significance_old | ekey:"clinical_significance" }}{% else %}Unclassified{% endif %}</del></div>
         {% endif %}
         {% if group.clinical_significance_pending %}
             <div><del>{% if group.clinical_significance %}{{ group.clinical_significance | ekey:"clinical_significance" }}{% else %}Unclassified{% endif %}</del></div>
             {{ group.clinical_significance_pending | ekey:"clinical_significance" }}
-            <div title="Some or all of these classifications have been marked as having pending changes to clinical significance" data-toggle="tooltip" class="flag flag-classification_pending_changes hover-detail mx-1"></div>
+            <div title="Some or all of these classifications have been marked as having pending changes to classification" data-toggle="tooltip" class="flag flag-classification_pending_changes hover-detail mx-1"></div>
         {% else %}
-            {% if group.clinical_significance %}{{ group.clinical_significance | ekey:"clinical_significance" }}{% else %}Unclassified{% endif %}
+            {% if group.clinical_significance %}{{ group.clinical_significance | ekey:"clinical_significance" }}{% else %}<span class="no-value">Unclassified</span>{% endif %}
+        {% endif %}
+        {% if group.somatic_clin_sig %}<br/>
+            <span class="scs scs-{{ group.somatic_clin_sig }}">{{ group.somatic_clin_sig | ekey:"somatic:clinical_significance" }}</span>
         {% endif %}
     </td>
     <td style="width:186px;">
@@ -71,7 +83,7 @@
             <div class="no-value">-</div>
         {% endif %}
     </td>
-    <td  style="width:155px;">
+    <td style="width:155px;">
         {% for acmg in group.acmg_criteria %}{% if not forloop.first %}, {% endif %}<span class="text-monospace text-secondary">{{ acmg }}</span>{% empty %}
             <div class="d-inline-block no-value">-</div>
         {% endfor %}
@@ -84,6 +96,7 @@
         </a><br/>
     </td>
     <td data-order="{{ group.date_sort_order_str }}"></td>{% comment %}hidden column just used for sorting{% endcomment %}
+    <td>{{ group.allele_origin_bucket }}</td>
     {% endwith %}
     {% if not sub_index %}
         {% comment %}<!-- This is now in the Allele Info box -->

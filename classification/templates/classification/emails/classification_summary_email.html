@@ -16,12 +16,12 @@ Hello Shariant User,
                 <table cellpadding="10" style="border-collapse: collapse;">
                     <tbody>
                         <tr>
-                            <th style="{{ th_style }}">Last Uploaded a New Classification</th>
+                            <th style="{{ th_style }}">Last Uploaded a New Classification Record</th>
                             <td>
                                 {% if lab_summary.last_imported_new_ago %}
                                     {{ lab_summary.last_imported_new_ago }} ago
                                 {% else %}
-                                    <span style="color:#888">Have not yet uploaded a classification</span>
+                                    <span style="color:#888">Have not yet uploaded a classification record</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -32,8 +32,8 @@ Hello Shariant User,
                                 {% if lab_summary.pending_changes_count or counts.waiting_for_amend%}
                                     {% if lab_summary.pending_changes_count %}
                                         <div>
-                                            {% if lab_summary.pending_changes_count == 1 %}<span style="{{ number_style }}">1</span> outstanding classification change ( <i>agreed upon during discordance discussion</i> )
-                                            {% else %}<span style="{{ number_style }}">{{ lab_summary.pending_changes_count }}</span> outstanding classification changes ( <i>agreed upon during discordance discussion</i> )
+                                            {% if lab_summary.pending_changes_count == 1 %}<span style="{{ number_style }}">1</span> outstanding classification record change ( <i>agreed upon during discordance discussion</i> )
+                                            {% else %}<span style="{{ number_style }}">{{ lab_summary.pending_changes_count }}</span> outstanding classification record changes ( <i>agreed upon during discordance discussion</i> )
                                             {% endif %}
                                         </div>
                                     {% endif %}
@@ -108,7 +108,7 @@ Hello Shariant User,
                                         <th style="font-weight:600; text-align:left; padding-right: 8px">Shariant ID</th>
                                         <th style="font-weight:600; text-align:left; padding-right: 8px">Discordance Detected</th>
                                         <th style="font-weight:600; text-align:left; padding-right: 8px">c.HGVS ({{ lab_summary.genome_build }})</th>
-                                        <th style="font-weight:600; text-align:left; padding-right: 8px">Lab / Clinical Significances</th>
+                                        <th style="font-weight:600; text-align:left; padding-right: 8px">Lab / Classification</th>
                                     </tr>
                                 </thead>
                                 <tbody>

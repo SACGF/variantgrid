@@ -5,7 +5,7 @@
 {% load js_tags %}
 {% load lab_tags %}
 {% load static %}
-{% block title %}Variant Classification Export{% endblock %}
+{% block title %}Variant Classification Record Export{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
     <meta http-equiv="refresh" content="1;url={% url 'classification_export_api' %}?{{ query_string | query_unquote}}" />
@@ -24,7 +24,7 @@
 {% endblock head %}
 {% block content %}
 <div class="container">
-    <h3>Downloading Classifications</h3>
+    <h3>Downloading Classification Records</h3>
     <div class="card">
         <div class="card-header">Download Parameters</div>
         <div class="card-body">

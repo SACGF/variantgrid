@@ -25,8 +25,8 @@ class ConditionTextColumns(DatatableConfig):
 
         self.rich_columns = [
             RichColumn(key="normalized_text", label='Text', orderable=True, client_renderer="idRenderer", extra_columns=["id"], sort_keys=['normalized_text', 'lab__name']),
-            RichColumn(key="classifications_count", label="Classification Count", orderable=True, default_sort=SortOrder.DESC, sort_keys=['classifications_count', '-normalized_text']),
-            RichColumn(key="classifications_count_outstanding", label="Classifications Outstanding", default_sort=SortOrder.DESC, orderable=True, sort_keys=['classifications_count_outstanding', '-normalized_text'])
+            RichColumn(key="classifications_count", label="Classification Record Count", orderable=True, default_sort=SortOrder.DESC, sort_keys=['classifications_count', '-normalized_text']),
+            RichColumn(key="classifications_count_outstanding", label="Classification Records Outstanding", default_sort=SortOrder.DESC, orderable=True, sort_keys=['classifications_count_outstanding', '-normalized_text'])
         ]
         if self.lab_picker.multi_labs_selected:
             self.rich_columns.insert(

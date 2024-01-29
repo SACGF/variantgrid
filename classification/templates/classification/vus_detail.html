@@ -92,13 +92,13 @@
             <th>c.HGVS/Lab</th>
             <th class="text-right">Max Abs<br/>Score</th>
             <th class="text-right">Total<br/>Patients</th>
-            <th class="crit-value">{% evidence_key_heading 'ps4' %}</th>
-            <th class="crit-value">{% evidence_key_heading 'pp1' %}<br/>{% evidence_key_heading 'bs4' %}</th>
-            <th class="crit-value">{% evidence_key_heading 'pm6' %}</th>
-            <th class="crit-value">{% evidence_key_heading 'ps2' %}</th>
-            <th class="crit-value">{% evidence_key_heading 'pm3' %}</th>
-            <th class="crit-value">{% evidence_key_heading 'pp4' %}</th>
-            <th class="crit-value">{% evidence_key_heading 'ps3' %}<br/>{% evidence_key_heading 'bs3' %}</th>
+            <th class="crit-value">{% evidence_key_heading 'acmg:ps4' %}</th>
+            <th class="crit-value">{% evidence_key_heading 'acmg:pp1' %}<br/>{% evidence_key_heading 'acmg:bs4' %}</th>
+            <th class="crit-value">{% evidence_key_heading 'acmg:pm6' %}</th>
+            <th class="crit-value">{% evidence_key_heading 'acmg:ps2' %}</th>
+            <th class="crit-value">{% evidence_key_heading 'acmg:pm3' %}</th>
+            <th class="crit-value">{% evidence_key_heading 'acmg:pp4' %}</th>
+            <th class="crit-value">{% evidence_key_heading 'acmg:ps3' %}<br/>{% evidence_key_heading 'acmg:bs3' %}</th>
         </tr>
     </thead>
     <tbody>
@@ -131,13 +131,13 @@
                                 {% endif %}
                             {% endwith %}
                         </td>
-                        {% criteria_strength_td strengths.ps4 %}
-                        {% criteria_strength_td strengths.pp1_bs4 %}
-                        {% criteria_strength_td strengths.pm6 %}
-                        {% criteria_strength_td strengths.ps2 %}
-                        {% criteria_strength_td strengths.pm3 %}
-                        {% criteria_strength_td strengths.pp4 %}
-                        {% criteria_strength_td strengths.bs3_ps3 %}
+                        {% criteria_strength_td strengths.acmg_ps4 %}
+                        {% criteria_strength_td strengths.acmg_pp1__acmg_bs4 %}
+                        {% criteria_strength_td strengths.acmg_pm6 %}
+                        {% criteria_strength_td strengths.acmg_ps2 %}
+                        {% criteria_strength_td strengths.acmg_pm3 %}
+                        {% criteria_strength_td strengths.acmg_pp4 %}
+                        {% criteria_strength_td strengths.acmg_bs3__acmg_ps3 %}
                     {% endwith %}
                 </tr>
             {% endfor %}

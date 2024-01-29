@@ -71,3 +71,12 @@ def timed_cache(size_limit=0, ttl=0, quick_key_access=False):
             return result
         return wrapper
     return decorator
+
+
+_NOT_FOUND = object()
+
+
+def clear_cached_property(instance, attribute):
+    cache = instance.__dict__
+    if cache.get(attribute, _NOT_FOUND) is not _NOT_FOUND:
+        del cache[attribute]

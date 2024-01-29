@@ -22,6 +22,7 @@ from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 from global_login_required import login_not_required
 from jfu.http import upload_receive, UploadResponse, JFUResponse
+from more_itertools import first
 from requests.models import Response
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
@@ -71,7 +72,7 @@ def activity(request, user_id: Optional[int] = None, lab_id: Optional[int] = Non
     lab: Optional[Lab] = None
     classifications: Optional[list[Classification]] = None
     base_url: Optional[str] = None
-    page_title = 'Classification Activity'
+    page_title = 'Classification Record Activity'
     if user_id:
         if request.user.is_superuser or request.user.pk == user_id:
             user = User.objects.get(pk=user_id)
@@ -174,6 +175,8 @@ class AutopopulateView(APIView):
         ensembl_transcript_accession = request.GET.get("ensembl_transcript_accession")
         sample_id = request.GET.get("sample_id")
         copy_from_id = request.GET.get("copy_from_vcm_id")
+        if copy_from_id:
+            copy_from_id = int(copy_from_id)
 
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
         variant: Variant = get_object_or_404(Variant, pk=variant_id)
@@ -206,7 +209,8 @@ class AutopopulateView(APIView):
 
         if copy_from_id:
             copy_from = ClassificationModification.objects.get(pk=copy_from_id)
-            consensus_patch = ClassificationConsensus(variant, request.user, copy_from=copy_from).consensus_patch
+            copy_from.check_can_view(request.user)
+            consensus_patch = ClassificationConsensus(modification=copy_from).consensus_patch
             for key, blob in consensus_patch.items():
                 if key not in used_keys:
                     used_keys.add(key)
@@ -276,7 +280,8 @@ def create_classification_object(request) -> Classification:
 
     if copy_from_id:
         copy_from = ClassificationModification.objects.get(pk=copy_from_id)
-        consensus_patch = ClassificationConsensus(variant, request.user, copy_from=copy_from).consensus_patch
+        copy_from.check_can_view(request.user)
+        consensus_patch = ClassificationConsensus(modification=copy_from).consensus_patch
         classification.patch_value(
             patch=consensus_patch,
             clear_all_fields=False,
@@ -303,19 +308,21 @@ def classification_history(request, classification_id: Any):
         'changes': changes,
         'can_create_classifications': Classification.can_create_via_web_form(request.user),
         'now': now(),
-        'page_title': f'Classification Activity ({classification.cr_lab_id})',
+        'page_title': f'Classification Record Activity ({classification.cr_lab_id})',
         'import_details': classification
     }
     return render(request, 'classification/activity.html', context)
 
 
 def view_classification(request: HttpRequest, classification_id: str):
+
     ref = ClassificationRef.init_from_str(request.user, str(classification_id))
     ref.check_exists()
     ref.check_security()
     withdraw_reasons = WithdrawReason.choices
     classification_record_id = Classification.objects.get(pk=ref.record.id)
 
+    withdraw_reasons = WithdrawReason.choices
     duplicate_records = []
     if classification_record_id.withdraw_reason == WithdrawReason.DUPLICATE:
         all_class_ids = Classification.objects.filter(allele=classification_record_id.allele_object,
@@ -332,7 +339,9 @@ def view_classification(request: HttpRequest, classification_id: str):
 
     record = ref.as_json(ClassificationJsonParams(current_user=request.user,
                                                   include_data=True,
-                                                  include_lab_config=True))
+                                                  include_lab_config=True,
+                                                  api_version=1
+                                                  ))
 
     # default to the natural build of the classification
     genome_build = None
@@ -602,7 +611,8 @@ class CreateClassificationForVariantView(TemplateView):
                                           add_other_annotation_consortium_transcripts=True)
         lab, lab_error = UserSettings.get_lab_and_error(self.request.user)
 
-        consensus = ClassificationConsensus(variant, self.request.user)
+        consensuses = ClassificationConsensus.all_consensus_candidates(allele=variant.allele, user=self.request.user)
+        consensus_default_suggestion = first((c for c in consensuses if c.default_suggestion), default=None)
         return {
             'variant': variant,
             "genome_build": genome_build,
@@ -611,7 +621,8 @@ class CreateClassificationForVariantView(TemplateView):
             "vts": vts,
             "lab": lab,
             "lab_error": lab_error,
-            "consensus": consensus
+            "consensuses": consensuses,
+            "consensus_default_suggestion": consensus_default_suggestion.modification.pk if consensus_default_suggestion else 0
         }
 
 

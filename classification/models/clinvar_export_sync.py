@@ -1,17 +1,24 @@
 from enum import Enum, auto
 from functools import cached_property
-from typing import TypedDict, Optional
+from typing import TypedDict, Optional, Tuple
 
 import requests
 from django.conf import settings
 from django.db import transaction
 from requests import Response
 
+from classification.enums import AlleleOriginBucket
 from classification.models import ClinVarExportBatch, ClinVarExportRequest, ClinVarExportRequestType, \
     ClinVarExportBatchStatus, ClinVarExportSubmission, ClinVarExportSubmissionStatus
 from library.constants import MINUTE_SECS
 from library.log_utils import report_message
 from library.utils import JsonObjType
+
+
+"""
+This code is responsible for sending our data to ClinVar API (after everything else has run to work out what
+data we want to send)
+"""
 
 
 class _ClinVarExportConfigDic(TypedDict):
@@ -29,6 +36,7 @@ class ClinVarRequestExceptionType(Enum):
     TOO_MANY_REQUESTS = auto()
     CLINVAR_SERVER_ISSUE = auto()
     RESPONSE_MISSING_KEY_DATA = auto()
+    NOT_SUPPORTED_YET = auto()
 
 
 class ClinVarRequestException(Exception):
@@ -48,6 +56,8 @@ class ClinVarRequestException(Exception):
         elif self.exception_type == ClinVarRequestExceptionType.CLINVAR_SERVER_ISSUE:
             return "ClinVar server returned an error code, maybe wait before trying again"
         elif self.exception_type == ClinVarRequestExceptionType.RESPONSE_MISSING_KEY_DATA:
+            return self.message
+        elif self.exception_type == ClinVarRequestExceptionType.NOT_SUPPORTED_YET:
             return self.message
 
     @staticmethod
@@ -149,7 +159,13 @@ class ClinVarExportSync:
             response_status_code=response.status_code
         )
 
-    def next_request(self, batch: ClinVarExportBatch) -> tuple[ClinVarExportRequest, ClinVarResponseOutcome]:
+    def next_request(self, batch: ClinVarExportBatch) -> Tuple[ClinVarExportRequest, ClinVarResponseOutcome]:
+        if batch.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
+            raise ClinVarRequestException(
+                exception_type=ClinVarRequestExceptionType.NOT_SUPPORTED_YET,
+                message=f"Cannot yet action non-germline submissions"
+            )
+
         clinvar_request: ClinVarExportRequest
         if not batch.submission_identifier:
             batch.status = ClinVarExportBatchStatus.UPLOADING
@@ -162,7 +178,7 @@ class ClinVarExportSync:
                 url=self.submission_url)
 
         else:
-            #if self.is_test:
+            # if self.is_test:
             #    raise ValueError("ClinVarExport test is set to True, but attempted to perform an action other than initial submission")
 
             if not batch.file_url:

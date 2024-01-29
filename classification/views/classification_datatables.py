@@ -1,6 +1,6 @@
 import operator
 from functools import cached_property, reduce
-from typing import Any, Optional
+from typing import Dict, Any, List, Optional
 
 from django.conf import settings
 from django.db.models import Q, When, Case, TextField, Value, IntegerField, QuerySet
@@ -8,7 +8,7 @@ from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Lower, Cast
 from django.http import HttpRequest
 
-from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel
+from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel, AlleleOriginBucket
 from classification.models import ClassificationModification, EvidenceKeyMap, \
     ImportedAlleleInfo
 from classification.models.classification_utils import classification_gene_symbol_filter
@@ -27,8 +27,14 @@ ALLELE_KNOWN_VALUES = ALLELE_GERMLINE_VALUES + ALLELE_SOMATIC_VALUES
 
 class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
-    def render_c_hgvs(self, row: dict[str, Any]) -> JsonDataType:
-        def get_preferred_chgvs_json() -> dict:
+    def render_clinical_significance(self, row: Dict[str, Any]) -> JsonDataType:
+        return {
+            SpecialEKeys.CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.CLINICAL_SIGNIFICANCE}__value"],
+            SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}__value"]
+        }
+
+    def render_c_hgvs(self, row: Dict[str, Any]) -> JsonDataType:
+        def get_preferred_chgvs_json() -> Dict:
             nonlocal row
             for index, genome_build in enumerate(self.genome_build_prefs):
                 if c_hgvs_string := row.get(ClassificationModification.column_name_for_build(genome_build)):
@@ -62,14 +68,14 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
         return response
 
-    def render_condition(self, row: dict[str, Any]) -> JsonDataType:
+    def render_condition(self, row: Dict[str, Any]) -> JsonDataType:
         if cr := row['classification__condition_resolution']:
             return cr
         else:
             return {"display_text": row['published_evidence__condition__value']}
 
-    def classification_id(self, row: dict[str, Any]) -> JsonDataType:
-        matches: Optional[dict[str, str]] = None
+    def classification_id(self, row: Dict[str, Any]) -> JsonDataType:
+        matches: Optional[Dict[str, str]] = None
         if id_filter := self.get_query_param("id_filter"):
             matches = {}
             id_keys = self.id_columns
@@ -92,16 +98,17 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             "lab_record_id": cr_lab_id,
             "share_level": row.get('classification__share_level'),
             "matches": matches,
-            "search": id_filter
+            "search": id_filter,
+            "allele_origin_bucket": row.get('classification__allele_origin_bucket')
         }
 
     @cached_property
-    def genome_build_prefs(self) -> list[GenomeBuild]:
+    def genome_build_prefs(self) -> List[GenomeBuild]:
         user_settings = UserSettings.get_for_user(self.user)
         return GenomeBuild.builds_with_annotation_priority(user_settings.default_genome_build)
 
     def __init__(self, request: HttpRequest):
-        self.term_cache: dict[str, OntologyTerm] = {}
+        self.term_cache: Dict[str, OntologyTerm] = {}
         super().__init__(request)
 
         user_settings = UserSettings.get_for_user(self.user)
@@ -123,7 +130,8 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                     'classification__lab__organization__name',
                     'classification__lab__name',
                     'classification__lab_record_id',
-                    'classification__share_level'
+                    'classification__share_level',
+                    'classification__allele_origin_bucket'
                 ]
             ),
             RichColumn(
@@ -158,10 +166,12 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             RichColumn(
                 key='published_evidence__clinical_significance__value',
                 name='clinical_significance',
-                label='Clinical Significance',
+                label='Classification',
+                renderer=self.render_clinical_significance,
                 client_renderer='VCTable.clinical_significance',
                 client_renderer_td='VCTable.clinical_significance_td',
                 sort_keys=['clinical_significance', 'clin_sig_sort'],
+                extra_columns=["published_evidence__somatic:clinical_significance__value"],
                 orderable=True
             ),
             RichColumn(
@@ -289,12 +299,12 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         return initial_qs
 
     @cached_property
-    def id_columns(self) -> list[str]:
+    def id_columns(self) -> List[str]:
         keys = EvidenceKeyMap.instance()
         return [e_key.key for e_key in keys.all_keys if '_id' in e_key.key and
                 e_key.evidence_category in (EvidenceCategory.HEADER_PATIENT, EvidenceCategory.HEADER_TEST, EvidenceCategory.SIGN_OFF)]
 
-    def value_columns(self) -> list[str]:
+    def value_columns(self) -> List[str]:
         all_columns = super().value_columns()
         if self.get_query_param("id_filter"):
             id_keys = self.id_columns
@@ -303,7 +313,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         return all_columns
 
     def filter_queryset(self, qs: QuerySet[ClassificationModification]) -> QuerySet[ClassificationModification]:
-        filters: list[Q] = []
+        filters: List[Q] = []
         if settings.CLASSIFICATION_GRID_SHOW_USERNAME:
             if user_id := self.get_query_param('user'):
                 filters.append(Q(classification__user__pk=user_id))
@@ -320,7 +330,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
         if id_filter := self.get_query_param("id_filter"):
             id_keys = self.id_columns
-            ids_contain_q_list: list[Q] = []
+            ids_contain_q_list: List[Q] = []
             for id_key in id_keys:
                 ids_contain_q_list.append(Q(**{f'published_evidence__{id_key}__value__icontains': id_filter}))
             id_filter_q = reduce(operator.or_, ids_contain_q_list)
@@ -350,17 +360,21 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             else:
                 return qs.none()
 
-        if settings.CLASSIFICATION_GRID_SHOW_ORIGIN:
-            if allele_origin := self.get_query_param("allele_origin"):
-                if allele_origin == 'germline':
-                    filters.append(Q(published_evidence__allele_origin__value__in=ALLELE_GERMLINE_VALUES))
-                elif allele_origin == 'somatic':
-                    filters.append(Q(published_evidence__allele_origin__value__in=ALLELE_SOMATIC_VALUES))
-                elif allele_origin == 'other':
-                    filters.append(
-                        ~Q(published_evidence__allele_origin__value__in=ALLELE_KNOWN_VALUES) |
-                        Q(published_evidence__allele_origin__value__isnull=True)
-                    )
+        if allele_origin := self.get_query_param("allele_origin"):
+            if allele_origin != "A":
+                filters.append(Q(classification__allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
+
+        # if settings.CLASSIFICATION_GRID_SHOW_ORIGIN:
+        #     if allele_origin := self.get_query_param("allele_origin"):
+        #         if allele_origin == 'germline':
+        #             filters.append(Q(published_evidence__allele_origin__value__in=ALLELE_GERMLINE_VALUES))
+        #         elif allele_origin == 'somatic':
+        #             filters.append(Q(published_evidence__allele_origin__value__in=ALLELE_SOMATIC_VALUES))
+        #         elif allele_origin == 'other':
+        #             filters.append(
+        #                 ~Q(published_evidence__allele_origin__value__in=ALLELE_KNOWN_VALUES) |
+        #                 Q(published_evidence__allele_origin__value__isnull=True)
+        #             )
 
         # ClassificationListGrid is also used on patient/sample page so we
         # need to filter by samples

@@ -5,10 +5,12 @@ import re
 import urllib
 from datetime import date
 from decimal import Decimal
+from enum import Enum
 from html import escape
 from typing import Union, Any, Optional
 
 from django import template
+from django.db.models import TextChoices
 from django.utils.safestring import mark_safe, SafeString
 
 from library.utils import format_significant_digits, JsonDataType
@@ -215,6 +217,8 @@ def format_preference(value):
         return 'Yes'
     if value is False:
         return 'No'
+    elif isinstance(value, TextChoices):
+        return value.label
     return value
 
 

@@ -5,7 +5,7 @@
         <a class="hover-link" href="{% url 'view_classification' vcm.classification.id %}">{{ vcm.classification.lab }} / {{ vcm.cr_lab_id }}</a>
     {% else %}
         <span class="share-level-{{ vcm.share_level_enum.name }} sig-level-{{ vcm.evidence.clinical_significance.value}}">
-            {% if show_clinical_grouping %}{% if vcm.classification.clinical_grouping_name != 'default' %}<span class="font-weight-bold text-uppercase text-secondary mr-1">{{ vcm.classification.clinical_grouping_name }} </span>{% endif %}{% endif %}
+            {% if show_clinical_grouping %}{% if vcm.classification.clinical_context.is_custom %}<span class="font-weight-bold text-uppercase text-secondary mr-1">{{ vcm.classification.clinical_grouping_name }} </span>{% endif %}{% endif %}
             {% clinical_significance vcm.evidence.clinical_significance.value %}
             <a class="hover-link" href="{% url 'view_classification' vcm.classification.id %}">
                 &nbsp;

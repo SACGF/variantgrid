@@ -235,6 +235,8 @@ class BulkClassificationInserter:
             if include_data == 'changes':
                 include_data = bool(patch_response.modified_keys)
 
+            include_lab_config = data.pop('config', False)
+
             if data:
                 patch_response.append_warning(code="unexpected_parameters", message=f"Unexpected parameters {data}")
 
@@ -248,7 +250,7 @@ class BulkClassificationInserter:
                         include_data=include_data,
                         current_user=user,
                         flatten=flatten,
-                        include_lab_config=data.pop('config', False),
+                        include_lab_config=include_lab_config,
                         api_version=self.api_version)
 
                     patch_response.classification_json = record.as_json(params)
@@ -346,7 +348,7 @@ class BulkClassificationInserter:
                 include_data=include_data or not save,
                 current_user=user,
                 flatten=flatten,
-                include_lab_config=data.pop('config', False),
+                include_lab_config=include_lab_config,
                 api_version=self.api_version
             ))
 

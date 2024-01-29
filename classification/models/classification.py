@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 from functools import cached_property
-from typing import Any, Union, Optional, Iterable, Callable, Mapping, TypedDict
+from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict, Tuple, Set
 
 import django.dispatch
 from datetimeutc.fields import DateTimeUTCField
@@ -29,14 +29,14 @@ from guardian.shortcuts import assign_perm, get_objects_for_user
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
 from annotation.regexes import db_ref_regexes, DbRegexes
 from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
-    CRITERIA_NOT_MET, ValidationCode, CriteriaEvaluation, WithdrawReason
+    CRITERIA_NOT_MET, ValidationCode, CriteriaEvaluation, WithdrawReason, AlleleOriginBucket
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_patcher import patch_fuzzy_age
 from classification.models.classification_utils import \
     ValidationMerger, ClassificationJsonParams, PatchMeta, ClassificationPatchResponse
 from classification.models.classification_variant_info_models import ImportedAlleleInfo, ImportedAlleleInfoStatus
 from classification.models.evidence_key import EvidenceKeyValueType, \
-    EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell
+    EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell, EvidenceKeyOverrides
 from classification.models.evidence_mixin import EvidenceMixin, VCPatch
 from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagPermissionLevel, FlagStatus
@@ -44,6 +44,7 @@ from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from genes.hgvs import HGVSMatcher, CHGVS
 from genes.models import Gene
+from library.cache import clear_cached_property
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
@@ -53,9 +54,10 @@ from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_tex
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Variant, Lab, Sample
+from snpdb.models import Variant, Lab, Sample, AlleleOriginFilterDefault
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import AlleleSource, Allele, VariantAllele
+from snpdb.user_settings_manager import UserSettingsManager
 
 ChgvsKey = namedtuple('CHGVS', ['short', 'column', 'build'])
 
@@ -219,13 +221,13 @@ class ConditionResolvedDict(TypedDict, total=False):
     """
     display_text: str  # plain text to show to users if not in a position to render links
     sort_text: str  # lower case representation of description
-    resolved_terms: list[ConditionResolvedTermDict]
+    resolved_terms: List[ConditionResolvedTermDict]
     resolved_join: str
 
 
 @dataclass(frozen=True)
 class ConditionResolved:
-    terms: list[OntologyTerm]
+    terms: List[OntologyTerm]
     join: Optional['MultiCondition'] = None
     plain_text: Optional[str] = field(default=None)  # fallback, not populated in all contexts
 
@@ -350,7 +352,7 @@ class ConditionResolved:
                 join = self.join or MultiCondition.NOT_DECIDED
                 text = f"{text}; {self.join.label}"
 
-            resolved_term_dicts: list[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in
+            resolved_term_dicts: List[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in
                                                                     self.terms]
 
             jsoned: ConditionResolvedDict = {
@@ -483,6 +485,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     clinical_significance = models.CharField(max_length=1, choices=ClinicalSignificance.CHOICES, null=True, blank=True)
     """ Used as an optimisation for queries """
 
+    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, default=AlleleOriginBucket.GERMLINE)
+    """ Used to cache if we consider this classification germline or somatic """
+
     condition_resolution = models.JSONField(null=True, blank=True)  # of type ConditionProcessedDict
 
     last_source_id = models.TextField(blank=True, null=True)
@@ -545,16 +550,15 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return None
 
     @property
-    def metrics_logging_key(self) -> tuple[str, Any]:
+    def metrics_logging_key(self) -> Tuple[str, Any]:
         return "classification_id", self.pk
 
     @property
     def clinical_grouping_name(self) -> str:
         if self.share_level not in ShareLevel.DISCORDANT_LEVEL_KEYS:
             return 'not-shared'
-
         if cc := self.clinical_context:
-            return cc.name
+            return cc.allele_origin_bucket + " " + cc.name
         return 'not-matched'
 
     @property
@@ -590,6 +594,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     class Meta:
         unique_together = ('lab', 'lab_record_id')
+        indexes = [
+            models.Index(fields=["share_level"]),
+            models.Index(fields=["withdrawn"])
+        ]
 
     @staticmethod
     def can_create_via_web_form(user: User):
@@ -611,7 +619,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return qs.exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
 
     @staticmethod
-    def dashboard_report_classifications_of_interest(since) -> list[ClassificationOutstandingIssues]:
+    def dashboard_report_classifications_of_interest(since) -> List[ClassificationOutstandingIssues]:
         min_age = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(
             minutes=2)  # give records 2 minutes to matching properly before reporting
 
@@ -625,7 +633,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         coi_qs = Classification.objects.filter(flag_q | (time_range_q & missing_chgvs_q))
         coi_qs = coi_qs.order_by('-pk').select_related('lab', 'flag_collection')
 
-        summaries: list[ClassificationOutstandingIssues] = []
+        summaries: List[ClassificationOutstandingIssues] = []
         c: Classification
         for c in coi_qs:
             coi = ClassificationOutstandingIssues(c)
@@ -672,6 +680,22 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @property
     def imported_g_hgvs(self):
         return self.get(SpecialEKeys.G_HGVS)
+
+    def calc_allele_origin_bucket(self) -> AlleleOriginBucket:
+        if allele_origin_value := self.get(SpecialEKeys.ALLELE_ORIGIN):
+            # FIXME, it would be good to put this value directly into allele origin
+            # logic is duplicated in JavaSCript in vc_form.js updateTitle()
+            if bucket := EvidenceKeyMap.cached_key(SpecialEKeys.ALLELE_ORIGIN).matched_options(allele_origin_value)[0].get("bucket"):
+                return AlleleOriginBucket(bucket)
+            elif "somatic" in allele_origin_value.lower():
+                return AlleleOriginBucket.SOMATIC
+            elif "germline" in allele_origin_value.lower():
+                return AlleleOriginBucket.GERMLINE
+        else:
+            return AlleleOriginBucket(settings.ALLELE_ORIGIN_NOT_PROVIDED_BUCKET)
+
+        # FIXME make the default configurable, should it default to UNKNOWN or GERMLINE in the environment
+        return AlleleOriginBucket.UNKNOWN
 
     def flag_type_context(self):
         return FlagTypeContext.objects.get(pk='classification')
@@ -767,7 +791,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def ensure_allele_info(self) -> Optional[ImportedAlleleInfo]:
         return self.ensure_allele_info_with_created()[0]
 
-    def ensure_allele_info_with_created(self, force_allele_info_update_check: bool = False) -> tuple[Optional[ImportedAlleleInfo], bool]:
+    def ensure_allele_info_with_created(self, force_allele_info_update_check: bool = False) -> Tuple[Optional[ImportedAlleleInfo], bool]:
         created = False
         if not self.allele_info or force_allele_info_update_check:
             try:
@@ -902,7 +926,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def create(user: User,
                lab: Lab,
                lab_record_id: Optional[str] = None,
-               data: Optional[dict[str, Any]] = None,
+               data: Optional[Dict[str, Any]] = None,
                save: bool = True,
                source: SubmissionSource = SubmissionSource.VARIANT_GRID,
                make_fields_immutable=False,
@@ -964,7 +988,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if fix_permissions:
             self.fix_permissions()
 
-    def get_key_errors(self) -> dict[str, dict]:
+    def get_key_errors(self) -> Dict[str, Dict]:
         """
         Returns a dict of key to validation error (first error in the case
         of multiple errors for one key).
@@ -995,7 +1019,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return None
 
     @staticmethod
-    def match_option(options, check_value) -> Optional[dict[str, str]]:
+    def match_option(options, check_value) -> Optional[Dict[str, str]]:
         for option in options:
             option_value = option.get('key')
 
@@ -1030,12 +1054,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return None
 
     @staticmethod
-    def process_option_values(cell: VCDataCell, values: list[Any]) -> Optional[list[str]]:
+    def process_option_values(cell: VCDataCell, values: List[Any]) -> Optional[List[str]]:
         e_key = cell.e_key
         options = e_key.virtual_options or []
         # Do a case-insensitive check for each value against the key and any aliases
         # if there's a match to any of those, normalise back to the key (with the case of the key)
-        results: list[str] = []
+        results: List[str] = []
         # remove duplicates
         values = list(set(values))
         for check_value in values:
@@ -1078,7 +1102,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @cached_property
     def evidence_keys(self) -> EvidenceKeyMap:
-        return EvidenceKeyMap.instance(lab=self.lab)
+        # note that this should be invalidated if the config changes (which would happen if
+        # assertion method is updated for example)
+        return EvidenceKeyMap.instance().with_overrides(self.evidence_key_overrides)
 
     def process_entry(self, cell: VCDataCell, source: str):
         """
@@ -1170,7 +1196,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             elif e_key.value_type in (EvidenceKeyValueType.MULTISELECT,
                                       EvidenceKeyValueType.SELECT,
                                       EvidenceKeyValueType.CRITERIA):
-                parts: list[Any]
+                parts: List[Any]
                 if isinstance(value, str):
                     if e_key.value_type == EvidenceKeyValueType.MULTISELECT and '|_' in str(value):
                         parts = value.split('|_')
@@ -1389,7 +1415,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @transaction.atomic()
     def patch_value(self,
-                    patch: dict[str, Any],
+                    patch: Dict[str, Any],
                     clear_all_fields: bool = False,
                     user: Optional[User] = None,
                     source: SubmissionSource = None,
@@ -1399,7 +1425,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     remove_api_immutable=False,
                     initial_data=False,
                     revalidate_all=False,
-                    ignore_if_only_patching: Optional[set[str]] = None) -> ClassificationPatchResponse:
+                    ignore_if_only_patching: Optional[Set[str]] = None) -> ClassificationPatchResponse:
         """
             Creates a new ClassificationModification if the patch values are different to the current values
             Patching a value with the same value has no effect
@@ -1647,12 +1673,20 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             Classification.patch_with(target=use_evidence.data, patch=diffs_only_patch, tidy_nones=True)
 
             self.evidence = use_evidence.data
+            # classification is stored on the classification record and on the classification modification
+            # (not sure if we actually use it for anything on the modification)
             clinical_significance_choice = self.calc_clinical_significance_choice()
             self.clinical_significance = clinical_significance_choice
             pending_modification.clinical_significance = clinical_significance_choice
 
+            self.allele_origin_bucket = self.calc_allele_origin_bucket()
+
             message = 'Patched changed values for ' + ', '.join(sorted(diffs_only_patch.keys()))
             patch_response.append_warning(code="patched", message=message)
+
+            # update the evidence keys in case that's changed
+            # FIXME do some optimisation so we can see if it changed easily
+            self._clear_evidence_key_cache()
 
             if save:
                 self.save()
@@ -1712,7 +1746,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return records
 
     @staticmethod
-    def validate_evidence(evidence: dict) -> list[dict]:
+    def validate_evidence(evidence: dict) -> List[Dict]:
         messages = []
 
         for key, blob in evidence.items():
@@ -1752,7 +1786,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                             return True
         return False
 
-    def validate(self) -> list[dict]:
+    def validate(self) -> List[Dict]:
         return Classification.validate_evidence(self.evidence)
 
     @staticmethod
@@ -1795,182 +1829,34 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return None
         return self.lab.group_name + '/' + patient_id
 
+    @property
+    def _evidence_key_overrides_from_evidence_fields(self) -> EvidenceKeyOverrides:
+        namespaces = set()
+        for namespace_key in [SpecialEKeys.ASSERTION_METHOD, SpecialEKeys.ALLELE_ORIGIN]:
+            if value := self.get(namespace_key):
+                if namespaces_key_found := EvidenceKeyMap.cached_key(namespace_key).option_dictionary_property("namespaces").get(value):
+                    namespaces |= set(namespaces_key_found)
+
+        return EvidenceKeyOverrides(
+            namespaces=namespaces
+        )
+
+    @cached_property
+    def evidence_key_overrides(self) -> EvidenceKeyOverrides:
+        return EvidenceKeyOverrides.merge(
+            EvidenceKeyOverrides.from_dict(self.lab.organization.classification_config),
+            EvidenceKeyOverrides.from_dict(self.lab.classification_config),
+            self._evidence_key_overrides_from_evidence_fields
+        )
+
+    def _clear_evidence_key_cache(self):
+        # ignore PyCharm's warnings https://youtrack.jetbrains.com/issue/PY-46623/Deleting-a-functools.cachedproperty-throws-a-warning-that-it-cannot-be-deleted
+        clear_cached_property(self, 'evidence_key_overrides')
+        clear_cached_property(self, 'evidence_keys')
+
     def as_json(self, params: ClassificationJsonParams) -> dict:
-        current_user = params.current_user
-        include_data = params.include_data
-        version = params.version
-        flatten = params.flatten
-        include_lab_config = params.include_lab_config
-        include_messages = params.include_messages
-        strip_complicated = params.strip_complicated
-        api_version = params.api_version
-
-        if version and not isinstance(version, ClassificationModification):
-            version = self.modification_at_timestamp(version)
-
-        include_data_bool = include_data or flatten
-
-        title = self.lab.group_name + '/' + self.lab_record_id
-        # have version and last_edited as separate as we might be looking at an older version
-        # but still want to know last edited
-        latest_modification = None
-        last_published_version = None
-
-        if version:
-            if version.is_last_published:
-                last_published_version = version
-            if version.is_last_edited:
-                latest_modification = version
-
-        if not latest_modification:
-            latest_modification = self.last_edited_version
-        if not last_published_version:
-            last_published_version = self.last_published_version
-
-        can_write = self.can_write(user_or_group=current_user)
-
-        if self.share_level == ShareLevel.CURRENT_USER.key:
-            last_published_version = None
-
-        last_published_timestamp = None
-        lowest_share_level = self.lowest_share_level(current_user)
-        if last_published_version:
-            last_published_timestamp = last_published_version.created.timestamp()
-
-        clinical_context = None
-        if self.clinical_context:
-            clinical_context = self.clinical_context.name
-
-        content = {
-            'id': self.id,
-            'lab_record_id': self.lab_record_id,
-            'institution_name': self.lab.organization.name,
-            'lab_id': self.lab.group_name,
-            'cr_lab_id': self.cr_lab_id,
-            'org_name': self.lab.organization.shortest_name,
-            'lab_name': self.lab.name,
-            'title': title,
-            'publish_level': self.share_level,
-            'version_publish_level': version.share_level if version else self.share_level,
-            'version_is_published': version.published if version else None,
-            'is_last_published': version.is_last_published if version else (True if bool(self.id) else None),
-            'published_version': last_published_timestamp,
-            'can_write': can_write,
-            'can_write_latest': can_write,
-            'clinical_context': clinical_context,
-            'data': self.get_visible_evidence(self.evidence, lowest_share_level),
-            'resolved_condition': self.condition_resolution_dict,
-            'withdrawn': self.withdrawn
-        }
-        if latest_modification:
-            content['version'] = latest_modification.created.timestamp()
-
-        if self.id:
-            # only get flag collection if we've saved a record
-            content['flag_collection'] = self.flag_collection_safe.pk
-
-        if last_published_version and latest_modification:
-            content['has_changes'] = last_published_version.id != latest_modification.id
-
-        if include_messages:
-            content['messages'] = Classification.validate_evidence(self.evidence)
-
-        if can_write and latest_modification:
-            content['last_edited'] = latest_modification.created.timestamp()
-
-        if version is None or version.is_last_edited:
-            # show the editable version
-            pass
-        else:
-            version_timestamp = version.created.timestamp()
-            versioned_data = version.evidence
-            content['title'] = content['title'] + '.' + str(version_timestamp)
-            content['version'] = version_timestamp
-            content['data'] = self.get_visible_evidence(versioned_data, lowest_share_level)
-            if include_messages:
-                content['messages'] = Classification.validate_evidence(versioned_data)
-            content['can_write'] = False
-
-        if include_lab_config:
-            content['config'] = EvidenceKey.merge_config(self.lab.classification_config,
-                                                         self.lab.organization.classification_config)
-
-        if include_messages:
-            content['messages'] = (content['messages'] or []) + self.current_state_validation(
-                user=current_user).flat_messages
-
-        # Summary
-        data = content['data']
-
-        content["allele"] = self.get_allele_info_dict()
-
-        if self.sample:
-            content["sample_id"] = self.sample.pk
-            content["sample_name"] = self.sample.name
-
-        if include_data is not None and not isinstance(include_data, bool):
-            if isinstance(include_data, str):
-                include_data = [include_data]
-            data_copy = {}
-            for key in include_data:
-                if key in data:
-                    data_copy[key] = data[key]
-                else:
-                    data_copy[key] = None
-            data = data_copy
-        else:
-            # do a copy just in case, want to make sure
-            # that there are no errant saves going on
-            data = content['data'].copy()
-
-        if data and params.fix_data_types:
-            # currently just fixes data types to multiselect array
-            # should fix more data types and move the logic out of as_json so it can be done for other datatypes
-            e_keys = EvidenceKeyMap.instance()
-            for key, blob in data.items():
-                if e_keys.get(key).value_type == EvidenceKeyValueType.MULTISELECT:
-                    value = blob.get('value')
-                    if isinstance(value, str):
-                        blob['value'] = [s.strip() for s in value.split(',')]
-
-        for key, blob in data.items():
-            if strip_complicated:
-                remove_keys = set(blob.keys()) - {'value', 'note', 'explain', 'db_refs'}
-                for remove_key in remove_keys:
-                    blob.pop(remove_key)
-            elif not include_messages:
-                blob.pop('validation', None)
-
-        if flatten:
-            data = Classification.flatten(data, ignore_none_values=True)
-
-        if include_data_bool:
-            content['data'] = data
-        else:
-            content.pop('data', None)
-
-        if api_version >= 2:
-            META_KEYS = [
-                'id', 'lab_record_id', 'institution_name', 'lab_id', 'lab_name', 'title',
-                'user', 'published_version', 'can_write', 'can_write_latest',
-                'clinical_context', 'flag_collection', 'has_changes', 'version',
-                'last_edited'
-            ]
-            meta = {}
-            for meta_key in META_KEYS:
-                if meta_key in content:
-                    meta[meta_key] = content.pop(meta_key)
-            if 'publish_level' in content:
-                content['publish'] = content.pop('publish_level')
-
-            content['meta'] = meta
-            content['id'] = self.lab.group_name + '/' + self.lab_record_id
-
-        if params.hardcode_extra_data:
-            for key, value in params.hardcode_extra_data.items():
-                content[key] = value
-
-        return content
+        from classification.models.classification_json import populate_classification_json
+        return populate_classification_json(self, params)
 
     def lowest_share_level(self, user) -> ShareLevel:
         """ lower = less restricted """
@@ -1991,7 +1877,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return ShareLevel.ALL_USERS
         return ShareLevel.PUBLIC
 
-    def get_visible_evidence(self, evidence, lowest_share_level: ShareLevel) -> dict[str, dict]:
+    def get_visible_evidence(self, evidence, lowest_share_level: ShareLevel) -> Dict[str, Dict]:
         """ Driven by EvidenceKey.max_share_level """
 
         if lowest_share_level.index == 0:  # No restrictions
@@ -2007,7 +1893,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 visible_evidence[k] = {'value': "(hidden)", 'hidden': True}
         return visible_evidence
 
-    def get_allele_info_dict(self) -> Optional[dict[str, Any]]:
+    def get_allele_info_dict(self) -> Optional[Dict[str, Any]]:
         allele_info_dict = {}
         if allele_info := self.allele_info:
             resolved_dict = {
@@ -2080,7 +1966,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                       clinical_significance_list: Iterable[str] = None,
                       lab_list: Iterable[Lab] = None) -> Q:
         """ returns a Q object filtering variants to those with a PUBLISHED classification
-            (optionally classification clinical significance in clinical_significance_list """
+            (optionally classification in clinical_significance_list """
         vc_qs = Classification.get_classifications_qs(user, clinical_significance_list, lab_list)
         return Classification.get_variant_q_from_classification_qs(vc_qs, genome_build)
 
@@ -2147,8 +2033,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             variant_annotation = variant.variantannotation_set.filter(version=variant_annotation_version).first()
         return variant_annotation
 
-    def c_hgvs_all(self) -> list[CHGVS]:
-        all_chgvs: list[CHGVS] = []
+    def c_hgvs_all(self) -> List[CHGVS]:
+        all_chgvs: List[CHGVS] = []
         for genome_build in GenomeBuild.builds_with_annotation_cached():
             if text := self.get_c_hgvs(genome_build):
                 chgvs = CHGVS(full_c_hgvs=text)
@@ -2349,6 +2235,8 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                         clinical_context: Optional['ClinicalContext'] = None,
                         exclude_withdrawn: bool = True,
                         shared_only: bool = False,
+                        allele_origin_bucket: Optional[AlleleOriginBucket] = None,
+                        exclude_external_labs: bool = False,
                         **kwargs) -> QuerySet['ClassificationModification']:
         """
 
@@ -2360,10 +2248,12 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         :param clinical_context: If provided, only modifications linked to the clinical context will be returned
         :param exclude_withdrawn: True by default, if false will include withdrawn records
         :param shared_only: False by default, if true will only include records at discordant levels
+        :param allele_origin_bucket: None by default, if Germline/Somatic/Unknown will only return classification from thos buckets
+        :param exclude_external_labs: If True, will not consider external labs to select from
         :param kwargs: Any other parameters will be used for filtering
         :return:
         """
-        qs = get_objects_for_user(user, cls.get_read_perm(), klass=cls, accept_global_perms=True)
+        qs: QuerySet[ClassificationModification] = get_objects_for_user(user, cls.get_read_perm(), klass=cls, accept_global_perms=True)
         qs = qs.order_by('-created', 'classification')
         if kwargs:
             qs = qs.filter(**kwargs)
@@ -2383,6 +2273,10 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             qs = qs.filter(classification__withdrawn=False)
         if shared_only:
             qs = qs.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)
+        if allele_origin_bucket:
+            qs = qs.filter(classification__clinical_context__allele_origin_bucket=allele_origin_bucket)
+        if exclude_external_labs:
+            qs = qs.filter(classification__lab__external=False)
 
         if published:
             qs = qs.select_related(
@@ -2493,7 +2387,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                                                          created__lt=self.created).count()
 
     @property
-    def evidence(self) -> dict[str, dict]:
+    def evidence(self) -> Dict[str, Dict]:
         if self.cached_evidence is None:
             if self.published_evidence is not None:
                 self.cached_evidence = self.published_evidence
@@ -2516,7 +2410,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                 self.cached_evidence = data
         return self.cached_evidence
 
-    def get_visible_evidence(self, user: User) -> dict[str, dict]:
+    def get_visible_evidence(self, user: User) -> Dict[str, Dict]:
         """ Driven by EvidenceKey.max_share_level """
         lowest_share_level = self.classification.lowest_share_level(user)
         return self.classification.get_visible_evidence(self.evidence, lowest_share_level)
@@ -2595,36 +2489,47 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         return True
 
 
+@dataclass
 class ClassificationConsensus:
+    modification: ClassificationModification
+    label: str = "no-label"
+    default_suggestion: bool = False
 
-    def __init__(self, variant: Variant, user: User, copy_from: Optional[ClassificationModification] = None):
-        variants = [variant]
-        allele = variant.allele
-        self.user = user
-        if copy_from:
-            self.vcm = copy_from
-            copy_from.check_can_view(user)
-        else:
-            self.vcm: Optional[ClassificationModification] = None
-            if allele:
-                variants = allele.variants
-            qs = ClassificationModification.latest_for_user(user=user, variant=variants, published=True)
-            if vcms := list(qs.filter(classification__lab__external=False)):
-                vcms.sort(key=lambda vcm: vcm.curated_date_check)
-                self.vcm = vcms[-1]
+    @staticmethod
+    def all_consensus_candidates(allele: Allele, user: User) -> ['ClassificationConsensus']:
+        us = UserSettingsManager.get_user_settings(user)
 
-    @property
-    def is_valid(self) -> bool:
-        return self.vcm is not None
+        default_allele_origin_filter = us.allele_origin_focus
+        default_allele_origin_bucket: Optional[AlleleOriginBucket] = None
+        if default_allele_origin_filter.value in (AlleleOriginBucket.GERMLINE.value, AlleleOriginBucket.SOMATIC.value):
+            default_allele_origin_bucket = AlleleOriginBucket(default_allele_origin_filter.value)
+
+        results = []
+        for identifier, allele_origin_bucket in [("Latest Germline", AlleleOriginBucket.GERMLINE), ("Latest Somatic", AlleleOriginBucket.SOMATIC)]:
+            if candidates := list(ClassificationModification.latest_for_user(user=user, allele=allele, published=True, exclude_external_labs=True, allele_origin_bucket=allele_origin_bucket).all()):
+                candidates.sort(key=lambda vcm: vcm.curated_date_check, reverse=True)
+                default_suggestion = allele_origin_bucket == default_allele_origin_bucket
+                results.append(ClassificationConsensus(modification=candidates[0], label=identifier, default_suggestion=default_suggestion))
+        return results
 
     @cached_property
     def consensus_patch(self) -> VCPatch:
-        keys = EvidenceKeyMap.instance()
-        if not self.vcm:
-            return {}
+        keys = EvidenceKeyMap.cached()
 
-        evidence = self.vcm.published_evidence
-        consensus: dict[str, Any] = {}
+        evidence = self.modification.published_evidence
+        consensus: Dict[str, Any] = {}
+
+        # default allele origin - don't use copy consensus because that would copy "likely somatic" etc
+        if allele_origin_bucket := self.modification.classification.allele_origin_bucket:
+            allele_origin = None
+            if allele_origin_bucket == AlleleOriginBucket.GERMLINE:
+                allele_origin = "germline"
+            elif allele_origin_bucket == AlleleOriginBucket.SOMATIC:
+                allele_origin = "somatic"
+
+            if allele_origin:
+                consensus["allele_origin.value"] = allele_origin
+
         for key in (ekey.key for ekey in keys.all_keys if ekey.copy_consensus):
             for part in ['value', 'note']:
                 blob = evidence.get(key)
@@ -2635,7 +2540,7 @@ class ClassificationConsensus:
                     continue
                 consensus[key + '.' + part] = part_value
 
-        patch: dict[str, dict[str, Any]] = nest_dict(consensus)
+        patch: Dict[str, Dict[str, Any]] = nest_dict(consensus)
         return patch
 
 

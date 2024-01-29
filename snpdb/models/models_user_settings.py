@@ -2,7 +2,7 @@ import dataclasses
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional
+from typing import Optional, List, Tuple, Dict, Set, Iterable, Any
 
 from avatar.templatetags.avatar_tags import avatar_url
 from dateutil.tz import gettz
@@ -20,6 +20,7 @@ from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.preview_request import PreviewData, PreviewModelMixin, PreviewKeyValue
 from library.utils import string_deterministic_hash, rgb_invert
+from snpdb.models import AlleleOriginFilterDefault, UserAward, UserAwards
 from snpdb.models.models import Tag, Lab, Organization
 from snpdb.models.models_columns import CustomColumnsCollection, CustomColumn
 from snpdb.models.models_enums import BuiltInFilters
@@ -59,7 +60,7 @@ class TagColorsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMo
         self.version_id += 1
         self.save()
 
-    def get_user_colors_by_tag(self) -> dict[str, dict]:
+    def get_user_colors_by_tag(self) -> Dict[str, Dict]:
         user_colors_by_tag = {}
         for tag_id, rgb in self.tagcolor_set.all().values_list('tag', 'rgb'):
             user_colors_by_tag[tag_id] = {
@@ -172,6 +173,19 @@ class SettingsOverride(models.Model):
                                    help_text="Port to connect to IGV on your machine")
     default_genome_build = models.ForeignKey(GenomeBuild, on_delete=SET_NULL, null=True, blank=True,
                                              help_text="Used for search (jump to result if that is the only one for this build) and populating defaults everywhere")
+    allele_origin_focus = models.CharField(
+        max_length=1,
+        choices=[(member.value, member.label) for member in [AlleleOriginFilterDefault.GERMLINE, AlleleOriginFilterDefault.SOMATIC]],
+        null=True,
+        blank=True,
+        help_text="Your primary focus when it comes to allele origin")
+
+    allele_origin_exclude_filter = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Should records not for your allele origin focus be excluded out by default"
+    )
+
     timezone = models.TextField(null=True, blank=True,
                                 help_text="Time/date used in classification download")
 
@@ -292,6 +306,10 @@ class AvatarDetails:
         return AvatarDetails(user=user)
 
     @cached_property
+    def awards(self) -> UserAwards:
+        return UserAwards(user=self.user)
+
+    @cached_property
     def preferred_label(self) -> str:
         user = self.user
         preferred_label = user.username
@@ -335,10 +353,28 @@ class UserSettings:
     import_messages: bool
     igv_port: bool
     default_genome_build: GenomeBuild
+    # default_allele_origin: AlleleOriginFilterDefault
+    allele_origin_focus: AlleleOriginFilterDefault
+    allele_origin_exclude_filter: bool
+    timezone: str
+
+    @staticmethod
+    def parse_value(field_name: str, value: Any) -> Any:
+        if field_name == "allele_origin_focus" and isinstance(value, str):
+            value = AlleleOriginFilterDefault(value)
+        return value
+
+    @property
+    def default_allele_origin(self) -> AlleleOriginFilterDefault:
+        if self.allele_origin_exclude_filter:
+            return self.allele_origin_focus
+        else:
+            return AlleleOriginFilterDefault.SHOW_ALL
+
     default_lab: Optional[Lab]
     oauth_sub: str
     timezone: str
-    _settings_overrides: list[SettingsOverride]
+    _settings_overrides: List[SettingsOverride]
 
     @property
     def tz(self):
@@ -358,7 +394,7 @@ class UserSettings:
         raise ValueError("User doesn't have access to any Labs")
 
     @staticmethod
-    def get_settings_overrides(user=None, lab=None, organization=None) -> list[SettingsOverride]:
+    def get_settings_overrides(user=None, lab=None, organization=None) -> List[SettingsOverride]:
         user_settings_override = None
         lab_settings_override = None
 
@@ -396,6 +432,9 @@ class UserSettings:
             for f in override_fields:
                 val = getattr(so, f, None)
                 if val is not None and val != '':
+                    # could do this in a more generic way, but allele origin focus is the only enum
+                    val = UserSettings.parse_value(f, val)
+
                     kwargs[f] = val
         return UserSettings(**kwargs)
 
@@ -408,13 +447,13 @@ class UserSettings:
         return UserSettingsManager.get_user_settings(user)
 
     @cached_property
-    def initial_perm_read_and_write_groups(self) -> tuple[set[Group], set[Group]]:
+    def initial_perm_read_and_write_groups(self) -> Tuple[Set[Group], Set[Group]]:
         groups = self.user.groups.all()
         settings_overrides = self._settings_overrides
         return self.get_initial_perm_read_and_write_groups(groups, settings_overrides)
 
     @staticmethod
-    def get_initial_perm_read_and_write_groups(groups, settings_overrides) -> tuple[set[Group], set[Group]]:
+    def get_initial_perm_read_and_write_groups(groups, settings_overrides) -> Tuple[Set[Group], Set[Group]]:
         group_read = defaultdict(lambda x: False)
         group_write = defaultdict(lambda x: False)
         qs = SettingsInitialGroupPermission.objects.filter(group__in=groups)
@@ -429,22 +468,22 @@ class UserSettings:
         write_groups = {g for g, write_perm in group_write.items() if write_perm}
         return read_groups, write_groups
 
-    def get_override_source_and_values_before_user(self) -> tuple[dict[str, str], dict[str, str]]:
+    def get_override_source_and_values_before_user(self) -> Tuple[Dict[str, str], Dict[str, str]]:
         override_fields = [s.name for s in dataclasses.fields(UserSettings)]
         parent_overrides = self._settings_overrides[:-1]  # Skip last, which is User override
         return self.get_override_source_and_values(override_fields, parent_overrides)
 
     @staticmethod
-    def get_override_source_and_values(override_fields, parent_overrides) -> tuple[dict[str, str], dict[str, str]]:
+    def get_override_source_and_values(override_fields: Iterable[str], parent_overrides: Iterable[SettingsOverride]) -> Tuple[Dict[str, str], Dict[str, str]]:
         override_source = {}
         override_values = {}
         for so in parent_overrides:
             source = str(so)
             for f in override_fields:
                 val = getattr(so, f, None)
-                if val is not None:
+                if val is not None and val != '':
                     override_source[f] = source
-                    override_values[f] = val
+                    override_values[f] = UserSettings.parse_value(f, val)
         return override_source, override_values
 
     def get_lab(self):
@@ -482,7 +521,7 @@ class UserSettings:
         return genome_build
 
     @staticmethod
-    def get_lab_and_error(user: User) -> tuple[Optional[Lab], Optional[str]]:
+    def get_lab_and_error(user: User) -> Tuple[Optional[Lab], Optional[str]]:
         lab_error = None
         lab = None
         user_settings = UserSettings.get_for_user(user)

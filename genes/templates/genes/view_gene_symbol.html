@@ -415,7 +415,7 @@
         {% endif %}
     </div>
     <div class="{% if classifications_new_grouping %}container{% else %}container-table{% endif %} mt-4">
-        <h4>Classifications</h4>
+        <h4>Classification Records</h4>
         <p>Filtering on gene symbols : <span class="text-monospace">{% for symbol in gene_symbol.alias_meta.alias_symbol_strs %}{% if not forloop.first %}, {% endif %}{{ symbol }}{% endfor %}</span> and associated alleles and transcripts.</p>
 
         <script>
@@ -450,7 +450,7 @@
     </div>
     <div class="container">
         {% if show_annotation %}
-                <h4>Variants ({{ genome_build }})</h4>
+                <h4 class="mt-4">Variants ({{ genome_build }})</h4>
 
             {% if has_samples_in_other_builds %}
                 Note: The variants below are from {{ genome_build }} VCFs only. To see data from other builds, switch

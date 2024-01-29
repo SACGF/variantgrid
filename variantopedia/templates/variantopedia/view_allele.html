@@ -61,7 +61,7 @@
         {% endlabelled %}
 
         {% if allele_card.imported_allele_infos %}
-            {% labelled label="Imported As" %}
+            {% labelled row_id="allele-imported-as" label="Imported As" %}
                 {% if allele_card.imported_allele_infos|length == 1 %}
                     {% imported_allele_info allele_card.imported_allele_infos.0 %}
                 {% else %}
@@ -76,7 +76,7 @@
             {% endlabelled %}
         {% endif %}
 
-        {% labelled label="Liftover Details" admin_only=True %}
+        {% labelled row_id="allele-liftover-details" label="Liftover Details" admin_only=True %}
             {% modal label="Liftover Details" %}
                 <div class="card-body">
                     {% for vc in allele_card.variant_cards %}
@@ -203,15 +203,17 @@
                     <th class="text-right">Quick Links</th>
                     {% for vc in allele_card.variant_cards %}
                         <td>
-                            {% if vc.quick_link_data %}
-                                {% modal label="Quick Links" size="md" %}
-                                    <div class="modal-body">
-                                        <div class="quick-links" id="quick-links-{{ vc.variant.pk }}">Loading ...</div>
-                                    </div>
-                                {% endmodal %}
-                            {% else %}
-                                <span class="no-value">-</span>
-                            {% endif %}
+                            <div id="quick-links-{{ vc.genome_build.pk }}-wrapper">
+                                {% if vc.quick_link_data %}
+                                    {% modal label="Quick Links" size="md" %}
+                                        <div class="modal-body">
+                                            <div class="quick-links" id="quick-links-{{ vc.variant.pk }}">Loading ...</div>
+                                        </div>
+                                    {% endmodal %}
+                                {% else %}
+                                    <span class="no-value">-</span>
+                                {% endif %}
+                            </div>
                         </td>
                     {% endfor %}
                 </tr>
@@ -223,7 +225,7 @@
                             <th>
                                 {% if vc.can_create_classification %}
                                     <a class="btn btn-primary w-100" href="{% url 'create_classification_for_variant' vc.variant.pk vc.genome_build.pk %}">
-                                        <i class="fas fa-plus-circle"></i> New Classification ({{ vc.genome_build }})
+                                        <i class="fas fa-plus-circle"></i> New Classification Record ({{ vc.genome_build }})
                                     </a>
                                 {% elif vc.can_create_variant %}
                                     <form action="{% url 'create_variant_for_allele' vc.allele.pk vc.genome_build.pk %}" method="POST">
@@ -243,14 +245,14 @@
         </table>
 
     {% if classifications_new_grouping and not edit_clinical_groupings %}
-        <div class="container mt-4">
-            <h4>Classifications</h4>
+        <div class="container mt-4" id="view-allele-classification-records">
+            <h4>Classification Records</h4>
             {% url 'allele_classifications_download' allele.id as download_link %}
             {% classification_groups classifications link_discordance_reports=discordance_enabled download_link=download_link context_object=allele %}
         </div>
     {% else %}
-        <div class="container-table mt-4">
-            <h4 style="margin-bottom:0">Classifications</h4>
+        <div class="container-table mt-4" id="view-allele-classification-records">
+            <h4 style="margin-bottom:0">Classification Records</h4>
             {% if classifications %}
                 {% classification_table classifications show_clinical_context=True allele=allele edit_clinical_groupings=edit_clinical_groupings %}
             {% else %}

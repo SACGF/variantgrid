@@ -86,11 +86,11 @@ class ClassificationlabCompareRow(ExportRow):
     def comment(self):
         return ''
 
-    @export_column("Patient_Id")
+    @export_column("Patient ID")
     def patient_id(self):
         return self.Patient_id
 
-    @export_column("C_HGVS")
+    @export_column("c.HGVS")
     def c_hgvs(self):
         return self.c_hgvs
 

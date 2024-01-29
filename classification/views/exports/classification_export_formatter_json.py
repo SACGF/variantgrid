@@ -29,7 +29,9 @@ class ClassificationExportFormatterJSON(ClassificationExportFormatter):
                                         include_data=True,
                                         api_version=2,
                                         strip_complicated=True,
-                                        include_messages=False)
+                                        include_messages=False,
+                                        # FIXME don't want this to be the default
+                                        remove_acmg_namespace=True)
 
     @property
     def delimiter_for_row(self):

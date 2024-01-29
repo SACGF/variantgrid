@@ -70,6 +70,7 @@ class ClassificationTestCaseViews(TestCase):
             "can_write": True,
             "can_write_latest": True,
             "clinical_context": None,
+            "allele_origin_bucket": "U",
             "data": {
                 "owner": {
                     "value": "joejoe"
@@ -151,8 +152,8 @@ class ClassificationTestCaseViews(TestCase):
             ]
         }
 
-        self.maxDiff = None
-        self.assertEqual(response, expected)
+        diffs = DeepDiff(t1=expected, t2=response)
+        self.assertFalse(diffs)
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
     def test_test_mode(self):
@@ -191,6 +192,7 @@ class ClassificationTestCaseViews(TestCase):
             'can_write_latest': False,
             'clinical_context': None,
             'withdrawn': False,
+            "allele_origin_bucket": "U",
             'messages': [
                 {'severity': 'error', 'code': 'mandatory', 'message': 'Missing mandatory value', 'key': 'clinical_significance'},
                 {'severity': 'error', 'code': 'mandatory', 'message': 'Missing mandatory value', 'key': 'condition'},

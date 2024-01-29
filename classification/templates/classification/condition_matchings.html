@@ -65,25 +65,26 @@
 
         {% lab_picker data=dlab.lab_picker %}
 
-        {% labelled hint="tiny" label="Classifications w Standard Condition" %}
+        {% labelled hint="tiny" label="Classification Records" %}&nbsp;{% endlabelled %}
+        {% labelled hint="tiny" label="Records w Standard Condition" %}
             {{ dlab.classifications_with_standard_text | number:'success' }}
         {% endlabelled %}
-        {% labelled hint="tiny" label="Classifications w/out Standard Condition" %}
+        {% labelled hint="tiny" label="Records w/out Standard Condition" %}
             {% if dlab.classifications_wout_standard_text %}
-                <span class="hover-detail" title="Classifications require a standard condition to be exported to ClinVar">
+                <span class="hover-detail" title="Classification records require a standard condition to be exported to ClinVar">
                     {{ dlab.classifications_wout_standard_text | number:'warning' }}
                 </span>
             {% else %}0 {{ 'success' | severity_icon }}{% endif %}
         {% endlabelled %}
         {% if dlab.classifications_wout_standard_gene %}
-            {% labelled hint="tiny" label="Classifications w/out Known Gene Symbol" %}
-                <div class="hover-detail" title="Classifications require a known gene symbol to be matched to a standard condition">
-                    <a href="#bad_gene_symbols" class="toggle-link" data-toggle="collapse">Show {{ dlab.classifications_wout_standard_gene.count }} classifications with unknown gene symbols</a>
+            {% labelled hint="tiny" label="Records w/out Known Gene Symbol" %}
+                <div class="hover-detail" title="require a known gene symbol to be matched to a standard condition">
+                    <a href="#bad_gene_symbols" class="toggle-link" data-toggle="collapse">Show {{ dlab.classifications_wout_standard_gene.count }} records with unknown gene symbols</a>
                     <div id="bad_gene_symbols" class="collapse" >
                         <table class="table">
                             <thead>
                                 <tr>
-                                    <th>Classification</th>
+                                    <th>Classification Record</th>
                                     <th>Gene Symbol</th>
                                 </tr>
                             </thead>

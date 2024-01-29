@@ -13,7 +13,7 @@ from django.template import Library
 from django.utils.safestring import mark_safe
 
 from classification.criteria_strengths import CriteriaStrength, AcmgPointScore
-from classification.enums import SpecialEKeys
+from classification.enums import SpecialEKeys, AlleleOriginBucket
 from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo
 from classification.models.classification import ClassificationModification, Classification
@@ -29,6 +29,7 @@ from eventlog.models import ViewEvent
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
 from library.health_check import HealthCheckRequest
+from ontology.models import OntologyTerm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab
 from snpdb.models.models_genome import GenomeBuild
@@ -68,7 +69,9 @@ def classification_groups(
         title: Optional[str] = None,
         context_object: Optional[Model] = None,
         group_utils: Optional[ClassificationGroupUtils] = None,
-        default_sort: Optional[str] = 'c_hgvs'):
+        default_sort: Optional[str] = 'c_hgvs',
+        allele_origin_filter_enabled: bool = True
+    ):
     """
     :param context: Auto included
     :param classification_modifications: The classification modifications to render
@@ -108,7 +111,8 @@ def classification_groups(
         "genome_build": groups.genome_build,
         "table_id": str(uuid.uuid4()).replace("-", "_"),
         "show_allele_origin": settings.CLASSIFICATION_GRID_SHOW_ORIGIN,
-        "sort_order_index": sort_order_index
+        "sort_order_index": sort_order_index,
+        "allele_origin_filter_enabled": allele_origin_filter_enabled
     }
     ordered_classifications = list(groups.modifications)
     # classifications are sorted by group, display them so they're sorted by date
@@ -235,10 +239,8 @@ def clinical_significance_select(name, value):
 
 
 @register.inclusion_tag("classification/tags/clinical_context.html", takes_context=True)
-def clinical_context(context, cc: ClinicalContext, show_link: Optional[bool] = None):
-    if show_link is None:
-        show_link = context.request.user.is_superuser
-    return {"cc": cc, "link": show_link}
+def clinical_context(context, cc: ClinicalContext, orientation: str = 'horizontal'):
+    return {"cc": cc, "orientation": orientation}
 
 
 @register.inclusion_tag("classification/tags/classification_quick.html", takes_context=True)
@@ -378,6 +380,22 @@ def allele(allele: Allele):
     return {"allele": allele}
 
 
+@register.inclusion_tag("classification/tags/allele_origin_toggle.html", takes_context=True)
+def allele_origin_toggle(context, style: str = "", show_label: bool = True):
+    """
+    Embed the allele origin toggle on the page.
+    It's expected this will only appear once per page and that there will be a JavaScript implementation of
+    function alleleOriginToggle(value) {}
+    on the page, where value can be "A", "G" or "S"
+    :return:
+    """
+    user = context.request.user
+    User_settings = UserSettings.get_for_user(user)
+
+    value = User_settings.default_allele_origin
+    return {"value": value, "style": style, "show_label": show_label}
+
+
 @register.inclusion_tag("classification/tags/gene_symbol.html")
 def gene_symbol(gene_symbol: GeneSymbol):
     return {"gene_symbol": gene_symbol}
@@ -478,7 +496,9 @@ def db_ref(data: VCDbRefDict, css: Optional[str] = ''):
 
 
 @register.inclusion_tag("classification/tags/condition.html")
-def condition(condition_obj: ConditionResolved, limit: Optional[int] = 100, show_link: Optional[bool] = True):
+def condition(condition_obj: Union[OntologyTerm, ConditionResolved], limit: Optional[int] = 100, show_link: Optional[bool] = True):
+    if isinstance(condition_obj, OntologyTerm):
+        condition_obj = ConditionResolved(terms=[condition_obj])
     return {"condition": condition_obj, "limit": limit, "show_link": show_link}
 
 

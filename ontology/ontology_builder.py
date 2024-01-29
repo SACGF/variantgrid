@@ -207,7 +207,7 @@ class OntologyBuilder:
         """
 
         cached = self._fetch_term(term_id)
-        if not primary_source and cached.status == ModifiedStatus.EXISTING:
+        if not primary_source and cached.status in (ModifiedStatus.EXISTING, ModifiedStatus.MODIFIED):
             # record was imported by a different process, so leave it alone
             # e.g. it was imported via an OMIM import but we're just referencing a stub value
             # now from a MONDO import.
