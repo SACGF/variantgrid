@@ -131,8 +131,8 @@ def get_allele_info_dict(classification: Classification) -> ClassificationJsonAl
 
 
 def populate_classification_json(classification: Classification, params: ClassificationJsonParams) -> dict:
-    if params.api_version == 3:
-        return populate_classification_json_v3(classification, params)
+    # if params.api_version == 3:
+    #     return populate_classification_json_v3(classification, params)
 
     current_user = params.current_user
     include_data = params.include_data

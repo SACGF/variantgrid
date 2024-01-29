@@ -21,7 +21,8 @@ __AT_LEAST_ONE_SET = {SpecialEKeys.CLINICAL_SIGNIFICANCE, SpecialEKeys.SOMATIC_C
 @receiver(classification_validation_signal, sender=Classification)
 def validate_variant_classification_significance(sender, patch_meta: PatchMeta, key_map: EvidenceKeyMap, **kwargs) -> Optional[ValidationMerger]:
     """
-    Validates that at least one of clinical significance or somatic clinical significance has a value
+    Validates that at l
+    east one of clinical significance or somatic clinical significance has a value
     """
     if patch_meta.intersection_modified(__AT_LEAST_ONE_SET):
         vm = ValidationMerger()

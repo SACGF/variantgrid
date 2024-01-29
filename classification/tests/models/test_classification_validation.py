@@ -27,7 +27,7 @@ class ClassificationTestValidation(TestCase):
             source=SubmissionSource.API,
             make_fields_immutable=False
         )
-        bp2 = vc.evidence.get('bp2')
+        bp2 = vc.evidence.get('acmg:bp2')
         self.assertEqual(bp2, {'value': 'BA'})
 
     @override_settings(CLASSIFICATION_REQUIRE_OVERWRITE_NOTE=True)
@@ -44,7 +44,7 @@ class ClassificationTestValidation(TestCase):
             source=SubmissionSource.API,
             make_fields_immutable=False
         )
-        bp2 = vc.evidence.get('bp2')
+        bp2 = vc.evidence.get('acmg:bp2')
         self.assertEqual(bp2, {
             'value': 'BA',
             'validation': [{'code': 'requires_note',
@@ -68,7 +68,7 @@ class ClassificationTestValidation(TestCase):
             source=SubmissionSource.API,
             make_fields_immutable=False
         )
-        bp2 = vc.evidence.get('bp2')
+        bp2 = vc.evidence.get('acmg:bp2')
         clinical_significance = vc.evidence.get('clinical_significance')
         # there should be no validation on external lab data
         self.assertEqual(bp2, {'value': 'BA'})

@@ -1,11 +1,10 @@
 from deepdiff import DeepDiff
 from django.test import TestCase, RequestFactory, override_settings
-
 from classification.enums import EvidenceKeyValueType, SubmissionSource
 from classification.models import Classification, EvidenceKey
 from classification.tests.models.test_utils import ClassificationTestUtils
 from classification.views.classification_view import ClassificationView
-
+import json
 
 class ClassificationTestCaseViews(TestCase):
 
@@ -36,6 +35,7 @@ class ClassificationTestCaseViews(TestCase):
         return ClassificationView().post(request=request)
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
+    @override_settings(ALLELE_ORIGIN_NOT_PROVIDED_BUCKET="U")
     def test_return_data(self):
         lab, _user = ClassificationTestUtils.lab_and_user()
         response = self.request_post({
@@ -156,6 +156,7 @@ class ClassificationTestCaseViews(TestCase):
         self.assertFalse(diffs)
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
+    @override_settings(ALLELE_ORIGIN_NOT_PROVIDED_BUCKET="U")
     def test_test_mode(self):
 
         lab, _user = ClassificationTestUtils.lab_and_user()
@@ -194,13 +195,15 @@ class ClassificationTestCaseViews(TestCase):
             'withdrawn': False,
             "allele_origin_bucket": "U",
             'messages': [
-                {'severity': 'error', 'code': 'mandatory', 'message': 'Missing mandatory value', 'key': 'clinical_significance'},
+                {'severity': 'error', 'code': 'missing_significance', 'message': 'Classification requires a value', 'key': 'clinical_significance'},
                 {'severity': 'error', 'code': 'mandatory', 'message': 'Missing mandatory value', 'key': 'condition'},
                 {'severity': 'error', 'code': 'mandatory', 'message': 'Missing mandatory value', 'key': 'zygosity'}
             ],
             'patch_messages': [{'code': 'test_mode', 'message': 'Test mode on, no changes have been saved'}]}
 
         diffs = DeepDiff(t1=expected, t2=response_json)
+        if diffs:
+            print(json.dumps(diffs))
         self.assertFalse(diffs)
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)

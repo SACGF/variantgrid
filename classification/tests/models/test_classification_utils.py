@@ -11,8 +11,8 @@ class ClassificationTestCaseUtils(TestCase):
         Thinking the way we store/re-calculate validation is starting to have a bit of cold smell
         """
         vm = ValidationMerger()
-        vm.tested({'a', 'b', 'c', 'd', 'e'}, 'bad')
-        vm.tested({'a', 'b', 'c', 'd'}, 'good')
+        vm.tested({'a', 'b', 'c', 'd', 'e'}, ['bad'])
+        vm.tested({'a', 'b', 'c', 'd'}, ['good'])
 
         vm.add_message(key='a', code='bad', message='xxx', severity='error')
         vm.add_message(key='b', code='bad', message='xxx', severity='error')

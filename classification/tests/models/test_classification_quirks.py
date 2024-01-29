@@ -31,8 +31,8 @@ class ClassificationTestQuirks(TestCase):
         )
         evidence_keys = EvidenceKeyMap.instance().with_overrides(vc.evidence_key_overrides)
         data = VCDataDict(vc.evidence, evidence_keys)
-        self.assertEqual(data['bp1'].value, CriteriaEvaluation.BENIGN_SUPPORTING)
-        self.assertEqual(data['bp2'].value, CriteriaEvaluation.NOT_MET)
+        self.assertEqual(data['acmg:bp1'].value, CriteriaEvaluation.BENIGN_SUPPORTING)
+        self.assertEqual(data['acmg:bp2'].value, CriteriaEvaluation.NOT_MET)
 
     def test_options(self):
         lab, user = ClassificationTestUtils.lab_and_user()

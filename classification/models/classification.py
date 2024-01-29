@@ -965,7 +965,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                            source=source,
                            save=save,
                            make_patch_fields_immutable=make_fields_immutable,
-                           initial_data=True)
+                           initial_data=True,
+                           # revalidate all - so validations that only occur when specific fields change will still fire
+                           # even if no values are provided for that field, handy if there's validation that requires
+                           # at least 1 of 2 fields to be present for example
+                           revalidate_all=True)
         if save:
             try:
                 if making_new_id:

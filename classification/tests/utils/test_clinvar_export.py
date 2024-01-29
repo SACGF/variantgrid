@@ -12,7 +12,7 @@ from classification.models.clinvar_export_sync import clinvar_export_sync, ClinV
 from classification.tests.models.test_utils import ClassificationTestUtils
 from library.guardian_utils import admin_bot
 from library.utils import JsonObjType
-from snpdb.models import GenomeBuild, ClinVarKey, GenomeBuildPatchVersion
+from snpdb.models import GenomeBuild, ClinVarKey, GenomeBuildPatchVersion, AlleleOrigin
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant, create_mock_allele
 
 
@@ -153,7 +153,8 @@ class TestClinVarExport(TestCase):
                 SpecialEKeys.AFFECTED_STATUS: {'value': 'yes'},
                 SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': 'VUS'},
                 SpecialEKeys.GENOME_BUILD: {'value': 'GRCh37'},
-                SpecialEKeys.CONDITION: {'value': 'MONDO:0008841'}
+                SpecialEKeys.CONDITION: {'value': 'MONDO:0008841'},
+                SpecialEKeys.ALLELE_ORIGIN: {'value': "germline"}
             },
             save=True,
             source=SubmissionSource.API,
