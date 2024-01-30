@@ -629,7 +629,6 @@ function alterAjaxCount(delta, comment) {
     } else {
         $('body').attr('data-ajax', activeAjaxLoading);
     }
-    console.log(`Adjusting ajax count by ${delta} to ${activeAjaxLoading} for ${comment}`);
 }
 
 $(document).ready(() => {
