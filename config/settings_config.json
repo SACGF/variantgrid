@@ -29,6 +29,9 @@
       "password": null
     }
   },
+  "SECURITY": {
+    "maintenance_mode": false
+  },
   "SLACK": {
     "enabled": false,
     "admin_callback_url": null
