@@ -201,12 +201,10 @@
             </nav>
         </div>
         <div class="main-content">
-            {% block main_content %}
             <div id="main-content-messages" class="container">{% include "uicore/messages/messages.html" %}</div>
             <div id="main-content-body">
                 {% block content %}{% endblock content %}
             </div>
-            {% endblock main_content %}
         </div>
     </div>
 

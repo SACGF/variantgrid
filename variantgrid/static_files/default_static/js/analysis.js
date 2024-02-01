@@ -29,19 +29,20 @@ function loadNodeData(nodeId, extra_filters, fromSelectNode) {
     win.loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode);
 }
 
-function resizeGrid(pane, $Pane, paneState) {
+function resizeGrid() {
+    let panelSize = $("#right-panel").innerWidth;
     let grid = $('.ui-jqgrid-btable:visible');
     if(grid.length) {
         grid.each(function(index) {
             let gridId = $(this).attr('id');
-            $('#' + gridId).setGridWidth(paneState.innerWidth - 2);
+            $('#' + gridId).setGridWidth(panelSize - 2);
         });
     }
 }
 
 function savePanelWidthSettings() {
     if (saveSettingsOnResize) {
-        let analysis_panel_fraction = $("#analysis-and-toolbar-container").outerWidth() / window.innerWidth;
+        let analysis_panel_fraction = $("#left-panel").outerWidth() / window.innerWidth;
         let data = 'analysis_panel_fraction=' + analysis_panel_fraction;
         $.ajax({
             type: "POST",
@@ -84,34 +85,28 @@ function inputSamples() {
 }
 
 
-function layoutAnalysisPanels(showAnalysisVariables, initialGridAndEditorWidth, nodeDataArray, nodeConnections, readOnly) {
+function layoutAnalysisPanels(showAnalysisVariables, initialAnalysisPanelFraction, nodeDataArray, nodeConnections, readOnly) {
     if (showAnalysisVariables) {
         $("#analysis-variables").show();
+        Split(['#analysis-variables', '#analysis-and-toolbar-container'], {
+            sizes: [15, 85],
+            direction: 'vertical',
+        });
     }
 
-    const centerLayoutParams = {
-        minWidth: 200,
-    };
-    if (!readOnly) {
-        centerLayoutParams.onresize = resizePanel;  // save panel widths
-    }
-
-    $('div.main-content').layout();
-    $('div#analysis-outer-container').layout({
-        north: {
-            size: "15%",
-            spacing_closed: 0, // HIDE resizer & toggler when 'closed'
-            slidable: false,
-            initClosed: !showAnalysisVariables,
-        },
-        center: centerLayoutParams,
-        east: { onresize: resizeGrid,
-                triggerEventsOnLoad: true,
-                size: initialGridAndEditorWidth,
-                // Setting minSize in this pane cases 'InternalError: too much recursion' with sizeMidPanes
-                // So we'll just reset min size upon loading each time
+    let onDragEnd = function() {
+        resizeGrid();
+        if (!readOnly) {
+            resizePanel();   // save panel widths
         }
-    });
+    }
+    let initialGridAndEditorFraction = 1.0 - initialAnalysisPanelFraction;
+    let splitParams = {
+        sizes: [initialAnalysisPanelFraction * 100, initialGridAndEditorFraction * 100],
+        expandToMin: true,
+        onDragEnd: onDragEnd,
+    }
+    Split(['#left-panel', '#right-panel'], splitParams);
 
     // Make clicking the background send a "click event" but not if you click on the .window
     // This is so we can make the editor switch out and then add nodes etc....
@@ -519,9 +514,10 @@ function showLoadingOverlay() {
     const oc = $("#overlay-container");
     if (!oc.is(":visible")) {
         // Move to right-panel (with top z-order), then things can load underneath.
-        oc.show();
         oc.appendTo("#right-panel");
-    
+        oc.show();
+        console.log("Appended to right panel...")
+
         $("#loading-message").remove();
 
         const canvasAttributes = {class: 'node-load-animation'};
