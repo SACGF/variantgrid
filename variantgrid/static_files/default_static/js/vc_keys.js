@@ -304,8 +304,7 @@ var EKeys = (function() {
             if (!namespaces.has("horak")) {
                 namespaces.add("acmg");
             }
-            console.log("Namespaces = ");
-            console.log(namespaces);
+            console.log(`Namespaces = (${Array.from(namespaces).join(', ')})`);
 
             return new EKeys(Array.from(this._map.values()).map(ekey => {
                 let config = labConfig[ekey.key];

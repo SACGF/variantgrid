@@ -673,7 +673,7 @@ const VCForm = (function() {
                 let listItem = $('<a>', {class: 'list-group-item list-group-item-action',  target: '_blank', click: () => {
                     jFilterBox.val('#' + eKey.key);
                     jFilterBox.keyup();
-                    $(`[entry="${key}"]`).trigger('click');
+                    $(`[entry="${eKey.key}"]`).trigger('click');
                     // return false;
                 }, html: [
                     this.iconForSeverity(error.severity),
@@ -796,7 +796,6 @@ const VCForm = (function() {
                     this.dataUpdated();
                 },
                 success: (record) => {
-                    console.log("Success in post");
                     if (record.deleted) {
                         this.deleted = true;
                         document.location.href = '../../../../classification/classifications';
@@ -880,8 +879,6 @@ const VCForm = (function() {
         },
 
         updateTitle() {
-            console.log("Updating title");
-
             let appendLabelHeading = (label, valueElement) => {
                 return $('<div>', {class: 'row no-gutters', html:[
                     $('<label>', {class:'col-3 text-right align-self-center', text: label}),
