@@ -1,0 +1,323 @@
+table.styled {
+  width: 100%;
+  max-width: 1500px;
+}
+table.styled td {
+  font-size: 12px;
+  padding: 3px;
+  min-height: 30px;
+}
+table.styled thead tr {
+  background-color: #eeeeee;
+}
+table.styled tr:nth-of-type(even) {
+  background-color: #eeeeee;
+}
+table.styled tr.no-stripe {
+  background-color: white !important;
+}
+table.styled th {
+  padding: 4px 6px 4px 6px;
+}
+table.styled tbody th {
+  text-align: right;
+}
+table.styled td.color {
+  text-align: center;
+  background-color: white;
+}
+table.styled .action + .action {
+  margin-top: 10px;
+}
+table.styled.small {
+  width: 300px;
+}
+table.styled.white tr:nth-of-type(even) {
+  background-color: inherit;
+}
+table.styled td.cc {
+  width: 130px;
+}
+table.styled td.cc input {
+  width: calc(100% - 6px);
+}
+table.styled td.id {
+  position: relative;
+  min-width: 200px;
+  word-break: break-word;
+}
+table.styled td.id img {
+  width: 14px;
+  height: 14px;
+  position: absolute;
+  left: 8px;
+}
+table.styled td.id span {
+  margin-left: 12px;
+  margin-right: 10px;
+}
+table.styled td.id a {
+  margin-left: 14px;
+}
+table.styled td.id-readonly a {
+  color: #8888AA;
+  font-style: italic;
+}
+table.styled td.date {
+  width: 100px;
+  font-family: monospace;
+}
+table.styled td.flags {
+  min-width: 100px;
+  width: 140px;
+}
+table.styled td.centered-number {
+  font-family: monospace;
+  text-align: center;
+}
+table.styled tr.cc {
+  background-color: #eeeeff !important;
+}
+table.styled tr.cc td:first-of-type {
+  padding: 10px 0 10px 10px;
+}
+table.model-table th {
+  text-align: left;
+}
+
+form .form-fields + .form-fields {
+  margin-top: 16px;
+}
+
+fieldset {
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid #dddddd;
+}
+fieldset ul label {
+  font-weight: normal !important;
+}
+fieldset .labelled label {
+  font-weight: normal !important;
+  padding-left: 4px;
+}
+fieldset.radios {
+  border: 1px solid gray;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+fieldset.radios legend {
+  font-weight: bold;
+}
+fieldset.radios > div + div {
+  margin-top: 6px;
+}
+fieldset.radios label {
+  font-weight: normal;
+  margin-left: 8px;
+  cursor: pointer;
+}
+fieldset.radios-toggle {
+  border: none;
+}
+fieldset.radios-toggle .ui-checkboxradio-label {
+  min-width: 100px;
+}
+fieldset.radios-toggle .ui-checkboxradio-label:first-of-type {
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+fieldset.radios-toggle .ui-checkboxradio-label:last-of-type {
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+fieldset.form-fields {
+  min-width: 600px;
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+fieldset.form-fields.centered label {
+  width: 50%;
+}
+fieldset.form-fields.left-aligned label {
+  width: 220px;
+}
+fieldset.form-fields label .tiny-icon {
+  width: 12px;
+  height: 12px;
+  margin-right: 4px;
+}
+fieldset.form-fields ul {
+  list-style-type: none;
+  position: relative;
+}
+fieldset.form-fields > ul {
+  margin-left: 23.5%;
+  top: -32px;
+  position: relative;
+}
+fieldset.form-fields > div:not(.citations),
+fieldset.form-fields > p {
+  display: flex;
+  margin-top: 12px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+fieldset.form-fields > div:not(.citations) > label,
+fieldset.form-fields > p > label {
+  width: 25%;
+  flex-grow: 0;
+  flex-shrink: 0;
+  text-align: right;
+  font-weight: bold;
+  margin-right: 16px;
+}
+fieldset.form-fields > div:not(.citations) > *:nth-child(2),
+fieldset.form-fields > p > *:nth-child(2),
+fieldset.form-fields > div:not(.citations) > *:nth-child(3).select2,
+fieldset.form-fields > p > *:nth-child(3).select2 {
+  text-align: left;
+  margin-left: 8px;
+}
+fieldset.form-fields > div:not(.citations) > div:nth-child(2),
+fieldset.form-fields > p > div:nth-child(2) {
+  width: 75%;
+  flex-grow: 1;
+}
+fieldset.form-fields > div:not(.citations) > textarea,
+fieldset.form-fields > p > textarea {
+  min-height: 2em;
+}
+fieldset.form-fields > div:not(.citations) > .timestamp,
+fieldset.form-fields > p > .timestamp {
+  word-break: break-word;
+}
+fieldset.form-fields > .buttons {
+  border-top: 1px solid #dddddd;
+  padding-top: 10px;
+  margin-top: 20px;
+  margin-bottom: 0;
+  text-align: center;
+  width: 100%;
+  flex-grow: 1;
+}
+fieldset.form-fields > .buttons button,
+fieldset.form-fields > .buttons input {
+  flex-grow: 1;
+  width: 100%;
+  max-width: 225px;
+  margin-left: calc(25% + 17px);
+  margin-right: auto;
+}
+fieldset.borderless {
+  margin-left: inherit;
+  margin-right: inherit;
+  border: inherit;
+  border-radius: inherit;
+}
+fieldset.small {
+  min-width: 450px;
+  max-width: 450px;
+  margin-right: auto;
+  margin-left: 0;
+}
+fieldset.small.form-fields input[type=text], fieldset.small.form-fields input[type=number], fieldset.small.form-fields input[type=email], fieldset.small.form-fields input[type=password], fieldset.small.form-fields input:not([type]) {
+  min-width: 220px;
+  max-width: 300px;
+}
+fieldset.small.form-fields select {
+  min-width: 227px;
+  max-width: 307px;
+}
+fieldset.tiny {
+  min-width: 200px;
+  max-width: 200px;
+  margin-right: auto;
+  margin-left: 0;
+}
+fieldset.tiny.form-fields > * > label {
+  width: 120px !important;
+  font-size: small;
+}
+fieldset.tiny.form-fields > * > *:nth-child(2) {
+  margin-left: 0;
+}
+fieldset legend {
+  font-size: 14px;
+  font-weight: bold;
+  color: #334466;
+}
+
+fieldset.form-fields input[type='text'], fieldset.form-fields input[type='password'], fieldset.form-fields input[type='email'], fieldset.form-fields input[type='number'], fieldset.form-fields input:not([type]) {
+  min-width: 300px;
+  border-radius: 4px;
+  border: 1px solid #dddddd;
+  min-height: 20px;
+  padding-left: 4px;
+}
+fieldset.form-fields textarea {
+  min-width: 300px;
+  border-radius: 4px;
+  border: 1px solid #dddddd;
+  min-height: 20px;
+  padding-left: 4px;
+}
+
+fieldset.form-fields select {
+  min-width: 307px;
+  height: 28px;
+}
+fieldset.form-fields legend {
+  width: auto;
+}
+
+/*
+.columned,
+.single-column,
+.multi-columned {
+	margin-left: auto;
+	margin-right: auto;
+	display: flex;
+	flex-flow: row wrap;
+}
+
+.columned,
+.single-column {
+	max-width: 1400px;
+}
+
+.columned fieldset {
+	width: 47%;
+	max-width: 47%;
+	margin-top: 20px;
+	margin-left: auto;
+}
+
+.multi-columned fieldset {
+	margin-top: 20px;
+	margin-left: 0;
+	margin-right: 0;
+}
+*/
+/*
+.ui-layout-pane {
+	// all panes
+	background: #FFF;
+	border: 1px solid #BBB;
+	padding: 10px;
+	overflow: auto;
+}
+
+.ui-layout-resizer {
+	// all 'resizer-bars'
+	background: #DDD;
+}
+
+.ui-layout-toggler {
+	// all 'toggler-buttons'
+	background: #AAA;
+}
+ */
+
+/*# sourceMappingURL=global_deprecated.css.map */

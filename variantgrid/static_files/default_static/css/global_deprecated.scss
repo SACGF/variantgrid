@@ -1,0 +1,428 @@
+////////////////////////
+// TABLES
+// TODO: remove styled in favour of <table class="table"> for bootstrap table
+////////////////////////
+
+table {
+    &.styled {
+        width: 100%;
+        max-width: 1500px;
+
+        td {
+            font-size: 12px;
+            padding: 3px;
+            min-height: 30px;
+        }
+
+        thead tr {
+            background-color: #eeeeee;
+        }
+
+        tr {
+            &:nth-of-type(even) {
+                background-color: #eeeeee;
+            }
+
+            &.no-stripe {
+                background-color: white !important;
+            }
+        }
+
+        th {
+            padding: 4px 6px 4px 6px;
+        }
+
+        tbody th {
+            text-align: right;
+        }
+
+        td.color {
+            text-align: center;
+            background-color: white;
+        }
+
+        .action + .action {
+            margin-top: 10px;
+        }
+
+        &.small {
+            width: 300px;
+        }
+
+        &.white tr:nth-of-type(even) {
+            background-color: inherit;
+        }
+
+        td {
+            &.cc {
+                width: 130px;
+
+                input {
+                    width: calc(100% - 6px);
+                }
+            }
+
+            &.id {
+                position: relative;
+                min-width: 200px;
+                word-break: break-word;
+
+                img {
+                    width: 14px;
+                    height: 14px;
+                    position: absolute;
+                    left: 8px;
+                }
+
+                span {
+                    margin-left: 12px;
+                    margin-right: 10px;
+                }
+
+                a {
+                    margin-left: 14px;
+                }
+            }
+
+            &.id-readonly a {
+                color: #8888AA;
+                font-style: italic;
+            }
+
+            &.date {
+                width: 100px;
+                font-family: monospace;
+            }
+
+            &.flags {
+                min-width: 100px;
+                width: 140px;
+            }
+
+            &.centered-number {
+                font-family: monospace;
+                text-align: center;
+            }
+        }
+
+        tr.cc {
+            background-color: #eeeeff !important;
+
+            td:first-of-type {
+                padding: 10px 0 10px 10px;
+            }
+        }
+    }
+
+    &.model-table th {
+        text-align: left;
+    }
+}
+
+////////////////////////
+// FIELDSETS
+// TODO: Now we use bootstrap rows and cols use of fieldset with .form-fields has been deprecated
+////////////////////////
+
+form .form-fields+.form-fields {
+	margin-top: 16px;
+}
+
+// NOTE that fieldset is now deprecated for our use cases
+// favour using crispyforms for proper bootstrap implementation
+
+fieldset {
+	padding: 10px;
+	border-radius: 4px;
+	border: 1px solid #dddddd;
+
+	ul label {
+		font-weight: normal !important;
+	}
+
+	.labelled label {
+		font-weight: normal !important;
+		padding-left: 4px;
+	}
+
+	&.radios {
+		border: 1px solid gray;
+		border-radius: 4px;
+		margin-bottom: 16px;
+
+		legend {
+			font-weight: bold;
+		}
+
+		>div+div {
+			margin-top: 6px;
+		}
+
+		label {
+			font-weight: normal;
+			margin-left: 8px;
+			cursor: pointer;
+		}
+	}
+
+	&.radios-toggle {
+		border: none;
+
+		.ui-checkboxradio-label {
+			min-width: 100px;
+
+			&:first-of-type {
+				border-top-left-radius: 4px;
+				border-bottom-left-radius: 4px;
+			}
+
+			&:last-of-type {
+				border-top-right-radius: 4px;
+				border-bottom-right-radius: 4px;
+			}
+		}
+	}
+
+	&.form-fields {
+		min-width: 600px;
+		max-width: 1400px;
+		margin-left: auto;
+		margin-right: auto;
+
+		&.centered label {
+			width: 50%;
+		}
+
+		&.left-aligned label {
+			width: 220px;
+		}
+
+		label .tiny-icon {
+			width: 12px;
+			height: 12px;
+			margin-right: 4px;
+		}
+
+		ul {
+			list-style-type: none;
+			position: relative;
+		}
+
+		> {
+			ul {
+				margin-left: 23.5%;
+				top: -32px;
+				position: relative;
+			}
+
+			div:not(.citations),
+			p {
+				display: flex;
+				margin-top: 12px;
+				margin-bottom: 12px;
+				align-items: center;
+			}
+
+			div:not(.citations)>label,
+			p>label {
+				width: 25%;
+				flex-grow: 0;
+				flex-shrink: 0;
+				text-align: right;
+				font-weight: bold;
+				margin-right: 16px;
+			}
+
+			div:not(.citations)>*:nth-child(2),
+			p>*:nth-child(2),
+			div:not(.citations)>*:nth-child(3).select2,
+			p>*:nth-child(3).select2 {
+				text-align: left;
+				margin-left: 8px;
+			}
+
+			div:not(.citations)>div:nth-child(2),
+			p>div:nth-child(2) {
+				width: 75%;
+				flex-grow: 1;
+			}
+
+			div:not(.citations)>textarea,
+			p>textarea {
+				min-height: 2em;
+			}
+
+			div:not(.citations)>.timestamp,
+			p>.timestamp {
+				word-break: break-word;
+			}
+
+			.buttons {
+				border-top: 1px solid #dddddd;
+				padding-top: 10px;
+				margin-top: 20px;
+				margin-bottom: 0;
+				text-align: center;
+				width: 100%;
+				flex-grow: 1;
+
+				button,
+				input {
+					flex-grow: 1;
+					width: 100%;
+					max-width: 225px;
+					margin-left: calc(25% + 17px);
+					margin-right: auto;
+				}
+			}
+		}
+	}
+
+	&.borderless {
+		margin-left: inherit;
+		margin-right: inherit;
+		border: inherit;
+		border-radius: inherit;
+	}
+
+	&.small {
+		min-width: 450px;
+		max-width: 450px;
+		margin-right: auto;
+		margin-left: 0;
+
+		&.form-fields {
+			input {
+
+				&[type=text],
+				&[type=number],
+				&[type=email],
+				&[type=password],
+				&:not([type]) {
+					min-width: 220px;
+					max-width: 300px;
+				}
+			}
+
+			select {
+				min-width: 227px;
+				max-width: 307px;
+			}
+		}
+	}
+
+	&.tiny {
+		min-width: 200px;
+		max-width: 200px;
+		margin-right: auto;
+		margin-left: 0;
+
+		&.form-fields>*> {
+			label {
+				width: 120px !important;
+				font-size: small;
+			}
+
+			*:nth-child(2) {
+				margin-left: 0;
+			}
+		}
+	}
+
+	legend {
+		font-size: 14px;
+		font-weight: bold;
+		color: #334466;
+	}
+}
+
+fieldset.form-fields {
+	input {
+
+		&[type='text'],
+		&[type='password'],
+		&[type='email'],
+		&[type='number'],
+		&:not([type]) {
+			min-width: 300px;
+			border-radius: 4px;
+			border: 1px solid #dddddd;
+			min-height: 20px;
+			padding-left: 4px;
+		}
+	}
+
+	textarea {
+		min-width: 300px;
+		border-radius: 4px;
+		border: 1px solid #dddddd;
+		min-height: 20px;
+		padding-left: 4px;
+	}
+}
+
+fieldset.form-fields {
+	select {
+		min-width: 307px;
+		height: 28px;
+	}
+
+	legend {
+		width: auto;
+	}
+}
+
+////////////////////////
+// LAYOUT
+////////////////////////
+
+// Couldn't find any reference to these
+/*
+.columned,
+.single-column,
+.multi-columned {
+	margin-left: auto;
+	margin-right: auto;
+	display: flex;
+	flex-flow: row wrap;
+}
+
+.columned,
+.single-column {
+	max-width: 1400px;
+}
+
+.columned fieldset {
+	width: 47%;
+	max-width: 47%;
+	margin-top: 20px;
+	margin-left: auto;
+}
+
+.multi-columned fieldset {
+	margin-top: 20px;
+	margin-left: 0;
+	margin-right: 0;
+}
+*/
+
+// We have removed JQuery UI, shouldn't need the below
+/*
+.ui-layout-pane {
+	// all panes
+	background: #FFF;
+	border: 1px solid #BBB;
+	padding: 10px;
+	overflow: auto;
+}
+
+.ui-layout-resizer {
+	// all 'resizer-bars'
+	background: #DDD;
+}
+
+.ui-layout-toggler {
+	// all 'toggler-buttons'
+	background: #AAA;
+}
+ */

@@ -1,3 +1,9 @@
+/**
+
+THIS FILE SHOULD BE REMOVED IN THE NEXT FEW DAYS
+PLEASE USE global.scss instead
+
+ */
 .mono {
   font-family: monospace;
 }
@@ -1009,14 +1015,6 @@ a.clinical-context {
 
 .nextseq-500 {
   background-image: url(/static/icons/sequencers/nextseq_icon.png);
-}
-
-.novaseq-5000 {
-  background-image: url(/static/icons/sequencers/novaseq_icon.png);
-}
-
-.novaseq-6000 {
-  background-image: url(/static/icons/sequencers/novaseq_icon.png);
 }
 
 .miseq {
