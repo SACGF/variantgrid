@@ -47,10 +47,19 @@ class CriteriaStrength:
 
     @property
     def is_expected_direction(self) -> bool:
-        if self.strength:
-            return self.ekey.key[0].upper() == self.strength_direction
-        else:
-            return True
+        ce = self.ekey.default_crit_evaluation
+        default_direction = CriteriaEvaluation.POINTS.get(ce, 0)
+        actual_direction = CriteriaEvaluation.POINTS.get(self.strength, 0)
+
+        return (default_direction > 0 and actual_direction > 0) or \
+            (default_direction < 0 and actual_direction < 0) or \
+            (default_direction == 0 and actual_direction == 0)
+        #
+        # if self.strength:
+        #     # only works for ACMG criteria
+        #     return self.ekey.key[0].upper() == self.strength_direction
+        # else:
+        #     return True
 
     @staticmethod
     def strength_suffix_for(strength: str, short: bool = False):
@@ -77,7 +86,7 @@ class CriteriaStrength:
         pretty_label = self.ekey.pretty_label.replace(" ", "")
         suffix = self.strength
         if suffix:
-            if not self.ekey.namespace:
+            if self.ekey.namespace in {None, "horak", "acmg"}:
                 if self.is_expected_direction and self.is_default_strength:
                     return pretty_label
 
