@@ -107,6 +107,8 @@ class VariantPKLookup:
 
     def get_variant_coordinate_hash(self, variant_coordinate: VariantCoordinate):
         """ For VCF records (needs GenomeBuild supplied) """
+
+        variant_coordinate = variant_coordinate.as_internal_symbolic()
         if self.chrom_contig_id_mappings is None:
             raise ValueError("Need to initialise w/GenomeBuild to call get_variant_coordinate_hash")
         contig_id = self.chrom_contig_id_mappings[variant_coordinate.chrom]
@@ -115,6 +117,8 @@ class VariantPKLookup:
         return self._get_variant_hash(contig_id, variant_coordinate.start, variant_coordinate.end, ref_id, alt_id)
 
     def add(self, variant_coordinate: VariantCoordinate):
+        variant_coordinate = variant_coordinate.as_internal_symbolic()
+
         # If sequence isn't known, variant is definitely unknown
         if variant_coordinate.ref in self.sequence_pk_by_seq and variant_coordinate.alt in self.sequence_pk_by_seq:
             # Maybe unknown, need to check
@@ -188,38 +192,37 @@ class VariantPKLookup:
     def _insert_unknown(self):
         self._insert_unknown_sequences()  # All ref/alt need to be in sequence_pk_by_seq to be able to get hash
 
-        loci_parts_by_hash = {}
-        locus_hash_alt_id_and_end_by_variant_hash = {}
+        loci_hashes = []
+        variant_hashes = []
         for variant_coordinate in self.unknown_variant_coordinates:
-            contig_id = self.chrom_contig_id_mappings[variant_coordinate.chrom]
-            ref_id = self.sequence_pk_by_seq[variant_coordinate.ref]
-            alt_id = self.sequence_pk_by_seq[variant_coordinate.alt]
-            loci_parts = (contig_id, variant_coordinate.start, ref_id)
-            locus_hash = self._get_locus_hash(*loci_parts)
-            loci_parts_by_hash[locus_hash] = loci_parts
-            variant_hash = self._get_variant_hash(contig_id, variant_coordinate.start, variant_coordinate.end, ref_id, alt_id)
-            locus_hash_alt_id_and_end_by_variant_hash[variant_hash] = (locus_hash, alt_id, variant_coordinate.end)
+            variant_hash = self.get_variant_coordinate_hash(variant_coordinate)
+            variant_hashes.append(variant_hash)
+
+            (contig_id, start, _end, ref_id, _alt_id) = variant_hash
+            locus_hash = (contig_id, start, ref_id)
+            loci_hashes.append(locus_hash)
 
         self.unknown_variant_coordinates.clear()
-        loci_ids = self.get_loci_ids(loci_parts_by_hash, validate_not_null=False)  # Could have some unknowns as None
+        loci_ids = self.get_loci_ids(loci_hashes, validate_not_null=False)  # Could have some unknowns as None
         unknown_loci_parts = []
-        for locus_hash, locus_pk in zip(loci_parts_by_hash, loci_ids):
+        for locus_hash, locus_pk in zip(loci_hashes, loci_ids):
             if locus_pk is None:
-                unknown_loci_parts.append(loci_parts_by_hash[locus_hash])
+                unknown_loci_parts.append(locus_hash)
 
         if unknown_loci_parts:
             self._insert_new_loci(unknown_loci_parts)
 
-        loci_ids = self.get_loci_ids(loci_parts_by_hash)  # Validates all are not null
-        locus_pk_by_hash = dict(zip(loci_parts_by_hash, loci_ids))
-        variant_ids = self.get_variant_ids(locus_hash_alt_id_and_end_by_variant_hash, validate_not_null=False)
+        loci_ids = self.get_loci_ids(loci_hashes)  # Validates all are not null
+        locus_pk_by_hash = dict(zip(loci_hashes, loci_ids))
+        variant_ids = self.get_variant_ids(variant_hashes, validate_not_null=False)
         unknown_variants = []
-        for variant_hash, variant_pk in zip(locus_hash_alt_id_and_end_by_variant_hash, variant_ids):
+        for variant_hash, variant_pk in zip(variant_hashes, variant_ids):
             if variant_pk is None:
-                (locus_hash, alt_id, end) = locus_hash_alt_id_and_end_by_variant_hash[variant_hash]
+                (contig_id, start, end, ref_id, alt_id) = variant_hash
+                locus_hash = (contig_id, start, ref_id)
                 locus_pk = locus_pk_by_hash[locus_hash]
                 unknown_variants.append((locus_pk, alt_id, end))
-        logging.debug("loci_hashes = %d, unknown_variants = %d", len(loci_parts_by_hash), len(unknown_variants))
+        logging.debug("loci_hashes = %d, unknown_variants = %d", len(loci_hashes), len(unknown_variants))
 
         if unknown_variants:
             self._insert_new_variants(unknown_variants)
