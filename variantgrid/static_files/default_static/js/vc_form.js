@@ -2131,11 +2131,13 @@ const VCForm = (function() {
                     continue;
                 }
                 let label = key;
+                let th;
                 if (pointBased) {
-                    label = `${(EKey.strengthToPoints[key])}`;
+                    th = $(`<th>`, {text: `${(EKey.strengthToPoints[key])}`, class: 'col-header'});
+                } else {
+                    th = $(`<th>`, {text: EKey.critValues[key], class: 'col-header', title: title, 'data-toggle':"tooltip", 'data-placement': 'left'});
                 }
-
-                let th = $(`<th>`, {text: label, class: 'col-header', title: EKey.critValues[key], 'data-toggle':"tooltip", 'data-placement': 'left'});
+                
                 headerRow.append(th);
             }
             critTable.append(headerRow);
