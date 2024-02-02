@@ -77,6 +77,8 @@ CELERY_TASK_ROUTES = {
     # Anything that runs on data uploaded from the web should be WEB_WORKERS
     # 1. As it may be a different machine than DB workers etc.
     # 2. So that these jobs (which don't require DB access) fill up their own queue so run in parallel with db_workers
+    'classification.tasks.classification_import_map_and_insert_task.ClassificationImportMapInsertTask': WEB_WORKERS,
+    'snpdb.tasks.graph_generation_task.generate_graph': WEB_WORKERS,
     'upload.tasks.vcf.import_vcf_task.ImportVCFExtractUnknownVariantsAndSplitFileTask': WEB_WORKERS,
     'upload.tasks.vcf.genotype_vcf_tasks.ImportCreateProjectForGenotypeVCFTask': WEB_WORKERS,
     'upload.tasks.vcf.genotype_vcf_tasks.ProcessGenotypeVCFDataTask': WEB_WORKERS,
@@ -85,8 +87,6 @@ CELERY_TASK_ROUTES = {
     'upload.tasks.import_gene_list_task.ImportGeneListTask': WEB_WORKERS,
     'upload.tasks.import_patient_records_task.ImportPatientRecords': WEB_WORKERS,
     'upload.tasks.import_ped_task.ImportPedTask': WEB_WORKERS,
-    'generate_graph': WEB_WORKERS,
-    'classification.tasks.classification_import_map_and_insert_task.ClassificationImportMapInsertTask': WEB_WORKERS,
 
     # VariantID workers
     'upload.tasks.vcf.unknown_variants_task.InsertUnknownVariantsTask': VARIANT_ID_SINGLE_WORKER,
