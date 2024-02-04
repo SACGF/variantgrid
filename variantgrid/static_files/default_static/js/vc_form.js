@@ -2133,7 +2133,16 @@ const VCForm = (function() {
                 let label = key;
                 let th;
                 if (pointBased) {
-                    th = $(`<th>`, {text: `${(EKey.strengthToPoints[key])}`, class: 'col-header'});
+                    let points = EKey.strengthToPoints[key];
+                    let title = "";
+                    if (points != 0) {
+                        let plural = Math.abs(points) > 1 ? "s" : "";
+                        let direction = points < 0 ? "Benign" : "Oncogenic"
+                        title = `(${Math.abs(points)} point${plural}) Towards ${direction}`;
+                    } else {
+                        title = "Neutral";
+                    }
+                    th = $(`<th>`, {text: `${(EKey.strengthToPoints[key])}`, title: title, class: 'col-header'});
                 } else {
                     th = $(`<th>`, {text: key, class: 'col-header', title: EKey.critValues[key], 'data-toggle':"tooltip", 'data-placement': 'left'});
                 }
