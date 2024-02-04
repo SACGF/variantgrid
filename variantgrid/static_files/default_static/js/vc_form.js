@@ -2135,7 +2135,7 @@ const VCForm = (function() {
                 if (pointBased) {
                     th = $(`<th>`, {text: `${(EKey.strengthToPoints[key])}`, class: 'col-header'});
                 } else {
-                    th = $(`<th>`, {text: EKey.critValues[key], class: 'col-header', title: title, 'data-toggle':"tooltip", 'data-placement': 'left'});
+                    th = $(`<th>`, {text: key, class: 'col-header', title: EKey.critValues[key], 'data-toggle':"tooltip", 'data-placement': 'left'});
                 }
                 
                 headerRow.append(th);
