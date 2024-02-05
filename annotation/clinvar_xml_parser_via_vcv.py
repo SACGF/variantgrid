@@ -9,7 +9,7 @@ from library.utils.xml_utils import parser_path, PP
 
 class ClinVarXmlParserViaVCV(ClinVarXmlParser):
 
-    PARSER_VERSION = 206  # change this whenever the parsing changes, so we know to ignore the old cache
+    PARSER_VERSION = 207  # change this whenever the parsing changes, so we know to ignore the old cache
 
     RE_LEGACY_CS = re.compile("^Converted during submission to (.*?).?$")
 
@@ -33,7 +33,7 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
 
     def __init__(self):
         super().__init__(
-            prefix=["ClinVarResult-Set", "VariationArchive", "InterpretedRecord", "ClinicalAssertionList", "ClinicalAssertion"]
+            prefix=["ClinVarResult-Set", "VariationArchive", "ClassifiedRecord", "ClinicalAssertionList", "ClinicalAssertion"]
         )
 
     @parser_path(on_start=True)
@@ -54,33 +54,34 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         self.latest.genome_build = elem.get("submittedAssembly")
 
     @parser_path(
+        "Classification",
         "ReviewStatus")
     def parse_review_status(self, elem):
         review_status = elem.text
         self.latest.review_status = review_status
         self.latest.stars = CLINVAR_REVIEW_STATUS_TO_STARS.get(review_status, 0)
 
-    @parser_path("Interpretation")
+    @parser_path("Classification")
     def parse_date_last_evaluated(self, elem):
         if dle := elem.get("DateLastEvaluated"):
             self.latest.date_last_evaluated = ClinVarXmlParser.parse_xml_date(dle)
 
     @parser_path(
-        "Interpretation",
+        "Classification",
         "Comment")
     def parse_interpretation_summary(self, elem):
         self.latest.interpretation_summary = elem.text
 
     @parser_path(
-        "Interpretation",
-        "Description")
+        "Classification",
+        "GermlineClassification")
     def parse_clinical_significance_desc(self, elem):
         if cs := elem.text:
             cs = cs.lower()
             self.latest.clinical_significance = CLINVAR_TO_VG_CLIN_SIG.get(cs, cs)
 
     @parser_path(
-        "Interpretation",
+        "Classification",
         "Comment")
     def parse_clinical_significance_comment(self, elem):
         # prioritise comment if it's in the format of

@@ -8,7 +8,6 @@ from django.utils.safestring import SafeString
 from annotation import models
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
 from annotation.clinvar_xml_parser import CLINVAR_RECORD_CACHE_DAYS
-from annotation.clinvar_xml_parser_via_rcvs import ClinVarXmlParserViaRCVs
 from annotation.clinvar_xml_parser_via_vcv import ClinVarXmlParserViaVCV
 from annotation.models import Citation, CitationFetchRequest, ClinVarRecordCollection, ClinVarRecord, ClinVar
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, get_admin_url
@@ -101,17 +100,17 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
         duration = datetime.now() - start
         messages.info(request, message=f"Fetching took {duration}")
 
-    @admin_action("Refresh: Force (using RCVs)")
-    def refresh_force_rcvs(self, request, queryset: QuerySet[ClinVarRecordCollection]):
-        start = datetime.now()
-        for obj in queryset:
-            ClinVarFetchRequest(
-                clinvar_variation_id=obj.clinvar_variation_id,
-                max_cache_age=timedelta(seconds=0),
-                parser=ClinVarXmlParserViaRCVs
-            ).fetch()
-        duration = datetime.now() - start
-        messages.info(request, message=f"Fetching took {duration}")
+    # @admin_action("Refresh: Force (using RCVs)")
+    # def refresh_force_rcvs(self, request, queryset: QuerySet[ClinVarRecordCollection]):
+    #     start = datetime.now()
+    #     for obj in queryset:
+    #         ClinVarFetchRequest(
+    #             clinvar_variation_id=obj.clinvar_variation_id,
+    #             max_cache_age=timedelta(seconds=0),
+    #             parser=ClinVarXmlParserViaRCVs
+    #         ).fetch()
+    #     duration = datetime.now() - start
+    #     messages.info(request, message=f"Fetching took {duration}")
 
 
 class HasErrorFilter(admin.SimpleListFilter):
