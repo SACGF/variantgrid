@@ -37,31 +37,34 @@
     {% endwith %}
 {% endfor %}
 {% if diff_latest or diff_all or download_link or history_link %}
-    <div data-toolbar="#{{ table_id }}" class="link-toolbar">
+    <div data-toolbar="#{{ table_id }}" class="data-toolbar" style="display:flex">
         {% if title %}<label>{{ title }}</label>{% endif %}
-        {% if diff_latest and diff_all %}
-            <div class="d-inline-block">
-                Show Evidence Differences Between
-                <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_latest }}{{ logging_key | safe }}" title="Some labs have multiple classifications, only compare the latest classification from each lab">Latest Classification per Lab</a> or
-                <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_all }}{{ logging_key | safe }}" title="Some labs have multiple classifications, compare every classification. There may be some redundancy">Every Classification</a>
-            </div>
-        {% else %}
-            {% if diff_latest %}
-                {% comment %}There shouldn't be a secnario where diff_all is True but diff_latest is False{% endcomment %}
-                <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_latest }}{{ logging_key | safe }}">Show Evidence Differences</a>
+        <div class="link-toolbar" style="position:relative; top:6px">
+            {% if diff_latest and diff_all %}
+                <div class="d-inline-block">
+                    Show Evidence Differences Between
+                    <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_latest }}{{ logging_key | safe }}" title="Some labs have multiple classifications, only compare the latest classification from each lab">Latest Classification per Lab</a> or
+                    <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_all }}{{ logging_key | safe }}" title="Some labs have multiple classifications, compare every classification. There may be some redundancy">Every Classification</a>
+                </div>
+            {% else %}
+                {% if diff_latest %}
+                    {% comment %}There shouldn't be a secnario where diff_all is True but diff_latest is False{% endcomment %}
+                    <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_latest }}{{ logging_key | safe }}">Show Evidence Differences</a>
+                {% endif %}
+                {% if diff_all %}
+                    <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_all }}{{ logging_key | safe }}">Show Evidence Differences</a>
+                {% endif %}
             {% endif %}
-            {% if diff_all %}
-                <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_all }}{{ logging_key | safe }}">Show Evidence Differences</a>
+            {% if download_link %}
+                <a class="download-link" href="{{ download_link }}">Download as CSV</a>
             {% endif %}
-        {% endif %}
-        {% if download_link %}
-            <a class="download-link" href="{{ download_link }}">Download as CSV</a>
-        {% endif %}
-        {% if history_link %}
-            <a class="hover-link" href="{{ history_link }}"><i class="fas fa-key" style="color:gray;opacity:0.75"></i> Show History</a>
-        {% endif %}
+            {% if history_link %}
+                <a class="hover-link" href="{{ history_link }}"><i class="fas fa-key" style="color:gray;opacity:0.75"></i> Show History</a>
+            {% endif %}
+        </div>
+        <div class="spacer"></div>
         {% if allele_origin_filter_enabled %}
-            {% allele_origin_toggle style="position:absolute; top: -6px; right: 0" %}
+            {% allele_origin_toggle %}
         {% endif %}
         {% comment %}<a class="btn btn-outline-secondary" href="#">TODO Download CSV</a>{% endcomment %}
     </div>
@@ -100,7 +103,7 @@
         let tableDom = $('#{{ table_id }}')
         table = tableDom.DataTable({
             order: [{{ sort_order_index }}, "asc"],
-            dom: '<"top"><"toolbar"<"custom">{% if paging %}f{% endif %}>rt<"bottom"{% if allele_origin_filter_enabled %}<"showing"il>p{% endif %}><"clear">',
+            dom: '<"top"><"toolbar"{% if paging %}f{% endif %}>rt<"bottom"{% if allele_origin_filter_enabled %}<"showing"il>p{% endif %}><"clear">',
             "orderFixed": {
                 post: [7, "desc"]
             },
@@ -142,7 +145,13 @@
                 Flags.instance.init({userId: '{{user.id}}', forceRender: true, filter:'.child', flagGroup:'classifications'});
             },1);
         });
-        $(`[data-toolbar="#{{table_id}}"]`).detach().appendTo(tableDom.closest('.dataTables_wrapper').find('.toolbar .custom'));
+        let dataToolbar = $(`[data-toolbar="#{{table_id}}"]`);
+        let toolbar = tableDom.closest('.dataTables_wrapper').find('.toolbar')
+        {% if paging %}
+            let filter = $(`#{{table_id}}_filter`);
+            filter.detach().appendTo(dataToolbar);
+        {% endif %}
+        toolbar.replaceWith(dataToolbar);
 
         {% if allele_origin_filter_enabled %}
             let checkedValue = $("input[name='allele-origin-toggle']:checked").val();

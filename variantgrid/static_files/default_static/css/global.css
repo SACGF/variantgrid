@@ -203,7 +203,8 @@ i.fas, i.fa-solid {
 .row.equal > div > .card {
   flex-grow: 1;
 }
-.row.equal .spacer {
+
+.spacer {
   flex-grow: 1;
 }
 
@@ -971,6 +972,12 @@ tbody tr.dtrg-group.dtrg-start:not(:first-child) td {
   border-top: 40px solid white;
 }
 
+div.dataTables_wrapper div.dataTables_filter label {
+  font-weight: 500 !important;
+  position: relative;
+  top: 0.5px;
+}
+
 .dataTables_filter input[type=search] {
   min-width: 200px;
 }
@@ -1382,10 +1389,20 @@ a.list-group-item-action {
   height: 32px;
 }
 
-.link-toolbar > *:not(:first-child):not(#allele-origin-toggle) {
+.data-toolbar {
+  position: relative;
+  top: 4px;
+}
+.data-toolbar > *:not(:first-child) {
   margin-left: 10px;
 }
-.link-toolbar > *:not(:first-child):not(#allele-origin-toggle)::before {
+
+.link-toolbar > *:not(:first-child) {
+  position: relative;
+  bottom: 2px;
+  margin-left: 10px;
+}
+.link-toolbar > *:not(:first-child)::before {
   content: '|';
   margin-right: 10px;
   color: grey !important;
@@ -2431,7 +2448,7 @@ a.clinical-context {
 }
 #allele-origin-toggle .btn-group .allele-origin-A.active {
   color: #fff;
-  background-color: #bbbbff;
+  background-color: #aaaabb;
 }
 #allele-origin-toggle .btn-group .allele-origin-G.active {
   color: #fff;
