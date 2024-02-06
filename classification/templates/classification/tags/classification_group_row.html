@@ -3,7 +3,6 @@
 {% load settings_tags %}
 
 {% settings_value 'CLASSIFICATION_GRID_SHOW_USERNAME' as show_username %}
-{% settings_value 'CLASSIFICATION_GRID_SHOW_ORIGIN' as show_allele_origin %}
 {% settings_value 'CLASSIFICATION_SHOW_SPECIMEN_ID' as show_specimen_id %}
 
 
@@ -74,9 +73,6 @@
         {% endif %}
     </td>
     <td style="width:100px;">
-        {% if show_allele_origin %}
-            <div class="mb-1">{{ group.allele_origins | ekey:"allele_origin" }}</div>
-        {% endif %}
         {% if group.zygosities %}
             {{ group.zygosities | ekey:"zygosity" }}
         {% else %}

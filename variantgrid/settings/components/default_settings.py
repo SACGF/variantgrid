@@ -484,9 +484,6 @@ CLASSIFICATION_RECLASSIFICATION_EMAIL = True
 CLASSIFICATION_ID_FILTER = True
 CLASSIFICATION_GRID_SHOW_USERNAME = True
 
-# WARNING the below will be deprecated as it becauses the default
-CLASSIFICATION_GRID_SHOW_ORIGIN = True  # Should Allele origin (e.g. germline/somatic) be shown on the grid
-
 CLASSIFICATION_STATS_USE_SHARED = False  # False=Use visible to user. True = Shared
 CLASSIFICATION_GRID_SHOW_PHGVS = True
 CLASSIFICATION_GRID_SHOW_SAMPLE = True

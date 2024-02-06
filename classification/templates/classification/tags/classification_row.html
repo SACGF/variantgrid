@@ -29,7 +29,6 @@
     {% endif %}
     {% endif %}
     <td class="cs">{% clinical_significance evidence.clinical_significance.value %}
-    {% if show_allele_origin %}<td class="allele_origin">{{ evidence.allele_origin.value | ekey:'allele_origin' }}</td>{% endif %}
     <td class="condition">
         {% if condition_obj %}
             {% condition condition_obj %}

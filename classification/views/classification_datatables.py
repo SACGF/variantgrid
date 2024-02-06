@@ -190,14 +190,6 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 orderable=True
             ),
             RichColumn(
-                key='published_evidence__allele_origin__value',
-                name='allele_origin',
-                label='Allele Origin',
-                client_renderer=f'VCTable.evidence_key.bind(null, "{ SpecialEKeys.ALLELE_ORIGIN }")',
-                enabled=settings.CLASSIFICATION_GRID_SHOW_ORIGIN,
-                orderable=True
-            ),
-            RichColumn(
                 key='published_evidence__condition__value',
                 name='condition',
                 label='Condition',

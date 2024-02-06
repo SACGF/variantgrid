@@ -165,7 +165,6 @@
 {% endblock %}
 {% block content %}
     {% settings_value 'CLASSIFICATION_GRID_SHOW_USERNAME' as CLASSIFICATION_GRID_SHOW_USERNAME %}
-    {% settings_value 'CLASSIFICATION_GRID_SHOW_ORIGIN' as CLASSIFICATION_GRID_SHOW_ORIGIN %}
     {% settings_value 'CLASSIFICATION_ID_FILTER' as CLASSIFICATION_ID_FILTER %}
     {% settings_value 'CLASSIFICATION_REDCAP_EXPORT' as CLASSIFICATION_REDCAP_EXPORT %}
     <div id="classifications-page">
@@ -221,17 +220,11 @@
                 </div>
                 {% endif %}
 
-                <div class="col-md-2 col-lg-2">
+                <div style="width: 160px" class="mx-3">
                     Allele Origin<br/>
                     {% allele_origin_toggle show_label=False %}
                 </div>
 
-                {% if CLASSIFICATION_GRID_SHOW_ORIGIN %}
-                <div class="col-md-4 col-lg-2">
-                    <br />
-                    {% crispy allele_origin_form form_helper.horizontal_no_labels %}
-                </div>
-                {% endif %}
                 {% if CLASSIFICATION_ID_FILTER %}
                 <div class="col-md-4 col-lg-2">
                     <br/>
