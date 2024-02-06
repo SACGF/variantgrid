@@ -50,7 +50,7 @@ See <a href="https://pubmed.ncbi.nlm.nih.gov/35101336/">ClinGen/CGC/VICC 2022</a
     condition = EvidenceKey.objects.get(key="condition")
     condition.namespace_overrides = {
       "somatic": {
-        "sub_label": "or Cancer Type"
+        "sub_label": "or Cancer type"
       }
     }
     condition.save()
