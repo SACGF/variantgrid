@@ -192,15 +192,15 @@ class VariantPKLookup:
     def _insert_unknown(self):
         self._insert_unknown_sequences()  # All ref/alt need to be in sequence_pk_by_seq to be able to get hash
 
-        loci_hashes = []
-        variant_hashes = []
+        loci_hashes = set()
+        variant_hashes = set()
         for variant_coordinate in self.unknown_variant_coordinates:
             variant_hash = self.get_variant_coordinate_hash(variant_coordinate)
-            variant_hashes.append(variant_hash)
+            variant_hashes.add(variant_hash)
 
             (contig_id, start, _end, ref_id, _alt_id) = variant_hash
             locus_hash = (contig_id, start, ref_id)
-            loci_hashes.append(locus_hash)
+            loci_hashes.add(locus_hash)
 
         self.unknown_variant_coordinates.clear()
         loci_ids = self.get_loci_ids(loci_hashes, validate_not_null=False)  # Could have some unknowns as None
