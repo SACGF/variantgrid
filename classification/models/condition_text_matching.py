@@ -20,6 +20,7 @@ from annotation.regexes import db_ref_regexes
 from classification.enums import SpecialEKeys, ShareLevel
 from classification.models import Classification, ClassificationModification, classification_post_publish_signal, \
     flag_types, EvidenceKeyMap, ConditionResolvedDict, ConditionResolved, classification_flag_types
+from classification.models.condition_text_search import condition_text_search
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol, GeneSymbolAlias
 from library.cache import timed_cache
@@ -946,26 +947,14 @@ def search_suggestion(text: str) -> ConditionMatchingSuggestion:
         return local_mondo
 
     try:
-        # TODO ensure "text" is safe, it should already be normalised
-        results = requests.get(
-            f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{text}', {
-                "prefix": "MONDO",
-                "rows": 10,
-                "minimal_tokenizer": "false",
-                "category": "disease"
-            }, timeout=MINUTE_SECS).json().get("docs")
-
         matches: list[ConditionMatchingSuggestion] = []
-        for result in results:
-            o_id = result.get('id')
-            # result.get('label') gives the label as it's known by the search server
-            term = OntologyTerm.get_or_stub(o_id)
+        for term in condition_text_search(text):
             if cms := search_text_to_suggestion(match_text, term):
                 matches.append(cms)
         if search_match := merge_matches(matches):
             return search_match
     except:
-        print("Error searching server")
+        report_exc_info()
 
     if local_omim := find_local_term(match_text, OntologyService.OMIM):
         return local_omim

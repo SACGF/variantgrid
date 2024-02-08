@@ -2,13 +2,10 @@ import re
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Any, Iterable, TypedDict
-
-import requests
 from django.urls import reverse
-
 from annotation.regexes import db_ref_regexes
-from library.constants import MINUTE_SECS
-from library.log_utils import report_message
+from classification.models.condition_text_search import condition_text_search
+from library.log_utils import report_message, report_exc_info
 from library.utils import empty_to_none
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, GeneDiseaseClassification
 
@@ -329,23 +326,16 @@ class OntologyMatching:
             if not detected_ontology_id:
                 # the actual server search
                 server_search_text = search_text
-                if gene_symbol:
-                    server_search_text = server_search_text + " " + gene_symbol
+                # including gene symbol does not work with the new search
+                # if gene_symbol:
+                #     server_search_text = server_search_text + " " + gene_symbol
                 try:
                     row_count = 6
-                    results = requests.get(f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{server_search_text}', {
-                        "prefix": "MONDO",
-                        "rows": row_count,
-                        "minimal_tokenizer": "false",
-                        "category": "disease"
-                    }, timeout=MINUTE_SECS).json().get("docs")
-
+                    results = condition_text_search(server_search_text, row_limit=row_count)
                     for index, result in enumerate(results):
-                        o_id = result.get('id')
-                        # result.get('label') gives the label as it's known by the search server
-                        ontology_matches.searched_term(o_id, row_count - index)
+                        ontology_matches.searched_term(result.id, row_count - index)
                 except:
-                    pass
+                    report_exc_info()
                     # TODO communicate to the user couldn't search mondo text search
 
         # ontology_matches.apply_scores()
