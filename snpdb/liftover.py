@@ -167,7 +167,7 @@ def _liftover_using_same_contig(genome_build, av_tuples: list[tuple[int, int]]):
                            genome_build=genome_build,
                            allele_id=allele_id,
                            origin=AlleleOrigin.LIFTOVER,
-                           conversion_tool=AlleleConversionTool.SAME_CONTIG)
+                           allele_linking_tool=AlleleConversionTool.SAME_CONTIG)
         variant_alleles.append(va)
 
     VariantAllele.objects.bulk_create(variant_alleles, ignore_conflicts=True, batch_size=2000)

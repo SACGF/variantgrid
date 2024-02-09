@@ -15,8 +15,9 @@ class Command(BaseCommand):
             print(f"Handling {genome_build}")
             variant_qs = Variant.objects.filter(Variant.get_contigs_q(genome_build), varianttag__isnull=False)
             # Do in small chunks so we can save as we go - this already uses smaller batches internally
-            for variant_chunk in iter_fixed_chunks(variant_qs, 10_000):
-                print("Handling 10k chunk")
+            chunk_size_kb = 2
+            for variant_chunk in iter_fixed_chunks(variant_qs, chunk_size_kb * 1000):
+                print(f"Handling {chunk_size_kb}k chunk")
                 populate_clingen_alleles_for_variants(genome_build, variant_chunk)  # Will add VariantAlleles
 
             va_collection = VariantAlleleCollectionSource.objects.create(genome_build=genome_build)
