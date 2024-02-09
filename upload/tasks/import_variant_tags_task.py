@@ -116,26 +116,48 @@ class VariantTagsInsertTask(ImportVCFStepTask):
         user_matcher = UserMatcher(default_user=variant_tags_import.user)
         variant_tags = []
         created_date = []
-        for ivt in variant_tags_import.importedvarianttag_set.all():
+        ivt_variants = {}
+        vts_qs = variant_tags_import.importedvarianttag_set.all()
+        # We often have a lot of tags per variant - so do in order, then can re-use lookup code
+        last_variant = None
+        last_variant_string = None
+        for ivt in vts_qs.order_by("variant_string"):
+            if ivt.variant_string == last_variant_string:
+                variant = last_variant
+            else:
+                variant_coordinate = VariantCoordinate.from_string(ivt.variant_string)
+                try:
+                    variant = Variant.get_from_variant_coordinate(variant_coordinate, genome_build)
+                except Variant.DoesNotExist:
+                    # Must have been normalized
+                    variant = ModifiedImportedVariant.get_variant_for_unnormalized_variant(upload_step.upload_pipeline,
+                                                                                           variant_coordinate)
+            ivt_variants[ivt] = variant
+
+            last_variant = variant
+            last_variant_string = ivt.variant_string
+
+        # Now we need to create the alleles
+        variants = set(ivt_variants.values())
+        populate_clingen_alleles_for_variants(genome_build, variants)
+
+        va_qs = VariantAllele.objects.filter(variant__in=variants, genome_build=genome_build)
+        allele_id_by_variant_id = dict(va_qs.values_list("variant_id", "allele_id"))
+
+        for ivt, variant in ivt_variants.items():
             tag = tag_cache.get(ivt.tag_string)
             if tag is None:
                 tag, _ = Tag.objects.get_or_create(pk=ivt.tag_string)
                 tag_cache[tag.pk] = tag
 
-            variant_coordinate = VariantCoordinate.from_string(ivt.variant_string)
-            try:
-                variant = Variant.get_from_variant_coordinate(variant_coordinate, genome_build)
-            except Variant.DoesNotExist:
-                # Must have been normalized
-                variant = ModifiedImportedVariant.get_variant_for_unnormalized_variant(upload_step.upload_pipeline,
-                                                                                       variant_coordinate)
-
             # We're not going to link analysis/nodes - as probably don't match up across systems
             analysis = None
             node = None
+            allele_id = allele_id_by_variant_id.get(variant.pk)
 
             # TODO: We should also look at not creating dupes somehow??
             vt = VariantTag(variant=variant,
+                            allele_id=allele_id,
                             genome_build=genome_build,
                             tag=tag,
                             analysis=analysis,
@@ -168,7 +190,6 @@ class VariantTagsInsertTask(ImportVCFStepTask):
             VariantTag.objects.bulk_update(variant_tags, fields=["created"], batch_size=2000)
 
         logging.info("Creating liftover pipelines")
-        populate_clingen_alleles_for_variants(genome_build, variant_list)
         allele_source = VariantAlleleCollectionSource.objects.create(genome_build=genome_build)
         va_collection_records = []
         for va in VariantAllele.objects.filter(variant__in=variant_list):
