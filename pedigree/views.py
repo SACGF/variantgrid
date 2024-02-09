@@ -23,10 +23,13 @@ def view_ped_file(request, ped_file_id):
     ped_file_form = forms.ReadOnlyPedFileForm(instance=ped_file)
     draw_pedigree_chart = bool(getattr(settings, "PEDIGREE_MADELINE2_COMMAND", None))
 
-    context = {'ped_file': ped_file,
-               'ped_file_form': ped_file_form,
-               'cohort_form': UserCohortForm(),
-               'draw_pedigree_chart': draw_pedigree_chart}
+    context = {
+        'ped_file': ped_file,
+        'ped_file_form': ped_file_form,
+        'cohort_form': UserCohortForm(),
+        'draw_pedigree_chart': draw_pedigree_chart,
+        'has_write_permission': ped_file.can_write(request.user)
+    }
     return render(request, 'pedigree/view_ped_file.html', context)
 
 
