@@ -335,7 +335,8 @@ class GeneSymbolWikiColumns(DatatableConfig[GeneSymbolWiki]):
         self.download_csv_button_enabled = True
 
         self.rich_columns = [
-            RichColumn('gene_symbol', renderer=self.render_gene_symbol, client_renderer="renderGeneSymbol"),
+            RichColumn('gene_symbol', orderable=True,
+                       renderer=self.render_gene_symbol, client_renderer="renderGeneSymbol"),
             RichColumn('markdown'),
             RichColumn('last_edited_by__username', name='user', orderable=True),
             RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True),
