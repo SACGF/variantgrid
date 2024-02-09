@@ -186,6 +186,7 @@ class ClinVarReviewStatus(models.TextChoices):
         'no_assertion_criteria_provided': NO_ASSERTION_CRITERIA_PROVIDED[0],
         'no_interpretation_for_the_single_variant': NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT[0],
         'criteria_provided,_conflicting_interpretations': CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0],
+        'criteria_provided,_conflicting_classifications': CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0],
         'criteria_provided,_single_submitter': CRITERIA_PROVIDED_SINGLE_SUBMITTER[0],
         'criteria_provided,_multiple_submitters,_no_conflicts': CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS_NO_CONFLICTS[0],
         'reviewed_by_expert_panel': REVIEWED_BY_EXPERT_PANEL[0],
