@@ -12,6 +12,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models.query_utils import Q
 
+from genes.hgvs import HGVSMatcher
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.genomics.vcf_utils import write_vcf_from_tuples
 from library.guardian_utils import admin_bot
@@ -79,11 +80,13 @@ def _get_build_liftover_tuples(allele_source: AlleleSource, inserted_genome_buil
 
     other_build_contigs_q_list = []
     other_builds = set()
+    hgvs_matchers = {}
     for genome_build in destination_genome_builds:
         if genome_build != inserted_genome_build:
             other_builds.add(genome_build)
             q = Q(variantallele__variant__locus__contig__in=genome_build.contigs)
             other_build_contigs_q_list.append(q)
+        hgvs_matchers[genome_build] = HGVSMatcher(genome_build)
 
     if not other_builds:
         return {}  # Nothing to do
@@ -106,10 +109,12 @@ def _get_build_liftover_tuples(allele_source: AlleleSource, inserted_genome_buil
                 logging.info("%s already lifted over to %s", allele, genome_build)
                 continue
 
+            hgvs_matcher = hgvs_matchers[genome_build]
             conversion_tool = None
             variant_id_or_coordinate = None
             try:
-                conversion_tool, variant_id_or_coordinate = allele.get_liftover_tuple(genome_build)
+                conversion_tool, variant_id_or_coordinate = allele.get_liftover_tuple(genome_build,
+                                                                                      hgvs_matcher=hgvs_matcher)
             except (Contig.ContigNotInBuildError, GenomeFasta.ContigNotInFastaError):
                 log_traceback()
 

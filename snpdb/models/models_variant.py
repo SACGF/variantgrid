@@ -126,10 +126,12 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
         if va := self.variant_alleles().filter(genome_build=genome_build).first():
             return va.variant
 
-    def get_liftover_tuple(self, genome_build: GenomeBuild) -> tuple[AlleleConversionTool,
-                                                                     Union[int, 'VariantCoordinate']]:
+    def get_liftover_tuple(self, genome_build: GenomeBuild,
+                           hgvs_matcher=None) -> tuple[AlleleConversionTool, Union[int, 'VariantCoordinate']]:
         """ Used by to write VCF coordinates during liftover. Can be slow (API call)
-            If you know a VariantAllele exists for your build, use variant_for_build(genome_build).as_tuple() """
+            If you know a VariantAllele exists for your build, use variant_for_build(genome_build).as_tuple()
+
+            Optionally pass in hgvs_matcher to save re-instantiating it all the time """
 
         from annotation.models import VariantAnnotationVersion
         from snpdb.models.models_dbsnp import DbSNP
@@ -162,7 +164,10 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
 
         variant_coordinate = None
         if g_hgvs:
-            variant_coordinate = get_hgvs_variant_coordinate(g_hgvs, genome_build)
+            if hgvs_matcher:
+                variant_coordinate = hgvs_matcher.get_variant_coordinate(g_hgvs)
+            else:
+                variant_coordinate = get_hgvs_variant_coordinate(g_hgvs, genome_build)
 
         return conversion_tool, variant_coordinate
 
