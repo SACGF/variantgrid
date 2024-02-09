@@ -40,7 +40,8 @@ git+https://github.com/davmlaw/django-messages/#egg=django-messages
 git+https://github.com/davmlaw/django-starfield#egg=django_starfield
 git+https://github.com/davmlaw/django-js-reverse#egg=django-js-reverse
 git+https://github.com/SACGF/hgvs#egg=pyhgvs
-git+https://github.com/biocommons/hgvs#egg=hgvs
+# Need https://github.com/biocommons/hgvs/issues/722 fixed
+git+https://github.com/davmlaw/hgvs@variantgrid#egg=hgvs
 git+https://github.com/davmlaw/PyVCF3@f7ba4b4adb8a79ac13e99470d013af6a8fe1363b#egg=pyvcf3
 gunicorn
 HTSeq
