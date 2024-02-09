@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.db import IntegrityError
 from django.db.models import OuterRef, Subquery, F
 from django.db.models.functions import Abs
 
@@ -72,9 +73,16 @@ class Command(BaseCommand):
 
             if not dry_run:
                 locus, created = Locus.objects.get_or_create(contig=v.locus.contig, position=v.locus.position, ref=seq[ref])
-                v.locus = locus
-                v.alt = seq_del
-                v.save()
+                try:
+                    v.locus = locus
+                    v.alt = seq_del
+                    v.save()
+                except IntegrityError as e:
+                    print(e)
+                    existing = Variant.objects.get(locus=locus, end=v.end, alt=seq_del)
+                    msg = f"Variant pk={v.pk} is a dupe of pk={existing.pk}"
+                    logging.error(msg)
+                    continue
 
             changed_data["end"] = v.end
             changed_data["new_ref"] = ref
