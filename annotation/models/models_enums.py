@@ -162,6 +162,7 @@ class ClinVarReviewStatus(models.TextChoices):
     NO_ASSERTION_PROVIDED = "N", "No assertion provided"
     NO_ASSERTION_CRITERIA_PROVIDED = "C", "No assertion criteria provided"
     NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT = "I", "No interpretation for the single variant"
+    NO_CLASSIFICATION_PROVIDED = 'n', "No Classification Provided"
     CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS = "F", "Criteria provided - conflicting interpretations"
     CRITERIA_PROVIDED_SINGLE_SUBMITTER = "S", "Criteria provided - single submitter"
     CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS_NO_CONFLICTS = "M", "Criteria provided - multiple submitters w/no conflicts"
@@ -182,7 +183,9 @@ class ClinVarReviewStatus(models.TextChoices):
     VCF_MAPPINGS = Constant({
         'no_assertion_provided': NO_ASSERTION_PROVIDED[0],
         'no_assertion_criteria_provided': NO_ASSERTION_CRITERIA_PROVIDED[0],
-        'no_interpretation_for_the_single_variant': NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT[0],
+        'no_interpretation_for_the_single_variant': NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT[0],  # Old value
+        'no_classification_for_the_single_variant': NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT[0],  # New one
+        'no_classification_provided': NO_CLASSIFICATION_PROVIDED[0],  # New one
         'criteria_provided,_conflicting_interpretations': CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0],
         'criteria_provided,_conflicting_classifications': CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0],
         'criteria_provided,_single_submitter': CRITERIA_PROVIDED_SINGLE_SUBMITTER[0],
