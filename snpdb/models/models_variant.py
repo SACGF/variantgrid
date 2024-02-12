@@ -462,8 +462,7 @@ class Variant(PreviewModelMixin, models.Model):
     REFERENCE_ALT = "="
     locus = models.ForeignKey(Locus, on_delete=CASCADE)
     alt = models.ForeignKey(Sequence, on_delete=CASCADE)
-    # end depends on length of ref/alt so can't be on a locus
-    end = models.IntegerField(null=True)
+    end = models.IntegerField()  # Start is on locus
 
     class Meta:
         unique_together = ("locus", "alt", "end")  # Possible to have eg CNV with same alt = <INS> but diff end
