@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from snpdb.models import GenomeBuild, Variant
+from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
@@ -28,3 +28,22 @@ class VariantTestCase(TestCase):
     def test_ref_variant_coordinate_internal(self):
         vc_symbolic = self.ref_variant.coordinate.as_internal_symbolic()
         self.assertEqual(vc_symbolic.alt, Variant.REFERENCE_ALT)
+
+    def _test_internal_to_external_and_back(self, variant_coordinate, genome_build):
+        internal = variant_coordinate.as_internal_symbolic()
+        external = internal.as_external_explicit(genome_build)
+        internal2 = external.as_internal_symbolic()
+        self.assertEqual(internal, internal2)
+
+    def test_del(self):
+        #7:23000505-23004589 <DEL>
+        vc = VariantCoordinate(chrom='7', start=23000505, end=23004589, ref='C', alt='<DEL>')
+        self._test_internal_to_external_and_back(vc, self.grch37)
+
+    def test_dup(self):
+        vc = VariantCoordinate(chrom='7', start=41200841, end=41203487, ref='C', alt='<DUP>')
+        self._test_internal_to_external_and_back(vc, self.grch37)
+
+    def test_inversion(self):
+        vc = VariantCoordinate(chrom='10', start=89714001, end=89714001, ref='A', alt='<INV>')
+        self._test_internal_to_external_and_back(vc, self.grch37)

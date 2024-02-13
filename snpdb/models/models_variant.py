@@ -4,6 +4,7 @@ from functools import cached_property
 from typing import Optional, Iterable, Union, Any
 
 import pydantic
+from bioutils.sequences import reverse_complement
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models, IntegrityError
@@ -338,6 +339,9 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             elif self.alt == VCFSymbolicAllele.DUP:
                 ref = ref_sequence[0]
                 alt = ref_sequence
+            elif self.alt == VCFSymbolicAllele.INV:
+                ref = ref_sequence
+                alt = reverse_complement(ref_sequence)
             else:
                 raise ValueError(f"Unknown symbolic alt of '{self.alt}'")
 
@@ -378,6 +382,13 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
                     alt = VCFSymbolicAllele.DEL
             else:
                 alt = self.alt
+
+                # Inversion
+                if svlen == 0 and ref_length >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
+                    if self.ref == reverse_complement(self.alt):
+                        ref = self.ref[0]
+                        alt = VCFSymbolicAllele.INV
+
         return VariantCoordinate(chrom=self.chrom, start=self.start, end=self.end, ref=ref, alt=alt)
 
 
