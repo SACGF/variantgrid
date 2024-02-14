@@ -8,10 +8,11 @@ def slowly_create_test_variant(chrom: str, position: int, ref: str, alt: str, ge
     """ For test only - doesn't use VariantPKLookup """
     vc = VariantCoordinate.from_start_only(chrom, position, ref, alt).as_internal_symbolic()
     contig = genome_build.contigs.get(name=vc.chrom)
-    ref_seq, _ = Sequence.objects.get_or_create(seq=ref.upper(), length=len(ref))
-    alt_seq, _ = Sequence.objects.get_or_create(seq=alt.upper(), length=len(alt))
+    ref_seq, _ = Sequence.objects.get_or_create(seq=vc.ref.upper(), length=len(vc.ref))
+    alt_seq, _ = Sequence.objects.get_or_create(seq=vc.alt.upper(), length=len(vc.alt))
     locus, _ = Locus.objects.get_or_create(contig=contig, position=position, ref=ref_seq)
-    variant, _ = Variant.objects.get_or_create(locus=locus, end=vc.end, alt=alt_seq)
+    defaults = {"end": vc.end}
+    variant, _ = Variant.objects.get_or_create(locus=locus, alt=alt_seq, svlen=vc.svlen, defaults=defaults)
     return variant
 
 

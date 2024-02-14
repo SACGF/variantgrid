@@ -37,13 +37,13 @@ class VariantTestCase(TestCase):
 
     def test_del(self):
         #7:23000505-23004589 <DEL>
-        vc = VariantCoordinate(chrom='7', start=23000505, end=23004589, ref='C', alt='<DEL>')
+        vc = VariantCoordinate(chrom='7', start=23000505, ref='C', alt='<DEL>', svlen=-4084)
         self._test_internal_to_external_and_back(vc, self.grch37)
 
     def test_dup(self):
-        vc = VariantCoordinate(chrom='7', start=41200841, end=41203487, ref='C', alt='<DUP>')
+        vc = VariantCoordinate(chrom='7', start=41200841, ref='C', alt='<DUP>', svlen=2646)
         self._test_internal_to_external_and_back(vc, self.grch37)
 
     def test_inversion(self):
-        vc = VariantCoordinate(chrom='10', start=89714001, end=89714001, ref='A', alt='<INV>')
+        vc = VariantCoordinate(chrom='10', start=89714001, ref='A', alt='<INV>', svlen=9549)
         self._test_internal_to_external_and_back(vc, self.grch37)
