@@ -181,7 +181,7 @@ class ClinicalGroupingOverlap:
         dr: Optional[DiscordanceReport] = None
         if cc := self.clinical_context:
             dr = DiscordanceReport.latest_report(cc)
-        return DiscordanceStatus.calculate(self.cms, dr)
+        return DiscordanceStatus.calculate(modifications=self.cms, allele_origin_bucket=cc.allele_origin_bucket if cc else None, discordance_report=dr)
 
     @cached_property
     def discordance_report(self) -> Optional[DiscordanceReport]:
