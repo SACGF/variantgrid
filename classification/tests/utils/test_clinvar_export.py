@@ -148,7 +148,7 @@ class TestClinVarExport(TestCase):
             data={
                 SpecialEKeys.C_HGVS: {'value': 'NM_000001.2(TECTA):c.1913G>A'},
                 SpecialEKeys.INTERPRETATION_SUMMARY: {'value': 'I have an interpretation summary'},
-                SpecialEKeys.ASSERTION_METHOD: {'value': 'acmg'},
+                SpecialEKeys.ASSERTION_METHOD: {'value': ['acmg']},
                 SpecialEKeys.MODE_OF_INHERITANCE: {'value': ['autosomal_dominant']},
                 SpecialEKeys.AFFECTED_STATUS: {'value': 'yes'},
                 SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': 'VUS'},

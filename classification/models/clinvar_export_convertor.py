@@ -502,7 +502,11 @@ class ClinVarExportConverter:
 
     @property
     def json_assertion_criteria(self) -> ValidatedJson:
-        assertion_criteria = self.value(SpecialEKeys.ASSERTION_METHOD) or ""
+        assertion_criterias = self.classification_based_on.get_value_list(SpecialEKeys.ASSERTION_METHOD)
+        if len(assertion_criterias) > 1:
+            return ValidatedJson(", ".join(assertion_criterias), JsonMessages.error("ClinVar does not currently support multiple assertion methods"))
+
+        assertion_criteria = assertion_criterias[0] if assertion_criterias else ""
         if mapped_assertion_method := self.clinvar_key.assertion_criteria_vg_to_code(assertion_criteria):
             if "url" in mapped_assertion_method or ("db" in mapped_assertion_method and "id" in mapped_assertion_method):
                 return ValidatedJson(mapped_assertion_method, JsonMessages.info(f"Mapped from \"{assertion_criteria}\"."))

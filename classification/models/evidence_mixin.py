@@ -8,7 +8,7 @@ from classification.criteria_strengths import CriteriaStrength, CriteriaStrength
 from classification.enums import SpecialEKeys
 from genes.hgvs import CHGVS, PHGVS
 from library.log_utils import report_message
-from library.utils import empty_to_none, first
+from library.utils import empty_to_none
 from snpdb.models import GenomeBuild, GenomeBuildPatchVersion
 
 
@@ -73,6 +73,15 @@ class EvidenceMixin:
             return default
         return value
 
+    def get_value_list(self, key: str):
+        value = self.get_optional_value_from(self._evidence or {}, key)
+        if value is None:
+            return []
+        elif isinstance(value, list):
+            return value
+        else:
+            return [value]
+
     def __getitem__(self, key: str):
         value = self.get(key)
         if value is None:
@@ -121,7 +130,7 @@ class EvidenceMixin:
     @property
     def is_likely_acmg(self) -> bool:
         if non_standard_res := settings.CLASSIFICATION_NON_ACMG_ASSERTION_METHOD:
-            if assertion_method := self.get(SpecialEKeys.ASSERTION_METHOD):
+            for assertion_method in self.get_value_list(SpecialEKeys.ASSERTION_METHOD):
                 for non_standard_re in non_standard_res:
                     if non_standard_re.match(assertion_method):
                         return False
