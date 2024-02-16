@@ -177,7 +177,7 @@ let EKey = (function() {
                 element.text(val);
                 element.addClass('override');
                 if (!element.attr('title')) {
-                    element.attr('title', 'Using an override strength for this ACMG criterion');
+                    element.attr('title', 'Using an override strength for this criterion');
                 }
             } else if (this.value_type === 'T') {
                 this.safeHtml(val, element);
