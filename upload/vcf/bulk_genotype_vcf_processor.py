@@ -14,7 +14,7 @@ from django.db.models import Max
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.genomics.vcf_enums import VCFConstant
-from library.genomics.vcf_utils import vcf_get_ref_alt_end
+from library.genomics.vcf_utils import vcf_get_ref_alt_svlen
 from library.git import Git
 from library.utils import double_quote, json_default_converter, AsciiValue
 from library.utils.database_utils import postgres_arrays
@@ -333,7 +333,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
     def process_entry(self, variant: cyvcf2.Variant):
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
-        ref, alt, end = vcf_get_ref_alt_end(variant)
+        ref, alt, svlen = vcf_get_ref_alt_svlen(variant)
         locus_tuple = (variant.CHROM, variant.POS, ref)
         if self.last_locus_tuple:
             if self.last_locus_tuple != locus_tuple:
@@ -366,7 +366,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         phred_likelihood_str = self.get_phred_likelihood_str(variant)
         samples_filters_str = self.get_samples_filters_str(variant)
 
-        variant_coordinate = VariantCoordinate(chrom=variant.CHROM, start=variant.POS, end=end, ref=ref, alt=alt)
+        variant_coordinate = VariantCoordinate(chrom=variant.CHROM, position=variant.POS, ref=ref, alt=alt, svlen=svlen)
         alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant_coordinate)
         format_json = self._get_format_json(self.num_samples, variant)
         info_json = self._get_info_json(variant)

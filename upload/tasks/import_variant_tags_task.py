@@ -58,8 +58,9 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
             if variant_string.endswith(NEW_CLASSIFICATION):
                 variant_string = variant_string[:-REMOVE_LENGTH].strip()
 
-            variant_coordinate = VariantCoordinate.from_string(variant_string)
-            if variant_coordinate is None:
+            try:
+                variant_coordinate = VariantCoordinate.from_string(variant_string)
+            except ValueError:
                 num_skipped_records += 1
                 if "*" in variant_string:
                     num_skipped_with_star += 1

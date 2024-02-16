@@ -7,7 +7,7 @@ import cyvcf2
 from django.conf import settings
 from django.core.cache import cache
 
-from library.genomics.vcf_utils import vcf_get_ref_alt_end
+from library.genomics.vcf_utils import vcf_get_ref_alt_svlen
 from library.utils.file_utils import name_from_filename, mk_path
 from snpdb import variant_collection
 from snpdb.models import VariantCoordinate
@@ -49,8 +49,8 @@ class BulkUnknownVariantInserter:
     def process_vcf_record(self, variant):
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
         # This has been decomposed (only be 1 alt per line)
-        ref, alt, end = vcf_get_ref_alt_end(variant)
-        variant_coordinate = VariantCoordinate(chrom=variant.CHROM, start=variant.POS, end=end, ref=ref, alt=alt)
+        ref, alt, svlen = vcf_get_ref_alt_svlen(variant)
+        variant_coordinate = VariantCoordinate(chrom=variant.CHROM, position=variant.POS, ref=ref, alt=alt, svlen=svlen)
         self.variant_pk_lookup.add(variant_coordinate)
         self.batch_process_check()
 
@@ -161,8 +161,12 @@ class InsertUnknownVariantsTask(ImportVCFStepTask):
             items_processed = 0
             # Python CSV reader dies with extremely long lines, so we just do by hand (not quoted or anything)
             for line in f:
-                chrom, start, end, ref, alt = line.strip().split(",")  # Not quoted, exactly 5 columns
-                variant_coordinate = VariantCoordinate(chrom=chrom, start=int(start), end=int(end), ref=ref, alt=alt)
+                chrom, position, ref, alt, svlen_str = line.strip().split(",")  # Not quoted, exactly 5 columns
+                if svlen_str:
+                    svlen = int(svlen_str)
+                else:
+                    svlen = None
+                variant_coordinate = VariantCoordinate(chrom=chrom, position=int(position), ref=ref, alt=alt, svlen=svlen)
                 variant_pk_lookup.add(variant_coordinate)
                 variant_pk_lookup.batch_check(settings.SQL_BATCH_INSERT_SIZE, insert_unknown=True)
                 items_processed += 1

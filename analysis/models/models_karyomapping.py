@@ -101,8 +101,8 @@ class KaryotypeBins:
         if q:
             q_list.append(q)
         qs = qs.filter(reduce(operator.and_, q_list))
-        return qs.values_list("id", "locus__contig", "locus__position", "end",
-                              "locus__ref__seq", "alt__seq", "cohortgenotype__samples_zygosity")
+        return qs.values_list("id", "locus__contig", "locus__position",
+                              "locus__ref__seq", "alt__seq", "svlen", "cohortgenotype__samples_zygosity")
 
     @staticmethod
     def get_variant_and_genotypes(trio, q=None):
@@ -112,10 +112,10 @@ class KaryotypeBins:
         get_genotypes = KaryotypeBins.create_get_genotypes_function(trio)  # GT indexes
         variant_data_and_genotypes = []
 
-        for variant_id, contig_id, start, end, ref, alt, samples_zygosity in values_list:
+        for variant_id, contig_id, position, ref, alt, svlen, samples_zygosity in values_list:
             proband_gt, father_gt, mother_gt = get_genotypes(samples_zygosity)
 
-            variant_data = (variant_id, contig_id, start, end, ref, alt)
+            variant_data = (variant_id, contig_id, position, ref, alt, svlen)
             genotype_tuple = (proband_gt, father_gt, mother_gt)
             variant_data_and_genotypes.append((variant_data, genotype_tuple))
         return variant_data_and_genotypes

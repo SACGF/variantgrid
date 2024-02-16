@@ -4,13 +4,13 @@ from functools import cached_property
 from typing import Optional, Iterable, Union, Any
 
 import pydantic
+from bioutils.sequences import reverse_complement
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models, IntegrityError
-from django.db.models import Value, QuerySet, F
+from django.db.models import Value, QuerySet
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
-from django.db.models.functions import Greatest
 from django.db.models.functions.text import Concat
 from django.db.models.query_utils import Q, FilteredRelation
 from django.dispatch import receiver
@@ -262,48 +262,67 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             * as_internal_symbolic() - to store in internal Database
     """
     chrom: str
-    start: int
-    end: int
+    position: int
     ref: str
     alt: str
+    svlen: Optional[int] = None
 
     @property
     def as_tuple(self) -> tuple:
-        return self.chrom, self.start, self.end, self.ref, self.alt
+        return self.chrom, self.position, self.ref, self.alt, self.svlen
+
+    @property
+    def end(self) -> int:
+        """ This corresponds to Variant.end - ie for overlaps """
+        if self.is_symbolic():
+            # Insertions add w/o replacing, so their end is the start (ie 1 past start using half-open)
+            if self.alt == VCFSymbolicAllele.DUP:
+                return self.position + 1
+            return self.position + abs(self.svlen) + 1
+        return self.position + len(self.ref)
 
     def __str__(self):
         return self.format()
 
+    def __hash__(self):
+        return self.as_tuple.__hash__()
+
     def format(self):
         if Sequence.allele_is_symbolic(self.alt):
-            return f"{self.chrom}:{self.start}-{self.end} {self.alt}"
+            range_end = self.position + abs(self.svlen)
+            return f"{self.chrom}:{self.position}-{range_end} {self.alt}"
         else:
-            return f"{self.chrom}:{self.start} {self.ref}>{self.alt}"
+            return f"{self.chrom}:{self.position} {self.ref}>{self.alt}"
 
     @staticmethod
     def from_variant_match(match, genome_build=None):
         chrom = match.group(1)
         if genome_build:
             chrom = format_chrom(chrom, genome_build.reference_fasta_has_chr)
-        start = int(match.group(2))
+        position = int(match.group(2))
         ref = match.group(3).strip().upper()
         alt = match.group(4).strip().upper()
-        return VariantCoordinate.from_start_only(chrom, start, ref, alt)
+        return VariantCoordinate.from_explicit_no_svlen(chrom, position, ref, alt)
 
     @staticmethod
     def from_symbolic_match(match, genome_build=None):
-        chrom, start, end, alt = match.groups()
+        chrom, start, range_end, alt = match.groups()
         if genome_build:
             chrom = format_chrom(chrom, genome_build.reference_fasta_has_chr)
         start = int(start)
-        end = int(end)
+        range_end = int(range_end)
+        if alt == "DEL":
+            svlen = start - range_end
+        else:
+            svlen = range_end - start
         alt = "<" + alt + ">"  # captured what was inside of brackets ie <()>
         if genome_build:
             contig_sequence = genome_build.genome_fasta.fasta[chrom]
-            ref = contig_sequence[start:start + 1].upper()
+            # 0-based
+            ref = contig_sequence[start-1:start].upper()
         else:
             ref = "N"
-        return VariantCoordinate(chrom=chrom, start=start, end=end, ref=ref, alt=alt)
+        return VariantCoordinate(chrom=chrom, position=start, ref=ref, alt=alt, svlen=svlen)
 
     @staticmethod
     def from_string(variant_string: str, genome_build=None):
@@ -316,13 +335,12 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         raise ValueError(f"{variant_string=} did not match against {regex_patterns=}")
 
     @staticmethod
-    def from_start_only(chrom: str, start: int, ref: str, alt: str):
+    def from_explicit_no_svlen(chrom: str, position: int, ref: str, alt: str):
         """ Initialise w/o providing an end """
 
         if Sequence.allele_is_symbolic(alt):
-            raise ValueError("Must pass 'end' when using symbolic alt")
-        end = start + abs(len(ref) - len(alt))
-        return VariantCoordinate(chrom=chrom, start=start, end=end, ref=ref, alt=alt)
+            raise ValueError("Must pass 'svlen' when using symbolic alt")
+        return VariantCoordinate(chrom=chrom, position=position, ref=ref, alt=alt)
 
     def is_symbolic(self):
         return Sequence.allele_is_symbolic(self.alt)
@@ -330,25 +348,34 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
     def as_external_explicit(self, genome_build) -> 'VariantCoordinate':
         """ explicit ref/alt """
         if self.is_symbolic():
+            if self.svlen is None:
+                raise ValueError(f"{self} has 'svlen' = None")
+
             contig_sequence = genome_build.genome_fasta.fasta[self.chrom]
-            ref_sequence = contig_sequence[self.start-1:self.end].upper()
+            # reference sequence is 0-based
+            ref_sequence = contig_sequence[self.position-1:self.position + abs(self.svlen)].upper()
             if self.alt == VCFSymbolicAllele.DEL:
                 ref = ref_sequence
                 alt = ref_sequence[0]
             elif self.alt == VCFSymbolicAllele.DUP:
                 ref = ref_sequence[0]
                 alt = ref_sequence
+            elif self.alt == VCFSymbolicAllele.INV:
+                ref = ref_sequence
+                alt = reverse_complement(ref_sequence)
             else:
                 raise ValueError(f"Unknown symbolic alt of '{self.alt}'")
 
-            return VariantCoordinate(chrom=self.chrom, start=self.start, end=self.end, ref=ref, alt=alt)
+            vc = VariantCoordinate(chrom=self.chrom, position=self.position, ref=ref, alt=alt)
+            # print(f"Symbolic = {self} -> {vc}")
+            return vc
 
         if self.alt == Variant.REFERENCE_ALT:
             # Convert from our internal format (alt='=' for ref) to explicit
             alt = self.ref
         else:
             alt = self.alt
-        return VariantCoordinate(chrom=self.chrom, start=self.start, end=self.end, ref=self.ref, alt=alt)
+        return VariantCoordinate(chrom=self.chrom, position=self.position, ref=self.ref, alt=alt)
 
     def as_internal_symbolic(self):
         """ Internal format - alt can be <DEL> or <DUP>
@@ -357,6 +384,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         if self.is_symbolic():
             return self
 
+        svlen = None
         ref = self.ref
         if self.alt == self.ref:
             alt = Variant.REFERENCE_ALT
@@ -364,21 +392,24 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             ref_length = len(ref)
             alt_length = len(self.alt)
             diff = alt_length - ref_length
-            svlen = abs(diff)
-            if svlen >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
-                # TODO Check against existing end?
-                end = self.start + svlen
-                if self.end != end:
-                    raise ValueError(f"{self}: end={self.end}, calculated end={end}")
-
+            if abs(diff) >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
                 if diff > 0:
                     alt = VCFSymbolicAllele.DUP
                 else:
                     ref = self.ref[0]
                     alt = VCFSymbolicAllele.DEL
+                svlen = diff
             else:
                 alt = self.alt
-        return VariantCoordinate(chrom=self.chrom, start=self.start, end=self.end, ref=ref, alt=alt)
+
+                # Inversion
+                if diff == 0 and ref_length >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
+                    if self.ref == reverse_complement(self.alt):
+                        ref = self.ref[0]
+                        alt = VCFSymbolicAllele.INV
+                        svlen = len(self.ref) - 1  # explicit inv had same length ref/alt, now we have len(ref) == 1
+
+        return VariantCoordinate(chrom=self.chrom, position=self.position, ref=ref, alt=alt, svlen=svlen)
 
 
 class Sequence(models.Model):
@@ -393,7 +424,7 @@ class Sequence(models.Model):
     """
     seq = models.TextField()
     seq_md5_hash = models.CharField(max_length=32, unique=True)
-    length = models.IntegerField()  # TODO: I think we should remove this as we now have Variant.end
+    length = models.IntegerField()  # TODO: I think we should remove this as wrong for symbolic, we have Variant.end
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if not self.seq_md5_hash:
@@ -462,10 +493,12 @@ class Variant(PreviewModelMixin, models.Model):
     REFERENCE_ALT = "="
     locus = models.ForeignKey(Locus, on_delete=CASCADE)
     alt = models.ForeignKey(Sequence, on_delete=CASCADE)
-    end = models.IntegerField()  # Start is on locus
+    # end is a calculated field, but we store as an optimisation for overlap queries (start = locus.position)
+    end = models.IntegerField()
+    svlen = models.IntegerField(null=True)  # For symbolic variants, difference in length between REF and ALT alleles
 
     class Meta:
-        unique_together = ("locus", "alt", "end")  # Possible to have eg CNV with same alt = <INS> but diff end
+        unique_together = ("locus", "alt", "svlen")  # Possible to have eg CNV with same alt = <INS> but diff end
 
     @classmethod
     def preview_icon(cls) -> str:
@@ -506,11 +539,11 @@ class Variant(PreviewModelMixin, models.Model):
         return errors
 
     @staticmethod
-    def format_tuple(chrom, start, end, ref, alt, abbreviate=False) -> str:
+    def format_tuple(chrom, position, ref, alt, svlen, abbreviate=False) -> str:
         if abbreviate and not Sequence.allele_is_symbolic(alt):
             ref = Sequence.abbreviate(ref)
             alt = Sequence.abbreviate(alt)
-        vc = VariantCoordinate(chrom=chrom, start=start, end=end, ref=ref, alt=alt)
+        vc = VariantCoordinate(chrom=chrom, position=position, ref=ref, alt=alt, svlen=svlen)
         return vc.format()
 
     @staticmethod
@@ -524,7 +557,7 @@ class Variant(PreviewModelMixin, models.Model):
     @staticmethod
     def get_from_variant_coordinate(variant_coordinate: VariantCoordinate, genome_build: GenomeBuild) -> 'Variant':
         variant_coordinate = variant_coordinate.as_internal_symbolic()
-        params = ["locus__contig__name", "locus__position", "end", "locus__ref__seq", "alt__seq"]
+        params = ["locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq", "svlen"]
         return Variant.objects.get(locus__contig__genomebuildcontig__genome_build=genome_build,
                                    **dict(zip(params, variant_coordinate)))
 
@@ -538,8 +571,8 @@ class Variant(PreviewModelMixin, models.Model):
     def coordinate(self) -> VariantCoordinate:
         locus = self.locus
         contig = locus.contig
-        return VariantCoordinate(chrom=contig.name, start=locus.position, end=self.end,
-                                 ref=locus.ref.seq, alt=self.alt.seq)
+        return VariantCoordinate(chrom=contig.name, position=locus.position,
+                                 ref=locus.ref.seq, alt=self.alt.seq, svlen=self.svlen)
 
     @staticmethod
     def is_ref_alt_reference(ref, alt):
@@ -586,7 +619,7 @@ class Variant(PreviewModelMixin, models.Model):
     def can_make_g_hgvs(self) -> bool:
         """ Can't form ones with some symbolic variants (eg <INS>) """
         if self.is_symbolic:
-            return self.alt.seq in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP}
+            return self.alt.seq in {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
         return True
 
     @property
@@ -596,8 +629,8 @@ class Variant(PreviewModelMixin, models.Model):
     def can_have_annotation(self) -> bool:
         return not self.is_reference
 
-    def as_tuple(self) -> tuple[str, int, int, str, str]:
-        return self.locus.contig.name, self.locus.position, self.end, self.locus.ref.seq, self.alt.seq
+    def as_tuple(self) -> tuple[str, int, str, str, int]:
+        return self.locus.contig.name, self.locus.position, self.locus.ref.seq, self.alt.seq, self.svlen
 
     def is_abbreviated(self):
         return str(self) != self.full_string
@@ -608,7 +641,7 @@ class Variant(PreviewModelMixin, models.Model):
         return self.format_tuple(*self.as_tuple())
 
     def __str__(self):
-        return self.format_tuple(self.locus.contig.name, self.locus.position, self.end, self.locus.ref.seq, self.alt.seq)
+        return self.format_tuple(self.locus.contig.name, self.locus.position, self.locus.ref.seq, self.alt.seq, self.svlen)
 
     def get_absolute_url(self):
         # will show allele if there is one, otherwise go to variant page
@@ -662,14 +695,6 @@ class Variant(PreviewModelMixin, models.Model):
     @property
     def length(self) -> int:
         return self.end - self.locus.position
-
-    @staticmethod
-    def calculate_end_from_lengths(position, ref_length, alt_length) -> int:
-        return position + abs(ref_length - alt_length)
-
-    @staticmethod
-    def calculate_end(position, ref, alt) -> int:
-        return Variant.calculate_end_from_lengths(position, len(ref), len(alt))
 
     @property
     def sort_string(self) -> str:

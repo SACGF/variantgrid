@@ -66,7 +66,7 @@ class BulkClinVarInserter:
 
     def process_variant(self, v):
         alt = self.variant_single_alt(v)
-        variant_coordinate = VariantCoordinate.from_start_only(v.CHROM, v.POS, v.REF, alt)
+        variant_coordinate = VariantCoordinate.from_explicit_no_svlen(v.CHROM, v.POS, v.REF, alt)
         variant_hash = self.variant_pk_lookup.add(variant_coordinate)
         self.variant_by_variant_hash[variant_hash] = v
         if len(self.variant_by_variant_hash) >= settings.SQL_BATCH_INSERT_SIZE:

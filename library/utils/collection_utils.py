@@ -394,7 +394,7 @@ class FormerTuple(ABC):
             return (self.chrom, self.start, self.end, self.alt, self.ref)
 
     # existing code (still works)
-    chrom, start, end, alt, ref = some_variant_coordinate
+    chrom, end, alt, ref, svlen = some_variant_coordinate
     """
 
     @property

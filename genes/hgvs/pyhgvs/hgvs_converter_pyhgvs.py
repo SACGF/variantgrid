@@ -125,8 +125,8 @@ class PyHGVSConverter(HGVSConverter):
         return PyHGVSVariant(self._hgvs_name(hgvs_string))
 
     def variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
-        chrom, start, _end, ref, alt = vc.as_external_explicit(self.genome_build)
-        hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, start, ref, alt,
+        chrom, position, ref, alt, _svlen = vc.as_external_explicit(self.genome_build)
+        hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, position, ref, alt,
                                                 self.genome_build.genome_fasta.fasta,
                                                 transcript=None, max_allele_length=sys.maxsize)
         contig = self.genome_build.chrom_contig_mappings[chrom]
@@ -135,8 +135,8 @@ class PyHGVSConverter(HGVSConverter):
 
     def variant_coordinate_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
         pyhgvs_transcript = make_transcript(transcript_version.pyhgvs_data)
-        chrom, start, _end, ref, alt = vc.as_external_explicit(self.genome_build)
-        hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, start, ref, alt, self.genome_build.genome_fasta.fasta,
+        chrom, position, ref, alt, _svlen = vc.as_external_explicit(self.genome_build)
+        hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, position, ref, alt, self.genome_build.genome_fasta.fasta,
                                                 pyhgvs_transcript, max_allele_length=sys.maxsize)
         return PyHGVSVariant(hgvs_name)
 
@@ -149,12 +149,12 @@ class PyHGVSConverter(HGVSConverter):
             pyhgvs_transcript = make_transcript(transcript_version.pyhgvs_data)
             self._validate_in_transcript_range(pyhgvs_transcript, hgvs_name)
 
-        chrom, start, ref, alt = pyhgvs.parse_hgvs_name(hgvs_string, self.genome_build.genome_fasta.fasta,
+        chrom, position, ref, alt = pyhgvs.parse_hgvs_name(hgvs_string, self.genome_build.genome_fasta.fasta,
                                                         transcript=pyhgvs_transcript,
                                                         indels_start_with_same_base=False)
         contig = self.genome_build.chrom_contig_mappings[chrom]
         chrom = contig.name
-        vc = VariantCoordinate.from_start_only(chrom, start, ref, alt)
+        vc = VariantCoordinate.from_explicit_no_svlen(chrom, position, ref, alt)
         matches_reference = self.get_hgvs_match_ref_allele(hgvs_name, pyhgvs_transcript)
         return vc, matches_reference
 
