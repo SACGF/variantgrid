@@ -1837,7 +1837,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def _evidence_key_overrides_from_evidence_fields(self) -> EvidenceKeyOverrides:
         namespaces = set()
         for namespace_key in [SpecialEKeys.ASSERTION_METHOD, SpecialEKeys.ALLELE_ORIGIN]:
-            if value := self.get(namespace_key):
+            for value in self.get_value_list(namespace_key):
                 if namespaces_key_found := EvidenceKeyMap.cached_key(namespace_key).option_dictionary_property("namespaces").get(value):
                     namespaces |= set(namespaces_key_found)
 
