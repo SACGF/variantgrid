@@ -1109,7 +1109,7 @@ class OntologySnake:
             # optimisations for OMIM/MONDO
             if term.ontology_service in {OntologyService.MONDO, OntologyService.OMIM}:
                 via_ids: QuerySet = None
-                exclude_mondo_omim = Q(relation__in={OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM})
+                exclude_mondo_omim = ~Q(relation__in={OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM})
                 if term.ontology_service == OntologyService.MONDO:
                     via_ids = OntologyTermRelation.objects.filter(source_term=term, dest_term__ontology_service=OntologyService.OMIM).filter(quality_q).filter(exclude_mondo_omim).values_list("dest_term_id", flat=True)
                 else:
