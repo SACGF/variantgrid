@@ -35,15 +35,24 @@ class VariantTestCase(TestCase):
         internal2 = external.as_internal_symbolic()
         self.assertEqual(internal, internal2)
 
-    def test_del(self):
-        #7:23000505-23004589 <DEL>
-        vc = VariantCoordinate(chrom='7', start=23000505, ref='C', alt='<DEL>', svlen=-4084)
+    def test_coordinate_conversion_del(self):
+        vc = VariantCoordinate(chrom='21', start=47532744, ref='T', alt='<DEL>', svlen=-1224)
         self._test_internal_to_external_and_back(vc, self.grch37)
 
-    def test_dup(self):
-        vc = VariantCoordinate(chrom='7', start=41200841, ref='C', alt='<DUP>', svlen=2646)
+        vc2 = VariantCoordinate(chrom='7', start=23000505, ref='C', alt='<DEL>', svlen=-4084)
+        self._test_internal_to_external_and_back(vc2, self.grch37)
+
+    def test_coordinate_conversion_dup(self):
+        vc = VariantCoordinate(chrom='1', start=1000000, ref='T', alt='<DUP>', svlen=1000)
         self._test_internal_to_external_and_back(vc, self.grch37)
 
-    def test_inversion(self):
+        vc2 = VariantCoordinate(chrom='7', start=41200841, ref='C', alt='<DUP>', svlen=2646)
+        self._test_internal_to_external_and_back(vc2, self.grch37)
+
+    def test_coordinate_conversion_inv(self):
         vc = VariantCoordinate(chrom='10', start=89714001, ref='A', alt='<INV>', svlen=9549)
         self._test_internal_to_external_and_back(vc, self.grch37)
+
+        vc = VariantCoordinate(chrom='1', start=100000, ref='C', alt='<INV>', svlen=1000)
+        self._test_internal_to_external_and_back(vc, self.grch37)
+

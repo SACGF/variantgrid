@@ -8,10 +8,9 @@ from bioutils.sequences import reverse_complement
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models, IntegrityError
-from django.db.models import Value, QuerySet, F
+from django.db.models import Value, QuerySet
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
-from django.db.models.functions import Greatest
 from django.db.models.functions.text import Concat
 from django.db.models.query_utils import Q, FilteredRelation
 from django.dispatch import receiver
@@ -347,8 +346,8 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
                 raise ValueError(f"{self} has 'svlen' = None")
 
             contig_sequence = genome_build.genome_fasta.fasta[self.chrom]
-            start = self.start - 1  # 0 based
-            ref_sequence = contig_sequence[start:start + abs(self.svlen)].upper()
+            # reference sequence is 0-based
+            ref_sequence = contig_sequence[self.start-1:self.start + abs(self.svlen)].upper()
             if self.alt == VCFSymbolicAllele.DEL:
                 ref = ref_sequence
                 alt = ref_sequence[0]
@@ -386,7 +385,6 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         else:
             ref_length = len(ref)
             alt_length = len(self.alt)
-            print(f"{self.chrom}/{self.start}, {ref_length=}, {alt_length=}")
             diff = alt_length - ref_length
             if abs(diff) >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
                 if diff > 0:
@@ -403,7 +401,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
                     if self.ref == reverse_complement(self.alt):
                         ref = self.ref[0]
                         alt = VCFSymbolicAllele.INV
-                        svlen = len(self.ref)
+                        svlen = len(self.ref) - 1  # explicit inv had same length ref/alt, now we have len(ref) == 1
 
         return VariantCoordinate(chrom=self.chrom, start=self.start, ref=ref, alt=alt, svlen=svlen)
 
