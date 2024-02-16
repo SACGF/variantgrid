@@ -27,7 +27,7 @@ MAX_VCF_FIELD_LENGTH = 1000  # while maximum is much larger than this, it indica
 
 
 def _is_safe_for_vcf(variant_coordinate: VariantCoordinate) -> bool:
-    if not all([variant_coordinate.chrom, variant_coordinate.start, variant_coordinate.ref, variant_coordinate.alt]):
+    if not all([variant_coordinate.chrom, variant_coordinate.position, variant_coordinate.ref, variant_coordinate.alt]):
         return False
 
     if len(variant_coordinate.ref) > MAX_VCF_FIELD_LENGTH or len(variant_coordinate.alt) > MAX_VCF_FIELD_LENGTH:

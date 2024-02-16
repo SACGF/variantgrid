@@ -230,11 +230,9 @@ class TestHGVS(TestCase):
     def _test_reference_diff(self, hgvs_converter_type: HGVSConverterType):
         TEST_HGVS = [
             # No provided ref
-            ('NM_001145661.2(GATA2):c.1113dup', VariantCoordinate(chrom='3', start=128200691, end=128200692,
-                                                                  ref='C', alt='CG'), True),
+            ('NM_001145661.2(GATA2):c.1113dup', VariantCoordinate(chrom='3', position=128200691, ref='C', alt='CG'), True),
             # provided ref = genomic ref
-            ('NM_001145661.2(GATA2):c.1113dupC', VariantCoordinate(chrom='3', start=128200691, end=128200692,
-                                                                   ref='C', alt='CG'), True),
+            ('NM_001145661.2(GATA2):c.1113dupC', VariantCoordinate(chrom='3', position=128200691, ref='C', alt='CG'), True),
         ]
         genome_build = GenomeBuild.grch37()
         create_gata2_transcript_version(genome_build)

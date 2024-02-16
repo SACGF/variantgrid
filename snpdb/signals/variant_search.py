@@ -182,10 +182,11 @@ def get_results_from_variant_coordinate(genome_build: GenomeBuild, qs: QuerySet,
     """
     chrom = format_chrom(variant_coordinate.chrom, genome_build.reference_fasta_has_chr)
     results = qs.filter(Variant.get_chrom_q(chrom),
-                        locus__position=variant_coordinate.start, end=variant_coordinate.end,
+                        locus__position=variant_coordinate.position,
                         locus__ref__seq=variant_coordinate.ref)
     if not any_alt:
-        results = results.filter(alt__seq=variant_coordinate.alt)
+        results = results.filter(alt__seq=variant_coordinate.alt, svlen=variant_coordinate.svlen)
+
 
     if not results:
         if not any_alt:
@@ -206,7 +207,7 @@ def yield_search_variant_match(search_input: SearchInputInstance, get_variant_co
             has_results = True
             yield results
 
-        if errors := Variant.validate(genome_build, variant_coordinate.chrom, variant_coordinate.start):
+        if errors := Variant.validate(genome_build, variant_coordinate.chrom, variant_coordinate.position):
             yield SearchMessageOverall(", ".join(errors), genome_builds=[genome_build])
         else:
             if not has_results:

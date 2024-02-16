@@ -11,6 +11,7 @@ from typing import Iterable
 from django.db.models import Q, Value, TextField
 from django.db.models.aggregates import Max
 from django.db.models.functions import Concat
+from django.db.models.functions.comparison import Coalesce
 
 from library.utils import md5sum_str
 from snpdb.models import Variant, Locus, Sequence, GenomeBuild, VariantCoordinate
@@ -18,6 +19,8 @@ from upload.vcf import sql_copy_files
 
 
 class VariantPKLookup:
+    """ variant hash is something we can compute via SQL from the Variant """
+
     def __init__(self, genome_build: GenomeBuild = None, working_dir=None):
         self.genome_build = genome_build
         self._working_dir = working_dir
@@ -42,8 +45,8 @@ class VariantPKLookup:
     def _get_locus_hash(self, contig_id, position, ref_id):
         return contig_id, position, ref_id
 
-    def _get_variant_hash(self, contig_id, start, end, ref_id, alt_id):
-        return contig_id, start, end, ref_id, alt_id
+    def _get_variant_hash(self, contig_id, position, ref_id, alt_id, svlen):
+        return contig_id, position, ref_id, alt_id, svlen or ''
 
     def _get_ids_for_hashes(self, hashes: Iterable, get_queryset):
         """ hashes tuples 1st 2 elements should be contig_id, position """
@@ -60,7 +63,8 @@ class VariantPKLookup:
 
     def _get_variant_ids(self, variant_hashes: Iterable) -> list[str]:
         annotate_kwargs = {
-            "hash": Concat("locus__position", Value("_"), "end", Value("_"), "locus__ref_id", Value("_"), "alt_id",
+            "hash": Concat("locus__position", Value("_"), "locus__ref_id", Value("_"), "alt_id",
+                           Value("_"), "svlen",
                            output_field=TextField())
         }
 
@@ -114,7 +118,7 @@ class VariantPKLookup:
         contig_id = self.chrom_contig_id_mappings[variant_coordinate.chrom]
         ref_id = self.sequence_pk_by_seq[variant_coordinate.ref]
         alt_id = self.sequence_pk_by_seq[variant_coordinate.alt]
-        return self._get_variant_hash(contig_id, variant_coordinate.start, variant_coordinate.end, ref_id, alt_id)
+        return self._get_variant_hash(contig_id, variant_coordinate.position, ref_id, alt_id, variant_coordinate.svlen)
 
     def add(self, variant_coordinate: VariantCoordinate):
         variant_coordinate = variant_coordinate.as_internal_symbolic()
@@ -192,15 +196,17 @@ class VariantPKLookup:
     def _insert_unknown(self):
         self._insert_unknown_sequences()  # All ref/alt need to be in sequence_pk_by_seq to be able to get hash
 
-        loci_hashes = set()
-        variant_hashes = set()
+        # We need these to be ordered, so will use dict keys
+        loci_hashes = {}  # Uses None as values, just want orderable
+        variant_coordinates_by_hash = {}
+
         for variant_coordinate in self.unknown_variant_coordinates:
             variant_hash = self.get_variant_coordinate_hash(variant_coordinate)
-            variant_hashes.add(variant_hash)
+            variant_coordinates_by_hash[variant_hash] = variant_coordinate
 
-            (contig_id, start, _end, ref_id, _alt_id) = variant_hash
+            (contig_id, start, ref_id, _alt_id, _svlen) = variant_hash
             locus_hash = (contig_id, start, ref_id)
-            loci_hashes.add(locus_hash)
+            loci_hashes[locus_hash] = None
 
         self.unknown_variant_coordinates.clear()
         loci_ids = self.get_loci_ids(loci_hashes, validate_not_null=False)  # Could have some unknowns as None
@@ -214,14 +220,15 @@ class VariantPKLookup:
 
         loci_ids = self.get_loci_ids(loci_hashes)  # Validates all are not null
         locus_pk_by_hash = dict(zip(loci_hashes, loci_ids))
-        variant_ids = self.get_variant_ids(variant_hashes, validate_not_null=False)
+        variant_ids = self.get_variant_ids(variant_coordinates_by_hash, validate_not_null=False)
         unknown_variants = []
-        for variant_hash, variant_pk in zip(variant_hashes, variant_ids):
+        for variant_hash, variant_pk in zip(variant_coordinates_by_hash, variant_ids):
             if variant_pk is None:
-                (contig_id, start, end, ref_id, alt_id) = variant_hash
+                (contig_id, start, ref_id, alt_id, svlen) = variant_hash
                 locus_hash = (contig_id, start, ref_id)
                 locus_pk = locus_pk_by_hash[locus_hash]
-                unknown_variants.append((locus_pk, alt_id, end))
+                vc = variant_coordinates_by_hash[variant_hash]
+                unknown_variants.append((locus_pk, alt_id, vc.end, svlen))
         logging.debug("loci_hashes = %d, unknown_variants = %d", len(loci_hashes), len(unknown_variants))
 
         if unknown_variants:

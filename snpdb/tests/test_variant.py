@@ -33,26 +33,35 @@ class VariantTestCase(TestCase):
         internal = variant_coordinate.as_internal_symbolic()
         external = internal.as_external_explicit(genome_build)
         internal2 = external.as_internal_symbolic()
-        self.assertEqual(internal, internal2)
+        self.assertEqual(internal, internal2, msg="internal<->external")
 
-    def test_coordinate_conversion_del(self):
-        vc = VariantCoordinate(chrom='21', start=47532744, ref='T', alt='<DEL>', svlen=-1224)
-        self._test_internal_to_external_and_back(vc, self.grch37)
+    def _test_to_and_from_string(self, variant_coordinate, genome_build):
+        variant_string = str(variant_coordinate)
+        new_vc = VariantCoordinate.from_string(variant_string, genome_build)
+        self.assertEqual(variant_coordinate, new_vc, msg="to/from string")
 
-        vc2 = VariantCoordinate(chrom='7', start=23000505, ref='C', alt='<DEL>', svlen=-4084)
-        self._test_internal_to_external_and_back(vc2, self.grch37)
+    def _test_coordinate_conversion(self, variant_coordinate, genome_build):
+        self._test_internal_to_external_and_back(variant_coordinate, genome_build)
+        self._test_to_and_from_string(variant_coordinate, genome_build)
 
-    def test_coordinate_conversion_dup(self):
-        vc = VariantCoordinate(chrom='1', start=1000000, ref='T', alt='<DUP>', svlen=1000)
-        self._test_internal_to_external_and_back(vc, self.grch37)
+    def test_del(self):
+        vc = VariantCoordinate(chrom='21', position=47532744, ref='T', alt='<DEL>', svlen=-1224)
+        self._test_coordinate_conversion(vc, self.grch37)
 
-        vc2 = VariantCoordinate(chrom='7', start=41200841, ref='C', alt='<DUP>', svlen=2646)
-        self._test_internal_to_external_and_back(vc2, self.grch37)
+        vc2 = VariantCoordinate(chrom='7', position=23000505, ref='C', alt='<DEL>', svlen=-4084)
+        self._test_coordinate_conversion(vc2, self.grch37)
 
-    def test_coordinate_conversion_inv(self):
-        vc = VariantCoordinate(chrom='10', start=89714001, ref='A', alt='<INV>', svlen=9549)
-        self._test_internal_to_external_and_back(vc, self.grch37)
+    def test_dup(self):
+        vc = VariantCoordinate(chrom='1', position=1000000, ref='T', alt='<DUP>', svlen=1000)
+        self._test_coordinate_conversion(vc, self.grch37)
 
-        vc = VariantCoordinate(chrom='1', start=100000, ref='C', alt='<INV>', svlen=1000)
-        self._test_internal_to_external_and_back(vc, self.grch37)
+        vc2 = VariantCoordinate(chrom='7', position=41200841, ref='C', alt='<DUP>', svlen=2646)
+        self._test_coordinate_conversion(vc2, self.grch37)
+
+    def test_inv(self):
+        vc = VariantCoordinate(chrom='10', position=89714001, ref='A', alt='<INV>', svlen=9549)
+        self._test_coordinate_conversion(vc, self.grch37)
+
+        vc = VariantCoordinate(chrom='1', position=100000, ref='C', alt='<INV>', svlen=1000)
+        self._test_coordinate_conversion(vc, self.grch37)
 

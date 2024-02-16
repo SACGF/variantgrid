@@ -40,7 +40,7 @@ def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=Fal
     if tuples_have_id_field:
         vcf_tuples = variant_tuples
     else:
-        vcf_tuples = ((chrom, start, end, ".", ref, alt) for (chrom, start, end, ref, alt) in variant_tuples)
+        vcf_tuples = ((chrom, position, ".", ref, alt, svlen) for (chrom, position, ref, alt, svlen) in variant_tuples)
 
     vcf_tuples = sorted(vcf_tuples, key=operator.itemgetter(0, 1, 3, 4))
 
@@ -54,9 +54,8 @@ def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=Fal
     with open(vcf_filename, "wt", encoding="utf-8") as f:
         f.write(header + "\n")
         for vcf_record in vcf_tuples:
-            (chrom, position, end, id_col, ref, alt) = vcf_record
+            (chrom, position, id_col, ref, alt, svlen) = vcf_record
             if Sequence.allele_is_symbolic(alt):
-                svlen = end - position
                 svtype = alt[1:-1]  # Strip off brackets
                 qual_filter_info = (".", ".", f"SVLEN={svlen};SVTYPE={svtype}")
             else:
@@ -99,7 +98,7 @@ def vcf_allele_is_symbolic(allele: str) -> bool:
     return allele.startswith("<") and allele.endswith(">")
 
 
-def vcf_get_ref_alt_end(variant: cyvcf2.Variant):
+def vcf_get_ref_alt_svlen(variant: cyvcf2.Variant):
     ref = variant.REF.strip().upper()
     if variant.ALT:
         alt = variant.ALT[0].strip().upper()
@@ -108,12 +107,12 @@ def vcf_get_ref_alt_end(variant: cyvcf2.Variant):
 
     if Sequence.allele_is_symbolic(ref) or Sequence.allele_is_symbolic(alt):
         # Need to provide END or SVLEN
-        if end_info := variant.INFO.get('END'):
-            end = end_info
-        elif svlen_info := variant.INFO.get('SVLEN'):
-            end = variant.POS + abs(svlen_info)
+        if svlen_info := variant.INFO.get('SVLEN'):
+            svlen = int(svlen_info)
+        elif end_info := variant.INFO.get('END'):
+            svlen = int(end_info) - variant.POS
         else:
             raise ValueError(f"SVLEN or END info field MUST be provided for symbolic (ie '<x>') {ref=},{alt=}")
     else:
-        end = variant.POS + abs(len(ref) - len(alt))
-    return ref, alt, end
+        svlen = None
+    return ref, alt, svlen

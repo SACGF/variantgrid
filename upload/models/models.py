@@ -586,10 +586,10 @@ class ModifiedImportedVariant(models.Model):
     def _to_variant_coordinate(old_variant) -> VariantCoordinate:
         if full_match := ModifiedImportedVariant.VT_OLD_VARIANT_PATTERN.fullmatch(old_variant):
             chrom = full_match.group(1)
-            start = int(full_match.group(2))
+            position = int(full_match.group(2))
             ref = full_match.group(3)
             alt = full_match.group(4)
-            return VariantCoordinate.from_start_only(chrom, start, ref, alt)
+            return VariantCoordinate.from_explicit_no_svlen(chrom, position, ref, alt)
         raise ValueError(f"{old_variant} didn't match regex {ModifiedImportedVariant.VT_OLD_VARIANT_PATTERN}")
 
     @staticmethod
@@ -600,7 +600,7 @@ class ModifiedImportedVariant(models.Model):
         for ov in ModifiedImportedVariant._split_old_variant(old_variant):
             vc = ModifiedImportedVariant._to_variant_coordinate(ov)
             contig = genome_build.chrom_contig_mappings[vc.chrom]
-            variant_coordinate = VariantCoordinate(chrom=contig.name, start=vc.start, end=vc.end, ref=vc.ref, alt=vc.alt)
+            variant_coordinate = VariantCoordinate(chrom=contig.name, position=vc.position, ref=vc.ref, alt=vc.alt, svlen=vc.svlen)
             formatted_old_variants.append(ModifiedImportedVariant.get_old_variant_from_variant_coordinate(variant_coordinate))
         return formatted_old_variants
 
@@ -626,7 +626,7 @@ class ModifiedImportedVariant(models.Model):
     def get_old_variant_from_variant_coordinate(vc: VariantCoordinate) -> str:
         # TODO - this doesn't work w/symbolic alts but neither does VT - will eventually rewrite this to use
         # BCF tools
-        return f"{vc.chrom}:{int(vc.start)}:{vc.ref}/{vc.alt}"
+        return f"{vc.chrom}:{int(vc.position)}:{vc.ref}/{vc.alt}"
 
     @classmethod
     def get_upload_pipeline_unnormalized_variant(cls, upload_pipeline, vc: VariantCoordinate):

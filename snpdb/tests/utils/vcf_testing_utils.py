@@ -6,7 +6,7 @@ from snpdb.models import Locus, Variant, Sequence, GenomeBuild, Allele, VariantA
 
 def slowly_create_test_variant(chrom: str, position: int, ref: str, alt: str, genome_build: GenomeBuild) -> Variant:
     """ For test only - doesn't use VariantPKLookup """
-    vc = VariantCoordinate.from_start_only(chrom, position, ref, alt).as_internal_symbolic()
+    vc = VariantCoordinate.from_explicit_no_svlen(chrom, position, ref, alt).as_internal_symbolic()
     contig = genome_build.contigs.get(name=vc.chrom)
     ref_seq, _ = Sequence.objects.get_or_create(seq=vc.ref.upper(), length=len(vc.ref))
     alt_seq, _ = Sequence.objects.get_or_create(seq=vc.alt.upper(), length=len(vc.alt))
@@ -36,7 +36,7 @@ def slowly_create_loci_and_variants_for_vcf(genome_build, vcf_filename, get_vari
         ref = str(v.REF)
         alt = str(v.ALT[0])
 
-        vc = VariantCoordinate.from_start_only(v.CHROM, int(v.POS), ref, alt).as_internal_symbolic()
+        vc = VariantCoordinate.from_explicit_no_svlen(v.CHROM, int(v.POS), ref, alt).as_internal_symbolic()
         ref_id = pk_by_seq.get(ref)
         if ref_id is None:
             sequence = Sequence.objects.create(seq=ref, length=len(ref))
@@ -45,7 +45,7 @@ def slowly_create_loci_and_variants_for_vcf(genome_build, vcf_filename, get_vari
 
         contig = genome_build.chrom_contig_mappings[vc.chrom]
         locus, _ = Locus.objects.get_or_create(contig=contig,
-                                               position=vc.start,
+                                               position=vc.position,
                                                ref_id=ref_id)
 
         alt_id = pk_by_seq.get(alt)

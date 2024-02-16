@@ -13,6 +13,7 @@ from library.utils import md5sum_str
 
 def _one_off_inv_symbolic(apps, _schema_editor):
     Variant = apps.get_model("snpdb", "Variant")
+    Locus = apps.get_model("snpdb", "Locus")
     Sequence = apps.get_model("snpdb", "Sequence")
 
     sequences_by_length = defaultdict(set)
@@ -48,9 +49,13 @@ def _one_off_inv_symbolic(apps, _schema_editor):
         print(f"Converting {qs.count()} variants to {symbolic_alt}")
         for v in Variant.objects.filter(q):
             old_ref_seq = v.locus.ref.seq
-            v.ref = base_lookup[old_ref_seq[0]]
+            new_ref = base_lookup[old_ref_seq[0]]
+            new_locus = Locus.objects.get_or_create(contig=v.locus.contig,
+                                                    position=v.locus.position,
+                                                    ref=new_ref)[0]
+            v.locus = new_locus
             v.alt = inv
-            v.svlen = len(old_ref_seq)
+            v.svlen = len(old_ref_seq) - 1  # ref has shrunk to 1, so svlen (=alt - ref) is 1 off
             v.save()
 
 

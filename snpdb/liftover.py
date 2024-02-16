@@ -123,8 +123,8 @@ def _get_build_liftover_tuples(allele_source: AlleleSource, inserted_genome_buil
                 if conversion_tool == AlleleConversionTool.SAME_CONTIG:
                     avt = (allele.pk, variant_id_or_coordinate)
                 else:
-                    chrom, start, end, ref, alt = variant_id_or_coordinate
-                    avt = (chrom, start, end, allele.pk, ref, alt)
+                    chrom, position, ref, alt, svlen = variant_id_or_coordinate
+                    avt = (chrom, position, allele.pk, ref, alt, svlen)
                 build_liftover_vcf_tuples[genome_build][conversion_tool].append(avt)
             elif settings.LIFTOVER_NCBI_REMAP_ENABLED:
                 if allele.liftovererror_set.filter(liftover__genome_build=genome_build,
@@ -132,10 +132,10 @@ def _get_build_liftover_tuples(allele_source: AlleleSource, inserted_genome_buil
                     continue  # Skip as already failed NCBI liftover to desired build
 
                 # Return VCF tuples in inserted genome build
-                chrom, start, end, ref, alt = allele.variant_for_build(inserted_genome_build).as_tuple()
+                chrom, position, ref, alt, svlen = allele.variant_for_build(inserted_genome_build).as_tuple()
                 if alt == Variant.REFERENCE_ALT:
                     alt = "."  # NCBI works with '.' but not repeating ref (ie ref = alt)
-                avt = (chrom, start, end, allele.pk, ref, alt)
+                avt = (chrom, position, allele.pk, ref, alt, svlen)
                 build_liftover_vcf_tuples[genome_build][AlleleConversionTool.NCBI_REMAP].append(avt)
 
     return build_liftover_vcf_tuples

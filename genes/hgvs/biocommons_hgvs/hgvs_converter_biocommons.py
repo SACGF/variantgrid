@@ -140,7 +140,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
             raise HGVSException from e
 
     def _variant_coordinate_to_sequence_variant(self, vc: VariantCoordinate) -> SequenceVariant:
-        chrom, position, _start, ref, alt = vc.as_external_explicit(self.genome_build)
+        chrom, position, ref, alt, _svlen = vc.as_external_explicit(self.genome_build)
         return self.babelfish.vcf_to_g_hgvs(chrom, position, ref, alt)
 
     def variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
@@ -170,12 +170,12 @@ class BioCommonsHGVSConverter(HGVSConverter):
     def hgvs_to_variant_coordinate_and_reference_match(self, hgvs_string: str, transcript_version=None) -> tuple[VariantCoordinate, HgvsMatchRefAllele]:
         var_g, matches_reference = self._hgvs_to_g_hgvs(hgvs_string)
         try:
-            (chrom, start, ref, alt, typ) = self.babelfish.hgvs_to_vcf(var_g)
+            (chrom, position, ref, alt, typ) = self.babelfish.hgvs_to_vcf(var_g)
             if alt == '.':
                 alt = ref
         except HGVSDataNotAvailableError:
             raise Contig.ContigNotInBuildError()
-        vc = VariantCoordinate.from_start_only(chrom, start, ref=ref, alt=alt)
+        vc = VariantCoordinate.from_explicit_no_svlen(chrom, position, ref=ref, alt=alt)
         return vc.as_internal_symbolic(), matches_reference
 
     def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:

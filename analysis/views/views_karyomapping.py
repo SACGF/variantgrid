@@ -76,10 +76,10 @@ def get_variant_lookup_and_scatter_data(karyomapping_bins):
     for karyotype_code, variant_data in karyomapping_bins.items():
         x = []
         text = []
-        for variant_id, chrom, start, end, ref, alt in variant_data:
-            variant_string = Variant.format_tuple(chrom, start, end, ref, alt)
+        for variant_id, chrom, position, ref, alt, svlen in variant_data:
+            variant_string = Variant.format_tuple(chrom, position, ref, alt, svlen)
             variant_id_lookup[variant_string] = variant_id
-            x.append(start)
+            x.append(position)
             text.append(variant_string)
 
         collapsed_code = KaryotypeBins.COLLAPSED_BINS[karyotype_code]
@@ -134,7 +134,7 @@ def download_karyomapping_gene_csv(request, pk):
         writer.writeheader()
         yield pseudo_buffer.value
         for variant_data, genotype_tuple in variant_and_genotypes:
-            _, chrom, start, end, ref, alt = variant_data
+            _, chrom, position, ref, alt, svlen = variant_data
             proband_gt, father_gt, mother_gt = genotype_tuple
             try:
                 karotype_bin = karotype_bin_lookup[proband_gt][father_gt][mother_gt]
@@ -142,10 +142,10 @@ def download_karyomapping_gene_csv(request, pk):
                 karotype_bin = ''
 
             row = {'chrom': chrom,
-                   'start': start,
-                   'end': end,
+                   'position': position,
                    'ref': ref,
                    'alt': alt,
+                   'svlen': svlen,
                    'proband_gt': Zygosity.get_genotype(proband_gt),
                    'father_gt': Zygosity.get_genotype(father_gt),
                    'mother_gt': Zygosity.get_genotype(mother_gt),
