@@ -8,7 +8,10 @@ from variantgrid.settings.env.shariant import *  # pylint: disable=wildcard-impo
 
 # import all the base settings #
 SITE_ID = 8
-SLACK['emoji'] = ':mouse:'
+
+OIDC_REQUIRED_GROUP = '/variantgrid/shariant_demo'
+
+SLACK['emoji'] = ':tv:'
 
 URLS_NAME_REGISTER.update({
     "condition_aliases": False,

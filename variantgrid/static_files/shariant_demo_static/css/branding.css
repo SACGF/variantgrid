@@ -18,7 +18,7 @@ body.login-bg-theme {
 }
 
 .login-bg-theme {
-  background-color: #DEF4FD;
+  background-color: #DEDEFD;
   color: #ddd;
 }
 .login-bg-theme .header, .login-bg-theme .footer {
@@ -46,7 +46,7 @@ body.login-bg-theme {
 .login-bg-theme .jumbo-box {
   color: #444;
   font-size: 16px;
-  background-color: #DEF4FD;
+  background-color: #DEDEFD;
 }
 
 @media screen and (min-width: 0) and (max-width: 991px) {
@@ -85,7 +85,7 @@ nav.navbar a.nav-link.active {
 }
 
 #site-name::after {
-  content: "Shariant";
+  content: "Shariant Demo";
 }
 
 /*# sourceMappingURL=branding.css.map */

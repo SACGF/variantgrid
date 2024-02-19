@@ -15,7 +15,7 @@ body.login-bg-theme {
     overflow-y: initial;
 }
 .login-bg-theme {
-    background-color: #DEF4FD;
+    background-color: #DEDEFD;
     .header, .footer {
         background-color: rgb(144, 144, 244);
     }
@@ -42,7 +42,7 @@ body.login-bg-theme {
     .jumbo-box {
         color: #444;
         font-size: 16px;
-        background-color: #DEF4FD;
+        background-color: #DEDEFD;
     }
 }
 
@@ -83,5 +83,5 @@ nav.navbar a.nav-link {
 
 // used by 50x.html
 #site-name::after {
-    content: "Shariant"
+    content: "Shariant Demo"
 }
