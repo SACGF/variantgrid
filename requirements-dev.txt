@@ -61,7 +61,7 @@ oauthlib
 pandas
 pronto>=2.4.7
 psycopg2
-PyPDF2==2.6.0
+pypdf
 pysam
 python_dateutil
 # Have trouble with Celery workers shutting down with newer versions of Redis
