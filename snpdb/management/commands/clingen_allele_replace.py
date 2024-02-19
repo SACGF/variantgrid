@@ -26,7 +26,7 @@ class Command(BaseCommand):
         if indels:
             filter_message.append(f"(Indels only)")
             variants_with_clingen = Variant.objects.filter(variantallele__allele__clingen_allele__in=cga_qs)
-            indel_qs = variants_with_clingen.filter(Q(locus__ref__length__gt=1) | Q(alt__length__gt=1))
+            indel_qs = variants_with_clingen.exclude(Variant.get_snp_q())
             values_qs = indel_qs.values_list("variantallele__allele__clingen_allele__id", flat=True)
             cga_qs = ClinGenAllele.objects.filter(pk__in=values_qs)
 

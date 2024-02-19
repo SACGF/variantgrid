@@ -424,7 +424,6 @@ class Sequence(models.Model):
     """
     seq = models.TextField()
     seq_md5_hash = models.CharField(max_length=32, unique=True)
-    length = models.IntegerField()  # TODO: I think we should remove this as wrong for symbolic, we have Variant.end
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if not self.seq_md5_hash:
@@ -438,7 +437,7 @@ class Sequence(models.Model):
         return s
 
     def __len__(self) -> int:
-        return self.length
+        return len(self.seq)
 
     def __str__(self):
         return self.abbreviate(self.seq)
@@ -514,8 +513,13 @@ class Variant(PreviewModelMixin, models.Model):
         return Q(locus__contig__genomebuildcontig__genome_build=genome_build)
 
     @staticmethod
-    def get_no_reference_q():
+    def get_no_reference_q() -> Q:
         return ~Q(alt__seq=Variant.REFERENCE_ALT)
+
+    @staticmethod
+    def get_snp_q() -> Q:
+        bases = "GATC"
+        return Q(locus__ref__seq__in=bases) & Q(alt__seq__in=bases)
 
     @staticmethod
     def annotate_variant_string(qs, name="variant_string", path_to_variant=""):
@@ -603,13 +607,13 @@ class Variant(PreviewModelMixin, models.Model):
     def is_insertion(self) -> bool:
         if self.alt.is_symbolic:
             return self.alt.seq == "<INS>"
-        return self.alt.seq != Variant.REFERENCE_ALT and self.locus.ref.length < self.alt.length
+        return self.alt.seq != Variant.REFERENCE_ALT and len(self.locus.ref.seq) < len(self.alt.seq)
 
     @property
     def is_deletion(self) -> bool:
         if self.alt.is_symbolic:
             return self.alt.seq == VCFSymbolicAllele.DEL
-        return self.alt.seq != Variant.REFERENCE_ALT and self.locus.ref.length > self.alt.length
+        return self.alt.seq != Variant.REFERENCE_ALT and len(self.locus.ref) > len(self.alt.seq)
 
     @property
     def is_symbolic(self) -> bool:

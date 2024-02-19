@@ -82,8 +82,7 @@ def store_results_to_db(mutational_signature, ms_results, result_type):
 
 def get_raw_mut_index_list_for_sample(fasta_reference, mut_index, sample):
     qs = sample.get_variant_qs()
-    qs = qs.filter(Variant.get_no_reference_q())
-    snps_qs = qs.filter(locus__ref__length=1, alt__length=1)
+    snps_qs = qs.filter(Variant.get_no_reference_q() & Variant.get_snp_q())
 
     raw_mut_index_list = []
     for chrom, position, alt in snps_qs.values_list("locus__contig__name", "locus__position", "alt__seq"):

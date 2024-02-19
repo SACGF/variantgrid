@@ -1,5 +1,6 @@
 import vcf
 
+from library.utils import md5sum_str
 from snpdb.models import Locus, Variant, Sequence, GenomeBuild, Allele, VariantAllele, AlleleOrigin, \
     AlleleConversionTool, VariantCoordinate
 
@@ -8,8 +9,10 @@ def slowly_create_test_variant(chrom: str, position: int, ref: str, alt: str, ge
     """ For test only - doesn't use VariantPKLookup """
     vc = VariantCoordinate.from_explicit_no_svlen(chrom, position, ref, alt).as_internal_symbolic()
     contig = genome_build.contigs.get(name=vc.chrom)
-    ref_seq, _ = Sequence.objects.get_or_create(seq=vc.ref.upper(), length=len(vc.ref))
-    alt_seq, _ = Sequence.objects.get_or_create(seq=vc.alt.upper(), length=len(vc.alt))
+    uref = vc.ref.upper()
+    ualt = vc.alt.upper()
+    ref_seq, _ = Sequence.objects.get_or_create(seq=uref, seq_md5_hash=md5sum_str(uref))
+    alt_seq, _ = Sequence.objects.get_or_create(seq=ualt, seq_md5_hash=md5sum_str(ualt))
     locus, _ = Locus.objects.get_or_create(contig=contig, position=position, ref=ref_seq)
     defaults = {"end": vc.end}
     variant, _ = Variant.objects.get_or_create(locus=locus, alt=alt_seq, svlen=vc.svlen, defaults=defaults)
@@ -39,7 +42,7 @@ def slowly_create_loci_and_variants_for_vcf(genome_build, vcf_filename, get_vari
         vc = VariantCoordinate.from_explicit_no_svlen(v.CHROM, int(v.POS), ref, alt).as_internal_symbolic()
         ref_id = pk_by_seq.get(ref)
         if ref_id is None:
-            sequence = Sequence.objects.create(seq=ref, length=len(ref))
+            sequence = Sequence.objects.create(seq=ref, seq_md5_hash=md5sum_str(ref))
             ref_id = sequence.pk
             pk_by_seq[ref] = ref_id
 
@@ -50,7 +53,7 @@ def slowly_create_loci_and_variants_for_vcf(genome_build, vcf_filename, get_vari
 
         alt_id = pk_by_seq.get(alt)
         if alt_id is None:
-            sequence = Sequence.objects.create(seq=alt, length=len(alt))
+            sequence = Sequence.objects.create(seq=alt, seq_md5_hash=md5sum_str(alt))
             alt_id = sequence.pk
             pk_by_seq[alt] = alt_id
 

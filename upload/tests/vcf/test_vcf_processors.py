@@ -22,7 +22,7 @@ class TestVCFProcessors(TestCase):
         super().setUpTestData()
 
         for base in "GATC":
-            Sequence.objects.get_or_create(seq=base, seq_md5_hash=md5sum_str(base), length=len(base))
+            Sequence.objects.get_or_create(seq=base, seq_md5_hash=md5sum_str(base))
 
     @classmethod
     def _create_fake_upload_step_and_vcf(cls, vcf_filename, vcf_reader) -> tuple[UploadStep, UploadedVCF]:

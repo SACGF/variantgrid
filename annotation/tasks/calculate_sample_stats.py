@@ -17,10 +17,11 @@ from annotation.models.models import InvalidAnnotationVersionError, VCFAnnotatio
 from eventlog.models import create_event
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.enums.log_level import LogLevel
+from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.git import Git
 from library.log_utils import get_traceback
 from snpdb.models import Sample, SampleStats, ImportStatus, SampleStatsPassingFilter, VCF, Variant, \
-    SampleStatsCodeVersion
+    SampleStatsCodeVersion, Sequence
 from snpdb.models import Zygosity
 from snpdb.models.models_genome import GenomeBuild
 
@@ -103,8 +104,8 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
 
     columns = [
         "locus__contig__name",
-        "locus__ref__length",
-        "alt__length",
+        "locus__ref__seq",
+        "alt__seq",
         samples_zygosity_column,
         "variantannotation__dbsnp_rs_id",
         "variantannotation__impact",
@@ -124,8 +125,8 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
 
     for vals in values_queryset.iterator():
         chrom = vals["locus__contig__name"]
-        ref_len = vals["locus__ref__length"]
-        alt_len = vals["alt__length"]
+        ref = vals["locus__ref__seq"]
+        alt = vals["alt__seq"]
         samples_zygosity = vals[samples_zygosity_column]
         dbsnp = vals["variantannotation__dbsnp_rs_id"]
         impact = vals["variantannotation__impact"]
@@ -153,12 +154,20 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
             for ss in [sl[SAMPLE_STATS] for sl in sample_stats_list]:
                 ss.variant_count += 1
 
-                if ref_len == 1 and alt_len == 1:
-                    ss.snp_count += 1
-                elif ref_len > alt_len:
-                    ss.deletions_count += 1
-                elif ref_len < alt_len:
-                    ss.insertions_count += 1
+                if Sequence.allele_is_symbolic(alt):
+                    if alt in (VCFSymbolicAllele.DUP, VCFSymbolicAllele.INS):
+                        ss.insertions_count += 1
+                    elif alt == VCFSymbolicAllele.DEL:
+                        ss.deletions_count += 1
+                else:
+                    ref_len = len(ref)
+                    alt_len = len(alt)
+                    if ref_len == 1 and alt_len == 1:
+                        ss.snp_count += 1
+                    elif ref_len > alt_len:
+                        ss.deletions_count += 1
+                    elif ref_len < alt_len:
+                        ss.insertions_count += 1
 
                 if zygosity == Zygosity.HET:
                     ss.het_count += 1

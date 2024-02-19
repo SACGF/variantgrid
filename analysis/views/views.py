@@ -427,7 +427,7 @@ def node_column_summary(request, analysis_id, analysis_version, node_id, node_ve
 
 def get_snp_matrix_counts(user: User, node_id, version_id):
     node = get_node_subclass_or_404(user, node_id, version=version_id)
-    qs = node.get_queryset().filter(locus__ref__length=1, alt__length=1)
+    qs = node.get_queryset().filter(Variant.get_snp_q())
     count_qs = qs.values_list('locus__ref__seq', 'alt__seq').distinct().annotate(Count('id'))
 
     bases = list('ACGT')

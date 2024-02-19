@@ -36,7 +36,6 @@ class VariantPKLookup:
         self.sequence_pk_by_seq = Sequence.get_pk_by_seq()
         defaults = {
             "seq_md5_hash": md5sum_str(Variant.REFERENCE_ALT),
-            "length": len(Variant.REFERENCE_ALT),
         }
         self.reference_seq_id = Sequence.objects.get_or_create(seq=Variant.REFERENCE_ALT,
                                                                defaults=defaults)[0].pk
@@ -171,7 +170,7 @@ class VariantPKLookup:
             # bulk create not returning pks, so have to retrieve any new ones ourselves
             max_dict = Sequence.objects.all().aggregate(highest_pk=Max("pk"))
             old_highest_pk = max_dict["highest_pk"] or 0
-            sequences = [Sequence(seq=seq, seq_md5_hash=md5sum_str(seq), length=len(seq)) for seq in unknown_sequences]
+            sequences = [Sequence(seq=seq, seq_md5_hash=md5sum_str(seq)) for seq in unknown_sequences]
             Sequence.objects.bulk_create(sequences, ignore_conflicts=True)
             self.sequence_pk_by_seq.update(Sequence.get_pk_by_seq(Q(pk__gt=old_highest_pk)))
 
