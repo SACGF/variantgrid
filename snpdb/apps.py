@@ -1,4 +1,5 @@
 import logging
+import sys
 
 from django.apps import AppConfig
 from django.conf import settings
@@ -48,3 +49,6 @@ class SnpdbConfig(AppConfig):
 
         # Disable annoying matplotlib findfont messages
         logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
+
+        if sys.version_info < (3, 10):
+            raise SystemExit("VariantGrid requires Python 3.10 or later.")
