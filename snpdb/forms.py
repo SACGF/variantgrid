@@ -22,8 +22,7 @@ from library.guardian_utils import DjangoPermission
 from snpdb import models
 from snpdb.models import VCF, Sample, Cohort, UserContact, Tag, UserSettings, GenomicIntervalsCollection, \
     ImportStatus, SettingsInitialGroupPermission, LabUserSettingsOverride, UserSettingsOverride, \
-    OrganizationUserSettingsOverride, CustomColumnsCollection, Project, VariantsType, SampleFilePath, \
-    AlleleOriginFilterDefault
+    OrganizationUserSettingsOverride, CustomColumnsCollection, Project, VariantsType, SampleFilePath
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from uicore.utils.form_helpers import form_helper_horizontal, FormHelperHelper

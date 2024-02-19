@@ -14,7 +14,7 @@ from annotation.manual_variant_entry import check_can_create_variants, CreateMan
 from classification.models import Classification, CreateNoClassificationForbidden
 from genes.hgvs import HGVSMatcher, HGVSException
 from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
-from genes.models import MissingTranscript, MANE, TranscriptVersion, GeneSymbol
+from genes.models import MissingTranscript, MANE, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from library.enums.log_level import LogLevel
 from library.genomics import format_chrom

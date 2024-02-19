@@ -11,7 +11,6 @@ from typing import Iterable
 from django.db.models import Q, Value, TextField
 from django.db.models.aggregates import Max
 from django.db.models.functions import Concat
-from django.db.models.functions.comparison import Coalesce
 
 from library.utils import md5sum_str
 from snpdb.models import Variant, Locus, Sequence, GenomeBuild, VariantCoordinate

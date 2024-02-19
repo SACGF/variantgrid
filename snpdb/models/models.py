@@ -14,6 +14,7 @@ from functools import cached_property, total_ordering
 from html import escape
 from re import RegexFlag
 from typing import TypedDict, Optional
+
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -29,12 +30,14 @@ from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 from more_itertools import first
+
 from classification.enums.classification_enums import ShareLevel
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.enums.log_level import LogLevel
 from library.preview_request import PreviewModelMixin
 from library.utils import import_class, JsonObjType
 from snpdb.models.models_enums import UserAwardLevel
+
 
 class Tag(models.Model):
     id = models.CharField(max_length=50, primary_key=True)

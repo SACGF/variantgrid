@@ -6,7 +6,7 @@ from annotation.fake_annotation import get_fake_annotation_version, create_fake_
     create_fake_variant_annotation
 from annotation.models import HumanProteinAtlasTissueSample, ClinVar, Citation, AnnotationRun
 from annotation.models.models_citations import CitationSource
-from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
+from library.django_utils.unittest_utils import URLTestCase
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 

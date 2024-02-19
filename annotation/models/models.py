@@ -23,7 +23,7 @@ from psqlextra.types import PostgresPartitioningMethod
 
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
-    SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction, AlphaMissensePrediction
+    SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
 from annotation.models.models_enums import AnnotationStatus, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \

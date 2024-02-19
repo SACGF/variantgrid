@@ -1,4 +1,5 @@
 from collections import Counter, defaultdict
+
 from cyvcf2 import Reader
 from django.core.management.base import BaseCommand
 

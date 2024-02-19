@@ -19,7 +19,6 @@ class AnnotationConfig(AppConfig):
     def ready(self):
         # pylint: disable=import-outside-toplevel,unused-import
         # imported to activate receivers
-        from annotation.signals import citation_preview, citation_search, clinvar_annotation_health_check
 
         from Bio import Entrez
         from django.conf import settings
