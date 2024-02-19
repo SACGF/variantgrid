@@ -1,5 +1,5 @@
 .bg-theme {
-  background-color: #9090f4 !important;
+  background-color: #3cb4e7 !important;
 }
 
 .bg-theme {
@@ -22,7 +22,7 @@ body.login-bg-theme {
   color: #ddd;
 }
 .login-bg-theme .header, .login-bg-theme .footer {
-  background-color: #9090f4;
+  background-color: #3cb4e7;
 }
 .login-bg-theme .main-container {
   margin-top: calc(70px + 10vh);
