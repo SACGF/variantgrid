@@ -9,7 +9,7 @@ ConfigArgParse
 coreapi
 crispy-bootstrap4
 cyvcf2>=0.30.14
-Django
+Django<5
 django-amazon-ses
 django_autocomplete_light
 django-avatar>=8.0.0
