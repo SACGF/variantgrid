@@ -2564,19 +2564,40 @@ span.cs {
   font-weight: bold;
 }
 
+td.scs-tier_1 {
+  background-color: #ffcccc;
+}
+
+td.scs-tier_2 {
+  background-color: #ffdddd;
+}
+
+td.scs-tier_3 {
+  background-color: #ddddff;
+}
+
+td.scs-tier_4 {
+  background-color: #ccccff;
+}
+
+td.cs, td.scs {
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.4);
+}
+
+/*
 .scs-tier_1 {
-  color: #444;
+	color: #444;
 }
 
 .scs-tier_2,
 .scs-tier_3 {
-  color: #666;
+	color: #666;
 }
 
 .scs-tier_4 {
-  color: #888;
+	color: #888;
 }
-
+*/
 .cs-b {
   background-color: #ccccff;
 }

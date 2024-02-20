@@ -2388,32 +2388,49 @@ VCTable.condition = (data, type, row) => {
 };
 
 VCTable.clinical_significance = (data, type, row) => {
-    let cs = data[SpecialEKeys.CLINICAL_SIGNIFICANCE];
-    let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
-    let label = csKey.prettyValue(cs);
+    let dom = $('<span>', {style: 'font-weight:bold;color:#555'});
+    let hadCs = false;
 
-    let dom = $('<span>', {style:'font-weight:bold;color:#555'});
-
-    if (cs && cs.length) {
-        dom.append(label.val);
-    } else {
-        dom.append($('<span>', {class: 'no-value', text: 'Unclassified'}));
+    if (SpecialEKeys.CLINICAL_SIGNIFICANCE in data) {
+        hadCs = true;
+        let cs = data[SpecialEKeys.CLINICAL_SIGNIFICANCE];
+        let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
+        let label = csKey.prettyValue(cs);
+        if (cs && cs.length) {
+            dom.append(label.val);
+        } else {
+            dom.append($('<span>', {class: 'no-value', text: '-'}));
+        }
     }
-
-    let scs = data[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE];
-    if (scs) {
-        let scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
-        let scsLabel = scsKey.prettyValue(scs);
-        dom.append('<br/>');
-        dom.append($('<span>', {text:scsLabel.val, 'class': `scs scs-${scsKey}`}));
+    if (SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE in data) {
+        let scs = data[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE];
+        if (scs) {
+            let scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
+            let scsLabel = scsKey.prettyValue(scs);
+            if (hadCs) {
+                dom.append('<br/>');
+            }
+            dom.append($('<span>', {text: scsLabel.val, 'class': `scs scs-${scs}`}));
+        } else {
+            dom.append($('<span>', {class: 'no-value', text: '-'}));
+        }
     }
-
     return dom.prop('outerHTML');
 };
 
 VCTable.clinical_significance_td = ( cell, cellData, rowData, rowIndex, colIndex ) => {
-    let cs = cellData[SpecialEKeys.CLINICAL_SIGNIFICANCE];
-    $(cell).addClass(`text-center cs cs-${(cs || '').toLowerCase()}`);
+     $(cell).addClass('text-center');
+    if (SpecialEKeys.CLINICAL_SIGNIFICANCE in cellData) {
+        let cs = cellData[SpecialEKeys.CLINICAL_SIGNIFICANCE];
+        $(cell).addClass(`cs cs-` + (cs || '').toLowerCase());
+    } else if (SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE in cellData) {
+        // TODO style based on tier
+        $(cell).addClass(`scs`);
+        let scs = cellData[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE];
+        if (scs) {
+            $(cell).addClass(`scs-` + scs);
+        }
+    }
 };
 
 VCTable.evidence_key = (key_name, data, type, row) => {

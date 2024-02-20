@@ -79,8 +79,8 @@
             <th>Lab</th>
             <th>HGVS <span class="text-secondary">{{ genome_build }}</span></th>
             <th class="text-center">Classification</th>
+            <th class="text-center">Clinical Significance</th>
             <th>Condition</th>
-            <th>Zygosities</th>
             <th><span class="text-secondary">Latest</span><br/>Criteria</th>
             <th><span class="text-secondary">Latest</span><br/>Curated</th>
             <th>Sort Column (hidden)</th>
@@ -88,6 +88,7 @@
             <th>Imported As</th>
             <th>Allele</th>
             <th>Gene Symbol</th>
+            <th>Zygosities</th>
             <th><div style="margin-top: 16px">Classification Records</div></th>
         </tr>
     </thead>
@@ -128,8 +129,8 @@
                 {}, // ID
                 {className: 'dt-hgvs'}, // HGVS
                 {}, // Classification
+                {}, // Clin Sig
                 {}, // Conditions
-                {}, // Zygosities
                 {}, // ACMG
                 {}, // last record
                 {visible: false}, // sorting column
@@ -137,6 +138,7 @@
                 {className: 'none'}, // imported as
                 {className: 'none'}, // allele
                 {className: 'none'}, // gene symbols
+                {className: 'none'}, // Zygosities
                 {className: 'none'}, // record sub-table
             ]
         });

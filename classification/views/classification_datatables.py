@@ -27,10 +27,20 @@ ALLELE_KNOWN_VALUES = ALLELE_GERMLINE_VALUES + ALLELE_SOMATIC_VALUES
 
 class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
-    def render_clinical_significance(self, row: Dict[str, Any]) -> JsonDataType:
+    def render_somatic_clinical_significance_combined(self, row: Dict[str, Any]) -> JsonDataType:
         return {
             SpecialEKeys.CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.CLINICAL_SIGNIFICANCE}__value"],
             SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}__value"]
+        }
+
+    def render_somatic_clinical_significance(self, row: Dict[str, Any]) -> JsonDataType:
+        return {
+            SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}__value"]
+        }
+
+    def render_classification(self, row: Dict[str, Any]) -> JsonDataType:
+        return {
+            SpecialEKeys.CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.CLINICAL_SIGNIFICANCE}__value"]
         }
 
     def render_c_hgvs(self, row: Dict[str, Any]) -> JsonDataType:
@@ -167,11 +177,32 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 key='published_evidence__clinical_significance__value',
                 name='clinical_significance',
                 label='Classification',
-                renderer=self.render_clinical_significance,
+                renderer=self.render_somatic_clinical_significance_combined,
                 client_renderer='VCTable.clinical_significance',
                 client_renderer_td='VCTable.clinical_significance_td',
                 sort_keys=['clinical_significance', 'clin_sig_sort'],
                 extra_columns=["published_evidence__somatic:clinical_significance__value"],
+                orderable=True,
+                enabled=False
+            ),
+            RichColumn(
+                key='published_evidence__clinical_significance__value',
+                name='classification',
+                label='Classification',
+                renderer=self.render_classification,
+                client_renderer='VCTable.clinical_significance',
+                client_renderer_td='VCTable.clinical_significance_td',
+                sort_keys=['clin_sig_sort'],
+                orderable=True
+            ),
+            RichColumn(
+                key='published_evidence__somatic:clinical_significance__value',
+                name='somatic_clinical_significance',
+                label='Clinical Significance',
+                renderer=self.render_somatic_clinical_significance,
+                client_renderer='VCTable.clinical_significance',
+                client_renderer_td='VCTable.clinical_significance_td',
+                sort_keys=['published_evidence__somatic:clinical_significance__value'],
                 orderable=True
             ),
             RichColumn(

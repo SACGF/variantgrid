@@ -224,7 +224,7 @@ table.diff tbody tr.textarea td {
 .classification-table td.dt-gene_symbol, .classification-table td.gene_symbol {
   width: 60px;
 }
-.classification-table td.dt-clinical_significance, .classification-table td.cs {
+.classification-table td.dt-clinical_significance, .classification-table td.cs, .classification-table td.scs {
   width: 125px;
 }
 .classification-table td.allele_origin {
