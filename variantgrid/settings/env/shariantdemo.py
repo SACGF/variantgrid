@@ -36,6 +36,20 @@ LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=https%3A%2
 _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded annotation (${ANNOTATION_BASE_DIR} from wiki)
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'demo_annotation_scratch')
 
+ANNOTATION[BUILD_GRCH37]["columns_version"] = 3
+ANNOTATION[BUILD_GRCH38]["columns_version"] = 3
+
+ANNOTATION[BUILD_GRCH37]["vep_config"].update({
+    "cosmic": "annotation_data/GRCh37/Cosmic_GenomeScreensMutant_v99_GRCh37.vcf.gz",
+    "dbnsfp": "annotation_data/GRCh37/dbNSFP4.5a.grch37.stripped.gz",
+    "mastermind": "annotation_data/GRCh37/mastermind_cited_variants_reference-2023.10.02-grch37.vcf.gz",
+})
+ANNOTATION[BUILD_GRCH38]["vep_config"].update({
+    "cosmic": "annotation_data/GRCh38/Cosmic_GenomeScreensMutant_v99_GRCh38.vcf.gz",
+    "dbnsfp": "annotation_data/GRCh38/dbNSFP4.5a.grch38.stripped.gz",
+    "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2023.10.02-grch38.vcf.gz",
+})
+
 SEARCH_HGVS_GENE_SYMBOL_USE_MANE = True
 
 SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
