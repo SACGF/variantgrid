@@ -241,12 +241,14 @@ class Command(BaseCommand):
         if new_genes:
             logging.info("Creating %d new genes", len(new_genes))
             Gene.objects.bulk_create(new_genes, batch_size=self.BATCH_SIZE)
+        del new_genes
 
         if new_gene_versions:
             logging.info("Creating %d new gene versions", len(new_gene_versions))
             GeneVersion.objects.bulk_create(new_gene_versions, batch_size=self.BATCH_SIZE)
             # Update with newly inserted records - so that we have a PK to use below
             gene_version_ids_by_accession.update({gv.accession: gv.pk for gv in new_gene_versions})
+        del new_gene_versions
 
         # Could potentially be duplicate gene versions (diff transcript versions from diff GFFs w/same GeneVersion)
         if modified_gene_versions:
@@ -255,6 +257,7 @@ class Command(BaseCommand):
             GeneVersion.objects.bulk_update(modified_gene_versions,
                                             gv_fields,
                                             batch_size=self.BATCH_SIZE)
+        del modified_gene_versions
 
         new_transcript_ids = set()
         new_transcript_versions = []
@@ -294,16 +297,20 @@ class Command(BaseCommand):
             Transcript.objects.bulk_create(new_transcripts, batch_size=self.BATCH_SIZE)
             known_transcript_ids.update(new_transcript_ids)
 
+        del new_transcript_ids
+
         # No need to update known after insert as there won't be duplicate transcript versions in the merged data
         if new_transcript_versions:
             logging.info("Creating %d new transcript versions", len(new_transcript_versions))
             TranscriptVersion.objects.bulk_create(new_transcript_versions, batch_size=self.BATCH_SIZE)
+        del new_transcript_versions
 
         if modified_transcript_versions:
             logging.info("Updating %d transcript versions", len(modified_transcript_versions))
             TranscriptVersion.objects.bulk_update(modified_transcript_versions,
                                                   ["gene_version_id", "import_source", "biotype", "data", "contig"],
                                                   batch_size=self.BATCH_SIZE)
+        del modified_transcript_versions
 
         if new_genes and annotation_consortium == AnnotationConsortium.REFSEQ:
             print("Created new RefSeq genes - retrieving gene summaries via API")
