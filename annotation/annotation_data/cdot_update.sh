@@ -2,7 +2,7 @@
 
 set -e
 
-CDOT_VERSION=0.2.22
+CDOT_VERSION=0.2.23
 THIS_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
 VG_DIR=${THIS_DIR}/../..
 DOWNLOAD_DIR=/tmp
