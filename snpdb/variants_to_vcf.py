@@ -1,8 +1,8 @@
-import re
 from collections import Counter
 
 from bgzip import BGZipWriter
 
+from library.genomics.vcf_utils import vcf_allele_is_symbolic
 from snpdb.models import VCF, Zygosity, Sample
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs, get_vcf_header_lines
 
@@ -19,10 +19,10 @@ VARIANT_GRID_INFO_DICT = {
         'description': 'VariantGrid primary column',
         VARIANT_PATH: 'id',
         'key_data_func': key_data_func},
-    # INFO fields for CNV
-    "END": {
+    # INFO fields for Symbolic alts
+    "SVLEN": {
         'type': 'Integer',
-        'description': 'Stop position of the interval',
+        'description': 'Difference in length between REF and ALT alleles',
     },
     "SVTYPE": {
         'type': 'String',
@@ -52,8 +52,6 @@ def write_qs_to_vcf_file_sort_alphabetically(qs, f, info_dict=None):
 
 
 def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict):
-    symbolic_pattern = re.compile("<(.*)>")
-
     for line in header_lines:
         line_bytes = (line + '\n').encode()
         f.write(line_bytes)
@@ -64,12 +62,12 @@ def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict):
         pos = data["locus__position"]
         ref = data["locus__ref__seq"]
         alt = data["alt__seq"]
-        end = data["end"]
+        svlen = data["svlen"]
         info = {}
 
-        if m := symbolic_pattern.match(alt):
-            info["END"] = end
-            info["SVTYPE"] = m.group(1)
+        if vcf_allele_is_symbolic(alt):
+            info["SVLEN"] = svlen
+            info["SVTYPE"] = alt[1:-1]  # Strip off brackets
 
         if info_dict:
             for info_name, info_data in info_dict.items():
