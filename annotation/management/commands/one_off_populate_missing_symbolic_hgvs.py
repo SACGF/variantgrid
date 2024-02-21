@@ -4,7 +4,7 @@ from django.core.management import BaseCommand
 
 from annotation.models import VariantAnnotation, VariantTranscriptAnnotation
 from genes.hgvs import HGVSMatcher, HGVSException
-from snpdb.models import GenomeBuild, Variant
+from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 
 
 class Command(BaseCommand):
@@ -16,16 +16,24 @@ class Command(BaseCommand):
         By variant so we only need to do that once
 
     """
-    def _update_annotation(self, v: Variant, variant_coordinate, matcher, records, klass):
+    def _update_annotation(self, v: Variant, variant_coordinate: VariantCoordinate, matcher, records, klass):
         va_list = []
-        for va in klass.objects.filter(variant=v):
-            try:
-                if va.transcript_version:
-                    transcript_accession = va.transcript_version.accession
+        for va in klass.objects.filter(variant=v, hgvs_c__isnull=True):
+            if va.transcript_version:
+                # This is not super perfect - as normalization may affect position, but we want a quick reject
+                if va.transcript_version.start > variant_coordinate.position:
+                    continue
+                elif variant_coordinate.end > va.transcript_version.end + 1:
+                    continue
+
+                transcript_accession = va.transcript_version.accession
+                try:
                     va.hgvs_c = matcher.variant_coordinate_to_hgvs_variant(variant_coordinate, transcript_accession)
                     va_list.append(va)
-            except (ValueError, HGVSException):
-                pass
+                except (ValueError, HGVSException) as e:
+                    # print(f"FAILED: {transcript_accession}: {e} - {quick_reject=}")
+                    pass
+
 
         records.extend(va_list)
         self._bulk_update(klass, records)
@@ -36,6 +44,7 @@ class Command(BaseCommand):
             records.clear()
 
     def handle(self, *args, **options):
+        MAX_SIZE = 100_000
 
         for genome_build in GenomeBuild.builds_with_annotation():
             matcher = HGVSMatcher(genome_build)
@@ -50,7 +59,11 @@ class Command(BaseCommand):
             last_update = time.time()
             for i, v in enumerate(symbolic_qs):
                 # Do this lookup of ref/alt once as it's expensive..
-                variant_coordinate = v.coordinate.as_external_explicit(genome_build)
+                variant_coordinate = v.coordinate
+                if abs(variant_coordinate.svlen) > MAX_SIZE:
+                    print(f"Skipping calculating HGVS for {variant_coordinate} because it exceeds {MAX_SIZE}")
+                    continue
+                variant_coordinate = variant_coordinate.as_external_explicit(genome_build)
 
                 self._update_annotation(v, variant_coordinate, matcher, va_list, VariantAnnotation)
                 self._update_annotation(v, variant_coordinate, matcher, vta_list, VariantTranscriptAnnotation)
