@@ -10,7 +10,7 @@ from typing import Optional, Any, Callable, Union, TypeVar, Generic, Type
 
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import QuerySet, Q
+from django.db.models import QuerySet, Q, F, OrderBy
 from django.http import HttpRequest, QueryDict
 from kombu.utils import json
 
@@ -145,9 +145,13 @@ class RichColumn:
             key = f'-{key}'
         return key
 
-    def sort_string(self, desc: bool) -> list[str]:
+    def sort_string(self, desc: bool) -> list[OrderBy]:
         use_keys = self.sort_keys or [self.key]
-        return [self.sort_key(key, desc) for key in use_keys]
+        if desc:
+            return [F(key).desc(nulls_last=True) for key in use_keys]
+        else:
+            return [F(key).asc(nulls_last=True) for key in use_keys]
+        #return [self.sort_key(key, desc) for key in use_keys]
 
     @property
     def value_columns(self) -> list[str]:
