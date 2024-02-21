@@ -241,6 +241,9 @@ class Command(BaseCommand):
         if new_genes:
             logging.info("Creating %d new genes", len(new_genes))
             Gene.objects.bulk_create(new_genes, batch_size=self.BATCH_SIZE)
+            has_new_genes = True
+        else:
+            has_new_genes = False
         del new_genes
 
         if new_gene_versions:
@@ -312,7 +315,7 @@ class Command(BaseCommand):
                                                   batch_size=self.BATCH_SIZE)
         del modified_transcript_versions
 
-        if new_genes and annotation_consortium == AnnotationConsortium.REFSEQ:
+        if has_new_genes and annotation_consortium == AnnotationConsortium.REFSEQ:
             print("Created new RefSeq genes - retrieving gene summaries via API")
             retrieve_refseq_gene_summaries()
 
