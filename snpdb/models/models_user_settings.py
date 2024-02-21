@@ -281,6 +281,8 @@ class UserPreview(PreviewModelMixin):
                 title = str(labs[0])
 
         extras = []
+        if self.user.email:
+            extras.append(PreviewKeyValue("Email", self.user.email))
         if last_logged_in := self.user.last_login:
             extras.append(PreviewKeyValue("Last Login", last_logged_in))
         else:
