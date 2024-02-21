@@ -12,16 +12,17 @@ from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     MutationAssessorPrediction, MutationTasterPrediction, Polyphen2Prediction, \
     PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction
 from annotation.models.models import ColumnVEPField, VariantAnnotation, \
-    VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap
+    VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap, AnnotationRun
 from annotation.models.models_enums import VariantClass, VariantAnnotationPipelineType
 from annotation.vep_annotation import VEPConfig
+from genes.hgvs import HGVSMatcher, HGVSException
 from genes.models import TranscriptVersion, GeneVersion
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import get_model_fields
 from library.django_utils.django_file_utils import get_import_processing_filename, get_import_processing_dir
 from library.log_utils import log_traceback
 from library.utils import invert_dict
-from snpdb.models import GenomeBuild
+from snpdb.models import GenomeBuild, VariantCoordinate
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
 VEP_SEPARATOR = '&'
@@ -100,7 +101,7 @@ class BulkVEPVCFAnnotationInserter:
     ALOFT_COLUMNS = ['aloft_prob_tolerant', 'aloft_prob_recessive', 'aloft_prob_dominant',
                      'aloft_pred', 'aloft_high_confidence', 'aloft_ensembl_transcript']
 
-    def __init__(self, annotation_run, infos=None, insert_variants=True, validate_columns=True):
+    def __init__(self, annotation_run: AnnotationRun, infos=None, insert_variants=True, validate_columns=True):
         self.annotation_run = annotation_run
         self.rows_processed = 0
         self.variant_transcript_annotation_list = []
@@ -115,6 +116,7 @@ class BulkVEPVCFAnnotationInserter:
         self.aloft_columns = False
         logging.info("CSQ: %s", self.vep_columns)
         self._setup_vep_fields_and_db_columns(validate_columns)
+        self.hgvs_matcher = HGVSMatcher(annotation_run.genome_build)
 
     @staticmethod
     def _get_vep_columns_from_csq(infos):
@@ -385,15 +387,15 @@ class BulkVEPVCFAnnotationInserter:
                 logging.warning(f"Could not find gene_id: '{vep_gene}'")
         return gene_id
 
-    def get_transcript_and_version_ids(self, vep_transcript_data) -> tuple[Optional[str], Optional[str]]:
+    def _get_transcript_accession_id_and_version_id(self, vep_transcript_data) -> tuple[Optional[str], Optional[str], Optional[str]]:
+        transcript_accession = None
         transcript_id = None
         transcript_version_id = None
         vep_feature_type = vep_transcript_data[VEPColumns.FEATURE_TYPE]
         if vep_feature_type == "Transcript":
-            accession = vep_transcript_data[VEPColumns.FEATURE]
-            if accession:
+            if transcript_accession := vep_transcript_data[VEPColumns.FEATURE]:
                 # We pass in --transcript_version so Ensembl IDs will have version
-                t_id, version = TranscriptVersion.get_transcript_id_and_version(accession)
+                t_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
                 transcript_versions = self.transcript_versions_by_id.get(t_id)
                 if transcript_versions:
                     transcript_id = t_id  # Know it's valid to link
@@ -402,10 +404,12 @@ class BulkVEPVCFAnnotationInserter:
                         logging.warning(f"Have transcript '{transcript_id}' but no version: '{version}'")
                 else:
                     logging.warning(f"Could not find transcript: '{t_id}'")
-        return transcript_id, transcript_version_id
+        return transcript_accession, transcript_id, transcript_version_id
 
-    def add_calculated_transcript_columns(self, transcript_data):
+    def add_calculated_transcript_columns(self, variant_coordinate: Optional[VariantCoordinate], transcript_data):
+        """ variant_coordinate - will only be set for symbolics """
         self._add_calculated_maxentscan(transcript_data)
+        self._add_hgvs(variant_coordinate, transcript_data)
 
     def add_calculated_variant_annotation_columns(self, transcript_data):
         self._add_calculated_num_predictions(transcript_data)
@@ -448,6 +452,15 @@ class BulkVEPVCFAnnotationInserter:
             cosmic_ids.update(existing_cosmic_id.split(VEP_SEPARATOR))
         transcript_data["cosmic_id"] = VEP_SEPARATOR.join(sorted(cosmic_ids))
 
+    def _add_hgvs(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: dict):
+        if transcript_accession := transcript_data.get("transcript_accession"):
+            try:
+                hgvs_c = self.hgvs_matcher.variant_coordinate_to_hgvs_variant(variant_coordinate, transcript_accession)
+                transcript_data['hgvs_c'] = hgvs_c
+                # TODO: Protein?? hgvs_p
+            except (ValueError, HGVSException):
+                pass
+
     def process_entry(self, v):
         if len(self.variant_transcript_annotation_list) >= settings.SQL_BATCH_INSERT_SIZE:
             self.bulk_insert()
@@ -456,6 +469,13 @@ class BulkVEPVCFAnnotationInserter:
         if csq is None:  # Legacy data error, VEP failed to annotate as something like C>C
             logging.warning(f"Skipped {v} as no CSQ")
             return
+
+        if svlen := v.INFO.get("SVLEN"):
+            variant_coordinate = VariantCoordinate(chrom=v.CHROM, position=v.POS, ref=v.REF, alt=v.ALT[0], svlen=svlen)
+            # Do now so we only retrieve sequences once
+            variant_coordinate = variant_coordinate.as_external_explicit(self.annotation_run.genome_build)
+        else:
+            variant_coordinate = None
 
         try:
             variant_id = v.INFO["variant_id"]
@@ -476,14 +496,15 @@ class BulkVEPVCFAnnotationInserter:
                 transcript_data.update(self.constant_data)
                 transcript_data["variant_id"] = variant_id
                 transcript_data["gene_id"] = gene_id
-                transcript_id, transcript_version_id = self.get_transcript_and_version_ids(vep_transcript_data)
+                transcript_accession, transcript_id, transcript_version_id = self._get_transcript_accession_id_and_version_id(vep_transcript_data)
+                transcript_data["transcript_accession"] = transcript_accession
                 transcript_data["transcript_id"] = transcript_id
                 transcript_data["transcript_version_id"] = transcript_version_id
                 if symbol := transcript_data.get("symbol"):
                     overlapping_symbols.add(symbol)
                 if gene_id:
                     overlapping_gene_ids.add(gene_id)
-                self.add_calculated_transcript_columns(transcript_data)
+                self.add_calculated_transcript_columns(variant_coordinate, transcript_data)
                 self.variant_transcript_annotation_list.append(transcript_data)
 
                 representative_transcript = vep_transcript_data.get(VEPColumns.PICK, False)
