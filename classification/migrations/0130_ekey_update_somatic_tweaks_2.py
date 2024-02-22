@@ -31,7 +31,7 @@ Tier I/II: If specific tier of clinical significance is not denoted further than
     option_updator.alphabetical_order()
     option_updator.save()
 
-    EvidenceKey.objects.get_or_create(key="somatic:tumour_cellularity", defaults={
+    EvidenceKey.objects.get_or_create(key="somatic:tumor_cellularity", defaults={
         "label": "Tumour Cellularity",
         "evidence_category": "HT",
         "value_type": "N",
