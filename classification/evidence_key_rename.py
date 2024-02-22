@@ -29,6 +29,7 @@ class OptionUpdator:
         elif update_existing:
             for matching_option in matching_options:
                 matching_option.update(option_data)
+        self.e_key.options = self.options
 
     def preferred_order(self, option_keys: list[str]):
         known_options = set(option_keys)
@@ -46,6 +47,11 @@ class OptionUpdator:
         for ordered_option in option_keys:
             self.options.extend(option_dict[ordered_option])
         self.options.extend(options_unknown)
+        self.e_key.options = self.options
+
+    def alphabetical_order(self):
+        self.options = list(sorted(self.options, key=lambda x: x.get("key")))
+        self.e_key.options = self.options
 
     def save(self):
         self.e_key.save()
