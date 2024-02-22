@@ -453,6 +453,9 @@ class BulkVEPVCFAnnotationInserter:
         transcript_data["cosmic_id"] = VEP_SEPARATOR.join(sorted(cosmic_ids))
 
     def _add_hgvs(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: dict):
+        if variant_coordinate is None:
+            return
+
         if transcript_accession := transcript_data.get("transcript_accession"):
             try:
                 hgvs_c = self.hgvs_matcher.variant_coordinate_to_hgvs_variant(variant_coordinate, transcript_accession)
