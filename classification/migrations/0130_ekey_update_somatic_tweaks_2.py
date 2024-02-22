@@ -27,6 +27,7 @@ Tier I/II: If specific tier of clinical significance is not denoted further than
     option_updator = OptionUpdator(EvidenceKey.objects.get(key='sample_type'))
     option_updator.ensure_option({"key": "skin_biopsy", "index": 9})
     option_updator.ensure_option({"key": "cf_dna", "label": "cfDNA", "index": 10})
+    option_updator.set_attributes("tumor", label="Tumour")
     option_updator.alphabetical_order()
     option_updator.save()
 
