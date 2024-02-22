@@ -168,6 +168,7 @@
             let regexSearch = `[${filterValue}|U]`;
             table.column(8).search(regexSearch, true, false).draw();
         }
+        table.column(3).visible(filterValue !== "G");
     }
 </script>
 {% else %}

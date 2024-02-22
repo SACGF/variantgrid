@@ -201,12 +201,13 @@ let DataTableDefinition = (function() {
 
         setupDom: function() {
             let dom = this.dom;
+            dom.empty();
             let dtParams = this.dtParams;
 
             let tHead = $('<thead/>').appendTo(dom);
             let tHeadTr = $('<tr/>').appendTo(tHead);
 
-            // GENERATE COlumns
+            // GENERATE COLUMNS
             for (let columnDef of dtParams.columnDefs) {
                 $('<th/>', {class: columnDef.classNames, html: columnDef.label}).appendTo(tHeadTr);
             }

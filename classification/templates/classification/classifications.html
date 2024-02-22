@@ -114,11 +114,6 @@
         data.lab = blankToNull(getLabValue());
         data.user = blankToNull($('#id_user').val());
 
-        let allele_origin_filter_value = $("input[name='allele-origin-toggle']:checked").val();
-        data.allele_origin = blankToNull(allele_origin_filter_value);
-        data.id_filter = blankToNull($('#id_filter').val());
-
-
         let flags = [];
         $('input[flagtypeid]').each((index, dom) => {
             let input = $(dom);
@@ -130,6 +125,10 @@
         if (flags.length) {
             data.flags = JSON.stringify(flags);
         }
+        let column = $('#vc-datatable').DataTable().column(3);
+        let allele_origin_filter_value = $("input[name='allele-origin-toggle']:checked").val();
+        let germline_only = allele_origin_filter_value == "G";
+        column.visible(!germline_only);
     }
     function downloadAs(mode) {
         let data = {};
