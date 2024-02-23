@@ -40,23 +40,25 @@
             <div class="mt-1 text-secondary text-monospace"  style="font-size:11px">{{ p_hgvs.p_dot }}</div>
         {% endfor %}
     </td>
-    <td style="width:100px; font-weight: bold; color: #555;" class="cs cs-{{ group.clinical_significance_effective|lower }} text-center" data-order="{{ group.clinical_significance_score }}{{ group.clinical_grouping }}">
+    <td style="width:100px" class="text-center" data-order="{{ group.clinical_significance_score }}{{ group.clinical_grouping }}">
         {% if group.clinical_significance_old %}
-            <div><del>{% if group.clinical_significance_old %}{{ group.clinical_significance_old | ekey:"clinical_significance" }}{% else %}Unclassified{% endif %}</del></div>
+            <div><del>{% if group.clinical_significance_old %}{{ group.clinical_significance_old | ekey:"clinical_significance" }}{% else %}No Data{% endif %}</del></div>
         {% endif %}
         {% if group.clinical_significance_pending %}
-            <div><del>{% if group.clinical_significance %}{{ group.clinical_significance | ekey:"clinical_significance" }}{% else %}Unclassified{% endif %}</del></div>
+            <div><del>{% if group.clinical_significance %}{{ group.clinical_significance | ekey:"clinical_significance" }}{% else %}No Data{% endif %}</del></div>
             {{ group.clinical_significance_pending | ekey:"clinical_significance" }}
             <div title="Some or all of these classifications have been marked as having pending changes to classification" data-toggle="tooltip" class="flag flag-classification_pending_changes hover-detail mx-1"></div>
         {% else %}
-            {% if group.clinical_significance %}{{ group.clinical_significance | ekey:"clinical_significance" }}{% else %}<span class="no-value">No Data</span>{% endif %}
+            {% if group.clinical_significance %}
+                <span class="c-pill cs cs-{{ group.clinical_significance_effective|lower }}">{{ group.clinical_significance | ekey:"clinical_significance" }}</span>
+            {% else %}<span class="c-pill cs cs-none no-value">No Data</span>{% endif %}
         {% endif %}
     </td>
-    <td style="width:100px; font-weight: bold; color: #555;" class="scs scs-{{ group.somatic_clin_sig }} text-center" data-order="{{ group.somatic_clin_sig|default_if_none:'0' }}">
+    <td style="width:100px" class="text-center" data-order="{{ group.somatic_clin_sig|default_if_none:'0' }}">
         {% if group.somatic_clin_sig %}
-            <span class="scs scs-{{ group.somatic_clin_sig }}">{{ group.somatic_clin_sig | ekey:"somatic:clinical_significance" }}</span>
+            <span class="c-pill scs scs-{{ group.somatic_clin_sig }}">{{ group.somatic_clin_sig | ekey:"somatic:clinical_significance" }}</span>
         {% elif group.allele_origin_bucket != "G" %}
-            <span class="no-value">No Data</span>
+            <span class="c-pill scs scs-none no-value">No Data</span>
         {% endif %}
     </td>
     <td style="width:186px;">

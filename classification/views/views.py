@@ -370,7 +370,6 @@ def view_classification(request: HttpRequest, classification_id: str):
     }
     return render(request, 'classification/classification.html', context)
 
-
 def view_classification_diff(request):
     extra_data = {}
 
@@ -424,7 +423,9 @@ def view_classification_diff(request):
         raise ValueError("Diff not given valid diff type")
 
     # filter out any Nones inserted by filtering on user permission etc
-    records = [record for record in records if record]
+    records: list[ClassificationModification] = [record for record in records if record]
+    # if filter_origin := request.GET.get('allele_origin'):
+    #
 
     records_json = [vcm.as_json(ClassificationJsonParams(
         current_user=request.user,

@@ -2553,83 +2553,58 @@ a .c-hgvs-body .c-hgvs-nomen {
   opacity: 0.4;
 }
 
-span.cs {
-  display: inline-block;
-  padding: 2px 4px 2px 4px;
-  border: 1px solid gray;
-  border-radius: 4px;
+.dt-classification, .dt-somatic_clinical_significance {
+  width: 135px;
 }
 
-.scs {
+.c-pill {
   font-weight: bold;
+  display: inline-block;
+  padding: 4px;
+  border-radius: 4px;
+  width: 130px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #555;
+  font-weight: 600;
 }
-
-.scs-tier_1 {
+.c-pill.scs-none, .c-pill.cs-none {
+  border: none !important;
+}
+.c-pill.scs-tier_1 {
   background-color: #ffcccc;
 }
-
-.scs-tier_1_or_2 {
+.c-pill.scs-tier_1_or_2 {
   background-color: #ffd5d5;
 }
-
-.scs-tier_2 {
+.c-pill.scs-tier_2 {
   background-color: #ffdddd;
 }
-
-.scs-tier_3 {
+.c-pill.scs-tier_3 {
   background-color: #dddddd;
 }
-
-.scs-tier_4 {
+.c-pill.scs-tier_4 {
   background-color: #ccccff;
 }
-
-td.cs, td.scs {
-  border-bottom: 1.5px solid rgba(255, 255, 255, 0.4);
-}
-
-/*
-.scs-tier_1 {
-	color: #444;
-}
-
-.scs-tier_2,
-.scs-tier_3 {
-	color: #666;
-}
-
-.scs-tier_4 {
-	color: #888;
-}
-*/
-.cs-b {
+.c-pill.cs-b {
   background-color: #ccccff;
 }
-
-.cs-lb {
+.c-pill.cs-lb {
   background-color: #ddddff;
 }
-
-.cs-vus,
-.cs-vus_a,
-.cs-vus_b,
-.cs-vus_c {
+.c-pill.cs-vus, .c-pill.cs-vus_a, .c-pill.cs-vus_b, .c-pill.cs-vus_c {
   background-color: #dddddd;
 }
-
-.cs-lp, .cs-lo {
+.c-pill.cs-lp, .c-pill.cs-lo {
   background-color: #ffdddd;
 }
-
-.cs-p, .cs-o {
+.c-pill.cs-p, .c-pill.cs-o {
   background-color: #ffcccc;
 }
-
-.cs-pending {
+.c-pill.cs-pending {
   background: repeating-linear-gradient(-45deg, #ddd, #ddd 10px, #eee 10px, #eee 20px);
 }
-
-.cs-withdrawn {
+.c-pill.cs-withdrawn {
   opacity: 0.5;
 }
 

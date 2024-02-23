@@ -13,7 +13,7 @@
             </div>
             <div class="col-5 w-100 d-flex">
                 {% if lab_summ.clinical_significance_from or lab_summ.clinical_significance_to %}
-                    <div class="flex-grow-1 d-inline-block py-2 cs-{{ lab_summ.clinical_significance_to }}" style="padding-left:8px; border-radius:5px; flex-basis: 0">
+                    <div class="flex-grow-1 d-inline-block py-2 c-pill cs cs-{{ lab_summ.clinical_significance_to }}" style="flex-basis: 0">
                         {% if lab_summ.changed %}
                             <del>{{ lab_summ.clinical_significance_from|ekey:'clinical_significance' }}</del> <i class="fas fa-arrow-right mx-2 text-secondary"></i>
                             <span style="font-weight:600">{{ lab_summ.clinical_significance_to|ekey:'clinical_significance' }}</span>
@@ -30,7 +30,7 @@
                     {% endif %}
                 {% endif %}
                 {% if lab_summ.somatic_clinical_significance %}
-                    <div class="flex-grow-1 d-inline-block py-2 scs scs-{{ lab_summ.somatic_clinical_significance }}" style="padding-left:8px; border-radius:5px; flex-basis: 0">
+                    <div class="flex-grow-1 d-inline-block py-2 c-pill scs scs-{{ lab_summ.somatic_clinical_significance }}" style="flex-basis: 0">
                         {{ lab_summ.somatic_clinical_significance|ekey:'somatic:clinical_significance' }}
                     </div>
                 {% endif %}
