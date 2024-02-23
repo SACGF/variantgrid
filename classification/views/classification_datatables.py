@@ -34,9 +34,13 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         }
 
     def render_somatic_clinical_significance(self, row: Dict[str, Any]) -> JsonDataType:
-        return {
-            SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}__value"]
-        }
+        if row["classification__allele_origin_bucket"] != "G":
+            return {
+                SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}__value"]
+            }
+        else:
+            return {}
+
 
     def render_classification(self, row: Dict[str, Any]) -> JsonDataType:
         return {
@@ -175,22 +179,10 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             ),
             RichColumn(
                 key='published_evidence__clinical_significance__value',
-                name='clinical_significance',
-                label='Classification',
-                renderer=self.render_somatic_clinical_significance_combined,
-                client_renderer='VCTable.clinical_significance',
-                client_renderer_td='VCTable.clinical_significance_td',
-                sort_keys=['clinical_significance', 'clin_sig_sort'],
-                extra_columns=["published_evidence__somatic:clinical_significance__value"],
-                orderable=True,
-                enabled=False
-            ),
-            RichColumn(
-                key='published_evidence__clinical_significance__value',
                 name='classification',
                 label='Classification',
                 renderer=self.render_classification,
-                client_renderer='VCTable.clinical_significance',
+                client_renderer='VCTable.classification',
                 client_renderer_td='VCTable.clinical_significance_td',
                 sort_keys=['clin_sig_sort'],
                 orderable=True
@@ -200,8 +192,9 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 name='somatic_clinical_significance',
                 label='Clinical Significance',
                 renderer=self.render_somatic_clinical_significance,
-                client_renderer='VCTable.clinical_significance',
+                client_renderer='VCTable.somatic_clinical_significance',
                 client_renderer_td='VCTable.clinical_significance_td',
+                extra_columns=['classification__allele_origin_bucket'],
                 sort_keys=['published_evidence__somatic:clinical_significance__value'],
                 orderable=True
             ),

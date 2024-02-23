@@ -2387,33 +2387,32 @@ VCTable.condition = (data, type, row) => {
     }
 };
 
-VCTable.clinical_significance = (data, type, row) => {
-    let dom = $('<span>', {style: 'font-weight:bold;color:#555'});
-    let hadCs = false;
-
-    if (SpecialEKeys.CLINICAL_SIGNIFICANCE in data) {
-        hadCs = true;
-        let cs = data[SpecialEKeys.CLINICAL_SIGNIFICANCE];
-        let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
-        let label = csKey.prettyValue(cs);
-        if (cs && cs.length) {
-            dom.append(label.val);
-        } else {
-            dom.append($('<span>', {class: 'no-value', text: '-'}));
-        }
-    }
+VCTable.somatic_clinical_significance = (data, type, row) => {
     if (SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE in data) {
+        let dom = $('<span>', {style: 'font-weight:bold;color:#555'});
         let scs = data[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE];
         if (scs) {
             let scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
             let scsLabel = scsKey.prettyValue(scs);
-            if (hadCs) {
-                dom.append('<br/>');
-            }
             dom.append($('<span>', {text: scsLabel.val, 'class': `scs scs-${scs}`}));
         } else {
-            dom.append($('<span>', {class: 'no-value', text: '-'}));
+            dom.append($('<span>', {class: 'no-value', text: 'No Data'}));
         }
+        return dom.prop('outerHTML');
+    } else {
+        return "";
+    }
+}
+
+VCTable.classification = (data, type, row) => {
+    let dom = $('<span>', {style: 'font-weight:bold;color:#555'});
+    let cs = data[SpecialEKeys.CLINICAL_SIGNIFICANCE];
+    let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
+    let label = csKey.prettyValue(cs);
+    if (cs && cs.length) {
+        dom.append(label.val);
+    } else {
+        dom.append($('<span>', {class: 'no-value', text: 'No Data'}));
     }
     return dom.prop('outerHTML');
 };

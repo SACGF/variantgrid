@@ -49,12 +49,14 @@
             {{ group.clinical_significance_pending | ekey:"clinical_significance" }}
             <div title="Some or all of these classifications have been marked as having pending changes to classification" data-toggle="tooltip" class="flag flag-classification_pending_changes hover-detail mx-1"></div>
         {% else %}
-            {% if group.clinical_significance %}{{ group.clinical_significance | ekey:"clinical_significance" }}{% else %}<span class="no-value">-</span>{% endif %}
+            {% if group.clinical_significance %}{{ group.clinical_significance | ekey:"clinical_significance" }}{% else %}<span class="no-value">No Data</span>{% endif %}
         {% endif %}
     </td>
     <td style="width:100px; font-weight: bold; color: #555;" class="scs scs-{{ group.somatic_clin_sig }} text-center" data-order="{{ group.somatic_clin_sig|default_if_none:'0' }}">
         {% if group.somatic_clin_sig %}
             <span class="scs scs-{{ group.somatic_clin_sig }}">{{ group.somatic_clin_sig | ekey:"somatic:clinical_significance" }}</span>
+        {% elif group.allele_origin_bucket != "G" %}
+            <span class="no-value">No Data</span>
         {% endif %}
     </td>
     <td style="width:186px;">
