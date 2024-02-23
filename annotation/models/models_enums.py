@@ -170,6 +170,7 @@ class ClinVarReviewStatus(models.TextChoices):
     PRACTICE_GUIDELINE = "P", "Practice guideline"
 
     STARS = Constant({
+        NO_CLASSIFICATION_PROVIDED[0]: 0,
         NO_ASSERTION_PROVIDED[0]: 0,
         NO_ASSERTION_CRITERIA_PROVIDED[0]: 0,
         NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT[0]: 0,
