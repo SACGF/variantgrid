@@ -1731,11 +1731,8 @@ const VCForm = (function() {
                         emptyValuePrefix = "⚪ ";
                     }
 
+
                     let blankOption = optionSources.find(o => !('key' in o));
-                    if (!blankOption) {
-                        // optionSources = [{key: '', label: ''}].concat(optionSources);
-                        optGroups.push($('<option>', {value: '', text: ''}));
-                    }
 
                     let makeOption = (option, overridePrefix) => {
                         let prefix = "";
@@ -1780,11 +1777,21 @@ const VCForm = (function() {
                         }));
                     }
 
+                    if (!blankOption) {
+                        options.unshift($('<option>', {value: '', text: ''}));
+                    }
+
                     let select = $('<select>', {name: key, html: options.concat(optGroups)});
                     if (type === 'multiple') {
                         select.attr('multiple', true);
                     }
                     widgetDiv.append(select);
+
+
+
+                    if (key == "acmg:pm1") {
+                        console.log(select.html());
+                    }
 
                     select.chosen({
                         allow_single_deselect: true,
