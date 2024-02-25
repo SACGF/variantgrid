@@ -16,6 +16,7 @@ from django.db import models, transaction, connection
 from django.db.models.deletion import PROTECT, CASCADE, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
+from django.urls import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from psqlextra.models import PostgresPartitionedModel
@@ -731,6 +732,9 @@ class AnnotationRun(TimeStampedModel):
 
     class Meta:
         unique_together = ('annotation_range_lock', 'pipeline_type')
+
+    def get_absolute_url(self):
+        return reverse('view_annotation_run', kwargs={'annotation_run_id': self.pk})
 
     @property
     def variant_annotation_version(self):

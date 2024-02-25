@@ -9,13 +9,19 @@ from annotation import models
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
 from annotation.clinvar_xml_parser import CLINVAR_RECORD_CACHE_DAYS
 from annotation.clinvar_xml_parser_via_vcv import ClinVarXmlParserViaVCV
-from annotation.models import Citation, CitationFetchRequest, ClinVarRecordCollection, ClinVarRecord, ClinVar
+from annotation.models import Citation, CitationFetchRequest, ClinVarRecordCollection, ClinVarRecord, ClinVar, \
+    AnnotationRun
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, get_admin_url
 
-admin.site.register(models.AnnotationRun)
 admin.site.register(models.AnnotationVersion)
 admin.site.register(models.GeneAnnotationVersion)
 admin.site.register(models.VariantAnnotationVersion)
+
+
+@admin.register(AnnotationRun)
+class AnnotationRun(ModelAdminBasics):
+    list_display = ("pk", "pipeline_type", "status")
+    list_filter = ("pipeline_type", "status")
 
 
 @admin.register(ClinVar)
