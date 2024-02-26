@@ -35,8 +35,16 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
     def render_somatic_clinical_significance(self, row: Dict[str, Any]) -> JsonDataType:
         if row["classification__allele_origin_bucket"] != "G":
+
+            highest_level: Optional[str] = None
+            for level in ['a', 'b', 'c', 'd']:
+                if level_value := row.get(f"published_evidence__amp:level_{level}__value"):
+                    highest_level = level.upper()
+                    break
+
             return {
-                SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}__value"]
+                SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}__value"],
+                "highest_level": highest_level
             }
         else:
             return {}
@@ -192,7 +200,13 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 label='Clinical Significance',
                 renderer=self.render_somatic_clinical_significance,
                 client_renderer='VCTable.somatic_clinical_significance',
-                extra_columns=['classification__allele_origin_bucket'],
+                extra_columns=[
+                    'classification__allele_origin_bucket',
+                    'published_evidence__amp:level_a__value',
+                    'published_evidence__amp:level_b__value',
+                    'published_evidence__amp:level_c__value',
+                    'published_evidence__amp:level_d__value'
+                ],
                 sort_keys=['published_evidence__somatic:clinical_significance__value'],
                 orderable=True
             ),

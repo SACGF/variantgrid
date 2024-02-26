@@ -99,6 +99,13 @@ class SpecialEKeys:
     VARIANT_LINKING_HGVS_KEYS = [C_HGVS, G_HGVS]
     VARIANT_LINKING_KEYS = VARIANT_LINKING_HGVS_KEYS + [VARIANT_COORDINATE]
 
+    AMP_LEVELS_TO_LEVEL = {
+        'amp:level_a': "A",
+        'amp:level_b': "B",
+        'amp:level_c': "C",
+        'amp:level_d': "D"
+    }
+
 
 class ValidationCode:
     # Basic Errors

@@ -885,7 +885,7 @@ const VCForm = (function() {
                     $('<div>', {class:'col-9 pl-3 align-self-center', html:valueElement})
                 ]}).appendTo(jSyncStatus);
             };
-            let appendLabelHeadingForKey = (key, showBlank, labelOverride) => {
+            let appendLabelHeadingForKey = (key, showBlank, labelOverride, extra) => {
                 let value = this.value(key);
                 if (value !== null || showBlank) {
                     let eKey = eKeys.key(key);
@@ -895,6 +895,9 @@ const VCForm = (function() {
                         valueElement = $('<span>', {class: 'no-value', text: '-'});
                     } else {
                         value = eKey.prettyValue(value).val;
+                        if (extra) {
+                            value += extra;
+                        }
                         valueElement = $('<span>', {text: value});
                     }
                     appendLabelHeading(label, valueElement);
@@ -969,7 +972,15 @@ const VCForm = (function() {
             appendLabelHeadingForKey(SpecialEKeys.CLINICAL_SIGNIFICANCE, true, 'Class.');
 
             if (this.value(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)) {
-                appendLabelHeadingForKey(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE, true, 'Somatic Sig');
+                let extra = null;
+                for (let level of ['a', 'b', 'c', 'd']) {
+                    let value = this.value(`amp:level_${level}`);
+                    if (value) {
+                        extra = ` - ${level.toUpperCase()}`;
+                        break;
+                    }
+                }
+                appendLabelHeadingForKey(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE, true, 'Somatic Sig', extra);
             }
 
             if (this.record.sample_id) {
@@ -1787,12 +1798,6 @@ const VCForm = (function() {
                     }
                     widgetDiv.append(select);
 
-
-
-                    if (key == "acmg:pm1") {
-                        console.log(select.html());
-                    }
-
                     select.chosen({
                         allow_single_deselect: true,
                         width: '288px',
@@ -2402,6 +2407,12 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
             let scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
             let scsLabel = scsKey.prettyValue(scs);
             dom = $('<span>', {text: scsLabel.val, 'class': `c-pill scs scs-${scs}`});
+
+            let highest_level = data["highest_level"];
+            if (highest_level) {
+                dom.append(` <span class="amp-level">${highest_level}</span>`);
+            }
+
         } else {
             dom = $('<span>', {class: 'c-pill scs-none no-value', text: 'No Data'});
         }

@@ -2957,6 +2957,14 @@ a .c-hgvs-body {
 	color: #555;
 	font-weight: 600;
 
+	.amp-level {
+		color: #777;
+		&::before {
+			content: '-';
+			padding-right: 2px;
+		}
+	}
+
 	&.scs-none, &.cs-none {
 		border: none !important;
 	}

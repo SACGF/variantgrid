@@ -153,6 +153,13 @@ class EvidenceMixin:
         return strengths.summary_string(acmg_only=only_acmg)
 
     @cached_property
+    def amp_level(self) -> Optional[str]:
+        for key, level in SpecialEKeys.AMP_LEVELS_TO_LEVEL.items():
+            if self.get(key):
+                return level
+        return None
+
+    @cached_property
     def c_parts(self) -> CHGVS:
         return CHGVS(self.get(SpecialEKeys.C_HGVS) or "")
 
