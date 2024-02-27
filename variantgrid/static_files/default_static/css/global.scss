@@ -2958,11 +2958,11 @@ a .c-hgvs-body {
 	font-weight: 600;
 
 	.amp-level {
-		color: #777;
-		&::before {
-			content: '-';
-			padding-right: 2px;
-		}
+		//color: #777;
+		//&::before {
+		//	content: '-';
+		//	padding-right: 2px;
+		//}
 	}
 
 	&.scs-none, &.cs-none {

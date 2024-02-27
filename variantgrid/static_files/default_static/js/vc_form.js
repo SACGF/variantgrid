@@ -976,7 +976,7 @@ const VCForm = (function() {
                 for (let level of ['a', 'b', 'c', 'd']) {
                     let value = this.value(`amp:level_${level}`);
                     if (value) {
-                        extra = ` - ${level.toUpperCase()}`;
+                        extra = ` ${level.toUpperCase()}`;
                         break;
                     }
                 }

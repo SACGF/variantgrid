@@ -2568,13 +2568,6 @@ a .c-hgvs-body .c-hgvs-nomen {
   color: #555;
   font-weight: 600;
 }
-.c-pill .amp-level {
-  color: #777;
-}
-.c-pill .amp-level::before {
-  content: '-';
-  padding-right: 2px;
-}
 .c-pill.scs-none, .c-pill.cs-none {
   border: none !important;
 }
