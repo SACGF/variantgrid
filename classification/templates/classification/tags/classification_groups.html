@@ -39,7 +39,7 @@
 {% if diff_latest or diff_all or download_link or history_link %}
     <div data-toolbar="#{{ table_id }}" class="data-toolbar" style="display:flex">
         {% if title %}<label>{{ title }}</label>{% endif %}
-        <div class="link-toolbar" style="position:relative; top:6px">
+        <div class="link-toolbar" {% if allele_origin_filter_enabled %}style="position:relative; top:6px"{% endif %}>
             {% if diff_latest and diff_all %}
                 <div class="d-inline-block">
                     Show Evidence Differences Between
@@ -99,8 +99,14 @@
     </tbody>
 </table>
 <script>
+    {% if allele_origin_filter_enabled %}
     let table = null;
+    {% endif %}
     $(document).ready(() => {
+        {% if not allele_origin_filter_enabled %}
+            // only need table out of scope if we've got allele filter
+            let table = null;
+        {% endif %}
         let tableDom = $('#{{ table_id }}')
         table = tableDom.DataTable({
             order: [{{ sort_order_index }}, "asc"],
@@ -161,15 +167,17 @@
         {% endif %}
     });
 
-    function alleleOriginToggle(filterValue) {
-        if (filterValue === "A") {
-            table.column(8).search("").draw();
-        } else {
-            let regexSearch = `[${filterValue}|U]`;
-            table.column(8).search(regexSearch, true, false).draw();
+    {% if allele_origin_filter_enabled %}
+        function alleleOriginToggle(filterValue) {
+            if (filterValue === "A") {
+                table.column(8).search("").draw();
+            } else {
+                let regexSearch = `[${filterValue}|U]`;
+                table.column(8).search(regexSearch, true, false).draw();
+            }
+            table.column(3).visible(filterValue !== "G");
         }
-        table.column(3).visible(filterValue !== "G");
-    }
+    {% endif %}
 </script>
 {% else %}
     <div class="no-value mb-4 text-center">No records</div>
