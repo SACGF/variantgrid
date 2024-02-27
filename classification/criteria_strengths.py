@@ -190,7 +190,7 @@ class CriteriaStrengths:
         return ", ".join(str(cs) for cs in sorted(self.strength_list_met))
 
     def summary_string_short(self) -> str:
-        return ", ".join(f"{cs:short}" for cs in sorted(strength for strength in self.strength_list_met if not strength.ekey.namespace))
+        return ", ".join(f"{cs:short}" for cs in sorted(strength for strength in self.strength_list_met if strength.ekey.namespace == "acmg"))
 
     @property
     def has_criteria(self):
