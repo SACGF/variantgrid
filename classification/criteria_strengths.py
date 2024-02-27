@@ -202,8 +202,8 @@ class CriteriaStrengths:
         if isinstance(item, str):
             from classification.models import EvidenceKeyMap
             if '_' in item:
-                parts = item.split('_')
-                return [self.strength_map.get(part.lower()) or CriteriaStrength(EvidenceKeyMap.cached_key(part), None) for part in parts]
+                parts = ["acmg:" + p for p in item.split('_')]
+                return [self.strength_map.get(part) or CriteriaStrength(EvidenceKeyMap.cached_key(part), None) for part in parts]
 
             return self.strength_map.get(item.lower()) or CriteriaStrength(EvidenceKeyMap.cached_key(item), None)
 
