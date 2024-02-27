@@ -2105,7 +2105,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if not cached_c_hgvs:
             cached_c_hgvs = self.get(SpecialEKeys.C_HGVS)
 
-        clinical_significance = self.get_clinical_significance_display() or "Unclassified"
+        clinical_significance = self.get_clinical_significance_display() or "No Data"
         return f"({str(self.id)}) {cached_c_hgvs} {clinical_significance}"
 
     @staticmethod

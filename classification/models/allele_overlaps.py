@@ -163,6 +163,7 @@ class ClinicalGroupingOverlap:
             clinical_significance_from=clinical_sig,
             clinical_significance_to=pending_clin_sig or clinical_sig,  # FIXME, check flags for pending
             somatic_clinical_significance=cm.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE),
+            amp_level=cm.amp_level,
             pending=bool(pending_clin_sig)
         )
         self.groups[group].append(cm)

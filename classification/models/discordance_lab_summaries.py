@@ -62,6 +62,7 @@ class DiscordanceLabSummary(ClassificationLabSummary):
                 clinical_significance_from=clinical_significance_from,
                 clinical_significance_to=clinical_significance_to,
                 somatic_clinical_significance=drc.classification_original.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE),
+                amp_level=drc.classification_original.amp_level,
                 pending=pending
             )].append(drc)
 

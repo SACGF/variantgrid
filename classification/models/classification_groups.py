@@ -358,8 +358,10 @@ class ClassificationGroup:
                 strength = cm.get(e_key.key)
                 if CriteriaEvaluation.is_met(strength):
                     strengths.add(CriteriaStrength(e_key, strength))
+            # for amp_level in SpecialEKeys.AMP_LEVELS_TO_LEVEL.keys():
+            #     if cm.get(amp_level):
+            # strengths.add(CriteriaStrength(ekey=None, ))
             return strengths
-
         output = MultiValues.convert([criteria_converter(cm) for cm in self.modifications])
         return output
 

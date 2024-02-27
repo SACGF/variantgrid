@@ -355,7 +355,7 @@ class ClinicalSignificance:
         (PATHOGENIC, 'Pathogenic'),
     ]
 
-    LABELS = dict(CHOICES + [(None, "Unclassified")])
+    LABELS = dict(CHOICES + [(None, "No Data")])
 
     SHORT_CHOICES = [
         (OTHER, 'O'),

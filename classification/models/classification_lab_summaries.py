@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 from classification.enums import SpecialEKeys
 from snpdb.models import Lab
@@ -10,6 +11,7 @@ class ClassificationLabSummaryEntry:
     clinical_significance_from: str
     clinical_significance_to: str
     somatic_clinical_significance: str
+    amp_level: Optional[str] = None
     pending: bool = False
 
 
@@ -28,12 +30,16 @@ class ClassificationLabSummary:
         return self.group.lab
 
     @property
+    def amp_level(self):
+        return self.group.amp_level
+
+    @property
     def clinical_significance_from(self):
-        return self.group.clinical_significance_from or 'Unclassified'
+        return self.group.clinical_significance_from or 'No Data'
 
     @property
     def clinical_significance_to(self):
-        return self.group.clinical_significance_to or 'Unclassified'
+        return self.group.clinical_significance_to or 'No Data'
 
     @property
     def somatic_clinical_significance(self):
