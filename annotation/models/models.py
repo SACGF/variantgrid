@@ -702,6 +702,27 @@ class AnnotationRangeLock(models.Model):
         max_v = self.max_variant_id
         return f"AnnotationRangeLock: (v. {self.version}) {min_v} - {max_v}"
 
+    @staticmethod
+    def release_variant(variant: Variant):
+        """ Sometimes we want to delete a variant that is either min/max of an AnnotationRangeLock
+            This moves the min/max ID in so we can delete it.
+        """
+
+        if arl := AnnotationRangeLock.objects.filter(min_variant=variant).first():
+            if arl.max_variant == variant:
+                # Just contained this variant
+                arl.delete()
+            else:
+                q_contig = Variant.get_contigs_q(arl.version.genome_build)
+                if new_min := Variant.objects.filter(q_contig, pk__gt=arl.min_variant_id, pk__lte=arl.max_variant_id):
+                    arl.min_variant = new_min
+                    arl.save()
+        elif arl := AnnotationRangeLock.objects.filter(max_variant=variant).first():
+            q_contig = Variant.get_contigs_q(arl.version.genome_build)
+            if new_max := Variant.objects.filter(q_contig, pk__gte=arl.min_variant_id, pk__lt=arl.max_variant_id):
+                arl.max_variant = new_max
+                arl.save()
+
 
 class AnnotationRun(TimeStampedModel):
     status = models.CharField(max_length=1, choices=AnnotationStatus.choices, default=AnnotationStatus.CREATED)

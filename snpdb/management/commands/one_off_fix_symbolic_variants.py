@@ -1,4 +1,6 @@
 from django.core.management.base import BaseCommand
+
+from annotation.models import AnnotationRangeLock
 from snpdb.models import Variant, Sequence, GenomeBuild, Locus
 from django.db.models.functions import Length
 from django.db.models import Q
@@ -20,7 +22,8 @@ class Command(BaseCommand):
         dupes = []
 
         for genome_build in GenomeBuild.builds_with_annotation():
-            for v in long_variants.filter(Variant.get_contigs_q(genome_build)):
+            q_contig = Variant.get_contigs_q(genome_build)
+            for v in long_variants.filter(q_contig):
                 vc = v.coordinate.as_internal_symbolic()
                 if not vc.is_symbolic():
                     not_symbolic.append(v)
@@ -36,6 +39,7 @@ class Command(BaseCommand):
                         dupes.append((v, existing))
                         continue
                     v.clinvar_set.all().update(variant=existing)
+                    AnnotationRangeLock.release_variant(v)
 
                     # Classification protects Variant FK, so won't delete if that exists
                     v.delete()
