@@ -14,6 +14,10 @@ let VCLink = (function() {
         },
 
         asAnchor(style) {
+            if (this.href === null) {
+                return $('<span>');
+            }
+
             let title = this.title || this.text;
             if (this.build) {
                 title = `${title} (${this.build})`;
@@ -49,6 +53,14 @@ let VCLink = (function() {
     return VCLink;
 
 })();
+
+EMPTY_LINK = new VCLink({
+    text: null,
+    href: null,
+    missing: true,
+    title: null,
+    build: null
+});
 
 let VCLinks = (function() {
 
@@ -97,6 +109,9 @@ let VCLinks = (function() {
 
             links.push(this.generateBeacon());
             links.push(this.makeLink('cBioPortal (Gene)', 'https://www.cbioportal.org', '/ln?q=@@:MUT', SpecialEKeys.GENE_SYMBOL));
+            links.push(this.makeLink('CIViC (Gene)', 'https://civicdb.org', '/links/entrez_name/@@', SpecialEKeys.GENE_SYMBOL));
+            // not sure why, but this straight up doesn't work
+            // links.push(this.makeLink('CIViC (Variant)', 'https://civicdb.org', '/links/allele_registry/@@', SpecialEKeys.CLINGEN_ALLELE_ID));
             links.push(this.makeLink('ClinGen Allele Reg.', 'http://reg.clinicalgenome.org', '/redmine/projects/registry/genboree_registry/by_caid?caid=@@', SpecialEKeys.CLINGEN_ALLELE_ID, 'Clingen Allele Registry'));
             links.push(this.generateClingenKb());
             links.push(this.makeLink('Clinvar Variant', 'https://www.ncbi.nlm.nih.gov', '/clinvar/variation/@@', SpecialEKeys.CLINVAR_VARIANTION_ID));
@@ -115,6 +130,8 @@ let VCLinks = (function() {
             links.push(this.generateUcsc());
             links.push(this.makeLink('Uniprot ID', 'https://www.uniprot.org/uniprot/', '@@', SpecialEKeys.UNIPROT_ID));
             links.push(this.generateVarsome());
+
+            links.push(EMPTY_LINK);
 
             return links;
         },
