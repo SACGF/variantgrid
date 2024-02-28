@@ -386,7 +386,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
 
         svlen = None
         ref = self.ref
-        if self.alt == self.ref:
+        if self.alt == Variant.REFERENCE_ALT or self.alt == self.ref:
             alt = Variant.REFERENCE_ALT
         else:
             ref_length = len(ref)
