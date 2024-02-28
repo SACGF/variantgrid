@@ -358,9 +358,15 @@ class ClassificationGroup:
                 strength = cm.get(e_key.key)
                 if CriteriaEvaluation.is_met(strength):
                     strengths.add(CriteriaStrength(e_key, strength))
-            # for amp_level in SpecialEKeys.AMP_LEVELS_TO_LEVEL.keys():
-            #     if cm.get(amp_level):
-            # strengths.add(CriteriaStrength(ekey=None, ))
+            for amp_level, letter in SpecialEKeys.AMP_LEVELS_TO_LEVEL.items():
+                if value := cm.get_value_list(amp_level):
+                    e_key = EvidenceKeyMap.cached_key(amp_level)
+                    for sub_value in value:
+                        sub_value_label = e_key.pretty_value(sub_value)
+                        strengths.add(CriteriaStrength(
+                            ekey=EvidenceKeyMap.cached_key(amp_level),
+                            custom_strength=f"{letter}_{sub_value_label}")
+                        )
             return strengths
         output = MultiValues.convert([criteria_converter(cm) for cm in self.modifications])
         return output

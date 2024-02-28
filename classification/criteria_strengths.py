@@ -13,6 +13,7 @@ from library.utils import first
 class CriteriaStrength:
     ekey: 'EvidenceKey'
     strength: Optional[str] = None
+    custom_strength: Optional[str] = None
 
     @property
     def acmg_point(self) -> Optional[int]:
@@ -29,14 +30,14 @@ class CriteriaStrength:
 
     @property
     def is_met(self):
-        return CriteriaEvaluation.is_met(self.strength)
+        return CriteriaEvaluation.is_met(self.strength) or self.custom_strength
 
     @property
     def is_unspecified(self) -> bool:
         return self.strength and self.strength.endswith("X")
 
     def __hash__(self):
-        return hash(self.ekey) + hash(self.strength)
+        return hash(self.ekey) + hash(self.strength) + hash(self.custom_strength)
 
     def __eq__(self, other):
         return self.ekey == other.ekey and self.strength == other.strength
@@ -83,7 +84,11 @@ class CriteriaStrength:
 
     def __format__(self, format_spec):
         # Make sure criteria are in camel case so removing spaces still leaves it readable
+
         pretty_label = self.ekey.pretty_label.replace(" ", "")
+        if custom := self.custom_strength:
+            return custom
+
         suffix = self.strength
         if suffix:
             if self.ekey.namespace in {None, "horak", "acmg"}:
@@ -105,7 +110,9 @@ class CriteriaStrength:
             index = CriteriaEvaluation.ALL_STRENGTHS.index(self.strength)
         except:
             pass
-        return index, self.ekey.pretty_label
+        if self.custom_strength:
+            index = 9999
+        return index, self.ekey.pretty_label, self.custom_strength
 
     def __lt__(self, other) -> bool:
         return self._sort_key < other._sort_key
