@@ -14,7 +14,6 @@ class Command(BaseCommand):
     """
     def handle(self, *args, **options):
         long_sequences = Sequence.objects.all().annotate(seq_length=Length("seq")).filter(seq_length__gte=1000)
-        Variant.objects.filter(locus__ref=Q())
         long_variants = Variant.objects.filter(Q(locus__ref__in=long_sequences) | Q(alt__in=long_sequences))
 
         base_lookup = {s: Sequence.objects.get(seq=s) for s in ["G", "A", "T", "C", "<DEL>", "<DUP>"]}
@@ -53,7 +52,10 @@ class Command(BaseCommand):
                         print(f"Deleting Variant={v.pk}")
                         v.delete()
                 except Variant.DoesNotExist:
-                    print(f"Fixing {v}")
+                    print(f"Fixing {v.pk}: {v}")
+                    if len(vc.ref) > 1:
+                        raise ValueError(f"{v.pk} had ref length of {len(vc.ref)}")
+
                     new_ref = base_lookup[vc.ref]
                     v.locus = Locus.objects.get_or_create(contig=v.locus.contig, position=vc.position, ref=new_ref)[0]
                     v.alt = base_lookup[vc.alt]
