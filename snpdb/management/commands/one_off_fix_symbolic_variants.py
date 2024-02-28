@@ -8,7 +8,7 @@ from django.db.models import Q
 
 class Command(BaseCommand):
     """
-        There was a bug where SVs were not converted to symbolic for a while
+        There was a bug where SVs were not converted to symbolic for a while in #982
 
         This will try and fix them
     """
