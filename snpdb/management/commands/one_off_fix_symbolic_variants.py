@@ -31,18 +31,27 @@ class Command(BaseCommand):
 
                 try:
                     existing = Variant.get_from_variant_coordinate(vc, genome_build)
+                    if v == existing:
+                        ref_length = len(v.locus.ref)
+                        if ref_length > 1:
+                            # It's already there as existing - but didn't have the ref trimmed down
+                            print(f"Fixing {v.pk} had ref_length of {ref_length}")
+                            new_ref = base_lookup[v.locus.ref.seq[0]]
+                            v.locus = Locus.objects.get_or_create(contig=v.locus.contig, position=vc.position,
+                                                                  ref=new_ref)[0]
+                            v.save()
+                    else:
+                        # I think these came in via ClinVar import - so will try to get rid of it, if it isn't referenced
+                        # by anything else
+                        if v.cohortgenotype_set.exists():
+                            dupes.append((v, existing))
+                            continue
+                        v.clinvar_set.all().update(variant=existing)
+                        AnnotationRangeLock.release_variant(v)
 
-                    # I think these came in via ClinVar import - so will try to get rid of it, if it isn't referenced
-
-                    # by anything else
-                    if v.cohortgenotype_set.exists():
-                        dupes.append((v, existing))
-                        continue
-                    v.clinvar_set.all().update(variant=existing)
-                    AnnotationRangeLock.release_variant(v)
-
-                    # Classification protects Variant FK, so won't delete if that exists
-                    v.delete()
+                        # Classification protects Variant FK, so won't delete if that exists
+                        print(f"Deleting Variant={v.pk}")
+                        v.delete()
                 except Variant.DoesNotExist:
                     print(f"Fixing {v}")
                     new_ref = base_lookup[vc.ref]
