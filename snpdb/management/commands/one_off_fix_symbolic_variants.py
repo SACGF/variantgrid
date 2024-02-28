@@ -23,7 +23,7 @@ class Command(BaseCommand):
         for genome_build in GenomeBuild.builds_with_annotation():
             q_contig = Variant.get_contigs_q(genome_build)
             for v in long_variants.filter(q_contig):
-                vc = v.coordinate.as_internal_symbolic()
+                vc = v.coordinate.as_internal_symbolic(genome_build)
                 if not vc.is_symbolic():
                     not_symbolic.append(v)
                     continue

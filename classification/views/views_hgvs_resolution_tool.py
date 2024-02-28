@@ -25,6 +25,7 @@ class HgvsResolutionForm(forms.Form):
 @dataclass
 class MatcherOutput:
     matcher_name: str
+    genome_build: GenomeBuild
     imported_allele_info: Optional[ImportedAlleleInfo] = None
     variant_coordinate: Optional[VariantCoordinate] = None
     transcript_version: Optional[TranscriptParts] = None
@@ -34,7 +35,7 @@ class MatcherOutput:
     @property
     def explicit_variant_coordinate(self):
         if vc := self.variant_coordinate:
-            return vc.as_internal_symbolic()
+            return vc.as_internal_symbolic(self.genome_build)
 
     @property
     def is_error(self):
@@ -83,8 +84,10 @@ def hgvs_resolution_tool(request: HttpRequest):
         context["outputs"] = all_output
 
         # check for existing
-        for iai in ImportedAlleleInfo.objects.filter(imported_c_hgvs=hgvs_str, imported_genome_build_patch_version__genome_build=genome_build):
-            output = MatcherOutput(matcher_name="Previously resolved", imported_allele_info=iai)
+        for iai in ImportedAlleleInfo.objects.filter(imported_c_hgvs=hgvs_str,
+                                                     imported_genome_build_patch_version__genome_build=genome_build):
+            output = MatcherOutput(matcher_name="Previously resolved", genome_build=genome_build,
+                                   imported_allele_info=iai)
             all_output.append(output)
             if resolved_variant := iai[genome_build]:
                 output.hgvs = resolved_variant.c_hgvs
@@ -97,7 +100,7 @@ def hgvs_resolution_tool(request: HttpRequest):
         for matcher_id in [HGVSConverterType.PYHGVS, HGVSConverterType.BIOCOMMONS_HGVS]:
             matcher = HGVSMatcher(genome_build, hgvs_converter_type=matcher_id)
 
-            output = MatcherOutput(matcher_name=matcher.hgvs_converter.description())
+            output = MatcherOutput(matcher_name=matcher.hgvs_converter.description(), genome_build=genome_build)
             all_output.append(output)
 
             try:

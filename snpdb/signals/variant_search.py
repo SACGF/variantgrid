@@ -200,8 +200,10 @@ def get_results_from_variant_coordinate(genome_build: GenomeBuild, qs: QuerySet,
 
 def yield_search_variant_match(search_input: SearchInputInstance, get_variant_coordinate: Callable):
     for genome_build in search_input.genome_builds:
-        variant_coordinate = get_variant_coordinate(search_input.match, genome_build).as_internal_symbolic()
-        results = get_results_from_variant_coordinate(genome_build, search_input.get_visible_variants(genome_build), variant_coordinate)
+        variant_coordinate = get_variant_coordinate(search_input.match, genome_build)
+        variant_coordinate = variant_coordinate.as_internal_symbolic(genome_build)
+        results = get_results_from_variant_coordinate(genome_build, search_input.get_visible_variants(genome_build),
+                                                      variant_coordinate)
         has_results = False
         if results.exists():
             has_results = True

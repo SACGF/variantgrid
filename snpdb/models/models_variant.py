@@ -377,38 +377,46 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             alt = self.alt
         return VariantCoordinate(chrom=self.chrom, position=self.position, ref=self.ref, alt=alt)
 
-    def as_internal_symbolic(self):
+    def as_internal_symbolic(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
         """ Internal format - alt can be <DEL> or <DUP>
             Uses our internal reference representation
         """
         if self.is_symbolic():
             return self
 
-        svlen = None
         ref = self.ref
+        alt = self.alt  # default, only change if symbolic
+        svlen = None
         if self.alt == Variant.REFERENCE_ALT or self.alt == self.ref:
             alt = Variant.REFERENCE_ALT
         else:
+            # Could be symbolic
             ref_length = len(ref)
             alt_length = len(self.alt)
             diff = alt_length - ref_length
-            if abs(diff) >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
-                if diff > 0:
-                    alt = VCFSymbolicAllele.DUP
-                else:
+            if ref_length == 1:
+                if alt_length >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
+                    # Possible dup
+                    # TODO: Can probably remove HGVS dependency from here - just look directly at sequence
+                    from genes.hgvs import HGVSMatcher
+                    matcher = HGVSMatcher(genome_build)
+                    hgvs_variant = matcher.variant_coordinate_to_hgvs_variant(self)
+                    if hgvs_variant.mutation_type == 'dup':
+                        ref = self.ref[0]
+                        alt = VCFSymbolicAllele.DUP
+                        svlen = diff
+            elif alt_length == 1:
+                if ref_length >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
                     ref = self.ref[0]
                     alt = VCFSymbolicAllele.DEL
-                svlen = diff
-            else:
-                alt = self.alt
+                    svlen = diff
 
-                # Inversion
-                if diff == 0 and ref_length >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
+            elif ref_length == alt_length:
+                if ref_length > settings.VARIANT_SYMBOLIC_ALT_SIZE:
                     if self.ref == reverse_complement(self.alt):
                         ref = self.ref[0]
                         alt = VCFSymbolicAllele.INV
                         svlen = len(self.ref) - 1  # explicit inv had same length ref/alt, now we have len(ref) == 1
-
         return VariantCoordinate(chrom=self.chrom, position=self.position, ref=ref, alt=alt, svlen=svlen)
 
 
@@ -560,7 +568,7 @@ class Variant(PreviewModelMixin, models.Model):
 
     @staticmethod
     def get_from_variant_coordinate(variant_coordinate: VariantCoordinate, genome_build: GenomeBuild) -> 'Variant':
-        variant_coordinate = variant_coordinate.as_internal_symbolic()
+        variant_coordinate = variant_coordinate.as_internal_symbolic(genome_build)
         params = ["locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq", "svlen"]
         return Variant.objects.get(locus__contig__genomebuildcontig__genome_build=genome_build,
                                    **dict(zip(params, variant_coordinate)))

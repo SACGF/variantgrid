@@ -354,7 +354,7 @@ class HGVSMatcher:
             variant_coordinate, matches_reference = self.hgvs_converter.hgvs_to_variant_coordinate_and_reference_match(hgvs_string, None)
 
         return VariantCoordinateAndDetails(
-            variant_coordinate=variant_coordinate.as_internal_symbolic(),
+            variant_coordinate=variant_coordinate.as_internal_symbolic(self.genome_build),
             transcript_accession=used_transcript_accession,
             kind=kind,
             method=method,

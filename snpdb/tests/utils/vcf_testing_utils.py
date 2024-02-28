@@ -7,7 +7,8 @@ from snpdb.models import Locus, Variant, Sequence, GenomeBuild, Allele, VariantA
 
 def slowly_create_test_variant(chrom: str, position: int, ref: str, alt: str, genome_build: GenomeBuild) -> Variant:
     """ For test only - doesn't use VariantPKLookup """
-    vc = VariantCoordinate.from_explicit_no_svlen(chrom, position, ref, alt).as_internal_symbolic()
+    vc = VariantCoordinate.from_explicit_no_svlen(chrom, position, ref, alt)
+    vc = vc.as_internal_symbolic(genome_build)
     contig = genome_build.contigs.get(name=vc.chrom)
     uref = vc.ref.upper()
     ualt = vc.alt.upper()
@@ -39,7 +40,8 @@ def slowly_create_loci_and_variants_for_vcf(genome_build, vcf_filename, get_vari
         ref = str(v.REF)
         alt = str(v.ALT[0])
 
-        vc = VariantCoordinate.from_explicit_no_svlen(v.CHROM, int(v.POS), ref, alt).as_internal_symbolic()
+        vc = VariantCoordinate.from_explicit_no_svlen(v.CHROM, int(v.POS), ref, alt)
+        vc = vc.as_internal_symbolic(genome_build)
         ref_id = pk_by_seq.get(ref)
         if ref_id is None:
             sequence = Sequence.objects.create(seq=ref, seq_md5_hash=md5sum_str(ref))

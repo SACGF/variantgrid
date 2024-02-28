@@ -26,13 +26,13 @@ class VariantTestCase(TestCase):
         self.assertEqual(vc_explicit.ref, vc_explicit.alt)
 
     def test_ref_variant_coordinate_internal(self):
-        vc_symbolic = self.ref_variant.coordinate.as_internal_symbolic()
+        vc_symbolic = self.ref_variant.coordinate.as_internal_symbolic(self.grch37)
         self.assertEqual(vc_symbolic.alt, Variant.REFERENCE_ALT)
 
     def _test_internal_to_external_and_back(self, variant_coordinate, genome_build):
-        internal = variant_coordinate.as_internal_symbolic()
+        internal = variant_coordinate.as_internal_symbolic(genome_build)
         external = internal.as_external_explicit(genome_build)
-        internal2 = external.as_internal_symbolic()
+        internal2 = external.as_internal_symbolic(genome_build)
         self.assertEqual(internal, internal2, msg="internal<->external")
 
     def _test_to_and_from_string(self, variant_coordinate, genome_build):
@@ -64,4 +64,14 @@ class VariantTestCase(TestCase):
 
         vc = VariantCoordinate(chrom='1', position=100000, ref='C', alt='<INV>', svlen=1000)
         self._test_coordinate_conversion(vc, self.grch37)
+
+    def test_multi_variant(self):
+        ref = 'AACCGGTT'
+        long_alt = "GATTACA" * 200  # 1.4kb
+        vc = VariantCoordinate(chrom='10', position=89714001, ref=ref, alt=long_alt)
+        vc_s = vc.as_internal_symbolic(self.grch37)
+        # This is not symbolic, it's a multi-alt
+        self.assertEquals(vc.ref, vc_s.ref)
+        self.assertEquals(vc.alt, vc_s.alt)
+
 

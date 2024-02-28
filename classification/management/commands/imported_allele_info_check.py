@@ -161,11 +161,11 @@ class ChgvsDiff(ExportRow):
         genome_build = self._imported_genome_build
         resolved = self.resolved.variant_coordinate
         if resolved:
-            resolved = resolved.as_internal_symbolic()
+            resolved = resolved.as_internal_symbolic(genome_build)
 
         updated = self.updated.variant_coordinate
         if updated:
-            updated = updated.as_internal_symbolic()
+            updated = updated.as_internal_symbolic(genome_build)
 
         return Change.compare_2(resolved, updated)
 

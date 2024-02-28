@@ -176,7 +176,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
         except HGVSDataNotAvailableError:
             raise Contig.ContigNotInBuildError()
         vc = VariantCoordinate.from_explicit_no_svlen(chrom, position, ref=ref, alt=alt)
-        return vc.as_internal_symbolic(), matches_reference
+        return vc.as_internal_symbolic(self.genome_build), matches_reference
 
     def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
         sequence_variant = self._parser_hgvs(hgvs_string)
