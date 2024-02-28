@@ -714,12 +714,12 @@ class AnnotationRangeLock(models.Model):
                 arl.delete()
             else:
                 q_contig = Variant.get_contigs_q(arl.version.genome_build)
-                if new_min := Variant.objects.filter(q_contig, pk__gt=arl.min_variant_id, pk__lte=arl.max_variant_id):
+                if new_min := Variant.objects.filter(q_contig, pk__gt=arl.min_variant_id, pk__lte=arl.max_variant_id).first():
                     arl.min_variant = new_min
                     arl.save()
         elif arl := AnnotationRangeLock.objects.filter(max_variant=variant).first():
             q_contig = Variant.get_contigs_q(arl.version.genome_build)
-            if new_max := Variant.objects.filter(q_contig, pk__gte=arl.min_variant_id, pk__lt=arl.max_variant_id):
+            if new_max := Variant.objects.filter(q_contig, pk__gte=arl.min_variant_id, pk__lt=arl.max_variant_id).first():
                 arl.max_variant = new_max
                 arl.save()
 
