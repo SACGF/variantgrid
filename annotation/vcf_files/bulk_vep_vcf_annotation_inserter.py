@@ -387,7 +387,7 @@ class BulkVEPVCFAnnotationInserter:
                 logging.warning(f"Could not find gene_id: '{vep_gene}'")
         return gene_id
 
-    def _get_transcript_accession_id_and_version_id(self, vep_transcript_data) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    def _get_transcript_id_and_version(self, vep_transcript_data) -> tuple[Optional[str], Optional[str]]:
         transcript_accession = None
         transcript_id = None
         transcript_version_id = None
@@ -404,7 +404,7 @@ class BulkVEPVCFAnnotationInserter:
                         logging.warning(f"Have transcript '{transcript_id}' but no version: '{version}'")
                 else:
                     logging.warning(f"Could not find transcript: '{t_id}'")
-        return transcript_accession, transcript_id, transcript_version_id
+        return transcript_id, transcript_version_id
 
     def add_calculated_transcript_columns(self, variant_coordinate: Optional[VariantCoordinate], transcript_data):
         """ variant_coordinate - will only be set for symbolics """
@@ -456,7 +456,10 @@ class BulkVEPVCFAnnotationInserter:
         if variant_coordinate is None:
             return
 
-        if transcript_accession := transcript_data.get("transcript_accession"):
+        transcript_id = transcript_data.get("transcript_id")
+        version = transcript_data.get("version_id")
+        if transcript_id and version:
+            transcript_accession = TranscriptVersion.get_accession(transcript_id, version)
             try:
                 hgvs_c = self.hgvs_matcher.variant_coordinate_to_hgvs_variant(variant_coordinate, transcript_accession)
                 transcript_data['hgvs_c'] = hgvs_c
@@ -499,8 +502,7 @@ class BulkVEPVCFAnnotationInserter:
                 transcript_data.update(self.constant_data)
                 transcript_data["variant_id"] = variant_id
                 transcript_data["gene_id"] = gene_id
-                transcript_accession, transcript_id, transcript_version_id = self._get_transcript_accession_id_and_version_id(vep_transcript_data)
-                transcript_data["transcript_accession"] = transcript_accession
+                transcript_id, transcript_version_id = self._get_transcript_id_and_version(vep_transcript_data)
                 transcript_data["transcript_id"] = transcript_id
                 transcript_data["transcript_version_id"] = transcript_version_id
                 if symbol := transcript_data.get("symbol"):
