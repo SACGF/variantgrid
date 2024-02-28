@@ -268,8 +268,9 @@ EKey.families = {
     DB: 'Other database',
     O: 'Other data',
     L: 'Literature',
+    SC: 'Somatic clinical significance evidence',
     HI: 'Interpretation',
-    SO: 'Sign Off',
+    SO: 'Sign off',
     U: 'Unknown'
 };
 

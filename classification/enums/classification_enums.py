@@ -152,6 +152,7 @@ class EvidenceCategory:
     ALLELIC_DATA = 'A'
     OTHER_DATABASE = 'DB'
     OTHER_DATA = 'O'
+    SOMATIC_CLINICAL_SIGNIFICANCE_EVIDENCE = "SC"
     INTERPRETATION = 'HI'
     SIGN_OFF = 'SO'
     LITERATURE = 'L'
@@ -174,6 +175,7 @@ class EvidenceCategory:
         (OTHER_DATABASE, 'Other Database'),
         (OTHER_DATA, 'Other Data'),
         (LITERATURE, 'Literature'),
+        (SOMATIC_CLINICAL_SIGNIFICANCE_EVIDENCE, "Somatic Clinical Significance Evidence"),
         (INTERPRETATION, 'Interpretation'),
         (SIGN_OFF, 'Sign Off')
     )
