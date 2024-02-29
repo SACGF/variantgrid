@@ -25,7 +25,8 @@ class Command(BaseCommand):
         dry_run = options["dry_run"]
 
         for genome_build in GenomeBuild.builds_with_annotation():
-            self._find_delins_as_del(dry_run, genome_build)
+            self._find_bad_symbolic_via_clinvar(dry_run, genome_build, "<DEL>")  # DELISN stored as DEL
+            self._find_bad_symbolic_via_clinvar(dry_run, genome_build, "<DUP>")  # INS stored as DUP
             num_deleted = 0
 
             matcher = HGVSMatcher(genome_build)
@@ -94,26 +95,26 @@ class Command(BaseCommand):
             print(f"Could not delete {dupe_variant.pk}: {e}")
         return 0
 
-    def _find_delins_as_del(self, dry_run: bool, genome_build):
+    def _find_bad_symbolic_via_clinvar(self, dry_run: bool, genome_build, alt_seq):
         """ Due to VariantCoordinate.as_symbolic_variant bug - some historical data was incorrectly imported """
 
         fixed = 0
 
         clinvar_variation_del = list(
-            ClinVar.objects.filter(version__genome_build=genome_build, variant__alt__seq='<DEL>').values_list(
+            ClinVar.objects.filter(version__genome_build=genome_build, variant__alt__seq=alt_seq).values_list(
                 "clinvar_variation_id", flat=True))
 
         clinvar_variation_original = {}
 
         for cv in ClinVar.objects.filter(version__genome_build=genome_build,
                                          clinvar_variation_id__in=clinvar_variation_del).exclude(
-                variant__alt__seq='<DEL>'):
+                variant__alt__seq=alt_seq):
             clinvar_variation_original[cv.clinvar_variation_id] = cv.variant
 
         clinvar_variation_bad = {}
         for cv in ClinVar.objects.filter(version__genome_build=genome_build,
                                          clinvar_variation_id__in=clinvar_variation_original,
-                                         variant__alt__seq='<DEL>'):
+                                         variant__alt__seq=alt_seq):
             clinvar_variation_bad[cv.clinvar_variation_id] = cv.variant
 
         for clinvar_variation_id, bad_variant in clinvar_variation_bad.items():
@@ -122,4 +123,4 @@ class Command(BaseCommand):
             if not dry_run:
                 fixed += self._merge_variant_dupe(bad_variant, original_variant)
 
-        print(f"{genome_build} deleted {fixed} delins as dups")
+        print(f"{genome_build} deleted {fixed} {alt_seq}")
