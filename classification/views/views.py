@@ -33,7 +33,7 @@ from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import
 from classification.classification_changes import ClassificationChanges
 from classification.classification_stats import get_grouped_classification_counts, \
     get_classification_counts, get_criteria_counts
-from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel, WithdrawReason
+from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel, WithdrawReason, AlleleOriginBucket
 from classification.forms import ClassificationAlleleOriginForm
 from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
@@ -678,13 +678,20 @@ def evidence_keys(request: HttpRequest) -> HttpResponse:
 
 
 def classification_graphs(request):
+
+    germline_buckets = {AlleleOriginBucket.GERMLINE, AlleleOriginBucket.UNKNOWN}
+
     if settings.CLASSIFICATION_STATS_USE_SHARED:
         show_unclassified = False
         visibility = "shared & matched to an allele"
     else:
         show_unclassified = True
         visibility = f"visible to {request.user.username}"
-    classification_counts = get_classification_counts(request.user, show_unclassified=show_unclassified, unique_alleles=True)
+    classification_counts = get_classification_counts(
+        request.user,
+        show_unclassified=show_unclassified,
+        unique_alleles=True,
+        allele_origin_buckets=germline_buckets)
 
     evidence_field = "published_evidence"
     vc_gene_data = get_grouped_classification_counts(
@@ -693,7 +700,9 @@ def classification_graphs(request):
         evidence_key="gene_symbol",
         max_groups=15,
         show_unclassified=show_unclassified,
-        allele_level=True)
+        allele_level=True,
+        allele_origin_buckets=germline_buckets
+    )
 
     acmg_by_significance = get_criteria_counts(request.user, evidence_field)
     context = {

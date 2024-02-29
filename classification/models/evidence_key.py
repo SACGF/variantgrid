@@ -584,9 +584,12 @@ class EvidenceKeyMap:
         """
         :return: A list of STANDARD ACMG criteria EvidenceKeys
         """
-        acmg_crit = [eKey for eKey in self.criteria() if eKey.namespace == "acmg"]
-        acmg_crit.sort(key=lambda k: k.pretty_label.lower())
-        return acmg_crit
+        return self.criteria_for("acmg")
+
+    def criteria_for(self, namespace) -> List[EvidenceKey]:
+        crit = [eKey for eKey in self.criteria() if eKey.namespace == namespace]
+        crit.sort(key=lambda k: k.pretty_label.lower())
+        return crit
 
     @staticmethod
     @timed_cache(ttl=60)

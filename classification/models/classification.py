@@ -2240,6 +2240,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                         exclude_withdrawn: bool = True,
                         shared_only: bool = False,
                         allele_origin_bucket: Optional[AlleleOriginBucket] = None,
+                        allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None,
                         exclude_external_labs: bool = False,
                         **kwargs) -> QuerySet['ClassificationModification']:
         """
@@ -2278,7 +2279,9 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         if shared_only:
             qs = qs.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)
         if allele_origin_bucket:
-            qs = qs.filter(classification__clinical_context__allele_origin_bucket=allele_origin_bucket)
+            qs = qs.filter(classification__allele_origin_bucket=allele_origin_bucket)
+        elif allele_origin_buckets:
+            qs = qs.filter(classification__allele_origin_bucket__in=allele_origin_buckets)
         if exclude_external_labs:
             qs = qs.filter(classification__lab__external=False)
 

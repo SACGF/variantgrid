@@ -8,7 +8,7 @@ from typing import Any, Optional, Union, Iterable
 import pandas as pd
 from django.http import StreamingHttpResponse
 
-from classification.enums import ShareLevel
+from classification.enums import ShareLevel, AlleleOriginBucket
 from classification.models import classification_flag_types, Classification, ClassificationModification, EvidenceKeyMap
 from flags.models import FlagComment
 from library.utils import delimited_row, IterableStitcher, IterableTransformer
@@ -189,12 +189,14 @@ class ClassificationAccumulationGraph:
                  mode: AccumulationReportMode,
                  shared_only: bool = True,
                  labs: Optional[list[Lab]] = None,
-                 time_step: Optional[timedelta] = None
+                 time_step: Optional[timedelta] = None,
+                 allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None
                  ):
         self.mode = mode
         self.shared_only = shared_only
         self.labs = labs
         self.time_delta = time_step or timedelta(days=7)
+        self.allele_origin_buckets = allele_origin_buckets
 
     @property
     def share_levels(self):
@@ -246,6 +248,9 @@ class ClassificationAccumulationGraph:
                                             "published_evidence__clinical_significance__value",
                                             "classification__allele_info__allele_id",
                                             "classification__lab__name")
+        if allele_origin_buckets := self.allele_origin_buckets:
+            cm_qs_summary = cm_qs_summary.filter(classification__allele_origin_bucket__in=allele_origin_buckets)
+
         if labs := self.labs:
             cm_qs_summary = cm_qs_summary.filter(classification__lab__in=labs)
         else:
@@ -312,7 +317,8 @@ def _iter_report_list(
         mode: AccumulationReportMode = AccumulationReportMode.Classification,
         shared_only: bool = True,
         labs: Optional[list[Lab]] = None,
-        time_step: Optional[timedelta] = None
+        time_step: Optional[timedelta] = None,
+        allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None
         ):
 
     cag = ClassificationAccumulationGraph(mode=mode, shared_only=shared_only, labs=labs, time_step=time_step)
@@ -348,7 +354,15 @@ def download_report(request):
     if frequency_param := request.GET.get('frequency'):
         frequency = int(frequency_param)
 
-    response = StreamingHttpResponse((delimited_row(r) for r in _iter_report_list(mode=mode, shared_only=shared_only, time_step=timedelta(days=frequency))), content_type="text/csv")
+    response = StreamingHttpResponse(
+        (delimited_row(r) for r in \
+         _iter_report_list(
+             mode=mode,
+             shared_only=shared_only,
+             time_step=timedelta(days=frequency),
+             allele_origin_buckets={AlleleOriginBucket.GERMLINE, AlleleOriginBucket.UNKNOWN}
+         )),
+        content_type="text/csv")
     response['Content-Disposition'] = f'attachment; filename="{mode.value.lower()}_accumulation_report.csv"'
     return response
 

@@ -37,6 +37,7 @@ from annotation.models.models_gene_counts import GeneValueCountCollection, \
     GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
 from annotation.serializers import ManualVariantEntryCollectionSerializer
 from classification.classification_stats import get_grouped_classification_counts
+from classification.enums import AlleleOriginBucket
 from classification.models.clinvar_export_sync import clinvar_export_sync
 from classification.views.classification_accumulation_graph import get_accumulation_graph_data, \
     AccumulationReportMode
@@ -1442,13 +1443,16 @@ def labs_graph_detail(request):
     show_unclassified = not settings.CLASSIFICATION_STATS_USE_SHARED
     org_field = "classification__lab__organization__name"
 
+    germline_buckets = {AlleleOriginBucket.GERMLINE, AlleleOriginBucket.UNKNOWN}
+
     vc_org_data_json = get_grouped_classification_counts(
         user=request.user,
         field=org_field,
         max_groups=15,
         field_labels=name_to_short_name,
         show_unclassified=show_unclassified,
-        allele_level=True)
+        allele_level=True,
+        allele_origin_buckets=germline_buckets)
 
     context = {}
     context["vc_org_data"] = vc_org_data_json
@@ -1469,7 +1473,8 @@ def labs_graph_detail(request):
             max_groups=15,
             show_unclassified=show_unclassified,
             norm_factor=state_pop_multiplier,
-            allele_level=True)
+            allele_level=True,
+            allele_origin_buckets=germline_buckets)
 
         context["vc_normalized_state_data_json"] = vc_normalized_state_data_json
     return render(request, "snpdb/labs_graph_detail.html", context)

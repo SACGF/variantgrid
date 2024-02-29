@@ -25,7 +25,10 @@
 {% block content %}
     <div class="container">
         <h3>Lab Submissions</h3>
-        <p class="text-info">Multiple classifications for the same allele are only counted once.</p>
+        <p class="text-info">
+            Graphs currently only cover germline data.<br/>
+            Multiple classifications for the same allele are only counted once.
+        </p>
         <div class="row">
             <div class="col">
                 <div data-toggle="ajax" href="{% url 'labs_graph_detail' %}">

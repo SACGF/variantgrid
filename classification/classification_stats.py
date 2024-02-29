@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 
-from classification.enums import ClinicalSignificance
+from classification.enums import ClinicalSignificance, AlleleOriginBucket
 from classification.enums.classification_enums import CriteriaEvaluation
 from classification.models import EvidenceKeyMap
 from classification.models.classification import Classification, ClassificationModification
@@ -15,8 +15,12 @@ from library.django_utils import get_field_counts
 from snpdb.models import Lab
 
 
-def get_classification_counts(user: User, show_unclassified=True, unique_alleles=False) -> dict[str, int]:
-    qs = get_visible_classifications_qs(user)
+def get_classification_counts(
+        user: User,
+        show_unclassified=True,
+        unique_alleles=False,
+        allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> dict[str, int]:
+    qs = get_visible_classifications_qs(user, allele_origin_buckets=allele_origin_buckets)
 
     field_counts: dict[str, int]
     if unique_alleles:
@@ -55,7 +59,7 @@ def get_classification_counts_allele(qs: QuerySet[ClassificationModification], f
     return counts
 
 
-def get_visible_classifications_qs(user: User) -> QuerySet[ClassificationModification]:
+def get_visible_classifications_qs(user: User, allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> QuerySet[ClassificationModification]:
     # now excludes external labs (don't want to report on Shariant only data within SA Path for example)
 
     shared = settings.CLASSIFICATION_STATS_USE_SHARED
@@ -70,6 +74,7 @@ def get_visible_classifications_qs(user: User) -> QuerySet[ClassificationModific
         exclude_withdrawn=True,
         published=shared,
         shared_only=shared,
+        allele_origin_buckets=allele_origin_buckets,
         **kwargs,
     )
 
@@ -81,7 +86,8 @@ def get_grouped_classification_counts(user: User,
                                       max_groups=10,
                                       show_unclassified=True,
                                       norm_factor: dict[str, float] = None,
-                                      allele_level: bool = False) -> list[dict[str, dict]]:
+                                      allele_level: bool = False,
+                                      allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> list[dict[str, dict]]:
     """ :param user: User used to check visibility of classifications
         :param field: the value we're extracting from evidence to group on (from Classification)
         :param evidence_key: label from ekey lookup
@@ -96,7 +102,7 @@ def get_grouped_classification_counts(user: User,
     if evidence_key and field_labels:
         raise ValueError("Can't supply both 'evidence_key' and 'field_labels'")
 
-    vc_qs = get_visible_classifications_qs(user).order_by('-modified')
+    vc_qs = get_visible_classifications_qs(user, allele_origin_buckets).order_by('-modified')
     values_qs = vc_qs.values_list("clinical_significance", field, "classification__allele_info__allele")
 
     counts = Counter()
@@ -154,13 +160,18 @@ def get_grouped_classification_counts(user: User,
     return data
 
 
-def get_criteria_counts(user: User, evidence_field: str) -> dict[str, list[dict]]:
-    acmg_labels = dict((e.key, e.pretty_label) for e in EvidenceKeyMap.instance().acmg_criteria())
+def get_criteria_counts(
+        user: User,
+        evidence_field: str,
+        critera="acmg",
+        allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None
+    ) -> dict[str, list[dict]]:
+    acmg_labels = dict((e.key, e.pretty_label) for e in EvidenceKeyMap.instance().criteria_for(critera))
     n = len(acmg_labels)
     acmg_met_not_met_by_significance = defaultdict(lambda: (np.zeros(n), np.zeros(n), np.zeros(n)))
     total_clinical_significance = Counter()
 
-    vc_qs = get_visible_classifications_qs(user)
+    vc_qs = get_visible_classifications_qs(user, allele_origin_buckets=allele_origin_buckets)
     vc_qs = vc_qs.filter(clinical_significance__isnull=False)
     num_classifications = 0
     for clinical_significance, evidence in vc_qs.values_list("clinical_significance", evidence_field):
