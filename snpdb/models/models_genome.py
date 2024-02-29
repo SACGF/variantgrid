@@ -238,6 +238,9 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
         """ annotation_version: defaults to latest """
         if annotation_version is None:
             annotation_version = self.annotationversion_set.order_by("pk").last()
+            if annotation_version is None:
+                raise ValueError(f"{self} has no annotation versions")
+
 
         return annotation_version.variant_annotation_version.assembly
 

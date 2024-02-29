@@ -405,7 +405,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
                         ref = self.ref[0]
                         alt = VCFSymbolicAllele.DUP
                         svlen = diff
-            elif alt_length == 1:
+            elif alt_length == 1 and self.alt == self.ref[0]:
                 if ref_length >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
                     ref = self.ref[0]
                     alt = VCFSymbolicAllele.DEL
