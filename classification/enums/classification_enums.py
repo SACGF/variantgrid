@@ -135,6 +135,8 @@ class ValidationCode:
     INVALID_FIELD_FOR_SOMATIC = 'invalid_for_somatic'
     INVALID_FIELD_FOR_GERMLINE = 'invalid_for_germline'
 
+    SOMATIC_MISMATCHED_LEVEL = 'somatic_mismatched_level'
+
 
 class EvidenceCategory:
     VARIANT = 'V'

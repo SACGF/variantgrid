@@ -55,6 +55,54 @@ def validate_variant_classification_significance(sender, patch_meta: PatchMeta, 
         return vm
 
 
+__LEVELS_AND_TIER = set(list(SpecialEKeys.AMP_LEVELS_TO_LEVEL.keys()) + [SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE])
+__LEVELS_TO_TIER = {
+    "A": "1",
+    "B": "1",
+    "C": "2",
+    "D": "2"
+}
+__TIER_TO_ROMAN = {
+    "1": "I",
+    "2": "II",
+    "3": "III",
+    "4": "IV"
+}
+
+@receiver(classification_validation_signal, sender=Classification)
+def validate_letter_to_tier(sender, patch_meta: PatchMeta, key_map: EvidenceKeyMap, **kwargs) -> Optional[ValidationMerger]:
+    """
+    Validates that at l
+    east one of clinical significance or somatic clinical significance has a value
+    """
+    max_level: Optional[str] = None
+    if patch_meta.intersection_modified(__LEVELS_AND_TIER):
+        vm = ValidationMerger()
+        vm.tested(
+            keys=[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE],
+            codes=[ValidationCode.SOMATIC_MISMATCHED_LEVEL]
+        )
+
+        for level_key, level in SpecialEKeys.AMP_LEVELS_TO_LEVEL.items():
+            if patch_meta.get(level_key, fallback_existing=True):
+                max_level = level
+                break
+
+        max_level_tier = __LEVELS_TO_TIER.get(max_level)
+        somatic_clin_sig = patch_meta.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE, fallback_existing=True)
+        if max_level_tier and somatic_clin_sig:
+            if actual_tier_level := key_map.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).option_dictionary_property("tier"):
+                if actual_tier_level != __LEVELS_AND_TIER:
+                    somatic_clin_sig_pretty_value = key_map.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(somatic_clin_sig)
+                    vm.add_message(
+                        SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE,
+                        code=ValidationCode.SOMATIC_MISMATCHED_LEVEL,
+                        severity='warning',
+                        message=f"Level {max_level} indicates Clinical Significance should be \"Tier {__TIER_TO_ROMAN.get(max_level_tier, max_level_tier)}\" not \"{somatic_clin_sig_pretty_value}\""
+                    )
+        return vm
+
+
 @receiver(classification_validation_signal, sender=Classification)
 def validate_variant_fields(sender, patch_meta: PatchMeta, key_map: EvidenceKeyMap, **kwargs) -> Optional[ValidationMerger]:  # pylint: disable=unused-argument
     """

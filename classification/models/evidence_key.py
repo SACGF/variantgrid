@@ -214,7 +214,7 @@ class EvidenceKey(TimeStampedModel):
         [{"key":"maternal", "value":"Maternal"}, {"key":"xsdfdwerew", "label":"xsdfdwerew"}]
         See in the 2nd example that we still try to provide an option for unmatched.
         :param normal_value_obj: A value or dict with a key value
-        :return: A list of options, guarenteed to to be the same length as normal_value_obj if that is a list, otherwise
+        :return: A list of options, guaranteed to be the same length as normal_value_obj if that is a list, otherwise
         will return a length of 1.
         """
         value: Optional[Any]
