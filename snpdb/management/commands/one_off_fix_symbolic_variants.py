@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from annotation.models import AnnotationRangeLock
+from annotation.models import AnnotationRangeLock, ClinVar
 from genes.hgvs import HGVSMatcher
 from snpdb.models import Variant, Sequence, GenomeBuild, Locus
 from django.db.models.functions import Length
@@ -22,12 +22,13 @@ class Command(BaseCommand):
 
         base_lookup = {s: Sequence.objects.get(seq=s) for s in ["G", "A", "T", "C", "<DEL>", "<DUP>"]}
         not_symbolic = []
-        dupes = []
         dry_run = options["dry_run"]
 
         for genome_build in GenomeBuild.builds_with_annotation():
-            matcher = HGVSMatcher(genome_build)
+            self._find_delins_as_del(dry_run, genome_build)
+            num_deleted = 0
 
+            matcher = HGVSMatcher(genome_build)
             q_contig = Variant.get_contigs_q(genome_build)
             for v in long_variants.filter(q_contig):
                 vc = v.coordinate.as_internal_symbolic(genome_build)
@@ -59,14 +60,7 @@ class Command(BaseCommand):
                         # I think these came in via ClinVar import - so will try to get rid of it, if it isn't referenced
                         # by anything else
                         if not dry_run:
-                            if v.cohortgenotype_set.exists():
-                                dupes.append((v, existing))
-                                continue
-                            v.clinvar_set.all().update(variant=existing)
-                            AnnotationRangeLock.release_variant(v)
-
-                            # Classification protects Variant FK, so won't delete if that exists
-                            v.delete()
+                            num_deleted += self._merge_variant_dupe(v, existing)
                 except Variant.DoesNotExist:
                     print(f"Fixing {v.pk}: {v} - changing {vc.alt}")
                     if len(vc.ref) > 1:
@@ -79,5 +73,53 @@ class Command(BaseCommand):
                         v.svlen = vc.svlen
                         v.save()
 
+            print(f"{GenomeBuild} Merged/Deleted {num_deleted} variants")
+
         print(f"Non-symbolic not converted: {len(not_symbolic)}")
-        print(f"Dupes: {len(dupes)}")
+        # This will take ages on some systems...
+        # Locus.objects.filter(variant__isnull=True).delete()
+
+    def _merge_variant_dupe(self, dupe_variant, original_variant) -> int:
+        if dupe_variant.cohortgenotype_set.exists():
+            print(f"Not deleting {dupe_variant.pk} as it has cohort genotype data")
+            return
+
+        dupe_variant.clinvar_set.all().update(variant=original_variant)
+        AnnotationRangeLock.release_variant(dupe_variant)
+        # Classification/Variant tags protects Variant FK, so won't delete if that exists
+        try:
+            dupe_variant.delete()
+            return 1
+        except Exception as e:
+            print(f"Could not delete {dupe_variant.pk}: {e}")
+        return 0
+
+    def _find_delins_as_del(self, dry_run: bool, genome_build):
+        """ Due to VariantCoordinate.as_symbolic_variant bug - some historical data was incorrectly imported """
+
+        fixed = 0
+
+        clinvar_variation_del = list(
+            ClinVar.objects.filter(version__genome_build=genome_build, variant__alt__seq='<DEL>').values_list(
+                "clinvar_variation_id", flat=True))
+
+        clinvar_variation_original = {}
+
+        for cv in ClinVar.objects.filter(version__genome_build=genome_build,
+                                         clinvar_variation_id__in=clinvar_variation_del).exclude(
+                variant__alt__seq='<DEL>'):
+            clinvar_variation_original[cv.clinvar_variation_id] = cv.variant
+
+        clinvar_variation_bad = {}
+        for cv in ClinVar.objects.filter(version__genome_build=genome_build,
+                                         clinvar_variation_id__in=clinvar_variation_original,
+                                         variant__alt__seq='<DEL>'):
+            clinvar_variation_bad[cv.clinvar_variation_id] = cv.variant
+
+        for clinvar_variation_id, bad_variant in clinvar_variation_bad.items():
+            original_variant = clinvar_variation_original[clinvar_variation_id]
+            print(f"{bad_variant} should have been {original_variant}")
+            if not dry_run:
+                fixed += self._merge_variant_dupe(bad_variant, original_variant)
+
+        print(f"{genome_build} deleted {fixed} delins as dups")
