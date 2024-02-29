@@ -127,7 +127,7 @@ class Test(URLTestCase):
 
         cls.PRIVATE_DATATABLES_GRID_LIST_URLS = [
             ("gene_lists_datatable", {}, ("text", cls.gene_list)),  # id uses view_primary_key - renders it as "text"
-            ("gene_list_genes_datatable", {"gene_list_id": cls.gene_list.pk}, ("gene_symbol__symbol", cls.gene_symbol)),
+            ("gene_list_genes_datatable", {"gene_list_id": cls.gene_list.pk}, ("gene_symbol", cls.gene_symbol)),
         ]
 
     def testUrls(self):

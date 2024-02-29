@@ -64,8 +64,7 @@ class GeneListGenesColumns(DatatableConfig[GeneListGeneSymbol]):
         super().__init__(request)
         self.rich_columns = [
             RichColumn('original_name', orderable=True),
-            RichColumn('gene_symbol', orderable=True,
-                       renderer=self.render_gene_symbol, client_renderer="renderGeneSymbol"),
+            RichColumn('gene_symbol', orderable=True, client_renderer="renderGeneSymbol"),
             RichColumn('gene_symbol_alias__source', orderable=True, name='Alias'),
         ]
 
@@ -74,11 +73,6 @@ class GeneListGenesColumns(DatatableConfig[GeneListGeneSymbol]):
             field_name = f"release_{release.pk}"
             self.annotation_releases[field_name] = release
             self.rich_columns.append(RichColumn(field_name, name=str(release), orderable=True))
-
-    @staticmethod
-    def render_gene_symbol(row: dict[str, Any]) -> JsonDataType:
-        gene_symbol = row["gene_symbol"]
-        return {"id": gene_symbol}
 
     def _get_gene_annotation_releases(self) -> list['GeneAnnotationRelease']:
         return GeneAnnotationRelease.get_for_latest_annotation_versions_for_builds()

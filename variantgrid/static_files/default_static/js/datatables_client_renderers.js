@@ -1,9 +1,9 @@
-function renderGeneSymbol(data, type, row) {
+function renderGeneSymbol(geneSymbol, type, row) {
     let link = $('<a>', {
-        href: Urls.view_gene_symbol(data.id),
+        href: Urls.view_gene_symbol(geneSymbol),
         class: 'hover-link',
         html: [
-            $('<span>', {text: data.id}),
+            $('<span>', {text: geneSymbol}),
         ]
     });
     return link.prop('outerHTML');
