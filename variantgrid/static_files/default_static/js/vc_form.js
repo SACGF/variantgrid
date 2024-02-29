@@ -1070,7 +1070,7 @@ const VCForm = (function() {
                         immutableDiv.addClass('hidden-value');
                         val = 'hidden';
                     }
-                    eKeys.key(name).formatValue(val, immutableDiv);
+                    eKeys.key(name).formatValue(val, immutableDiv, "spaced");
                     
                 } else {
                     immutableDiv.hide();

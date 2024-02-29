@@ -161,7 +161,8 @@ let EKey = (function() {
             }
         },
     
-        formatValue: function(value, element, report) {
+        formatValue: function(value, element, style) {
+            let report = style == true || style == "report";
             if (typeof(element) === 'undefined') {
                 element = $('<div>', {});
             }
@@ -199,6 +200,14 @@ let EKey = (function() {
                     val = toFixedString(val);
                     element.text(val);
                 }
+            } else if (this.value_type === 'M' && Array.isArray(value) && value.length > 1 && style == "spaced") {
+                let valueDivs = [];
+                for (let subValue of value) {
+                    let prettySubValue = this.prettyValue(subValue).val;
+                    valueDivs.push($('<div>', {text: prettySubValue}));
+                }
+                element.html(valueDivs);
+
             } else {
                 // TODO - add formatting if not isValidValue
                 element.text(val);
