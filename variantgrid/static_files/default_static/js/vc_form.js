@@ -31,6 +31,14 @@ const VCForm = (function() {
             return val;
         } else if (typeof(val) === 'undefined') {
             return null;
+        } else if (Array.isArray(val)) {
+            let filtered_array = [];
+            for (let sub_value of val) {
+                if (sub_value != null && sub_value !== '') {
+                    filtered_array.push(sub_value)
+                }
+            }
+            return filtered_array;
         }
         return val;
     }
