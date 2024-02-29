@@ -4,7 +4,7 @@
 {% load help_tags %}
 {% load datatable_tags %}
 {% load wiki_tags %}
-{% block title %}{{ gene_list.name }}{% endblock title %}
+{% block title %}{{ site_name }} GeneList: {{ gene_list.name }}{% endblock title %}
 
 {% block jsdocumentready %}
     $("#gene-list-tabs").tabs();
