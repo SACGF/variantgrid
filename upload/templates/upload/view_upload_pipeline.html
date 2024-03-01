@@ -178,7 +178,10 @@
 	<div class="container">
         <h3>Upload Pipeline</h3>
 	    <fieldset class="form-fields">
-		{{ upload_pipeline | as_p }}
+		    {{ upload_pipeline | as_p }}
+            {% if upload_pipeline.genome_build %}
+                <p><label>genome build</label><span class="field str">{{ upload_pipeline.genome_build }}</span></p>
+            {% endif %}
         </fieldset>
 
 	{% if upload_pipeline.file_type == 'V' %}

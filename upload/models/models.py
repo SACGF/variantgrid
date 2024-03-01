@@ -239,8 +239,8 @@ class UploadPipeline(models.Model):
                 vcf_import_info.append(import_info)
         return vcf_import_info
 
-    @property
-    def genome_build(self) -> GenomeBuild:
+    @cached_property
+    def genome_build(self) -> Optional[GenomeBuild]:
         """ returns GenomeBuild based on uploaded file type
             throws ValueError if it can't retrieve it """
 
@@ -269,10 +269,9 @@ class UploadPipeline(models.Model):
         elif file_type == UploadedFileTypes.WIKI_VARIANT:
             genome_build = uploaded_file.uploadedwikicollection.wiki_collection.genome_build
 
-        if genome_build is None:
-            msg = f"Don't know how to get GenomeBuild for UploadedFile type '{uploaded_file.get_file_type_display()}'"
-            raise ValueError(msg)
-
+        #  if genome_build is None:
+        #    msg = f"Don't know how to get GenomeBuild for UploadedFile type '{uploaded_file.get_file_type_display()}'"
+        #    raise ValueError(msg)
         return genome_build
 
     def __str__(self):
