@@ -1398,8 +1398,6 @@ a.list-group-item-action {
 }
 
 .link-toolbar > *:not(:first-child) {
-  position: relative;
-  bottom: 2px;
   margin-left: 10px;
 }
 .link-toolbar > *:not(:first-child)::before {
