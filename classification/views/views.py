@@ -417,15 +417,16 @@ def view_classification_diff(request):
 
     elif cids := request.GET.get('cids'):
         records = [ClassificationModification.latest_for_user(user=request.user, classification=cid, published=True).first() for cid in [cid.strip() for cid in cids.split(',')]]
-        records = [record for record in records if record]
 
     else:
         raise ValueError("Diff not given valid diff type")
 
     # filter out any Nones inserted by filtering on user permission etc
     records: list[ClassificationModification] = [record for record in records if record]
-    # if filter_origin := request.GET.get('allele_origin'):
-    #
+
+    if filter_origin := request.GET.get('allele_origin_bucket'):
+        bucket: AlleleOriginBucket = AlleleOriginBucket(filter_origin)
+        records = [record for record in records if record.classification.allele_origin_bucket in {AlleleOriginBucket.UNKNOWN, bucket}]
 
     records_json = [vcm.as_json(ClassificationJsonParams(
         current_user=request.user,
