@@ -272,13 +272,17 @@ const Diff = (function() {
 
             //var percent = Math.floor(100 / Math.max(1, this.versions.length));
             includedVersions.forEach((v, index) => {
+
+                let headers = [];
+
                 let url = Urls.view_classification(v.id);
                 if (v.version) {
                     url += `.${v.version}`;
                 }
 
                 let titleDom = $('<a>', {class:'hover-link text-center d-flex flex-column flex-align-center', href: url});
-                
+                headers.push(titleDom);
+
                 let titlePart = $('<div>', {text:  v.org_name + ' / ' + v.lab_name + ' / ' + v.cr_lab_id}).appendTo(titleDom);
                 if (v.first_seen) {
                     let first_seen_date = moment(v.first_seen * 1000).format('DD/MMM/YYYY HH:mm');
@@ -295,8 +299,36 @@ const Diff = (function() {
                     $('<div>', {class: 'timestamp', text: 'Working version', title: 'Working Version'}).appendTo(titleDom);
                 }
                 let content = null;
+
+                clinSigText = [];
+
+                let clin_sig_key = this.eKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
+                let clin_sig = clin_sig_key.prettyValue((v.clinical_significance || {}).value);
+                if (clin_sig.val) {
+                    clinSigText.push(clin_sig.val);
+                }
+
+                let somatic_clin_sig_value = v[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE];
+                if (somatic_clin_sig_value && somatic_clin_sig_value.value) {
+                    let somatic_clin_sig_key = this.eKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
+                    let somatic_clin_sig_pretty = somatic_clin_sig_key.prettyValue(somatic_clin_sig_value.value);
+                    clinSigText.push(somatic_clin_sig_pretty.val);
+                }
+                headers.push(
+                    $('<div>', {class:'text-center my-1', text: clinSigText.join(" - ")})
+                );
+
+                /*
+                let conditionRow = $('<div>', {class:'my-1'});
+                if (v.resolved_condition) {
+                    VCForm.format_condition(v.resolved_condition).appendTo(conditionRow);
+                } else {
+                    conditionRow.text((v.condition || {}).value);
+                }
+                */
                 let flagRow = $('<div>', {class:'d-flex mt-2 align-items-center', style:'min-height:20px'}).appendTo(titleDom);
                 $('<div>', {class:'flex-grow'}).appendTo(flagRow);
+
                 if (!v.version_is_published) {
                     content = {
                         icon: '/static/icons/share_level/draft.png',
@@ -313,26 +345,13 @@ const Diff = (function() {
                     height: '16px',
                     display: 'inline-block'
                 }).appendTo(flagRow);
-                let clin_sig_key = this.eKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
-                let clin_sig = clin_sig_key.prettyValue((v.clinical_significance || {}).value);
-                let clinSigRow = $('<div>', {class:'text-center my-1', text:clin_sig.val});
-                /*
-                let conditionRow = $('<div>', {class:'my-1'});
-                if (v.resolved_condition) {
-                    VCForm.format_condition(v.resolved_condition).appendTo(conditionRow);
-                } else {
-                    conditionRow.text((v.condition || {}).value);
-                }
-                */
+
                 $('<div>', {'class': 'ml-2 text-center', 'data-flags': v.flag_collection, text: ''}).appendTo(flagRow);
                 $('<div>', {class:'flex-grow'}).appendTo(flagRow);
 
-                let th = $('<th>', {html: [
-                        titleDom,
-                        clinSigRow,
-                        flagRow,
-                        // conditionRow
-                    ]}).appendTo(headerRow);
+                headers.push(flagRow);
+
+                let th = $('<th>', {html: headers}).appendTo(headerRow);
             });
 
             let rowLabRecordId = $('<tr>', {class: 'group no-compare'}).appendTo(table);
