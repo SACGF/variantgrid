@@ -62,6 +62,10 @@ No link for the thumbnail
                 {{ JQ_OPEN }} } else { {{ JQ_CLOSE }}
                     {{ JQ_OPEN }}=file.file_type{{ JQ_CLOSE }}
                 {{ JQ_OPEN }} } {{ JQ_CLOSE }}
+
+                {{ JQ_OPEN }} if (file.genome_build) { {{ JQ_CLOSE }}
+                    <i>({{ JQ_OPEN }}=file.genome_build{{ JQ_CLOSE }})</i>
+                {{ JQ_OPEN }} } {{ JQ_CLOSE }}
             </div>
         </div>
 

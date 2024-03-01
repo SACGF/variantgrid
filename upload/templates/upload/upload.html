@@ -263,6 +263,10 @@ img.thumbnail {
         if ((processingStatus == 'S' || processingStatus == 'T') && upload_status["data_url"]) {
 			fileLink = '<a href="' + upload_status["data_url"] + '">' + fileType + '</a>';
 		}
+        const genomeBuild = upload_status['genome_build'];
+        if (genomeBuild) {
+            fileLink += " <i>(" + genomeBuild + ")</i>";
+        }
 		fileTypeDiv.append(fileLink);
 
         const upload_data = upload_status["upload_data"];

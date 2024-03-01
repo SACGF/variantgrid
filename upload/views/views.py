@@ -85,6 +85,9 @@ def uploadedfile_dict(uploaded_file):
     try:
         upload_pipeline = UploadPipeline.objects.get(uploaded_file=uploaded_file)
         data["upload_pipeline_id"] = upload_pipeline.pk
+        if upload_pipeline.genome_build:
+            data["genome_build"] = str(upload_pipeline.genome_build)
+
         status = upload_pipeline.status
         url = reverse('view_upload_pipeline', kwargs={'upload_pipeline_id': upload_pipeline.pk})
     except:
