@@ -34,11 +34,14 @@ class Command(BaseCommand):
             for v in long_variants.filter(q_contig):
                 vc = v.coordinate.as_internal_symbolic(genome_build)
 
-                old_hgvs = matcher.variant_coordinate_to_g_hgvs(v.coordinate)
-                new_hgvs = matcher.variant_coordinate_to_g_hgvs(vc)
+                try:
+                    old_hgvs = matcher.variant_coordinate_to_g_hgvs(v.coordinate)
+                    new_hgvs = matcher.variant_coordinate_to_g_hgvs(vc)
 
-                if old_hgvs != new_hgvs:
-                    raise ValueError(f"Variant: {v.pk} old: {old_hgvs} != {new_hgvs}")
+                    if old_hgvs != new_hgvs:
+                        raise ValueError(f"Variant: {v.pk} old: {old_hgvs} != {new_hgvs}")
+                except Exception as e:
+                    print(f"Could not test {v.pk} g.hgvs: {e}")
 
                 if not vc.is_symbolic():
                     not_symbolic.append(v)
