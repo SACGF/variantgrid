@@ -456,10 +456,9 @@ class BulkVEPVCFAnnotationInserter:
         if variant_coordinate is None:
             return
 
+        # Only calculate very long HGVS for representative transcripts
         if variant_coordinate.max_sequence_length > settings.HGVS_MAX_SEQUENCE_LENGTH:
             if not transcript_data.get(VEPColumns.PICK, False):
-                logging.warning(f"Skipping calculating HGVS for {variant_coordinate} NON-representative transcript "
-                                f"because it exceeds {settings.HGVS_MAX_SEQUENCE_LENGTH}")
                 return
 
         transcript_id = transcript_data.get("transcript_id")
