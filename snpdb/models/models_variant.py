@@ -377,6 +377,13 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             alt = self.alt
         return VariantCoordinate(chrom=self.chrom, position=self.position, ref=self.ref, alt=alt)
 
+    @property
+    def max_sequence_length(self) -> int:
+        if self.is_symbolic():
+            return self.svlen
+        else:
+            return max(len(self.ref), len(self.alt))
+
     def as_internal_symbolic(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
         """ Internal format - alt can be <DEL> or <DUP>
             Uses our internal reference representation

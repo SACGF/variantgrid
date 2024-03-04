@@ -60,8 +60,8 @@ class Command(BaseCommand):
             for i, v in enumerate(symbolic_qs):
                 # Do this lookup of ref/alt once as it's expensive..
                 variant_coordinate = v.coordinate
-                if abs(variant_coordinate.svlen) > settings.HGVS_MAX_ALT_LENGTH:
-                    print(f"Skipping calculating HGVS for {variant_coordinate} because it exceeds {settings.HGVS_MAX_ALT_LENGTH}")
+                if abs(variant_coordinate.svlen) > settings.HGVS_MAX_SEQUENCE_LENGTH:
+                    print(f"Skipping calculating HGVS for {variant_coordinate} because it exceeds {settings.HGVS_MAX_SEQUENCE_LENGTH}")
                     continue
                 variant_coordinate = variant_coordinate.as_external_explicit(genome_build)
 
