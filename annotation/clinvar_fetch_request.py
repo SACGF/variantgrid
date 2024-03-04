@@ -11,7 +11,7 @@ from django.utils import timezone
 from annotation.clinvar_xml_parser import CLINVAR_RECORD_CACHE_DAYS, ClinVarXmlParser
 from annotation.clinvar_xml_parser_via_vcv import ClinVarXmlParserViaVCV
 from annotation.models import ClinVarRecordCollection, ClinVar, ClinVarVersion
-from snpdb.models import VariantAllele, GenomeBuild
+from snpdb.models import VariantAllele, GenomeBuild, Allele
 
 
 @dataclass
@@ -60,10 +60,8 @@ class ClinVarFetchRequest:
 
             allele_id = clinvar_record_collection.allele_id
             if not allele_id:
-                if variant_id := ClinVar.objects.filter(clinvar_variation_id=self.clinvar_variation_id)\
-                        .filter(version__in=clinvar_versions).values_list('variant', flat=True).first():
-                    if va_allele_id := VariantAllele.objects.filter(variant_id=variant_id).values_list('allele', flat=True).first():
-                        allele_id = va_allele_id
+                if allele := Allele.objects.filter(variantallele__variant__clinvar__clinvar_variation_id=self.clinvar_variation_id).first():
+                    allele_id = allele.pk
                 clinvar_record_collection.allele_id = allele_id
 
             if not allele_id:
