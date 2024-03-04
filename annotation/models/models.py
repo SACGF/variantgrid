@@ -757,6 +757,17 @@ class AnnotationRun(TimeStampedModel):
     def get_absolute_url(self):
         return reverse('view_annotation_run', kwargs={'annotation_run_id': self.pk})
 
+    @staticmethod
+    def get_for_variant(variant: Variant, variant_annotation_version) -> Optional['AnnotationRun']:
+        if variant.is_symbolic:
+            pipeline_type = VariantAnnotationPipelineType.CNV
+        else:
+            pipeline_type = VariantAnnotationPipelineType.STANDARD
+        return AnnotationRun.objects.filter(annotation_range_lock__version=variant_annotation_version,
+                                            annotation_range_lock__min_variant__gte=variant.pk,
+                                            annotation_range_lock__max_variant__lte=variant.pk,
+                                            pipeline_type=pipeline_type).first()
+
     @property
     def variant_annotation_version(self):
         return self.annotation_range_lock.version
