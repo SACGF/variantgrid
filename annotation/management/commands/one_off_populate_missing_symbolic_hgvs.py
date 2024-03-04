@@ -1,5 +1,6 @@
 import time
 
+from django.conf import settings
 from django.core.management import BaseCommand
 
 from annotation.models import VariantAnnotation, VariantTranscriptAnnotation
@@ -44,7 +45,6 @@ class Command(BaseCommand):
             records.clear()
 
     def handle(self, *args, **options):
-        MAX_SIZE = 100_000
 
         for genome_build in GenomeBuild.builds_with_annotation():
             matcher = HGVSMatcher(genome_build)
@@ -60,8 +60,8 @@ class Command(BaseCommand):
             for i, v in enumerate(symbolic_qs):
                 # Do this lookup of ref/alt once as it's expensive..
                 variant_coordinate = v.coordinate
-                if abs(variant_coordinate.svlen) > MAX_SIZE:
-                    print(f"Skipping calculating HGVS for {variant_coordinate} because it exceeds {MAX_SIZE}")
+                if abs(variant_coordinate.svlen) > settings.HGVS_MAX_ALT_LENGTH:
+                    print(f"Skipping calculating HGVS for {variant_coordinate} because it exceeds {settings.HGVS_MAX_ALT_LENGTH}")
                     continue
                 variant_coordinate = variant_coordinate.as_external_explicit(genome_build)
 
