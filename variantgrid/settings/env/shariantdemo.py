@@ -30,7 +30,7 @@ CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE = True
 
 # OIDC SETTINGS
 OIDC_RP_CLIENT_ID = 'shariant-demo'
-OIDC_REQUIRED_GROUP = None
+OIDC_REQUIRED_GROUP = '/variantgrid/shariant_demo'
 LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=https%3A%2F%2Fdemo.shariant.org.au'
 
 _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded annotation (${ANNOTATION_BASE_DIR} from wiki)

@@ -22,7 +22,7 @@ URLS_NAME_REGISTER.update({
 })
 
 DISCORDANCE_EMAIL = '"Shariant Updates" <updates@shariant.org.au>'
-SEND_EMAILS = False
+SEND_EMAILS = '/variantgrid/shariant_test'
 HEALTH_CHECK_ENABLED = True
 
 HEARTBEAT_URL = 'https://heartbeat.uptimerobot.com/m785768698-f47e172d7c428063e2f452af783dadfcc07da004'
