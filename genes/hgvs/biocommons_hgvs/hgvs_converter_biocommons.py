@@ -238,6 +238,13 @@ class BioCommonsHGVSConverter(HGVSConverter):
             if m := self.reference_sequence_pattern.match(exception_str):
                 ok = True
                 provided_ref, calculated_ref = m.groups()
+                pr_len = len(provided_ref)
+                cr_len = len(calculated_ref)
+                if pr_len != cr_len:
+                    msg = f"Calculated reference '{calculated_ref}' length ({cr_len}) different from provided " \
+                            + f"reference '{provided_ref}' length ({pr_len})"
+                    raise HGVSInvalidVariantError(msg) from hgvs_e
+
                 var_x.posedit.edit.ref = calculated_ref  # Switch reference
                 # HgvsMatchRefAllele wants genomic refs, may need to convert
                 provided_g_ref = provided_ref
