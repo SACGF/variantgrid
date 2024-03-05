@@ -22,7 +22,7 @@ URLS_NAME_REGISTER.update({
 })
 
 DISCORDANCE_EMAIL = '"Shariant Updates" <updates@shariant.org.au>'
-SEND_EMAILS = '/variantgrid/shariant_test'
+SEND_EMAILS = False
 HEALTH_CHECK_ENABLED = True
 
 HEARTBEAT_URL = 'https://heartbeat.uptimerobot.com/m785768698-f47e172d7c428063e2f452af783dadfcc07da004'
@@ -33,7 +33,7 @@ CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE = True
 
 # OIDC SETTINGS
 OIDC_RP_CLIENT_ID = 'shariant-test'
-OIDC_REQUIRED_GROUP = None
+OIDC_REQUIRED_GROUP = '/variantgrid/shariant_demo'
 LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=https%3A%2F%2Ftest.shariant.org.au'
 
 _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded annotation (${ANNOTATION_BASE_DIR} from wiki)
