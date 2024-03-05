@@ -6,7 +6,7 @@ from django.db.models.functions import Length
 from manual.operations.manual_operations import ManualOperation
 
 
-def _test_for_bad_symbolic_variants(apps, _schema_editor):
+def _test_for_bad_symbolic_variants(apps):
     Variant = apps.get_model("snpdb", "Variant")
     ClinVar = apps.get_model("annotation", "ClinVar")
 
