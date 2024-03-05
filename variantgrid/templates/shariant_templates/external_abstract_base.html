@@ -1,0 +1,95 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+{% load static %}
+{% load settings_tags %}
+{% load compress %}
+{% load i18n %}
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>{% block title %}{{ site_name }}{% endblock %}</title>
+
+    <link rel="stylesheet" href="{% static 'js/lib/bootstrap/4.5.2/css/bootstrap.min.css' %}">
+    <script src="{% static 'js/lib/jquery-3.3.1/jquery-3.3.1.min.js' %}"></script>
+    <!-- Font Awesome -->
+    <link href="{% static 'fontawesomefree/css/all.min.css' %}" rel="stylesheet" type="text/css">
+
+    <style>
+        @import url("https://fonts.googleapis.com/css?family=Raleway:400,500");
+    </style>
+    {% compress css %}
+    <!-- standard values -->
+        <link href="{% static 'css/global.css' %}" rel="stylesheet">
+    {% endcompress %}
+    {% compress js %}
+        <script>window.SITE_NAME = "{{ site_name }}";</script>
+        <script src="{% static 'js/global.js' %}"></script>
+    {% endcompress %}
+
+    <script>
+        var $buoop = {
+            required:{e:16,f:60,o:53,s:11,c:66},insecure:false,api:2021.03,reminder:0,test:false,no_permanent_hide: true,
+            text:'Your browser {brow_name} <b>will not work on this site</b>.<br/>Please <a{up_but}>click here</a> for details on getting an up to date browser.'
+        };
+        function $buo_f(){
+         var e = document.createElement("script");
+         e.src = "//browser-update.org/update.min.js";
+         document.body.appendChild(e);
+        };
+        try {document.addEventListener("DOMContentLoaded", $buo_f,false)}
+        catch(e){window.attachEvent("onload", $buo_f)}
+    </script>
+
+
+    <script type="text/javascript">
+        {% if use_oidc %}
+        function login() {
+            window.location = '{% url 'oidc_authentication_init' %}'
+        }
+        function logout() {
+            window.location = '{% url 'auth_logout' %}';
+        }
+        {% endif %}
+        function resume() {
+            window.location = '/';
+        }
+    </script>
+    <meta name="description" content="VariantGrid: An source available variant database, and web analysis platform."/>
+    {% block head %}{% endblock %}
+</head>
+
+<body class="login-bg-theme">
+    <div class="container main-container mt-4">
+        <div class="row" style="display:flex; align-items:center">
+            <div class="col-12 col-lg-7">
+                <div class="jumbo-box">
+                    <h1>{{ site_name }}</h1>
+                    <p style="font-size: 18px">Australian Genomics Variant Classification Sharing Platform</p>
+                    {% block content %}{% endblock %}
+
+                    <div class="mt-3">
+                    </div>
+                    <hr class="my-4"/>
+
+                    <p>Developed for <a class="external-link" href='https://www.australiangenomics.org.au'>Australian Genomics</a> as part of the project area “Genomics Diagnostics” to support the efficiency, quality and consistency of genomic diagnostic practice in Australia.</p>
+                    <p><a class="external-link" href="https://www.cell.com/ajhg/fulltext/S0002-9297(22)00454-2">Shariant Paper (AJHG)</a></p>
+                    <p><a class="external-link" href='https://www.australiangenomics.org.au/project-areas/genomic-diagnostics/'>About the Genomic Diagnostics project area</a></p>
+
+                    <label>Shariant has been designed to:</label>
+                    <p>Enable the real-time sharing of clinically curated variants with structured supporting evidence between Australian clinical genetic testing laboratories.</p>
+                    <p>Support a process to automatically identify and promote resolution of discrepancies in variant interpretation between laboratories.</p>
+                    <p>Streamline submission to international databases, including ClinVar.</p>
+                </div>
+            </div>
+            <div class="col-12 col-lg-5">
+                <div class="poster">
+                    <img src="{% static 'images/shariant_cloud.png' %}" style="max-width: 500px" />
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{% static 'js/lib/popper/1.16.1/popper.min.js' %}"></script>
+    <script src="{% static 'js/lib/bootstrap/4.5.2/js/bootstrap.min.js' %}"></script>
+</body>
+</html>
