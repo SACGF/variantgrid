@@ -380,7 +380,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
     @property
     def max_sequence_length(self) -> int:
         if self.is_symbolic():
-            return self.svlen
+            return abs(self.svlen)
         else:
             return max(len(self.ref), len(self.alt))
 
