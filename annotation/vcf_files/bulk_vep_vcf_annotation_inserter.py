@@ -455,11 +455,19 @@ class BulkVEPVCFAnnotationInserter:
     def _add_hgvs(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: dict):
         if variant_coordinate is None:
             return
+        # VEP doesn't currently calculate this - but may in a future version
+        if transcript_data.get('hgvs_c'):
+            return
+
+        if transcript_data.get(VEPColumns.PICK):
+            max_length = settings.HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT
+        else:
+            max_length = settings.HGVS_MAX_SEQUENCE_LENGTH
 
         # Only calculate very long HGVS for representative transcripts
-        if variant_coordinate.max_sequence_length > settings.HGVS_MAX_SEQUENCE_LENGTH:
-            if not transcript_data.get(VEPColumns.PICK, False):
-                return
+        if variant_coordinate.max_sequence_length > max_length:
+            transcript_data['hgvs_c'] = "c.HGVS not calculated due to length"
+            return
 
         transcript_id = transcript_data.get("transcript_id")
         version = transcript_data.get("version_id")
