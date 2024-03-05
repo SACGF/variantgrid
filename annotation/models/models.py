@@ -758,12 +758,13 @@ class AnnotationRun(TimeStampedModel):
         return reverse('view_annotation_run', kwargs={'annotation_run_id': self.pk})
 
     @staticmethod
-    def get_for_variant(variant: Variant, variant_annotation_version) -> Optional['AnnotationRun']:
+    def get_for_variant(variant: Variant, genome_build) -> Optional['AnnotationRun']:
         if variant.is_symbolic:
             pipeline_type = VariantAnnotationPipelineType.CNV
         else:
             pipeline_type = VariantAnnotationPipelineType.STANDARD
-        return AnnotationRun.objects.filter(annotation_range_lock__version=variant_annotation_version,
+        # For newly created variants, there will only be one per build for latest annotation version
+        return AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=genome_build,
                                             annotation_range_lock__min_variant__gte=variant.pk,
                                             annotation_range_lock__max_variant__lte=variant.pk,
                                             pipeline_type=pipeline_type).first()
@@ -1233,10 +1234,7 @@ class ManualVariantEntryCollection(models.Model):
         annotation_run = None
         if mve := self.first_entry:
             if variant := self.first_variant:
-                ar_qs = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=mve.genome_build,
-                                                     annotation_range_lock__min_variant__gte=variant.pk,
-                                                     annotation_range_lock__max_variant__lte=variant.pk)
-                annotation_run = ar_qs.first()
+                annotation_run = AnnotationRun.get_for_variant(variant, mve.genome_build)
         return annotation_run
 
     @staticmethod

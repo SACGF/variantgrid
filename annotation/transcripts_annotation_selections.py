@@ -98,7 +98,7 @@ class VariantTranscriptSelections:
                         self.gene_annotations[vsta.gene_id] = model_to_dict(gene_annotation)
         except VariantAnnotation.DoesNotExist:
             # Probably due to variant being annotated - in that case show a warning message
-            if ar := AnnotationRun.get_for_variant(variant, annotation_version.variant_annotation_version):
+            if ar := AnnotationRun.get_for_variant(variant, self.genome_build):
                 if ar.status in (AnnotationStatus.ERROR, AnnotationStatus.FINISHED):
                     msg = f"Annotation for variant {variant} failed (Annotation run: {ar.get_status_display()})"
                     self.error_messages.append(msg)
