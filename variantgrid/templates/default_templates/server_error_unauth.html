@@ -1,9 +1,10 @@
 {% extends "registration/abstract_login.html" %}
+{% load ui_utils %}
 {% block content %}
-    {{ block.super }}
+    <div class="alert alert-danger">
+        {{ 'E' | severity_icon }}
+        {{ message }}
+    </div>
 
-    <P>
-    {{ message }}
-    </p>
-    
+    {{ block.super }}
 {% endblock %}
