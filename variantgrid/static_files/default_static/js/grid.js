@@ -369,6 +369,34 @@ function geneSymbolNewWindowLink(geneSymbol) {
     return _geneSymbolLink(geneSymbol, false);
 }
 
+function formatMavedbUrnLinks(mavedbUrn) {
+    console.log("formatMavedbUrnLinks" + mavedbUrn);
+    const urls = mavedbUrnToUrls(mavedbUrn);
+    return Object.entries(urls).map(([key, value]) => `<a target="_blank" href="${value}">${key}</a>`).join(" ");
+}
+
+function mavedbUrnToUrls(mavedbUrn) {
+  const experimentSets = new Set();
+  const EXPERIMENT_URL_PREFIX = "https://www.mavedb.org/#/experiment-sets/";
+  if (mavedbUrn) {
+    mavedbUrn.split("&").forEach(urn => {
+      const es = urn.rsplit("-", 2)[0];
+      experimentSets.add(es);
+    });
+  }
+  const urls = {};
+  [...experimentSets].sort().forEach(urn => {
+    urls[urn] = EXPERIMENT_URL_PREFIX + urn;
+  });
+  return urls;
+}
+
+// JavaScript does not have a built-in rsplit function, so we need to implement it.
+String.prototype.rsplit = function(sep, maxsplit) {
+  const split = this.split(sep);
+  return maxsplit ? [split.slice(0, -maxsplit).join(sep), ...split.slice(-maxsplit)] : split;
+};
+
 
 function showTagAutocomplete(variantId) {
     let container = $("#tag-entry-container-" + variantId);
@@ -608,6 +636,7 @@ jQuery.extend($.fn.fmatter , {
     'gnomadFilteredFormatter' : gnomadFilteredFormatter,
     'unitAsPercentFormatter' : unitAsPercentFormatter,
     'formatMasterMindMMID3': formatMasterMindMMID3,
+    'formatMavedbUrnLinks': formatMavedbUrnLinks,
 });
 
 
