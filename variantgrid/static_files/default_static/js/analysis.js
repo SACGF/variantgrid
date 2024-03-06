@@ -516,7 +516,6 @@ function showLoadingOverlay() {
         // Move to right-panel (with top z-order), then things can load underneath.
         oc.appendTo("#right-panel");
         oc.show();
-        console.log("Appended to right panel...")
 
         $("#loading-message").remove();
 

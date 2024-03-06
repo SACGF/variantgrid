@@ -370,7 +370,6 @@ function geneSymbolNewWindowLink(geneSymbol) {
 }
 
 function formatMavedbUrnLinks(mavedbUrn) {
-    console.log("formatMavedbUrnLinks" + mavedbUrn);
     const urls = mavedbUrnToUrls(mavedbUrn);
     return Object.entries(urls).map(([key, value]) => `<a target="_blank" href="${value}">${key}</a>`).join(" ");
 }
