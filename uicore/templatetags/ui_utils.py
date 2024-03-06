@@ -390,21 +390,30 @@ def severity_icon(severity: str, title: Optional[str] = None) -> str:
         classes.append('hover-detail')
         title_html = f' title="{title}"'
 
-    severity = severity.upper()
-    if severity.startswith('C'):  # critical
-        classes += ['fa-bomb', 'text-danger']
-    elif severity.startswith('E') or severity == 'DANGER':  # error
-        classes += ['fa-exclamation-circle', 'text-danger']
-    elif severity.startswith('W'):  # warning
-        classes += ['fa-exclamation-triangle', 'text-warning']
-    elif severity.startswith('I'):  # info
-        classes += ['fa-info-circle', 'text-info']
-    elif severity.startswith('D'):  # debug
-        classes += ['fa-key', 'text-info']
-    elif severity.startswith('S'):  # success
-        classes += ['fa-check-circle', 'text-success']
-    else:
-        # not sure what this was meant to be
+    def severity_for(severity_part: str) -> Optional[list[str]]:
+        # TODO make the below more robust
+        if severity_part.startswith('C'):  # critical
+            return ['fa-bomb', 'text-danger']
+        elif severity_part.startswith('E') or severity_part == 'DANGER':  # error
+            return ['fa-exclamation-circle', 'text-danger']
+        elif severity_part.startswith('W'):  # warning
+            return ['fa-exclamation-triangle', 'text-warning']
+        elif severity_part.startswith('I'):  # info
+            return ['fa-info-circle', 'text-info']
+        elif severity_part.startswith('D'):  # debug
+            return ['fa-key', 'text-info']
+        elif severity_part.startswith('S'):  # success
+            return ['fa-check-circle', 'text-success']
+        else:
+            return None
+
+    found_extra_classes = False
+    for part in [s for s in severity.upper().split(" ") if s]:
+        if extra_classes := severity_for(part):
+            classes += extra_classes
+            found_extra_classes = True
+            break
+    if not found_extra_classes:
         classes += ['fa-question-circle', 'text-secondary']
 
     class_string = " ".join(class_str for class_str in classes)

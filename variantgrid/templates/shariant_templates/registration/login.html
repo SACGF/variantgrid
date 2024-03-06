@@ -35,14 +35,7 @@
                     <h1>{{ site_name }}</h1>
                     <p style="font-size: 18px">Australian Genomics Variant Classification Sharing Platform</p>
                     {% comment %}Not using the standard template for messages as want to provide link to ShariantTest in certain circumstances{% endcomment %}
-                    {% for message in messages %}
-                        <div class="alert {{ message.tags }}" role="alert">
-                            {{ message.tags | severity_icon }} {{ message }}
-                            {% if "not authorised for this environment" in message.message %}
-                                <br/>Please try our test environment <a href="https://test.shariant.org.au">https://test.shariant.org.au</a>
-                            {% endif %}
-                        </div>
-                    {% endfor %}
+                    {% include "uicore/messages/messages.html" %}
                     {% login_form next=next form=form %}
                     <div class="mt-3">
                     {% modal label="Need an Account?" show_prefix=False size="md" %}
