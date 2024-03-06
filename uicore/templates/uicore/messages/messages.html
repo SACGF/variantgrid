@@ -7,7 +7,7 @@
 <div id="django-messages">
     {% for message in messages %}
       <div class="alert {{ message.tags }}" role="alert">
-        {{ message.tags | severity_icon }} {{ message }}
+        {{ message.tags | severity_icon }} {% if "html" in message.extra_tags %}{{ message | safe }}{% else %}{{ message }}{% endif %}
       {% comment %}
           {% if "saved successfully" in message.message %}@ <span class="convert-timestamp seconds float-right"></span>{% endif %}
       {% endcomment %}

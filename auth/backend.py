@@ -45,10 +45,28 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         # convert it so we get 'some_group_1', 'some_group_2'
 
         user.is_active = True
-        if settings.OIDC_REQUIRED_GROUP and settings.OIDC_REQUIRED_GROUP not in claims['groups']:
+        all_claim_groups = claims["groups"]
+        if settings.OIDC_REQUIRED_GROUP and settings.OIDC_REQUIRED_GROUP not in all_claim_groups:
             user.is_active = False
             user.save()
-            messages.add_message(self.request, messages.ERROR, "This account is not authorised for this environment.")
+
+            # Please try our test environment <a href="https://test.shariant.org.au">https://test.shariant.org.au</a>
+
+            allowed_environments_map = {
+                "/variantgrid/shariant_demo": """Please try out demo environment <a href="https://demo.shariant.org.au">https://demo.shariant.org.au</a>""",
+                "/variantgrid/shariant_test": """Please try out test environment <a href="https://test.shariant.org.au">https://test.shariant.org.au</a>""",
+                "/variantgrid/shariant_production": """Please try out production environment <a href="https://shariant.org.au">https://shariant.org.au</a>""",
+            }
+            allowed_environment_list = []
+            for group, message in allowed_environments_map.items():
+                if group in all_claim_groups:
+                    allowed_environment_list.append(message)
+
+            message = "This account is not authorised for this environment."
+            for allowed_environment in allowed_environment_list:
+                message += "<br/>" + allowed_environment
+
+            messages.add_message(self.request, messages.ERROR, message, extra_tags="html")
             return user
 
         oauth_groups = [g.split('/')[1:] for g in claims['groups']]
