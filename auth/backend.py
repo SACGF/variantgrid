@@ -62,7 +62,7 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
                 if group in all_claim_groups:
                     allowed_environment_list.append(message)
 
-            message = "This account is not authorised for this environment."
+            message = f"This account <i>{user.email}</i> is not authorised for this environment."
             for allowed_environment in allowed_environment_list:
                 message += "<br/>" + allowed_environment
 
