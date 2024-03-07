@@ -344,14 +344,27 @@ def vep_parse_version_line(line):
         raise
 
 
-def vep_check_version_match(variant_annotation_version, filename: str):
+def _vep_check_version_match(variant_annotation_version, vep_version_kwargs: dict, vep_version_desc: str):
+    for k, v in vep_version_kwargs.items():
+        version_value = getattr(variant_annotation_version, k)
+        if version_value != v:
+            msg = f"Annotation/VEP out of sync! Version '{variant_annotation_version}' and {vep_version_desc} differ, " \
+                  f"KEY: '{k}' annotation: '{version_value}', vcf: '{v}'"
+            raise VEPVersionMismatchError(msg)
+
+
+def vep_check_annotated_file_version_match(variant_annotation_version, filename):
     """ Load VEP VCF, check VEP= line and make sure that values match expected VariantAnnotationVersion """
     vep_config = VEPConfig(variant_annotation_version.genome_build)
     vep_dict = get_vep_version_from_vcf(filename)
-    kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_dict)
-    for k, v in kwargs.items():
-        version_value = getattr(variant_annotation_version, k)
-        if version_value != v:
-            msg = f"Annotation/VCF out of sync! Version '{variant_annotation_version}' and VCF '{filename}' differ, " \
-                  f"KEY: '{k}' annotation: '{version_value}', vcf: '{v}'"
-            raise VEPVersionMismatchError(msg)
+    vep_version_kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_dict)
+    _vep_check_version_match(variant_annotation_version, vep_version_kwargs,
+                            f"VEP annotated VCF: '{filename}'")
+
+
+def vep_check_command_line_version_match(variant_annotation_version):
+    """ Check vs what will get executed on command line """
+    vep_config = VEPConfig(variant_annotation_version.genome_build)
+    vep_version = get_vep_version(variant_annotation_version.genome_build, vep_config.annotation_consortium)
+    vep_version_kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version)
+    _vep_check_version_match(variant_annotation_version, vep_version_kwargs, "VEP command line")

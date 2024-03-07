@@ -8,7 +8,7 @@ from django.utils import timezone
 from annotation.annotation_version_querysets import get_unannotated_variants_qs
 from annotation.models import AnnotationRun, re, VEPSkippedReason
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
-from annotation.vep_annotation import vep_check_version_match
+from annotation.vep_annotation import vep_check_annotated_file_version_match
 
 
 def import_vcf_annotations(annotation_run: AnnotationRun, insert_variants=True, vep_version_check=True,
@@ -21,7 +21,7 @@ def import_vcf_annotations(annotation_run: AnnotationRun, insert_variants=True, 
     annotation_run.save()
 
     if vep_version_check:
-        vep_check_version_match(annotation_run.variant_annotation_version, annotation_run.vcf_annotated_filename)
+        vep_check_annotated_file_version_match(annotation_run.variant_annotation_version, annotation_run.vcf_annotated_filename)
     vcf_reader = cyvcf2.VCF(annotation_run.vcf_annotated_filename)
     header_types = cyvcf2_header_types(vcf_reader)
     infos = header_types["INFO"]

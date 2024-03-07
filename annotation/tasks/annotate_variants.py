@@ -11,7 +11,7 @@ from annotation.models import AnnotationStatus, GenomeBuild
 from annotation.models.models import AnnotationRun, InvalidAnnotationVersionError
 from annotation.signals.manual_signals import annotation_run_complete_signal
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
-from annotation.vep_annotation import get_vep_command
+from annotation.vep_annotation import get_vep_command, vep_check_command_line_version_match
 from eventlog.models import create_event
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, report_message, log_traceback
@@ -99,7 +99,11 @@ def annotate_variants(annotation_run_id):
         annotation_run.save()
 
 
-def dump_and_annotate_variants(annotation_run):
+def dump_and_annotate_variants(annotation_run, vep_version_check=True):
+    if vep_version_check:
+        # Do a check before we annotate
+        vep_check_command_line_version_match(annotation_run.variant_annotation_version)
+
     vcf_dump_filename = annotation_run.get_dump_filename()
     annotation_run.dump_start = timezone.now()
     annotation_run.vcf_dump_filename = vcf_dump_filename
