@@ -1,9 +1,10 @@
 import json
+from typing import Optional
 
 from django.contrib.auth.models import User
 from django.core.serializers import serialize
 
-from analysis.models import Analysis, GenomeBuild, AnnotationVersion, AnalysisEdge
+from analysis.models import Analysis, GenomeBuild, AnnotationVersion, AnalysisEdge, AnalysisTemplateType
 from analysis.models.nodes.node_utils import reload_analysis_nodes
 from analysis.serializers import AnalysisNodeSerializer, AnalysisSerializer
 
@@ -38,24 +39,29 @@ def analysis_export_to_file(analysis: Analysis, file):
 
 
 def analysis_import(user: User, genome_build: GenomeBuild, filename,
-                    annotation_version: AnnotationVersion = None) -> Analysis:
+                    annotation_version: AnnotationVersion = None, replace: bool = True) -> Optional[Analysis]:
     if annotation_version is None:
         annotation_version = AnnotationVersion.latest(genome_build)
 
     with open(filename, encoding="utf-8") as f:
         analysis_json = json.loads(f.read())
 
-    node_serializers = {}
-    for serializer_subclass in AnalysisNodeSerializer.__subclasses__():
-        model_name = serializer_subclass.Meta.model._meta.label
-        node_serializers[model_name] = serializer_subclass
-
     analysis_record = analysis_json["analysis"]
     analysis_kwargs = analysis_record["fields"]
+    if not replace:
+        if Analysis.objects.filter(name=analysis_kwargs["name"],
+                                   template_type=AnalysisTemplateType.TEMPLATE).exists():
+            return None
+
     analysis_kwargs["user"] = user
     analysis_kwargs["genome_build"] = genome_build
     analysis_kwargs["annotation_version"] = annotation_version
     analysis = Analysis.objects.create(**analysis_kwargs)
+
+    node_serializers = {}
+    for serializer_subclass in AnalysisNodeSerializer.__subclasses__():
+        model_name = serializer_subclass.Meta.model._meta.label
+        node_serializers[model_name] = serializer_subclass
 
     print(f"Creating analysis: {analysis.pk}")
     old_new_map = {}

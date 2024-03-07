@@ -144,6 +144,7 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
         # Now we have standard/CNV type pipelines, it's possible some can be empty
         annotation_run.dump_count = 0
         annotation_run.annotated_count = 0
+        annotation_run.annotation_end = timezone.now()
 
     annotation_run.save()
 

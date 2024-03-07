@@ -313,14 +313,19 @@ $(document).ready(function() {
         {% csrf_token %}
         {% crispy vcf_form form_helper.horizontal %}
 
-        {% if vcf.uploadedvcf.uploaded_file and can_download_vcf %}
-            {% if vcf.uploadedvcf.uploaded_file.exists %}
-                <div class="form-group-row row">
+        {% if can_download_vcf %}
+            <div class="form-group-row row">
                 <label class="col-form-label col-12 col-md-3 text-md-right">Download</label>
-                <div class="col-12 col-md-9 text-left"><a href="{% url 'download_uploaded_file' vcf.uploadedvcf.uploaded_file.pk %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Uploaded VCF</a> ({{ vcf.uploadedvcf.uploaded_file.size|filesizeformat }})</div>
-                    <!-- <div class="left margin-r-5"><a href=""><div class="icon24 left margin-r-5 vcf-icon"></div> Annotated VCF</a></div> -->
+                <div class="d-flex flex-row">
+                    {% if vcf.uploadedvcf.uploaded_file.exists %}
+                        <div class="p-2"><a href="{% url 'download_uploaded_file' vcf.uploadedvcf.uploaded_file.pk %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Original VCF</a> ({{ vcf.uploadedvcf.uploaded_file.size|filesizeformat }})</div>
+                    {% endif %}
+                    {% if can_download_annotated_vcf %}
+                        <div class="p-2"><a href="{% url 'cohort_grid_export' vcf.cohort.pk 'vcf' %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Annotated VCF</a></div>
+                        <div class="p-2"><a href="{% url 'cohort_grid_export' vcf.cohort.pk 'csv' %}"><div class="icon24 left margin-r-5 csv-icon"></div> Annotated CSV</a></div>
+                    {% endif %}
                 </div>
-            {% endif %}
+            </div>
         {% endif %}
 
         <h3>Samples</h3>

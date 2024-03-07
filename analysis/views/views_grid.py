@@ -1,9 +1,11 @@
 import logging
 import operator
+import os
 import re
 import time
 from collections import Counter
 from io import StringIO
+from typing import Optional
 from urllib.parse import urlencode
 
 from django.contrib.postgres.aggregates.general import StringAgg
@@ -17,7 +19,8 @@ from vcf import Writer, Reader
 from vcf.model import _Substitution, _Record, make_calldata_tuple, _Call
 
 from analysis import grids
-from analysis.models import AnalysisNode
+from analysis.analysis_templates import get_cohort_analysis
+from analysis.models import AnalysisNode, AnalysisTemplate
 from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
 from analysis.views.node_json_view import NodeJSONGetView, NodeJSONViewMixin
 from annotation.models import VariantTranscriptAnnotation
@@ -25,7 +28,8 @@ from genes.models import CanonicalTranscriptCollection
 from library.constants import WEEK_SECS
 from library.django_utils import get_model_fields
 from library.jqgrid.jqgrid_export import grid_export_csv, StashFile
-from snpdb.models import Sample, ColumnVCFInfo, VCFInfoTypes, Zygosity
+from library.utils import name_from_filename
+from snpdb.models import Sample, ColumnVCFInfo, VCFInfoTypes, Zygosity, VCF, Cohort
 from snpdb.models.models_variant import Variant
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs
 
@@ -89,16 +93,17 @@ class NodeGridConfig(NodeJSONGetView):
         return ret
 
 
-def format_items_iterator(analysis, sample_ids, items):
+def format_items_iterator(sample_ids, items, variant_tags_dict: Optional[dict] = None):
     """ A few things are done in JS formatters, e.g. changing -1 to missing values (? in grid) and tags
         We can't just add tags via node queryset (in monkey patch func above) as we'll get an issue with
-        tacked on zygosity columns etc not being in GROUP BY or aggregate func. So, just patch items via iterator """
+        tacked on zygosity columns etc not being in GROUP BY or aggregate func. So, just patch items via iterator
+
+        variant_tags_dict: key = variant_id, value = tags (for this analysis) """
+
+    if variant_tags_dict is None:
+        variant_tags_dict = {}
 
     SAMPLE_FIELDS = ["allele_depth", "allele_frequency", "read_depth", "genotype_quality", "phred_likelihood"]
-
-    variant_tags_qs = Variant.objects.filter(varianttag__analysis=analysis)
-    variant_tags_qs = variant_tags_qs.annotate(tags=StringAgg("varianttag__tag", delimiter=', ', distinct=True))
-    variant_tags = dict(variant_tags_qs.values_list("id", "tags"))
 
     for item in items:
         for sample_id in sample_ids:
@@ -120,8 +125,7 @@ def format_items_iterator(analysis, sample_ids, items):
             item["tags_global"] = ", ".join(summarised_tags)
 
         variant_id = item["id"]
-        tags = variant_tags.get(variant_id)
-        if tags:
+        if tags := variant_tags_dict.get(variant_id):
             item["tags"] = tags
         yield item
 
@@ -195,11 +199,43 @@ def get_node_export_basename(node: AnalysisNode) -> str:
     return "_".join(name_parts)
 
 
+def cohort_grid_export(request, cohort_id, export_type):
+    EXPORT_TYPES = {"csv", "vcf"}
+
+    cohort = Cohort.get_for_user(request.user, cohort_id)
+    if export_type not in EXPORT_TYPES:
+        raise ValueError(f"{export_type} must be one of: {EXPORT_TYPES}")
+
+    analysis_template = AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
+    analysis = get_cohort_analysis(cohort, analysis_template)
+    node = analysis.analysisnode_set.get_subclass(output_node=True)  # Should only be 1
+    basename = "_".join([name_from_filename(cohort.name), "annotated", f"v{analysis.annotation_version.pk}",
+                         str(cohort.genome_build)])
+    return _node_grid_export(request, node, export_type, basename=basename)
+
+
 def node_grid_export(request, analysis_id):
     export_type = request.GET["export_type"]
     use_canonical_transcripts = request.GET.get("use_canonical_transcripts")
 
     node = _node_from_request(request)
+    canonical_transcript_collection = None
+    if use_canonical_transcripts:
+        # Whether to use it or not is set server-side. Just use client to see what they wanted
+        if ctc := node.analysis.canonical_transcript_collection:
+            canonical_transcript_collection = ctc
+        else:
+            logging.warning("Grid request had 'use_canonical_transcripts' but analysis did not.")
+
+    variant_tags_qs = Variant.objects.filter(varianttag__analysis=node.analysis)
+    variant_tags_qs = variant_tags_qs.annotate(tags=StringAgg("varianttag__tag", delimiter=', ', distinct=True))
+    variant_tags_dict = dict(variant_tags_qs.values_list("id", "tags"))
+
+    return _node_grid_export(request, node, export_type, canonical_transcript_collection, variant_tags_dict)
+
+
+def _node_grid_export(request, node, export_type, canonical_transcript_collection=None, variant_tags_dict=None, basename: str = None):
+
     grid_kwargs = {}
     if export_type == 'vcf':
         grid_kwargs["sort_by_contig_and_position"] = True
@@ -207,19 +243,16 @@ def node_grid_export(request, analysis_id):
 
     grid = _variant_grid_from_request(request, node, **grid_kwargs)
 
-    basename = get_node_export_basename(node)
+    if basename is None:
+        basename = get_node_export_basename(node)
     sample_ids = node.get_sample_ids()
     _, _, items = grid.get_items(request)
 
-    if use_canonical_transcripts:
-        # Whether to use it or not is set server-side. Just use client to see what they wanted
-        if ctc := node.analysis.canonical_transcript_collection:
-            basename += f"_{ctc}"
-            items = _replace_transcripts_iterator(request, grid, ctc, items)
-        else:
-            logging.warning("Grid request had 'use_canonical_transcripts' but analysis did not.")
+    if canonical_transcript_collection:
+        basename += f"_{canonical_transcript_collection}"
+        items = _replace_transcripts_iterator(request, grid, canonical_transcript_collection, items)
 
-    items = format_items_iterator(node.analysis, sample_ids, items)
+    items = format_items_iterator(sample_ids, items, variant_tags_dict)
 
     colmodels = grid.get_colmodels()
 
@@ -240,7 +273,7 @@ def _node_from_request(request) -> AnalysisNode:
 
 
 def _variant_grid_from_request(request, node: AnalysisNode, **kwargs):
-    extra_filters = request.GET["extra_filters"]
+    extra_filters = request.GET.get("extra_filters")
     return grids.VariantGrid(request.user, node, extra_filters, **kwargs)
 
 

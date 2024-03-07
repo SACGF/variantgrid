@@ -11,15 +11,24 @@ from snpdb.models import GenomeBuild
 
 
 class Command(BaseCommand):
+    def add_arguments(self, parser):
+        parser.add_argument('--replace', default=False, action='store_true')
+
     def handle(self, *args, **options):
         ANALYSIS_TEMPLATES_DIR = os.path.join(settings.BASE_DIR, "analysis", "data", "analysis_templates")
 
         user = admin_bot()
         genome_build = GenomeBuild.grch37()  # Doesn't matter for templates
+        replace = options["replace"]
 
         for filename in glob.glob(f"{ANALYSIS_TEMPLATES_DIR}/*.json"):
-            print(filename)
-            analysis = analysis_import(user, genome_build, filename)
+            analysis = analysis_import(user, genome_build, filename, replace=replace)
+            if analysis is None:
+                print(f"Skipped {filename}...")
+                continue
+            else:
+                print(f"Created: {filename}")
+
             analysis.template_type = AnalysisTemplateType.TEMPLATE
             analysis.visible = False
             analysis.save()

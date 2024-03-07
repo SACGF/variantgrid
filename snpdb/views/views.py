@@ -275,6 +275,14 @@ def view_vcf(request, vcf_id):
     except UploadedVCF.DoesNotExist:
         can_view_upload_pipeline = False
 
+    can_download_annotated_vcf = False
+    if vcf.import_status == ImportStatus.SUCCESS:
+        try:
+            AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_SAMPLE")
+            can_download_annotated_vcf = True
+        except ValueError:
+            pass
+
     context = {
         'vcf': vcf,
         'sample_stats_het_hom_count': sample_stats_het_hom_count,
@@ -286,6 +294,7 @@ def view_vcf(request, vcf_id):
         'patient_form': PatientForm(user=request.user),  # blank
         'has_write_permission': has_write_permission,
         'can_download_vcf': (not settings.VCF_DOWNLOAD_ADMIN_ONLY) or request.user.is_superuser,
+        'can_download_annotated_vcf': can_download_annotated_vcf,
         'can_view_upload_pipeline': can_view_upload_pipeline,
         "variant_zygosity_count_collections": variant_zygosity_count_collections,
     }
@@ -424,14 +433,11 @@ def sample_variants_tab(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
     analysis = None
     error_message = None
-    if settings.ANALYSIS_TEMPLATES_AUTO_SAMPLE:
-        try:
-            analysis_template = AnalysisTemplate.objects.get(name=settings.ANALYSIS_TEMPLATES_AUTO_SAMPLE)
-            analysis = get_sample_analysis(sample, analysis_template)
-        except AnalysisTemplate.DoesNotExist:
-            error_message = f"Analysis Template '{settings.ANALYSIS_TEMPLATES_AUTO_SAMPLE}' does not exist!"
-    else:
-        error_message = "settings.ANALYSIS_TEMPLATES_AUTO_SAMPLE not set. Talk to your administrator"
+    try:
+        analysis_template = AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_SAMPLE")
+        analysis = get_sample_analysis(sample, analysis_template)
+    except ValueError as e:
+        error_message = str(e)
 
     if error_message:
         messages.add_message(request, messages.ERROR, error_message)

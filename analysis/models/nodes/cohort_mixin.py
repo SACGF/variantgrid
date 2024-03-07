@@ -233,7 +233,8 @@ class CohortMixin:
                     if lowest_unannotated_variant := get_lowest_unannotated_variant_id(variant_annotation_version):
                         if uv.max_variant_id > lowest_unannotated_variant:
                             errors.append(f"VCF '{vcf}' contains variants that have not finished annotation"
-                                          f" (in variant annotation version={variant_annotation_version})")
+                                          f" (in variant annotation version={variant_annotation_version})"
+                                          f" {uv.max_variant_id=} > {lowest_unannotated_variant=}")
             except UploadedVCF.DoesNotExist:
                 pass
         return errors

@@ -21,7 +21,7 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsA
 from library.guardian_utils import admin_bot, assign_permission_to_user_and_groups
 from library.preview_request import PreviewModelMixin
 from snpdb.models import CustomColumnsCollection, CustomColumn, \
-    UserSettings, AbstractNodeCountSettings, Sample
+    UserSettings, AbstractNodeCountSettings, Sample, Cohort
 from snpdb.models.models_enums import BuiltInFilters
 from snpdb.models.models_genome import GenomeBuild
 
@@ -117,6 +117,12 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
     @classmethod
     def get_listing_url(cls):
         return reverse('analyses')
+
+    @classmethod
+    def filter_for_user(cls, user, queryset=None, **kwargs):
+        """ Hide invisible ones from general queries """
+        qs = super().filter_for_user(user, queryset=queryset, **kwargs)
+        return qs.filter(visible=True)
 
     def check_valid(self):
         for e in self.get_errors():
@@ -338,6 +344,16 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
     user = models.ForeignKey(User, null=True, on_delete=CASCADE)
     analysis = models.OneToOneField(Analysis, null=True, on_delete=SET_NULL)  # deleted or soft deleted in pre_delete
     deleted = models.BooleanField(default=False)
+
+    @staticmethod
+    def get_template_from_setting(setting_name: str) -> 'AnalysisTemplate':
+        if template_name := getattr(settings, setting_name, None):
+            try:
+                return AnalysisTemplate.objects.get(name=template_name)
+            except AnalysisTemplate.DoesNotExist:
+                raise ValueError(f"Analysis Template '{template_name}' does not exist!")
+        else:
+            raise ValueError(f"settings.{setting_name} not set. Talk to your administrator")
 
     @classmethod
     def get_permission_class(cls):
@@ -583,6 +599,15 @@ class AnalysisTemplateRunArgument(models.Model):
     object_pk = models.TextField(null=True, blank=True)  # for variable.class_name object
     value = models.TextField()
     error = models.TextField(null=True)
+
+
+class CohortAnalysisTemplateRun(models.Model):
+    """ Analysis (settings.ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT) automatically run once against a cohort  """
+    cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
+    analysis_template_run = models.ForeignKey(AnalysisTemplateRun, on_delete=CASCADE)
+
+    class Meta:
+        unique_together = ('cohort', 'analysis_template_run')
 
 
 class SampleAnalysisTemplateRun(models.Model):

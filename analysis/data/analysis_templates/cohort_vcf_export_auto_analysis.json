@@ -1,0 +1,76 @@
+{
+  "analysis": {
+    "model": "analysis.Analysis",
+    "pk": 10746,
+    "fields": {
+      "version": 0,
+      "analysis_type": null,
+      "name": "Cohort VCF Export auto analysis",
+      "description": null,
+      "show_igv_links": true,
+      "analysis_panel_fraction": 0.25,
+      "lock_input_sources": false,
+      "template_type": "T",
+      "node_queryset_filter_contigs": false,
+      "genome_build": "GRCh37",
+      "canonical_transcript_collection": null
+    }
+  },
+  "nodes": [
+    {
+      "model": "analysis.CohortNode",
+      "pk": 108961,
+      "fields": {
+        "id": 108961,
+        "analysis": 10746,
+        "name": "fake vcf",
+        "x": 47,
+        "y": 63,
+        "auto_node_name": true,
+        "output_node": true,
+        "hide_node_and_descendants_upon_template_configuration_error": false,
+        "visible": true,
+        "errors": null,
+        "shadow_color": null,
+        "load_seconds": 0.0919489860534668,
+        "cloned_from": null,
+        "status": "R",
+        "min_het_or_hom_count": 0,
+        "max_het_or_hom_count": null,
+        "min_unk_count": 0,
+        "max_unk_count": null,
+        "min_ref_count": 0,
+        "max_ref_count": null,
+        "min_hom_count": 0,
+        "max_hom_count": null,
+        "min_het_count": 0,
+        "max_het_count": null,
+        "min_ad": 0,
+        "min_dp": 0,
+        "min_gq": 0,
+        "max_pl": null,
+        "min_ad_op": "Y",
+        "min_dp_op": "Y",
+        "min_gq_op": "Y",
+        "max_pl_op": "Y",
+        "cohort": 68,
+        "zygosity": "A",
+        "zygosity_op": "L",
+        "accordion_panel": 0,
+        "analysisvariable_set": [
+          {
+            "id": 1065,
+            "field": "cohort",
+            "class_name": "snpdb.Cohort"
+          }
+        ],
+        "nodeallelefrequencyfilter": {
+          "group_operation": "Y",
+          "nodeallelefrequencyrange_set": []
+        },
+        "nodewiki": null
+      }
+    }
+  ],
+  "edges": []
+}
