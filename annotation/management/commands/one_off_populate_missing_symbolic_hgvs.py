@@ -1,9 +1,11 @@
 import time
+from typing import Optional
 
 from django.conf import settings
 from django.core.management import BaseCommand
 
 from annotation.models import VariantAnnotation, VariantTranscriptAnnotation
+from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import SV_HGVS_TOO_LONG_MESSAGE
 from genes.hgvs import HGVSMatcher, HGVSException
 from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 
@@ -17,24 +19,29 @@ class Command(BaseCommand):
         By variant so we only need to do that once
 
     """
-    def _update_annotation(self, v: Variant, variant_coordinate: VariantCoordinate, matcher, records, klass):
+    def _update_annotation(self, v: Variant, variant_coordinate: VariantCoordinate, matcher,
+                           records, klass, hgvs_c: Optional[str]):
         va_list = []
         for va in klass.objects.filter(variant=v, hgvs_c__isnull=True):
             if va.transcript_version:
-                # This is not super perfect - as normalization may affect position, but we want a quick reject
-                if va.transcript_version.start > variant_coordinate.position:
-                    continue
-                elif variant_coordinate.end > va.transcript_version.end + 1:
-                    continue
+                if hgvs_c is None:
+                    # This is not super perfect - as normalization may affect position, but we want a quick reject
+                    if va.transcript_version.start > variant_coordinate.position:
+                        continue
+                    elif variant_coordinate.end > va.transcript_version.end + 1:
+                        continue
 
-                transcript_accession = va.transcript_version.accession
-                try:
-                    va.hgvs_c = matcher.variant_coordinate_to_hgvs_variant(variant_coordinate, transcript_accession)
+                    transcript_accession = va.transcript_version.accession
+                    try:
+                        hgvs_c = matcher.variant_coordinate_to_hgvs_variant(variant_coordinate, transcript_accession)
+                        va_list.append(va)
+                    except (ValueError, HGVSException) as e:
+                        # print(f"FAILED: {transcript_accession}: {e} - {quick_reject=}")
+                        pass
+
+                if hgvs_c:
+                    va.hgvs_c = hgvs_c
                     va_list.append(va)
-                except (ValueError, HGVSException) as e:
-                    # print(f"FAILED: {transcript_accession}: {e} - {quick_reject=}")
-                    pass
-
 
         records.extend(va_list)
         self._bulk_update(klass, records)
@@ -60,13 +67,15 @@ class Command(BaseCommand):
             for i, v in enumerate(symbolic_qs):
                 # Do this lookup of ref/alt once as it's expensive..
                 variant_coordinate = v.coordinate
+                hgvs_c = None  # if None, Will calculate in _update_annotation
                 if abs(variant_coordinate.svlen) > settings.HGVS_MAX_SEQUENCE_LENGTH:
-                    print(f"Skipping calculating HGVS for {variant_coordinate} because it exceeds {settings.HGVS_MAX_SEQUENCE_LENGTH}")
-                    continue
-                variant_coordinate = variant_coordinate.as_external_explicit(genome_build)
+                    hgvs_c = SV_HGVS_TOO_LONG_MESSAGE
+                else:
+                    # Need to use in _update_annotation calculations
+                    variant_coordinate = variant_coordinate.as_external_explicit(genome_build)
 
-                self._update_annotation(v, variant_coordinate, matcher, va_list, VariantAnnotation)
-                self._update_annotation(v, variant_coordinate, matcher, vta_list, VariantTranscriptAnnotation)
+                self._update_annotation(v, variant_coordinate, matcher, va_list, VariantAnnotation, hgvs_c)
+                self._update_annotation(v, variant_coordinate, matcher, vta_list, VariantTranscriptAnnotation, hgvs_c)
                 now = time.time()
                 if now - last_update > 5:
                     last_update = now

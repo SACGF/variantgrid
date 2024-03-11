@@ -25,6 +25,7 @@ from library.utils import invert_dict
 from snpdb.models import GenomeBuild, VariantCoordinate
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
+SV_HGVS_TOO_LONG_MESSAGE = "c.HGVS not calculated due to length"
 VEP_SEPARATOR = '&'
 EMPTY_VALUES = {'', '.'}
 DELIMITER = '\t'
@@ -466,7 +467,7 @@ class BulkVEPVCFAnnotationInserter:
 
         # Only calculate very long HGVS for representative transcripts
         if variant_coordinate.max_sequence_length > max_length:
-            transcript_data['hgvs_c'] = "c.HGVS not calculated due to length"
+            transcript_data['hgvs_c'] = SV_HGVS_TOO_LONG_MESSAGE
             return
 
         transcript_id = transcript_data.get("transcript_id")
