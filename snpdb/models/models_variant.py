@@ -644,9 +644,14 @@ class Variant(PreviewModelMixin, models.Model):
     @property
     def can_have_clingen_allele(self) -> bool:
         return self.length <= settings.CLINGEN_ALLELE_REGISTRY_MAX_ALLELE_SIZE and self.can_make_g_hgvs
+
     @property
     def can_have_annotation(self) -> bool:
         return not self.is_reference
+
+    @property
+    def can_have_c_hgvs(self) -> bool:
+        return self.can_have_annotation and abs(self.svlen) <= settings.HGVS_MAX_SEQUENCE_LENGTH
 
     def as_tuple(self) -> tuple[str, int, str, str, int]:
         return self.locus.contig.name, self.locus.position, self.locus.ref.seq, self.alt.seq, self.svlen

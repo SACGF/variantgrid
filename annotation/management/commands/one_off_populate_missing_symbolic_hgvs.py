@@ -68,11 +68,11 @@ class Command(BaseCommand):
                 # Do this lookup of ref/alt once as it's expensive..
                 variant_coordinate = v.coordinate
                 hgvs_c = None  # if None, Will calculate in _update_annotation
-                if abs(variant_coordinate.svlen) > settings.HGVS_MAX_SEQUENCE_LENGTH:
-                    hgvs_c = SV_HGVS_TOO_LONG_MESSAGE
-                else:
+                if v.can_have_c_hgvs:
                     # Need to use in _update_annotation calculations
                     variant_coordinate = variant_coordinate.as_external_explicit(genome_build)
+                else:
+                    hgvs_c = SV_HGVS_TOO_LONG_MESSAGE
 
                 self._update_annotation(v, variant_coordinate, matcher, va_list, VariantAnnotation, hgvs_c)
                 self._update_annotation(v, variant_coordinate, matcher, vta_list, VariantTranscriptAnnotation, hgvs_c)

@@ -485,7 +485,7 @@ function applyVariantValues() {
                 {% labelled id="g-hgvs" label="g.HGVS" value_css="variant-coordinate variant_coordinate" %}{% c_hgvs g_hgvs %}{% endlabelled %}
                 {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
                 {% labelled label="Genome Build" %}{{ genome_build }}{% endlabelled %}
-                {% if variant.can_have_annotation and variant_show_canonical_hgvs %}
+                {% if variant.can_have_c_hgvs and variant_show_canonical_hgvs %}
                     {% labelled id="variant-canonical-c-hgvs" label="Canonical c.HGVS" %}Loading...{% endlabelled %}
                 {% endif %}
                 {% labelled id="allele" label="Allele" help=annotation_description.allele %}Loading...{% endlabelled %}
