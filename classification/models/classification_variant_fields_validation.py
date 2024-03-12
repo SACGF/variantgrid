@@ -88,17 +88,18 @@ def validate_letter_to_tier(sender, patch_meta: PatchMeta, key_map: EvidenceKeyM
                 max_level = level
                 break
 
+        e_key_somatic_clin_sig = key_map.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
         max_level_tier = __LEVELS_TO_TIER.get(max_level)
         somatic_clin_sig = patch_meta.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE, fallback_existing=True)
         if max_level_tier and somatic_clin_sig:
-            if actual_tier_level := key_map.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).option_dictionary_property("tier"):
-                if actual_tier_level != __LEVELS_AND_TIER:
-                    somatic_clin_sig_pretty_value = key_map.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(somatic_clin_sig)
+            if actual_tier_level := e_key_somatic_clin_sig.option_dictionary_property("tier").get(somatic_clin_sig, "X"):
+                if actual_tier_level != max_level_tier:
+                    somatic_clin_sig_pretty_value = e_key_somatic_clin_sig.pretty_value(somatic_clin_sig)
                     vm.add_message(
                         SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE,
                         code=ValidationCode.SOMATIC_MISMATCHED_LEVEL,
                         severity='warning',
-                        message=f"Level {max_level} indicates Clinical Significance should be \"Tier {__TIER_TO_ROMAN.get(max_level_tier, max_level_tier)}\" not \"{somatic_clin_sig_pretty_value}\""
+                        message=f"Level {max_level} indicates {e_key_somatic_clin_sig.pretty_label} should be \"Tier {__TIER_TO_ROMAN.get(max_level_tier, max_level_tier)}\" not \"{somatic_clin_sig_pretty_value}\""
                     )
         return vm
 
