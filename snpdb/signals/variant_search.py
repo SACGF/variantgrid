@@ -160,16 +160,20 @@ def allele_search(search_input: SearchInputInstance):
         allele = clingen_allele.allele
         for genome_build in search_input.genome_builds:
             try:
-                if variant := allele.variant_for_build(genome_build):
+                if variant := allele.variant_for_build(genome_build, best_attempt=False):
                     yield variant
                     continue
             except ValueError:
                 pass
-            # if there was no variant for that allele
-            variant_string = clingen_allele.get_variant_string(genome_build)
-            if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build, variant_string=variant_string):
-                variant_string_abbreviated = clingen_allele.get_variant_string(genome_build, abbreviate=True)
-                yield create_manual, SearchMessage(f'"{clingen_allele}" resolved to "{variant_string_abbreviated}"', severity=LogLevel.INFO)
+
+            try:
+                # if there was no variant for that allele
+                variant_string = clingen_allele.get_variant_string(genome_build)
+                if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build, variant_string=variant_string):
+                    variant_string_abbreviated = clingen_allele.get_variant_string(genome_build, abbreviate=True)
+                    yield create_manual, SearchMessage(f'"{clingen_allele}" resolved to "{variant_string_abbreviated}"', severity=LogLevel.INFO)
+            except ValueError as e:
+                yield SearchMessageOverall(str(e), severity=LogLevel.ERROR, genome_builds=[genome_build])
 
 
 def get_results_from_variant_coordinate(genome_build: GenomeBuild, qs: QuerySet, variant_coordinate: VariantCoordinate, any_alt: bool = False) -> QuerySet[Variant]:
@@ -213,7 +217,6 @@ def yield_search_variant_match(search_input: SearchInputInstance, get_variant_co
             yield SearchMessageOverall(", ".join(errors), genome_builds=[genome_build])
         else:
             if not has_results:
-
                 variant_string = variant_coordinate.format()
                 if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build,
                                                                        variant_string=variant_string):
