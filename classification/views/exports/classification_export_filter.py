@@ -127,11 +127,6 @@ class AlleleData:
     @cached_property
     def variant(self) -> Optional[Variant]:
         return self.cached_variant
-        # if allele := self.allele:
-        #    try:
-        #        return self.allele.variant_for_build(genome_build=self.genome_build, best_attempt=True)
-        #    except ValueError:
-        #        pass
 
     @property
     def genome_build(self) -> GenomeBuild:

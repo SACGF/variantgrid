@@ -2024,10 +2024,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     def get_variant_for_build(self, genome_build: GenomeBuild) -> Optional[Variant]:
         if self.variant and self.variant.allele:
-            va_set = self.variant.allele.variantallele_set
-            variant_allele: VariantAllele = va_set.filter(genome_build=genome_build).first()
-            if variant_allele:
-                return variant_allele.variant
+            return self.variant.allele.variant_for_build_optional(genome_build)
         return None
 
     def get_variant_annotation(self, variant_annotation_version: VariantAnnotationVersion) -> Optional[Variant]:
