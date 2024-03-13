@@ -48,8 +48,13 @@
 
     function afSetSliderMinMaxLabels(slider, minVal, maxVal) {
         const container = $(slider).parent();
-        $(".slider-min", container).text(Math.floor(minVal * 100));
-        $(".slider-max", container).text(Math.floor(maxVal * 100));
+        {% if VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT %}
+            minVal = Math.floor(minVal * 100) + "%";
+            maxVal = Math.floor(maxVal * 100) + "%";
+        {% endif %}
+
+        $(".slider-min", container).text(minVal);
+        $(".slider-max", container).text(maxVal);
     }
 
     function createSlider(value1, value2) {

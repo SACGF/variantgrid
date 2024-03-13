@@ -1,5 +1,6 @@
 import json
 
+from django.conf import settings
 from django.template import Library
 
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter
@@ -12,7 +13,10 @@ register = Library()
 def allele_frequency_controls(node):
     allele_frequency = get_allele_frequency_filter_json_for_node(node)
 
-    return {'allele_frequency': allele_frequency}
+    return {
+        "VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT": settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT,
+        'allele_frequency': allele_frequency
+    }
 
 
 def get_allele_frequency_filter_json_for_node(node):
