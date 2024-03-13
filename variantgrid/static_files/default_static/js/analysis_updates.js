@@ -33,12 +33,17 @@ function AnalysisMessagePoller(node_status_url, task_status_url) {
 			}
 		};
 
+		const error_function = function(data) {
+			that.stop_polling();
+		}
+
 		const data = 'nodes=' + JSON.stringify(nodes);
 		$.ajax({
 		    type: "GET",
 		    data: data,
 		    url: this.node_status_url,
 		    success: on_node_status_success_function,
+			error: error_function,
 		});
 
         if (this.task_status_url) {
