@@ -88,7 +88,7 @@ def _allele_preview_classifications_extra(user: User, obj: Allele, genome_build:
 
     if not hgvs_extras:
         try:
-            v = obj.variant_for_build(genome_build)
+            v = obj.variant_for_any_build(genome_build)
             hgvs_extras = _variant_hgvs_extra(v, genome_build)
         except ValueError:
             pass

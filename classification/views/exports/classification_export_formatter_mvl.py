@@ -219,7 +219,7 @@ class MVLEntry(ExportRow):
     def variant_anchor_tag(self):
         # if we want to produce the same URLs as before for comparison, at the cost of a lot of speed
         if self.formatter.compatability_mode:
-            v = Allele.objects.get(pk=self._cm.classification.allele_id).variant_for_build(self.mvl_data.data.source.genome_build)
+            v = Allele.objects.get(pk=self._cm.classification.allele_id).variant_for_any_build(self.mvl_data.data.source.genome_build)
             url = v.get_absolute_url()
             url = get_url_from_view_path(url) + f'?refer=mvl&seen={self.data.source.date_str}'
             return f'<a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a>'

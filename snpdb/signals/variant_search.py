@@ -160,7 +160,7 @@ def allele_search(search_input: SearchInputInstance):
         allele = clingen_allele.allele
         for genome_build in search_input.genome_builds:
             try:
-                if variant := allele.variant_for_build(genome_build, best_attempt=False):
+                if variant := allele.variant_for_any_build(genome_build, best_attempt=False):
                     yield variant
                     continue
             except ValueError:

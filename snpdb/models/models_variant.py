@@ -94,14 +94,14 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
     @cached_property
     def grch37(self) -> Optional['Variant']:
         try:
-            return self.variant_for_build(genome_build=GenomeBuild.grch37(), best_attempt=False)
+            return self.variant_for_any_build(preferred_genome_build=GenomeBuild.grch37(), best_attempt=False)
         except ValueError:
             return None
 
     @cached_property
     def grch38(self) -> Optional['Variant']:
         try:
-            return self.variant_for_build(genome_build=GenomeBuild.grch38(), best_attempt=False)
+            return self.variant_for_any_build(preferred_genome_build=GenomeBuild.grch38(), best_attempt=False)
         except ValueError:
             return None
 
@@ -109,13 +109,13 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
     def variants(self):
         return Variant.objects.filter(pk__in=self.variant_alleles().values_list('variant', flat=True))
 
-    def variant_for_build(self, genome_build: GenomeBuild, best_attempt=True) -> 'Variant':
+    def variant_for_any_build(self, preferred_genome_build: GenomeBuild, best_attempt=True) -> 'Variant':
         vas = self.variant_alleles()
         va = None
-        if genome_build:
-            va = vas.filter(genome_build=genome_build).first()
+        if preferred_genome_build:
+            va = vas.filter(genome_build=preferred_genome_build).first()
             if not va and not best_attempt:
-                raise ValueError(f'Could not find a variant in allele {self.id} for build {genome_build}')
+                raise ValueError(f'Could not find a variant in allele {self.id} for build {preferred_genome_build}')
         if not va:
             va = vas.first()
         if va:
