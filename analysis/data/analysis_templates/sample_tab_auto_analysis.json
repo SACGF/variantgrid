@@ -76,7 +76,7 @@
         "x": 84,
         "y": 40,
         "auto_node_name": false,
-        "output_node": false,
+        "output_node": true,
         "hide_node_and_descendants_upon_template_configuration_error": false,
         "visible": true,
         "errors": null,
@@ -90,10 +90,10 @@
         "min_dp": 0,
         "min_gq": 0,
         "max_pl": null,
-        "zygosity_ref": false,
+        "zygosity_ref": true,
         "zygosity_het": true,
         "zygosity_hom": true,
-        "zygosity_unk": false,
+        "zygosity_unk": true,
         "restrict_to_qc_gene_list": false,
         "analysisvariable_set": [
           {
