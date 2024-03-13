@@ -163,6 +163,23 @@ class Citation(TimeStampedModel, PreviewModelMixin):
         else:
             return self.title
 
+    def should_refresh(self, refresh_before: datetime) -> bool:
+        """
+        Does this record need to be reloaded from Entrez
+        :param refresh_before: If the citation was loaded before this date - or never loaded, reload it
+        :return: A boolean indicating if a refresh is required
+        """
+        if self.error:
+            # We could perhaps list all the errors, eg: 'Temporary failure in name resolution' or "connection refused"
+            # But perhaps easier is just check if it was anything other than not found
+            if self.error != CitationFetchRequest.NO_RECORD_FOUND:
+                return True
+
+        if last_loaded := self.last_loaded:
+            return last_loaded < refresh_before
+        else:
+            return True
+
     def __str__(self):
         return self.id
 
@@ -381,17 +398,6 @@ class CitationFetchEntry:
         if isinstance(obj, typing.Hashable):
             self.requested_ids.add(obj)
 
-    def should_refresh(self, refresh_before: datetime) -> bool:
-        """
-        Does this record need to be reloaded from Entrez
-        :param refresh_before: If the citation was loaded before this date - or never loaded, reload it
-        :return: A boolean indicating if a refresh is required
-        """
-        if last_loaded := self.citation.last_loaded:
-            return last_loaded < refresh_before
-        else:
-            return True
-
     def to_json(self) -> JsonObjType:
         if self.citation:
             data = {key: value for key, value in vars(self.citation).items() if isinstance(value, str)}
@@ -458,6 +464,7 @@ class CitationFetchRequest:
     Use to request a batch of populated Citations. Attempts to do so with the minimum number of database and network calls.
     """
 
+    NO_RECORD_FOUND = "No record was returned for this ID"
     TOP_LEVEL_NBK_RE = re.compile("^NBK[0-9]+$")
     """
     Used to identify which response from requesting NBK represents the book (and not just a chapter)
@@ -603,7 +610,7 @@ class CitationFetchRequest:
 
     @property
     def _all_citations_needing_loading(self):
-        return [fetch for fetch in self._all_citation_fetches if fetch.should_refresh(self.refresh_before)]
+        return [fetch for fetch in self._all_citation_fetches if fetch.citation.should_refresh(self.refresh_before)]
 
     def _fetch_queue(self):
         self._load_citation_stubs()
@@ -621,7 +628,7 @@ class CitationFetchRequest:
 
         # Often the error is we asked NCBI Bookshelf for a list of IDs, but it only returned data for some of the IDs
         # so if nothing has returned data for a Citation, mark it as in error
-        self._mark_error_if_not_fetched(ids_require_fetching, "No record was returned for this ID")
+        self._mark_error_if_not_fetched(ids_require_fetching, self.NO_RECORD_FOUND)
 
         for fetch in self.id_to_fetch.values():
             if fetch.fetched:
