@@ -88,7 +88,7 @@
                         {% endif %}
 
                         {% if vc.liftover_error_qs.exists %}
-                            {% for liftover_error in liftover_error_qs %}
+                            {% for liftover_error in vc.liftover_error_qs %}
                                 <div>
                                     Liftover Failed: {{ liftover_error.liftover }} on {% timestamp liftover_error.liftover.modified %}
                                     {% if liftover_error.variant %}
