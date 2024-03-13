@@ -1297,12 +1297,18 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
     def accession(self):
         return TranscriptVersion.get_accession(self.transcript_id, self.version)
 
+    def raise_any_errors(self):
+        data = json.loads(self.api_response)
+        if self.version != data["version"]:
+            raise NoTranscript(f"Only latest version: (v{data['version']}) can be retrieved via API")
+
     @staticmethod
     def get(transcript_accession: str, retrieve=True) -> Optional['TranscriptVersionSequenceInfo']:
         """ Returns DB copy if we have it, or retrieves + stores from API """
 
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
         if tvi := TranscriptVersionSequenceInfo.objects.filter(transcript_id=transcript_id, version=version).first():
+            tvi.raise_any_errors()
             return tvi
 
         if retrieve:
@@ -1354,23 +1360,33 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             "GRCh38": "https://rest.ensembl.org",
         }
         base_url = ENSEMBL_REST_BASE_URLS[genome_build.name]
-        transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+        transcript_id, requested_version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
         url = f"{base_url}/sequence/id/{transcript_id}?type=cdna"
         r = requests.get(url, headers={"Content-Type": "application/json"}, timeout=MINUTE_SECS)
         data = r.json()
 
         if r.ok:
-            if version != data["version"]:
-                raise NoTranscript(f"Only latest version: (v{data['version']}) can be retrieved via API")
             transcript, _ = Transcript.objects.get_or_create(identifier=data["id"],
                                                              annotation_consortium=AnnotationConsortium.ENSEMBL)
-            return TranscriptVersionSequenceInfo.objects.get_or_create(transcript=transcript,
-                                                                       version=data["version"],
-                                                                       defaults={
-                                                                           "api_response": r.text,
-                                                                           "sequence": data["seq"],
-                                                                           "length": len(data["seq"])
-                                                                       })[0]
+
+            # Ensembl only returns the latest version via API - so requested/returned version may be different
+            returned_version = data["version"]
+            kwargs = {
+                "transcript": transcript,
+                "version": requested_version,
+                "defaults": {
+                    "api_response": r.text,
+                    "sequence": data["seq"],
+                    "length": len(data["seq"])
+                },
+            }
+            requested_tvsi = TranscriptVersionSequenceInfo.objects.get_or_create(**kwargs)[0]
+            if requested_version != returned_version:
+                # Store what was actually returned
+                kwargs["version"] = returned_version
+                TranscriptVersionSequenceInfo.objects.get_or_create(**kwargs)
+
+            requested_tvsi.raise_any_errors()
         else:
             error = data.get("error")
             if error:
