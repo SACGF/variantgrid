@@ -159,12 +159,9 @@ def allele_search(search_input: SearchInputInstance):
         clingen_allele = get_clingen_allele(search_string)
         allele = clingen_allele.allele
         for genome_build in search_input.genome_builds:
-            try:
-                if variant := allele.variant_for_any_build(genome_build, best_attempt=False):
-                    yield variant
-                    continue
-            except ValueError:
-                pass
+            if variant := allele.variant_for_build_optional(genome_build):
+                yield variant
+                continue
 
             try:
                 # if there was no variant for that allele

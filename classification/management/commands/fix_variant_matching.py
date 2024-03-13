@@ -294,19 +294,13 @@ class Command(BaseCommand):
         rvi_qs.delete()
 
         for iai in ImportedAlleleInfo.objects.filter(pk__in=iai_ids_to_fix):
-            try:
-                variant_37 = iai.allele.variant_for_any_build(GenomeBuild.grch37())
+            if variant_37 := iai.allele.variant_for_build_optional(GenomeBuild.grch37()):
                 iai.grch37 = ResolvedVariantInfo.get_or_create(allele_info=iai, genome_build=GenomeBuild.grch37(),
                                                                variant=variant_37)
-            except ValueError:
-                pass
 
-            try:
-                variant_38 = iai.allele.variant_for_any_build(GenomeBuild.grch38())
+            if variant_38 := iai.allele.variant_for_build_optional(GenomeBuild.grch38()):
                 iai.grch38 = ResolvedVariantInfo.get_or_create(allele_info=iai, genome_build=GenomeBuild.grch38(),
                                                                variant=variant_38)
-            except ValueError:
-                pass
 
             iai.apply_validation(force_update=True)
             iai.save()

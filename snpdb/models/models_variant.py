@@ -93,17 +93,11 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
 
     @cached_property
     def grch37(self) -> Optional['Variant']:
-        try:
-            return self.variant_for_any_build(preferred_genome_build=GenomeBuild.grch37(), best_attempt=False)
-        except ValueError:
-            return None
+        return self.variant_for_build_optional(genome_build=GenomeBuild.grch37())
 
     @cached_property
     def grch38(self) -> Optional['Variant']:
-        try:
-            return self.variant_for_any_build(preferred_genome_build=GenomeBuild.grch38(), best_attempt=False)
-        except ValueError:
-            return None
+        return self.variant_for_build_optional(genome_build=GenomeBuild.grch38())
 
     @cached_property
     def variants(self):
@@ -125,6 +119,12 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
     def variant_for_build_optional(self, genome_build: GenomeBuild) -> Optional['Variant']:
         if va := self.variant_alleles().filter(genome_build=genome_build).first():
             return va.variant
+
+    def variant_for_build(self, genome_build: GenomeBuild) -> 'Variant':
+        v = self.variant_for_build_optional(genome_build)
+        if v is None:
+            raise ValueError(f'Could not find a variant in allele {self.id} for build {genome_build}')
+        return v
 
     def get_liftover_tuple(self, genome_build: GenomeBuild,
                            hgvs_matcher=None) -> tuple[AlleleConversionTool, Union[int, 'VariantCoordinate']]:

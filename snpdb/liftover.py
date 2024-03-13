@@ -132,7 +132,7 @@ def _get_build_liftover_tuples(allele_source: AlleleSource, inserted_genome_buil
                     continue  # Skip as already failed NCBI liftover to desired build
 
                 # Return VCF tuples in inserted genome build
-                chrom, position, ref, alt, svlen = allele.variant_for_any_build(inserted_genome_build).as_tuple()
+                chrom, position, ref, alt, svlen = allele.variant_for_build(inserted_genome_build).as_tuple()
                 if alt == Variant.REFERENCE_ALT:
                     alt = "."  # NCBI works with '.' but not repeating ref (ie ref = alt)
                 avt = (chrom, position, allele.pk, ref, alt, svlen)
