@@ -19,8 +19,8 @@ from vcf import Writer, Reader
 from vcf.model import _Substitution, _Record, make_calldata_tuple, _Call
 
 from analysis import grids
-from analysis.analysis_templates import get_cohort_analysis
-from analysis.models import AnalysisNode, AnalysisTemplate
+from analysis.analysis_templates import get_cohort_analysis, get_sample_analysis
+from analysis.models import AnalysisNode, AnalysisTemplate, SampleNode
 from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
 from analysis.views.node_json_view import NodeJSONGetView, NodeJSONViewMixin
 from annotation.models import VariantTranscriptAnnotation
@@ -211,7 +211,23 @@ def cohort_grid_export(request, cohort_id, export_type):
     node = analysis.analysisnode_set.get_subclass(output_node=True)  # Should only be 1
     basename = "_".join([name_from_filename(cohort.name), "annotated", f"v{analysis.annotation_version.pk}",
                          str(cohort.genome_build)])
-    return _node_grid_export(request, node, export_type, basename=basename)
+    return _node_grid_export(request, node, export_type, basename=basename, grid_kwargs={"paging": False})
+
+
+def sample_grid_export(request, sample_id, export_type):
+    EXPORT_TYPES = {"csv", "vcf"}
+
+    sample = Sample.get_for_user(request.user, sample_id)
+    if export_type not in EXPORT_TYPES:
+        raise ValueError(f"{export_type} must be one of: {EXPORT_TYPES}")
+
+    analysis_template = AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_SAMPLE")
+    analysis = get_sample_analysis(sample, analysis_template)
+    node = SampleNode.objects.get(analysis=analysis, output_node=True)  # Should only be 1
+    basename = "_".join([name_from_filename(sample.name), "annotated", f"v{analysis.annotation_version.pk}",
+                         str(sample.genome_build)])
+    return _node_grid_export(request, node, export_type, basename=basename, grid_kwargs={"paging": False})
+
 
 
 def node_grid_export(request, analysis_id):
@@ -234,9 +250,14 @@ def node_grid_export(request, analysis_id):
     return _node_grid_export(request, node, export_type, canonical_transcript_collection, variant_tags_dict)
 
 
-def _node_grid_export(request, node, export_type, canonical_transcript_collection=None, variant_tags_dict=None, basename: str = None):
+def _node_grid_export(request, node, export_type, canonical_transcript_collection=None, variant_tags_dict=None,
+                      basename: str = None, grid_kwargs: dict = None):
 
-    grid_kwargs = {}
+    if grid_kwargs is None:
+        grid_kwargs = {}
+    else:
+        grid_kwargs = grid_kwargs.copy()
+
     if export_type == 'vcf':
         grid_kwargs["sort_by_contig_and_position"] = True
         grid_kwargs["af_show_in_percent"] = False

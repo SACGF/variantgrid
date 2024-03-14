@@ -435,43 +435,12 @@ def analysis_template_save(request, pk):
     """ Creates a new AnalysisTemplateVersion for an AnalysisTemplate """
     analysis_template = AnalysisTemplate.get_for_user(request.user, pk, write=True)
 
-    # Make sure it has variables
-    analysis_variables = AnalysisVariable.objects.filter(node__analysis=analysis_template.analysis)
-    error = None
-    if not analysis_variables.exists():
-        error = "You have not configured any analysis variables."
-    else:
-        required_fields = ["pedigree", "trio", "cohort", "sample"]
-        if not analysis_variables.filter(field__in=required_fields).exists():
-            error = f"You need at at least one analysis variable of: {', '.join(required_fields)}"
+    try:
+        analysis_template.new_version()
+    except ValueError as e:
+        return JsonResponse({"error": str(e)})
 
-    if error:
-        return JsonResponse({"error": error})
-
-    analysis_name_template = request.POST.get("analysis_name_template")
-
-    # Mark all previous as inactive
-    analysis_template.analysistemplateversion_set.all().update(active=False)
-
-    analysis_snapshot = analysis_template.analysis.clone()
-    analysis_snapshot.visible = False
-    analysis_snapshot.template_type = AnalysisTemplateType.SNAPSHOT
-    analysis_snapshot.save()
-
-    sample_gene_list = analysis_snapshot.analysisnode_set.filter(analysisvariable__field='sample_gene_list',
-                                                                 analysisvariable__class_name='genes.SampleGeneList')
-    requires_sample_gene_list = sample_gene_list.exists()
-
-    data = analysis_template.analysistemplateversion_set.all().aggregate(max_version=Max("version"))
-    current_max_version = data.get("max_version") or 0
-    version = current_max_version + 1
-    AnalysisTemplateVersion.objects.create(template=analysis_template,
-                                           version=version,
-                                           analysis_name_template=analysis_name_template,
-                                           analysis_snapshot=analysis_snapshot,
-                                           active=True,
-                                           requires_sample_gene_list=requires_sample_gene_list)
-    return JsonResponse({"version": version})
+    return JsonResponse({"version": analysis_template.version})
 
 
 @require_POST

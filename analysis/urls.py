@@ -89,7 +89,10 @@ urlpatterns = [
     # Analysis templates
     perm_path('<int:analysis_id>/templates/variable/<int:node_id>/', views_json.analysis_template_variable, name='analysis_template_variable'),
 
-    perm_path('cohort_grid_export/<int:cohort_id>/<export_type>/', views_grid.cohort_grid_export, name='cohort_grid_export'),
+    perm_path('cohort_grid_export/<int:cohort_id>/<export_type>/', views_grid.cohort_grid_export,
+              name='cohort_grid_export'),
+    perm_path('sample_grid_export/<int:sample_id>/<export_type>/', views_grid.sample_grid_export,
+              name='sample_grid_export'),
 
     # Grids
     perm_path('<int:analysis_id>/node_grid/export/', views_grid.node_grid_export, name='node_grid_export'),

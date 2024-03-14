@@ -1,12 +1,12 @@
 from collections import defaultdict
 from functools import cached_property
-from typing import Union
+from typing import Union, Optional
 
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.db import models
-from django.db.models import Model, Q, Count
+from django.db.models import Model, Q, Count, Max
 from django.db.models.deletion import SET_NULL, CASCADE, SET_DEFAULT, PROTECT, ProtectedError
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
@@ -446,6 +446,43 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
             unique_name = f"{name} {i}"
             i += 1
         return unique_name
+
+    def new_version(self, analysis_name_template: Optional[str] = None) -> 'AnalysisTemplateVersion':
+        # Make sure it has variables
+        analysis_variables = AnalysisVariable.objects.filter(node__analysis=self.analysis)
+        error = None
+        if not analysis_variables.exists():
+            error = "You have not configured any analysis variables."
+        else:
+            required_fields = ["pedigree", "trio", "cohort", "sample"]
+            if not analysis_variables.filter(field__in=required_fields).exists():
+                error = f"You need at at least one analysis variable of: {', '.join(required_fields)}"
+
+        if error:
+            raise ValueError(error)
+
+        # Mark all previous as inactive
+        self.analysistemplateversion_set.all().update(active=False)
+
+        analysis_snapshot = self.analysis.clone()
+        analysis_snapshot.visible = False
+        analysis_snapshot.template_type = AnalysisTemplateType.SNAPSHOT
+        analysis_snapshot.save()
+
+        sample_gene_list = analysis_snapshot.analysisnode_set.filter(analysisvariable__field='sample_gene_list',
+                                                                     analysisvariable__class_name='genes.SampleGeneList')
+        requires_sample_gene_list = sample_gene_list.exists()
+
+        data = self.analysistemplateversion_set.all().aggregate(max_version=Max("version"))
+        current_max_version = data.get("max_version") or 0
+        version = current_max_version + 1
+        return AnalysisTemplateVersion.objects.create(template=self,
+                                                      version=version,
+                                                      analysis_name_template=analysis_name_template,
+                                                      analysis_snapshot=analysis_snapshot,
+                                                      active=True,
+                                                      requires_sample_gene_list=requires_sample_gene_list)
+
 
     def clone(self, user: User = None):
         analysis_copy = self.analysis.clone(user)

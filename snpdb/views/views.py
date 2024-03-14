@@ -278,7 +278,7 @@ def view_vcf(request, vcf_id):
     can_download_annotated_vcf = False
     if vcf.import_status == ImportStatus.SUCCESS:
         try:
-            AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_SAMPLE")
+            AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
             can_download_annotated_vcf = True
         except ValueError:
             pass
@@ -392,12 +392,22 @@ def view_sample(request, sample_id):
         related_samples = SomalierRelatePairs.get_for_sample(sample).order_by("relate")
 
     sample_stats_variant_class_df, sample_stats_zygosity_df = _sample_stats(sample)
+    can_download_annotated_vcf = False
+    if sample.import_status == ImportStatus.SUCCESS:
+        try:
+            AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_SAMPLE")
+            can_download_annotated_vcf = True
+        except ValueError:
+            pass
+
     context = {
         'sample': sample,
         'samples': [sample],
         'sample_locus_count': sample_locus_count,
         'form': form,
         'patient_form': patient_form,
+        'can_download_vcf': (not settings.VCF_DOWNLOAD_ADMIN_ONLY) or request.user.is_superuser,
+        'can_download_annotated_vcf': can_download_annotated_vcf,
         'cohorts': cohorts,
         'has_write_permission': has_write_permission,
         'igv_data': igv_data,

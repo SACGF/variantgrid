@@ -122,6 +122,17 @@ $(document).ready(function() {
             <form method="post" id='sample-form'>
                 {% csrf_token %}
                 {% crispy form form_helper.horizontal %}
+                {% if can_download_vcf %}
+                    <div class="form-group-row row">
+                        <label class="col-form-label col-12 col-md-3 text-md-right">Download</label>
+                        <div class="d-flex flex-row">
+                            {% if can_download_annotated_vcf %}
+                                <div class="p-2"><a href="{% url 'sample_grid_export' sample.pk 'vcf' %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Annotated Sample VCF</a></div>
+                                <div class="p-2"><a href="{% url 'sample_grid_export' sample.pk 'csv' %}"><div class="icon24 left margin-r-5 csv-icon"></div> Annotated Sample CSV</a></div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
 
                 {% if has_write_permission %}
                     <button id='save-sample' class="btn btn-primary">save</button>

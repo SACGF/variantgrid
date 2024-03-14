@@ -41,7 +41,8 @@ class VariantGrid(AbstractVariantGrid):
         'tags': {'classes': 'no-word-wrap', 'formatter': 'tagsFormatter', 'sortable': False},
     }
 
-    def __init__(self, user, node, extra_filters=None, sort_by_contig_and_position=False, af_show_in_percent=None):
+    def __init__(self, user, node, extra_filters=None, sort_by_contig_and_position=False, af_show_in_percent=None,
+                 paging=True):
         if af_show_in_percent is None:
             af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
 
@@ -59,6 +60,7 @@ class VariantGrid(AbstractVariantGrid):
 
         self.node = node
         self.name = node.name
+        self.paging = paging
 
         try:
             node_count = NodeCount.load_for_node(self.node, extra_filters)
@@ -137,6 +139,11 @@ class VariantGrid(AbstractVariantGrid):
 
         msg = f"{column_name} not found in grid column model"
         raise PermissionDenied(msg)
+
+    def get_paginate_by(self, request):
+        if self.paging:
+            return super().get_paginate_by(request)
+        return None  # No paging
 
     def _get_fields_and_overrides(self, node: AnalysisNode, af_show_in_percent: bool) -> tuple[list, dict]:
         ccc = node.analysis.custom_columns_collection
