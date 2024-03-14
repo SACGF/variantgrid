@@ -1283,7 +1283,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
     version = models.IntegerField()
     # Data from Fasta file will have this set, from API will be populated with api_response
     fasta_import = models.ForeignKey(TranscriptVersionSequenceInfoFastaFileImport, null=True, on_delete=CASCADE)
-    api_response = models.TextField(null=True)
+    api_response = models.TextField(null=True)  # null if loaded from a file
     sequence = models.TextField()
     length = models.IntegerField()
 
@@ -1298,9 +1298,11 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
         return TranscriptVersion.get_accession(self.transcript_id, self.version)
 
     def raise_any_errors(self):
-        data = json.loads(self.api_response)
-        if self.version != data["version"]:
-            raise NoTranscript(f"Only latest version: (v{data['version']}) can be retrieved via API")
+        # Some will be inserted from files, and thus will have no API resposne
+        if self.api_response:
+            data = json.loads(self.api_response)
+            if self.version != data["version"]:
+                raise NoTranscript(f"Only latest version: (v{data['version']}) can be retrieved via API")
 
     @staticmethod
     def get(transcript_accession: str, retrieve=True) -> Optional['TranscriptVersionSequenceInfo']:
