@@ -11,18 +11,20 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--vcf', required=True)
+        parser.add_argument('--columns', required=True, help="comma separated list of columns")
 
     def handle(self, *args, **options):
         vcf = options["vcf"]
+        columns = options["columns"].split(",")
+
         reader = Reader(vcf)
 
         header_types = cyvcf2_header_types(reader)
         infos = header_types["INFO"]
         vep_columns = BulkVEPVCFAnnotationInserter._get_vep_columns_from_csq(infos)
-        #print(vep_columns)
-
-        NEW_COLUMNS = ["am_class", "am_pathogenicity",
-                       "MaveDB_nt", "MaveDB_pro", "MaveDB_score", "MaveDB_urn"]
+        for column in columns:
+            if column not in vep_columns:
+                raise ValueError(f"{column=} not in {vep_columns=}")
 
         field_values = defaultdict(Counter)
 
@@ -36,7 +38,7 @@ class Command(BaseCommand):
 
             for transcript_csq in csq.split(","):
                 td = dict(zip(vep_columns, transcript_csq.split("|")))
-                for nk in NEW_COLUMNS:
+                for nk in columns:
                     if info_val := td[nk]:
                         values = info_val.split("&")
                         values = [v for v in values if v and v != '.']
