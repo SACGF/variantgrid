@@ -290,7 +290,7 @@ class EvidenceKey(TimeStampedModel):
 
                 if self.crit_uses_points:
                     if points := CriteriaEvaluation.POINTS.get(entry_key):
-                        entry["label"] = f"Met: {points} Points"
+                        entry["label"] = f"Met: {points} Point{'s' if points > 1 else ''}"
 
                 use_options.append(entry)
             return use_options
