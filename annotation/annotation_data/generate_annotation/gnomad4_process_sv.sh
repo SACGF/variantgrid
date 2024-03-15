@@ -21,17 +21,29 @@ MERGE_VCF=gnomad.v4.0.sv.merged.vcf
 merge_args=()
 for chrom in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y; do
   GNOMAD_VCF=gnomad.v4.0.sv.chr${chrom}.vcf.gz
-  #wget https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/genome_sv/${GNOMAD_VCF}
-  #wget https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/genome_sv/${GNOMAD_VCF}.tbi
+  if [ ! -e ${GNOMAD_VCF} ]; then
+    wget https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/genome_sv/${GNOMAD_VCF} &
+    wget https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/genome_sv/${GNOMAD_VCF}.tbi &
+  fi
+done
 
+echo "Waiting for downloads to finish..."
+wait
+echo "Downloads done"
+
+for chrom in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y; do
+  GNOMAD_VCF=gnomad.v4.0.sv.chr${chrom}.vcf.gz
   OUTPUT_VCF=gnomad.v4.0.sv.chr${chrom}.converted.vcf.gz
   echo "Going from ${GNOMAD_VCF} -> ${OUTPUT_VCF}"
 
   # Dont' normalize as is mostly "N" refs
-  bcftools annotate --exclude 'AC=0' --remove "^${KEEP_COLUMNS}" --rename-chrs=${CHROM_MAPPING_FILE} ${GNOMAD_VCF} -o ${OUTPUT_VCF}
+  bcftools annotate --exclude 'AC=0' --remove "^${KEEP_COLUMNS}" ${GNOMAD_VCF} -o ${OUTPUT_VCF} &
   merge_args+=(${OUTPUT_VCF})
 done
 
-bcftools concat --output-type b --output ${MERGE_VCF} ${merge_args[@]};
+echo "Waiting for annotate jobs to finish..."
+wait
+
+bcftools concat --output-type v --output ${MERGE_VCF} ${merge_args[@]};
 bgzip ${MERGE_VCF}
 tabix -p vcf ${MERGE_VCF}.gz
