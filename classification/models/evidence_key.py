@@ -2,7 +2,7 @@ import math
 import re
 from collections import defaultdict
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import field
 from enum import Enum
 from functools import cached_property
 from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set, TypedDict, cast
@@ -11,15 +11,13 @@ import pydantic
 from django.db import models
 from django.db.models.deletion import SET_NULL
 from django_extensions.db.models import TimeStampedModel
-
-from classification.criteria_strengths import CriteriaStrength
 from classification.enums import CriteriaEvaluation, SubmissionSource, SpecialEKeys
 from classification.enums.classification_enums import EvidenceCategory, \
     EvidenceKeyValueType, ShareLevel
 from classification.models.evidence_mixin import VCBlobDict, VCPatchValue, VCPatch, VCDbRefDict
 from library.cache import timed_cache
 from library.utils import empty_to_none, strip_json, first
-from snpdb.models import VariantGridColumn, Lab
+from snpdb.models import VariantGridColumn
 
 CLASSIFICATION_VALUE_TOLERANCE = 0.00000001
 """
@@ -55,6 +53,11 @@ class EvidenceKeyOption(TypedDict):
     Only used for clinical_significance, what discordant bucket does each value fall into
     """
 
+    namespace: Optional[str]
+    """
+    If a namespace is provided, the option will only be enabled if that namespace is enabled
+    """
+
 
 class EvidenceKeyOverrides(pydantic.BaseModel):
     evidence_key_config: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -79,7 +82,7 @@ class EvidenceKeyOverrides(pydantic.BaseModel):
         If there's a key called "namespaces" it's expected to be a list of strings
         these strings should match the namespace of some evidence keys
         :param config_dict: A diction of evidence key overrides and namespaces
-        :return: A well structured EvidenceKeyOverrides
+        :return: A well-structured EvidenceKeyOverrides
         """
         if not config_dict:
             return EvidenceKeyOverrides()
@@ -354,7 +357,7 @@ class EvidenceKey(TimeStampedModel):
     @staticmethod
     def dummy_key(key: str) -> 'EvidenceKey':
         """
-        For use when an EvidenceKey (that doesn't exist) is refernced and you don't want None exceptions
+        For use when an EvidenceKey (that doesn't exist) is referenced, and you don't want None exceptions
         """
         dummy = EvidenceKey()
         dummy.key = key
@@ -524,13 +527,13 @@ class EvidenceKeyMap:
         self.un_namespaced: dict[str, list[EvidenceKey]] = defaultdict(list)
 
         for key in ordered_keys:
-            if namespace := key.namespace:
+            if key.namespace:
                 self.un_namespaced[key.without_namespace].append(key)
 
             in_namespace = not key.namespace or key.namespace in config.namespaces
             override_config = config.evidence_key_config.get(key.key)
             if not in_namespace or override_config:
-                # keep ordered_keys untouched so we can copy them again with different configs
+                # keep ordered_keys untouched, so we can copy them again with different configs
                 key = deepcopy(key)
                 if not in_namespace:
                     key.exclude_namespace = True
@@ -610,8 +613,8 @@ class WipeMode(Enum):
 class VCDataCell:
     """
     Representation of the value provided for a single evidence key
-    Can existing even when there's no value at all in dictionary and changes
-    here will automatically be applied back to the data
+    Can exist even when there's no value at all in dictionary
+    Changes here will automatically be applied back to the data
     """
 
     def __init__(self, data: VCPatch, e_key: EvidenceKey):
