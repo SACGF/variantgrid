@@ -69,14 +69,13 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
                     pipeline_type: VariantAnnotationPipelineType):
     vc = VEPConfig(genome_build)
     vep_cmd = os.path.join(settings.ANNOTATION_VEP_CODE_DIR, "vep")
-    reference_fasta = genome_build.reference_fasta
 
+    # 
     cmd = [
         vep_cmd,
         "-i", vcf_filename,
         "-o", output_filename,
         "--cache", "--dir", settings.ANNOTATION_VEP_CACHE_DIR,
-        "--fasta", reference_fasta,
         "--assembly", genome_build.name,
         "--offline", "--use_given_ref", "--vcf", "--compress_output", "gzip",
         "--force_overwrite", "--flag_pick", "--exclude_predicted", "--no_stats",
