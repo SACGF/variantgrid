@@ -15,5 +15,5 @@ class ClinVarOptionUpdator:
         if option := next(option for option in self.options if option.get('key') == option_key):
             option["clinvar"] = clinvar
         else:
-            raise ValueError(f"No such option {self.key}.{option}")
+            raise ValueError(f"No such option {self.evidence_key.key}.{option}")
         self.evidence_key.save()

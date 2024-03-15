@@ -211,7 +211,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
                 clinical_context_change_data_cause = ClinicalContextChangeData(cause_text=f"{clinical_context_change_data.cause_text} and newly added labs {newly_added_labs_str}", cause_code=clinical_context_change_data.cause_code)
                 discordance_change_signal.send(DiscordanceReport, discordance_report=self, clinical_context_change_data=clinical_context_change_data_cause)
             else:
-                # the complete withdraw of 1 lab means we might still want to close off triages
+                # the complete withdrawl of 1 lab means we might still want to close off triages
                 discordance_change_signal.send(
                     DiscordanceReport,
                     discordance_report=self,
@@ -313,7 +313,7 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
     @property
     def should_reopen_continued_discordance(self):
         if not self.clinical_context.discordance_status.is_discordant:
-            # what was once "continued discordance" is concordant, re-open so we can instantly close it
+            # what was once "continued discordance" is concordant, re-open, so we can instantly close it
             return True
 
         existing_labs: set[Lab] = set()

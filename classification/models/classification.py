@@ -54,7 +54,7 @@ from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_tex
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Variant, Lab, Sample, AlleleOriginFilterDefault
+from snpdb.models import Variant, Lab, Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import AlleleSource, Allele, VariantAllele
 from snpdb.user_settings_manager import UserSettingsManager
@@ -89,7 +89,7 @@ class VCBlobKeys(Enum):
 class ClassificationProcessError(Exception):
     """
     Use to report critical errors that an API user should be able to see
-    e.g. referring to a non existent lab
+    e.g. referring to a non-existent lab
     """
 
 
@@ -139,7 +139,7 @@ class ClassificationImportAlleleSource(AlleleSource):
 
 
 class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
-    """ Used to reload all Classifications (for upgrades etc) """
+    """ Used to reload all Classifications (for upgrades etc.) """
 
     script = models.TextField()  # Set if run from script, can check hasn't been re-run
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
@@ -162,7 +162,7 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
 def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pylint: disable=unused-argument
     """
     Allows us to provide extra info for FlagCollections attached to Classification
-    e.g. linking to the appropriate allele page, discordance report etc
+    e.g. linking to the appropriate allele page, discordance report etc.
     :param flag_infos: Information on the flag collections being displayed to the user.
     Populates this with the extra info
     :param user: The current user
@@ -662,7 +662,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @property
     def variant_coordinate(self):
         """
-        Used for the admin screen so we can show variant coordinate in listing
+        Used for the admin screen, so we can show variant coordinate in listing
         """
         return self.get(SpecialEKeys.VARIANT_COORDINATE)
 
@@ -811,7 +811,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 fields["imported_transcript"] = self.transcript
             else:
                 raise ValueError("Classification does not have imported_c_hgvs or imported_g_hgvs")
-                # need either c.hgvs, g.hgvs (in future, re-support variant_coordinate)
+                # need either c.hgvs, g.hgvs (in the future, re-support variant_coordinate)
                 # return None, False
 
             allele_info = ImportedAlleleInfo.get_or_create(**fields)
@@ -847,7 +847,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     def attempt_set_variant_info_from_pre_existing_imported_allele_info(self) -> ImportedAlleleInfo:
         """
-        Link to ImportedAlleleInfo (if haven't already), then update classification with any existing ImportedAlleleInfo
+        Link to ImportedAlleleInfo (if we haven't already), then update classification with any existing ImportedAlleleInfo
         :return: True if there's nothing more to do, False if this may still require matching
         """
         allele_info = self.ensure_allele_info()
@@ -1150,7 +1150,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 # if the array is empty, treat that as a null value
                 value = None
             elif e_key.value_type != EvidenceKeyValueType.MULTISELECT and len(value) == 1:
-                # if we're not a multi-select key and we have an array with 1 value in it
+                # if we're not a multi-select key, and we have an array with 1 value in it
                 # use that 1 value
                 value = value[0]
 
@@ -1196,7 +1196,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                                 message="Invalid value for yes/no field (" + str(value) + ")")
                 cell.value = value
 
-            # handle selects with multiple values (comma sep string, array etc)
+            # handle selects with multiple values (comma sep string, array etc.)
             elif e_key.value_type in (EvidenceKeyValueType.MULTISELECT,
                                       EvidenceKeyValueType.SELECT,
                                       EvidenceKeyValueType.CRITERIA):
@@ -1368,7 +1368,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         """
         modifications_for_self_qs = ClassificationModification.objects.filter(classification=self)
         if not modifications_for_self_qs.filter(is_last_published=True).count() == 1:
-            # in case we have multiple last published records, this will  ensure we only hav 1
+            # in case we have multiple last published records, this will  ensure we only have 1
             modifications_for_self_qs.filter(is_last_published=True).update(is_last_published=False)
             last_published = modifications_for_self_qs.filter(published=True).order_by('-created').first()
             if last_published:
@@ -1445,7 +1445,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             :param initial_data: if True, divides c.hgvs to
             :param revalidate_all: if True, runs validation over all fields we have, otherwise only the values being patched
             :param ignore_if_only_patching: if provided, if only these fields are different in the patch, don't both to patch anything
-            :returns: A dict with "messages" (validation errors, warnings etc) and "modified" (fields that actually changed value)
+            :returns: A dict with "messages" (validation errors, warnings etc.) and "modified" (fields that actually changed value)
         """
         source = source or SubmissionSource.API
 
@@ -1457,7 +1457,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         use_evidence = VCDataDict(copy.deepcopy(self.evidence),
                                   evidence_keys=self.evidence_keys)  # deep copy so don't accidentally mutate the data
         patch = VCDataDict(data=EvidenceMixin.to_patch(patch),
-                           evidence_keys=self.evidence_keys)  # the patch we're going to apply ontop of the evidence
+                           evidence_keys=self.evidence_keys)  # the patch we're going to apply on-top of the evidence
 
         # make sure gene symbol is uppercase
         # need to do it here because it might get used in c.hgvs
@@ -1509,9 +1509,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                         c_parts = c_parts.with_gene_symbol(gene_symbol_cell.value)
                         c_parts_cell.value = c_parts.full_c_hgvs
 
-        # if submitting via API treat null as {value:None, explain:None, notes:None} for known keys
+        # if submitting via API treat null as {value:None, explain:None, notes:None} for known keys,
         # so we clear out any previous values but still retain immutability
-        # for non existent keys just leave as null (if it started as null)
+        # for non-existent keys just leave as null (if it started as null)
         if source == SubmissionSource.API:
             submitted_keys = list(patch.keys())
             for key in submitted_keys:
@@ -2126,7 +2126,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     published = models.BooleanField(null=False, default=False)
     published_evidence = models.JSONField(null=True, blank=True, default=None)
     # changing the share level does not change the actual logic of sharing
-    # it's useful if we have to rework permissions though
+    # it is useful if we have to rework permissions though
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices(), null=True, blank=True)
 
     @property
@@ -2250,7 +2250,8 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         :param clinical_context: If provided, only modifications linked to the clinical context will be returned
         :param exclude_withdrawn: True by default, if false will include withdrawn records
         :param shared_only: False by default, if true will only include records at discordant levels
-        :param allele_origin_bucket: None by default, if Germline/Somatic/Unknown will only return classification from thos buckets
+        :param allele_origin_bucket: None by default, if Germline/Somatic/Unknown will only return classification from those buckets
+        :param allele_origin_buckets: If we want multiple buckets, provide a set of them
         :param exclude_external_labs: If True, will not consider external labs to select from
         :param kwargs: Any other parameters will be used for filtering
         :return:
@@ -2323,7 +2324,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         """
         :param share_level: The share level we want to publish as
         :param user: The user who initiated the publishing
-        :param vc: The variant classification we're publishing - even though it's redundant but we get the same object
+        :param vc: The variant classification we're publishing - even though it's redundant, but we get the same object
         instance and don't reload it from the database
         :param debug_timer: for timing the event
         :return a boolean indicating if a new version was published (false if no change was required)

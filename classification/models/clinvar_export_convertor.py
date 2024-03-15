@@ -409,19 +409,20 @@ class ClinVarExportConverter:
                 "assertionCriteria": self.json_assertion_criteria,
             }).without_warnings()
 
-            data = {}
-            data["clinicalSignificance"] = self.json_clinical_significance
-            data["conditionSet"] = self.condition_set
             allele_id = self.clinvar_export_record.clinvar_allele.allele_id
 
             local_id = f"ALLELE_{allele_id}"
             c = self.classification_based_on.classification
             local_key = c.lab.group_name + "/" + c.lab_record_id
 
-            data["localID"] = local_id
-            data["localKey"] = local_key
-            data["observedIn"] = self.observed_in
-            data["variantSet"] = self.variant_set
+            data = {
+                "clinicalSignificance": self.json_clinical_significance,
+                "conditionSet": self.condition_set,
+                "localID": local_id,
+                "localKey": local_key,
+                "observedIn": self.observed_in,
+                "variantSet": self.variant_set
+            }
 
             messages = JSON_MESSAGES_EMPTY
             for flag in self.classification_based_on.classification.flag_collection.flags(only_open=True):
@@ -583,6 +584,8 @@ class ClinVarExportConverter:
         attempt_allele_origin_default = True
         allele_origin_value = ""
         allele_origin_messages = JSON_MESSAGES_EMPTY
+
+        bucket: Optional[AlleleOriginBucket] = None
         if based_on := self.clinvar_export_record.classification_based_on:
             bucket = based_on.classification.allele_origin_bucket
             if bucket != AlleleOriginBucket.GERMLINE:

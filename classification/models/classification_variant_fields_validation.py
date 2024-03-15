@@ -69,6 +69,7 @@ __TIER_TO_ROMAN = {
     "4": "IV"
 }
 
+
 @receiver(classification_validation_signal, sender=Classification)
 def validate_letter_to_tier(sender, patch_meta: PatchMeta, key_map: EvidenceKeyMap, **kwargs) -> Optional[ValidationMerger]:
     """

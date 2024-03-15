@@ -45,8 +45,7 @@ class ClassificationImportRun(TimeStampedModel):
     logging_version = models.IntegerField(default=0)
 
     def __str__(self):
-        parts = []
-        parts.append(f"(run_id={self.pk})")
+        parts = [f"(run_id={self.pk})"]
         if file := self.from_file:
             parts.append(file.filename)
         else:
@@ -74,18 +73,18 @@ class ClassificationImportRun(TimeStampedModel):
         elif status == ClassificationPatchStatus.WITHDRAWN:
             self.row_count_withdrawn += 1
         else:
-            # shouldn't happen but it's here if we need it
+            # shouldn't happen, but it's here if we need it
             self.row_count_unknown += 1
 
     @staticmethod
     def record_classification_import(identifier: str, add_row_count: int = 0, is_complete: bool = False) -> 'ClassificationImportRun':
         """
-        :param identifier: An identifier for the import - when importing more up to date versions of the same file, try to re-use the same identifier
+        :param identifier: An identifier for the import - when importing more up-to-date versions of the same file, try to re-use the same identifier
         :param add_row_count: How many rows just got added
         :param is_complete: Is the import complete
         This method may trigger classification_imports_complete_signal
         """
-        use_me: Optional[ClassificationImportRun] = None
+        use_me: Optional[ClassificationImportRun]
 
         # see if there's already an ongoing import, if it's not too old
         too_old = now() - MAX_IMPORT_AGE
@@ -103,7 +102,7 @@ class ClassificationImportRun(TimeStampedModel):
         use_me.save()
 
         # after we've either updated or created a new import, cleanup any old ones
-        # do this after so we don't close and import and start a new one - but trigger the fact that there were 0 imports in that split moment inbetween
+        # do this after, so we don't close and import and start a new one - but trigger the fact that there were 0 imports in that split moment inbetween
         ClassificationImportRun.cleanup()
         return use_me
 

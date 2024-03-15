@@ -3,8 +3,8 @@ from typing import Optional, Mapping
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.utils.timezone import now
-
-from classification.enums import ShareLevel, ForceUpdate, SubmissionSource, SpecialEKeys
+# from classification.enums import ForceUpdate
+from classification.enums import ShareLevel, SubmissionSource, SpecialEKeys
 from classification.models import ClassificationProcessError, ClassificationRef, \
     EvidenceMixin, classification_flag_types, ClassificationJsonParams, ClassificationModification, \
     ClassificationPatchResponse, ClassificationImportRun
@@ -110,12 +110,12 @@ class BulkClassificationInserter:
 
             # note we don't actually use ForceUpdate for anything at the moment
             # at one time (never in prod) was used to stop changes to only source ID, curation date
-            force: Optional[ForceUpdate] = None
-            if force_str := data.pop('force', None):
-                try:
-                    force = ForceUpdate(force_str)
-                except ValueError:
-                    pass
+            # force: Optional[ForceUpdate] = None
+            # if force_str := data.pop('force', None):
+            #     try:
+            #         force = ForceUpdate(force_str)
+            #     except ValueError:
+            #         pass
 
             for op in ['create', 'upsert', 'overwrite', 'data', 'patch', 'patch-empty']:
                 op_data = data.pop(op, None)

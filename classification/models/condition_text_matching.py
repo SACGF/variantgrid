@@ -5,8 +5,6 @@ from dataclasses import dataclass
 from functools import cached_property, reduce
 from operator import attrgetter
 from typing import Optional, Iterable
-
-import requests
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, transaction
@@ -24,7 +22,6 @@ from classification.models.condition_text_search import condition_text_search
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol, GeneSymbolAlias
 from library.cache import timed_cache
-from library.constants import MINUTE_SECS
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info, report_message
@@ -1113,7 +1110,7 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                     # if root was a suggestion, but we couldn't come up with a more specific suggestion
                     # suggest the root at each gene level anyway (along with any warnings we may have generated)
                     if not root_cms.ids_found_in_text and not root_cms.merged:
-                        cms.terms = root_cms.terms  # just copy parent term if couldn't use child term
+                        cms.terms = root_cms.terms  # just copy parent term if we couldn't use the child term
                         # for message in root_cms.messages:
                         #    cms.add_message(message)
     return suggestions
@@ -1180,7 +1177,7 @@ def apply_condition_resolution_to_classifications(ctm: ConditionTextMatch):
 def condition_text_saved(sender, instance: ConditionTextMatch, created: bool, raw, using, update_fields, **kwargs):
     if not created or instance.classification_id:
         # only worth doing this for new classification links or already existing ctms
-        # e.g. a newly created root, gene level, inheritance level wont have any terms to assign
+        # e.g. a newly created root, gene level, inheritance level will not have any terms to assign
         apply_condition_resolution_to_classifications(instance)
 
 

@@ -59,7 +59,7 @@ class AutopopulateData:
             self._all_data = None
 
     def update(self, other: 'AutopopulateData'):
-        if type(other) != type(self):
+        if type(other) is not type(self):
             raise ValueError(f'Can only update with another AutopopulateData, not {type(other)}')
         self.linked.append(other)
         self._all_data = None
@@ -478,7 +478,7 @@ def get_evidence_fields_from_variant_query(
         evidence_variant_columns,
         ekey_formatters,
         annotation_version) -> AutopopulateData:
-    # Run a Variant query against the appropriate annotation versions etc
+    # Run a Variant query against the appropriate annotation versions etc.
     # Then pull out values and populate
     data = AutopopulateData("variant annotations")
     # Retrieve fields for Mastermind/SpliceAI summaries
@@ -492,7 +492,7 @@ def get_evidence_fields_from_variant_query(
     qs = qs.filter(pk=variant.pk)
     columns = {f"variantannotation__{f}" for f in va_fields_for_summaries}
     columns.update([e['col'] for e in evidence_variant_columns.values()])
-    # Also retrieve gnomad2_liftover_af so we can use it if normal gnomAD isn't available
+    # Also retrieve gnomad2_liftover_af, so we can use it if normal gnomAD isn't available
     gnomad2_liftover_af = "variantannotation__gnomad2_liftover_af"
     columns.add(gnomad2_liftover_af)
     values = qs.values(*columns).get()
@@ -521,7 +521,7 @@ def get_literature(clinvar) -> str:
     literature_references: Optional[str] = None
     if clinvar:
         clinvar_citation_text_rows = []
-        citation:Citation
+        citation: Citation
         for citation in clinvar.get_loaded_citations():
             citation_parts = [citation.authors_short]
             if citation.year:

@@ -109,7 +109,7 @@ class ResolvedVariantInfo(TimeStampedModel):
     def set_variant_and_save(self, variant: Variant) -> 'ResolvedVariantInfo':
         """
         Update all the derived fields
-        :param variant: Can't be None, variant we should use, provide the existing one if still need to update derived fields for existing record
+        :param variant: Can't be None, variant we should use, provide the existing one if we still need to update derived fields for existing record
         """
         if not variant:
             raise ValueError("set_variant_and_save requires a non-None variant")

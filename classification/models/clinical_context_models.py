@@ -49,7 +49,7 @@ class DiscordanceLevel(str, Enum):
     CONCORDANT_AGREEMENT = 'concordant_agreement'  # complete agreement
     CONCORDANT_DIFF_VUS = 'concordant_agreement_diff_vus'  # VUS-A, VUS-B vs VUS-C
     CONCORDANT_CONFIDENCE = 'concordant_confidence'  # Benign vs Likely Benign
-    MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED = 'multiple_records'  # SOmatic before we support discordan
+    MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED = 'multiple_records'  # Somatic before we support discordan
     DISCORDANT = 'discordant'
 
     @property
@@ -403,12 +403,12 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
 
         if ongoing_import:
             # always set pending cause, to ensure calculation is re-triggered at the end
-            # because even if the status doesn't change, a new lab might be added to an existing discordance report
+            # because even if the status doesn't change, a new lab might be added to an existing discordance report,
             # so we still need to recaluclate
 
             self.pending_cause = self.pending_cause or cause
             # Important - this pending status is not to do with "Pending Changes"
-            was_already_pending = self.pending_status != self.status
+            # was_already_pending = self.pending_status != self.status
             pending_or_old_status = self.pending_status or self.status
 
             if (not is_simple_new) and (new_status != pending_or_old_status):

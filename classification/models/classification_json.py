@@ -1,13 +1,8 @@
-from dataclasses import dataclass
-from typing import Optional
-
-from django.contrib.auth.models import User
-
 from classification.enums import ShareLevel, EvidenceKeyValueType, SpecialEKeys
 from classification.models import Classification, ClassificationJsonParams, ClassificationModification, EvidenceKeyMap, \
     ImportedAlleleInfo
 from classification.models.classification_json_definitions import ClassificationJsonAlleleDict, \
-    ClassificationJsonAlleleRevolvedDict, ClassificationJsonDictv3, ClassificationJsonVersionDict
+    ClassificationJsonAlleleRevolvedDict
 from genes.hgvs import CHGVS
 
 

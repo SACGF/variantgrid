@@ -207,7 +207,7 @@ class ClassificationJsonParams:
         """
         :param current_user: The user who will be consuming this data
         :param include_data: Include all the evidence for this classification (typically True for a GET and False for a POST)
-        :param version: Which version of the data to show, if omitted will be latest version
+        :param version: Which version of the data to show, if omitted it will be the latest version
         :param flatten: If True, instead of "c_hgvs": {"value":"x","note":"Oops"} we'd get "c_hgvs.value":"x","c_hgvs.note":"Oops"
         :param include_lab_config: If True, return the lab's EvidenceKey overrides
         :param include_messages: If True, return any validation messages
@@ -230,6 +230,7 @@ class ClassificationJsonParams:
 
     def report(self) -> None:
         """
+        FIXME, so many references to non-existent variables, has this method been copy and pasted here by mistake?
         Record all information about the VariantMatching evidence on the VariantMatching flag of the Classification
         """
         if self.matching_flag:
@@ -322,18 +323,13 @@ class UserClassificationStats:
 def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Optional[Q]:
 
     # We want to filter using the genes set via variant annotation
-    genes: Optional[Iterable[Gene]] = None
-    symbols: Optional[Iterable[str]] = None
     if gene_symbol := GeneSymbol.cast(gene_symbol):
-        genes = gene_symbol.alias_meta.genes
-        symbols = gene_symbol.alias_meta.alias_symbol_strs
-
-        if genes:
+        if genes := gene_symbol.alias_meta.genes:
             allele_qs = Allele.objects.filter(variantallele__variant__variantannotation__gene__in=genes)
             match_gene = Q(classification__variant__variantallele__allele__in=allele_qs)
             evidence_q_list = []
 
-            for symbol in symbols:
+            for symbol in gene_symbol.alias_meta.alias_symbol_strs:
                 evidence_q_list.append(Q(published_evidence__gene_symbol__value__iexact=symbol))
                 # TODO match on gene symbol in the variant info
 

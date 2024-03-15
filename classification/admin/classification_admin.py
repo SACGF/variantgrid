@@ -23,7 +23,7 @@ from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
 from classification.models.clinical_context_models import ClinicalContextRecalcTrigger, DiscordanceNotification
-from classification.models.clinical_context_utils import update_clinical_context, update_clinical_contexts
+from classification.models.clinical_context_utils import update_clinical_contexts
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from classification.models.discordance_models_utils import DiscordanceReportRowDataTriagesRowData
 from classification.signals import send_prepared_discordance_notifications
@@ -117,7 +117,8 @@ class ClassificationLatestImportFilter(admin.SimpleListFilter):
     def queryset(self, request, queryset: QuerySet[Classification]):
         if value := self.value():
             most_up_to_date_run: Optional[ClassificationImportRun] = None
-            if most_up_to_date_class_run := queryset.filter(last_import_run__isnull=False).order_by('-last_import_run__created').first():
+            if most_up_to_date_class_run := queryset.filter(last_import_run__isnull=False).order_by(
+                    '-last_import_run__created').first():
                 most_up_to_date_run = most_up_to_date_class_run.last_import_run
             if most_up_to_date_run:
                 if value == "latest":
@@ -141,14 +142,15 @@ class ClassificationModificationAdmin(admin.TabularInline):
 class ClassificationImportRunAdmin(ModelAdminBasics):
     # change_list_template = 'classification/admin/change_list.html'
     list_display = ['id', 'identifier', 'row_count', 'status', 'from_file', 'created_detailed', 'modified_detailed']
-    list_filter = ('status', )
+    list_filter = ('status',)
 
     @admin_model_action(url_slug="create_dummy/", short_description="Create Dummy Import", icon="fa-solid fa-plus")
     def create_dummy(self, request):
         ClassificationImportRun(identifier="Dummy Import").save()
         self.message_user(request, "Created a dummy import")
 
-    @admin_model_action(url_slug="mark_unfinished/", short_description="Mark OnGoing Imports as Unfinished", icon="fa-regular fa-trash-can")
+    @admin_model_action(url_slug="mark_unfinished/", short_description="Mark OnGoing Imports as Unfinished",
+                        icon="fa-regular fa-trash-can")
     def close_all_open(self, request):
         ongoing_imports = ClassificationImportRun.objects.filter(status=ClassificationImportRunStatus.ONGOING)
         if ongoing_imports:
@@ -264,7 +266,8 @@ class ClassificationAdmin(ModelAdminBasics):
             else:
                 genome_build = vc.get_genome_build()
                 annotation_version = AnnotationVersion.latest(genome_build)
-                data = get_evidence_fields_for_variant(genome_build, vc.variant, refseq_transcript_id, ensembl_transcript_id,
+                data = get_evidence_fields_for_variant(genome_build, vc.variant, refseq_transcript_id,
+                                                       ensembl_transcript_id,
                                                        evidence_keys_list=[], annotation_version=annotation_version)
                 patch = {}
                 publish = False
@@ -373,11 +376,14 @@ class ClassificationAdmin(ModelAdminBasics):
                 )
 
         if already_published:
-            self.message_user(request, message=f"({already_published}) records had been previously published", level=messages.INFO)
+            self.message_user(request, message=f"({already_published}) records had been previously published",
+                              level=messages.INFO)
         if in_error:
-            self.message_user(request, message=f"({in_error}) records can't be published due to validation errors", level=messages.ERROR)
+            self.message_user(request, message=f"({in_error}) records can't be published due to validation errors",
+                              level=messages.ERROR)
         if published:
-            self.message_user(request, message=f"({published}) records have been freshly published", level=messages.INFO)
+            self.message_user(request, message=f"({published}) records have been freshly published",
+                              level=messages.INFO)
 
     @admin_action("Publish: Organisation")
     def publish_org(self, request, queryset):
@@ -390,9 +396,11 @@ class ClassificationAdmin(ModelAdminBasics):
     @admin_action("State: Make Mutable")
     def make_mutable(self, request, queryset: QuerySet[Classification]):
         for vc in queryset:
-            vc.patch_value(patch={}, user=request.user, source=SubmissionSource.VARIANT_GRID, remove_api_immutable=True, save=True)
+            vc.patch_value(patch={}, user=request.user, source=SubmissionSource.VARIANT_GRID, remove_api_immutable=True,
+                           save=True)
 
-    def set_withdraw(self, request, queryset: QuerySet[Classification], withdraw: bool, reason: WithdrawReason.OTHER) -> int:
+    def set_withdraw(self, request, queryset: QuerySet[Classification], withdraw: bool,
+                     reason: WithdrawReason = WithdrawReason.OTHER) -> int:
         count = 0
         for vc in queryset:
             try:
@@ -469,7 +477,8 @@ class ClassificationImportAdmin(ModelAdminBasics):
 
 @admin.register(ClinicalContext)
 class ClinicalContextAdmin(ModelAdminBasics):
-    list_display = ('id', 'allele', 'name', 'status', 'allele_origin_bucket', 'modified', 'pending_cause', 'pending_status')
+    list_display = (
+    'id', 'allele', 'name', 'status', 'allele_origin_bucket', 'modified', 'pending_cause', 'pending_status')
     search_fields = ('id', 'allele__pk', 'name')
 
     def get_form(self, request, obj=None, **kwargs):
@@ -483,7 +492,8 @@ class ClinicalContextAdmin(ModelAdminBasics):
     @admin_action("Recalculate Status")
     def recalculate(self, request, queryset):
         for dc in queryset:
-            dc.recalc_and_save(cause='Admin recalculation', cause_code=ClinicalContextRecalcTrigger.ADMIN)  # cause of None should change to Unknown, which is accurate if this was required
+            dc.recalc_and_save(cause='Admin recalculation',
+                               cause_code=ClinicalContextRecalcTrigger.ADMIN)  # cause of None should change to Unknown, which is accurate if this was required
         self.message_user(request, 'Recalculated %i statuses' % queryset.count())
 
 
@@ -526,8 +536,9 @@ class EvidenceKeyAdmin(ModelAdminBasics):
     fieldsets = (
         ('Basic', {'fields': ('key', 'label', 'sub_label')}),
         ('Position', {'fields': ('hide', 'evidence_category', 'order')}),
-        ('Type', {'fields': ('mandatory', 'value_type', 'options', 'allow_custom_values', 'default_crit_evaluation', 'crit_allows_override_strengths', 'crit_uses_points')}),
-        ('Overrides', {'fields': ('namespace_overrides', )}),
+        ('Type', {'fields': ('mandatory', 'value_type', 'options', 'allow_custom_values', 'default_crit_evaluation',
+                             'crit_allows_override_strengths', 'crit_uses_points')}),
+        ('Overrides', {'fields': ('namespace_overrides',)}),
         ('Help', {'fields': ('description', 'examples', 'see')}),
         ('Admin', {'fields': ('max_share_level', 'copy_consensus', 'variantgrid_column', 'immutable')})
     )
@@ -589,7 +600,8 @@ class DiscordanceReportAdminLabFilter(admin.SimpleListFilter):
 
 class DiscordanceReportClassificationAdmin(admin.TabularInline):
     model = DiscordanceReportClassification
-    readonly_fields = ["classification_original", "clinical_context_effective", "clinical_context_final", "withdrawn_final"]
+    readonly_fields = ["classification_original", "clinical_context_effective", "clinical_context_final",
+                       "withdrawn_final"]
     fields = ["classification_original", "clinical_context_effective", "clinical_context_final", "withdrawn_final"]
 
     def clinical_context_effective(self, drc: DiscordanceReportClassification):
@@ -684,11 +696,10 @@ class DiscordanceReportAdminExport(ExportRow):
     def _days_in_discordance(self):
         dr = self.discordance_report
         started = dr.report_started_date
-        closed = dr.report_completed_date
         delta: timedelta
         if closed := dr.report_completed_date:
             delta = closed - started
-        if not closed:
+        else:
             delta = timezone.now() - started
 
         days_delta_float = delta.seconds / 144.0
@@ -813,12 +824,14 @@ class DiscordanceReportAdminExport(ExportRow):
 
     @export_column("Triage", sub_data=DiscordanceReportRowDataTriagesRowData)
     def _triages(self):
-        return DiscordanceReportRowDataTriagesRowData(discordance_report=self.discordance_report, perspective=LabPickerData.for_admin())
+        return DiscordanceReportRowDataTriagesRowData(discordance_report=self.discordance_report,
+                                                      perspective=LabPickerData.for_admin())
 
 
 @admin.register(DiscordanceReport)
 class DiscordanceReportAdmin(ModelAdminBasics):
-    list_display = ["pk", "report_started_date", "c_hgvs",  "days_open", "classification_count", "clinical_sigs", "labs", "anotes"]
+    list_display = ["pk", "report_started_date", "c_hgvs", "days_open", "classification_count", "clinical_sigs", "labs",
+                    "anotes"]
     list_select_related = ('clinical_context', 'clinical_context__allele')
     list_filter = [DiscordanceReportAdminLabFilter]
     inlines = (DiscordanceReportClassificationAdmin,)
@@ -830,12 +843,13 @@ class DiscordanceReportAdmin(ModelAdminBasics):
 
     @admin_list_column("Admin Notes")
     def anotes(self, obj: DiscordanceReport):
-        # make this an admin list column so it crops the characters
+        # make this an admin list column, so it crops the characters
         return obj.admin_note
 
     @admin_list_column("c.HGVS")
     def c_hgvs(self, obj: DiscordanceReport):
-        for record in obj.discordancereportclassification_set.select_related('classification_original__classification__allele_info'):
+        for record in obj.discordancereportclassification_set.select_related(
+                'classification_original__classification__allele_info'):
             if allele_info := record.classification_original.classification.allele_info:
                 if c_hgvs := allele_info.grch38:
                     return c_hgvs
@@ -886,12 +900,14 @@ class DiscordanceReportAdmin(ModelAdminBasics):
     def re_calculate(self, request, queryset):
         ds: DiscordanceReport
         for ds in queryset:
-            ds.clinical_context.recalc_and_save(cause="Admin recalculation", cause_code=ClinicalContextRecalcTrigger.ADMIN)
+            ds.clinical_context.recalc_and_save(cause="Admin recalculation",
+                                                cause_code=ClinicalContextRecalcTrigger.ADMIN)
 
     @admin_action("Export Admin Report CSV")
     def export_admin_report(self, request, queryset: QuerySet[DiscordanceReport]):
         perspective = LabPickerData.for_user(request.user)
-        return DiscordanceReportAdminExport.streaming(request, (DiscordanceReportAdminExport(dr, perspective) for dr in queryset), filename="discordance_admin_report")
+        return DiscordanceReportAdminExport.streaming(request, (DiscordanceReportAdminExport(dr, perspective) for dr in
+                                                                queryset), filename="discordance_admin_report")
 
 
 class TriageStatusFilter(admin.SimpleListFilter):
@@ -925,7 +941,8 @@ class DiscordanceReportTriageAdmin(ModelAdminBasics):
     def discordance_report_extra(self, obj: DiscordanceReportTriage):
         dr = obj.discordance_report
         total_triages = dr.discordancereporttriage_set.count()
-        completed_triages = dr.discordancereporttriage_set.exclude(triage_status=DiscordanceReportTriageStatus.PENDING).count()
+        completed_triages = dr.discordancereporttriage_set.exclude(
+            triage_status=DiscordanceReportTriageStatus.PENDING).count()
         url = get_admin_url(dr)
         return SafeString(
             f'(<a href="{url}">DR_{dr.pk}</a>) {dr.get_resolution_display() or "Discordant"} - <span style="font-size:0.6rem">triages complete {completed_triages} <i>of</i> {total_triages}</span>'
@@ -962,7 +979,7 @@ class DiscordanceNotificationAdmin(ModelAdminBasics):
 class UploadedClassificationsUnmappedAdmin(ModelAdminBasics):
     list_display = ("pk", "lab", "created", "filename", "validation_summary", "status", "comment")
     list_filter = (('lab', RelatedFieldListFilter), ('status', AllValuesChoicesFieldListFilter))
-    exclude = ('validation_list', )  # excludes validation_list that can be too big
+    exclude = ('validation_list',)  # excludes validation_list that can be too big
 
     def is_readonly_field(self, f) -> bool:
         if f.name in ("url", "filename", "file_size"):
@@ -972,6 +989,7 @@ class UploadedClassificationsUnmappedAdmin(ModelAdminBasics):
     @admin_action("Process (Wait & Validate Only)")
     def process(self, request, queryset: QuerySet[UploadedClassificationsUnmapped]):
         for ufl in queryset:
+            # noinspection PyArgumentList
             ClassificationImportMapInsertTask.run(upload_classifications_unmapped_id=ufl.pk, import_records=False)
             ufl.refresh_from_db()
             if validation_summary := ufl.validation_summary:
@@ -1031,12 +1049,12 @@ class ValidationFilter(admin.SimpleListFilter):
     def queryset(self, request, queryset: QuerySet[ImportedAlleleInfo]):
         if self.value() == "gene_symbol":
             return queryset.filter(
-                Q(latest_validation__validation_tags__normalize__gene_symbol_change__isnull=False) | \
+                Q(latest_validation__validation_tags__normalize__gene_symbol_change__isnull=False) |
                 Q(latest_validation__validation_tags__liftover__gene_symbol_change__isnull=False)
             ).filter(
-                Q(latest_validation__validation_tags__normalize__c_nomen_change__isnull=True) & \
-                Q(latest_validation__validation_tags__liftover__c_nomen_change__isnull=True) & \
-                Q(latest_validation__validation_tags__builds__missing_37__isnull=True) & \
+                Q(latest_validation__validation_tags__normalize__c_nomen_change__isnull=True) &
+                Q(latest_validation__validation_tags__liftover__c_nomen_change__isnull=True) &
+                Q(latest_validation__validation_tags__builds__missing_37__isnull=True) &
                 Q(latest_validation__validation_tags__builds__missing_38__isnull=True)
             )
 
@@ -1070,10 +1088,11 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
         "grch37_limit",
         "grch38_limit",
         "latest_validation"
-        #"variant_coordinate",
-        #"created"
+        # "variant_coordinate",
+        # "created"
     )
-    list_filter = ('imported_genome_build_patch_version', 'status', 'latest_validation__confirmed', ValidationFilter, MatchingOnFilter)
+    list_filter = (
+        'imported_genome_build_patch_version', 'status', 'latest_validation__confirmed', ValidationFilter, MatchingOnFilter)
     search_fields = ('id', 'imported_c_hgvs', 'imported_g_hgvs', 'message')
     inlines = (ImportedAlleleInfoValidationInline,)
 
@@ -1167,7 +1186,8 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
         iai: ImportedAlleleInfo
         marked_complete = 0
         marked_failed = 0
-        for iai in queryset.filter(status__in=(ImportedAlleleInfoStatus.PROCESSING, ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD)):
+        for iai in queryset.filter(
+                status__in=(ImportedAlleleInfoStatus.PROCESSING, ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD)):
             if iai.allele_id and (iai.grch37_id or iai.grch38_id):
                 iai.status = ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS
                 marked_complete += 1
@@ -1175,7 +1195,8 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
                 iai.status = ImportedAlleleInfoStatus.FAILED
                 marked_failed += 1
             iai.save()
-        self.message_user(request, message=f'Records now marked as complete {marked_complete}, records marked as failure {marked_failed}',
+        self.message_user(request,
+                          message=f'Records now marked as complete {marked_complete}, records marked as failure {marked_failed}',
                           level=messages.INFO)
 
     def has_add_permission(self, request):

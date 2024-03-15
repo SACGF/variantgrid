@@ -55,7 +55,7 @@ class ClassificationRef:
         if self.cached_record:
             return self.cached_record
 
-        qs: QuerySet[Classification] = None
+        qs: QuerySet[Classification]
         if self.rid:
             qs = Classification.objects.filter(pk=self.rid)
         elif self.lab_record_id:

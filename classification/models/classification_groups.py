@@ -170,10 +170,10 @@ class ClassificationGroup:
 
         # filter out modifications that share the same (non None) patient id
         # as in we don't want to show multiple records for the same patient
-        first = group_entries[0]
+        first_group = group_entries[0]
         # TODO rename ClassificationGroupEntry to match
-        self.clinical_significance_pending = first.clinical_significance_pending
-        self.clinical_significance_old = first.clinical_significance_old
+        self.clinical_significance_pending = first_group.clinical_significance_pending
+        self.clinical_significance_old = first_group.clinical_significance_old
         self.group_entries = group_entries
 
         modification_list = [ge.modification for ge in group_entries]
@@ -260,7 +260,7 @@ class ClassificationGroup:
 
     @property
     def clinical_significance_effective(self):
-        if override := self.clinical_significance_pending:
+        if self.clinical_significance_pending:
             return "pending"  # TODO, this is "pending" to help with the css class, maybe not best method name
         return self.clinical_significance or ''
 
@@ -458,7 +458,7 @@ class ClassificationGroups:
         for group in groups:
             group.sort_order = next_sort_order
             next_sort_order += 1
-        groups.reverse()  # default store records as most recent to least recent
+        groups.reverse()  # default store records as most to least recent
         self.groups = groups
 
     def __iter__(self):

@@ -73,7 +73,7 @@ class InterpretationSummaryLengthFilter(admin.SimpleListFilter):
                 queryset = queryset.annotate(interpretation_summary_length=Length(Cast('classification_based_on__published_evidence__interpretation_summary', output_field=TextField())))
                 length_q = Q(**{f"interpretation_summary_length{InterpretationSummaryLengthFilter.SUFFIX_MAP[direction]}": length})
                 if (direction == '=' and length == 0) or direction.startswith('<'):
-                    length_q = length_q | Q(classification_based_on__published_evidence__interpretation_summary__isnull=True)
+                    length_q |= Q(classification_based_on__published_evidence__interpretation_summary__isnull=True)
                 queryset = queryset.filter(length_q)
             else:
                 raise ValueError(f"Internal error, can't parse {length_check}")

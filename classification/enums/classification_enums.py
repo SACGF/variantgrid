@@ -428,7 +428,7 @@ class CriteriaEvaluation:
                      PATHOGENIC_SUPPORTING, PATHOGENIC_MODERATE, PATHOGENIC_STRONG, PATHOGENIC_VERY_STRONG, PATHOGENIC_UNSPECIFIED]
 
     ####
-    # used for drop downs
+    # used for drop-downs
 
     BENIGN_OPTIONS = [
         {'key': CRITERIA_NOT_MET, 'label': 'Not Met', 'index': 1},

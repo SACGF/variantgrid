@@ -135,12 +135,12 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
 
     def __str__(self):
         parts = [f"ClinVar Export ({self.pk})"]
-        status = self.get_status_display()
+        # status = self.get_status_display()
         if self.classification_based_on_id is None:
             parts.append("No Valid Classification")
         else:
             parts.append(self.get_status_display())
-            status = "No Valid Classification"
+            # status = "No Valid Classification"
         if self.scv:
             parts.append(self.scv)
         return " ".join(parts)

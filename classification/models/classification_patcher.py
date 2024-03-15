@@ -16,7 +16,7 @@ def patch_fuzzy_age(age: Any) -> str:
     Important - works on the combined age field, if you have historic data with age_units
     run patch_merge_age_units first
     :param age: The str to fuzzy up
-    :return the fuzzy age, or just the input if it wasn't able to be processed
+    :return the fuzzy age, or just the input if it wasn't processed
     """
     if age:
         age = str(age)
@@ -26,7 +26,7 @@ def patch_fuzzy_age(age: Any) -> str:
             if unit == 'weeks_gestation':
                 return 'prenatal'
             if unit == 'months':
-                number_part = number_part / 12
+                number_part /= 12
                 unit = 'years'
 
             if unit != 'years':

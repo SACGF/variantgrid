@@ -37,7 +37,7 @@ class PatientCount:
     @cached_property
     def count(self):
         numbers = [1 if key.patient_id else value for key, value in self.counts.items()]
-        return reduce(lambda a, b: a+b, numbers, 0)
+        return reduce(lambda a, b: a + b, numbers, 0)
 
     @cached_property
     def consolidates_variant_classifications(self) -> bool:
@@ -81,10 +81,12 @@ class OverlapsCalculatorState:
     @cached_property
     def _collection_to_flag(self):
         # The number of open clinical significance change flags should be limited, so fetch them all to check later
-        all_open_pending_changes = Flag.objects.filter(flag_type=classification_flag_types.classification_pending_changes, resolution__status=FlagStatus.OPEN)
+        all_open_pending_changes = Flag.objects.filter(
+            flag_type=classification_flag_types.classification_pending_changes, resolution__status=FlagStatus.OPEN)
         collection_clin_sig = {}
         for flag in all_open_pending_changes:
-            collection_clin_sig[flag.collection_id] = (flag.data or {}).get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY)
+            collection_clin_sig[flag.collection_id] = (flag.data or {}).get(
+                ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY)
         return collection_clin_sig
 
     def pending_change_clin_sig(self, cms: ClassificationModification) -> Optional[str]:
@@ -113,7 +115,8 @@ class ClassificationLabSummaryExtra(ClassificationLabSummary):
 
     @property
     def patient_count(self) -> PatientCount:
-        return reduce(lambda a, b: a + b, (PatientCount.count_classification(cms) for cms in self.cms), PatientCount.ZERO)
+        return reduce(lambda a, b: a + b, (PatientCount.count_classification(cms) for cms in self.cms),
+                      PatientCount.ZERO)
 
     @cached_property
     def strengths(self) -> CriteriaStrengths:
@@ -141,7 +144,8 @@ class ClinicalGroupingOverlap:
 
     @cached_property
     def patient_count(self) -> PatientCount:
-        return reduce(lambda a, b: a + b, (PatientCount.count_classification(cms) for cms in self.cms), PatientCount.ZERO)
+        return reduce(lambda a, b: a + b, (PatientCount.count_classification(cms) for cms in self.cms),
+                      PatientCount.ZERO)
 
     @cached_property
     def criteria_compare(self) -> CriteriaSummarizer:
@@ -171,7 +175,8 @@ class ClinicalGroupingOverlap:
 
     @cached_property
     def extreme_acmg_points(self) -> AcmgPointScore:
-        return AcmgPointScore.most_extreme_point_score(lb.criteria_strengths().acmg_point_score for lb in self.all_latest)
+        return AcmgPointScore.most_extreme_point_score(
+            lb.criteria_strengths().acmg_point_score for lb in self.all_latest)
 
     @property
     def cms(self):
@@ -182,7 +187,9 @@ class ClinicalGroupingOverlap:
         dr: Optional[DiscordanceReport] = None
         if cc := self.clinical_context:
             dr = DiscordanceReport.latest_report(cc)
-        return DiscordanceStatus.calculate(modifications=self.cms, allele_origin_bucket=cc.allele_origin_bucket if cc else None, discordance_report=dr)
+        return DiscordanceStatus.calculate(modifications=self.cms,
+                                           allele_origin_bucket=cc.allele_origin_bucket if cc else None,
+                                           discordance_report=dr)
 
     @cached_property
     def discordance_report(self) -> Optional[DiscordanceReport]:
@@ -237,7 +244,7 @@ class AlleleOverlap(OverlapState):
     Details of all overlaps for clinical groupings within an allele.
     Most of the important details are kept in ClinicalGroupingOverlap, but we like to order things in Allele
     so report the most extreme details from the clinical groupings.
-    (In most cases Clincal Groupings are just going to be the default, and unshared)
+    (In most cases Clinical Groupings are just going to be the default, and unshared)
     """
 
     def __init__(self, calculator_state: OverlapsCalculatorState, allele: Allele):
@@ -333,7 +340,8 @@ class OverlapsCalculator:
         # find all overlaps, then see if user is allowed to see them and if user wants to see them (lab restriction)
 
         # overlaps
-        overlapping_alleles_qs = Allele.objects.annotate(classification__count=Count('classification')).filter(classification__count__gte=2)
+        overlapping_alleles_qs = Allele.objects.annotate(classification__count=Count('classification')).filter(
+            classification__count__gte=2)
         # your lab
         your_lab_alleles_qs = Classification.objects.filter(lab_id__in=lab_ids)
         if self.shared_only and not perspective.is_admin_mode:
@@ -342,25 +350,26 @@ class OverlapsCalculator:
 
         cm_qs: QuerySet[ClassificationModification]
         cm_qs = ClassificationModification.latest_for_user(user=perspective.user, published=True).filter(
-                classification__allele_id__in=Subquery(overlapping_alleles_qs.values("pk"))
-            ).filter(
-                classification__allele_id__in=Subquery(your_lab_alleles_qs)
-            ).select_related('classification',
-                            'classification__allele_info__grch37',
-                            'classification__allele_info__grch38',
-                            'classification__allele_info__allele',
-                            'classification__clinical_context',
-                            'classification__lab',
-                            'classification__lab__organization') \
+            classification__allele_id__in=Subquery(overlapping_alleles_qs.values("pk"))
+        ).filter(
+            classification__allele_id__in=Subquery(your_lab_alleles_qs)
+        ).select_related('classification',
+                         'classification__allele_info__grch37',
+                         'classification__allele_info__grch38',
+                         'classification__allele_info__allele',
+                         'classification__clinical_context',
+                         'classification__lab',
+                         'classification__lab__organization') \
             .order_by('classification__allele_info__allele').iterator()
 
         all_overlaps = []
-        for allele, cms in group_by_key(cm_qs, lambda x: x.classification.allele_object):
-            if len(cms) >= 2 and any((cm.classification.lab_id in lab_ids for cm in cms)):
+        cms_list: list[ClassificationModification]
+        for allele, cms_list in group_by_key(cm_qs, lambda x: x.classification.allele_object):
+            if len(cms_list) >= 2 and any((cms.classification.lab_id in lab_ids for cms in cms_list)):
                 overlap = AlleleOverlap(calculator_state=self.calculator_state, allele=allele)
                 all_overlaps.append(overlap)
                 cm: Classification
-                for cm in cms:
+                for cm in cms_list:
                     if (not self.shared_only) or cm.share_level_enum.is_discordant_level:
                         overlap.add_classification(cm)
 

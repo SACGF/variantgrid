@@ -213,7 +213,7 @@ class ClinvarExportPrepare:
 
         combined_log = []
 
-        # need to keep track of which allele, clinvar_key combos we've seen
+        # need to keep track of which allele, clinvar_key combos we've seen,
         # so we can check all other alleles to make sure they haven't lost candidates
         valid_allele_origin_buckets = (AlleleOriginBucket.GERMLINE, AlleleOriginBucket.SOMATIC)
 
