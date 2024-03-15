@@ -1300,9 +1300,11 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
     def raise_any_errors(self):
         # Some will be inserted from files, and thus will have no API resposne
         if self.api_response:
-            data = json.loads(self.api_response)
-            if self.version != data["version"]:
-                raise NoTranscript(f"Only latest version: (v{data['version']}) can be retrieved via API")
+            # Ensembl is JSON, while RefSeq use their own text based format
+            if self.transcript.annotation_consortium == AnnotationConsortium.ENSEMBL:
+                data = json.loads(self.api_response)
+                if self.version != data["version"]:
+                    raise NoTranscript(f"Only latest version: (v{data['version']}) can be retrieved via API")
 
     @staticmethod
     def get(transcript_accession: str, retrieve=True) -> Optional['TranscriptVersionSequenceInfo']:
