@@ -90,6 +90,6 @@ class DiscordanceLabSummary(ClassificationLabSummary):
             for dl in with_triages:
                 if not dl.triage:
                     dl = dl._with_triage(triage_by_lab.pop(dl.lab, None))
-            with_triages.append(dl)
+                with_triages.append(dl)
 
         return with_triages
