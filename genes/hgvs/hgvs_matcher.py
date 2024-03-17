@@ -104,6 +104,8 @@ class HGVSMatcher:
     # captures things in teh form of delG, insG, dupG & delGinsC
     # the del pattern at the start is only for delins, as otherwise the op del is captured
 
+    P_HGVS_REMOVAL = re.compile(r"^(?P<main>.*?) p.*$")
+
     HGVS_METHOD_INTERNAL_LIBRARY = "Internally converted using library"
     # External calls to ClinGen
     HGVS_METHOD_CLINGEN_ALLELE_REGISTRY = "ClinGen Allele Registry"
@@ -510,8 +512,11 @@ class HGVSMatcher:
             report_exc_info()
         return None
 
-    def clean_hgvs(self, hgvs_string) -> tuple[str, list[str]]:
+    def clean_hgvs(self, hgvs_string: str) -> tuple[str, list[str]]:
         search_messages = []
+        if p_hgvs_remove_match := HGVSMatcher.P_HGVS_REMOVAL.match(hgvs_string):
+            hgvs_string = p_hgvs_remove_match.group("main")
+
         cleaned_hgvs = clean_string(hgvs_string)  # remove non-printable characters
         cleaned_hgvs = cleaned_hgvs.replace(" ", "")  # No whitespace in HGVS
         cleaned_hgvs = cleaned_hgvs.replace("::", ":")  # Fix double colon
