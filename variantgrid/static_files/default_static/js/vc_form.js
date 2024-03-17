@@ -1740,6 +1740,7 @@ const VCForm = (function() {
                     }
 
                     let optGroups = [];
+                    let options = [];
 
                     let standardPrefix = ""
                     let overridePrefix = ""
@@ -1749,7 +1750,6 @@ const VCForm = (function() {
                         standardPrefix = "⭐ ";
                         emptyValuePrefix = "⚪ ";
                     }
-
 
                     let blankOption = optionSources.find(o => !('key' in o));
 
