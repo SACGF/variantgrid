@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Any, Optional
+from urllib.parse import urlparse, parse_qs
 
 from django import template
 from django.http import HttpRequest
@@ -59,12 +60,23 @@ class TabBuilder:
 
 def check_active_tab(tab_set: str, tab_id: str, request: HttpRequest) -> bool:
     active = False
-    if activeTab := request.GET.get("activeTab"):
-        parts = activeTab.split(":")
+    active_tab = request.GET.get("activeTab")
+    if not active_tab:
+        try:
+            if referer := request.headers.get("Referer"):
+                if "activeTab" in referer:
+                    query = urlparse(referer).query
+                    active_tab = parse_qs(query)["activeTab"][0]
+                    print(active_tab)
+        except Exception:
+            pass
+
+    if active_tab:
+        parts = active_tab.split(":")
         if len(parts) == 2 and parts[0] == tab_set:
-            active = parts[1] == tab_id
+            active = parts[1] == tab_id or parts[1] + "-tab" == tab_id
         elif len(parts) == 1:
-            active = parts[0] == tab_id
+            active = parts[0] == tab_id or parts[0] + "-tab" == tab_id
     return active
 
 
