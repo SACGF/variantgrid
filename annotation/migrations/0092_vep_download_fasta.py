@@ -11,9 +11,9 @@ def _test_has_missing_fasta(genome_build_name):
     build_annotation = settings.ANNOTATION.get(genome_build_name)
     if build_annotation.get("enabled"):
         if vep_config := build_annotation.get("vep_config"):
-            vep_fasta_filename = build_annotation.get("fasta")
-            if not os.path.exists(vep_fasta_filename):
-                return True
+            if vep_fasta_filename := vep_config.get("fasta"):
+                if not os.path.exists(vep_fasta_filename):
+                    return True
     return False
 
 
