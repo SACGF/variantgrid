@@ -219,6 +219,9 @@ BUILD_GRCH37 = "GRCh37"
 BUILD_GRCH38 = "GRCh38"
 
 ANNOTATION = {
+    # We need separate 'reference_fasta' as cdot requires a NCBI fasta with contig_ids as the names
+    # While VEP has issues with this, so has 'vep_config.fasta' see https://github.com/Ensembl/ensembl-vep/issues/1635
+
     BUILD_GRCH37: {
         "enabled": True,
         "annotation_consortium": "Ensembl",
@@ -235,6 +238,7 @@ ANNOTATION = {
             "dbnsfp": "annotation_data/GRCh37/dbNSFP4.0a.grch37.stripped.gz",
             "dbscsnv": "annotation_data/GRCh37/dbscSNV1.1_GRCh37.txt.gz",
             "gnomad2": "annotation_data/GRCh37/gnomad2.1.1_GRCh37_combined_af.vcf.bgz",
+            "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz"),
             "mastermind": "annotation_data/GRCh37/mastermind_cited_variants_reference-2022.04.02-grch37.vcf.gz",
             "mave": None,  # n/a for GRCh37
             "maxentscan": "annotation_data/all_builds/maxentscan",
@@ -268,6 +272,7 @@ ANNOTATION = {
             "cosmic": "annotation_data/GRCh38/CosmicCodingMuts_v95_20211101_grch38.normal.vcf.gz",
             "dbnsfp": "annotation_data/GRCh38/dbNSFP4.0a.grch38.stripped.gz",
             "dbscsnv": "annotation_data/GRCh38/dbscSNV1.1_GRCh38.txt.gz",
+            "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh38.dna.toplevel.fa.gz"),
             "gnomad2": "annotation_data/GRCh38/gnomad2.1.1_GRCh38_combined_af.vcf.bgz",
             "gnomad3": "annotation_data/GRCh38/gnomad3.1_GRCh38_merged.vcf.bgz",
             "gnomad4": "annotation_data/GRCh38/gnomad4.0_GRCh38_combined_af.vcf.bgz",

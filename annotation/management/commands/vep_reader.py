@@ -11,20 +11,26 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--vcf', required=True)
-        parser.add_argument('--columns', required=True, help="comma separated list of columns")
+        parser.add_argument('--columns', help="comma separated list of columns")
+        parser.add_argument('--print-lines', action='store_true', help="Print info about each line")
 
     def handle(self, *args, **options):
         vcf = options["vcf"]
-        columns = options["columns"].split(",")
+        columns = options["columns"]
+        print_lines = options["print_lines"]
 
         reader = Reader(vcf)
 
         header_types = cyvcf2_header_types(reader)
         infos = header_types["INFO"]
         vep_columns = BulkVEPVCFAnnotationInserter._get_vep_columns_from_csq(infos)
-        for column in columns:
-            if column not in vep_columns:
-                raise ValueError(f"{column=} not in {vep_columns=}")
+        if columns:
+            for column in columns.split(","):
+                if column not in vep_columns:
+                    raise ValueError(f"{column=} not in {vep_columns=}")
+        else:
+            # Just use all columns
+            columns = vep_columns
 
         field_values = defaultdict(Counter)
 
@@ -44,18 +50,21 @@ class Command(BaseCommand):
                         values = [v for v in values if v and v != '.']
                         if any(values):
                             found_in_transcript = True
-                            print(f"{nk}={info_val=}")
+                            if print_lines:
+                                print(f"{nk}={info_val=}")
                             for v in values:
                                 field_values[nk][v] += 1
 
                 if found_in_transcript:
-                    print("-----")
+                    if print_lines:
+                        print("-----")
                     found_in_variant = True
                     found_in_transcript = False
 
             if found_in_variant:
                 num_found += 1
-                print("=" * 50)
+                if print_lines:
+                    print("=" * 50)
 
                 #if mane_select := td.get("MANE_SELECT"):
                 #    print(f'mane_select={mane_select}, {td["HGVSc"]}')
@@ -73,3 +82,8 @@ class Command(BaseCommand):
             else:
                 for v, count in counts.most_common():
                     print(f"{v} = {count}")
+
+        empty_columns = [column for column in columns if column not in field_values]
+        if empty_columns:
+            print("-" * 50)
+            print(f"Empty columns: {','.join(empty_columns)}")

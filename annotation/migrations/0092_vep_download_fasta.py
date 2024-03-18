@@ -7,39 +7,21 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
-def _check_needs_vep_download_fasta(apps):
-    GenomeBuild = apps.get_model("snpdb", "GenomeBuild")
-    VariantAnnotationVersion = apps.get_model("annotation", "VariantAnnotationVersion")
-
-    enabled_annotation = []
-    for build_name, values in settings.ANNOTATION.items():
-        if values.get("enabled"):
-            enabled_annotation.append(build_name)
-    builds_with_annotation = GenomeBuild.objects.filter(name__in=enabled_annotation).order_by('name')
-
-    for genome_build in builds_with_annotation:
-        qs = VariantAnnotationVersion.objects.filter(genome_build=genome_build, active=True)
-        vav = qs.order_by("annotation_date").last()
-        org_name = "homo_sapiens"
-
-        build_settings = settings.ANNOTATION[genome_build.name]
-        annotation_consortium = build_settings["annotation_consortium"]
-        if annotation_consortium == "RefSeq":
-            org_name += "_refseq"
-
-        dir_name = os.path.join(settings.ANNOTATION_VEP_CACHE_DIR, org_name, f"{vav.vep}_{genome_build.name}")
-
-        FASTA_FILES = {
-            "GRCh37": "Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz",
-            "GRCh38": "Homo_sapiens.GRCh38.dna.toplevel.fa.gz",
-        }
-        filename = FASTA_FILES[genome_build.name]
-        fasta_file = os.path.join(dir_name, filename)
-        # print(f"Checking for existance of file: '{fasta_file}'")
-        if not os.path.exists(fasta_file):
+def _test_has_missing_fasta(genome_build_name):
+    build_annotation = settings.ANNOTATION.get(genome_build_name)
+    if build_annotation.get("enabled"):
+        fasta_filename = build_annotation.get("reference_fasta")
+        if not os.path.exists(fasta_filename):
             return True
-
     return False
+
+
+def _test_has_missing_37_fasta(apps):
+    return _test_has_missing_fasta("GRCh37")
+
+
+def _test_has_missing_38_fasta(apps):
+    return _test_has_missing_fasta("GRCh37")
 
 
 class Migration(migrations.Migration):
@@ -48,6 +30,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation.operation_manage(["vep_download_fasta"],
-                                         test=_check_needs_vep_download_fasta)
+        ManualOperation.operation_other(args=[
+            "Download Ensembl Fasta file - go to fasta dir and run: ${VARIANTGRID_DIR}/annotation/annotation_data/generate_annotation/vep_fasta_grch37.sh"],
+            test=_test_has_missing_37_fasta),
+        ManualOperation.operation_other(args=[
+            "Download Ensembl Fasta file - go to fasta dir and run: ${VARIANTGRID_DIR}/annotation/annotation_data/generate_annotation/vep_fasta_grch38.sh"],
+            test=_test_has_missing_38_fasta),
     ]
