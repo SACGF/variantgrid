@@ -1,7 +1,7 @@
+import re
 from dataclasses import dataclass
 from typing import Any, Optional
 from urllib.parse import urlparse, parse_qs
-
 from django import template
 from django.http import HttpRequest
 from django.template.base import FilterExpression
@@ -58,6 +58,8 @@ class TabBuilder:
         return self.tabs[0].url is not None
 
 
+CLEAN_TAB_RE = re.compile("(.*)(?:_[0-9]+|-tab)")
+
 def check_active_tab(tab_set: str, tab_id: str, request: HttpRequest) -> bool:
     active = False
     active_tab = request.GET.get("activeTab")
@@ -71,12 +73,17 @@ def check_active_tab(tab_set: str, tab_id: str, request: HttpRequest) -> bool:
         except Exception:
             pass
 
+    def clean_tab(check_tab_id):
+        if match := CLEAN_TAB_RE.match(check_tab_id):
+            return match.group(1)
+        return check_tab_id
+
     if active_tab:
         parts = active_tab.split(":")
         if len(parts) == 2 and parts[0] == tab_set:
-            active = parts[1] == tab_id or parts[1] + "-tab" == tab_id
+            active = clean_tab(parts[1]) == clean_tab(tab_id)
         elif len(parts) == 1:
-            active = parts[0] == tab_id or parts[0] + "-tab" == tab_id
+            active = clean_tab(parts[0]) in clean_tab(tab_id)
     return active
 
 
