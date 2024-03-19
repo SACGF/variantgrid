@@ -70,7 +70,6 @@ def check_active_tab(tab_set: str, tab_id: str, request: HttpRequest) -> bool:
                 if "activeTab" in referer:
                     query = urlparse(referer).query
                     active_tab = parse_qs(query)["activeTab"][0]
-                    print(active_tab)
         except Exception:
             pass
 
