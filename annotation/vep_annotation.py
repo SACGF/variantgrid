@@ -174,7 +174,7 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
             # distance : the distance the ends of the overlapping SVs should be within.
             # match_type : only report reference SV which lie within or completely surround the input SV
             # options: within, surrounding
-            VEPPlugin.STRUCTURALVARIANTOVERLAP: lambda: f"StructuralVariantOverlap,file={vc['structuralvariantoverlap']}",
+            VEPPlugin.STRUCTURALVARIANTOVERLAP: lambda: f"StructuralVariantOverlap,file={vc['structuralvariantoverlap']},same_type=1",
         }
 
     for vep_plugin, plugin_arg_func in plugin_data_func.items():

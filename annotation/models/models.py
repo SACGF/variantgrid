@@ -975,6 +975,12 @@ class VariantAnnotation(AbstractVariantAnnotation):
     gnomad_non_par = models.BooleanField(null=True, blank=True)  # Not pseudoautosomal regions
     gnomad_popmax = models.CharField(max_length=3, choices=GnomADPopulation.choices, null=True, blank=True)
 
+    # These are populated for SVs using VEP plugin StructuralVariantOverlap
+    # They are text as they can have multiple entries joined via '&'
+    gnomad_sv_overlap_af = models.TextField(null=True, blank=True)
+    gnomad_sv_overlap_percent = models.TextField(null=True, blank=True)
+    gnomad_sv_overlap_name = models.TextField(null=True, blank=True)
+
     # From https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4267638/
     # "optimum cutoff value identified in the ROC analysis (0.6)"
     dbscsnv_ada_score = models.FloatField(null=True, blank=True)
