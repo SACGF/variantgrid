@@ -38,7 +38,7 @@ def append(suffix, postfix):
 @register.simple_tag(takes_context=True)
 def update_django_messages(context):
     """
-    Use when you've loaded messages in an ajax tab, and need to update the page messages with save etc messages
+    Use when you've loaded messages in an ajax tab, and need to update the page messages with save etc. messages
     """
     message_json = []
     if messages := context.get("messages"):
@@ -336,7 +336,7 @@ class ModalTag(template.Node):
         if admin_only_bool and not context.request.user.is_superuser:
             return ""
 
-        # if an ID isn't provided, generate a uuid and make sure it starts with a letter
+        # if an ID isn't provided, generate a UUID and make sure it starts with a letter
         id_str = escape(TagUtils.value_str(context, self.id) or "x" + str(uuid.uuid4()))
         label_str = TagUtils.value_str(context, self.label)
         output = self.nodelist.render(context)

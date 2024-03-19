@@ -30,7 +30,7 @@ def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbo
 def _get_panel_app_panel_api_json(panel_app_panel):
     r = requests.get(panel_app_panel.url, timeout=MINUTE_SECS)
     json_data: dict = r.json()
-    # Panel App isn't very REST-ful - returns 200 for missing data but we'll return 404
+    # Panel App isn't very REST-ful - returns 200 for missing data, but we'll return 404
     if detail := json_data.get("detail"):
         if detail == "Not found.":
             raise NotFound(detail=f"PanelApp couldn't find {panel_app_panel.panel_id} ({r.url})")
@@ -118,7 +118,7 @@ def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource:
 
 
 def get_panel_app_local_cache(panel_app_panel: PanelAppPanel) -> PanelAppPanelLocalCache:
-    """ Gets or creates local cache of a panel app panel so it can be used as a GeneList """
+    """ Gets or creates local cache of a panel app panel, so it can be used as a GeneList """
 
     # Attempt to use cache if recent and present, otherwise fall through and do a query
     try:

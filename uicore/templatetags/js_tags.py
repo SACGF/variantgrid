@@ -5,10 +5,8 @@ import re
 import urllib
 from datetime import date
 from decimal import Decimal
-from enum import Enum
 from html import escape
 from typing import Union, Any, Optional
-
 from django import template
 from django.db.models import TextChoices
 from django.utils.safestring import mark_safe, SafeString
@@ -129,8 +127,7 @@ def code_json(data: JsonDataType, css_class: Optional[str] = "", dash_if_empty: 
         return {"blank": True}
 
     if not css_class:
-        # if we're formatting ValidatedJson and the first element has messages, that provides formatting
-        # so we don't need code-block
+        # if we're formatting ValidatedJson and the first element has messages, that provides formatting we don't need code-block
         # Also if we already have a css_class (like card-body) we don't need code-block
         if not data or not isinstance(data, dict) or ('*wrapper$' not in data and not data.get('messages')):
             css_class = "code-block"

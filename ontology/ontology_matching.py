@@ -105,7 +105,7 @@ IGNORE_TERMS = {"ar", "ad", "linked", "xld", "xlr", "disability", "disorder"}  #
 # should disease be in this as well?
 NON_PR_TERMS = {"retard"}
 
-SUB_TYPE = re.compile("^(.*?)(?: )((?:group|type)?(?: )?(?:[A-Z]|[0-9]+|[0-9]+[A-Z]|i|ii|iii|iv|v|vi|vii|viii|ix))$", re.IGNORECASE)
+SUB_TYPE = re.compile("^(.*?) ((?:group|type)? ?(?:[A-Z]|[0-9]+|[0-9]+[A-Z]|i|ii|iii|iv|v|vi|vii|viii|ix))$", re.IGNORECASE)
 ROMAN = {
     "i": '1',
     "ii": '2',
@@ -116,7 +116,7 @@ ROMAN = {
     "vii": '7',
     "viii": '8',
     "ix": '9',
-    # 'x': '10', matching on x can be dangerous, has a lot of other meanings
+    # "x": "10", # matching on x can be dangerous, has a lot of other meanings
     'xi': '11',
     'xii': '12',
     'xiii': '13',
@@ -224,7 +224,7 @@ def normalize_condition_text(text: str):
         return None
     text = text.lower()
     text = re.sub("[,;./?()]", " ", text)  # replace , ; . with spaces
-    text = re.sub("[ ]{2,}", " ", text)  # replace multiple spaces with
+    text = re.sub(" {2,}", " ", text)  # replace multiple spaces with
     text = text.strip()
     return text
 

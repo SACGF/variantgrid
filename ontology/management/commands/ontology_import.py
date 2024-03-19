@@ -79,8 +79,6 @@ class TermId:
 
 
 def load_mondo(filename: str, force: bool):
-    data_file = None
-
     file_hash = file_md5sum(filename)
 
     ontology_builder = OntologyBuilder(
@@ -93,6 +91,7 @@ def load_mondo(filename: str, force: bool):
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
     ontology_builder.cache_everything()
 
+    data_file: dict
     with open(filename, 'r') as json_file:
         data_file = json.load(json_file)
 
@@ -178,7 +177,7 @@ def load_mondo(filename: str, force: bool):
                                 extra={"all_relations": unique_relations}
                             )
 
-                        # end synonymns
+                        # end synonyms
                         # occasionally split up MONDO name into different aliases
                         if label and "MONDO" in full_id:
                             if ";" in label:
@@ -614,7 +613,7 @@ class Command(BaseCommand):
             except OntologyBuilderDataUpToDateException:
                 print("Phenotype to Genes File hash is the same as last import")
 
-        if filename := options.get("omim_frequencies"):
+        if options.get("omim_frequencies"):
             print("THIS FILE IS DEPRECATED, please use phenotype_to_genes.txt instead")
 
         print("*** If your instance uses Condition Text Matching, you might want to run:")

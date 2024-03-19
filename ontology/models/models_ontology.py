@@ -110,7 +110,7 @@ class OntologyRelation:
     IS_A = "is_a"
     EXACT = "exact"  # defined by HPO and MONDO
     EXACT_SYNONYM = "exact_synonym"
-    RELATED = "related"  # defined by HPO and MONDO (also use relatedSynonymn from mondo to populate this)
+    RELATED = "related"  # defined by HPO and MONDO (also use related Synonym from mondo to populate this)
     RELATED_SYNONYM = "related_synonym"
     CLOSE = "close"  # defined by HPO and MONDO
     BROAD = "broad"  # defined by HPO and MONDO
@@ -459,7 +459,7 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
         """
         Returns an OntologyTerm for the given ID.
         If the OntologyTerm doesn't exist in the database, will create an OntologyTerm but
-        WONT persist it to the database
+        WILL NOT persist it to the database
         """
         if isinstance(id_str, OntologyIdNormalized):
             normal_id = id_str
@@ -543,7 +543,7 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
     Relationship between two terms, is generally considered to be bi-directional (or at the very least
     code typically checks relationships in both directions)
 
-    I haven't elected to use django_dag node_factory here as it only allows one kind of relationship
+    I haven't elected to use django_dag node_factory here as it only allows one kind of relationship,
     and we have quite a lot.
     """
     objects = OntologyTermRelationManager()
@@ -665,7 +665,7 @@ OntologyList = Optional[Union[QuerySet, list[OntologyTerm]]]
 
 
 class OntologyVersion(TimeStampedModel):
-    """ This is used by annotation.AnnotationVersion to keep track of different OntologyImports
+    """ This is used by annotation.AnnotationVersion to keep track of different OntologyImports,
         so we can load historical versions of OntologyTermRelation """
 
     gencc_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, related_name="gencc_ontology_version")

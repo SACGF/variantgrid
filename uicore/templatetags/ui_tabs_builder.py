@@ -48,7 +48,7 @@ class TabBuilder:
     def tabs_required(self) -> bool:
         """
         Returns if we need tabs, or if it can be rendered directly on the page.
-        Currently if there is just one tab but it's an ajax tab, this will return True
+        Currently, if there is just one tab, but it's an ajax tab, this will return True
         :return:
         """
         if len(self.tabs) > 1:
@@ -59,6 +59,7 @@ class TabBuilder:
 
 
 CLEAN_TAB_RE = re.compile("(.*)(?:_[0-9]+|-tab)")
+
 
 def check_active_tab(tab_set: str, tab_id: str, request: HttpRequest) -> bool:
     active = False
@@ -128,7 +129,7 @@ def ui_register_tab(
 @register.simple_tag(takes_context=True)
 def ui_register_tabs(context, tab_set: str):
     """
-    Used because the creation of he tabs in subcontext e.g. for loops, will dissapear when poping to a higher context
+    Used because the creation of he tabs in subcontext e.g. for loops, will disappear when popping to a higher context
     """
     tab_key = f"ui-tab-{tab_set}"
     context[tab_key] = TabBuilder(tab_set)

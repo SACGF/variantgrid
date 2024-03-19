@@ -10,7 +10,7 @@ from django.db.models.query_utils import Q
 
 
 class AutocompleteView(autocomplete.Select2QuerySetView):
-    """ Requires logged in user.
+    """ Requires logged-in user.
         Case-insensitive match for ANY of fields """
     fields = []
 

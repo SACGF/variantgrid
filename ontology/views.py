@@ -48,7 +48,7 @@ class OntologyTermView(TemplateView):
 
                     elif is_gene or relationship.dest_term.ontology_service != OntologyService.HGNC:
                         # gene symbols go into gene_relationships, no need to list them again in direct relationships
-                        # though currently gene symbols don't do reverse gene_relationships, so still show everyhting that links in gene_symbol
+                        # though currently gene symbols don't do reverse gene_relationships, so still show everything that links in gene_symbol
                         regular_relationships.append(relationship)
 
             patients_qs = patients_qs_for_ontology_term(self.request.user, term)

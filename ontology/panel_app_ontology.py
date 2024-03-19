@@ -17,8 +17,9 @@ from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDa
 # increment if you change the logic of parsing ontology terms from PanelApp
 # which will then effectively nullify the cache so the new logic is run
 PANEL_APP_API_PROCESSOR_VERSION = 7
-# with look ahead and behind to make sure we're not in a 7 digit number
+# with look ahead and behind to make sure we're not in a 7-digit number
 ABANDONED_OMIM_RE = re.compile('(?<![0-9])([0-9]{6})(?![0-9])')
+
 
 def update_gene_relations(gene_symbol: Union[GeneSymbol, str]):
     if isinstance(gene_symbol, GeneSymbol):
@@ -110,7 +111,7 @@ def _update_gene_relations_activate(ontology_builder: OntologyBuilder, hgnc_term
                             add_term_if_valid(result.id_fixed)
                             found_term = True
                     if not found_term:
-                        # just look for abandoned 6 digit numbers
+                        # just look for abandoned 6-digit numbers
                         for omim_id in ABANDONED_OMIM_RE.finditer(phenotype_row):
                             add_term_if_valid(f"OMIM:{omim_id.group(1)}")
 

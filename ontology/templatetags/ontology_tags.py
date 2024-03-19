@@ -2,9 +2,7 @@ import itertools
 import uuid
 from dataclasses import dataclass
 from typing import Optional, Union, Iterable, Iterator
-
 from django.template import Library
-
 from ontology.models import OntologyTerm, OntologyTermRelation, GeneDiseaseClassification, OntologyService, \
     OntologySnake
 from ontology.ontology_matching import OntologyMatch
@@ -125,7 +123,7 @@ def ontology_snake_table(snakes: Iterable[OntologySnake], reference_term: Option
 
 @register.inclusion_tag("ontology/tags/ontology_snake_row.html")
 def ontology_snake_row(snake: OntologySnake, reference_term: Optional[OntologyTerm], row_span: int = 1, weak: Optional[bool] = None, is_gene: Optional[bool] = False):
-    steps = steps = snake.show_steps()
+    steps = snake.show_steps()
     source_term = snake.source_term
     dest_term = steps[-1].dest_term
 

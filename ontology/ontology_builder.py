@@ -107,7 +107,7 @@ class OntologyBuilder:
 
     def ensure_old(self, max_age: timedelta):
         """
-        Raises OntologyBuilderDataUpToDateException if data is up to date
+        Raises OntologyBuilderDataUpToDateException if data is up-to-date
         """
         if self.previous_import:
             if not self.force_update and self.previous_import.processed_date > datetime.now(tz=timezone.get_default_timezone()) - max_age:
@@ -209,7 +209,7 @@ class OntologyBuilder:
         cached = self._fetch_term(term_id)
         if not primary_source and cached.status in (ModifiedStatus.EXISTING, ModifiedStatus.MODIFIED):
             # record was imported by a different process, so leave it alone
-            # e.g. it was imported via an OMIM import but we're just referencing a stub value
+            # e.g. it was imported via an OMIM import, but we're just referencing a stub value
             # now from a MONDO import.
             return cached.obj, False
 
@@ -251,8 +251,11 @@ class OntologyBuilder:
 
     def complete(self, purge_old_relationships=False, purge_old_terms=False, verbose=True):
         """
-        :purge_old If True will mark OntologyTermGeneRelations not included in this import (but included in a previous
+        Note that with the move to keep relationships
+        :param purge_old_relationships: If True will mark OntologyTermGeneRelations not included in this import (but included in a previous
         import with the same context and ontology service) as deleted
+        :param purge_old_terms: If True, will delete terms not included in this import, relatively risky operation
+        :param verbose: Just provides more logging information
         Will also complain about other records not included in this import but won't delete them
         """
 
