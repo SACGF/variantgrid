@@ -453,8 +453,7 @@ class ColumnVEPField(models.Model):
     variant_grid_column = models.ForeignKey(VariantGridColumn, on_delete=CASCADE)
     genome_build = models.ForeignKey(GenomeBuild, null=True, on_delete=CASCADE)  # null = all builds
     pipeline_type = models.CharField(max_length=1, choices=VariantAnnotationPipelineType.choices,
-                                     null=True, blank=True,  # null = all pipeline types
-                                     default=VariantAnnotationPipelineType.STANDARD)
+                                     null=True, blank=True)  # Null = all pipeline types
     category = models.CharField(max_length=1, choices=ColumnAnnotationCategory.choices)
     source_field = models.TextField(null=True)  # @see use vep_info_field
     source_field_processing_description = models.TextField(null=True)
