@@ -6,7 +6,7 @@ from django.db import migrations
 def _one_off_move_alphamissense_dbnsfp(apps, _schema_editor):
     # Getting rid of alphamissense_pathogenicity to replace with alphamissense_rankscore
 
-    ANNOTATION_LEVEL = 'A'
+    VARIANT_LEVEL = 'V'
 
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
     ColumnVCFInfo = apps.get_model("snpdb", "ColumnVCFInfo")
@@ -15,7 +15,7 @@ def _one_off_move_alphamissense_dbnsfp(apps, _schema_editor):
 
     alphamissense_rankscore = VariantGridColumn.objects.create(grid_column_name='alphamissense_rankscore',
                                                                variant_column='variantannotation__alphamissense_rankscore',
-                                                               annotation_level=ANNOTATION_LEVEL,
+                                                               annotation_level=VARIANT_LEVEL,
                                                                width=None,
                                                                label='AlphaMissense RankScore',
                                                                model_field=True,
