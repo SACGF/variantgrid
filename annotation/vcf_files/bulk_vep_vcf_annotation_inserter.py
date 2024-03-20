@@ -206,13 +206,9 @@ class BulkVEPVCFAnnotationInserter:
         self.source_field_to_columns = defaultdict(set)
         self.ignored_vep_fields = self.VEP_NOT_COPIED_FIELDS.copy()
 
-        cvf_filters = [ColumnVEPField.get_columns_version_q(vc.columns_version)]
-        if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.CNV:
-            cvf_filters.extend([
-                Q(vep_plugin__isnull=True),
-                Q(vep_custom__isnull=True),
-            ])
         vep_source_qs = ColumnVEPField.filter_for_build(self.genome_build)
+        cvf_filters = [ColumnVEPField.get_columns_version_q(vc.columns_version),
+                       ColumnVEPField.get_pipeline_type_q(self.annotation_run.pipeline_type)]
         q_cvf = reduce(operator.and_, cvf_filters)
         # Sort to have consistent VCF headers
         for cvf in vep_source_qs.filter(q_cvf).order_by("source_field"):
@@ -228,6 +224,9 @@ class BulkVEPVCFAnnotationInserter:
                 # logging.info("Handling column %s => %s", cvf.vep_info_field, cvf.variant_grid_column_id)
             except:
                 logging.warning("Skipping custom %s due to missing settings", cvf.vep_info_field)
+
+        logging.debug("source_field_to_columns:")
+        logging.debug(self.source_field_to_columns)
 
         vav = self.annotation_run.variant_annotation_version
         self.prediction_pathogenic_funcs = vav.get_pathogenic_prediction_funcs()
@@ -539,6 +538,9 @@ class BulkVEPVCFAnnotationInserter:
             if variant_data:
                 if overlapping_symbols:
                     variant_data["overlapping_symbols"] = ",".join(sorted(overlapping_symbols))
+
+                logging.debug(f"variant_data:")
+                logging.debug(variant_data)
                 self.variant_annotation_list.append(variant_data)
 
                 for gene_id in overlapping_gene_ids:

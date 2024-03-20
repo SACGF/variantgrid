@@ -164,17 +164,32 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
                 logging.warning("Skipped custom annotation: %s", prefix)
 
     else:
+        # TODO: Need to decide on overlap criteria
+        # percentage : percentage overlap between SVs (default: 80)
+        # reciprocal : calculate reciprocal overlap, options: 0 or 1. (default: 0)
+        # (overlap is expressed as % of input SV by default)
+        # cols : colon delimited list of data types to return from the INFO fields (only AF by default)
+        # same_type : 1/0 only report SV of the same type (eg deletions for deletions, off by default)
+        # distance : the distance the ends of the overlapping SVs should be within.
+        # match_type : only report reference SV which lie within or completely surround the input SV
+        # options: within, surrounding
+
+        # We'd like to use "same_type=1" but there is a bug:
+        # StructuralVariantOverlap skips all INV matches when same_type=1 used
+        # @see https://github.com/Ensembl/VEP_plugins/issues/710
+        # So we will post-process the annotated VCF
+
+        SV_CALCULATED_FIELDS = {"PC", "name"}  # Not passed in via cols=
+        sv_cols = []
+        for source_field in ColumnVEPField.get_source_fields(genome_build, vep_plugin=VEPPlugin.STRUCTURALVARIANTOVERLAP):
+            info_field = source_field.replace("SV_overlap_", "")
+            if info_field not in SV_CALCULATED_FIELDS:
+                sv_cols.append(info_field)
+        sv_cols = ":".join(sv_cols)
+        sv_overlap_args = f"StructuralVariantOverlap,file={vc['structuralvariantoverlap']},same_type=1,cols={sv_cols}"
+
         plugin_data_func = {
-            # TODO: Need to decide on overlap criteria
-            # percentage : percentage overlap between SVs (default: 80)
-            # reciprocal : calculate reciprocal overlap, options: 0 or 1. (default: 0)
-            # (overlap is expressed as % of input SV by default)
-            # cols : colon delimited list of data types to return from the INFO fields (only AF by default)
-            # same_type : 1/0 only report SV of the same type (eg deletions for deletions, off by default)
-            # distance : the distance the ends of the overlapping SVs should be within.
-            # match_type : only report reference SV which lie within or completely surround the input SV
-            # options: within, surrounding
-            VEPPlugin.STRUCTURALVARIANTOVERLAP: lambda: f"StructuralVariantOverlap,file={vc['structuralvariantoverlap']},same_type=1",
+            VEPPlugin.STRUCTURALVARIANTOVERLAP: lambda: sv_overlap_args,
         }
 
     for vep_plugin, plugin_arg_func in plugin_data_func.items():
