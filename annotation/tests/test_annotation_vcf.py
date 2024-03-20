@@ -1,6 +1,4 @@
-import copy
 import os
-from uuid import uuid4
 
 from django.conf import settings
 from django.test import TestCase
@@ -8,6 +6,7 @@ from django.test.utils import override_settings
 
 from annotation.annotation_versions import get_variant_annotation_version, \
     get_annotation_range_lock_and_unannotated_count
+from annotation.fake_annotation import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotation
 from annotation.models.damage_enums import PathogenicityImpact, ALoFTPrediction
 from annotation.models.models import AnnotationRun, VariantAnnotationVersion, VariantTranscriptAnnotation
@@ -19,33 +18,8 @@ from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
 
-TEST_IMPORT_PROCESSING_DIR = os.path.join(settings.PRIVATE_DATA_ROOT, 'import_processing',
-                                          "test", str(uuid4()))
 
-TEST_ANNOTATION = copy.deepcopy(settings.ANNOTATION)
-# I didn't have the phasCons/phyloP data on my laptop when I generated the test VCFs, so need to disable
-TEST_ANNOTATION[settings.BUILD_GRCH37]["vep_config"].update({
-    "phastcons100way": None,
-    "phastcons46way": None,
-    "phylop100way": None,
-    "phylop46way": None,
-})
-TEST_ANNOTATION[settings.BUILD_GRCH38]["vep_config"].update({
-    "phastcons100way": None,
-    "phastcons30way": None,
-    "phylop100way": None,
-    "phylop30way": None,
-})
-
-ANNOTATION_COLUMNS_V1 = copy.deepcopy(TEST_ANNOTATION)
-ANNOTATION_COLUMNS_V1[settings.BUILD_GRCH37]["columns_version"] = 1
-ANNOTATION_COLUMNS_V1[settings.BUILD_GRCH38]["columns_version"] = 1
-
-
-@override_settings(IMPORT_PROCESSING_DIR=TEST_IMPORT_PROCESSING_DIR,
-                   VARIANT_ZYGOSITY_GLOBAL_COLLECTION="global",
-                   ANNOTATION_VEP_FAKE_VERSION=True,
-                   ANNOTATION=ANNOTATION_COLUMNS_V1)
+@override_settings(**get_fake_annotation_settings_dict(columns_version=1))
 class TestAnnotationVCF(TestCase):
     TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
     TEST_ANNOTATION_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_columns_version1_grch37.vep_annotated.vcf")
@@ -195,15 +169,7 @@ class TestAnnotationVCF(TestCase):
         self.assertEqual(va.polyphen2_hvar_pred_most_damaging, 'D')
 
 
-ANNOTATION_COLUMNS_V2 = copy.deepcopy(TEST_ANNOTATION)
-ANNOTATION_COLUMNS_V2[settings.BUILD_GRCH37]["columns_version"] = 2
-ANNOTATION_COLUMNS_V2[settings.BUILD_GRCH38]["columns_version"] = 2
-
-
-@override_settings(IMPORT_PROCESSING_DIR=TEST_IMPORT_PROCESSING_DIR,
-                   VARIANT_ZYGOSITY_GLOBAL_COLLECTION="global",
-                   ANNOTATION_VEP_FAKE_VERSION=True,
-                   ANNOTATION=ANNOTATION_COLUMNS_V2)
+@override_settings(**get_fake_annotation_settings_dict(columns_version=2))
 class TestAnnotationVCF2(TestAnnotationVCF):
     TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
     TEST_ANNOTATION_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_columns_version2_grch37.vep_annotated.vcf")
@@ -234,15 +200,7 @@ class TestAnnotationVCF2(TestAnnotationVCF):
         self.assertTrue(vta.nmd_escaping_variant)
 
 
-ANNOTATION_COLUMNS_V3 = copy.deepcopy(TEST_ANNOTATION)
-ANNOTATION_COLUMNS_V3[settings.BUILD_GRCH37]["columns_version"] = 3
-ANNOTATION_COLUMNS_V3[settings.BUILD_GRCH38]["columns_version"] = 3
-
-
-@override_settings(IMPORT_PROCESSING_DIR=TEST_IMPORT_PROCESSING_DIR,
-                   VARIANT_ZYGOSITY_GLOBAL_COLLECTION="global",
-                   ANNOTATION_VEP_FAKE_VERSION=True,
-                   ANNOTATION=ANNOTATION_COLUMNS_V3)
+@override_settings(**get_fake_annotation_settings_dict(columns_version=3))
 class TestAnnotationVCF3(TestAnnotationVCF):
     TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
     TEST_ANNOTATION_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_columns_version3_grch37.vep_annotated.vcf")

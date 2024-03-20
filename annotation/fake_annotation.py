@@ -1,7 +1,9 @@
 """
 Used for testing purposes
 """
+import copy
 import os
+from uuid import uuid4
 
 from django.conf import settings
 from django.db.models.fields import IntegerField, TextField
@@ -18,6 +20,37 @@ from ontology.tests.test_data_ontology import create_ontology_test_data, create_
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
+
+
+def get_fake_annotation_settings_dict(columns_version: int) -> dict:
+    TEST_IMPORT_PROCESSING_DIR = os.path.join(settings.PRIVATE_DATA_ROOT, 'import_processing',
+                                              "test", str(uuid4()))
+
+    TEST_ANNOTATION = copy.deepcopy(settings.ANNOTATION)
+    # I didn't have the phasCons/phyloP data on my laptop when I generated the test VCFs, so need to disable
+    TEST_ANNOTATION[settings.BUILD_GRCH37]["vep_config"].update({
+        "phastcons100way": None,
+        "phastcons46way": None,
+        "phylop100way": None,
+        "phylop46way": None,
+    })
+    TEST_ANNOTATION[settings.BUILD_GRCH38]["vep_config"].update({
+        "phastcons100way": None,
+        "phastcons30way": None,
+        "phylop100way": None,
+        "phylop30way": None,
+    })
+
+    ANNOTATION_COLUMNS = copy.deepcopy(TEST_ANNOTATION)
+    ANNOTATION_COLUMNS[settings.BUILD_GRCH37]["columns_version"] = columns_version
+    ANNOTATION_COLUMNS[settings.BUILD_GRCH38]["columns_version"] = columns_version
+
+    return {
+        "IMPORT_PROCESSING_DIR": TEST_IMPORT_PROCESSING_DIR,
+        "VARIANT_ZYGOSITY_GLOBAL_COLLECTION": "global",
+        "ANNOTATION_VEP_FAKE_VERSION": True,
+        "ANNOTATION": ANNOTATION_COLUMNS,
+    }
 
 
 def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium, columns_version: int):
