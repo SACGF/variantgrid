@@ -206,12 +206,9 @@ class BulkVEPVCFAnnotationInserter:
         self.source_field_to_columns = defaultdict(set)
         self.ignored_vep_fields = self.VEP_NOT_COPIED_FIELDS.copy()
 
-        vep_source_qs = ColumnVEPField.filter_for_build(self.genome_build)
-        cvf_filters = [ColumnVEPField.get_columns_version_q(vc.columns_version),
-                       ColumnVEPField.get_pipeline_type_q(self.annotation_run.pipeline_type)]
-        q_cvf = reduce(operator.and_, cvf_filters)
+        vep_source_qs = ColumnVEPField.filter(self.genome_build, vc.columns_version, self.annotation_run.pipeline_type)
         # Sort to have consistent VCF headers
-        for cvf in vep_source_qs.filter(q_cvf).order_by("source_field"):
+        for cvf in vep_source_qs.order_by("source_field"):
             try:
                 if cvf.vep_custom:  # May not be configured
                     prefix = cvf.get_vep_custom_display()
@@ -225,8 +222,8 @@ class BulkVEPVCFAnnotationInserter:
             except:
                 logging.warning("Skipping custom %s due to missing settings", cvf.vep_info_field)
 
-        logging.debug("source_field_to_columns:")
-        logging.debug(self.source_field_to_columns)
+        logging.info("source_field_to_columns:")
+        logging.info(self.source_field_to_columns)
 
         vav = self.annotation_run.variant_annotation_version
         self.prediction_pathogenic_funcs = vav.get_pathogenic_prediction_funcs()
@@ -242,9 +239,20 @@ class BulkVEPVCFAnnotationInserter:
 
         # Find the ones that don't apply to this version, and exclude them
         vc = VEPConfig(self.genome_build)
-        qs = ColumnVEPField.filter_for_build(self.genome_build)
-        q_not_this_version = ~ColumnVEPField.get_columns_version_q(vc.columns_version)
-        vep_fields_not_this_version = qs.filter(q_not_this_version).values_list("column", flat=True)
+
+        # TODO:
+        old_way = True
+        if old_way:
+            qs = ColumnVEPField.filter_for_build(self.genome_build)
+            q_not_this_version = ~ColumnVEPField.get_columns_version_q(vc.columns_version)
+            vep_fields_not_this_version = qs.filter(q_not_this_version).values_list("column", flat=True)
+        else:
+            cvf_qs = ColumnVEPField.filter(self.genome_build, vc.columns_version, self.annotation_run.pipeline_type)
+            other_cvf_qs = ColumnVEPField.objects.all().exclude(pk__in=cvf_qs.values_list("pk", flat=True))
+            vep_fields_not_this_version = list(other_cvf_qs.values_list("variant_grid_column_id", flat=True))
+            desc = f"{self.genome_build}/{vc.columns_version}/{self.annotation_run.pipeline_type}"
+            logging.info(f"{desc} Ignoring CVF from other builds: {','.join(vep_fields_not_this_version)}")
+
         ignore_columns.update(vep_fields_not_this_version)
 
         for c in list(ignore_columns):

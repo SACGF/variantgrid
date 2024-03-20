@@ -39,8 +39,10 @@ def slowly_create_loci_and_variants_for_vcf(genome_build, vcf_filename, get_vari
     for v in vcf.Reader(filename=vcf_filename):
         ref = str(v.REF)
         alt = str(v.ALT[0])
-
-        vc = VariantCoordinate.from_explicit_no_svlen(v.CHROM, int(v.POS), ref, alt)
+        if svlen := v.INFO.get("SVLEN"):
+            vc = VariantCoordinate(chrom=v.CHROM, position=int(v.POS), ref=ref, alt=alt, svlen=svlen)
+        else:
+            vc = VariantCoordinate.from_explicit_no_svlen(v.CHROM, int(v.POS), ref, alt)
         vc = vc.as_internal_symbolic(genome_build)
         ref_id = pk_by_seq.get(ref)
         if ref_id is None:

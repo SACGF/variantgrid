@@ -186,7 +186,7 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
             if info_field not in SV_CALCULATED_FIELDS:
                 sv_cols.append(info_field)
         sv_cols = ":".join(sv_cols)
-        sv_overlap_args = f"StructuralVariantOverlap,file={vc['structuralvariantoverlap']},same_type=1,cols={sv_cols}"
+        sv_overlap_args = f"StructuralVariantOverlap,file={vc['structuralvariantoverlap']},cols={sv_cols}"
 
         plugin_data_func = {
             VEPPlugin.STRUCTURALVARIANTOVERLAP: lambda: sv_overlap_args,
