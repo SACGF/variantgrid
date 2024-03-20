@@ -2,19 +2,19 @@ from django.contrib.auth.models import User
 from django.core.management import BaseCommand
 from django.db.models import Q
 
-from classification.models import Classification, ClassificationModification
+from classification.models import ClassificationModification
 from snpdb.models import Lab
 
 
 class Command(BaseCommand):
     def add_arguments(self, parser):
-        parser.add_argument('lab_id', type='str', help="The lab_id with classifications that we want to change")
-        parser.add_argument('old_user_id', type='str', help="The user_id we don't want anymore")
-        parser.add_argument('new_user_id', type='str', help="The user_id we don't want anymore")
-        parser.add_argument('test', action='store_true')
+        parser.add_argument('-lab_id', type=str, help="The lab_id with classifications that we want to change")
+        parser.add_argument('-old_user_id', type=str, help="The user_id we don't want anymore")
+        parser.add_argument('-new_user_id', type=str, help="The user_id we want to replace want anymore")
+        parser.add_argument('--test', action='store_true')
 
     @staticmethod
-    def get_user(user_id:str) -> User:
+    def get_user(user_id: str) -> User:
         if user_id.isnumeric():
             return User.objects.get(pk=int(user_id))
         else:
