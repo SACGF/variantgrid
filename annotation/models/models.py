@@ -449,10 +449,11 @@ class HumanProteinAtlasAnnotation(models.Model):
 
 class ColumnVEPField(models.Model):
     """ For VariantAnnotation/Transcript columns derived from VEP fields """
-    column = models.TextField(unique=True)
+    column = models.TextField(unique=True)  # Do we actually need this or can we fall back on natural PK?
     variant_grid_column = models.ForeignKey(VariantGridColumn, on_delete=CASCADE)
     genome_build = models.ForeignKey(GenomeBuild, null=True, on_delete=CASCADE)  # null = all builds
     pipeline_type = models.CharField(max_length=1, choices=VariantAnnotationPipelineType.choices,
+                                     null=True, blank=True,  # null = all pipeline types
                                      default=VariantAnnotationPipelineType.STANDARD)
     category = models.CharField(max_length=1, choices=ColumnAnnotationCategory.choices)
     source_field = models.TextField(null=True)  # @see use vep_info_field
@@ -493,6 +494,10 @@ class ColumnVEPField(models.Model):
         q_min = Q(min_vep_columns_version__isnull=True) | Q(min_vep_columns_version__lte=columns_version)
         q_max = Q(max_vep_columns_version__isnull=True) | Q(max_vep_columns_version__gte=columns_version)
         return q_min & q_max
+
+    @staticmethod
+    def get_pipeline_type_q(pipeline_type) -> Q:
+        return Q(pipeline_type__isnull=True) | Q(pipeline_type=pipeline_type)
 
     @staticmethod
     def filter_for_build(genome_build: GenomeBuild):
