@@ -804,12 +804,15 @@ class SVOverlapProcessor:
         if filtered_sv_records:
             chosen_record = self._pick_record(filtered_sv_records)
             # Update if not special multi-field
-            single_chosen_fields = {k: v for k, v in chosen_record.items() if k not in self.MULTI_VALUE_FIELDS}
+            update_fields = {k: v for k, v in chosen_record.items() if k not in self.MULTI_VALUE_FIELDS}
+            # Need to re-build the multi-files from what is filtered
+            for f in self.MULTI_VALUE_FIELDS:
+                update_fields[f] = VEP_SEPARATOR.join([r[f] for r in filtered_sv_records])
         else:
             # Nothing left after filtering - need to blank out all our values
-            single_chosen_fields = {f: None for f in self.sv_fields}
+            update_fields = {f: None for f in self.sv_fields}
 
-        raw_db_data.update(single_chosen_fields)
+        raw_db_data.update(update_fields)
 
     def _pick_record(self, filtered_sv_records):
         if len(filtered_sv_records) == 1:

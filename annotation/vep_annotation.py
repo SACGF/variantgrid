@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import uuid
 from shlex import shlex
 
 from django.conf import settings
@@ -223,7 +224,8 @@ def get_vep_version(genome_build: GenomeBuild, annotation_consortium):
         with open(vcf_filename, "w", encoding="utf-8") as f:
             f.write(FAKE_VCF_STR)
 
-    output_basename = f"fake.vep_annotated_{genome_build.name}.vcf.gz"
+    # Use unique name so we don't get collisions
+    output_basename = f"fake.vep_annotated_{genome_build.name}.{uuid.uuid4()}.vcf.gz"
     output_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, output_basename)
     returncode, std_out, std_err = run_vep(vcf_filename, output_filename, genome_build,
                                            annotation_consortium, VariantAnnotationPipelineType.STANDARD)
@@ -231,7 +233,9 @@ def get_vep_version(genome_build: GenomeBuild, annotation_consortium):
         logging.info(std_out)
         logging.error(std_err)
         raise ValueError(f"VEP returned {returncode}")
-    return get_vep_version_from_vcf(output_filename)
+    vep_version = get_vep_version_from_vcf(output_filename)
+    os.remove(output_filename)
+    return vep_version
 
 
 def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: dict) -> dict:

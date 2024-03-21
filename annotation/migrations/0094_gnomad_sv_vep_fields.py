@@ -130,9 +130,8 @@ def _test_has_cnv_annotation(apps):
         latest_version = qs.order_by("annotation_date").last()
         ar_qs = AnnotationRun.objects.filter(annotation_range_lock__version_id=latest_version.pk,
                                              pipeline_type='C')
-        for ar in ar_qs:
-            ar.error_exception = "manually failed to reload"
-            ar.save()
+        ERROR = 'E'
+        if ar_qs.update(error_exception="manually failed to reload", status=ERROR):
             need_to_rerun_annotation = True
 
     return need_to_rerun_annotation
