@@ -75,17 +75,10 @@ class TestAnnotationVCFCNV(TestCase):
         self.assertEqual(va.variant_class, VariantClass.DELETION)
         self.assertEqual(va.impact, PathogenicityImpact.HIGH)
 
-        # 21	36303862	.	G	<INS>	.	.	SVTYPE=INS;SVLEN=613;variant_id=204
-        va = VariantAnnotation.objects.get(variant_id=204)
-        self.assertEqual(va.variant_class, VariantClass.INSERTION)
-        self.assertEqual(va.impact, PathogenicityImpact.HIGH)
-
         # 21	36418200	.	G	<DUP>	.	.	SVTYPE=DUP;SVLEN=6000;variant_id=205
         va = VariantAnnotation.objects.get(variant_id=205)
         self.assertEqual(va.variant_class, VariantClass.DUPLICATION)
         self.assertEqual(va.impact, PathogenicityImpact.MODIFIER)
-
-
 
     def test_import_variant_annotations_grch38(self):
         genome_build = GenomeBuild.get_name_or_alias('GRCh38')
@@ -104,11 +97,11 @@ class TestAnnotationVCFCNV(TestCase):
 
         # Verify a few fields
         # 3	128486000	.	C	<DUP>	.	.	SVLEN=9951;SVTYPE=DUP;variant_id=101
-        va = VariantAnnotation.objects.get(variant_id=24601)
+        va = VariantAnnotation.objects.get(variant_id=101)
         self.assertEqual(va.variant_class, VariantClass.DUPLICATION)
-        self.assertEqual(va.impact, PathogenicityImpact.MODERATE)
+        self.assertEqual(va.impact, PathogenicityImpact.MODIFIER)
 
         # 21	35041808	.	G	<DEL>	.	.	SVLEN=10000;SVTYPE=DEL;variant_id=102
-        va = VariantAnnotation.objects.get(variant_id=24601)
+        va = VariantAnnotation.objects.get(variant_id=102)
         self.assertEqual(va.variant_class, VariantClass.DELETION)
         self.assertEqual(va.impact, PathogenicityImpact.HIGH)

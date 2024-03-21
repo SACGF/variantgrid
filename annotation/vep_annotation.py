@@ -177,7 +177,7 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         # We'd like to use "same_type=1" but there is a bug:
         # StructuralVariantOverlap skips all INV matches when same_type=1 used
         # @see https://github.com/Ensembl/VEP_plugins/issues/710
-        # So we will post-process the annotated VCF
+        # So we will post-process the annotated VCF in BulkVEPVCFAnnotationInserter._process_structural_variant_data
 
         SV_CALCULATED_FIELDS = {"PC", "name"}  # Not passed in via cols=
         sv_cols = []

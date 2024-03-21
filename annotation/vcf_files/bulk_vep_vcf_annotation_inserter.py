@@ -6,13 +6,14 @@ from functools import cached_property
 from typing import Optional
 
 from django.conf import settings
+from django.db.models import QuerySet
 
 from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     MutationAssessorPrediction, MutationTasterPrediction, Polyphen2Prediction, \
     PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction
 from annotation.models.models import ColumnVEPField, VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap, AnnotationRun
-from annotation.models.models_enums import VariantClass, VariantAnnotationPipelineType
+from annotation.models.models_enums import VariantClass, VariantAnnotationPipelineType, VEPPlugin
 from annotation.vep_annotation import VEPConfig
 from genes.hgvs import HGVSMatcher, HGVSException
 from genes.models import TranscriptVersion, GeneVersion
@@ -103,6 +104,8 @@ class BulkVEPVCFAnnotationInserter:
 
     def __init__(self, annotation_run: AnnotationRun, infos=None, insert_variants=True, validate_columns=True):
         self.annotation_run = annotation_run
+        self.genome_build = self.annotation_run.variant_annotation_version.genome_build
+        self.vep_config = VEPConfig(self.genome_build)
         self.rows_processed = 0
         self.variant_transcript_annotation_list = []
         self.variant_annotation_list = []
@@ -115,8 +118,21 @@ class BulkVEPVCFAnnotationInserter:
         self.vep_columns = self._get_vep_columns_from_csq(infos)
         self.aloft_columns = False
         logging.info("CSQ: %s", self.vep_columns)
-        self._setup_vep_fields_and_db_columns(validate_columns)
+
+        cvf_qs = ColumnVEPField.filter(self.genome_build, self.vep_config.columns_version,
+                                       self.annotation_run.pipeline_type)
+
+        self._setup_vep_fields_and_db_columns(validate_columns, cvf_qs)
         self.hgvs_matcher = HGVSMatcher(annotation_run.genome_build)
+
+        sv_overlap_processor = None
+        if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.CNV:
+            sv_overlap_processor = SVOverlapProcessor(cvf_qs)
+        self.sv_overlap_processor = sv_overlap_processor
+
+    @property
+    def description(self) -> str:
+        return f"{self.genome_build}/{self.vep_config.columns_version}/{self.annotation_run.get_pipeline_type_display()}"
 
     @staticmethod
     def _get_vep_columns_from_csq(infos):
@@ -137,7 +153,7 @@ class BulkVEPVCFAnnotationInserter:
             columns = columns_str.split("|")
         return columns
 
-    def _add_vep_field_handlers(self):
+    def _add_vep_field_handlers(self, cvf_qs):
         # TOPMED and 1k genomes can return multiple values - take highest
         empty_mave_float_values = EMPTY_VALUES | {"NA"}
         format_pick_lowest_float = get_clean_and_pick_single_value_func(min, float,
@@ -196,23 +212,21 @@ class BulkVEPVCFAnnotationInserter:
             "variant_class": get_choice_formatter_func(VariantClass.choices),
         }
 
-        vc = VEPConfig(self.genome_build)
         # gnomad3 wasn't combined using gnomad_data.py so just uses FILTER
         # while combined exome/genomes use "gnomad_filtered=1" (which should auto-convert bool)
-        if self.genome_build == GenomeBuild.grch38() and vc.columns_version <= 2:
+        if self.genome_build == GenomeBuild.grch38() and self.vep_config.columns_version <= 2:
             self.field_formatters["gnomad_filtered"] = gnomad_filtered_func
 
         self.source_field_to_columns = defaultdict(set)
         self.ignored_vep_fields = self.VEP_NOT_COPIED_FIELDS.copy()
 
-        vep_source_qs = ColumnVEPField.filter(self.genome_build, vc.columns_version, self.annotation_run.pipeline_type)
         # Sort to have consistent VCF headers
-        for cvf in vep_source_qs.order_by("source_field"):
+        for cvf in cvf_qs.order_by("source_field"):
             try:
                 if cvf.vep_custom:  # May not be configured
                     prefix = cvf.get_vep_custom_display()
                     setting_key = prefix.lower()
-                    _ = vc[setting_key]  # May throw exception if not setup
+                    _ = self.vep_config[setting_key]  # May throw exception if not setup
                     if cvf.source_field_has_custom_prefix:
                         self.ignored_vep_fields.append(prefix)
 
@@ -221,14 +235,11 @@ class BulkVEPVCFAnnotationInserter:
             except:
                 logging.warning("Skipping custom %s due to missing settings", cvf.vep_info_field)
 
-        logging.info("source_field_to_columns:")
-        logging.info(self.source_field_to_columns)
-
         vav = self.annotation_run.variant_annotation_version
         self.prediction_pathogenic_funcs = vav.get_pathogenic_prediction_funcs()
 
-    def _setup_vep_fields_and_db_columns(self, validate_columns):
-        self._add_vep_field_handlers()
+    def _setup_vep_fields_and_db_columns(self, validate_columns, cvf_qs):
+        self._add_vep_field_handlers(cvf_qs)
 
         ignore_columns = set(self.DB_FIXED_COLUMNS +
                              self.DB_MANUALLY_POPULATED_COLUMNS +
@@ -236,9 +247,7 @@ class BulkVEPVCFAnnotationInserter:
         if self.annotation_run.annotation_consortium == AnnotationConsortium.REFSEQ:
             ignore_columns.update(self.VEP_NOT_COPIED_REFSEQ_ONLY)
 
-        vc = VEPConfig(self.genome_build)
         # Find the ones that don't apply to this version, and exclude them
-        cvf_qs = ColumnVEPField.filter(self.genome_build, vc.columns_version, self.annotation_run.pipeline_type)
         other_cvf_qs = ColumnVEPField.objects.all().difference(cvf_qs)
         vep_fields_not_this_version = set(other_cvf_qs.values_list("variant_grid_column_id", flat=True))
         ignore_columns.update(vep_fields_not_this_version)
@@ -260,13 +269,13 @@ class BulkVEPVCFAnnotationInserter:
 
             unused_vep_columns = vep_columns - handled_vep_columns
             if unused_vep_columns:
-                logging.warning("Unhandled VEP CSQ columns (maybe add to VEP_NOT_COPIED_FIELDS or disable in VEP pipeline?) :")
+                logging.warning(f"{self.description}: Unhandled VEP CSQ columns (maybe add to VEP_NOT_COPIED_FIELDS or disable in VEP pipeline?) :")
                 logging.warning(", ".join(sorted(unused_vep_columns)))
 
             missing_expected_vep_columns = handled_vep_columns - vep_columns
             if missing_expected_vep_columns:
                 missing = ", ".join(sorted(missing_expected_vep_columns))
-                msg = f"Fields missing from VEP annotated vcf CSQ columns: {missing}"
+                msg = f"{self.description}: Fields missing from VEP annotated vcf CSQ columns: {missing}"
                 logging.error(msg)
                 raise VEPMissingColumnsError(msg)
 
@@ -325,6 +334,9 @@ class BulkVEPVCFAnnotationInserter:
 
         if self.aloft_columns and self._has_all_aloft_columns(raw_db_data):
             self._pick_aloft_values(raw_db_data)
+
+        if self.sv_overlap_processor:
+            self.sv_overlap_processor.process(raw_db_data)
 
         db_data = {}
         for c, value in raw_db_data.items():
@@ -535,8 +547,8 @@ class BulkVEPVCFAnnotationInserter:
                 if overlapping_symbols:
                     variant_data["overlapping_symbols"] = ",".join(sorted(overlapping_symbols))
 
-                logging.debug(f"variant_data:")
-                logging.debug(variant_data)
+                # logging.debug(f"variant_data:")
+                # logging.debug(variant_data)
                 self.variant_annotation_list.append(variant_data)
 
                 for gene_id in overlapping_gene_ids:
@@ -607,11 +619,6 @@ class BulkVEPVCFAnnotationInserter:
         import_processing_dir = get_import_processing_dir(self.annotation_run.pk, prefix=self.PREFIX)
         logging.info("********* Deleting '%s' *******", import_processing_dir)
         shutil.rmtree(import_processing_dir)
-
-    @property
-    def genome_build(self):
-        vav = self.annotation_run.variant_annotation_version
-        return vav.genome_build
 
     @cached_property
     def gene_identifiers(self):
@@ -748,3 +755,81 @@ def format_aloft_high_confidence(value) -> bool:
 
 def format_canonical(value) -> bool:
     return value == "YES"
+
+
+class SVOverlapProcessor:
+    # These ones aren't processed down to 1 but instead are kept as the multi-value string fields
+    MULTI_VALUE_FIELDS = {'gnomad_sv_overlap_af', 'gnomad_sv_overlap_name', 'gnomad_sv_overlap_percent'}
+
+    def __init__(self, cvf_qs: QuerySet[ColumnVEPField]):
+        cvf_qs = cvf_qs.filter(vep_plugin=VEPPlugin.STRUCTURALVARIANTOVERLAP)
+        self.sv_fields = set(cvf_qs.values_list("variant_grid_column_id", flat=True))
+
+    @staticmethod
+    def _get_required_substring(variant_class: str):
+        required_substring = ''  # Empty string is in anything
+        if settings.ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE:
+            # gnomad_sv_overlap_name looks like: 'gnomAD-SV_v2.1_INV_17_731&gnomAD-SV_v2.1_DEL_17_160435'
+            EXPECTED_NAME = {
+                'deletion': "DEL",
+                'duplication': 'DUP',
+                'inversion': 'INV',
+            }
+            required_substring = EXPECTED_NAME[variant_class]
+        return required_substring
+
+    def process(self, raw_db_data: dict):
+        # This one should always there if any overlaps
+        if 'gnomad_sv_overlap_name' not in raw_db_data:
+            return
+
+        # The StructuralVariantOverlap fields are joined via '&'
+        # Get it into a nice structure then process it
+        sv_list_values = {}
+        for field in self.sv_fields:
+            if value := raw_db_data.get(field):
+                sv_list_values[field] = value.split("&")
+
+        required_substring = self._get_required_substring(raw_db_data["variant_class"])
+
+        filtered_sv_records: list[dict] = []
+        for i, overlap_name in enumerate(sv_list_values['gnomad_sv_overlap_name']):
+            if required_substring in overlap_name:
+                values_dict = {}
+                for field in self.sv_fields:
+                    if v := sv_list_values.get(field):
+                        values_dict[field] = v[i]
+                filtered_sv_records.append(values_dict)
+
+        if filtered_sv_records:
+            chosen_record = self._pick_record(filtered_sv_records)
+            raw_db_data["gnomad_af"] = chosen_record["gnomad_sv_overlap_af"]
+            # Update if not special multi-field
+            single_chosen_fields = {k: v for k,v in chosen_record.items() if k not in self.MULTI_VALUE_FIELDS}
+        else:
+            # Nothing left after filtering - need to blank out all our values
+            single_chosen_fields = {f: None for f in self.sv_fields}
+
+        raw_db_data.update(single_chosen_fields)
+
+    def _pick_record(self, filtered_sv_records):
+        if len(filtered_sv_records) == 1:
+            return filtered_sv_records[0]
+
+        chosen_record = None
+        if settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD == "greatest_overlap":
+            raise NotImplementedError("greatest_overlap")
+        elif settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD == "lowest_af":
+            for record in filtered_sv_records:
+                if chosen_record:
+                    if record["gnomad_sv_overlap_af"] > chosen_record["gnomad_sv_overlap_af"]:
+                        continue
+                chosen_record = record
+        elif settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD == "exact_or_lowest_af":
+            raise NotImplementedError("exact_or_lowest_af")
+        else:
+            raise ValueError(f"Unknown value for {settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD=}")
+
+        return chosen_record
+
+

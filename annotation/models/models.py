@@ -514,7 +514,7 @@ class ColumnVEPField(models.Model):
         return reduce(operator.and_, filters)
 
     @staticmethod
-    def filter(genome_build: GenomeBuild, columns_version, pipeline_type) -> Q:
+    def filter(genome_build: GenomeBuild, columns_version, pipeline_type):
         q = ColumnVEPField.get_q(genome_build, columns_version, pipeline_type)
         return ColumnVEPField.objects.filter(q)
 
