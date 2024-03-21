@@ -4,22 +4,21 @@ from django.conf import settings
 from django.test import TestCase
 from django.test.utils import override_settings
 
-from annotation.annotation_versions import get_variant_annotation_version, \
-    get_annotation_range_lock_and_unannotated_count
+from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
 from annotation.fake_annotation import get_fake_annotation_settings_dict
-from annotation.models import VariantAnnotation, VariantClass
-from annotation.models.damage_enums import PathogenicityImpact, ALoFTPrediction
-from annotation.models.models import AnnotationRun, VariantAnnotationVersion, VariantTranscriptAnnotation
-from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
+from annotation.models import VariantAnnotation, VariantClass, VariantAnnotationPipelineType
+from annotation.models.damage_enums import PathogenicityImpact
+from annotation.models.models import AnnotationRun, VariantAnnotationVersion
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
-from annotation.vep_annotation import vep_parse_version_line, get_vep_version_from_vcf, \
-    vep_dict_to_variant_annotation_version_kwargs, VEPVersionMismatchError, VEPConfig
+from annotation.vep_annotation import get_vep_version_from_vcf, vep_dict_to_variant_annotation_version_kwargs, \
+    VEPConfig
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
 
 
-@override_settings(**get_fake_annotation_settings_dict(columns_version=1))
+# CNV stuff only comes in with columns version >= 3
+@override_settings(**get_fake_annotation_settings_dict(columns_version=3))
 class TestAnnotationVCFCNV(TestCase):
     TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
     TEST_ANNOTATION_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_columns_version3_grch37_cnv.vep_annotated.vcf")
@@ -61,6 +60,7 @@ class TestAnnotationVCFCNV(TestCase):
         annotation_range_lock, _ = get_annotation_range_lock_and_unannotated_count(vav)
         annotation_range_lock.save()
         annotation_run = AnnotationRun.objects.create(annotation_range_lock=annotation_range_lock,
+                                                      pipeline_type=VariantAnnotationPipelineType.CNV,
                                                       vcf_annotated_filename=self.TEST_ANNOTATION_VCF_GRCH37)
         import_vcf_annotations(annotation_run, delete_temp_files=False, vep_version_check=False)
 
@@ -98,6 +98,7 @@ class TestAnnotationVCFCNV(TestCase):
         annotation_range_lock, _ = get_annotation_range_lock_and_unannotated_count(vav)
         annotation_range_lock.save()
         annotation_run = AnnotationRun.objects.create(annotation_range_lock=annotation_range_lock,
+                                                      pipeline_type=VariantAnnotationPipelineType.CNV,
                                                       vcf_annotated_filename=self.TEST_ANNOTATION_VCF_GRCH38)
         import_vcf_annotations(annotation_run, delete_temp_files=False, vep_version_check=False)
 

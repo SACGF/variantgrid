@@ -2,11 +2,10 @@ import logging
 import operator
 import shutil
 from collections import defaultdict
-from functools import cached_property, reduce
+from functools import cached_property
 from typing import Optional
 
 from django.conf import settings
-from django.db.models import Q
 
 from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     MutationAssessorPrediction, MutationTasterPrediction, Polyphen2Prediction, \
@@ -74,7 +73,7 @@ class BulkVEPVCFAnnotationInserter:
         "overlapping_symbols",
         "gnomad_hemi_count",
     ]
-    DB_IGNORED_COLUMNS = ["id", "transcript"]
+    DB_IGNORED_COLUMNS = ["id", "transcript", "MaveDB_nt", "MaveDB_pro"]
     VEP_NOT_COPIED_FIELDS = [
         "Allele",
         "BIOTYPE",
@@ -237,22 +236,11 @@ class BulkVEPVCFAnnotationInserter:
         if self.annotation_run.annotation_consortium == AnnotationConsortium.REFSEQ:
             ignore_columns.update(self.VEP_NOT_COPIED_REFSEQ_ONLY)
 
-        # Find the ones that don't apply to this version, and exclude them
         vc = VEPConfig(self.genome_build)
-
-        # TODO:
-        old_way = True
-        if old_way:
-            qs = ColumnVEPField.filter_for_build(self.genome_build)
-            q_not_this_version = ~ColumnVEPField.get_columns_version_q(vc.columns_version)
-            vep_fields_not_this_version = qs.filter(q_not_this_version).values_list("column", flat=True)
-        else:
-            cvf_qs = ColumnVEPField.filter(self.genome_build, vc.columns_version, self.annotation_run.pipeline_type)
-            other_cvf_qs = ColumnVEPField.objects.all().exclude(pk__in=cvf_qs.values_list("pk", flat=True))
-            vep_fields_not_this_version = list(other_cvf_qs.values_list("variant_grid_column_id", flat=True))
-            desc = f"{self.genome_build}/{vc.columns_version}/{self.annotation_run.pipeline_type}"
-            logging.info(f"{desc} Ignoring CVF from other builds: {','.join(vep_fields_not_this_version)}")
-
+        # Find the ones that don't apply to this version, and exclude them
+        cvf_qs = ColumnVEPField.filter(self.genome_build, vc.columns_version, self.annotation_run.pipeline_type)
+        other_cvf_qs = ColumnVEPField.objects.all().difference(cvf_qs)
+        vep_fields_not_this_version = set(other_cvf_qs.values_list("variant_grid_column_id", flat=True))
         ignore_columns.update(vep_fields_not_this_version)
 
         for c in list(ignore_columns):
