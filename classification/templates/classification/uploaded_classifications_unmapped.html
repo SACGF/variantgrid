@@ -1,5 +1,6 @@
 {% extends "uicore/page/base.html" %}
 {% load static %}
+{% load user_tags %}
 {% load ui_menu_bars %}
 {% load ui_utils %}
 {% load ui_help %}
@@ -23,6 +24,7 @@
         {% labelled label="File Name" %}{{ record.file_data.filename }}{% admin_link record %}{% endlabelled %}
         {% labelled label="File ID" %}{{ record.pk }}{% endlabelled %}
         {% labelled label="Upload Date" %}{% timestamp record.created %}{% endlabelled %}
+        {% labelled label="Uploaded By" %}{% user record.user size="tiny" %}{% endlabelled %}
         <div data-toggle="ajax" href="{% url 'classification_upload_unmapped_status_detail' record.pk %}">
             Loading Status
         </div>
