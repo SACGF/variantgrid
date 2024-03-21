@@ -329,19 +329,20 @@ def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild):
 
 
 def get_vep_version_from_vcf(output_filename):
-    VEP_VERSIONS_LINE_START = "##VEP"
+    VEP_VERSIONS_LINE_START = "##VEP="
 
+    num_lines_read = 0
     with open_handle_gzip(output_filename, "rt") as f:
         for line in f:
+            num_lines_read += 1
             if line.startswith("#"):
                 if line.startswith(VEP_VERSIONS_LINE_START):
                     return vep_parse_version_line(line)
             else:
                 break
 
-    msg = f"Could not find line in header starting with '{VEP_VERSIONS_LINE_START}'"
-    raise ValueError(msg)
-
+    raise ValueError(f"{output_filename}: Could not find line in header starting with '{VEP_VERSIONS_LINE_START}' "
+                     + f"(read {num_lines_read} lines).")
 
 def vep_parse_version_line(line):
     try:

@@ -803,9 +803,8 @@ class SVOverlapProcessor:
 
         if filtered_sv_records:
             chosen_record = self._pick_record(filtered_sv_records)
-            raw_db_data["gnomad_af"] = chosen_record["gnomad_sv_overlap_af"]
             # Update if not special multi-field
-            single_chosen_fields = {k: v for k,v in chosen_record.items() if k not in self.MULTI_VALUE_FIELDS}
+            single_chosen_fields = {k: v for k, v in chosen_record.items() if k not in self.MULTI_VALUE_FIELDS}
         else:
             # Nothing left after filtering - need to blank out all our values
             single_chosen_fields = {f: None for f in self.sv_fields}

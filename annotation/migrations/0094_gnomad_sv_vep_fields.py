@@ -4,6 +4,7 @@ from django.db import migrations
 from django.db.models import Q
 
 from library.django_utils import bulk_insert_class_data
+from manual.operations.manual_operations import ManualOperation
 
 VEP_PLUGIN_STRUCTURALVARIANTOVERLAP = 'o'
 
@@ -23,6 +24,10 @@ def _gnomad_sv_vep_fields(apps, _schema_editor):
 
     COLUMN_VEP_FIELD = [
         {'column': 'gnomad_sv_overlap_af', 'variant_grid_column_id': 'gnomad_sv_overlap_af',
+         'pipeline_type': VARIANT_ANNOTATION_PIPELINE_TYPE_CNV, 'category': FREQUENCY_DATA,
+         'source_field': 'SV_overlap_AF', 'vep_plugin': VEP_PLUGIN_STRUCTURALVARIANTOVERLAP},
+        # The chosen value is copied into gnomad_af
+        {'column': 'gnomad_sv_overlap_copied_to_gnomad_af', 'variant_grid_column_id': 'gnomad_af',
          'pipeline_type': VARIANT_ANNOTATION_PIPELINE_TYPE_CNV, 'category': FREQUENCY_DATA,
          'source_field': 'SV_overlap_AF', 'vep_plugin': VEP_PLUGIN_STRUCTURALVARIANTOVERLAP},
         {'column': 'gnomad_sv_overlap_percent', 'variant_grid_column_id': 'gnomad_sv_overlap_percent',
@@ -114,6 +119,25 @@ def _reverse_gnomad_sv_vep_fields(apps, _schema_editor):
     ColumnVEPField.objects.filter(vep_plugin=VEP_PLUGIN_STRUCTURALVARIANTOVERLAP).delete()
 
 
+def _test_has_cnv_annotation(apps):
+    """ This also fails stuff - to force the reload """
+    AnnotationRun = apps.get_model("annotation", "AnnotationRun")
+    VariantAnnotationVersion = apps.get_model("annotation", "VariantAnnotationVersion")
+
+    need_to_rerun_annotation = False
+    for genome_build_name in ["GRCh37", "GRCh38"]:
+        qs = VariantAnnotationVersion.objects.filter(genome_build__name=genome_build_name, active=True)
+        vav = qs.order_by("annotation_date").last()
+        ar_qs = AnnotationRun.objects.filter(annotation_range_lock__version=vav,
+                                             pipeline_type='C')
+        for ar in ar_qs:
+            ar.error_exception = "manually failed to reload"
+            ar.save()
+            need_to_rerun_annotation = True
+
+    return need_to_rerun_annotation
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -122,5 +146,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(_gnomad_sv_vep_fields, reverse_code=_reverse_gnomad_sv_vep_fields)
+        migrations.RunPython(_gnomad_sv_vep_fields, reverse_code=_reverse_gnomad_sv_vep_fields),
+        ManualOperation.operation_other(args=[
+            "Re-run CNV annotation (should be quick) As admin, go to [annotation] -> [Pipeline runs] then click retry failed runs"],
+            test=_test_has_cnv_annotation),
+
     ]
