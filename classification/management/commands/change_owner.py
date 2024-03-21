@@ -45,12 +45,16 @@ class Command(BaseCommand):
         )
 
         print(f"Records to update = {records_to_update_qs.count()}")
+        if records_to_update_qs.exists():
+            print(f"Example = {records_to_update_qs.first().classification.cr_lab_id}")
 
         if not options["test"]:
             for cm in records_to_update_qs:
                 cm.published_evidence["owner"]["value"] = new_user.email
                 cm.delta["owner"]["value"] = new_user.email
                 cm.save(update_fields=["published_evidence", "delta"])
-                cm.classification.evidence["owner"]["value"] = new_user.email
-                cm.save(update_fields=["evidence"])
+                c = cm.classification
+                c.evidence["owner"]["value"] = new_user.email
+                c.user = new_user
+                c.save(update_fields=["evidence", "user"])
             print("Done")
