@@ -127,8 +127,8 @@ def _test_has_cnv_annotation(apps):
     need_to_rerun_annotation = False
     for genome_build_name in ["GRCh37", "GRCh38"]:
         qs = VariantAnnotationVersion.objects.filter(genome_build__name=genome_build_name, active=True)
-        vav = qs.order_by("annotation_date").last()
-        ar_qs = AnnotationRun.objects.filter(annotation_range_lock__version=vav,
+        latest_version = qs.order_by("annotation_date").last()
+        ar_qs = AnnotationRun.objects.filter(annotation_range_lock__version_id=latest_version.pk,
                                              pipeline_type='C')
         for ar in ar_qs:
             ar.error_exception = "manually failed to reload"
