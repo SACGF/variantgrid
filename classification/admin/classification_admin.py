@@ -984,6 +984,8 @@ class UploadedClassificationsUnmappedAdmin(ModelAdminBasics):
     def is_readonly_field(self, f) -> bool:
         if f.name in ("url", "filename", "file_size"):
             return True
+        if f.name == "user":
+            return False
         return super().is_readonly_field(f)
 
     @admin_action("Process (Wait & Validate Only)")
