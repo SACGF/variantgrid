@@ -13,11 +13,13 @@ class Command(BaseCommand):
         parser.add_argument('--vcf', required=True)
         parser.add_argument('--columns', help="comma separated list of columns")
         parser.add_argument('--print-lines', action='store_true', help="Print info about each line")
+        parser.add_argument('--pick', action='store_true', help="Print pick for each record")
 
     def handle(self, *args, **options):
         vcf = options["vcf"]
         columns = options["columns"]
         print_lines = options["print_lines"]
+        pick = options["pick"]
 
         reader = Reader(vcf)
 
@@ -44,6 +46,13 @@ class Command(BaseCommand):
 
             for transcript_csq in csq.split(","):
                 td = dict(zip(vep_columns, transcript_csq.split("|")))
+                if pick:
+                    if td.get("PICK"):
+                        if variant_id := td.get("variant_id"):
+                            print(f"{variant_id=}")
+                        print(td)
+                        print("-" * 50)
+
                 for nk in columns:
                     if info_val := td[nk]:
                         values = info_val.split("&")

@@ -33,9 +33,11 @@ class Command(BaseCommand):
         if test:
             print("Re-generating VCF for unit test")
             vep_suffix = "vep_annotated"
-            base_name = f"test_{genome_build.name.lower()}"
+            test_vcf_filename = f"test_{genome_build.name.lower()}"
+            if cnv:
+                test_vcf_filename += "_symbolic_alt"
             unit_test_dir = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
-            vcf_filename = os.path.join(unit_test_dir, f"{base_name}.vcf")
+            vcf_filename = os.path.join(unit_test_dir, f"{test_vcf_filename}.vcf")
             output_dir = unit_test_dir
             base_name = f"test_columns_version{vc.columns_version}_{genome_build.name.lower()}"
         else:
@@ -50,12 +52,13 @@ class Command(BaseCommand):
                 base_name = "test"  # "dump_small"
                 vcf_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, f"{base_name}.vcf")
 
-        output_filename = os.path.join(output_dir, f"{base_name}.{vep_suffix}.vcf.gz")
         if cnv:
             pipeline_type = VariantAnnotationPipelineType.CNV
+            base_name += "_cnv"
         else:
             pipeline_type = VariantAnnotationPipelineType.STANDARD
 
+        output_filename = os.path.join(output_dir, f"{base_name}.{vep_suffix}.vcf.gz")
         return_code, std_out, std_err = run_vep(vcf_filename, output_filename,
                                                 genome_build, genome_build.annotation_consortium,
                                                 pipeline_type)

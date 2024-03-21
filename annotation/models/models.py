@@ -1,9 +1,10 @@
 import logging
+import operator
 import os
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta
-from functools import cached_property
+from functools import cached_property, reduce
 from typing import Optional, Callable
 
 from Bio import Entrez
@@ -449,8 +450,8 @@ class HumanProteinAtlasAnnotation(models.Model):
 
 class ColumnVEPField(models.Model):
     """ For VariantAnnotation/Transcript columns derived from VEP fields """
-    column = models.TextField(unique=True)  # Do we actually need this or can we fall back on natural PK?
-    variant_grid_column = models.ForeignKey(VariantGridColumn, on_delete=CASCADE)
+    column = models.TextField(unique=True)  # TODO: Do we actually need this?
+    variant_grid_column = models.ForeignKey(VariantGridColumn, on_delete=CASCADE)  # VariantAnnotation.column dest
     genome_build = models.ForeignKey(GenomeBuild, null=True, on_delete=CASCADE)  # null = all builds
     pipeline_type = models.CharField(max_length=1, choices=VariantAnnotationPipelineType.choices,
                                      null=True, blank=True)  # Null = all pipeline types
@@ -498,10 +499,29 @@ class ColumnVEPField(models.Model):
     def get_pipeline_type_q(pipeline_type) -> Q:
         return Q(pipeline_type__isnull=True) | Q(pipeline_type=pipeline_type)
 
+
+    @staticmethod
+    def get_genome_build_q(genome_build) -> Q:
+        return Q(genome_build=genome_build) | Q(genome_build__isnull=True)
+
+    @staticmethod
+    def get_q(genome_build: GenomeBuild, columns_version, pipeline_type) -> Q:
+        filters = [
+            ColumnVEPField.get_genome_build_q(genome_build),
+            ColumnVEPField.get_columns_version_q(columns_version),
+            ColumnVEPField.get_pipeline_type_q(pipeline_type),
+        ]
+        return reduce(operator.and_, filters)
+
+    @staticmethod
+    def filter(genome_build: GenomeBuild, columns_version, pipeline_type):
+        q = ColumnVEPField.get_q(genome_build, columns_version, pipeline_type)
+        return ColumnVEPField.objects.filter(q)
+
     @staticmethod
     def filter_for_build(genome_build: GenomeBuild):
         """ genome_build = NULL (no build) or matches provided build """
-        return ColumnVEPField.objects.filter(Q(genome_build=genome_build) | Q(genome_build__isnull=True))
+        return ColumnVEPField.objects.filter(ColumnVEPField.get_genome_build_q(genome_build))
 
     @staticmethod
     def get_source_fields(genome_build: GenomeBuild, *columnvepfield_args, **columnvepfield_kwargs):
