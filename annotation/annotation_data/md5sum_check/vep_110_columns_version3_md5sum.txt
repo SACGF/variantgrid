@@ -11,6 +11,7 @@ cb3a8892e29774e470eef114fa633554  GRCh37/mastermind_cited_variants_reference-202
 5ef133c77046ac1c997c452a94f0ec4c  GRCh38/Cosmic_GenomeScreensMutant_v99_GRCh38.vcf.gz
 4b22a65eda9df55d372608a5cc3f3dc2  GRCh38/Cosmic_GenomeScreensMutant_v99_GRCh38.vcf.gz.tbi
 ef438f139f872ab00fa9cb171441cb6a  GRCh38/dbNSFP4.5a.grch38.stripped.gz
+ce2461a3ca2b43203d8d37bc0655200f  GRCh38/dbNSFP4.5a.grch38.stripped.gz.tbi
 bfdfd76bde3b6406b550343403a32e2f  GRCh38/gnomad4.0_GRCh38_combined_af.vcf.bgz
 1c898d79d887b348e46a6a19a321af86  GRCh38/gnomad4.0_GRCh38_combined_af.vcf.bgz.tbi
 35ce9d990015e208e0d2883175ffddc8  GRCh38/gnomad.v4.0.sv.merged.vcf.gz
