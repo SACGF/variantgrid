@@ -5,7 +5,7 @@ import re
 from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import cached_property, reduce
-from typing import Optional, Callable
+from typing import Optional, Callable, Iterable
 
 from Bio import Entrez
 from Bio.Data.IUPACData import protein_letters_1to3
@@ -1080,6 +1080,12 @@ class VariantAnnotation(AbstractVariantAnnotation):
         GnomADPopulation.SOUTH_ASIAN: 'gnomad_sas_af',
     }
 
+    GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS = [
+        'gnomad_sv_overlap_af',
+        'gnomad_sv_overlap_name',
+        'gnomad_sv_overlap_percent',
+    ]
+
     ALOFT_FIELDS = {
         "aloft_pred": "Pred",
         "aloft_high_confidence": "High Confidence",
@@ -1150,8 +1156,12 @@ class VariantAnnotation(AbstractVariantAnnotation):
         if gnomad_dataset:
             v = self.variant
             gnomad_variant = f"{v.locus.chrom}-{v.locus.position}-{v.locus.ref}-{v.alt}"
-            url = f"http://gnomad.broadinstitute.org/variant/{gnomad_variant}?dataset={gnomad_dataset}"
+            url = self.get_gnomad_url(gnomad_variant, gnomad_dataset)
         return url
+
+    @staticmethod
+    def get_gnomad_url(gnomad_variant: str, dataset: str) -> str:
+        return f"http://gnomad.broadinstitute.org/variant/{gnomad_variant}?dataset={dataset}"
 
     @staticmethod
     def mavedb_urn_to_urls(mavedb_urn: str) -> dict[str, str]:
@@ -1201,6 +1211,54 @@ class VariantAnnotation(AbstractVariantAnnotation):
 
     def get_pubmed_search_terms(self):
         return get_variant_pubmed_search_terms(self.transcript_annotation)
+
+    @staticmethod
+    def vep_multi_fields_to_list_of_dicts(data: dict, fields: Iterable[str]) -> list[dict]:
+        list_values = {}
+        for field in fields:
+            if value := data.get(field):
+                list_values[field] = value.split("&")
+
+        # Ensure they are all same length
+        first_field = fields[0]
+        first_field_len = len(list_values[first_field])
+        for field in fields:
+            assert first_field_len == len(list_values[field]), "all split multi-values are equal length"
+
+        records: list[dict] = []
+        for i in range(first_field_len):
+            values_dict = {}
+            for field in fields:
+                if v := list_values.get(field):
+                    values_dict[field] = v[i]
+            records.append(values_dict)
+        return records
+
+    @property
+    def gnomad_sv_overlap(self) -> list[dict]:
+        sv_overlap_list = []
+        for sv_overlap in self.vep_multi_fields_to_list_of_dicts(self.__dict__,
+                                                      VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS):
+            sv_overlap['gnomad_sv_overlap_af'] = float(sv_overlap['gnomad_sv_overlap_af'])
+
+            dataset = None
+            remove_prefix = None
+            if self.version.gnomad.startswith("2.1"):
+                dataset = "gnomad_sv_r2_1"
+                remove_prefix = "gnomAD-SV_v2.1_"
+                gnomad_variant = name.replace("gnomAD-SV_v3_", "")
+            elif self.version.gnomad.startswith("4"):
+                dataset = "gnomad_sv_r4"
+                remove_prefix = "gnomAD-SV_v3_"
+
+            gnomad_variant = sv_overlap["gnomad_sv_overlap_name"]
+            if remove_prefix:
+                gnomad_variant = gnomad_variant.replace(remove_prefix, "")
+
+            sv_overlap['gnomad_sv_overlap_url'] = self.get_gnomad_url(gnomad_variant, dataset)
+
+            sv_overlap_list.append(sv_overlap)
+        return sv_overlap_list
 
     def __str__(self):
         return f"{self.variant}: {self.version}"

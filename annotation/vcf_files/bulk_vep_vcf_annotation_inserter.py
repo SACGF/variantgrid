@@ -758,9 +758,6 @@ def format_canonical(value) -> bool:
 
 
 class SVOverlapProcessor:
-    # These ones aren't processed down to 1 but instead are kept as the multi-value string fields
-    MULTI_VALUE_FIELDS = {'gnomad_sv_overlap_af', 'gnomad_sv_overlap_name', 'gnomad_sv_overlap_percent'}
-
     def __init__(self, cvf_qs: QuerySet[ColumnVEPField]):
         cvf_qs = cvf_qs.filter(vep_plugin=VEPPlugin.STRUCTURALVARIANTOVERLAP)
         self.sv_fields = set(cvf_qs.values_list("variant_grid_column_id", flat=True))
@@ -785,28 +782,20 @@ class SVOverlapProcessor:
 
         # The StructuralVariantOverlap fields are joined via '&'
         # Get it into a nice structure then process it
-        sv_list_values = {}
-        for field in self.sv_fields:
-            if value := raw_db_data.get(field):
-                sv_list_values[field] = value.split("&")
-
+        sv_records = VariantAnnotation.vep_multi_fields_to_list_of_dicts(raw_db_data, self.sv_fields)
         required_substring = self._get_required_substring(raw_db_data["variant_class"])
-
-        filtered_sv_records: list[dict] = []
-        for i, overlap_name in enumerate(sv_list_values['gnomad_sv_overlap_name']):
-            if required_substring in overlap_name:
-                values_dict = {}
-                for field in self.sv_fields:
-                    if v := sv_list_values.get(field):
-                        values_dict[field] = v[i]
-                filtered_sv_records.append(values_dict)
+        filtered_sv_records = [r for r in sv_records if required_substring in r['gnomad_sv_overlap_name']]
 
         if filtered_sv_records:
             chosen_record = self._pick_record(filtered_sv_records)
             # Update if not special multi-field
-            update_fields = {k: v for k, v in chosen_record.items() if k not in self.MULTI_VALUE_FIELDS}
+            update_fields = {}
+            for k, v in chosen_record.items():
+                if k not in VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS:
+                    update_fields[k] = v
+
             # Need to re-build the multi-files from what is filtered
-            for f in self.MULTI_VALUE_FIELDS:
+            for f in VariantAnnotation.GNOMAD_SV_OVERLAP_MULTI_VALUE_FIELDS:
                 update_fields[f] = VEP_SEPARATOR.join([r[f] for r in filtered_sv_records])
         else:
             # Nothing left after filtering - need to blank out all our values

@@ -702,7 +702,7 @@ function applyVariantValues() {
                         {% labelled id='af_1kg' label='1000 genomes' help=annotation_description.af_1kg hint="tiny" value_css="text-monospace" %}{{ variant_annotation.af_1kg|format_unit_as_percent }}{% endlabelled %}
                         {% labelled id='af_uk10k' label='UK10K' help=annotation_description.af_uk10k hint="tiny" value_css="text-monospace" %}{{ variant_annotation.af_uk10k|format_unit_as_percent }}{% endlabelled %}
                         {% labelled id='topmed_af' label='TopMed' help=annotation_description.topmed_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.topmed_af|format_unit_as_percent }}{% endlabelled %}
-                        {% if variant_annotation.gnomad_url %}
+                        {% if variant_annotation.gnomad_af %}
                             {% labelled id='gnomad_af' label='gnomAD Allele Frequency' help=annotation_description.gnomad_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_af|format_unit_as_percent }}{% endlabelled %}
                             {% if annotation_version.variant_annotation_version.columns_version >= 3 %}
                                 {% labelled id='gnomad_fafmax_faf95_max' label='Grpmax Filtering AF (95% confidence)' help=annotation_description.gnomad_fafmax_faf95_max hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_fafmax_faf95_max|format_unit_as_percent }}{% endlabelled %}
@@ -735,9 +735,26 @@ function applyVariantValues() {
                                 {% endlabelled %}
                             {% endif %}
 
-                            {% labelled label="View in gnomAD" hint="tiny" %}
-                                <a target='_blank' class="hover-link" href='{{ variant_annotation.gnomad_url }}'>Click here</a>
-                            {% endlabelled %}
+                            {% if variant_annotation.annotation_run.pipeline_type == 'C' %}
+                                {% labelled label="Structural Variants" hint="tiny" %}
+                                    <a class='toggle-link' data-toggle="collapse" href='#gnomad-sv-list'>Show Structural Variant Overlaps</a>
+                                {% endlabelled %}
+                                <div id="gnomad-sv-list" class="collapse">
+                                    {% for sv_overlap in variant_annotation.gnomad_sv_overlap %}
+                                        {% labelled id='gnomad_sv_overlap_name' label='SV Overlap Name' help=annotation_description.gnomad_sv_overlap_name hint="tiny" value_css="text-monospace" %}
+                                            <a target='_blank' class="hover-link" href='{{ sv_overlap.gnomad_sv_overlap_url }}'>{{ sv_overlap.gnomad_sv_overlap_name }}</a>
+
+                                        {% endlabelled %}
+                                        {% labelled id='gnomad_sv_overlap_af' label='SV Overlap AF' help=annotation_description.gnomad_sv_overlap_af hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_af|format_unit_as_percent }}{% endlabelled %}
+                                        {% labelled id='gnomad_sv_overlap_percent' label='SV Overlap %' help=annotation_description.gnomad_sv_overlap_percent hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_percent }}{% endlabelled %}
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                {% labelled label="View in gnomAD" hint="tiny" %}
+                                    <a target='_blank' class="hover-link" href='{{ variant_annotation.gnomad_url }}'>Click here</a>
+                                {% endlabelled %}
+                            {% endif %}
+
                             {% labelled label="gnomAD Populations" hint="tiny" %}
                                 <a class='toggle-link' data-toggle="collapse" href='#gnomad-pops'>Show gnomAD Pops</a>
                             {% endlabelled %}
