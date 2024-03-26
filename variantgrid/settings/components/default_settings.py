@@ -212,6 +212,7 @@ ANNOTATION_VEP_DISTANCE = 5000  # VEP --distance arg (default=5000) - how far up
 ANNOTATION_VEP_COLUMNS_VERSION = 1  # 1 = original version, 2 = May 2022
 ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE = True  # Only 'dup' for dups, false is all SVs overlap
 ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD = "lowest_af"  # "greatest_overlap", "lowest_af", "exact_or_lowest_af"
+ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION = 0.8
 
 ANNOTATION_MAX_BENIGN_RANKSCORE = 0.15
 ANNOTATION_MIN_PATHOGENIC_RANKSCORE = 0.85
@@ -241,6 +242,9 @@ ANNOTATION = {
             "dbnsfp": "annotation_data/GRCh37/dbNSFP4.0a.grch37.stripped.gz",
             "dbscsnv": "annotation_data/GRCh37/dbscSNV1.1_GRCh37.txt.gz",
             "gnomad2": "annotation_data/GRCh37/gnomad2.1.1_GRCh37_combined_af.vcf.bgz",
+            # We use gnomAD SV VCF with --custom twice
+            "gnomad_sv": "annotation_data/GRCh37/gnomad_v2.1_sv.sites.grch37.converted.vcf.gz",
+            "gnomad_sv_name": "annotation_data/GRCh37/gnomad_v2.1_sv.sites.grch37.converted.vcf.gz",
             "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz"),
             "mastermind": "annotation_data/GRCh37/mastermind_cited_variants_reference-2022.04.02-grch37.vcf.gz",
             "mave": None,  # n/a for GRCh37
@@ -254,7 +258,6 @@ ANNOTATION = {
             "repeatmasker": "annotation_data/GRCh37/repeatmasker_hg19.bed.gz",
             "spliceai_snv": "annotation_data/GRCh37/spliceai_scores.raw.snv.hg19.vcf.gz",
             "spliceai_indel": "annotation_data/GRCh37/spliceai_scores.raw.indel.hg19.vcf.gz",
-            "structuralvariantoverlap": "annotation_data/GRCh37/gnomad_v2.1_sv.sites.grch37.converted.vcf.gz",
             "topmed": "annotation_data/GRCh37/TOPMED_GRCh37.vcf.gz",
             "uk10k": "annotation_data/GRCh37/UK10K_COHORT.20160215.sites.vcf.gz",
         }
@@ -279,6 +282,9 @@ ANNOTATION = {
             "gnomad2": "annotation_data/GRCh38/gnomad2.1.1_GRCh38_combined_af.vcf.bgz",
             "gnomad3": "annotation_data/GRCh38/gnomad3.1_GRCh38_merged.vcf.bgz",
             "gnomad4": "annotation_data/GRCh38/gnomad4.0_GRCh38_combined_af.vcf.bgz",
+            # We use gnomAD SV VCF with --custom twice
+            "gnomad_sv": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.vcf.gz",
+            "gnomad_sv_name": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.vcf.gz",
             "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2022.04.02-grch38.vcf.gz",
             "mave": "annotation_data/GRCh38/MaveDB_variants.tsv.gz",
             "maxentscan": "annotation_data/all_builds/maxentscan",
@@ -291,7 +297,6 @@ ANNOTATION = {
             "repeatmasker": "annotation_data/GRCh38/repeatmasker_hg38.bed.gz",
             "spliceai_snv": "annotation_data/GRCh38/spliceai_scores.raw.snv.hg38.vcf.gz",
             "spliceai_indel": "annotation_data/GRCh38/spliceai_scores.raw.indel.hg38.vcf.gz",
-            "structuralvariantoverlap": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.vcf.gz",
             "topmed": "annotation_data/GRCh38/TOPMED_GRCh38_20180418.vcf.gz",
             "uk10k": "annotation_data/GRCh38/UK10K_COHORT.20160215.sites.GRCh38.vcf.gz",
         }

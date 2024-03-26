@@ -13,7 +13,7 @@ from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction
 from annotation.models.models import ColumnVEPField, VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap, AnnotationRun
-from annotation.models.models_enums import VariantClass, VariantAnnotationPipelineType, VEPPlugin
+from annotation.models.models_enums import VariantClass, VariantAnnotationPipelineType, VEPCustom
 from annotation.vep_annotation import VEPConfig
 from genes.hgvs import HGVSMatcher, HGVSException
 from genes.models import TranscriptVersion, GeneVersion
@@ -759,7 +759,7 @@ def format_canonical(value) -> bool:
 
 class SVOverlapProcessor:
     def __init__(self, cvf_qs: QuerySet[ColumnVEPField]):
-        cvf_qs = cvf_qs.filter(vep_plugin=VEPPlugin.STRUCTURALVARIANTOVERLAP)
+        cvf_qs = cvf_qs.filter(vep_custom__in=[VEPCustom.GNOMAD_SV, VEPCustom.GNOMAD_SV_NAME])
         self.sv_fields = set(cvf_qs.values_list("variant_grid_column_id", flat=True))
 
     @staticmethod

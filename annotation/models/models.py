@@ -1004,6 +1004,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
     gnomad_sv_overlap_af = models.TextField(null=True, blank=True)
     gnomad_sv_overlap_percent = models.TextField(null=True, blank=True)
     gnomad_sv_overlap_name = models.TextField(null=True, blank=True)
+    gnomad_sv_overlap_coords = models.TextField(null=True, blank=True)
+    gnomad_sv_overlap_filters = models.TextField(null=True, blank=True)
 
     # From https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4267638/
     # "optimum cutoff value identified in the ROC analysis (0.6)"
@@ -1084,6 +1086,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
         'gnomad_sv_overlap_af',
         'gnomad_sv_overlap_name',
         'gnomad_sv_overlap_percent',
+        'gnomad_sv_overlap_coords',
+        'gnomad_sv_overlap_filters',
     ]
 
     ALOFT_FIELDS = {
