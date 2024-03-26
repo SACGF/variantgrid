@@ -283,6 +283,7 @@ class Command(BaseCommand):
         e_key.see = row["see"]
         e_key.order = row["order"]
         e_key.allow_custom_values = row["allow_custom_values"]
+        e_key.sub_label = row[""]
 
         value_type = row["value_type"]
         default_crit_evaluation = row["default_crit_evaluation"]
