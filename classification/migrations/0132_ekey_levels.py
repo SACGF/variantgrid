@@ -12,7 +12,7 @@ def _add_evidence_keys(apps, schema_editor):
 		"key": "amp:level_a",
 		"order": 2,
 		"label": "Level A",
-		"description": "Biomarkers that predict response or resistance to US FDA-approved therapies for a specific type of tumor or have been included in professional guidelines as therapeutic, diagnostic, and/or prognostic biomarkers for specific types of tumors.\r\n\r\nSee <a href=\"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5707196/\">AMP/ASCO/CAP 2017</a>",
+		"description": "Biomarkers that predict response or resistance to US FDA-approved therapies for a specific type of tumour or have been included in professional guidelines as therapeutic, diagnostic, and/or prognostic biomarkers for specific types of tumours.\r\n\r\nSee <a href=\"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5707196/\">AMP/ASCO/CAP 2017</a>",
 		"options": [
 			{
 				"key": "therapeutic",
@@ -40,7 +40,7 @@ def _add_evidence_keys(apps, schema_editor):
 		"key": "amp:level_b",
 		"order": 2,
 		"label": "Level B",
-		"description": "Biomarkers that predict response or resistance to a therapy, or have diagnostic and/or prognostic significance, for a specific type of tumor based on well-powered studies with consensus from experts in the field.\r\n\r\nSee <a href=\"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5707196/\">AMP/ASCO/CAP 2017</a>",
+		"description": "Biomarkers that predict response or resistance to a therapy, or have diagnostic and/or prognostic significance, for a specific type of tumour based on well-powered studies with consensus from experts in the field.\r\n\r\nSee <a href=\"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5707196/\">AMP/ASCO/CAP 2017</a>",
 		"options": [
 			{
 				"key": "therapeutic",
@@ -68,7 +68,7 @@ def _add_evidence_keys(apps, schema_editor):
 		"key": "amp:level_c",
 		"order": 2,
 		"label": "Level C",
-		"description": "Biomarkers that predict response or resistance to therapies approved by FDA or professional societies for a different tumor type (i.e. off-label use of a drug), serve as inclusion criteria for clinical trials, or have diagnostic and/or prognostic significance based on the results of multiple small studies.\r\n\r\nSee <a href=\"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5707196/\">AMP/ASCO/CAP 2017</a>",
+		"description": "Biomarkers that predict response or resistance to therapies approved by FDA or professional societies for a different tumour type (i.e. off-label use of a drug), serve as inclusion criteria for clinical trials, or have diagnostic and/or prognostic significance based on the results of multiple small studies.\r\n\r\nSee <a href=\"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5707196/\">AMP/ASCO/CAP 2017</a>",
 		"options": [
 			{
 				"key": "therapeutic",
