@@ -12,13 +12,13 @@ from classification.models import EvidenceKey
 
 data = \
 '''key,mandatory,order,label,description,examples,options,see,evidence_category,value_type,allow_custom_values,sub_label,hide,variantgrid_column_id,immutable,created,modified,copy_consensus,default_crit_evaluation,max_share_level,crit_allows_override_strengths,crit_uses_points,namespace_overrides
-amp:level_a,FALSE,2,Level A,"Biomarkers that predict response or resistance to US FDA-approved therapies for a specific type of tumor or have been included in professional guidelines as therapeutic, diagnostic, and/or prognostic biomarkers for specific types of tumors.
+amp:level_a,FALSE,2,Level A,"Biomarkers that predict response or resistance to US FDA-approved therapies for a specific type of tumour or have been included in professional guidelines as therapeutic, diagnostic, and/or prognostic biomarkers for specific types of tumours.
 
 See <a href=""https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5707196/"">AMP/ASCO/CAP 2017</a>",,"[{""key"": ""therapeutic"", ""index"": 1}, {""key"": ""diagnostic"", ""index"": 2}, {""key"": ""prognostic"", ""index"": 3}, {""key"": ""unspecified"", ""index"": 4}]",,SC,M,FALSE,Evidence of strong clinical significance,FALSE,,FALSE,2024-02-28 04:36:54.090957+00,2024-02-28 04:36:54.090982+00,TRUE,,logged_in_users,FALSE,FALSE,
-amp:level_b,FALSE,2,Level B,"Biomarkers that predict response or resistance to a therapy, or have diagnostic and/or prognostic significance, for a specific type of tumor based on well-powered studies with consensus from experts in the field.
+amp:level_b,FALSE,2,Level B,"Biomarkers that predict response or resistance to a therapy, or have diagnostic and/or prognostic significance, for a specific type of tumour based on well-powered studies with consensus from experts in the field.
 
 See <a href=""https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5707196/"">AMP/ASCO/CAP 2017</a>",,"[{""key"": ""therapeutic"", ""index"": 1}, {""key"": ""diagnostic"", ""index"": 2}, {""key"": ""prognostic"", ""index"": 3}, {""key"": ""unspecified"", ""index"": 4}]",,SC,M,FALSE,Evidence of strong clinical significance,FALSE,,FALSE,2024-02-28 04:36:54.094618+00,2024-02-28 04:36:54.094635+00,TRUE,,logged_in_users,FALSE,FALSE,
-amp:level_c,FALSE,2,Level C,"Biomarkers that predict response or resistance to therapies approved by FDA or professional societies for a different tumor type (i.e. off-label use of a drug), serve as inclusion criteria for clinical trials, or have diagnostic and/or prognostic significance based on the results of multiple small studies.
+amp:level_c,FALSE,2,Level C,"Biomarkers that predict response or resistance to therapies approved by FDA or professional societies for a different tumour type (i.e. off-label use of a drug), serve as inclusion criteria for clinical trials, or have diagnostic and/or prognostic significance based on the results of multiple small studies.
 
 See <a href=""https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5707196/"">AMP/ASCO/CAP 2017</a>",,"[{""key"": ""therapeutic"", ""index"": 1}, {""key"": ""diagnostic"", ""index"": 2}, {""key"": ""prognostic"", ""index"": 3}, {""key"": ""unspecified"", ""index"": 4}]",,SC,M,FALSE,Evidence of potential clinical significance,FALSE,,FALSE,2024-02-28 04:36:54.095854+00,2024-02-28 04:36:54.095868+00,TRUE,,logged_in_users,FALSE,FALSE,
 amp:level_d,FALSE,2,Level D,"Biomarkers that show plausible therapeutic significance based on preclinical studies, or may assist disease diagnosis and/or prognosis themselves or along with other biomarkers based on small studies or multiple case reports with no consensus.
@@ -50,19 +50,19 @@ Additional options may include
 See <a href=""https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4544753/"">ACMG/AMP</a> for widely used Germline guidelines or
 See <a href=""https://pubmed.ncbi.nlm.nih.gov/35101336/"">ClinGen/CGC/VICC 2022</a> for widely used Somatic guidelines",[],"[{""vg"": ""1"", ""key"": ""B"", ""index"": 1, ""label"": ""Benign"", ""bucket"": 1, ""clinvar"": ""Benign""}, {""vg"": ""2"", ""key"": ""LB"", ""index"": 2, ""label"": ""Likely Benign"", ""bucket"": 1, ""clinvar"": ""Likely benign""}, {""vg"": ""3"", ""key"": ""VUS"", ""index"": 3, ""label"": ""VUS"", ""bucket"": 2, ""aliases"": [""US"", ""VOUS""], ""clinvar"": ""Uncertain significance""}, {""vg"": ""3"", ""key"": ""VUS_A"", ""index"": 4, ""label"": ""VUS A"", ""bucket"": 2, ""aliases"": [""US_A""], ""clinvar"": ""Uncertain significance""}, {""vg"": ""3"", ""key"": ""VUS_B"", ""index"": 5, ""label"": ""VUS B"", ""bucket"": 2, ""aliases"": [""US_B""], ""clinvar"": ""Uncertain significance""}, {""vg"": ""3"", ""key"": ""VUS_C"", ""index"": 6, ""label"": ""VUS C"", ""bucket"": 2, ""aliases"": [""US_C""], ""clinvar"": ""Uncertain significance""}, {""vg"": ""4"", ""key"": ""LP"", ""index"": 7, ""label"": ""Likely Pathogenic"", ""bucket"": 3, ""clinvar"": ""Likely pathogenic"", ""namespace"": ""acmg""}, {""vg"": ""5"", ""key"": ""P"", ""index"": 8, ""label"": ""Pathogenic"", ""bucket"": 3, ""clinvar"": ""Pathogenic"", ""namespace"": ""acmg""}, {""vg"": ""4"", ""key"": ""LO"", ""index"": 7, ""label"": ""Likely Oncogenic"", ""bucket"": 3, ""clinvar"": ""Likely oncogenic"", ""namespace"": ""horak""}, {""vg"": ""5"", ""key"": ""O"", ""index"": 8, ""label"": ""Oncogenic"", ""bucket"": 3, ""clinvar"": ""Oncogenic"", ""namespace"": ""horak""}, {""vg"": ""0"", ""key"": ""D"", ""index"": 9, ""label"": ""Drug Response"", ""bucket"": null, ""clinvar"": ""drug response"", ""namespace"": ""germline""}, {""vg"": ""0"", ""key"": ""R"", ""index"": 10, ""label"": ""Risk Factor"", ""bucket"": 4, ""clinvar"": ""risk factor"", ""namespace"": ""germline""}]",,HI,S,FALSE,formerly Clinical Significance,FALSE,,FALSE,2019-10-21 03:25:22.377726+00,2024-02-06 23:42:50.167267+00,FALSE,,public,FALSE,FALSE,
 horak:om1,FALSE,10000,OM1,"Located in a critical and well-established part of a functional domain (e.g., active site of an enzyme).",,,,CP,C,FALSE,Located in a critical and well-established part of a functional domain,FALSE,,FALSE,2023-11-14 01:57:08.942507+00,2024-02-06 23:42:50.132968+00,TRUE,PM,logged_in_users,TRUE,TRUE,
-horak:om2,FALSE,10000,OM2,"Protein length changes as a result of in-frame deletions/insertions in a known oncogene, or tumor suppressor gene or stop-loss variants in a known tumor suppressor gene.",,,,CP,C,FALSE,Protein length changes as a result of in-frame deletions/insertions ,FALSE,,FALSE,2023-11-14 01:57:08.943963+00,2024-02-06 23:42:50.134841+00,TRUE,PM,logged_in_users,TRUE,TRUE,
+horak:om2,FALSE,10000,OM2,"Protein length changes as a result of in-frame deletions/insertions in a known oncogene, or tumour suppressor gene or stop-loss variants in a known tumour suppressor gene.",,,,CP,C,FALSE,Protein length changes as a result of in-frame deletions/insertions ,FALSE,,FALSE,2023-11-14 01:57:08.943963+00,2024-02-06 23:42:50.134841+00,TRUE,PM,logged_in_users,TRUE,TRUE,
 horak:om3,FALSE,10000,OM3,Missense variant at an amino acid residue where a different missense variant determined to be oncogenic (using this standard) has been documented. Amino acid difference from reference amino acid should be greater or at least approximately the same as for missense change determined to be oncogenic.,,,,CP,C,FALSE,Missense change at an amino acid residue where a different missense change determined to be oncogenic has been documented,FALSE,,FALSE,2023-11-14 01:57:08.945444+00,2024-02-06 23:42:50.136536+00,TRUE,PM,logged_in_users,TRUE,TRUE,
 horak:om4,FALSE,10000,OM4,"Located in one of the hotspots in cancerhotspots.org with <50 samples with a somatic variant at the same amino acid position, and the same amino acid change count in cancerhotspots.org is at least 10.",,,,F,C,FALSE,Cancer hotspot with moderate frequency of recurrence,FALSE,,FALSE,2023-11-14 01:57:08.946874+00,2024-02-06 23:42:50.138282+00,TRUE,PM,logged_in_users,TRUE,TRUE,
-horak:op1,FALSE,10000,OP1,"All used lines of computational evidence support an oncogenic effect of a variant (conservation/evolutionary, splicing impact, etc.).",,,,CP,C,FALSE,All utilized lines of computational evidence support oncogenicity,FALSE,,FALSE,2023-11-14 01:57:08.948358+00,2024-02-06 23:42:50.139898+00,TRUE,PP,logged_in_users,TRUE,TRUE,
+horak:op1,FALSE,10000,OP1,"All used lines of computational evidence support an oncogenic effect of a variant (conservation/evolutionary, splicing impact, etc.).",,,,CP,C,FALSE,All utilised lines of computational evidence support oncogenicity,FALSE,,FALSE,2023-11-14 01:57:08.948358+00,2024-02-06 23:42:50.139898+00,TRUE,PP,logged_in_users,TRUE,TRUE,
 horak:op2,FALSE,10000,OP2,Somatic variant in a gene in a malignancy with a single genetic etiology. Example: retinoblastoma is caused by bi-allelic RB1 inactivation.,,,,CP,C,FALSE,Somatic variant in a gene in a malignancy with a single genetic etiology,FALSE,,FALSE,2023-11-14 01:57:08.949784+00,2024-02-06 23:42:50.141481+00,TRUE,PP,logged_in_users,TRUE,TRUE,
 horak:op3,FALSE,10000,OP3,Located in one of the hotspots in cancerhotspots.org and the particular amino acid change count in cancerhotspots.org is below 10.,,,,F,C,FALSE,Cancer hotspots with low frequency of recurrence,FALSE,,FALSE,2023-11-14 01:57:08.951251+00,2024-02-06 23:42:50.14303+00,TRUE,PP,logged_in_users,TRUE,TRUE,
 horak:op4,FALSE,10000,OP4,Absent from controls (or at an extremely low frequency) in Genome Aggregation Database (gnomAD).,,,,P,C,FALSE,Absent in population databases,FALSE,,FALSE,2023-11-14 01:57:08.952645+00,2024-02-06 23:42:50.144638+00,TRUE,PP,logged_in_users,TRUE,TRUE,
 horak:os1,FALSE,10000,OS1,Same amino acid change as a previously established oncogenic variant (using this standard) regardless of nucleotide change. Example: Val→Leu caused by either G>C or G>T in the same codon.,,,,CP,C,FALSE,Same amino acid change as a previously established oncogenic variant,FALSE,,FALSE,2023-11-14 01:57:08.93797+00,2024-02-06 23:42:50.151106+00,TRUE,PS,logged_in_users,TRUE,TRUE,
 horak:os2,FALSE,10000,OS2,"Well-established in vitro or in vivo functional studies, supportive of an oncogenic effect of the variant.",,,,F,C,FALSE,Well-established functional studies supportive of an oncogenic effect,FALSE,,FALSE,2023-11-14 01:57:08.939477+00,2024-02-06 23:42:50.152715+00,TRUE,PS,logged_in_users,TRUE,TRUE,
 horak:os3,FALSE,10000,OS3,"Located in one of the hotspots in cancerhotspots.org with at least 50 samples with a somatic variant at the same amino acid position, and the same amino acid change count in cancerhotspots.org in at least 10 samples.",,,,F,C,FALSE,Cancer hotspot with high frequency of recurrence,FALSE,,FALSE,2023-11-14 01:57:08.941037+00,2024-02-06 23:42:50.154287+00,TRUE,PS,logged_in_users,TRUE,TRUE,
-horak:ovs1,FALSE,10000,OVS1,"Null variant (nonsense, frameshift, canonical ±1 or 2 splice sites, initiation codon, single or multi-exon deletion) in a bona fide tumor suppressor gene.",,,,CP,C,FALSE,Null variant in tumor suppressor,FALSE,,FALSE,2023-11-14 01:57:08.934762+00,2024-02-06 23:42:50.155885+00,TRUE,PVS,logged_in_users,TRUE,TRUE,
-horak:sbp1,FALSE,10000,SBP1,"All used lines of computational evidence suggest no effect of a variant (conservation/evolutionary, splicing impact, etc.).",,,,CP,C,FALSE,All utilized lines of computational evidence suggest no impact of a variant,FALSE,,FALSE,2023-11-14 01:57:08.959269+00,2024-02-06 23:42:50.157435+00,TRUE,BS,logged_in_users,TRUE,TRUE,
-horak:sbp2,FALSE,10000,SBP2,A synonymous (silent) variant for which splicing prediction algorithms predict no effect on the splice consensus sequence nor the creation of a new splice site and the nucleotide is not highly conserved.,,,,CP,C,FALSE,Silent mutation (no predicted impact on splicing),FALSE,,FALSE,2023-11-14 01:57:08.960767+00,2024-02-06 23:42:50.15896+00,TRUE,BS,logged_in_users,TRUE,TRUE,
+horak:ovs1,FALSE,10000,OVS1,"Null variant (nonsense, frameshift, canonical ±1 or 2 splice sites, initiation codon, single or multi-exon deletion) in a bona fide tumour suppressor gene.",,,,CP,C,FALSE,Null variant in tumour suppressor,FALSE,,FALSE,2023-11-14 01:57:08.934762+00,2024-02-06 23:42:50.155885+00,TRUE,PVS,logged_in_users,TRUE,TRUE,
+horak:sbp1,FALSE,10000,SBP1,"All used lines of computational evidence suggest no effect of a variant (conservation/evolutionary, splicing impact, etc.).",,,,CP,C,FALSE,All utilised lines of computational evidence suggest no impact of a variant,FALSE,,FALSE,2023-11-14 01:57:08.959269+00,2024-02-06 23:42:50.157435+00,TRUE,BP,logged_in_users,TRUE,TRUE,
+horak:sbp2,FALSE,10000,SBP2,A synonymous (silent) variant for which splicing prediction algorithms predict no effect on the splice consensus sequence nor the creation of a new splice site and the nucleotide is not highly conserved.,,,,CP,C,FALSE,Silent mutation (no predicted impact on splicing),FALSE,,FALSE,2023-11-14 01:57:08.960767+00,2024-02-06 23:42:50.15896+00,TRUE,BP,logged_in_users,TRUE,TRUE,
 horak:sbs1,FALSE,10000,SBS1,"Minor allele frequency is >1% in Genome Aggregation Database (gnomAD) in any of 5 general continental populations: African, East Asian, European (Non-Finnish), Latino, and South Asian.",,,,P,C,FALSE,MAF >1%,FALSE,,FALSE,2023-11-14 01:57:08.955589+00,2024-02-06 23:42:50.160557+00,TRUE,BS,logged_in_users,TRUE,TRUE,
 horak:sbs2,FALSE,10000,SBS2,Well-established in vitro or in vivo functional studies show no oncogenic effects.,,,,F,C,FALSE,Well-established functional studies show no oncogenic effects,FALSE,,FALSE,2023-11-14 01:57:08.957108+00,2024-02-06 23:42:50.16213+00,TRUE,BS,logged_in_users,TRUE,TRUE,
 horak:sbvs1,FALSE,10000,SBVS1,"Minor allele frequency is >5% in Genome Aggregation Database (gnomAD) in any of 5 general continental populations: African, East Asian, European (Non-Finnish), Latino, and South Asian.",,,,P,C,FALSE,MAF >5%,FALSE,,FALSE,2023-11-14 01:57:08.954058+00,2024-02-06 23:42:50.163765+00,TRUE,BA,logged_in_users,TRUE,TRUE,
@@ -271,6 +271,8 @@ class Command(BaseCommand):
 
     def process_row(self, row: Series, backporting: bool):
         key = row["key"]
+        evidence_category = row["evidence_category"]
+
         e_key, exists = EvidenceKey.objects.get_or_create(pk=key, defaults={"evidence_category": EvidenceCategory.INTERPRETATION})
         if exists:
             print(f"Insertin {key}")
@@ -295,6 +297,7 @@ class Command(BaseCommand):
         # BACKPORT
         if backporting:
             if key.startswith("horak:"):
+                # horak codes need to be changed to regular selects instead of point based criteria
                 value_type = EvidenceKeyValueType.SELECT
                 default_ce = CE(default_crit_evaluation)
                 reference_values = list(BENIGN if default_ce in BENIGN else PATHOGENIC)
@@ -314,8 +317,11 @@ class Command(BaseCommand):
                         options.append(ce_as_option(reference_value, index=use_index, is_default=False))
                         use_index += 1
 
-            if key == "assertion_method":
+            if key == "assertion_method":  # don't want to risk backporting multiple assertion methods
                 value_type = EvidenceKeyValueType.SELECT
+
+            if evidence_category == "SC":  # somatic clinical evidence doesn't exist in old version
+                evidence_category = EvidenceCategory.INTERPRETATION
         # END BACKPORT
         else:
             # Forward port, provide evidence keys with newer properties
@@ -324,6 +330,7 @@ class Command(BaseCommand):
             e_key.crit_uses_points = row["crit_uses_points"]
             e_key.namespace_overrides = row["crit_uses_points"]
 
+        e_key.evidence_category = evidence_category
         e_key.value_type = value_type
         e_key.options = options
         e_key.save()
