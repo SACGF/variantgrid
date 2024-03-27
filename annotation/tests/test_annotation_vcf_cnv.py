@@ -21,8 +21,8 @@ from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_
 @override_settings(**get_fake_annotation_settings_dict(columns_version=3))
 class TestAnnotationVCFCNV(TestCase):
     TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
-    TEST_ANNOTATION_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_columns_version3_grch37_cnv.vep_annotated.vcf")
-    TEST_ANNOTATION_VCF_GRCH38 = os.path.join(TEST_DATA_DIR, "test_columns_version3_grch38_cnv.vep_annotated.vcf")
+    TEST_ANNOTATION_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_columns_version3_grch37_sv.vep_annotated.vcf")
+    TEST_ANNOTATION_VCF_GRCH38 = os.path.join(TEST_DATA_DIR, "test_columns_version3_grch38_sv.vep_annotated.vcf")
 
     @classmethod
     def setUpTestData(cls):
