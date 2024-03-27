@@ -6,10 +6,10 @@ from django.db import migrations
 _horak_data = [
     {
         "code": "OVS1",
-        "description": "Null variant (nonsense, frameshift, canonical ±1 or 2 splice sites, initiation codon, single or multi-exon deletion) in a bona fide tumor suppressor gene.",
+        "description": "Null variant (nonsense, frameshift, canonical ±1 or 2 splice sites, initiation codon, single or multi-exon deletion) in a bona fide tumour suppressor gene.",
         "evidence_category": "Predictive Data",
         "score": "8",
-        "sublabel": "Null variant in tumor suppressor"
+        "sublabel": "Null variant in tumour suppressor"
     },
     {
         "code": "OS1",
@@ -41,7 +41,7 @@ _horak_data = [
     },
     {
         "code": "OM2",
-        "description": "Protein length changes as a result of in-frame deletions/insertions in a known oncogene, or tumor suppressor gene or stop-loss variants in a known tumor suppressor gene.",
+        "description": "Protein length changes as a result of in-frame deletions/insertions in a known oncogene, or tumour suppressor gene or stop-loss variants in a known tumour suppressor gene.",
         "evidence_category": "Predictive Data",
         "score": "2",
         "sublabel": "Protein length changes as a result of in-frame deletions/insertions "
@@ -65,7 +65,7 @@ _horak_data = [
         "description": "All used lines of computational evidence support an oncogenic effect of a variant (conservation/evolutionary, splicing impact, etc.).",
         "evidence_category": "Computational Evidence",
         "score": "1",
-        "sublabel": "All utilized lines of computational evidence support oncogenicity"
+        "sublabel": "All utilised lines of computational evidence support oncogenicity"
     },
     {
         "code": "OP2",
@@ -114,7 +114,7 @@ _horak_data = [
         "description": "All used lines of computational evidence suggest no effect of a variant (conservation/evolutionary, splicing impact, etc.).",
         "evidence_category": "Computational Evidence",
         "score": "-1",
-        "sublabel": "All utilized lines of computational evidence suggest no impact of a variant"
+        "sublabel": "All utilised lines of computational evidence suggest no impact of a variant"
     },
     {
         "code": "SBP2",
@@ -138,7 +138,7 @@ _points_to_criteria = {
     -8: "BA",
     -4: "BS",
     -2: "BM",
-    -1: "BS",
+    -1: "BP",
      1: "PP",
      2: "PM",
      4: "PS",
