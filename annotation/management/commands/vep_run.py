@@ -53,8 +53,8 @@ class Command(BaseCommand):
                 vcf_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, f"{base_name}.vcf")
 
         if cnv:
-            pipeline_type = VariantAnnotationPipelineType.CNV
-            base_name += "_cnv"
+            pipeline_type = VariantAnnotationPipelineType.STRUCTURAL_VARIANT
+            base_name += "_sv"
         else:
             pipeline_type = VariantAnnotationPipelineType.STANDARD
 

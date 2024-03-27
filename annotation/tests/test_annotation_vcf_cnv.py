@@ -60,7 +60,7 @@ class TestAnnotationVCFCNV(TestCase):
         annotation_range_lock, _ = get_annotation_range_lock_and_unannotated_count(vav)
         annotation_range_lock.save()
         annotation_run = AnnotationRun.objects.create(annotation_range_lock=annotation_range_lock,
-                                                      pipeline_type=VariantAnnotationPipelineType.CNV,
+                                                      pipeline_type=VariantAnnotationPipelineType.STRUCTURAL_VARIANT,
                                                       vcf_annotated_filename=self.TEST_ANNOTATION_VCF_GRCH37)
         import_vcf_annotations(annotation_run, delete_temp_files=False, vep_version_check=False)
 
@@ -91,7 +91,7 @@ class TestAnnotationVCFCNV(TestCase):
         annotation_range_lock, _ = get_annotation_range_lock_and_unannotated_count(vav)
         annotation_range_lock.save()
         annotation_run = AnnotationRun.objects.create(annotation_range_lock=annotation_range_lock,
-                                                      pipeline_type=VariantAnnotationPipelineType.CNV,
+                                                      pipeline_type=VariantAnnotationPipelineType.STRUCTURAL_VARIANT,
                                                       vcf_annotated_filename=self.TEST_ANNOTATION_VCF_GRCH38)
         import_vcf_annotations(annotation_run, delete_temp_files=False, vep_version_check=False)
 

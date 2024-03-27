@@ -747,6 +747,8 @@ function applyVariantValues() {
                                         {% endlabelled %}
                                         {% labelled id='gnomad_sv_overlap_af' label='SV Overlap AF' help=annotation_description.gnomad_sv_overlap_af hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_af|format_unit_as_percent }}{% endlabelled %}
                                         {% labelled id='gnomad_sv_overlap_percent' label='SV Overlap %' help=annotation_description.gnomad_sv_overlap_percent hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_percent }}{% endlabelled %}
+                                        {% labelled id='gnomad_sv_overlap_coords' label='SV Coords' help=annotation_description.gnomad_sv_overlap_coords hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_coords }}{% endlabelled %}
+                                        {% labelled id='gnomad_sv_overlap_length' label='SV Length' help=annotation_description.gnomad_sv_overlap_length hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_length }}{% endlabelled %}
                                     {% endfor %}
                                 </div>
                             {% else %}

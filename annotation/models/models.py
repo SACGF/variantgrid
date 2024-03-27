@@ -36,7 +36,8 @@ from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAn
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
 from library.django_utils.django_partition import RelatedModelsPartitionModel
-from library.utils import invert_dict, name_from_filename, first
+from library.genomics import parse_gnomad_coord
+from library.utils import invert_dict, name_from_filename, first, all_equal
 from ontology.models import OntologyVersion
 from patients.models_enums import GnomADPopulation
 from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN, \
@@ -477,7 +478,10 @@ class ColumnVEPField(models.Model):
 
         vif = self.source_field
         if self.vep_custom and self.source_field_has_custom_prefix:
-            vif = self.get_vep_custom_display() + "_" + vif
+            if vif:
+                vif = self.get_vep_custom_display() + "_" + vif
+            else:
+                vif = self.get_vep_custom_display()  # Just the prefix - used eg to return ID in VEP custom VCFs
         return vif
 
     @cached_property
@@ -784,14 +788,16 @@ class AnnotationRun(TimeStampedModel):
     @staticmethod
     def get_for_variant(variant: Variant, genome_build) -> Optional['AnnotationRun']:
         if variant.is_symbolic:
-            pipeline_type = VariantAnnotationPipelineType.CNV
+            pipeline_type = VariantAnnotationPipelineType.STRUCTURAL_VARIANT
         else:
             pipeline_type = VariantAnnotationPipelineType.STANDARD
         # For newly created variants, there will only be one per build for latest annotation version
-        return AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=genome_build,
-                                            annotation_range_lock__min_variant__gte=variant.pk,
-                                            annotation_range_lock__max_variant__lte=variant.pk,
-                                            pipeline_type=pipeline_type).first()
+        ar: Optional[AnnotationRun]
+        ar = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=genome_build,
+                                          annotation_range_lock__min_variant__gte=variant.pk,
+                                          annotation_range_lock__max_variant__lte=variant.pk,
+                                          pipeline_type=pipeline_type).first()
+        return ar
 
     @property
     def variant_annotation_version(self):
@@ -842,7 +848,7 @@ class AnnotationRun(TimeStampedModel):
     def get_dump_filename(self) -> str:
         PIPELINE_TYPE = {
             VariantAnnotationPipelineType.STANDARD: "standard",
-            VariantAnnotationPipelineType.CNV: "cnv",
+            VariantAnnotationPipelineType.STRUCTURAL_VARIANT: "structural_variant",
         }
         type_desc = PIPELINE_TYPE.get(self.pipeline_type, str(self.pipeline_type))
         vcf_base_name = f"dump_{self.pk}_{type_desc}.vcf"
@@ -1005,7 +1011,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
     gnomad_sv_overlap_percent = models.TextField(null=True, blank=True)
     gnomad_sv_overlap_name = models.TextField(null=True, blank=True)
     gnomad_sv_overlap_coords = models.TextField(null=True, blank=True)
-    gnomad_sv_overlap_filters = models.TextField(null=True, blank=True)
+    # Can't use filters unfortunately due to VEP custom bug, @see https://github.com/Ensembl/ensembl-vep/issues/1646
+    # gnomad_sv_overlap_filters = models.TextField(null=True, blank=True)
 
     # From https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4267638/
     # "optimum cutoff value identified in the ROC analysis (0.6)"
@@ -1087,7 +1094,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
         'gnomad_sv_overlap_name',
         'gnomad_sv_overlap_percent',
         'gnomad_sv_overlap_coords',
-        'gnomad_sv_overlap_filters',
     ]
 
     ALOFT_FIELDS = {
@@ -1224,10 +1230,18 @@ class VariantAnnotation(AbstractVariantAnnotation):
                 list_values[field] = value.split("&")
 
         # Ensure they are all same length
-        first_field = fields[0]
+        first_field = next(iter(fields))
         first_field_len = len(list_values[first_field])
+        field_lengths = {}
         for field in fields:
-            assert first_field_len == len(list_values[field]), "all split multi-values are equal length"
+            field_lengths[field] = len(list_values[field])
+
+        if not all_equal(field_lengths.values()):
+            logging.error("All split VEP multi-values must be equal length")
+            for f, l in field_lengths.items():
+                logging.error("%s: %d", f, l)
+            raise ValueError(
+                f"All split multi-values must be equal length: {field_lengths}")
 
         records: list[dict] = []
         for i in range(first_field_len):
@@ -1250,7 +1264,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
             if self.version.gnomad.startswith("2.1"):
                 dataset = "gnomad_sv_r2_1"
                 remove_prefix = "gnomAD-SV_v2.1_"
-                gnomad_variant = name.replace("gnomAD-SV_v3_", "")
             elif self.version.gnomad.startswith("4"):
                 dataset = "gnomad_sv_r4"
                 remove_prefix = "gnomAD-SV_v3_"
@@ -1260,6 +1273,9 @@ class VariantAnnotation(AbstractVariantAnnotation):
                 gnomad_variant = gnomad_variant.replace(remove_prefix, "")
 
             sv_overlap['gnomad_sv_overlap_url'] = self.get_gnomad_url(gnomad_variant, dataset)
+            if coords := sv_overlap.get("gnomad_sv_overlap_coords"):
+                chrom, start, end = parse_gnomad_coord(coords)
+                sv_overlap['gnomad_sv_overlap_length'] = end - start
 
             sv_overlap_list.append(sv_overlap)
         return sv_overlap_list

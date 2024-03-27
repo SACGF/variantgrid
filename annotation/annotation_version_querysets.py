@@ -54,7 +54,7 @@ def get_unannotated_variants_qs(annotation_version, pipeline_type=None, min_vari
     if pipeline_type:
         if pipeline_type == VariantAnnotationPipelineType.STANDARD:
             q_filters.append(~q_symbolic)
-        elif pipeline_type == VariantAnnotationPipelineType.CNV:
+        elif pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
             q_filters.append(q_symbolic)
         else:
             raise ValueError(f"Unrecognised {pipeline_type=}")

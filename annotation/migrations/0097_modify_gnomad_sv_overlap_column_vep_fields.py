@@ -24,7 +24,9 @@ def _modify_gnomad_sv_overlap_column_vep_fields(apps, _schema_editor):
                                                                                          source_field=source_field_replace_func,
                                                                                          source_field_has_custom_prefix=True)
     SV_OVERLAP_NAME = "gnomad_sv_overlap_name"  # This has to go to VEP_CUSTOM_GNOMAD_SV_NAME
-    ColumnVEPField.objects.filter(variant_grid_column=SV_OVERLAP_NAME).update(vep_custom=VEP_CUSTOM_GNOMAD_SV_NAME)
+    ColumnVEPField.objects.filter(variant_grid_column=SV_OVERLAP_NAME).update(vep_custom=VEP_CUSTOM_GNOMAD_SV_NAME,
+                                                                              source_field='gnomAD_SV_name',
+                                                                              source_field_has_custom_prefix=False)
 
     # This is now a calculated field from coords
     ColumnVEPField.objects.filter(variant_grid_column="gnomad_sv_overlap_percent").update(source_field='')
@@ -37,9 +39,6 @@ def _modify_gnomad_sv_overlap_column_vep_fields(apps, _schema_editor):
         {'column': 'gnomad_sv_overlap_coords', 'variant_grid_column_id': 'gnomad_sv_overlap_coords',
          'pipeline_type': VARIANT_ANNOTATION_PIPELINE_TYPE_CNV, 'category': FREQUENCY_DATA,
          'source_field': '', 'vep_custom': VEP_CUSTOM_GNOMAD_SV, 'source_field_has_custom_prefix': True},
-        {'column': 'gnomad_sv_overlap_filters', 'variant_grid_column_id': 'gnomad_sv_overlap_filters',
-         'pipeline_type': VARIANT_ANNOTATION_PIPELINE_TYPE_CNV, 'category': FREQUENCY_DATA,
-         'source_field': 'FILTER', 'vep_custom': VEP_CUSTOM_GNOMAD_SV, 'source_field_has_custom_prefix': True},
     ]
 
     bulk_insert_class_data(apps, "annotation", [("ColumnVEPField", COLUMN_VEP_FIELD)])

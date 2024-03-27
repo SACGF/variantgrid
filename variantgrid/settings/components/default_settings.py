@@ -243,8 +243,8 @@ ANNOTATION = {
             "dbscsnv": "annotation_data/GRCh37/dbscSNV1.1_GRCh37.txt.gz",
             "gnomad2": "annotation_data/GRCh37/gnomad2.1.1_GRCh37_combined_af.vcf.bgz",
             # We use gnomAD SV VCF with --custom twice
-            "gnomad_sv": "annotation_data/GRCh37/gnomad_v2.1_sv.sites.grch37.converted.vcf.gz",
-            "gnomad_sv_name": "annotation_data/GRCh37/gnomad_v2.1_sv.sites.grch37.converted.vcf.gz",
+            "gnomad_sv": "annotation_data/GRCh37/gnomad_v2.1_sv.sites.grch37.converted.no_filters.vcf.gz",
+            "gnomad_sv_name": "annotation_data/GRCh37/gnomad_v2.1_sv.sites.grch37.converted.no_filters.vcf.gz",
             "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz"),
             "mastermind": "annotation_data/GRCh37/mastermind_cited_variants_reference-2022.04.02-grch37.vcf.gz",
             "mave": None,  # n/a for GRCh37
@@ -283,8 +283,8 @@ ANNOTATION = {
             "gnomad3": "annotation_data/GRCh38/gnomad3.1_GRCh38_merged.vcf.bgz",
             "gnomad4": "annotation_data/GRCh38/gnomad4.0_GRCh38_combined_af.vcf.bgz",
             # We use gnomAD SV VCF with --custom twice
-            "gnomad_sv": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.vcf.gz",
-            "gnomad_sv_name": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.vcf.gz",
+            "gnomad_sv": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.no_filters.vcf.gz",
+            "gnomad_sv_name": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.no_filters.vcf.gz",
             "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2022.04.02-grch38.vcf.gz",
             "mave": "annotation_data/GRCh38/MaveDB_variants.tsv.gz",
             "maxentscan": "annotation_data/all_builds/maxentscan",

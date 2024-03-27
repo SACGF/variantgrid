@@ -66,7 +66,7 @@ class ClinGenClassification(models.TextChoices):
 class VariantAnnotationPipelineType(models.TextChoices):
     """ We have standard long and short  """
     STANDARD = "S", "Standard Short Variant"
-    CNV = "C", "CNV"
+    STRUCTURAL_VARIANT = "C", "Structural Variant"
 
 
 class VariantClass(models.TextChoices):
