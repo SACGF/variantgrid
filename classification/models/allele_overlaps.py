@@ -164,6 +164,7 @@ class ClinicalGroupingOverlap:
         pending_clin_sig = self.calculator_state.pending_change_clin_sig(cm)
         group = ClassificationLabSummaryEntry(
             lab=cm.classification.lab,
+            allele_origin_bucket=cm.classification.allele_origin_bucket,
             clinical_significance_from=clinical_sig,
             clinical_significance_to=pending_clin_sig or clinical_sig,  # FIXME, check flags for pending
             somatic_clinical_significance=cm.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE),

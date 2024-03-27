@@ -1,13 +1,14 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from classification.enums import SpecialEKeys
+from classification.enums import SpecialEKeys, AlleleOriginBucket
 from snpdb.models import Lab
 
 
 @dataclass(frozen=True)
 class ClassificationLabSummaryEntry:
     lab: Lab
+    allele_origin_bucket: AlleleOriginBucket
     clinical_significance_from: str
     clinical_significance_to: str
     somatic_clinical_significance: str
@@ -20,6 +21,10 @@ class ClassificationLabSummary:
     group: ClassificationLabSummaryEntry
     is_internal: bool
     count: int
+
+    @property
+    def allele_origin_bucket(self):
+        return self.group.allele_origin_bucket
 
     @property
     def embedded(self):

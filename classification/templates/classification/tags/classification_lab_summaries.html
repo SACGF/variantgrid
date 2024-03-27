@@ -13,7 +13,7 @@
             </div>
             <div class="col-5 w-100 d-flex">
                 {% if lab_summ.clinical_significance_from or lab_summ.clinical_significance_to %}
-                    <div class="flex-grow-1 d-inline-block py-2 c-pill cs cs-{{ lab_summ.clinical_significance_to }}" style="flex-basis: 0">
+                    <div title="Classification" class="flex-grow-1 d-inline-block py-2 c-pill cs cs-{{ lab_summ.clinical_significance_to }}" style="flex-basis: 0">
                         {% if lab_summ.changed %}
                             <del>{{ lab_summ.clinical_significance_from|ekey:'clinical_significance' }}</del> <i class="fas fa-arrow-right mx-2 text-secondary"></i>
                             <span style="font-weight:600">{{ lab_summ.clinical_significance_to|ekey:'clinical_significance' }}</span>
@@ -29,9 +29,11 @@
                         <span>&nbsp;</span>
                     {% endif %}
                 {% endif %}
-                {% if lab_summ.somatic_clinical_significance %}
-                    <div class="flex-grow-1 d-inline-block py-2 c-pill scs scs-{{ lab_summ.somatic_clinical_significance }}" style="flex-basis: 0">
-                        {{ lab_summ.somatic_clinical_significance|ekey:'somatic:clinical_significance' }}
+                {% if lab_summ.somatic_clinical_significance or lab_summ.allele_origin_bucket == "S" %}
+                    <div title="Somatic Clinical Significance" class="flex-grow-1 d-inline-block py-2 c-pill scs scs-{{ lab_summ.somatic_clinical_significance }}" style="flex-basis: 0">
+                        {% if not lab_summ.somatic_clinical_significance %}<span class="no-value">No Data</span>
+                        {% else %}{{ lab_summ.somatic_clinical_significance|ekey:'somatic:clinical_significance' }}
+                        {% endif %}
                         {% if lab_summ.amp_level %}<span class="amp-level">{{ lab_summ.amp_level }}</span>{% endif %}
                     </div>
                 {% endif %}

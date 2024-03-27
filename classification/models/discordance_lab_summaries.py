@@ -59,6 +59,7 @@ class DiscordanceLabSummary(ClassificationLabSummary):
 
             group_counts[ClassificationLabSummaryEntry(
                 lab=drc.classification_original.classification.lab,
+                allele_origin_bucket=discordance_report.clinical_context.allele_origin_bucket,
                 clinical_significance_from=clinical_significance_from,
                 clinical_significance_to=clinical_significance_to,
                 somatic_clinical_significance=drc.classification_original.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE),
@@ -87,9 +88,11 @@ class DiscordanceLabSummary(ClassificationLabSummary):
 
         if triage_by_lab:
             # there are some triages for purely withdrawn labs
+            all_triaged = []
             for dl in with_triages:
                 if not dl.triage:
                     dl = dl._with_triage(triage_by_lab.pop(dl.lab, None))
-                with_triages.append(dl)
+                all_triaged.append(dl)
+            with_triages = all_triaged
 
         return with_triages
