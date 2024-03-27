@@ -1,0 +1,15 @@
+We report overlaps against gnomAD Structural Variants that:
+
+<ul>
+    <li>Overlap >= 80% with our SV
+    <li>Have no FILTERS (there were too many extremely large artifacts that overlapped with everything)
+    <li>Have the same "type" (ie del for a del, inv for an inv)
+</ul>
+
+<p>
+You can view all overlaps by selecting "Show Structural Variant Overlaps"
+</p>
+
+<p>
+If there are multiple overlapping gnomAD records, we assign the one with the lowest allele frequency to the gnomAD values (gnomad_af, allele count) etc - it is this which will be used for filtering in an analysis.
+</p>

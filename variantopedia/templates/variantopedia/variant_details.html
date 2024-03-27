@@ -743,12 +743,10 @@ function applyVariantValues() {
                                     {% for sv_overlap in variant_annotation.gnomad_sv_overlap %}
                                         {% labelled id='gnomad_sv_overlap_name' label='SV Overlap Name' help=annotation_description.gnomad_sv_overlap_name hint="tiny" value_css="text-monospace" %}
                                             <a target='_blank' class="hover-link" href='{{ sv_overlap.gnomad_sv_overlap_url }}'>{{ sv_overlap.gnomad_sv_overlap_name }}</a>
-
                                         {% endlabelled %}
+                                        {% labelled id='gnomad_sv_overlap_coords' label='SV Coords' help=annotation_description.gnomad_sv_overlap_coords hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_coords }} ({{ sv_overlap.gnomad_sv_overlap_length }}bp){% endlabelled %}
                                         {% labelled id='gnomad_sv_overlap_af' label='SV Overlap AF' help=annotation_description.gnomad_sv_overlap_af hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_af|format_unit_as_percent }}{% endlabelled %}
                                         {% labelled id='gnomad_sv_overlap_percent' label='SV Overlap %' help=annotation_description.gnomad_sv_overlap_percent hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_percent }}{% endlabelled %}
-                                        {% labelled id='gnomad_sv_overlap_coords' label='SV Coords' help=annotation_description.gnomad_sv_overlap_coords hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_coords }}{% endlabelled %}
-                                        {% labelled id='gnomad_sv_overlap_length' label='SV Length' help=annotation_description.gnomad_sv_overlap_length hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_length }}{% endlabelled %}
                                     {% endfor %}
                                 </div>
                             {% else %}
@@ -780,6 +778,9 @@ function applyVariantValues() {
                             </div>
                         {% else %}
                             {% labelled id='gnomad_none' label='gnomAD' hint="tiny" %}No gnomAD entry{% endlabelled %}
+                        {% endif %}
+                        {% if variant_annotation.annotation_run.pipeline_type == 'C' %}
+                            {% page_help page_id="variantdetails/sv_gnomad_help" title="gnomAD Structural Variants" %}
                         {% endif %}
                     </div>
                 </div>
