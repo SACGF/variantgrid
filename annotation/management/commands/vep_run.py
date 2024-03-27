@@ -20,12 +20,12 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--test', action='store_true')
-        parser.add_argument('--cnv', action='store_true')
+        parser.add_argument('--sv', action='store_true')
         parser.add_argument('--genome-build', required=True)
 
     def handle(self, *args, **options):
         test = options["test"]
-        cnv = options["cnv"]
+        sv = options["sv"]
         build_name = options["genome_build"]
         genome_build = GenomeBuild.get_name_or_alias(build_name)
         vc = VEPConfig(genome_build)
@@ -34,7 +34,7 @@ class Command(BaseCommand):
             print("Re-generating VCF for unit test")
             vep_suffix = "vep_annotated"
             test_vcf_filename = f"test_{genome_build.name.lower()}"
-            if cnv:
+            if sv:
                 test_vcf_filename += "_symbolic_alt"
             unit_test_dir = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
             vcf_filename = os.path.join(unit_test_dir, f"{test_vcf_filename}.vcf")
@@ -52,7 +52,7 @@ class Command(BaseCommand):
                 base_name = "test"  # "dump_small"
                 vcf_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, f"{base_name}.vcf")
 
-        if cnv:
+        if sv:
             pipeline_type = VariantAnnotationPipelineType.STRUCTURAL_VARIANT
             base_name += "_sv"
         else:
