@@ -84,4 +84,9 @@ nav.navbar a.nav-link.active {
   content: "Shariant";
 }
 
+#allele-origin-toggle .btn-group .allele-origin-A.active {
+  color: #fff;
+  background-color: #1b75bc !important;
+}
+
 /*# sourceMappingURL=branding.css.map */

@@ -85,3 +85,10 @@ nav.navbar a.nav-link {
 #site-name::after {
     content: "Shariant Demo"
 }
+
+#allele-origin-toggle .btn-group {
+    .allele-origin-A.active {
+        color: #fff;
+        background-color: rgb(27, 117, 188) !important;
+    }
+}
