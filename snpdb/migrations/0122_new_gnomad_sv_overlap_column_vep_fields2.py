@@ -5,7 +5,7 @@ from django.db.models import Max, F
 
 from library.django_utils import bulk_insert_class_data
 
-_NEW_SV_COLUMNS = ["gnomad_sv_overlap_coords", "gnomad_sv_overlap_filters"]
+_NEW_SV_COLUMNS = ["gnomad_sv_overlap_coords"]
 
 
 def _new_gnomad_sv_columns2(apps, _schema_editor):
@@ -19,14 +19,6 @@ def _new_gnomad_sv_columns2(apps, _schema_editor):
          'label': 'gnomAD SV coords',
          'model_field': True,
          'queryset_field': True},
-
-        {'grid_column_name': 'gnomad_sv_overlap_filters',
-         'variant_column': 'variantannotation__gnomad_sv_overlap_filters',
-         'annotation_level': VARIANT_LEVEL,
-         'width': None,
-         'label': 'gnomAD SV overlap filters',
-         'model_field': True,
-         'queryset_field': True},
     ]
 
     NEW_COLUMN_VCF_INFO = [
@@ -35,11 +27,6 @@ def _new_gnomad_sv_columns2(apps, _schema_editor):
          'number': 1,
          'type': 'S',
          'description': 'gnomAD SV (StructuralVariantOverlap): coordinates'},
-        {'info_id': 'SV_overlap_FILTER',
-         'column_id': 'gnomad_sv_overlap_filters',
-         'number': 1,
-         'type': 'S',
-         'description': 'gnomAD SV (StructuralVariantOverlap): filters'},
     ]
 
     bulk_insert_class_data(apps, "snpdb", [("VariantGridColumn", NEW_VARIANT_GRID_COLUMNS)])
@@ -69,7 +56,6 @@ def _reverse_new_gnomad_sv_columns2(apps, _schema_editor):
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
 
     VariantGridColumn.objects.filter(grid_column_name__in=_NEW_SV_COLUMNS).delete()
-
 
 
 class Migration(migrations.Migration):
