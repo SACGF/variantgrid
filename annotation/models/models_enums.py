@@ -66,7 +66,7 @@ class ClinGenClassification(models.TextChoices):
 class VariantAnnotationPipelineType(models.TextChoices):
     """ We have standard long and short  """
     STANDARD = "S", "Standard Short Variant"
-    CNV = "C", "CNV"
+    STRUCTURAL_VARIANT = "C", "Structural Variant"
 
 
 class VariantClass(models.TextChoices):
@@ -133,13 +133,15 @@ class VEPPlugin(models.TextChoices):
     NMD = "N", 'NMD'
     SPLICEAI = 'a', 'SpliceAI'
     SPLICEREGION = 's', 'SpliceRegion'
-    STRUCTURALVARIANTOVERLAP = 'o', 'StructuralVariantOverlap'
 
 
 class VEPCustom(models.TextChoices):
     GNOMAD_2 = 'g', 'gnomAD2'
     GNOMAD_3 = 'n', 'gnomAD3'
     GNOMAD_4 = 'o', 'gnomAD4'
+    # We split GNOMAD_SV into 2, as we need to call custom twice
+    GNOMAD_SV = 'S', 'gnomAD_SV'
+    GNOMAD_SV_NAME = 'N', 'gnomAD_SV_name'
     PHASTCONS_100_WAY = '1', 'phastCons100way'
     PHASTCONS_30_WAY = '2', 'phastCons30way'
     PHASTCONS_46_WAY = '3', 'phastCons46way'

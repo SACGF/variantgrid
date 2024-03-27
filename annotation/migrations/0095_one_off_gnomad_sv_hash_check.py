@@ -11,26 +11,30 @@ from manual.operations.manual_operations import ManualOperation
 def _structuralvariantoverlap_hash_check(apps):
     """ Return True if file hash is different """
 
-    try:
-        sv_basename = settings.ANNOTATION['GRCh37']['vep_config']["structuralvariantoverlap"]
-        sv_filename = os.path.join(settings.ANNOTATION_VEP_BASE_DIR, sv_basename)
-        print(f"Checking hash of '{sv_filename}'")
-        sv_hash = file_md5sum(sv_filename)
+    # We renamed the setting in 0097 switching from plugin -> custom VCF
+    SV_SETTINGS = ["structuralvariantoverlap", "gnomad_sv"]
 
-        if sv_hash != "9dc41830054485b22026bb0a784b75b4":
-            return True
-    except KeyError:
-        pass
+    for sv_setting_name in SV_SETTINGS:
+        try:
+            sv_basename = settings.ANNOTATION['GRCh37']['vep_config'][sv_setting_name]
+            sv_filename = os.path.join(settings.ANNOTATION_VEP_BASE_DIR, sv_basename)
+            print(f"Checking hash of '{sv_filename}'")
+            sv_hash = file_md5sum(sv_filename)
 
-    try:
-        sv_basename = settings.ANNOTATION['GRCh38']['vep_config']["structuralvariantoverlap"]
-        sv_filename = os.path.join(settings.ANNOTATION_VEP_BASE_DIR, sv_basename)
-        print(f"Checking hash of '{sv_filename}'")
-        sv_hash = file_md5sum(sv_filename)
-        if sv_hash != "35ce9d990015e208e0d2883175ffddc8":
-            return True
-    except KeyError:
-        pass
+            if sv_hash != "ab22ddfbd6b33a0b9faf56cc0e01c8e1":
+                return True
+        except KeyError:
+            pass
+
+        try:
+            sv_basename = settings.ANNOTATION['GRCh38']['vep_config'][sv_setting_name]
+            sv_filename = os.path.join(settings.ANNOTATION_VEP_BASE_DIR, sv_basename)
+            print(f"Checking hash of '{sv_filename}'")
+            sv_hash = file_md5sum(sv_filename)
+            if sv_hash != "ac2ae9a09bee5a7a66ab532d838a2b2e":
+                return True
+        except KeyError:
+            pass
 
     return False
 

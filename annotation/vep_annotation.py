@@ -46,8 +46,29 @@ def _get_dbnsfp_plugin_command(genome_build: GenomeBuild, vc: VEPConfig):
 def _get_custom_params_list(fields, prefix, data_path) -> list:
     extension = get_extension_without_gzip(data_path)
 
-    if extension == 'vcf':
-        joined_columns = ",".join(fields)
+    fields = [f for f in fields if f]  # Strip empty/falsey
+
+    if prefix in ["gnomAD_SV", "gnomAD_SV_name"]:
+        delimiter = "%"
+        overlap_cutoff = str(int(100 * settings.ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION))
+
+        params = {
+            "file": data_path,
+            "short_name": prefix,
+            "format": 'vcf',
+            "type": "overlap",
+            "overlap_cutoff": overlap_cutoff,
+            "same_type": "1",
+        }
+        # gnomad_sv_name doesn't have any fields
+        if prefix == "gnomAD_SV":
+            params["fields"] = delimiter.join(fields)
+            params["coords"] = "1"
+
+        command = ",".join([f"{k}={v}" for k, v in params.items()])
+    elif extension == 'vcf':
+        delimiter = ","
+        joined_columns = delimiter.join(fields)
         command = f"{data_path},{prefix},vcf,exact,0,{joined_columns}"
     else:
         try:
@@ -148,50 +169,26 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
                 VEPPlugin.MAVEDB: lambda: f"MaveDB,file={vc['mave']},single_aminoacid_changes=0,transcript_match=0 ",
             })
 
-        # Custom
-        for vep_custom, prefix in dict(VEPCustom.choices).items():
-            try:
-                q = ColumnVEPField.get_columns_version_q(vc.columns_version)
-                if fields := ColumnVEPField.get_source_fields(genome_build, q, vep_custom=vep_custom):
-                    prefix_lc = prefix.lower()
-                    if cfg := vc[prefix_lc]:  # annotation settings are lower case
-                        cmd.extend(_get_custom_params_list(fields, prefix, cfg))
-                    else:
-                        logging.info("Skipping due to settings.ANNOTATION[%s][vep_config][%s] = None",
-                                     genome_build.name, prefix_lc)
-            except Exception as e:
-                logging.warning(e)
-                # Not all annotations available for all builds - ok to just warn
-                logging.warning("Skipped custom annotation: %s", prefix)
-
     else:
-        # TODO: Need to decide on overlap criteria
-        # percentage : percentage overlap between SVs (default: 80)
-        # reciprocal : calculate reciprocal overlap, options: 0 or 1. (default: 0)
-        # (overlap is expressed as % of input SV by default)
-        # cols : colon delimited list of data types to return from the INFO fields (only AF by default)
-        # same_type : 1/0 only report SV of the same type (eg deletions for deletions, off by default)
-        # distance : the distance the ends of the overlapping SVs should be within.
-        # match_type : only report reference SV which lie within or completely surround the input SV
-        # options: within, surrounding
+        plugin_data_func = {}  # No plugins for SVs
 
-        # We'd like to use "same_type=1" but there is a bug:
-        # StructuralVariantOverlap skips all INV matches when same_type=1 used
-        # @see https://github.com/Ensembl/VEP_plugins/issues/710
-        # So we will post-process the annotated VCF in BulkVEPVCFAnnotationInserter._process_structural_variant_data
 
-        SV_CALCULATED_FIELDS = {"PC", "name"}  # Not passed in via cols=
-        sv_cols = []
-        for source_field in ColumnVEPField.get_source_fields(genome_build, vep_plugin=VEPPlugin.STRUCTURALVARIANTOVERLAP):
-            info_field = source_field.replace("SV_overlap_", "")
-            if info_field not in SV_CALCULATED_FIELDS:
-                sv_cols.append(info_field)
-        sv_cols = ":".join(sv_cols)
-        sv_overlap_args = f"StructuralVariantOverlap,file={vc['structuralvariantoverlap']},cols={sv_cols}"
+    # Custom
+    for vep_custom, prefix in dict(VEPCustom.choices).items():
+        try:
+            q = ColumnVEPField.get_q(genome_build, vc.columns_version, pipeline_type)
+            if fields := ColumnVEPField.get_source_fields(genome_build, q, vep_custom=vep_custom):
+                prefix_lc = prefix.lower()
+                if cfg := vc[prefix_lc]:  # annotation settings are lower case
+                    cmd.extend(_get_custom_params_list(fields, prefix, cfg))
+                else:
+                    logging.info("Skipping due to settings.ANNOTATION[%s][vep_config][%s] = None",
+                                 genome_build.name, prefix_lc)
+        except Exception as e:
+            logging.warning(e)
+            # Not all annotations available for all builds - ok to just warn
+            logging.warning("Skipped custom annotation: %s", prefix)
 
-        plugin_data_func = {
-            VEPPlugin.STRUCTURALVARIANTOVERLAP: lambda: sv_overlap_args,
-        }
 
     for vep_plugin, plugin_arg_func in plugin_data_func.items():
         try:

@@ -1,5 +1,6 @@
 import logging
 import operator
+import re
 import shutil
 from collections import defaultdict
 from functools import cached_property
@@ -13,13 +14,14 @@ from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction
 from annotation.models.models import ColumnVEPField, VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap, AnnotationRun
-from annotation.models.models_enums import VariantClass, VariantAnnotationPipelineType, VEPPlugin
+from annotation.models.models_enums import VariantClass, VariantAnnotationPipelineType, VEPCustom
 from annotation.vep_annotation import VEPConfig
 from genes.hgvs import HGVSMatcher, HGVSException
 from genes.models import TranscriptVersion, GeneVersion
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import get_model_fields
 from library.django_utils.django_file_utils import get_import_processing_filename, get_import_processing_dir
+from library.genomics import overlap_fraction, Range, parse_gnomad_coord
 from library.log_utils import log_traceback
 from library.utils import invert_dict
 from snpdb.models import GenomeBuild, VariantCoordinate
@@ -126,7 +128,7 @@ class BulkVEPVCFAnnotationInserter:
         self.hgvs_matcher = HGVSMatcher(annotation_run.genome_build)
 
         sv_overlap_processor = None
-        if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.CNV:
+        if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
             sv_overlap_processor = SVOverlapProcessor(cvf_qs)
         self.sv_overlap_processor = sv_overlap_processor
 
@@ -227,8 +229,9 @@ class BulkVEPVCFAnnotationInserter:
                     prefix = cvf.get_vep_custom_display()
                     setting_key = prefix.lower()
                     _ = self.vep_config[setting_key]  # May throw exception if not setup
-                    if cvf.source_field_has_custom_prefix:
-                        self.ignored_vep_fields.append(prefix)
+                    # VEP custom often adds a column of just the prefix which we often don't use
+                    #if cvf.source_field_has_custom_prefix:
+                    #    self.ignored_vep_fields.append(prefix)
 
                 self.source_field_to_columns[cvf.vep_info_field].add(cvf.variant_grid_column_id)
                 # logging.info("Handling column %s => %s", cvf.vep_info_field, cvf.variant_grid_column_id)
@@ -419,9 +422,10 @@ class BulkVEPVCFAnnotationInserter:
         self._add_calculated_maxentscan(transcript_data)
         self._add_hgvs(variant_coordinate, transcript_data)
 
-    def add_calculated_variant_annotation_columns(self, transcript_data):
+    def add_calculated_variant_annotation_columns(self, variant_coordinate, transcript_data):
         self._add_calculated_num_predictions(transcript_data)
         self._add_hemi_count(transcript_data)
+        self._calculate_gnomad_sv_overlap_percentage(variant_coordinate, transcript_data)
 
     def _add_calculated_num_predictions(self, transcript_data):
         num_pathogenic = 0
@@ -440,6 +444,21 @@ class BulkVEPVCFAnnotationInserter:
         """ gnomad_non_par=True means not on pseudoautosomal region on chrX, so XY count = hemizygous """
         if transcript_data.get("gnomad_non_par"):
             transcript_data["gnomad_hemi_count"] = transcript_data.get("gnomad_xy_ac")
+
+    def _calculate_gnomad_sv_overlap_percentage(self, variant_coordinate, transcript_data):
+        SV_PC_FIELD = "gnomad_sv_overlap_percent"
+
+        # These are currently coordinates that look like eg: chr17:42853981-43253980&chr17:43048298-43898190
+        if orig_gnomad_sv_overlap_percent := transcript_data.get(SV_PC_FIELD):
+            gnomad_sv_overlap_percent_list = []
+
+            for coord in orig_gnomad_sv_overlap_percent.split(VEP_SEPARATOR):
+                chrom, start, end = parse_gnomad_coord(coord)
+                of = overlap_fraction(Range(variant_coordinate.position, variant_coordinate.end),
+                                      Range(start, end))
+                gnomad_sv_overlap_percent_list.append(int(of * 100))
+
+            transcript_data[SV_PC_FIELD] = VEP_SEPARATOR.join([str(p) for p in gnomad_sv_overlap_percent_list])
 
     @staticmethod
     def _add_calculated_maxentscan(transcript_data):
@@ -537,7 +556,7 @@ class BulkVEPVCFAnnotationInserter:
                 if representative_transcript:
                     variant_data = self.vep_to_db_dict(vep_transcript_data, self.variant_only_columns)
                     variant_data.update(transcript_data)
-                    self.add_calculated_variant_annotation_columns(variant_data)
+                    self.add_calculated_variant_annotation_columns(variant_coordinate, variant_data)
                     # If we're using custom COSMIC vcf, merge with those from VEP existing variation
                     if custom_vcf_cosmic_ids := vep_transcript_data.get("COSMIC"):
                         self._merge_cosmic_ids(variant_data, custom_vcf_cosmic_ids)
@@ -759,7 +778,7 @@ def format_canonical(value) -> bool:
 
 class SVOverlapProcessor:
     def __init__(self, cvf_qs: QuerySet[ColumnVEPField]):
-        cvf_qs = cvf_qs.filter(vep_plugin=VEPPlugin.STRUCTURALVARIANTOVERLAP)
+        cvf_qs = cvf_qs.filter(vep_custom__in=[VEPCustom.GNOMAD_SV, VEPCustom.GNOMAD_SV_NAME])
         self.sv_fields = set(cvf_qs.values_list("variant_grid_column_id", flat=True))
 
     @staticmethod
