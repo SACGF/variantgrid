@@ -484,6 +484,9 @@ function applyVariantValues() {
             <div class="card-body">
                 {% labelled id="g-hgvs" label="g.HGVS" value_css="variant-coordinate variant_coordinate" %}{% c_hgvs g_hgvs %}{% endlabelled %}
                 {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
+                {% if variant.svlen %}
+                    {% labelled label="SVLEN" help="Structural Variant Length - Difference in length between REF and ALT alleles" %}{{ variant.svlen }}{% endlabelled %}
+                {% endif %}
                 {% labelled label="Genome Build" %}{{ genome_build }}{% endlabelled %}
                 {% if variant.can_have_c_hgvs and variant_show_canonical_hgvs %}
                     {% labelled id="variant-canonical-c-hgvs" label="Canonical c.HGVS" %}Loading...{% endlabelled %}
@@ -596,6 +599,12 @@ function applyVariantValues() {
         </div>
     </div>
 
+    {% if variant_annotation.annotation_run.pipeline_type == 'C' %}
+    <div id="sv-annotation-help-info" class="container">
+        {% page_help page_id="variantdetails/sv_annotation_help" title="Structural Variant Annotation Differences" %}
+    </div>
+    {% endif %}
+
     <div id="transcript-info" class="container">
         <div class="row equal">
 
@@ -613,6 +622,7 @@ function applyVariantValues() {
                 </div>
             </div>
 
+            {% if variant_annotation.has_sequence_and_domains %}
             <div class="col-md-6 mt-4">
                 <div class="card">
                     <div class="card-header">Sequence and Domain</div>
@@ -623,7 +633,9 @@ function applyVariantValues() {
                     </div>
                 </div>
             </div>
+            {% endif %}
 
+            {% if variant_annotation.has_pathogenicity %}
             <div class="col-md-6 mt-4">
                 <div class="card">
                     <div class="card-header">Pathogenicity</div>
@@ -671,7 +683,9 @@ function applyVariantValues() {
                     </div>
                 </div>
             </div>
+            {% endif %}
 
+            {% if variant_annotation.has_conservation %}
             <div class="col-md-6 mt-4">
                 <div class="card">
                     <div class="card-header">Conservation</div>
@@ -694,22 +708,25 @@ function applyVariantValues() {
                     </div>
                 </div>
             </div>
+            {% endif %}
 
             <div class="col-md-6 mt-4">
                 <div class="card">
                     <div class="card-header">Population Frequency</div>
                     <div class="card-body">
+                    {% if variant_annotation.has_non_gnomad_population_frequency %}
                         {% labelled id='af_1kg' label='1000 genomes' help=annotation_description.af_1kg hint="tiny" value_css="text-monospace" %}{{ variant_annotation.af_1kg|format_unit_as_percent }}{% endlabelled %}
                         {% labelled id='af_uk10k' label='UK10K' help=annotation_description.af_uk10k hint="tiny" value_css="text-monospace" %}{{ variant_annotation.af_uk10k|format_unit_as_percent }}{% endlabelled %}
                         {% labelled id='topmed_af' label='TopMed' help=annotation_description.topmed_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.topmed_af|format_unit_as_percent }}{% endlabelled %}
+                    {% endif %}
                         {% if variant_annotation.gnomad_af %}
                             {% labelled id='gnomad_af' label='gnomAD Allele Frequency' help=annotation_description.gnomad_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_af|format_unit_as_percent }}{% endlabelled %}
-                            {% if variant_annotation.gnomad4_or_later %}
+                            {% if variant_annotation.has_gnomad_faf %}
                                 {% labelled id='gnomad_fafmax_faf95_max' label='Grpmax Filtering AF (95% confidence)' help=annotation_description.gnomad_fafmax_faf95_max hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_fafmax_faf95_max|format_unit_as_percent }}{% endlabelled %}
                             {% endif %}
 
-                            {% if variant_annotation.has_extended_gnomad_fields %}
-                                {% labelled id='gnomad_gnomad2_liftover_af' label='Legacy gnomAD 2 liftover AF' help=annotation_description.gnomad_gnomad2_liftover_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad2_liftover_af|format_unit_as_percent }}{% endlabelled %}
+                            {% if variant_annotation.gnomad2_liftover_af %}
+                                {% labelled id='gnomad_gnomad2_liftover_af' label='Legacy gnomAD 2 liftover AF' help=annotation_description.gnomad2_liftover_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad2_liftover_af|format_unit_as_percent }}{% endlabelled %}
                             {% endif %}
                             {% labelled id='gnomad_popmax' label='gnomAD Pop Max' help=annotation_description.gnomad_popmax hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_af|format_unit_as_percent }} ({{ variant_annotation.get_gnomad_popmax_display }}) {% endlabelled %}
 
@@ -779,13 +796,11 @@ function applyVariantValues() {
                         {% else %}
                             {% labelled id='gnomad_none' label='gnomAD' hint="tiny" %}No gnomAD entry{% endlabelled %}
                         {% endif %}
-                        {% if variant_annotation.annotation_run.pipeline_type == 'C' %}
-                            {% page_help page_id="variantdetails/sv_gnomad_help" title="gnomAD Structural Variants" %}
-                        {% endif %}
                     </div>
                 </div>
             </div>
 
+            {% if variant_annotation.has_splicing %}
             <div class="col-md-6 mt-4">
                 <div class="card">
                     <div class="card-header">Splicing</div>
@@ -829,6 +844,7 @@ function applyVariantValues() {
                     </div>
                 </div>
             </div>
+            {% endif %}
 
             <div class="col-md-6 mt-4">
                 <div class="card">
@@ -836,11 +852,15 @@ function applyVariantValues() {
                     <div class="card-body">
                         <!-- note this used to have css class of "loading" -->
                         {% labelled id="clingen-allele-id" label="ClinGen" help=annotation_description.clingen_allele hint="tiny" %}{% endlabelled %}
+                    {% if variant_annotation.has_cosmic %}
                         {% labelled id='cosmic_id' label='COSMIC Genomic Mutation ID' help=annotation_description.cosmic_id hint="tiny" %}{{ variant_annotation.cosmic_id }}{% endlabelled %}
                         {% labelled id='cosmic_legacy_id' label='COSMIC Legacy ID' help=annotation_description.cosmic_legacy_id hint="tiny" %}{{ variant_annotation.cosmic_legacy_id }}{% endlabelled %}
                         {% labelled id='cosmic_count' label='COSMIC Sample Count' help=annotation_description.cosmic_count hint="tiny" %}{% endlabelled %}
+                    {% endif %}
+
                         {% labelled id='dbsnp_rs_id' label='dbSNP' help=annotation_description.dbsnp_rs_id hint="tiny" %}{{ variant_annotation.dbsnp_rs_id }}{% endlabelled %}
                         {% labelled id='ensembl_protein' label='Ensembl Protein' help=annotation_description.ensembl_protein hint="tiny" %}{% endlabelled %}
+                    {% if variant_annotation.has_mavedb %}
                         {% labelled id='mave_db_url' label='MaveDB' help=annotation_description.mave_db_url hint='tiny' %}
                             {% with mave_urls=variant_annotation.get_mave_urls %}
                                 {% for label, url in mave_urls.items %}
@@ -848,6 +868,7 @@ function applyVariantValues() {
                                 {% endfor %}
                             {% endwith %}
                         {% endlabelled %}
+                    {% endif %}
                         {% labelled id='search_terms' label='Search Terms' hint="tiny" %}
                             {% with search_term=variant_annotation.get_search_terms %}
                                 {% if search_term %}

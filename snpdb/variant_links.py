@@ -11,6 +11,7 @@ def variant_link_info(variant: Variant, genome_build: GenomeBuild) -> dict[str, 
     #FIXME this really needs to refer to SpecialEKeys but can't due to its package
     link_data['variant_coordinate'] = str(coordinate)
     link_data['variant_string'] = str(variant)
+    link_data['variant_svlen'] = variant.svlen
     link_data['genome_build'] = genome_build.name
     link_data['canonical_c_hgvs'] = variant.get_canonical_c_hgvs(genome_build)
 

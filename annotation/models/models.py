@@ -1126,6 +1126,42 @@ class VariantAnnotation(AbstractVariantAnnotation):
     ]
 
     @cached_property
+    def is_standard_annotation(self) -> bool:
+        return self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STANDARD
+
+    @property
+    def has_sequence_and_domains(self) -> bool:
+        return self.is_standard_annotation
+
+    @property
+    def has_pathogenicity(self) -> bool:
+        return self.is_standard_annotation
+
+    @property
+    def has_conservation(self) -> bool:
+        return self.is_standard_annotation
+
+    @property
+    def has_splicing(self) -> bool:
+        return self.is_standard_annotation
+
+    @property
+    def has_non_gnomad_population_frequency(self) -> bool:
+        return self.is_standard_annotation
+
+    @property
+    def has_cosmic(self) -> bool:
+        return self.is_standard_annotation
+
+    @property
+    def has_mavedb(self) -> bool:
+        return self.is_standard_annotation and self.version.columns_version >= 3
+
+    @property
+    def has_gnomad_faf(self) -> bool:
+        return self.is_standard_annotation and self.gnomad4_or_later
+
+    @cached_property
     def has_extended_gnomad_fields(self):
         """ I grabbed a few new fields but haven't patched back to GRCh37 yet
             TODO: remove this and if statements in variant_details.html once issue #231 is completed """
