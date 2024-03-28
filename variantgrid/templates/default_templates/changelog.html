@@ -30,7 +30,6 @@
                     <li>PhenotypeNode - support MONDO, shows a warning if ontology term doesn't map to genes</li>
                 </ul>
 
-
                 <h4>Annotation</h4>
                 <ul>
                     <li>New dbNSFP gene columns (see <a href="{% url 'view_annotation_descriptions' %}">annotation descriptions)</a>
@@ -56,10 +55,10 @@
                             </li>
                         </ul>
                     </li>
-                    <li>Update VEP (v106), updated Mastermind, COSMIC</li>
+                    <li>Update VEP (v110), updated Mastermind, COSMIC</li>
                     <li>Pathogenicity Predictions have changed:
                         <ul>
-                            <li>New columns added: BayesDel (NoAF), CADD (raw), ClinPred, REVEL, MetaLR, VEST4.
+                            <li>New columns added: Alphamissense, BayesDel (NoAF), CADD (raw), ClinPred, REVEL, MetaLR, VEST4.
 
                                 <p>These are "rankscores" ie scores scaled 0->1 based on all of the scores in non-synonymous SNVs. There is 1 score per variant (not per transcript)</p>
                                 <p>
@@ -70,29 +69,34 @@
                             <li>Old columns removed: FATHMM, Mutation Assessor, Mutation Taster, Polyphen2, CADD Phred, REVEL Score</li>
                         </ul>
                     </li>
-                    <li>Patients - phenotype text also matched for MONDO terms</li>
+                    <li>gnomAD v4, added some extra fields for GRCh37 gnomAD (v2)</li>
+                    <li>Added MAVEdb info/links</li>
                 </ul>
 
                 <h4>Classification</h4>
                 <ul>
+                    <li>Somatic classifications</li>
                     <li>New pathogenicity prediction tool scores now autopopulate classifications</li>
                 </ul>
 
                 <h4>Data</h4>
                 <ul>
+                    <li>Download annotated CSV/VCF from VCF/sample page</li>
                     <li>Samples page (data) - filter for variant type. Fix autocompletes sometimes not searching all builds</li>
                     <li>Cohorts / Pedigree - added user to to make it easier to find</li>
                 </ul>
 
-                <h4>Gene Page</h4>
+                <h4>Genes</h4>
                 <ul>
+                    <li>Switch to BioCommons HGVS library (includes adding support for 'inv')</li>
                     <li>Gene Symbol page has been rearranged/updated with new annotation fields</li>
                     <li>Gene/Disease - use GenCC (includes ClinGen) instead of just ClinGen on Gene page, Gene Grid column</li>
                 </ul>
 
                 <h4>Ontology</h4>
                 <ul>
-                    <li>Ontology can have multiple versions</li>
+                    <li>Ontology can have multiple versions (allowing upgrades over time)</li>
+                    <li>Patients - phenotype text also matched for MONDO terms</li>
                     <li>Update ontologies to latest versions (and will be able to do this going forward)</li>
                     <li>Ontology term page shows classifications and patients linked to term</li>
                 </ul>
@@ -120,7 +124,8 @@
                     <li>#13 - <a href="https://www.ncbi.nlm.nih.gov/refseq/MANE/">MANE</a> transcripts indicated and chosen as default transcript on variant details page/classification</li>
                     <li>#109 - Allow users to see (limited) annotation on intergenic variants</li>
                     <li>#668 - add tooltips to show help about columns on gene / variant pages</li>
-                    <li>Nearby variants shows tags and classification summary counts</li>
+                    <li>Nearby variants shows tags and classification summary counts, works across builds</li>
+                    <li>Page appears differently for Structural Variants (hiding unavailable annotations, add notes)</li>
                 </ul>
 
                <h4>Variant Grids</h4>
@@ -140,11 +145,13 @@
 
     {% else %}
         <div class="card mt-4">
-            <div class="card-header">9 Mar 2024</div>
+            <div class="card-header">28 Mar 2024</div>
             <div class="card-body">
                 <ul>
                     <li>Somatic classifications</li>
                     <li>Can download annotated VCF/CSV from VCF page</li>
+                    <li>Structural Variant annotation now includes gnomAD, repeat masker</li>
+                    <li>Variant details page cleaned up for Structural Variants</li>
                 </ul>
             </div>
         </div>
