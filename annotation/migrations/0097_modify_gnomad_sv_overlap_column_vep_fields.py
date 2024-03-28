@@ -15,6 +15,7 @@ def _modify_gnomad_sv_overlap_column_vep_fields(apps, _schema_editor):
     VEP_PLUGIN_STRUCTURALVARIANTOVERLAP = 'o'  # This has been removed last migration
     VEP_CUSTOM_GNOMAD_SV = 'S'
     VEP_CUSTOM_GNOMAD_SV_NAME = 'N'
+    VEP_CUSTOM_REPEAT_MASKER = 'r'
 
     # All set to new custom
     source_field_replace_func = Func(F('source_field'), Value('SV_overlap_'), Value(''), function='REPLACE')
@@ -30,6 +31,10 @@ def _modify_gnomad_sv_overlap_column_vep_fields(apps, _schema_editor):
 
     # This is now a calculated field from coords
     ColumnVEPField.objects.filter(variant_grid_column="gnomad_sv_overlap_percent").update(source_field='')
+
+    # OK to run this for SVs as well
+    ColumnVEPField.objects.filter(vep_custom=VEP_CUSTOM_REPEAT_MASKER).update(pipeline_type=None)
+
 
     # Insert the new CVFs
     VARIANT_ANNOTATION_PIPELINE_TYPE_CNV = 'C'

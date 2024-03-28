@@ -1130,10 +1130,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STANDARD
 
     @property
-    def has_sequence_and_domains(self) -> bool:
-        return self.is_standard_annotation
-
-    @property
     def has_pathogenicity(self) -> bool:
         return self.is_standard_annotation
 
