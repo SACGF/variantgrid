@@ -53,7 +53,7 @@
         "min_dp_op": "Y",
         "min_gq_op": "Y",
         "max_pl_op": "Y",
-        "cohort": 68,
+        "cohort": null,
         "zygosity": "A",
         "zygosity_op": "L",
         "accordion_panel": 0,
