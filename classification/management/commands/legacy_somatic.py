@@ -280,7 +280,11 @@ class Command(BaseCommand):
             print(f"Updating {key}")
         e_key.label = row["label"]
         e_key.description = row["description"]
-        e_key.examples = row["examples"]
+        examples = []
+        if example_str := row["examples"]:
+            examples = json.loads(example_str)
+
+        e_key.examples = examples
         e_key.copy_consensus = row["copy_consensus"]
         e_key.see = row["see"]
         e_key.order = row["order"]
