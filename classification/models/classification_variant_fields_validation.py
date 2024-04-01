@@ -16,7 +16,10 @@ from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 
 
 __AT_LEAST_ONE_SET = {SpecialEKeys.CLINICAL_SIGNIFICANCE, SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}
-__CHECK_IF_CHANGED = __AT_LEAST_ONE_SET | {SpecialEKeys.ALLELE_ORIGIN}
+__CHECK_IF_CHANGED = __AT_LEAST_ONE_SET | {SpecialEKeys.ALLELE_ORIGIN} | set(SpecialEKeys.AMP_LEVELS_TO_LEVEL.keys())
+__NOT_FOR_GERMLINE = {SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE} | set(SpecialEKeys.AMP_LEVELS_TO_LEVEL.keys())
+__VALIDATED_FIELDS = __AT_LEAST_ONE_SET | set(SpecialEKeys.AMP_LEVELS_TO_LEVEL.keys())
+
 
 @receiver(classification_validation_signal, sender=Classification)
 def validate_variant_classification_significance(sender, patch_meta: PatchMeta, key_map: EvidenceKeyMap, **kwargs) -> Optional[ValidationMerger]:
@@ -27,7 +30,7 @@ def validate_variant_classification_significance(sender, patch_meta: PatchMeta, 
     if patch_meta.intersection_modified(__CHECK_IF_CHANGED):
         vm = ValidationMerger()
         vm.tested(
-            keys=[SpecialEKeys.CLINICAL_SIGNIFICANCE, SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE],
+            keys=__VALIDATED_FIELDS,
             codes=[
                 ValidationCode.MISSING_CLINICAL_SIGNIFICANCE,
                 ValidationCode.INVALID_FIELD_FOR_SOMATIC,
@@ -46,18 +49,20 @@ def validate_variant_classification_significance(sender, patch_meta: PatchMeta, 
                     severity='error',
                     message=f"{key_map.get(SpecialEKeys.CLINICAL_SIGNIFICANCE).label} requires a value"
                 )
-            if patch_meta.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE):
 
-                allele_origin_pretty_value = key_map.get(SpecialEKeys.ALLELE_ORIGIN).pretty_value(allele_origin)
-                if not allele_origin_pretty_value:
-                    allele_origin_pretty_value = "'blank'"
+            allele_origin_pretty_value = key_map.get(SpecialEKeys.ALLELE_ORIGIN).pretty_value(allele_origin)
+            if not allele_origin_pretty_value:
+                allele_origin_pretty_value = "'blank'"
 
-                vm.add_message(
-                    SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE,
-                    code=ValidationCode.INVALID_FIELD_FOR_GERMLINE,
-                    severity='warning',
-                    message=f"This field is not valid for the given {key_map.get(SpecialEKeys.ALLELE_ORIGIN).pretty_label} {allele_origin_pretty_value}"
-                )
+            for not_germline_key in __NOT_FOR_GERMLINE:
+                if patch_meta.get(not_germline_key, fallback_existing=True):
+                    vm.add_message(
+                        not_germline_key,
+                        code=ValidationCode.INVALID_FIELD_FOR_GERMLINE,
+                        severity='warning',
+                        message=f"This field is not valid for {key_map.get(SpecialEKeys.ALLELE_ORIGIN).pretty_label}: {allele_origin_pretty_value}"
+                    )
+
             return vm
 
         has_value = False
@@ -225,7 +230,7 @@ SUB_CLIN_SIG = re.compile(r'this variant .{2,20}? classified .*?[.]', RegexFlag.
 @receiver(classification_validation_signal, sender=Classification)
 def validate_clinical_significance(sender, patch_meta: PatchMeta, **kwargs) -> Optional[ValidationMerger]:  # pylint: disable=unused-argument
     """
-    Warns if the text description seems to imply one clinical significance wheras the actua value states another
+    Warns if the text description seems to imply one classification but the actual value states another
     """
 
     vm = ValidationMerger()
