@@ -76,7 +76,7 @@ def _update_allele_origin(apps, schema_editor):
         if key := option.get("key"):
             if "somatic" in key.lower():
                 option["namespaces"] = ["somatic"]
-            elif "germline" in key:
+            elif "germline" in key.lower():
                 option["namespaces"] = ["germline"]
     allele_origin.save()
 
