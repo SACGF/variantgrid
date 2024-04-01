@@ -682,20 +682,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return self.get(SpecialEKeys.G_HGVS)
 
     def calc_allele_origin_bucket(self) -> AlleleOriginBucket:
-        if allele_origin_value := self.get(SpecialEKeys.ALLELE_ORIGIN):
-            # FIXME, it would be good to put this value directly into allele origin
-            # logic is duplicated in JavaSCript in vc_form.js updateTitle()
-            if bucket := EvidenceKeyMap.cached_key(SpecialEKeys.ALLELE_ORIGIN).matched_options(allele_origin_value)[0].get("bucket"):
-                return AlleleOriginBucket(bucket)
-            elif "somatic" in allele_origin_value.lower():
-                return AlleleOriginBucket.SOMATIC
-            elif "germline" in allele_origin_value.lower():
-                return AlleleOriginBucket.GERMLINE
-        else:
-            return AlleleOriginBucket(settings.ALLELE_ORIGIN_NOT_PROVIDED_BUCKET)
-
-        # FIXME make the default configurable, should it default to UNKNOWN or GERMLINE in the environment
-        return AlleleOriginBucket.UNKNOWN
+        return AlleleOriginBucket.bucket_for_allele_origin(self.get(SpecialEKeys.ALLELE_ORIGIN))
 
     def flag_type_context(self):
         return FlagTypeContext.objects.get(pk='classification')

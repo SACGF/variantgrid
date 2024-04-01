@@ -5,7 +5,7 @@ from typing import Optional
 from django.conf import settings
 from django.dispatch.dispatcher import receiver
 
-from classification.enums import ValidationCode, SpecialEKeys
+from classification.enums import ValidationCode, SpecialEKeys, AlleleOriginBucket
 from classification.models import EvidenceKeyMap, PatchMeta
 from classification.models.classification import Classification, \
     classification_validation_signal
@@ -16,7 +16,7 @@ from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 
 
 __AT_LEAST_ONE_SET = {SpecialEKeys.CLINICAL_SIGNIFICANCE, SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}
-
+__CHECK_IF_CHANGED = __AT_LEAST_ONE_SET | {SpecialEKeys.ALLELE_ORIGIN}
 
 @receiver(classification_validation_signal, sender=Classification)
 def validate_variant_classification_significance(sender, patch_meta: PatchMeta, key_map: EvidenceKeyMap, **kwargs) -> Optional[ValidationMerger]:
@@ -24,12 +24,41 @@ def validate_variant_classification_significance(sender, patch_meta: PatchMeta, 
     Validates that at l
     east one of clinical significance or somatic clinical significance has a value
     """
-    if patch_meta.intersection_modified(__AT_LEAST_ONE_SET):
+    if patch_meta.intersection_modified(__CHECK_IF_CHANGED):
         vm = ValidationMerger()
         vm.tested(
-            keys=[SpecialEKeys.CLINICAL_SIGNIFICANCE],
-            codes=[ValidationCode.MISSING_CLINICAL_SIGNIFICANCE]
+            keys=[SpecialEKeys.CLINICAL_SIGNIFICANCE, SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE],
+            codes=[
+                ValidationCode.MISSING_CLINICAL_SIGNIFICANCE,
+                ValidationCode.INVALID_FIELD_FOR_SOMATIC,
+                ValidationCode.INVALID_FIELD_FOR_GERMLINE
+            ]
         )
+
+        allele_origin = patch_meta.get(SpecialEKeys.ALLELE_ORIGIN, fallback_existing=True)
+        bucket = AlleleOriginBucket.bucket_for_allele_origin(allele_origin)
+
+        if bucket == AlleleOriginBucket.GERMLINE:
+            if not patch_meta.get(SpecialEKeys.CLINICAL_SIGNIFICANCE):
+                vm.add_message(
+                    SpecialEKeys.CLINICAL_SIGNIFICANCE,
+                    code=ValidationCode.MISSING_CLINICAL_SIGNIFICANCE,
+                    severity='error',
+                    message=f"{key_map.get(SpecialEKeys.CLINICAL_SIGNIFICANCE).label} requires a value"
+                )
+            if patch_meta.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE):
+
+                allele_origin_pretty_value = key_map.get(SpecialEKeys.ALLELE_ORIGIN).pretty_value(allele_origin)
+                if not allele_origin_pretty_value:
+                    allele_origin_pretty_value = "'blank'"
+
+                vm.add_message(
+                    SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE,
+                    code=ValidationCode.INVALID_FIELD_FOR_GERMLINE,
+                    severity='warning',
+                    message=f"This field is not valid for the given {key_map.get(SpecialEKeys.ALLELE_ORIGIN).pretty_label} {allele_origin_pretty_value}"
+                )
+            return vm
 
         has_value = False
         for code in __AT_LEAST_ONE_SET:
@@ -41,7 +70,7 @@ def validate_variant_classification_significance(sender, patch_meta: PatchMeta, 
             # TODO this test is pretty basic compared to what
             likely_somatic = "somatic" in (patch_meta.get(SpecialEKeys.ALLELE_ORIGIN, fallback_existing=True) or "").lower()
             message: str
-            if likely_somatic:
+            if bucket == AlleleOriginBucket.GERMLINE:
                 message = f"{key_map.get(SpecialEKeys.CLINICAL_SIGNIFICANCE).label} or {key_map.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).label} requires a value"
             else:
                 message = f"{key_map.get(SpecialEKeys.CLINICAL_SIGNIFICANCE).label} requires a value"

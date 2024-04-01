@@ -2,10 +2,9 @@ import typing
 from enum import Enum
 from functools import total_ordering
 from typing import Optional, Union
-
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import TextChoices
-
 from library.guardian_utils import public_group, all_users_group
 from library.utils import ChoicesEnum
 
@@ -18,6 +17,25 @@ class AlleleOriginBucket(TextChoices):
     GERMLINE = "G", "Germline"
     SOMATIC = "S", "Somatic"
     UNKNOWN = "U", "Unknown"
+
+    @staticmethod
+    def bucket_for_allele_origin(allele_origin: Optional[str]) -> 'AlleleOriginBucket':
+        # logic is duplicated in JavaSCript in vc_form.js updateTitle()
+        if not allele_origin:
+            return AlleleOriginBucket(settings.ALLELE_ORIGIN_NOT_PROVIDED_BUCKET)
+
+        # TODO, it would be good to put the bucket directly into allele origin
+        from classification.models import EvidenceKeyMap
+        if bucket := EvidenceKeyMap.cached_key(SpecialEKeys.ALLELE_ORIGIN).matched_options(allele_origin)[0].get("bucket"):
+            return AlleleOriginBucket(bucket)
+
+        allele_origin = allele_origin.lower()
+        if "somatic" in allele_origin:
+            return AlleleOriginBucket.SOMATIC
+        elif "germline" in allele_origin:
+            return AlleleOriginBucket.GERMLINE
+        else:
+            return AlleleOriginBucket.UNKNOWN
 
 
 class SpecialEKeys:
