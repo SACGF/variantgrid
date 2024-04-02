@@ -408,7 +408,10 @@ $(document).ready(function() {
     }
 
     handlePubMedLinks("{{ variant_annotation.pubmed|default_if_none:''|safe }}");
-    formatField($("#dbsnp_rs_id"), formatDBSNP);
+    let dbSNP = $("#dbsnp_rs_id").text();
+    if (dbSNP && dbSNP !== '-') {
+        formatField($("#dbsnp_rs_id"), formatDBSNP);
+    }
 
     // load hardcoded values through
     applyVariantValues();
