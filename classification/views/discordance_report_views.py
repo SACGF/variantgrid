@@ -508,7 +508,7 @@ def discordance_preview_extra(sender, user: User, obj: DiscordanceReport, **kwar
     cids = ",".join([str(g.most_recent.classification.pk) for g in groups.groups])
     diff_url = reverse("classification_diff") + f"?cids={cids}&discordance_report_id={obj.pk}"
 
-    extras += [PreviewKeyValue(key="", value="Show Evidence Differences", link=diff_url)]
+    extras += [PreviewKeyValue(key="", value="Show Differences", link=diff_url)]
 
     e_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
     for group in groups.groups:
