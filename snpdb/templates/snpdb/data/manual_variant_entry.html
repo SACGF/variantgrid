@@ -59,6 +59,7 @@
                 <thead>
                 <tr>
                 <th class="date">Date
+                <th>User
                 <th>Status
                 <th>Genome build
                 <th>Variants
@@ -66,6 +67,7 @@
             {% for mvec in mvec_qs %}
                 <tr>
                 <td>{% timestamp mvec.created %}
+                <td>{{ mvec.user }}
                 <td>
                 {% if url_name_visible.view_upload_pipeline and mvec.uploadedmanualvariantentrycollection %}
                     <a class="hover-link" href="{% url 'view_upload_pipeline' mvec.uploadedmanualvariantentrycollection.uploaded_file.uploadpipeline.pk %}">
@@ -79,19 +81,19 @@
                 {% if mvec.manualvariantentry_set.exists %}
                     {% for mve in mvec.manualvariantentry_set.all %}
                         <span class="variant-coordinate"><b>{{ mve.entry_text | truncatechars:50 }}</b></span>
-                            {% if mve.error_message %}
-                            <ul class='messages'>
-                                <li class="error">{{ mve.error_message|default_if_none:'' }}</li>
-                            </ul>
+                        {% if mve.error_message %}
+                        <ul class='messages'>
+                            <li class="error">{{ mve.error_message|default_if_none:'' }}</li>
+                        </ul>
+                        {% endif %}
+                        {% for cmv in mve.unique_created_variants %}
+                            <br/>
+                            {% if cmv.variant.variantannotation_set.exists %}
+                                <a class="hover-link variant-coordinate" href="{% url 'view_variant' cmv.variant_id  %}">{{ cmv.variant }}</a>
+                            {% else %}
+                                <a class="hover-link variant-coordinate un-annotated" title="Not annotated" href="{% url 'view_variant' cmv.variant_id  %}">{{ cmv.variant }}</a>
                             {% endif %}
-                            {% for cmv in mve.unique_created_variants %}
-                                <br/>
-                                {% if cmv.variant.variantannotation_set.exists %}
-                                    <a class="hover-link variant-coordinate" href="{% url 'view_variant' cmv.variant_id  %}">{{ cmv.variant }}</a>
-                                {% else %}
-                                    <a class="hover-link variant-coordinate un-annotated" title="Not annotated" href="{% url 'view_variant' cmv.variant_id  %}">{{ cmv.variant }}</a>
-                                {% endif %}
-                            {% endfor %}
+                        {% endfor %}
                     {% endfor %}
                 {% endif %}
             {% endfor %}
