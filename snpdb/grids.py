@@ -363,7 +363,7 @@ class AbstractVariantGrid(JqGridUserRowConfig):
             'variantannotation__exon': {"server_side_formatter": server_side_format_exon_and_intron},
             'variantannotation__intron': {"server_side_formatter": server_side_format_exon_and_intron},
             'variantannotation__mastermind_mmid3': {'formatter': 'formatMasterMindMMID3'},
-            'variantannotation__mavedb_urn': {'formatter': 'formatMavedbUrnLinks'}, # formatMavedbUrnLinks
+            'variantannotation__mavedb_urn': {'formatter': 'formatMavedbUrnLinks'},  # formatMavedbUrnLinks
             # There is more server side formatting (Unit -> Percent) added in _get_fields_and_overrides
         }
 

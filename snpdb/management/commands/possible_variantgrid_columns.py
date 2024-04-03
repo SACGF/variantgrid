@@ -99,8 +99,3 @@ class Command(BaseCommand):
                 print(path)
         else:
             print(f"All possible paths ({len(possible_paths)}) already assigned VariantGridColumns")
-
-
-
-
-

@@ -503,7 +503,6 @@ class ColumnVEPField(models.Model):
     def get_pipeline_type_q(pipeline_type) -> Q:
         return Q(pipeline_type__isnull=True) | Q(pipeline_type=pipeline_type)
 
-
     @staticmethod
     def get_genome_build_q(genome_build) -> Q:
         return Q(genome_build=genome_build) | Q(genome_build__isnull=True)

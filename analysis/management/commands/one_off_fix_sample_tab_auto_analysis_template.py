@@ -27,4 +27,3 @@ class Command(BaseCommand):
 
                     analysis_name_template = analysis_template.default_name_template()
                     analysis_template.new_version(analysis_name_template)
-

@@ -483,7 +483,6 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
                                                       active=True,
                                                       requires_sample_gene_list=requires_sample_gene_list)
 
-
     def clone(self, user: User = None):
         analysis_copy = self.analysis.clone(user)
         analysis_copy.template_type = AnalysisTemplateType.TEMPLATE

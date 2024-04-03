@@ -188,7 +188,6 @@ def get_results_from_variant_coordinate(genome_build: GenomeBuild, qs: QuerySet,
     if not any_alt:
         results = results.filter(alt__seq=variant_coordinate.alt, svlen=variant_coordinate.svlen)
 
-
     if not results:
         if not any_alt:
             return ModifiedImportedVariant.get_variants_for_unnormalized_variant(variant_coordinate)

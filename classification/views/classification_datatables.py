@@ -49,7 +49,6 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         else:
             return {}
 
-
     def render_classification(self, row: Dict[str, Any]) -> JsonDataType:
         return {
             SpecialEKeys.CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.CLINICAL_SIGNIFICANCE}__value"]

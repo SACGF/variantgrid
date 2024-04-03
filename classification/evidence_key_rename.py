@@ -34,7 +34,7 @@ class OptionUpdator:
     def preferred_order(self, option_keys: list[str]):
         known_options = set(option_keys)
 
-        options_unknown = [] # maintain the order of options not listed in option_keys and put them at the end.
+        options_unknown = []  # maintain the order of options not listed in option_keys and put them at the end.
         option_dict = defaultdict(list)
         for option in self.options:
             option_key = option.get("key")

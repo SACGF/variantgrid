@@ -268,7 +268,6 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('-direction', type=str, required=True, help='backport or forwardport (backport to add somatic functionality to VG3, forwardport once on VG4)')
 
-
     def process_row(self, row: Series, backporting: bool):
         key = row["key"]
         evidence_category = row["evidence_category"]

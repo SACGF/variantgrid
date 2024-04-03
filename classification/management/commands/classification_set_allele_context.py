@@ -50,7 +50,6 @@ class Command(BaseCommand):
         else:
             print("All records now have an allele origin bucket")
 
-
         # for count, chunk in enumerate(iter_fixed_chunks(Classification.objects.iterator(chunk_size=100), chunk_size=100)):
         #     classify: Classification
         #     for classify in chunk:

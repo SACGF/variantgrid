@@ -92,7 +92,7 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     vc = VEPConfig(genome_build)
     vep_cmd = os.path.join(settings.ANNOTATION_VEP_CODE_DIR, "vep")
 
-    # 
+    #
     cmd = [
         vep_cmd,
         "-i", vcf_filename,
@@ -172,7 +172,6 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     else:
         plugin_data_func = {}  # No plugins for SVs
 
-
     # Custom
     for vep_custom, prefix in dict(VEPCustom.choices).items():
         try:
@@ -188,7 +187,6 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
             logging.warning(e)
             # Not all annotations available for all builds - ok to just warn
             logging.warning("Skipped custom annotation: %s", prefix)
-
 
     for vep_plugin, plugin_arg_func in plugin_data_func.items():
         try:

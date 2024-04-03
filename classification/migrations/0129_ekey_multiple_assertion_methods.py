@@ -6,7 +6,7 @@ from django.db import migrations
 def _tweak_assertion_method(apps, schema_editor):
     EvidenceKey = apps.get_model('classification', 'EvidenceKey')
     assertion_method = EvidenceKey.objects.get(key='assertion_method')
-    assertion_method.value_type = "M" # for multi-select
+    assertion_method.value_type = "M"  # for multi-select
     assertion_method.save()
 
 class Migration(migrations.Migration):

@@ -89,4 +89,3 @@ def get_sample_analysis(sample: Sample, analysis_template: AnalysisTemplate) -> 
 def get_cohort_analysis(cohort: Cohort, analysis_template: AnalysisTemplate) -> Analysis:
     return _get_single_template_run_analysis(CohortAnalysisTemplateRun, analysis_template,
                                              cohort, "cohort")
-

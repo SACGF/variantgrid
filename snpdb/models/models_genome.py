@@ -241,7 +241,6 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
             if annotation_version is None:
                 raise ValueError(f"{self} has no annotation versions")
 
-
         return annotation_version.variant_annotation_version.assembly
 
     def __str__(self):

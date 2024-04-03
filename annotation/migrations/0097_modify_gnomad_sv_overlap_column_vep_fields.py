@@ -35,7 +35,6 @@ def _modify_gnomad_sv_overlap_column_vep_fields(apps, _schema_editor):
     # OK to run this for SVs as well
     ColumnVEPField.objects.filter(vep_custom=VEP_CUSTOM_REPEAT_MASKER).update(pipeline_type=None)
 
-
     # Insert the new CVFs
     VARIANT_ANNOTATION_PIPELINE_TYPE_CNV = 'C'
     FREQUENCY_DATA = 'F'

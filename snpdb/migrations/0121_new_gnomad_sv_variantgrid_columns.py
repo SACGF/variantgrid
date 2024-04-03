@@ -92,7 +92,6 @@ def _reverse_new_gnomad_sv_columns(apps, _schema_editor):
     VariantGridColumn.objects.filter(grid_column_name__in=_NEW_SV_COLUMNS).delete()
 
 
-
 class Migration(migrations.Migration):
 
     dependencies = [

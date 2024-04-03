@@ -83,4 +83,3 @@ class Command(BaseCommand):
             # Record progress - we'll redo the last one just to be sure
             with open(progress_file, "w") as f:
                 f.write(str(range_lock.min_variant_id))
-

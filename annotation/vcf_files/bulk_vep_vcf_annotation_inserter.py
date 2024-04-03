@@ -854,5 +854,3 @@ class SVOverlapProcessor:
             raise ValueError(f"Unknown value for {settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD=}")
 
         return chosen_record
-
-

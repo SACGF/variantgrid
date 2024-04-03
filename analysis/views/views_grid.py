@@ -229,7 +229,6 @@ def sample_grid_export(request, sample_id, export_type):
     return _node_grid_export(request, node, export_type, basename=basename, grid_kwargs={"paging": False})
 
 
-
 def node_grid_export(request, analysis_id):
     export_type = request.GET["export_type"]
     use_canonical_transcripts = request.GET.get("use_canonical_transcripts")
