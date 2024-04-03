@@ -510,7 +510,6 @@ class BulkVEPVCFAnnotationInserter:
     def _add_hgvs_g(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: dict):
         # VEP110 has a bug with --hgvsg but we hope to introduce in VEP111+
         if transcript_data.get('hgvs_g'):
-            print(f"Skipping as this mofo is populated already: {transcript_data.get('hgvs_g')}")
             return
 
         max_length = settings.HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT  # VariantAnnotation
@@ -520,7 +519,6 @@ class BulkVEPVCFAnnotationInserter:
 
         try:
             transcript_data['hgvs_g'] = self.hgvs_matcher.variant_coordinate_to_g_hgvs(variant_coordinate)
-            print(f"Just set it to: {transcript_data['hgvs_g']}")
         except Exception as e:
             logging.error("Error calculating g.HGVS for '%s': %s", variant_coordinate, e)
 
