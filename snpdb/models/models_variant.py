@@ -384,7 +384,8 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         else:
             return max(len(self.ref), len(self.alt))
 
-    def as_internal_symbolic(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
+    def as_internal_symbolic(self, genome_build: GenomeBuild,
+                             min_symbolic_alt_size=settings.VARIANT_SYMBOLIC_ALT_SIZE) -> 'VariantCoordinate':
         """ Internal format - alt can be <DEL> or <DUP>
             Uses our internal reference representation
         """
@@ -402,7 +403,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             alt_length = len(self.alt)
             diff = alt_length - ref_length
             if ref_length == 1:
-                if alt_length >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
+                if alt_length >= min_symbolic_alt_size:
                     # Possible dup
                     # TODO: Can probably remove HGVS dependency from here - just look directly at sequence
                     from genes.hgvs import HGVSMatcher
@@ -413,13 +414,13 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
                         alt = VCFSymbolicAllele.DUP
                         svlen = diff
             elif alt_length == 1 and self.alt == self.ref[0]:
-                if ref_length >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
+                if ref_length >= min_symbolic_alt_size:
                     ref = self.ref[0]
                     alt = VCFSymbolicAllele.DEL
                     svlen = diff
 
             elif ref_length == alt_length:
-                if ref_length > settings.VARIANT_SYMBOLIC_ALT_SIZE:
+                if ref_length > min_symbolic_alt_size:
                     if self.ref == reverse_complement(self.alt):
                         ref = self.ref[0]
                         alt = VCFSymbolicAllele.INV
