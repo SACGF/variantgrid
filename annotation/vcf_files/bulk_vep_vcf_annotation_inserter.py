@@ -75,6 +75,7 @@ class BulkVEPVCFAnnotationInserter:
         "predictions_num_benign",
         "overlapping_symbols",
         "gnomad_hemi_count",
+        "hgvs_g",
     ]
     DB_IGNORED_COLUMNS = ["id", "transcript", "MaveDB_nt", "MaveDB_pro"]
     VEP_NOT_COPIED_FIELDS = [
@@ -420,12 +421,13 @@ class BulkVEPVCFAnnotationInserter:
     def add_calculated_transcript_columns(self, variant_coordinate: Optional[VariantCoordinate], transcript_data):
         """ variant_coordinate - will only be set for symbolics """
         self._add_calculated_maxentscan(transcript_data)
-        self._add_hgvs(variant_coordinate, transcript_data)
+        self._add_hgvs_c(variant_coordinate, transcript_data)
 
     def add_calculated_variant_annotation_columns(self, variant_coordinate, transcript_data):
         self._add_calculated_num_predictions(transcript_data)
         self._add_hemi_count(transcript_data)
         self._calculate_gnomad_sv_overlap_percentage(variant_coordinate, transcript_data)
+        self._add_hgvs_g(variant_coordinate, transcript_data)
 
     def _add_calculated_num_predictions(self, transcript_data):
         num_pathogenic = 0
@@ -479,10 +481,8 @@ class BulkVEPVCFAnnotationInserter:
             cosmic_ids.update(existing_cosmic_id.split(VEP_SEPARATOR))
         transcript_data["cosmic_id"] = VEP_SEPARATOR.join(sorted(cosmic_ids))
 
-    def _add_hgvs(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: dict):
-        if variant_coordinate is None:
-            return
-        # VEP doesn't currently calculate this - but may in a future version
+    def _add_hgvs_c(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: dict):
+        # VEP will have already done for non-symbolics, may do them in future version
         if transcript_data.get('hgvs_c'):
             return
 
@@ -507,6 +507,23 @@ class BulkVEPVCFAnnotationInserter:
             except (ValueError, HGVSException):
                 pass
 
+    def _add_hgvs_g(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: dict):
+        # VEP110 has a bug with --hgvsg but we hope to introduce in VEP111+
+        if transcript_data.get('hgvs_g'):
+            print(f"Skipping as this mofo is populated already: {transcript_data.get('hgvs_g')}")
+            return
+
+        max_length = settings.HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT  # VariantAnnotation
+        if variant_coordinate.max_sequence_length > max_length:
+            transcript_data['hgvs_g'] = SV_HGVS_TOO_LONG_MESSAGE
+            return
+
+        try:
+            transcript_data['hgvs_g'] = self.hgvs_matcher.variant_coordinate_to_g_hgvs(variant_coordinate)
+            print(f"Just set it to: {transcript_data['hgvs_g']}")
+        except Exception as e:
+            logging.error("Error calculating g.HGVS for '%s': %s", variant_coordinate, e)
+
     def process_entry(self, v):
         if len(self.variant_transcript_annotation_list) >= settings.SQL_BATCH_INSERT_SIZE:
             self.bulk_insert()
@@ -516,12 +533,10 @@ class BulkVEPVCFAnnotationInserter:
             logging.warning(f"Skipped {v} as no CSQ")
             return
 
-        if svlen := v.INFO.get("SVLEN"):
-            variant_coordinate = VariantCoordinate(chrom=v.CHROM, position=v.POS, ref=v.REF, alt=v.ALT[0], svlen=svlen)
-            # Do now so we only retrieve sequences once
-            variant_coordinate = variant_coordinate.as_external_explicit(self.annotation_run.genome_build)
-        else:
-            variant_coordinate = None
+        svlen = v.INFO.get("SVLEN")
+        variant_coordinate = VariantCoordinate(chrom=v.CHROM, position=v.POS, ref=v.REF, alt=v.ALT[0], svlen=svlen)
+        # Do now so we only retrieve sequences once
+        variant_coordinate = variant_coordinate.as_external_explicit(self.annotation_run.genome_build)
 
         try:
             variant_id = v.INFO["variant_id"]

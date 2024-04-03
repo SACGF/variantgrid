@@ -970,6 +970,9 @@ class VariantAnnotation(AbstractVariantAnnotation):
     """ This is the "representative transcript" chosen (1 per variant/annotation version) """
     GENE_COLUMN = "variantannotation__gene"
 
+    # Only need this once per variant
+    hgvs_g = models.TextField(null=True, blank=True)
+
     # Population frequency
     af_1kg = models.FloatField(null=True, blank=True)
     af_uk10k = models.FloatField(null=True, blank=True)
