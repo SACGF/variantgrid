@@ -157,10 +157,16 @@ function clearAutoCompletes(leave_autcomplete_term_type) {
 
 function filterPatientGrid(term_type, value, leave_autcomplete_term_type) {
     let msgBox = $("#grid-filter-message");
-    msgBox.html("Filtering grid to <span class='" + term_type.toLowerCase() + "'>" + value + "</span>... <a href='javascript:resetGrid()'>show all</a>");
-    msgBox.show();
+    if (value) {
+        msgBox.html("Filtering grid to <span class='" + term_type.toLowerCase() + "'>" + value + "</span>... <a href='javascript:resetGrid()'>show all</a>");
+        msgBox.show();
+        filterGrid({'term_type' : term_type, 'value' : value });
+    } else {
+        msgBox.html("Error: could not search on <span class='" + term_type.toLowerCase() + "'> value='" + value + "'</span>... <a href='javascript:resetGrid()'>show all</a>");
+        msgBox.show();
+    }
 
-    filterGrid({'term_type' : term_type, 'value' : value });
+
     clearAutoCompletes(leave_autcomplete_term_type);
 }
 
