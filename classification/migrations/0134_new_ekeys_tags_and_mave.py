@@ -27,6 +27,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('classification', '0133_fix_om3_om4'),
+        ('snpdb', '0123_new_vg_columns_and_custom_columns'),
     ]
 
     operations = [
