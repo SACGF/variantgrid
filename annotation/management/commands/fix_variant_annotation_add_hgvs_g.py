@@ -1,27 +1,24 @@
 import logging
-import operator
 import time
-from functools import reduce
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.db.models import Case, Value, IntegerField, When, Q, F
 
 from annotation.models import VariantAnnotationVersion, VariantAnnotation
 from genes.hgvs import HGVSMatcher
-from snpdb.models import GenomeBuild
 
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
         update_time = 5
 
-        for genome_build in GenomeBuild.builds_with_annotation():
-            vav = VariantAnnotationVersion.latest(genome_build)
-            matcher = HGVSMatcher(genome_build)
+        for vav in VariantAnnotationVersion.objects.all():
+            matcher = HGVSMatcher(vav.genome_build)
             va_qs = VariantAnnotation.objects.filter(version=vav, hgvs_g__isnull=True)  # Only blank ones
             total_todo = va_qs.count()
-            print(f"{genome_build}: {total_todo} records to update...")
+            print(f"{vav.genome_build}/{vav.vep}: {total_todo} records to update...")
+            if total_todo == 0:
+                continue
             va_qs = va_qs.select_related("variant", "variant__locus", "variant__locus__contig",
                                          "variant__locus__ref", "variant__alt")
             records = []

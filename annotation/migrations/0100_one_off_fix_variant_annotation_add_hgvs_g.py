@@ -6,17 +6,10 @@ from manual.operations.manual_operations import ManualOperation
 
 
 def _check_missing_hgvs_g(apps):
-    GenomeBuild = apps.get_model("snpdb", "GenomeBuild")
     VariantAnnotation = apps.get_model("annotation", "VariantAnnotation")
-    VariantAnnotationVersion = apps.get_model("annotation", "VariantAnnotationVersion")
 
-    for genome_build_name in ["GRCh37", "GRCh38"]:
-        genome_build = GenomeBuild.objects.get(name=genome_build_name)
-        qs = VariantAnnotationVersion.objects.filter(genome_build=genome_build, active=True)
-        vav = qs.order_by("annotation_date").last()
-        # Do we have current annotation SNP that is missing g.HGVS? Could be some large SVs that are skipped....
-        if VariantAnnotation.objects.filter(version=vav, variant_class='SN', hgvs_g__isnull=True).exists():
-            return True
+    if VariantAnnotation.objects.filter(variant_class='SN', hgvs_g__isnull=True).exists():
+        return True
 
     return False
 
