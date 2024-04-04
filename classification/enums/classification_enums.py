@@ -50,6 +50,7 @@ class SpecialEKeys:
     CURATION_DATE = 'curation_date'
     CURATION_VERIFIED_DATE = 'curation_verified_date'
     SAMPLE_DATE = 'sample_date'
+    VARIANT_TAGS = 'variant_tags'
 
     # POPULATED
     # Note: Some fields not here are populated - those with variantgrid_column

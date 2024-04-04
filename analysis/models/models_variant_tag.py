@@ -2,7 +2,7 @@ from typing import Union
 
 from django.contrib.auth.models import User, Group
 from django.db import models
-from django.db.models import CASCADE, SET_NULL, PROTECT, Q
+from django.db.models import CASCADE, SET_NULL, PROTECT, Q, QuerySet, Count, Max
 from django_extensions.db.models import TimeStampedModel
 
 from analysis.models.enums import TagLocation
@@ -103,3 +103,17 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
 
         return Q(variantallele__genome_build=genome_build,
                  variantallele__allele__in=tags_qs.values_list("allele"))
+
+    @staticmethod
+    def get_variant_tag_counts_qs(variant, genome_build=None) -> QuerySet['VariantTag']:
+        if genome_build is None:
+            genome_build = next(iter(variant.genome_builds))
+        qs = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
+        return qs.values("tag").annotate(count=Count("id"), last_created=Max("created")).order_by("tag")
+
+    @staticmethod
+    def get_summary_for_variant(variant, genome_build=None) -> str:
+        tag_counts = []
+        for tag, count in VariantTag.get_variant_tag_counts_qs(variant, genome_build).values_list("tag", "count"):
+            tag_counts.append(f"{tag} x {count}")
+        return ", ".join(tag_counts)

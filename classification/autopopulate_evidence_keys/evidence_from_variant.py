@@ -5,6 +5,7 @@ from urllib.error import HTTPError
 from django.conf import settings
 from django.contrib.sites.models import Site
 
+from analysis.models import VariantTag
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models import Citation
 from annotation.models.damage_enums import FATHMMPrediction, \
@@ -203,11 +204,8 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
     """ annotation_version is optional (defaults to latest for genome build) """
 
     data = AutopopulateData("basic variant")
-    hgvs_matcher = HGVSMatcher(genome_build=genome_build)
     clingen_allele = None
     if variant:
-        data[SpecialEKeys.G_HGVS] = hgvs_matcher.variant_to_g_hgvs(variant)
-
         clingen_allele, evidence_value, message = get_clingen_allele_and_evidence_value_for_variant(genome_build, variant)
         if message:
             data.message = message
@@ -216,6 +214,9 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
             'value': variant.full_string,
             'immutable': SubmissionSource.VARIANT_GRID
         }
+
+        if tag_summary := VariantTag.get_summary_for_variant(variant, genome_build):
+            data[SpecialEKeys.VARIANT_TAGS] = tag_summary
 
     # Directly copy over fields according to EvidenceKey.variantgrid_column
 
@@ -246,6 +247,7 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
         transcript_values = {"refseq_transcript_accession": refseq_transcript_accession,
                              "ensembl_transcript_accession": ensembl_transcript_accession}
 
+        hgvs_matcher = HGVSMatcher(genome_build=genome_build)
         data.update(get_evidence_fields_from_transcript_data(genome_build, variant, clingen_allele, hgvs_matcher,
                                                              transcript_values, evidence_transcript_columns,
                                                              ekey_formatters, annotation_version))

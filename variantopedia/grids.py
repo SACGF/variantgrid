@@ -3,7 +3,7 @@ from functools import reduce
 from typing import Optional, Any
 
 from django.conf import settings
-from django.db.models import TextField, Value, QuerySet, Q, Count, Max
+from django.db.models import TextField, Value, QuerySet, Q
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
@@ -261,11 +261,7 @@ class VariantTagCountsColumns(DatatableConfig[VariantTag]):
     def get_initial_queryset(self) -> QuerySet[VariantTag]:
         variant_id = self.get_query_param('variant_id')
         variant = Variant.objects.get(pk=variant_id)
-        # Not going to use anything build specific so don't care about build
-        genome_build = next(iter(variant.genome_builds))
-        qs = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
-        qs = qs.values("tag").annotate(count=Count("id"), last_created=Max("created")).order_by("tag")
-        return qs
+        return VariantTag.get_variant_tag_counts_qs(variant)
 
 
 class VariantTagDetailColumns(DatatableConfig[VariantTag]):
