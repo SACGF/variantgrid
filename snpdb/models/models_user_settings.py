@@ -175,7 +175,7 @@ class SettingsOverride(models.Model):
                                              help_text="Used for search (jump to result if that is the only one for this build) and populating defaults everywhere")
     allele_origin_focus = models.CharField(
         max_length=1,
-        choices=[(member.value, member.label) for member in [AlleleOriginFilterDefault.GERMLINE, AlleleOriginFilterDefault.SOMATIC]],
+        choices=[(member.value, member.label) for member in [AlleleOriginFilterDefault.SHOW_ALL, AlleleOriginFilterDefault.GERMLINE, AlleleOriginFilterDefault.SOMATIC]],
         null=True,
         blank=True,
         help_text="Your primary focus when it comes to allele origin")
@@ -183,7 +183,7 @@ class SettingsOverride(models.Model):
     allele_origin_exclude_filter = models.BooleanField(
         null=True,
         blank=True,
-        help_text="Should records not for your allele origin focus be excluded out by default"
+        help_text="Would you like to automatically filter classifications based on your selected Allele Origin focus?"
     )
 
     timezone = models.TextField(null=True, blank=True,
