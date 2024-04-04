@@ -1311,6 +1311,16 @@ class VariantAnnotation(AbstractVariantAnnotation):
             sv_overlap_list.append(sv_overlap)
         return sv_overlap_list
 
+    @staticmethod
+    def get_hgvs_g(variant) -> Optional[str]:
+        # They should all be the same so any will be ok - but take latest in case we fixed HGVS
+        qs = variant.variantannotation_set.filter(hgvs_g__isnull=False).order_by("-version")
+        data = qs.values_list("hgvs_g", flat=True)[:1]
+        hgvs_g = None
+        if data:
+            hgvs_g = data[0]
+        return hgvs_g
+
     def __str__(self):
         return f"{self.variant}: {self.version}"
 

@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
 
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
+from annotation.models import VariantAnnotation
 from annotation.templatetags.clinvar_tags import ClinVarDetails
 from classification.models import Classification, ImportedAlleleInfo
 from genes.hgvs import HGVSMatcher
@@ -66,7 +67,7 @@ class VariantCard:
     @property
     def g_hgvs(self):
         if variant := self.variant:
-            return HGVSMatcher(self.genome_build).variant_to_g_hgvs(variant)
+            return VariantAnnotation.get_hgvs_g(variant)
 
     @property
     def is_imported_directly(self):

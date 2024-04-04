@@ -5,7 +5,7 @@ from django.template import Library
 from more_itertools import first
 from pydantic import ConfigDict
 
-from annotation.models import ClinVar, AnnotationVersion
+from annotation.models import ClinVar, AnnotationVersion, VariantAnnotation
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from genes.hgvs import HGVSMatcher
 from library.log_utils import report_exc_info
@@ -91,7 +91,7 @@ class ClinVarDetails(pydantic.BaseModel):
 
         g_hgvs: Optional[str] = None
         if not clinvar_record and variant.can_make_g_hgvs:
-            g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
+            g_hgvs = VariantAnnotation.get_hgvs_g(variant)
 
         return ClinVarDetails(
             clinvar=clinvar_record,

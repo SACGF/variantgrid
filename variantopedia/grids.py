@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404
 from analysis.models import VariantTag, Analysis
 from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version, \
     get_variant_queryset_for_annotation_version
-from annotation.models import AnnotationVersion
+from annotation.models import AnnotationVersion, VariantAnnotation
 from genes.hgvs import HGVSMatcher
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import update_dict_of_dict_values, JsonDataType
@@ -42,9 +42,7 @@ class VariantWikiColumns(DatatableConfig[VariantWiki]):
     def render_variant(cell: CellData) -> JsonDataType:
         variant_id = cell["variant"]
         variant = get_object_or_404(Variant, pk=variant_id)
-        genome_build = next(iter(variant.genome_builds))
-        g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
-        return {"id": variant_id, "g_hgvs": g_hgvs}
+        return {"id": variant_id, "g_hgvs": VariantAnnotation.get_hgvs_g(variant)}
 
     def render_genome_build(self, _cell: CellData) -> JsonDataType:
         return self.get_query_param('genome_build')

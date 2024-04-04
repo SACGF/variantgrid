@@ -174,6 +174,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
         if variant_id not in variant_ids_with_allele or variant_id in allele_missing_clingen_by_variant_id:
             if v.can_have_clingen_allele:
                 variant_ids_without_alleles.append(variant_id)
+                # Because we can't guarantee annotation is finished here, use HGVSMatcher to get g.HGVS
                 variant_hgvs.append(hgvs_matcher.variant_to_g_hgvs(v))
             else:
                 skip_variant_ids_without_alleles.append(variant_id)
