@@ -510,7 +510,7 @@ class Variant(PreviewModelMixin, models.Model):
     alt = models.ForeignKey(Sequence, on_delete=CASCADE)
     # end is a calculated field, but we store as an optimisation for overlap queries (start = locus.position)
     end = models.IntegerField()
-    svlen = models.IntegerField(null=True)  # For symbolic variants, difference in length between REF and ALT alleles
+    svlen = models.IntegerField(null=True, blank=True)  # For symbolic variants, difference in length between REF and ALT alleles
 
     class Meta:
         unique_together = ("locus", "alt", "svlen")  # Possible to have eg CNV with same alt = <INS> but diff end

@@ -1264,11 +1264,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
                 list_values[field] = value.split("&")
 
         # Ensure they are all same length
-        first_field = next(iter(fields))
-        first_field_len = len(list_values[first_field])
-        field_lengths = {}
-        for field in fields:
-            field_lengths[field] = len(list_values[field])
+        first_field_len = len(next(iter(list_values.values())))
+        field_lengths = {k: len(v) for k, v in list_values.items()}
 
         if not all_equal(field_lengths.values()):
             logging.error("All split VEP multi-values must be equal length")

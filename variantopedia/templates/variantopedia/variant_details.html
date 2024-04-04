@@ -762,7 +762,10 @@ function applyVariantValues() {
                                         {% labelled id='gnomad_sv_overlap_name' label='SV Overlap Name' help=annotation_description.gnomad_sv_overlap_name hint="tiny" value_css="text-monospace" %}
                                             <a target='_blank' class="hover-link" href='{{ sv_overlap.gnomad_sv_overlap_url }}'>{{ sv_overlap.gnomad_sv_overlap_name }}</a>
                                         {% endlabelled %}
-                                        {% labelled id='gnomad_sv_overlap_coords' label='SV Coords' help=annotation_description.gnomad_sv_overlap_coords hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_coords }} ({{ sv_overlap.gnomad_sv_overlap_length }}bp){% endlabelled %}
+                                        {% if sv_overlap.gnomad_sv_overlap_coords  %}
+                                            {% comment %}This might not have been annotated in all environments, so check before displaying {% endcomment %}
+                                            {% labelled id='gnomad_sv_overlap_coords' label='SV Coords' help=annotation_description.gnomad_sv_overlap_coords hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_coords }} ({{ sv_overlap.gnomad_sv_overlap_length }}bp){% endlabelled %}
+                                        {% endif %}
                                         {% labelled id='gnomad_sv_overlap_af' label='SV Overlap AF' help=annotation_description.gnomad_sv_overlap_af hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_af|format_unit_as_percent }}{% endlabelled %}
                                         {% labelled id='gnomad_sv_overlap_percent' label='SV Overlap %' help=annotation_description.gnomad_sv_overlap_percent hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_percent }}{% endlabelled %}
                                     {% endfor %}
