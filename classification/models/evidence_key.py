@@ -509,6 +509,7 @@ class EvidenceKeyMap:
         return ordered_by_category_key_entries
 
     @staticmethod
+    @timed_cache(ttl=60)
     def instance() -> 'EvidenceKeyMap':
         return EvidenceKeyMap(
             ordered_keys=EvidenceKeyMap.__ordered_keys()
