@@ -189,15 +189,20 @@ def _unannotated_variants_to_vcf(genome_build: GenomeBuild, vcf_filename,
     if os.path.exists(vcf_filename):
         raise ValueError(f"Don't want to overwrite '{vcf_filename}' which already exists!")
     mk_path_for_file(vcf_filename)
-    with open(vcf_filename, 'wb') as f:
-        kwargs = {}
-        if annotation_range_lock:
-            kwargs["min_variant_id"] = annotation_range_lock.min_variant.pk
-            kwargs["max_variant_id"] = annotation_range_lock.max_variant.pk
+    kwargs = {}
+    if annotation_range_lock:
+        kwargs["min_variant_id"] = annotation_range_lock.min_variant.pk
+        kwargs["max_variant_id"] = annotation_range_lock.max_variant.pk
 
-        annotation_version = annotation_range_lock.version.get_any_annotation_version()
-        qs = get_unannotated_variants_qs(annotation_version, pipeline_type=pipeline_type, **kwargs)
-        qs = qs.order_by("locus__contig__genomebuildcontig__order", "locus__position")
-        sorted_values = qs.values("id", "locus__contig__name", "locus__position",
-                                  "locus__ref__seq", "alt__seq", "svlen")
-        return write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict=VARIANT_GRID_INFO_DICT)
+    annotation_version = annotation_range_lock.version.get_any_annotation_version()
+    qs = get_unannotated_variants_qs(annotation_version, pipeline_type=pipeline_type, **kwargs)
+    return write_qs_to_vcf(vcf_filename, genome_build, qs)
+
+
+def write_qs_to_vcf(vcf_filename, genome_build, qs, info_dict=VARIANT_GRID_INFO_DICT):
+    qs = qs.order_by("locus__contig__genomebuildcontig__order", "locus__position")
+    sorted_values = qs.values("id", "locus__contig__name", "locus__position",
+                              "locus__ref__seq", "alt__seq", "svlen")
+
+    with open(vcf_filename, 'wb') as f:
+        return write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict=info_dict)
