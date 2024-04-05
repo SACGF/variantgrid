@@ -204,6 +204,15 @@
     {% endlabelled %}
 
     {% labelled label="Share Levels" %}
+        {% if user.is_superuser %}
+        <div class="form-check">
+            <label class="form-check-label">
+            <input id="exported_to_clinvar" name="share_level" value="clinvar" type="radio" class="form-check-input" />
+            <img src="{% static 'icons/share_level/public.png' %}" class="tiny-icon" />
+            Exported to ClinVar <span style="color:rgb(128,128,128)">(admin only)</span>
+            </label>
+        </div>
+        {% endif %}
         {% comment %}
             {% if user.is_superuser %}
                 <div class="form-check">
