@@ -95,7 +95,7 @@ class OntologyService(models.TextChoices):
     })
 
     @staticmethod
-    def index_to_id(ontology_service: 'OntologyService', index: int):
+    def index_to_id(ontology_service: 'OntologyService', index: Union[int|str]):
         num_part = str(index)
         if expected_length := OntologyService.EXPECTED_LENGTHS.get(ontology_service):
             num_part = str(index).rjust(expected_length, '0')
@@ -269,13 +269,10 @@ class OntologyIdNormalized:
         prefix = OntologyService(prefix)
 
         try:
-            num_part = str(postfix)
-            clean_id: str
-            if OntologyService.EXPECTED_LENGTHS[prefix]:
-                clean_id = OntologyService.index_to_id(prefix, num_part)
-            else:
-                # variable length IDs like DOID
-                clean_id = f"{prefix}:{postfix}"
+            if expected_length := OntologyService.EXPECTED_LENGTHS[prefix]:
+                postfix = str(int(postfix)) # strip leading 0s so we can then add the correct number
+                postfix = postfix.rjust(expected_length, '0')
+            clean_id = f"{prefix}:{postfix}"
             return OntologyIdNormalized(prefix=prefix, postfix=postfix, full_id=clean_id, clean=True)
 
         except ValueError:
