@@ -43,12 +43,16 @@ def get_queryset_for_annotation_version(klass, annotation_version):
     return qs
 
 
-def get_unannotated_variants_qs(annotation_version, pipeline_type=None, min_variant_id=None, max_variant_id=None):
+def get_variants_qs_for_annotation(annotation_version, pipeline_type=None,
+                                   min_variant_id=None, max_variant_id=None,
+                                   annotated=False):
     # Explicitly join to version partition so other version annotations don't count
     qs = get_variant_queryset_for_annotation_version(annotation_version)
     q_filters = VariantAnnotation.VARIANT_ANNOTATION_Q + \
-        [Variant.get_contigs_q(annotation_version.genome_build),
-         Q(variantannotation__isnull=True)]  # Not annotated
+        [Variant.get_contigs_q(annotation_version.genome_build)]
+
+    if not annotated:
+        q_filters.append(Q(variantannotation__isnull=True))
 
     q_symbolic = Q(locus__ref__seq__contains='<') | Q(alt__seq__contains='<')
     if pipeline_type:

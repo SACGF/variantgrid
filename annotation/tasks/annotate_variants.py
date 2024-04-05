@@ -6,7 +6,7 @@ from celery import chain
 from django.conf import settings
 from django.utils import timezone
 
-from annotation.annotation_version_querysets import get_unannotated_variants_qs
+from annotation.annotation_version_querysets import get_variants_qs_for_annotation
 from annotation.models import AnnotationStatus, GenomeBuild
 from annotation.models.models import AnnotationRun, InvalidAnnotationVersionError
 from annotation.signals.manual_signals import annotation_run_complete_signal
@@ -195,7 +195,7 @@ def _unannotated_variants_to_vcf(genome_build: GenomeBuild, vcf_filename,
         kwargs["max_variant_id"] = annotation_range_lock.max_variant.pk
 
     annotation_version = annotation_range_lock.version.get_any_annotation_version()
-    qs = get_unannotated_variants_qs(annotation_version, pipeline_type=pipeline_type, **kwargs)
+    qs = get_variants_qs_for_annotation(annotation_version, pipeline_type=pipeline_type, **kwargs)
     return write_qs_to_vcf(vcf_filename, genome_build, qs)
 
 

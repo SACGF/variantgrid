@@ -5,7 +5,7 @@ import os
 from django.conf import settings
 from django.utils import timezone
 
-from annotation.annotation_version_querysets import get_unannotated_variants_qs
+from annotation.annotation_version_querysets import get_variants_qs_for_annotation
 from annotation.models import AnnotationRun, re, VEPSkippedReason
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from annotation.vep_annotation import vep_check_annotated_file_version_match
@@ -81,10 +81,10 @@ def handle_vep_warnings(annotation_run: AnnotationRun, bulk_inserter):
 
         version = annotation_run.annotation_range_lock.version
         annotation_version = version.get_any_annotation_version()
-        for v in get_unannotated_variants_qs(annotation_version,
-                                             pipeline_type=annotation_run.pipeline_type,
-                                             min_variant_id=annotation_run.annotation_range_lock.min_variant_id,
-                                             max_variant_id=annotation_run.annotation_range_lock.max_variant_id):
+        for v in get_variants_qs_for_annotation(annotation_version,
+                                                pipeline_type=annotation_run.pipeline_type,
+                                                min_variant_id=annotation_run.annotation_range_lock.min_variant_id,
+                                                max_variant_id=annotation_run.annotation_range_lock.max_variant_id):
             if v.locus.contig.name in skipped_contigs:
                 reason = VEPSkippedReason.UNKNOWN_CONTIG
             elif v.pk in incomplete_variant_ids:

@@ -4,7 +4,7 @@ import sys
 from django.db.models.aggregates import Max, Min, Count
 from django.utils import timezone
 
-from annotation.annotation_version_querysets import get_unannotated_variants_qs
+from annotation.annotation_version_querysets import get_variants_qs_for_annotation
 from annotation.models import AnnotationRangeLock, Variant, AnnotationStatus
 from annotation.models import VariantAnnotationVersion
 from annotation.vep_annotation import get_vep_variant_annotation_version_kwargs
@@ -51,7 +51,7 @@ def _get_unannotated_count_min_max(annotation_version, search_min: int,
             break
 
         logging.debug("Searching for unannotated variants in range: %d-%d", search_min, search_max)
-        qs = get_unannotated_variants_qs(annotation_version, min_variant_id=search_min, max_variant_id=search_max)
+        qs = get_variants_qs_for_annotation(annotation_version, min_variant_id=search_min, max_variant_id=search_max)
         results = qs.aggregate(count=Count("id"), min_variant_id=Min("id"), max_variant_id=Max("id"))
         if results["count"]:
             unannotated_count += results["count"]
