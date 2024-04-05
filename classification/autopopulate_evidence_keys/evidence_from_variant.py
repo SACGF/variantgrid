@@ -204,6 +204,7 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
     """ annotation_version is optional (defaults to latest for genome build) """
 
     data = AutopopulateData("basic variant")
+    hgvs_matcher = HGVSMatcher(genome_build=genome_build)
     clingen_allele = None
     if variant:
         clingen_allele, evidence_value, message = get_clingen_allele_and_evidence_value_for_variant(genome_build, variant)
@@ -243,11 +244,15 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
     if variant:
         data.update(get_evidence_fields_from_variant_query(variant, evidence_variant_columns, ekey_formatters, annotation_version))
 
+        # Should be populated from VariantAnnotation, but this is mandatory so add if not there
+        obj = data[SpecialEKeys.G_HGVS]
+        if not obj.get("value"):
+            obj["value"] = hgvs_matcher.variant_to_g_hgvs(variant)
+
     if refseq_transcript_accession or ensembl_transcript_accession:
         transcript_values = {"refseq_transcript_accession": refseq_transcript_accession,
                              "ensembl_transcript_accession": ensembl_transcript_accession}
 
-        hgvs_matcher = HGVSMatcher(genome_build=genome_build)
         data.update(get_evidence_fields_from_transcript_data(genome_build, variant, clingen_allele, hgvs_matcher,
                                                              transcript_values, evidence_transcript_columns,
                                                              ekey_formatters, annotation_version))

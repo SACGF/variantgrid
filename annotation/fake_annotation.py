@@ -14,6 +14,7 @@ from annotation.models.models import VariantAnnotationVersion, ClinVarVersion, \
     HumanProteinAtlasAnnotationVersion, AnnotationVersion, ClinVar, ClinVarCitation, \
     ClinVarCitationsCollection, VariantAnnotation, AnnotationRun, AnnotationRangeLock, GeneAnnotationVersion
 from annotation.models.models_citations import CitationIdNormalized, CitationSource
+from genes.hgvs import HGVSMatcher
 from genes.models import GeneAnnotationImport
 from genes.models_enums import AnnotationConsortium
 from ontology.tests.test_data_ontology import create_ontology_test_data, create_test_ontology_version
@@ -152,7 +153,9 @@ def create_fake_clinvar_data(clinvar_version: ClinVarVersion):
 
 
 def create_fake_variant_annotation(variant, variant_annotation_version: VariantAnnotationVersion) -> VariantAnnotation:
+    matcher = HGVSMatcher(variant_annotation_version.genome_build)
     defaults = {
+        "hgvs_g": matcher.variant_to_g_hgvs(variant)
         # ??
     }
     annotation_range_lock, _ = AnnotationRangeLock.objects.get_or_create(version=variant_annotation_version,
