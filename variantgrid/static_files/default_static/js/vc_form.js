@@ -979,9 +979,9 @@ const VCForm = (function() {
                 conditionElement = VCForm.format_condition(this.record.resolved_condition);
             } else {
                 let condition = this.value(SpecialEKeys.CONDITION);
-                let condition_url = Urls.condition_matching(this.condition_resolution);
+                let condition_url = Urls.condition_matching(this.conditionResolution);
 
-                if (this.isEditMode() && this.condition_matching_is_view_enabled === 'true') {
+                if (this.isEditMode() && this.conditionMatchingIsViewEnabled) {
                     conditionElement = $('<a>', {href: condition_url , text: condition, class: 'hover-link', target: '_blank'});
                 } else {
                     conditionElement = $('<span>', { text: condition });
@@ -1264,9 +1264,9 @@ const VCForm = (function() {
             this.userAdmin = params.userAdmin;
             this.lab_record_id = params.lab_record_id;
             this.citations = params.citations;
-            this.condition_resolution = params.conditionresolution;
+            this.conditionResolution = params.conditionResolution;
             this.attachmentsEnabled = params.attachmentsEnabled || false;
-            this.condition_matching_is_view_enabled = params.condition_matching_is_view_enabled || false;
+            this.conditionMatchingIsViewEnabled = params.conditionMatchingIsViewEnabled || false;
             
             jHelp = $(params.help);
             jCritTable = $(params.critTable);
