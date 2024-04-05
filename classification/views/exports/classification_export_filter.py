@@ -15,7 +15,7 @@ from threadlocals.threadlocals import get_current_request
 from classification.enums import ShareLevel, ClinicalContextStatus
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
-    DiscordanceReport, ClinicalContext, ImportedAlleleInfo
+    DiscordanceReport, ClinicalContext, ImportedAlleleInfo, ClinVarExport
 from flags.models import FlagsMixin, Flag, FlagComment
 from library.utils import batch_iterator, local_date_string, http_header_date_now
 from snpdb.models import GenomeBuild, Lab, Organization, Allele, Variant, AlleleOriginFilterDefault
@@ -224,6 +224,7 @@ class ClassificationFilter:
     request_params: Optional[dict] = None
     row_limit: Optional[int] = None
     _last_modified: str = None
+    clinvar_export: bool = False
 
     def __post_init__(self):
         self._last_modified = http_header_date_now()
@@ -283,12 +284,16 @@ class ClassificationFilter:
             ClassificationFilter._string_to_group_name(Lab, request.query_params.get('exclude_labs'))
         include_sources = ClassificationFilter._string_to_group_name(Lab, request.query_params.get('include_labs'))
         build_name = request.query_params.get('build', 'GRCh38')
+        clinvar_export = False
 
         share_level_str = request.query_params.get('share_level', 'logged_in_users')
         # public is ever so slowly being deprecated
         if share_level_str == 'public':
             share_level_str = 'logged_in_users'
         elif share_level_str == 'any':
+            share_level_str = 'lab'
+        elif share_level_str == 'clinvar':
+            clinvar_export = True
             share_level_str = 'lab'
 
         allele_origin_filter = AlleleOriginFilterDefault(request.query_params.get('allele_origin', AlleleOriginFilterDefault.SHOW_ALL.value))
@@ -337,7 +342,8 @@ class ClassificationFilter:
             allele=allele,
             benchmarking=benchmarking,
             rows_per_file=rows_per_file,
-            row_limit=row_limit
+            row_limit=row_limit,
+            clinvar_export=clinvar_export
         )
 
     @cached_property
@@ -435,6 +441,12 @@ class ClassificationFilter:
 
         if self.min_share_level != ShareLevel.LAB:
             cms = cms.filter(share_level__in=self._share_levels)
+
+        if self.clinvar_export:
+            # Note that this will get us the latest version of classifications that have been uploaded to ClinVar
+            # not necessarily the version that is known by ClinVar
+            clinvar_uploaded_records = ClinVarExport.objects.exclude(scv='').values_list('classification_based_on__classification_id', flat=True)
+            cms = cms.filter(classification_id__in=clinvar_uploaded_records)
 
         if self.allele_origin_filter and self.allele_origin_filter != AlleleOriginFilterDefault.SHOW_ALL:
             cms = cms.filter(classification__allele_origin_bucket__in=self.allele_origin_filter.buckets)
