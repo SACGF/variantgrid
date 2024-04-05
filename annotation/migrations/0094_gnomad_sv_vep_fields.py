@@ -128,11 +128,13 @@ def _test_has_cnv_annotation(apps):
     for genome_build_name in ["GRCh37", "GRCh38"]:
         qs = VariantAnnotationVersion.objects.filter(genome_build__name=genome_build_name, active=True)
         latest_version = qs.order_by("annotation_date").last()
-        ar_qs = AnnotationRun.objects.filter(annotation_range_lock__version=latest_version,
-                                             pipeline_type='C')
-        ERROR = 'E'
-        if ar_qs.update(error_exception="manually failed to reload", status=ERROR):
-            need_to_rerun_annotation = True
+        if latest_version:
+            # I have some kind of strange bug where the types don't match - but workaround is to use IDs as below
+            ar_qs = AnnotationRun.objects.filter(annotation_range_lock__version_id=latest_version.pk,
+                                                 pipeline_type='C')
+            ERROR = 'E'
+            if ar_qs.update(error_exception="manually failed to reload", status=ERROR):
+                need_to_rerun_annotation = True
 
     return need_to_rerun_annotation
 
