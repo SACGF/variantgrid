@@ -93,9 +93,15 @@ let VCLinks = (function() {
             this.data = data;
 
             this.variant_coordinate_parts = null;
+            this.variant_coordinate_symbolic_parts = null;
+
             let variant_coordinate = this.data[SpecialEKeys.VARIANT_COORDINATE];
             if (variant_coordinate) {
-                this.variant_coordinate_parts = variant_coordinate.match(/(.+?):([0-9]+)(?:[ ])?([ATCG].+)/);
+                this.variant_coordinate_parts = variant_coordinate.match(/(.+?):([0-9]+)(?:[ ])?(<.+>|[ATCG].+)/);
+                if (this.variant_coordinate_parts == null) {
+                    this.variant_coordinate_symbolic_parts = variant_coordinate.match(/(.+?):([0-9]+)-([0-9]+)\s*<(DEL|DUP|INS|INV|CNV)>/);
+                }
+
             }
 
             let links = [];
@@ -249,15 +255,25 @@ let VCLinks = (function() {
 
         generateUcsc() {
             let genome_build = this.data[SpecialEKeys.GENOME_BUILD];
-            if (this.variant_coordinate_parts && genome_build) {
+            if (genome_build) {
                 try {
-                    let parts = this.variant_coordinate_parts;
-                    let coordinate = parseInt(parts[2]);
                     let use_build = 'hg19';
                     if (genome_build && genome_build.indexOf('38') != -1) {
                         use_build = 'hg38';
                     }
-                    let range = `chr${parts[1]}%3A${coordinate - 20}-${coordinate + 20}`;
+
+                    let range;
+                    if (this.variant_coordinate_parts) {
+                        let parts = this.variant_coordinate_parts;
+                        let coordinate = parseInt(parts[2]);
+                        range = `chr${parts[1]}%3A${coordinate - 20}-${coordinate + 20}`;
+                    } else if (this.variant_coordinate_symbolic_parts) {
+                        let parts = this.variant_coordinate_symbolic_parts;
+                        range = `chr${parts[1]}%3A${parts[2] - 20}-${parts[3] + 20}`;
+                    } else {
+                        return null;
+                    }
+
                     let url = `https://genome.ucsc.edu/cgi-bin/hgTracks?db=${use_build}&lastVirtModeType=default&lastVirtModeExtraState=&virtModeType=default&virtMode=0&nonVirtPosition=&position=${range}`;
                     return new VCLink({
                         text:'UCSC',
@@ -281,14 +297,21 @@ let VCLinks = (function() {
                 if (genome_build && genome_build.indexOf('38') != -1) {
                     use_build = 'hg38';
                 }
-                let searchFor = this.data[SpecialEKeys.VARIANT_COORDINATE];
+                let varsomeType = "variant";
+                let searchFor;
+                if (this.variant_coordinate_symbolic_parts) {
+                    varsomeType = "cnv";
+                    searchFor = this.variant_coordinate_symbolic_parts.slice(1).join("-");
+                } else {
+                    searchFor = this.data[SpecialEKeys.VARIANT_COORDINATE];
+                }
                 if (searchFor == null) {
                     searchFor = this.data[SpecialEKeys.C_HGVS];
                 }
                 if (searchFor) {
                     return new VCLink({
                         text: 'varsome',
-                        href: `https://varsome.com/variant/${use_build}/${encodeURIComponent(searchFor)}`,
+                        href: `https://varsome.com/${varsomeType}/${use_build}/${encodeURIComponent(searchFor)}`,
                         build: this.buildName()
                     });
                 }
@@ -301,10 +324,18 @@ let VCLinks = (function() {
         },
 
         generateIgv() {
-            if (typeof createIgvUrl == 'undefined' || !this.variant_coordinate_parts) {
+            if (typeof createIgvUrl == 'undefined') {
                 return null;
             }
-            let locus = this.variant_coordinate_parts[1] + ':' + this.variant_coordinate_parts[2];
+            let locus = null;
+            if (this.variant_coordinate_parts) {
+                locus = this.variant_coordinate_parts[1] + ':' + this.variant_coordinate_parts[2];
+            } else if (this.variant_coordinate_symbolic_parts) {
+                // Can do a range
+                locus = this.variant_coordinate_symbolic_parts[1] + ':' + this.variant_coordinate_symbolic_parts[2] + "-" + this.variant_coordinate_symbolic_parts[3];
+            } else {
+                return null;
+            }
             return new VCLink({text:'IGV', href:createIgvUrl(locus), title:`Open ${locus} in IGV`});
         },
 
