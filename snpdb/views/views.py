@@ -1587,7 +1587,7 @@ def view_genome_build(request, genome_build_name):
 
 
 def view_contig(request, contig_accession):
-    q = Q(refseq_accession=contig_accession) | Q(genbank_accession=contig_accession)
+    q = Contig.get_q(contig_accession)
     contig = get_object_or_404(Contig, q)
     builds = list(contig.genome_builds)
     genome_build = builds[0]

@@ -1,7 +1,8 @@
 import itertools
+import operator
 import os
 import re
-from functools import cached_property
+from functools import cached_property, reduce
 from typing import Optional
 
 from django.conf import settings
@@ -16,12 +17,13 @@ from library.cache import timed_cache
 from library.django_utils import SortMetaOrderingMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingImmutable
 from library.genomics.fasta_wrapper import FastaFileWrapper
+from library.preview_request import PreviewModelMixin
 from library.utils import invert_dict
 from snpdb.genome.fasta_index import load_genome_fasta_index
 from snpdb.models.models_enums import SequenceRole, AssemblyMoleculeType
 
 
-class GenomeBuild(models.Model, SortMetaOrderingMixin):
+class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
     """ There is only 1 patch version of a genome build on the system
 
         enabled means a build can be loaded via get_name_or_alias()
@@ -313,7 +315,7 @@ class GenomeBuildPatchVersion(models.Model):
         return gbpv
 
 
-class Contig(models.Model):
+class Contig(models.Model, PreviewModelMixin):
     """ Contigs don't directly link to genome build so builds can share contigs
         e.g. hg19 and GRCh37 are the same except for mitochondrion
         @see annotation.reference_contigs.get_assembly_report_df """
@@ -337,6 +339,17 @@ class Contig(models.Model):
     def genome_builds(self):
         builds = GenomeBuild.builds_with_annotation()
         return builds.filter(genomebuildcontig__contig=self, enabled=True).order_by("name")
+
+    @staticmethod
+    def get_q(accession: str, case_sensitive=True) -> Q:
+        q_list = []
+        for field in ["genbank_accession", "refseq_accession", "name", "ucsc_name"]:
+            if case_sensitive:
+                f = field
+            else:
+                f = f"{field}__iexact"
+            q_list.append(Q(**{f: accession}))
+        return reduce(operator.or_, q_list)
 
     def __str__(self):
         return f"{self.name} - {self.refseq_accession} ({self.length})"
