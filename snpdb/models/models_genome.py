@@ -9,6 +9,7 @@ from django.db import models
 from django.db.models import QuerySet
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
+from django.urls import reverse
 
 from genes.models_enums import AnnotationConsortium
 from library.cache import timed_cache
@@ -40,6 +41,9 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
     class Meta:
         ordering = ["name"]
         base_manager_name = 'objects'
+
+    def get_absolute_url(self):
+        return reverse("view_genome_build", kwargs={"genome_build_name": self.name})
 
     def is_version(self, version: int) -> bool:
         return str(version) in self.name
@@ -325,6 +329,14 @@ class Contig(models.Model):
 
     class ContigNotInBuildError(ValueError):
         pass
+
+    def get_absolute_url(self):
+        return reverse("view_contig", kwargs={"contig_accession": self.refseq_accession})
+
+    @property
+    def genome_builds(self):
+        builds = GenomeBuild.builds_with_annotation()
+        return builds.filter(genomebuildcontig__contig=self, enabled=True).order_by("name")
 
     def __str__(self):
         return f"{self.name} - {self.refseq_accession} ({self.length})"

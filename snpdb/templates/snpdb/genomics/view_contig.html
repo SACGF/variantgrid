@@ -1,0 +1,52 @@
+{% extends "uicore/page/base.html" %}
+{% load english_tags %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% load js_tags %}
+{% load humanize %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
+{% load ui_tabs_builder %}
+{% block title %}Contig: {{ contig.refseq_accession }}{% endblock title %}
+{% block content %}
+    <script>
+        function getConfigUrl() {
+            return "extra_filters=" + JSON.stringify({"contig_id": {{ contig.pk }}});
+        }
+    </script>
+
+    <div class="current-record-menu-item">
+        <div class="text-small text-muted">viewing</div>
+        <i class="fa-solid fa-circle main-icon mr-1" style="color:#bbb; font-size:8pt"></i><label>{{ genome_build }}</label>
+    </div>
+
+    <div class="contaizner" style="position:relative">
+        <div class="card">
+            <div class="card-header">Contig: {{ contig.refseq_accession }}</div>
+            <div class="card-body">
+                {% labelled hint="tiny" label="Genome Builds" %}
+                    {% for genome_build in contig.genome_builds %}
+                        <a href="{% url 'view_genome_build' genome_build.name %}">{{ genome_build }}</a>
+                    {% endfor %}
+                {% endlabelled %}
+                {% labelled hint="tiny" label="Name" %}{{ contig.name }}{% endlabelled %}
+                {% labelled hint="tiny" label="RefSeq" %}{{ contig.refseq_accession }}{% endlabelled %}
+                {% labelled hint="tiny" label="GenBank" %}{{ contig.genbank_accession }}{% endlabelled %}
+                {% labelled hint="tiny" label="UCSC" %}{{ contig.ucsc_name }}{% endlabelled %}
+                {% labelled hint="tiny" label="Length" %}{{ contig.length|intcomma }}{% endlabelled %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Genes</div>
+            <div class="card-body">
+                {% load jqgrid_tags %}
+                {% jqgrid 'genes_grid' 'gene-annotation-versions' genome_build_name=genome_build.name search=False delete=False jqgrid_config_get_parameters_func='getConfigUrl' %}
+            </div>
+        </div>
+
+
+
+    </div>
+
+
+{% endblock %}

@@ -97,6 +97,9 @@ urlpatterns = [
     perm_path('index', views.index, name='index'),
     perm_path('user_global_sample_gene_matrix', views.user_global_sample_gene_matrix, name='user_global_sample_gene_matrix'),
 
+    perm_path('view_genome_build/<genome_build_name>', views.view_genome_build, name='view_genome_build'),
+    perm_path('view_contig/<contig_accession>', views.view_contig, name='view_contig'),
+
     # Grids
     perm_path('cohort/grid/<slug:op>/', JQGridView.as_view(grid=CohortListGrid, delete_row=True), name='cohort_grid'),
     perm_path('cohort_sample/grid/<int:cohort_id>/<slug:op>/', JQGridView.as_view(grid=CohortSampleListGrid), name='cohort_sample_grid'),

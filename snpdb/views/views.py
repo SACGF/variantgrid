@@ -10,6 +10,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import PermissionDenied, ImproperlyConfigured, ObjectDoesNotExist
+from django.db.models import Q
 from django.db.utils import IntegrityError
 from django.forms.models import inlineformset_factory, ALL_FIELDS
 from django.forms.widgets import TextInput
@@ -71,8 +72,8 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
     VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, SampleStats, \
-    SampleStatsPassingFilter, TagColorsCollection
-from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
+    SampleStatsPassingFilter, TagColorsCollection, Contig
+from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, SequenceRole
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.utils import LabNotificationBuilder, get_tag_styles_and_colors
@@ -1574,3 +1575,33 @@ def sample_allele_frequency_histogram_graph(request, sample_id, min_read_depth):
     graph_class_name = full_class_name(AlleleFrequencyHistogramGraph)
     cached_graph = graphcache.async_graph(graph_class_name, sample_id, min_read_depth)
     return HttpResponseRedirect(reverse("cached_generated_file_check", kwargs={"cgf_id": cached_graph.id}))
+
+
+def view_genome_build(request, genome_build_name):
+    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+    context = {
+        "genome_build": genome_build,
+        "standard_contigs": genome_build.contigs.filter(role=SequenceRole.ASSEMBLED_MOLECULE)
+    }
+    return render(request, "snpdb/genomics/view_genome_build.html", context)
+
+
+def view_contig(request, contig_accession):
+    q = Q(refseq_accession=contig_accession) | Q(genbank_accession=contig_accession)
+    contig = get_object_or_404(Contig, q)
+    builds = list(contig.genome_builds)
+    genome_build = builds[0]
+    # If multiple builds (eg MT), we'll use user default if they have it, doesn't really matter
+    if len(builds) > 1:
+        try:
+            user_settings = UserSettings.get_for_user(request.user)
+            if user_settings.default_genome_build in builds:
+                genome_build = user_settings.default_genome_build
+        except:
+            pass
+
+    context = {
+        "contig": contig,
+        "genome_build": genome_build,
+    }
+    return render(request, "snpdb/genomics/view_contig.html", context)

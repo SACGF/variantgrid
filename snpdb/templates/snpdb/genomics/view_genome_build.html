@@ -1,0 +1,39 @@
+{% extends "uicore/page/base.html" %}
+{% load english_tags %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% load js_tags %}
+{% load humanize %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
+{% load ui_tabs_builder %}
+{% block title %}{{ genome_build }}{% endblock title %}
+{% block content %}
+    <div class="current-record-menu-item">
+        <div class="text-small text-muted">viewing</div>
+        <i class="fa-solid fa-circle main-icon mr-1" style="color:#bbb; font-size:8pt"></i><label>{{ genome_build }}</label>
+    </div>
+
+    <div class="container" style="position:relative">
+        <div class="card">
+            <div class="card-header">{{ genome_build }} contigs</div>
+            <div class="card-body">
+                <table class="table">
+                    <tr>
+                        <th>Name</th>
+                        <th>RefSeq accession</th>
+                        <th>Length</th>
+                    </tr>
+                {% for contig in standard_contigs %}
+                    <tr>
+                        <td>{{ contig.name }}</td>
+                        <td><a href="{% url 'view_contig' contig.refseq_accession %}">{{ contig.refseq_accession }}</a></td>
+                        <td>{{ contig.length |intcomma }}</td>
+                    </tr>
+                {% endfor %}
+                </table>
+
+            </div>
+        </div>
+    </div>
+
+{% endblock %}

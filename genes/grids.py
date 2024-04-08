@@ -22,7 +22,7 @@ from library.utils import update_dict_of_dict_values, JsonDataType
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import UserSettings, Q, VariantGridColumn, Tag, ImportStatus
-from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_genome import GenomeBuild, Contig
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol, variant_qs_filter_has_internal_data
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
@@ -196,7 +196,13 @@ class GenesGrid(JqGridUserRowConfig):
         av = AnnotationVersion.latest(genome_build)
         gene_annotation_release_id = av.gene_annotation_version.gene_annotation_release_id
         if extra_filters:
-            gene_annotation_release_id = extra_filters["gene_annotation_release_id"]
+            if contig_id := extra_filters.get("contig_id"):
+                contig = Contig.objects.get(pk=contig_id)
+                print(f"Should filter to: {contig}")
+
+            if gar_id := extra_filters.get("gene_annotation_release_id"):
+                gene_annotation_release_id = gar_id
+
             if column := extra_filters.get("column"):
                 if column in self.fields:
                     is_null = extra_filters.get("is_null", False)
