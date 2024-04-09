@@ -21,12 +21,14 @@
                     <tr>
                         <th>Name</th>
                         <th>RefSeq accession</th>
+                        <th>UCSC Name</th>
                         <th>Length</th>
                     </tr>
                 {% for contig in standard_contigs %}
                     <tr>
                         <td>{{ contig.name }}</td>
                         <td><a href="{% url 'view_contig' contig.refseq_accession %}">{{ contig.refseq_accession }}</a></td>
+                        <td>{{ contig.ucsc_name }}</td>
                         <td>{{ contig.length |intcomma }}</td>
                     </tr>
                 {% endfor %}

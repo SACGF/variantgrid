@@ -12,6 +12,18 @@
         function getConfigUrl() {
             return "extra_filters=" + JSON.stringify({"contig_id": {{ contig.pk }}});
         }
+
+        function geneSymbolLink(v) {
+            let url = Urls.view_gene_symbol(v);
+            return `<a href='${url}'>${v}</a>`;
+        }
+
+        $(document).ready(function() {
+            jQuery.extend($.fn.fmatter, {
+                'geneSymbolLink': geneSymbolLink,
+            });
+        });
+
     </script>
 
     <div class="current-record-menu-item">
@@ -37,14 +49,12 @@
         </div>
 
         <div class="card">
-            <div class="card-header">Genes</div>
+            <div class="card-header">Genes on contig</div>
             <div class="card-body">
                 {% load jqgrid_tags %}
                 {% jqgrid 'genes_grid' 'gene-annotation-versions' genome_build_name=genome_build.name search=False delete=False jqgrid_config_get_parameters_func='getConfigUrl' %}
             </div>
         </div>
-
-
 
     </div>
 

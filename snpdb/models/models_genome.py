@@ -349,6 +349,11 @@ class Contig(models.Model, PreviewModelMixin):
             else:
                 f = f"{field}__iexact"
             q_list.append(Q(**{f: accession}))
+
+        # MT doesn't have ucsc_name, so need special case to load M with chr prefix
+        if accession.lower() in ("chrm", "chrmt"):
+            q_list.append(Q(name="MT"))
+
         return reduce(operator.or_, q_list)
 
     def __str__(self):

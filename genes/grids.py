@@ -198,7 +198,8 @@ class GenesGrid(JqGridUserRowConfig):
         if extra_filters:
             if contig_id := extra_filters.get("contig_id"):
                 contig = Contig.objects.get(pk=contig_id)
-                print(f"Should filter to: {contig}")
+                gene_versions = TranscriptVersion.objects.filter(contig=contig).values_list("gene_version_id", flat=True)
+                queryset = queryset.filter(gene_version__in=gene_versions)
 
             if gar_id := extra_filters.get("gene_annotation_release_id"):
                 gene_annotation_release_id = gar_id
