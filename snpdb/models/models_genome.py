@@ -129,6 +129,11 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
         qs = Contig.objects.filter(genomebuildcontig__genome_build=self)
         return qs.order_by("genomebuildcontig__order")
 
+    @property
+    def genome_builds(self):
+        """ For PreviewModelMixin - search knows it's a genome build """
+        return [self]
+
     @staticmethod
     def get_choices():
         choices = []
