@@ -30,7 +30,7 @@ fieldset.form-fields {
         </tr>
         </thead>
     {% for transcript_data in vts.transcript_data %}
-        <tr class="radio-row">
+        <tr class="radio-row{% if transcript_data.hidden %} other-annotation-consortium-transcripts collapse{% endif %}">
             <td>    <input type='radio' name='transcript_choice' value='{{ transcript_data.transcript_id }}'
                     {% if transcript_data.selected  %}
                         checked='1'
@@ -73,6 +73,9 @@ fieldset.form-fields {
     
     {% endif %}
     </table>
+        {% if vts.hide_other_annotation_consortium_transcripts %}
+            <a id='show-other-annotation-consortium-transcripts-link' class="toggle-link" data-toggle="collapse" href=".other-annotation-consortium-transcripts">Toggle {{ vts.get_other_annotation_consortium_display }} transcripts (not annotated)</a>
+        {% endif %}
     {% endif %}
     
 <script>

@@ -27,7 +27,7 @@ class VariantTranscriptSelections:
 
     def __init__(self, variant: Variant,
                  genome_build: GenomeBuild, annotation_version=None,
-                 add_other_annotation_consortium_transcripts=False):
+                 hide_other_annotation_consortium_transcripts=True):
         """ annotation_version defaults to latest version """
 
         if annotation_version is None:
@@ -35,6 +35,11 @@ class VariantTranscriptSelections:
 
         self.genome_build = genome_build
         self.annotation_consortium = annotation_version.variant_annotation_version.annotation_consortium
+        if self.annotation_consortium == AnnotationConsortium.REFSEQ:
+            self.other_annotation_consortium = AnnotationConsortium.ENSEMBL
+        else:
+            self.other_annotation_consortium = AnnotationConsortium.REFSEQ
+        self.hide_other_annotation_consortium_transcripts = hide_other_annotation_consortium_transcripts
         self.variant_annotation = None
         self.gene_annotations = {}
         self.transcript_data = []  # See docstring in _populate for details
@@ -43,8 +48,7 @@ class VariantTranscriptSelections:
         self.initial_transcript_id = self.NO_TRANSCRIPT
         self._populate(variant, annotation_version)
         self.other_annotation_consortium_transcripts_warning = None  # set in _add_other_annotation_consortium_transcripts
-        if add_other_annotation_consortium_transcripts:
-            self._add_other_annotation_consortium_transcripts(variant)
+        self._add_other_annotation_consortium_transcripts(variant)
         if self.annotation_consortium == AnnotationConsortium.REFSEQ:
             sort_order = [self.REFSEQ_TRANSCRIPT]
         else:
@@ -54,6 +58,9 @@ class VariantTranscriptSelections:
 
     def get_annotation_consortium_display(self):
         return AnnotationConsortium(self.annotation_consortium).label
+
+    def get_other_annotation_consortium_display(self):
+        return AnnotationConsortium(self.other_annotation_consortium).label
 
     @cached_property
     def variant_transcript_annotations_dict(self):
@@ -157,6 +164,7 @@ class VariantTranscriptSelections:
 
         data["selected"] = False  # Will be set in _set_initial_and_selected
         data["canonical_score"] = transcript_canonical_score
+
         is_representative = bool(representative_transcript and representative_transcript == obj.transcript)
         data[self.REPRESENTATIVE] = is_representative
         return data
@@ -188,13 +196,8 @@ class VariantTranscriptSelections:
             Whichever one is used will have molecular consequences etc.
 
             We may have transcripts from consortium not used, so can add those. """
-        if self.annotation_consortium == AnnotationConsortium.REFSEQ:
-            other_annotation_consortium = AnnotationConsortium.ENSEMBL
-        else:
-            other_annotation_consortium = AnnotationConsortium.REFSEQ
-
         ac_key = self._ac_key(self.annotation_consortium)
-        other_ac_key = self._ac_key(other_annotation_consortium)
+        other_ac_key = self._ac_key(self.other_annotation_consortium)
 
         gene_symbols = set()
         for ga in self.gene_annotations.values():
@@ -212,7 +215,7 @@ class VariantTranscriptSelections:
 
         hgvs_matcher = HGVSMatcher(self.genome_build)
         kwargs = {
-            "transcript__annotation_consortium": other_annotation_consortium,
+            "transcript__annotation_consortium": self.other_annotation_consortium,
             "genome_build": self.genome_build,
             "gene_version__gene_symbol_id__in": gene_symbols,
         }
@@ -234,6 +237,7 @@ class VariantTranscriptSelections:
                     self.REPRESENTATIVE: False,
                     "consequence": "?",
                     "canonical_score": -1,
+                    "hidden": self.hide_other_annotation_consortium_transcripts,
                 }
                 try:
                     # Transcript data may not be well formed
@@ -254,4 +258,4 @@ class VariantTranscriptSelections:
             ac_dict = dict(AnnotationConsortium.choices)
             self.other_annotation_consortium_transcripts_warning = f"""
 This system only annotates {ac_dict[self.annotation_consortium]} transcripts. You may select
-{ac_dict[other_annotation_consortium]} transcripts, but they will not be auto-populated with transcript annotation"""
+{ac_dict[self.other_annotation_consortium]} transcripts, but they will not be auto-populated with transcript annotation"""
