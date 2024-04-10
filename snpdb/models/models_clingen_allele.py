@@ -160,10 +160,6 @@ class ClinGenAllele(TimeStampedModel):
                         return t_hgvs, ta
         return None, None
 
-    @staticmethod
-    def filtered_genomic_alleles(genomic_alleles, genome_build: GenomeBuild):
-        return [ga for ga in genomic_alleles if ga.get("referenceGenome") == genome_build.name]
-
     def get_g_hgvs(self, genome_build: GenomeBuild):
         invalid_contigs = Contig.objects.none()
         valid_contigs = genome_build.contigs
@@ -177,15 +173,19 @@ class ClinGenAllele(TimeStampedModel):
 
         invalid_contigs = set()
         unknown_contigs = set()
-        for ga in self.filtered_genomic_alleles(genomic_alleles, genome_build):
+        # Work on the contig level as AlleleRegistry only has MT for "GRCh38" (even though contigs are the same)
+        for ga in genomic_alleles:
             for h in ga["hgvs"]:
                 contig = h.split(":", 1)[0]
                 if contig in refseq_contigs:
                     return h
-                if contig in refseq_invalid_contigs:
-                    invalid_contigs.add(contig)
-                else:
-                    unknown_contigs.add(contig)
+
+                # Only report bad ones for this genome build
+                if ga.get("referenceGenome") == genome_build.name:
+                    if contig in refseq_invalid_contigs:
+                        invalid_contigs.add(contig)
+                    else:
+                        unknown_contigs.add(contig)
 
         if invalid_contigs:
             ic_msg = "settings.LIFTOVER_TO_CHROMOSOMES_ONLY=True disabled liftover to non-chrom contigs"
