@@ -1,3 +1,13 @@
+{% if analysis_template_links.exists or analysis_template_form %}
+    <style>
+        form.analysis-template-form>label {
+            display: none;
+        }
+    </style>
+    {% if missing_templates %}
+        Note: Templates unavailable for this sample include those requiring: {{ missing_templates }}
+    {% endif %}
+{% endif %}
 {% if analysis_template_links.exists %}
 <script>
     function createAnalysis_{{ flattened_uuid }}(analysis_template_id) {
@@ -22,7 +32,7 @@
 </ul>
 {% endif %}
 {% if analysis_template_form %}
-    <form id="analysis-template-form-{{ flattened_uuid }}" method="post" action="{% url 'create_analysis_from_template' genome_build.name %}">
+    <form class="analysis-template-form" id="analysis-template-form-{{ flattened_uuid }}" method="post" action="{% url 'create_analysis_from_template' genome_build.name %}">
         {% csrf_token %}
         <input name="tag_uuid" type="hidden" value="{{ flattened_uuid }}">
         {% for name, value in hidden_inputs.items %}

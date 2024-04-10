@@ -123,12 +123,16 @@ def analysis_templates_tag(context, genome_build, autocomplete_field=True, has_s
     class_name = klass._meta.label
     # Show/Hide AnalysisTemplateVersions based on requires_sample_gene_list
 
+    missing_templates = []
     requires_sample_somatic = None
     if not has_somatic_sample:
         requires_sample_somatic = False
+        missing_templates.append("somatic sample")
 
     if not has_sample_gene_list:
         requires_sample_gene_list = False
+        missing_templates.append("sample gene list")
+
     AnalysisTemplateForm = get_analysis_template_form_for_variables_only_of_class(class_name,
                                                                                   autocomplete_field=autocomplete_field,
                                                                                   requires_sample_somatic=requires_sample_somatic,
@@ -147,4 +151,5 @@ def analysis_templates_tag(context, genome_build, autocomplete_field=True, has_s
         "analysis_template_form": AnalysisTemplateForm(prefix=flattened_uuid),
         "analysis_template_links": analysis_template_links,
         "hidden_inputs": hidden_inputs,
+        "missing_templates": ", ".join(missing_templates),
     }
