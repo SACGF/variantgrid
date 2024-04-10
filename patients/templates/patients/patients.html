@@ -139,9 +139,10 @@ function filterGrid(extra_filters) {
 function clearAutoCompletes(leave_autcomplete_term_type) {
     // Clear the autcompletes (temp disabling change handlers)
     const AUTOCOMPLETE_IDS = {
-        'HP': 'id_hpo_synonym',
-        'OMIM': 'id_mim_morbid_alias',
-        'HGNC': 'id_gene',
+        'HP': 'id_hpo',
+        'OMIM': 'id_omim',
+        'HGNC': 'id_gene_symbol',
+        'MONDO': 'id_mondo',
     };
 
     ignoreAutcompleteChangeEvent = true;
@@ -158,7 +159,8 @@ function clearAutoCompletes(leave_autcomplete_term_type) {
 function filterPatientGrid(term_type, value, leave_autcomplete_term_type) {
     let msgBox = $("#grid-filter-message");
     if (value) {
-        msgBox.html("Filtering grid to <span class='" + term_type.toLowerCase() + "'>" + value + "</span>... <a href='javascript:resetGrid()'>show all</a>");
+        let url = Urls.ontology_term_text(term_type, value);
+        msgBox.html("Filtering grid to <span class='" + term_type.toLowerCase() + "'><a href='" + url + "' target='_blank'>" + value + "</a></span>... <a href='javascript:resetGrid()'>show all</a>");
         msgBox.show();
         filterGrid({'term_type' : term_type, 'value' : value });
     } else {

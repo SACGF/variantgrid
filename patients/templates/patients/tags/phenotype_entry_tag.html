@@ -124,9 +124,10 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
         addToDescription(value);
 
         const AUTOCOMPLETE_IDS = {
-            'hpo': 'id_hpo_synonym',
-            'omim': 'id_mim_morbid_alias',
-            'gene': 'id_gene',
+            'hpo': 'id_hpo',
+            'omim': 'id_omim',
+            'mondo': 'id_mondo',
+            'gene': 'id_gene_symbol',
         };
         ignoreAutcompleteChangeEvent = true;
         for (const t in AUTOCOMPLETE_IDS) {
@@ -169,10 +170,10 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
             const grid = selector.jqGrid({
                 datatype: "local",
                 data: gridData,
-                colModel: [{name: 'term_type', index: 'term_type', 'label': 'Term Type'},
-                    {name: 'accession', index: 'accession', 'label': 'Accession'},
-                    {name: 'name', index: 'name', 'label': 'Name'},
-                    {name: 'gene_symbols', index: 'gene_symbols', 'label': 'Gene Symbols'},
+                colModel: [
+                    {name: 'accession', index: 'accession', label: 'Accession', formatter: 'ontologyTermFormatter'},
+                    {name: 'name', index: 'name', label: 'Name'},
+                    {name: 'gene_symbols', index: 'gene_symbols', label: 'Gene Symbols'},
                 ],
                 caption: "Matched Phenotype Terms",
                 height: 'auto',
@@ -201,6 +202,18 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
 
     function showGrid() {   
         $("#phenotype-entry-terms-grid-container", phenotypeEditorTag).show();
+    }
+
+    function ontologyTermFormatter(termText) {
+        let m = termText.match(/(.*):(\d+) /);
+        if (m) {
+            let safeTermId = m[1] + "_" + m[2];
+            let url = Urls.ontology_term(safeTermId);
+            console.log(url);
+            termText = `<a href='${url}' target='_blank'>${termText}</a>`;
+
+        }
+        return termText;
     }
 
     
@@ -243,6 +256,12 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
         {% endif %}
         
     });
+
+    jQuery.extend($.fn.fmatter , {
+        'ontologyTermFormatter': ontologyTermFormatter,
+    });
+
+
 })();
 </script>
 {% if show_page_help %}

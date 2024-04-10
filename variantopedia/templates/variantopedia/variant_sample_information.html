@@ -119,7 +119,8 @@
                 const terms = term_list.split('|');
                 for (let i=0 ; i<terms.length ; ++i) {
                     const term = terms[i];
-                    links += "<span class='grid-term-link " + term_type + "' title='" + term + "' term='" + term + "' term_type='" + term_type + "'>" + term + "</span>";
+                    let url = Urls.ontology_term_text(term_type, term);
+                    links += "<span class='grid-term-link " + term_type + "' title='" + term + "' term='" + term + "' term_type='" + term_type + "'><a href='" + url + "' target='_blank'>" + term + "</a></span>";
                 }
             }
             return links;
@@ -209,13 +210,13 @@
                     return ZYGOSITY_DICT[zygosity] || zygosity;
                 },
                 hpoFormatter : function(phenotype_terms) {
-                    return getTermLinks('hpo', phenotype_terms);
+                    return getTermLinks('HP', phenotype_terms);
                 },
                 omimFormatter : function(omim_terms) {
-                    return getTermLinks('omim', omim_terms);
+                    return getTermLinks('OMIM', omim_terms);
                 },
                 mondoFormatter : function(mondo_terms) {
-                    return getTermLinks('mondo', mondo_terms);
+                    return getTermLinks('MONDO', mondo_terms);
                 },
                 sampleFormatFieldFormatter : sampleFormatFieldFormatter,
             });
