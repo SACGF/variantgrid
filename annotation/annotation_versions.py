@@ -5,7 +5,7 @@ from django.db.models.aggregates import Max, Min, Count
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
-from annotation.models import AnnotationRangeLock, Variant, AnnotationStatus
+from annotation.models import AnnotationRun, AnnotationRangeLock, Variant, AnnotationStatus
 from annotation.models import VariantAnnotationVersion
 from annotation.vep_annotation import get_vep_variant_annotation_version_kwargs
 from library.django_utils import highest_pk
@@ -100,9 +100,10 @@ def get_annotation_range_lock_and_unannotated_count(variant_annotation_version: 
 
 def get_lowest_unannotated_variant_id(variant_annotation_version):
     # Get min_variant_id from annotation lock that hasn't completed
-    qs = AnnotationRangeLock.objects.filter(version=variant_annotation_version)
-    unannotated_qs = qs.exclude(annotationrun__status=AnnotationStatus.FINISHED)
-    data = unannotated_qs.aggregate(first_unannotated_variant_id=Min("min_variant_id"))
+    # There can be multiple AnnotationRuns (Statndard/SV) for a range lock
+    qs = AnnotationRun.objects.filter(annotation_range_lock__version=variant_annotation_version)
+    unannotated_qs = qs.exclude(status=AnnotationStatus.FINISHED)
+    data = unannotated_qs.aggregate(first_unannotated_variant_id=Min("annotation_range_lock__min_variant_id"))
     first_unannotated_variant_id = data["first_unannotated_variant_id"]
     if first_unannotated_variant_id is None:
         # All annotation locks completed - get 1 past the highest max
