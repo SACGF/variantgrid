@@ -19,7 +19,7 @@ admin.site.register(models.VariantAnnotationVersion)
 
 
 @admin.register(AnnotationRun)
-class AnnotationRun(ModelAdminBasics):
+class AnnotationRunAdmin(ModelAdminBasics):
     list_display = ("pk", "pipeline_type", "status")
     list_filter = ("pipeline_type", "status")
 
