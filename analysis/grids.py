@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied
 from django.db.models import Max, F, Q, QuerySet
+from django.db.models.functions import Substr
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 from django.utils.functional import SimpleLazyObject
@@ -46,6 +47,7 @@ class VariantGrid(AbstractVariantGrid):
         if af_show_in_percent is None:
             af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
 
+        self.cohorts, self.visibility = node.get_cohorts_and_sample_visibility()
         self.fields, override = self._get_fields_and_overrides(node, af_show_in_percent)
         super().__init__(user)  # Need to call init after setting fields
 
@@ -153,9 +155,8 @@ class VariantGrid(AbstractVariantGrid):
 
         update_dict_of_dict_values(overrides, self._get_standard_overrides(af_show_in_percent))
         update_dict_of_dict_values(overrides, node.get_extra_colmodel_overrides())
-        cohorts, visibility = node.get_cohorts_and_sample_visibility()
-        if cohorts:
-            sample_columns, sample_overrides = VariantGrid.get_grid_genotype_columns_and_overrides(cohorts, visibility, af_show_in_percent)
+        if self.cohorts:
+            sample_columns, sample_overrides = VariantGrid.get_grid_genotype_columns_and_overrides(self.cohorts, self.visibility, af_show_in_percent)
             if sample_columns_position:
                 fields = fields[:sample_columns_position] + sample_columns + fields[sample_columns_position:]
             else:
@@ -210,7 +211,7 @@ class VariantGrid(AbstractVariantGrid):
         packed_data_replace = dict(Zygosity.CHOICES)
         # Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for
         # empty values (what CyVCF2 returns using format()) @see https://github.com/SACGF/variantgrid/issues/59
-        MISSING_VALUES = [CohortGenotype.MISSING_NUMBER_VALUE, -2147483648]
+        MISSING_VALUES = [CohortGenotype.MISSING_NUMBER_VALUE, -2147483648] #
         packed_data_replace.update({mv: VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE for mv in MISSING_VALUES})
 
         # Record the 1st cohort a sample appears in, and the concatenated cohorts index
@@ -230,22 +231,50 @@ class VariantGrid(AbstractVariantGrid):
             for column, (column_label, label_format, width) in sample_columns.items():
                 if not available_format_columns[column]:
                     continue
-                column_names.append(f"{sample.pk}_{column}")
+                column_names.append(f"sample_{sample.pk}_{column}")
                 label = label_format % {"sample": sample.name, "label": column_label}
                 server_side_formatter = VariantGrid._get_sample_columns_server_side_formatter(sample,
                                                                                               packed_data_replace,
                                                                                               column, cc_index,
                                                                                               af_show_in_percent)
+                cgc = cohort.cohort_genotype_collection
+                sql_index = cgc.get_sql_index_for_sample_id(sample.pk)
+
                 col_data_dict = {
                     "label": label,
                     "width": width,
                     "server_side_formatter": server_side_formatter,
-                    "order_by": cohort.get_sample_column_order_by(sample, column)
+                    # Index is what is passed back to server side for sorting - we'll pack the info here
+                    "index": ":".join([cgc.cohortgenotype_alias, str(sql_index), column]),
                 }
                 column_data.append(col_data_dict)
 
         overrides = get_overrides(column_names, column_data, model_field=False, queryset_field=False)
         return column_names, overrides
+
+    def _sort_items(self, items, sidx, sord):
+        """ Special case to handle sort by CohortGenotype packed fields """
+        if sidx is not None:
+            # For special fields, we pack sorting info into the 'index' which doesn't map to a field
+            # looks like 'cohortgenotype_134:1:samples_zygosity'
+            if ":" in sidx:
+                sort_alias = "cohort_genotype_sample_sort_alias"
+                cohortgenotype_alias, sql_index, column = sidx.split(":")
+                sql_index = int(sql_index)
+                is_array, _ = CohortGenotype.COLUMN_IS_ARRAY_EMPTY_VALUE[column]
+                if is_array:
+                    # Django index transforms are 0-based
+                    # https://docs.djangoproject.com/en/5.0/ref/contrib/postgres/fields/#index-transforms
+                    django_index = sql_index-1
+                    sort_func = F(f"{cohortgenotype_alias}__{column}__{django_index}")
+                else:
+                    # Is string...
+                    sort_func = Substr(f"{cohortgenotype_alias}__{column}", sql_index, length=1)
+
+                items = items.annotate(**{sort_alias: sort_func})
+                sidx = sort_alias
+
+        return super()._sort_items(items, sidx, sord)
 
 
 class AnalysesGrid(JqGridUserRowConfig):

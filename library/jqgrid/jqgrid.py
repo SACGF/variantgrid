@@ -261,8 +261,12 @@ class JqGrid:
 
     def sort_items(self, request, items):
         sidx = request.GET.get('sidx')
+        sord = request.GET.get('sord')
+        return self._sort_items(items, sidx, sord)
+
+    def _sort_items(self, items, sidx, sord):
+        """ Moved code into here to make it easier to overwrite sidx in subclasses (as request.GET is immutable) """
         if sidx is not None:
-            sord = request.GET.get('sord')
             order_by = F(sidx)
             # dlawrence - sort nulls first/last via
             # https://docs.djangoproject.com/en/3.1/ref/models/expressions/#using-f-to-sort-null-values
@@ -281,7 +285,6 @@ class JqGrid:
             # always ultimately sort by PK to ensure reliable results
             order_by_list.append("-pk")
             try:
-                # print(f"ORDER BY: {order_by_list}")
                 items = items.order_by(*order_by_list)
             except FieldError as fe:
                 print(fe)

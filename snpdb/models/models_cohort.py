@@ -193,18 +193,6 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
     def get_absolute_url(self):
         return reverse('view_cohort', kwargs={"cohort_id": self.pk})
 
-    def get_sample_column_order_by(self, sample, column) -> str:
-        """ Used to sort analysis grid """
-        cgc = self.cohort_genotype_collection
-        i = cgc.get_sql_index_for_sample_id(sample.pk)
-        source = f"{cgc.get_partition_table()}.{column}"
-        is_array = column != "samples_zygosity"
-        if is_array:
-            order_by = f"{source}[{i}]"
-        else:
-            order_by = f"substring({source}, {i}, 1)"
-        return order_by
-
     @classmethod
     def get_listing_url(cls):
         return reverse('cohorts')
