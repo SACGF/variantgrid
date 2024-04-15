@@ -223,7 +223,7 @@ class ClinVarExportSync:
                 if responses:
                     response_json = responses[0]
                     status = response_json.get('status')
-                    if status == "processing":
+                    if status in {"processing", "submitted"}:
                         return ClinVarResponseOutcome.ASK_AGAIN_LATER
                     elif files := response_json.get("files"):
                         for file_json in files:
@@ -238,7 +238,7 @@ class ClinVarExportSync:
                         return ClinVarResponseOutcome.COMPLETE
 
         # couldn't find "processing" or still in progress, this is unexpected
-        raise ValueError(f"Processing of JSON for request {clinvar_request.pk} couldn't find status of processing or file")
+        raise ValueError(f"Processing of JSON for request {clinvar_request.pk} couldn't find status of processing, submitted or file")
 
     def _handle_response_file(self, clinvar_request: ClinVarExportRequest) -> ClinVarResponseOutcome:
         if (response_json := clinvar_request.response_json) and (submissions_json := response_json.get('submissions')):
