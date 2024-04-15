@@ -223,7 +223,7 @@ class ClinVarExportSync:
                 if responses:
                     response_json = responses[0]
                     status = response_json.get('status')
-                    if status in {"processing", "submitted"}:
+                    if status == "processing":
                         return ClinVarResponseOutcome.ASK_AGAIN_LATER
                     elif files := response_json.get("files"):
                         for file_json in files:
@@ -236,6 +236,9 @@ class ClinVarExportSync:
                     # only expect responses to be an empty array if we're submitting to test
                     if action_json.get("targetDb") == "clinvar-test":
                         return ClinVarResponseOutcome.COMPLETE
+                    if status := action_json.get('status'):
+                        if status == "submitted":
+                            return ClinVarResponseOutcome.ASK_AGAIN_LATER
 
         # couldn't find "processing" or still in progress, this is unexpected
         raise ValueError(f"Processing of JSON for request {clinvar_request.pk} couldn't find status of processing, submitted or file")
