@@ -160,6 +160,7 @@ class AlleleConversionTool(models.TextChoices):
     NCBI_REMAP = 'NR', "NCBI Remap"  # This is obsolete as of November 2023
     PICARD = "PC", "Picard LiftoverVCF"
     CROSSMAP = "CM", "CrossMap"
+    BCFTOOLS_LIFTOVER = "BL", "BCFtools/liftover"
 
     @classmethod
     def vcf_tuples_in_destination_build(cls, conversion_tool):
@@ -167,7 +168,8 @@ class AlleleConversionTool(models.TextChoices):
             cls.SAME_CONTIG: True,
             cls.CLINGEN_ALLELE_REGISTRY: True,
             cls.DBSNP: True,
-            cls.NCBI_REMAP: False
+            cls.NCBI_REMAP: False,
+            cls.BCFTOOLS_LIFTOVER: False,
         }
         return IN_DEST_BUILD[conversion_tool]
 
@@ -180,11 +182,11 @@ class AlleleOriginFilterDefault(models.TextChoices):
     @property
     def buckets(self) -> Set[AlleleOriginBucket]:
         if self == AlleleOriginFilterDefault.SHOW_ALL:
-            return set(AlleleOriginBucket.values)
+            return {AlleleOriginBucket.values}
         elif self == AlleleOriginFilterDefault.GERMLINE:
-            return set([AlleleOriginBucket.GERMLINE, AlleleOriginBucket.UNKNOWN])
+            return {AlleleOriginBucket.GERMLINE, AlleleOriginBucket.UNKNOWN}
         elif self == AlleleOriginFilterDefault.SOMATIC:
-            return set([AlleleOriginBucket.SOMATIC, AlleleOriginBucket.UNKNOWN])
+            return {AlleleOriginBucket.SOMATIC, AlleleOriginBucket.UNKNOWN}
 
 
 class ClinGenAlleleExternalRecordType(Enum):

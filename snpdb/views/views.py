@@ -47,7 +47,7 @@ from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import CustomGeneListForm, UserGeneListForm, GeneAndTranscriptForm
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList
 from library.constants import WEEK_SECS, HOUR_SECS
-from library.django_utils import add_save_message, get_model_fields, set_form_read_only
+from library.django_utils import add_save_message, get_model_fields, set_form_read_only, require_superuser
 from library.guardian_utils import DjangoPermission
 from library.keycloak import Keycloak
 from library.utils import full_class_name, import_class, rgb_invert
@@ -72,7 +72,7 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
     VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, SampleStats, \
-    SampleStatsPassingFilter, TagColorsCollection, Contig
+    SampleStatsPassingFilter, TagColorsCollection, Contig, Liftover, AlleleSource
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, SequenceRole
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
@@ -1495,6 +1495,21 @@ def labs_graph_detail(request):
 
         context["vc_normalized_state_data_json"] = vc_normalized_state_data_json
     return render(request, "snpdb/labs_graph_detail.html", context)
+
+
+@require_superuser
+def liftover(request):
+    context = {}
+    return render(request, "snpdb/liftover/liftover.html", context)
+
+
+@require_superuser
+def view_liftover(request, liftover_id):
+    liftover = Liftover.objects.get(pk=liftover_id)
+    context = {
+        "liftover": liftover
+    }
+    return render(request, "snpdb/liftover/view_liftover.html", context)
 
 
 @login_not_required

@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Optional
+from typing import Optional, Any
 
 from django.conf import settings
 from django.db.models import F, QuerySet
@@ -10,11 +10,11 @@ from guardian.shortcuts import get_objects_for_user
 
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
-from library.utils import calculate_age
+from library.utils import calculate_age, JsonDataType
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
     GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig, GenomeBuild, ClinGenAllele, \
-    VariantZygosityCountCollection, TagColorsCollection
+    VariantZygosityCountCollection, TagColorsCollection, Liftover, AlleleConversionTool
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs, remove_soft_deleted_vcfs_task
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
@@ -462,3 +462,48 @@ class TagColorsCollectionColumns(DatatableConfig[TagColorsCollection]):
 
     def get_initial_queryset(self) -> QuerySet[TagColorsCollection]:
         return TagColorsCollection.filter_for_user(self.user)
+
+
+class LiftoverColumns(DatatableConfig[Liftover]):
+
+    def __init__(self, request):
+        super().__init__(request)
+        self.user = request.user
+
+        self.rich_columns = [
+            RichColumn(key="id", renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            # Don't bother with user as always admin/admin bot
+            # RichColumn(key="user__username", label="User", orderable=True),
+            RichColumn(key="created", client_renderer='TableFormat.timestamp',
+                       orderable=True, default_sort=SortOrder.DESC),
+            # Don't bother with modified as always same time as created
+            # RichColumn(key='allele_source', orderable=True),
+            RichColumn(key='conversion_tool', renderer=self.render_conversion_tool, orderable=True),
+            RichColumn(key='source_vcf', orderable=True),
+            RichColumn(key='source_genome_build', label='Source Build', orderable=True),
+            RichColumn(key='genome_build', label='Dest Build', orderable=True),
+            RichColumn(key="uploadedliftover__uploaded_file__uploadpipeline__status",
+                       label='Status', renderer=self.render_import_status, orderable=True),
+            RichColumn(key="uploadedliftover__uploaded_file__uploadpipeline__items_processed",
+                       label='Processed', orderable=True),
+        ]
+
+    def render_conversion_tool(self, row: dict[str, Any]) -> JsonDataType:
+        label = ""
+        if conversion_tool := row['conversion_tool']:
+            act = AlleleConversionTool(conversion_tool)
+            label = act.label
+        return label
+
+    def render_import_status(self, row: dict[str, Any]) -> JsonDataType:
+        label = ""
+        if status := row['uploadedliftover__uploaded_file__uploadpipeline__status']:
+            import_status = ImportStatus(status)
+            label = import_status.label
+        return label
+
+
+    def get_initial_queryset(self) -> QuerySet[TagColorsCollection]:
+        return Liftover.objects.all()
+

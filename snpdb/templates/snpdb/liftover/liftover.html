@@ -1,0 +1,21 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load js_tags %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% block title %}Liftover{% endblock %}
+{% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
+{% block content %}
+    <script>
+    </script>
+
+    <div class="container">
+        <h3>Liftover</h3>
+
+        <table id="liftover-datatable" data-datatable-url="{% url 'liftover_datatable' %}" class="sticky-header responsive"></table>
+    </div>
+{% endblock %}
+
+
