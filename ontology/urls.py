@@ -7,7 +7,8 @@ from variantgrid.perm_path import perm_path
 
 urlpatterns = [
     perm_path('term/<slug:term>', OntologyTermView.as_view(), name='ontology_term'),
-    perm_path('term/<ontology_service>/<name>', ontology_term_text, name='ontology_term_text'),
+    # Need to use 'path' below to as ontology term names have slashes in them
+    perm_path('term/<ontology_service>/<path:name>', ontology_term_text, name='ontology_term_text'),
     perm_path('autocomplete/HPO', views_autocomplete.HPOAutocompleteView.as_view(), name='hpo_autocomplete'),
     perm_path('autocomplete/OMIM', views_autocomplete.OMIMAutocompleteView.as_view(), name='omim_autocomplete'),
     perm_path('autocomplete/HGNC', views_autocomplete.HGNCAutocompleteView.as_view(), name='hgnc_autocomplete'),
