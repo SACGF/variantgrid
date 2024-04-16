@@ -40,7 +40,7 @@ class Command(BaseCommand):
         q = ~Q(status=ImportedAlleleInfoStatus.FAILED) & reduce(operator.or_, filters)
         iai_qs = ImportedAlleleInfo.objects.all()
         iai_ids_with_hgvs_errors = set()
-        for iai in iai_qs.filter(q):
+        for iai in iai_qs.filter(q).iterator():
             matcher = genome_build_matchers[iai.imported_genome_build]
             hgvs_name = iai.imported_c_hgvs or iai.imported_g_hgvs
             try:
@@ -50,5 +50,6 @@ class Command(BaseCommand):
                 iai_ids_with_hgvs_errors.add(iai.pk)
 
         rematch_iai_qs = ImportedAlleleInfo.objects.filter(pk__in=iai_ids_with_hgvs_errors)
+        print(f"Have {rematch_iai_qs.count()} ImportAlleleIDs to fix")
         user = admin_bot()
         reattempt_variant_matching(user, rematch_iai_qs)
