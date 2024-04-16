@@ -118,7 +118,7 @@
                                         {% labelled label="For Term" %}{% ontology_term suggestion_detail.term show_link=True %}{% endlabelled %}
                                     {% endif %}
                                     {% if gene_symbol %}
-                                        {% labelled label="Has Gene Relationship" %}{{ suggestion_detail.has_gene_symbol_relationship|boolean }}{% endlabelled %}
+                                        {% labelled label="Has Strong Gene Relationship" %}{{ suggestion_detail.has_gene_symbol_relationship|boolean }}{% endlabelled %}
                                     {% endif %}
                                     {% labelled label="Descendants" %}
                                         {% with descendants=suggestion_detail.descendants %}
