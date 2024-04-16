@@ -30,6 +30,15 @@ CLINVAR_TO_VG_CLIN_SIG = {
     "unknown": None
 }
 
+SOMATIC_CLIN_SIG_VALUE = {
+    "tier i": "tier_1",
+    "tier ii": "tier_2",
+    "tier iii": "tier_3",
+    "tier iv": "tier_4",
+    "tier i/ii": "tier_1_or_2",
+}
+
+
 CLINVAR_REVIEW_STATUS_TO_STARS = {
     "no assertion criteria provided": 1,
     "criteria provided, single submitter": 2,
