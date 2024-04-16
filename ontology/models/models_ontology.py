@@ -1059,13 +1059,21 @@ class OntologySnake:
         update_gene_relations(gene_symbol)
         terms = set()
 
+        otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
         q_relation = OntologySnake.gencc_quality_filter()
 
-        mondos = OntologyTermRelation.objects.filter(q_relation, dest_term=gene_ontology,
-                                                     source_term__ontology_service=OntologyService.MONDO)
+        mondos = otr_qs.filter(
+            q_relation,
+            dest_term=gene_ontology,
+            source_term__ontology_service=OntologyService.MONDO
+        )
         terms = terms.union(set(mondos.values_list("source_term_id", flat=True)))
-        omim_ids = OntologyTermRelation.objects.filter(q_relation, dest_term=gene_ontology,
-                                                       source_term__ontology_service=OntologyService.OMIM).values_list("source_term_id", flat=True)
+        omim_ids = otr_qs.objects.filter(
+            q_relation,
+            dest_term=gene_ontology,
+            source_term__ontology_service=OntologyService.OMIM
+        ).values_list("source_term_id", flat=True)
+
         if omim_ids:
             # relationships are always MONDO -> OMIM, and MONDO -> HGNC, OMIM -> HGNC
             via_omim_mondos = OntologyTermRelation.objects.filter(source_term__ontology_service=OntologyService.MONDO, dest_term_id__in=omim_ids).exclude(relation__in={OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM}).values_list("source_term_id", flat=True)
@@ -1101,17 +1109,18 @@ class OntologySnake:
             gene_term = OntologyTerm.get_gene_symbol(gene_symbol)
             # try direct link first
             quality_q = OntologySnake.gencc_quality_filter(quality)
-            if OntologyTermRelation.objects.filter(source_term=term, dest_term=gene_term).filter(quality_q).exists():
+            otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
+            if otr_qs.filter(source_term=term, dest_term=gene_term).filter(quality_q).exists():
                 return True
             # optimisations for OMIM/MONDO
             if term.ontology_service in {OntologyService.MONDO, OntologyService.OMIM}:
                 via_ids: QuerySet = None
                 exclude_mondo_omim = ~Q(relation__in={OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM})
                 if term.ontology_service == OntologyService.MONDO:
-                    via_ids = OntologyTermRelation.objects.filter(source_term=term, dest_term__ontology_service=OntologyService.OMIM).filter(quality_q).filter(exclude_mondo_omim).values_list("dest_term_id", flat=True)
+                    via_ids = otr_qs.filter(source_term=term, dest_term__ontology_service=OntologyService.OMIM).filter(quality_q).filter(exclude_mondo_omim).values_list("dest_term_id", flat=True)
                 else:
-                    via_ids = OntologyTermRelation.objects.filter(dest_term=term, source_term__ontology_service=OntologyService.MONDO).filter(quality_q).filter(exclude_mondo_omim).values_list("source_term_id", flat=True)
-                return OntologyTermRelation.objects.filter(source_term_id__in=via_ids, dest_term=gene_term).exists()
+                    via_ids = otr_qs.filter(dest_term=term, source_term__ontology_service=OntologyService.MONDO).filter(quality_q).filter(exclude_mondo_omim).values_list("source_term_id", flat=True)
+                return otr_qs.filter(source_term_id__in=via_ids, dest_term=gene_term).exists()
 
             hgnc_terms = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC).leafs()
             return gene_term in hgnc_terms
