@@ -12,29 +12,28 @@ Ideally, this could have been done via Django FilteredRelation - but that doesn'
 
 import operator
 from functools import reduce
-
+from django.db.models import QuerySet
 from django.db.models.query_utils import Q
-
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationPipelineType
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
 from snpdb.models import Variant
 
 
-def get_variant_queryset_for_latest_annotation_version(genome_build):
+def get_variant_queryset_for_latest_annotation_version(genome_build) -> QuerySet:
     annotation_version = AnnotationVersion.latest(genome_build)
     return get_variant_queryset_for_annotation_version(annotation_version)
 
 
-def get_variant_queryset_for_annotation_version(annotation_version):
+def get_variant_queryset_for_annotation_version(annotation_version) -> QuerySet:
     return get_queryset_for_annotation_version(Variant, annotation_version)
 
 
-def get_queryset_for_latest_annotation_version(klass, genome_build):
+def get_queryset_for_latest_annotation_version(klass, genome_build) -> QuerySet:
     annotation_version = AnnotationVersion.latest(genome_build)
     return get_queryset_for_annotation_version(klass, annotation_version=annotation_version)
 
 
-def get_queryset_for_annotation_version(klass, annotation_version):
+def get_queryset_for_annotation_version(klass, annotation_version) -> QuerySet:
     """ Returns a klass QuerySet for which joins to the correct VariantAnnotation partition """
 
     assert annotation_version, "Must provide 'annotation_version'"

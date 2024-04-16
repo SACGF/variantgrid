@@ -1,4 +1,7 @@
+from typing import Optional
+
 from django.db import models
+from django.db.models import QuerySet, Q
 from django.db.models.deletion import CASCADE
 from model_utils.managers import InheritanceManager
 
@@ -52,20 +55,17 @@ class GeneCountType(models.Model):
                             cgc.launch_task(gene.pk)
 
     @staticmethod
-    def get_gene_by_variant_annotation_version(classification):
+    def get_gene_by_variant_annotation_version(classification: Classification):
         gene_by_vav_id = {}
         for vav in VariantAnnotationVersion.objects.all():
-            variant_annotation = classification.get_variant_annotation(vav)
-            if variant_annotation:
+            if variant_annotation := classification.get_variant_annotation(vav):
                 gene_by_vav_id[vav.pk] = variant_annotation.gene
         return gene_by_vav_id
 
-    def _get_variant_q(self, genome_build: GenomeBuild):
-        q_variant = None
+    def _get_variant_q(self, genome_build: GenomeBuild) -> Optional[Q]:
         if self.uses_classifications:
             vc_qs = self.get_classification_qs()
-            q_variant = Classification.get_variant_q_from_classification_qs(vc_qs, genome_build)
-        return q_variant
+            return Classification.get_variant_q_from_classification_qs(vc_qs, genome_build)
 
     def get_variant_queryset(self, variant_annotation_version: VariantAnnotationVersion):
         annotation_version = variant_annotation_version.get_any_annotation_version()
@@ -73,12 +73,11 @@ class GeneCountType(models.Model):
         qs = get_variant_queryset_for_annotation_version(annotation_version=annotation_version)
         kwargs = {VariantAnnotation.GENE_COLUMN + "__isnull": False}
         qs = qs.filter(Variant.get_no_reference_q(), **kwargs)
-        q_variant = self._get_variant_q(annotation_version.genome_build)
-        if q_variant:
+        if q_variant := self._get_variant_q(annotation_version.genome_build):
             qs = qs.filter(q_variant)
         return qs
 
-    def get_classification_qs(self, last_published: bool = True):
+    def get_classification_qs(self, last_published: bool = True) -> QuerySet[Classification]:
         """ @param last_published - set to False to look through historical modifications """
 
         if not self.uses_classifications:

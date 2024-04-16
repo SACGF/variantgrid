@@ -2014,12 +2014,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return self.variant.allele.variant_for_build_optional(genome_build)
         return None
 
-    def get_variant_annotation(self, variant_annotation_version: VariantAnnotationVersion) -> Optional[Variant]:
-        variant_annotation = None
-        variant = self.get_variant_for_build(variant_annotation_version.genome_build)
-        if variant:
-            variant_annotation = variant.variantannotation_set.filter(version=variant_annotation_version).first()
-        return variant_annotation
+    def get_variant_annotation(self, variant_annotation_version: VariantAnnotationVersion) -> Optional[VariantAnnotation]:
+        if variant := self.get_variant_for_build(variant_annotation_version.genome_build):
+            return variant.variantannotation_set.filter(version=variant_annotation_version).first()
 
     def c_hgvs_all(self) -> List[CHGVS]:
         all_chgvs: List[CHGVS] = []
