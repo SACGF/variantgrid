@@ -24,28 +24,46 @@
     </div>
 </div>
 {% if records %}
-    <table class="table">
+    <table class="classification-table table">
         <thead>
             <tr>
+                <th></th>
                 <th>Submitter</th>
                 <th style="min-width:220px">HGVS</th>
-                <th class="text-center" style="width:150px">Classification</th>
-                <th style="min-width:200px">Condition</th>
-                <th style="width:155px">Curated</th>
+                <th class="text-center">Classification</th>
+                <th class="text-center">Somatic Clinical Significance</th>
+                <th >Condition</th>
+                <th class="text-center" >Curated</th>
             </tr>
         </thead>
         <tbody>
             {% for record in records %}
                 <tr>
+                <td style="align-items: center;align-content: center;">
+                    {%  if record.allele_origin_bucket %}
+                        {% clinical_context cc=record orientation='vertical' %}
+                    {% endif %}
+                </td>
                     <td>{% clinvar_stars record.stars record.review_status %} <a class="subtle-link" href="https://www.ncbi.nlm.nih.gov/clinvar/submitters/{{ record.org_id }}">{{ record.submitter }}</a>
                         <br/><span class="text-secondary">{{ record.record_id }}</span>
                     </td>
-                    <td>{% if record.c_hgvs %}{% c_hgvs record.c_hgvs %}{% elif record.variant_coordinate %}{{ record.variant_coordinate }}{% else %}<span class="no-value">-</span>{% endif %}</td>
-                    <td class="text-center">
-                        <span class="c-pill cs cs-{{ record.clinical_significance }}">{{ record.clinical_significance | ekey:"clinical_significance" }}</span>
+                    <td class="dt-c_hgvs">{% if record.c_hgvs %}{% c_hgvs record.c_hgvs %}{% elif record.variant_coordinate %}{{ record.variant_coordinate }}{% else %}<span class="no-value">-</span>{% endif %}</td>
+                    <td class="dt-clinical_significance text-center">
+                        {% if record.clinical_significance %}
+                            <span class="c-pill cs cs-{{ record.clinical_significance }}">{{ record.clinical_significance | ekey:"clinical_significance" }}</span>
+                        {% else %}
+                            <span class="no-value">-</span>
+                        {% endif %}
                     </td>
-                    <td>{% if record.condition %}{% ontology_term record.condition %}{% else %}<span class="no-value">-</span>{% endif %}</td>
-                    <td>{% timestamp record.date_last_evaluated time_ago=True %}</td>
+                    <td class="dt-clinical_significance text-center">
+                        {% if record.somatic_clinical_significance %}
+                            <span class="c-pill cs scs-{{ record.somatic_clinical_significance }}">{{ record.somatic_clinical_significance | ekey:"somatic:clinical_significance" }}</span>
+                        {% else %}
+                            <span class="no-value">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="dt-condition">{% if record.condition %}{% ontology_term record.condition %}{% else %}<span class="no-value">-</span>{% endif %}</td>
+                    <td class="dt-created text-center">{% timestamp record.date_last_evaluated time_ago=True %}</td>
                 </tr>
             {% endfor %}
         </tbody>

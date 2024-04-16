@@ -39,7 +39,7 @@ class ClinVarAdmin(ModelAdminBasics):
 class ClinVarRecordAdmin(TabularInline):
     model = ClinVarRecord
 
-    fields = ("record_id", "submitter", "hgvs", "condition", "stars", "date_last_evaluated", "clinical_significance")
+    fields = ("record_id", "submitter", "hgvs", "condition", "stars", "date_last_evaluated", "clinical_significance", "somatic_clinical_significance", "allele_origin_bucket")
     readonly_fields = ("hgvs", )
 
     def hgvs(self, obj: ClinVarRecord):

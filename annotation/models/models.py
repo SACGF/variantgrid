@@ -32,6 +32,7 @@ from annotation.models.models_enums import AnnotationStatus, \
     ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, \
     EssentialGeneGeneTrap, VariantAnnotationPipelineType
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
+from classification.enums import AlleleOriginBucket
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
@@ -250,10 +251,12 @@ class ClinVarRecord(TimeStampedModel):
     variant_coordinate = models.TextField(null=True, blank=True)
     condition = models.TextField(null=True, blank=True)
     clinical_significance = models.TextField(null=True, blank=True)
+    somatic_clinical_significance = models.TextField(null=True, blank=True)
     gene_symbol = models.TextField(null=True, blank=True)
     interpretation_summary = models.TextField(null=True, blank=True)
     assertion_method = models.TextField(null=True, blank=True)
     allele_origin = models.TextField(null=True, blank=True)
+    allele_origin_bucket = models.TextField(choices=AlleleOriginBucket.choices, null=True, blank=True)
 
     def __lt__(self, other):
         def sort_key(record: ClinVarRecord):

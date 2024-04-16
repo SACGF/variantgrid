@@ -3,7 +3,7 @@ import re
 from Bio import Entrez
 
 from annotation.clinvar_xml_parser import ClinVarXmlParser, ClinVarXmlParserOutput, CLINVAR_REVIEW_STATUS_TO_STARS, \
-    CLINVAR_TO_VG_CLIN_SIG
+    CLINVAR_TO_VG_CLIN_SIG, SOMATIC_CLIN_SIG_VALUE
 from library.utils.xml_utils import parser_path, PP
 
 
@@ -77,8 +77,19 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         "GermlineClassification")
     def parse_clinical_significance_desc(self, elem):
         if cs := elem.text:
+            self.latest.allele_origin_bucket = "G"
             cs = cs.lower()
             self.latest.clinical_significance = CLINVAR_TO_VG_CLIN_SIG.get(cs, cs)
+
+    @parser_path(
+        "Classification",
+        "SomaticClinicalImpact")
+    def parse_somatic_clinical_significance_desc(self, elem):
+        if cs := elem.text:
+            self.latest.allele_origin_bucket = "S"
+            cs = cs.lower()
+            cs = cs.split("-")[0].strip()
+            self.latest.somatic_clinical_significance = SOMATIC_CLIN_SIG_VALUE.get(cs, cs)
 
     @parser_path(
         "Classification",
