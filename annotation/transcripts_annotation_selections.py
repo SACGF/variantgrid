@@ -1,5 +1,6 @@
 import operator
 from functools import cached_property
+from typing import Any, Optional
 
 from django.conf import settings
 from django.forms.models import model_to_dict
@@ -9,7 +10,7 @@ from annotation.models import VEPSkippedReason, AnnotationStatus
 from annotation.models.models import VariantAnnotation, AnnotationVersion, \
     InvalidAnnotationVersionError, VariantTranscriptAnnotation, AnnotationRun
 from genes.hgvs import HGVSMatcher, HGVSException
-from genes.models import TranscriptVersion, GnomADGeneConstraint
+from genes.models import TranscriptVersion, GnomADGeneConstraint, Transcript
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
@@ -40,7 +41,7 @@ class VariantTranscriptSelections:
         else:
             self.other_annotation_consortium = AnnotationConsortium.REFSEQ
         self.hide_other_annotation_consortium_transcripts = hide_other_annotation_consortium_transcripts
-        self.variant_annotation = None
+        self.variant_annotation: Optional[VariantAnnotation] = None
         self.gene_annotations = {}
         self.transcript_data = []  # See docstring in _populate for details
         self.warning_messages = []
@@ -66,7 +67,7 @@ class VariantTranscriptSelections:
     def variant_transcript_annotations_dict(self):
         return {d["transcript_id"]: d for d in self.transcript_data}
 
-    def get_transcript_annotation(self, transcript_version: TranscriptVersion):
+    def get_transcript_annotation(self, transcript_version: TranscriptVersion) -> dict[str, Any]:
         """ Try looking up Transcript accession or failing that, ID """
         vta = self.variant_transcript_annotations_dict
         try:
@@ -119,7 +120,7 @@ class VariantTranscriptSelections:
         except InvalidAnnotationVersionError as e:
             self.error_messages.append(str(e))
 
-    def _get_transcript_data(self, obj: VariantTranscriptAnnotation, representative_transcript):
+    def _get_transcript_data(self, obj: VariantTranscriptAnnotation, representative_transcript: Transcript) -> dict:
         data = model_to_dict(obj)
         # Use nice values if available
         for f in data:
@@ -191,7 +192,7 @@ class VariantTranscriptSelections:
                 selected_transcript_data["selected"] = True
                 self.initial_transcript_id = selected_transcript_data["transcript_id"]
 
-    def _add_other_annotation_consortium_transcripts(self, variant):
+    def _add_other_annotation_consortium_transcripts(self, variant: Variant):
         """ VariantAnnotation is populated from VEP as either RefSeq or Ensembl
             Whichever one is used will have molecular consequences etc.
 
