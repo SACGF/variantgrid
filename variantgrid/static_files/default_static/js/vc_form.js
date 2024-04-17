@@ -969,13 +969,27 @@ const VCForm = (function() {
 
             appendLabelHeadingForKey(SpecialEKeys.ASSERTION_METHOD, true, "Method")
 
-            if (this.record.resolved_condition) {
-                let label = "Condition";
-                if (alleleOriginBucket === "S") {
-                    label = "Cancer";
-                }
-                appendLabelHeading(label, VCForm.format_condition(this.record.resolved_condition));
+            let label = "Condition";
+            if (alleleOriginBucket === "S") {
+                label = "Cancer";
             }
+
+            let conditionElement;
+            if (this.record.resolved_condition) {
+                conditionElement = VCForm.format_condition(this.record.resolved_condition);
+            } else {
+                let condition = this.value(SpecialEKeys.CONDITION);
+                let condition_url = Urls.condition_matching(this.conditionResolution);
+
+                if (this.isEditMode() && this.conditionMatchingIsViewEnabled) {
+                    conditionElement = $('<a>', {href: condition_url , text: condition, class: 'hover-link', target: '_blank'});
+                } else {
+                    conditionElement = $('<span>', { text: condition });
+                }
+            }
+
+            appendLabelHeading(label, conditionElement);
+
 
             appendLabelHeadingForKey(SpecialEKeys.CLINICAL_SIGNIFICANCE, true, 'Class.');
 
@@ -1250,7 +1264,9 @@ const VCForm = (function() {
             this.userAdmin = params.userAdmin;
             this.lab_record_id = params.lab_record_id;
             this.citations = params.citations;
+            this.conditionResolution = params.conditionResolution;
             this.attachmentsEnabled = params.attachmentsEnabled || false;
+            this.conditionMatchingIsViewEnabled = params.conditionMatchingIsViewEnabled || false;
             
             jHelp = $(params.help);
             jCritTable = $(params.critTable);

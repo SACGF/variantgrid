@@ -367,6 +367,7 @@ def view_classification(request: HttpRequest, classification_id: str):
         'delete_enabled': settings.CLASSIFICATION_ALLOW_DELETE,
         'duplicate_records': duplicate_records,
         'withdraw_reasons': withdraw_reasons,
+        'condition_text_match': vc.condition_text_record if vc.condition_text_record else None,
     }
     return render(request, 'classification/classification.html', context)
 
