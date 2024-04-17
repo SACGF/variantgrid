@@ -281,6 +281,7 @@ class ClinVarKey(TimeStampedModel):
 
     default_affected_status = models.TextField(choices=ClinVarAssertionMethods.choices, null=True, blank=True)
     inject_acmg_description = models.BooleanField(blank=True, default=False)
+    include_interpretation_summary = models.BooleanField(blank=True, default=True)
     assertion_method_lookup = models.JSONField(null=False, default=dict)
     citations_mode = models.TextField(choices=ClinVarCitationsModes.choices, default=ClinVarCitationsModes.all)
 

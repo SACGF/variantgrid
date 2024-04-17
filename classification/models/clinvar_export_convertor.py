@@ -525,7 +525,7 @@ class ClinVarExportConverter:
 
         comment_parts: list[str] = []
 
-        if interpret := self.value(SpecialEKeys.INTERPRETATION_SUMMARY):
+        if self.clinvar_key.include_interpretation_summary and (interpret := self.value(SpecialEKeys.INTERPRETATION_SUMMARY)):
             comment_parts.append(interpret.strip())
 
         if self.clinvar_key.inject_acmg_description and (acmg_summary := self.classification_based_on.criteria_strength_summary()):
