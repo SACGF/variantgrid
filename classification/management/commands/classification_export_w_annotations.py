@@ -42,7 +42,7 @@ class Command(BaseCommand):
                 "lab",
                 "lab_record_id",
                 "c_hgvs_38",
-                "status" +
+                "status",
                 "splice_ai_acceptor_gain",
                 "splice_ai_acceptor_loss",
                 "splice_ai_donor_gain",
