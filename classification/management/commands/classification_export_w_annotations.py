@@ -5,6 +5,7 @@ from annotation.models import AnnotationVersion
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
 from classification.models import Classification, EvidenceKey
+from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild, Variant
 import csv
 
@@ -42,7 +43,12 @@ class Command(BaseCommand):
                 "lab",
                 "lab_record_id",
                 "c_hgvs_38",
+                "substituted_transcript_version",
                 "status",
+                "gnomad_af",
+                "gnomad_popmax",
+                "gnomad_popmax_af",
+                "gnomad_url",
                 "splice_ai_acceptor_gain",
                 "splice_ai_acceptor_loss",
                 "splice_ai_donor_gain",
@@ -53,9 +59,16 @@ class Command(BaseCommand):
             last_variant: Optional[Variant] = None
             variant_annotations: list
             status = "unresolved"
+            count = 0
             for c in Classification.objects.filter(withdrawn=False, allele_info__isnull=False).select_related("lab", "allele_info").order_by('allele_info__allele').iterator():
-                variant_annotation_cells = [None] * 4
+                count += 1
+                if count % 100 == 0:
+                    print(f"Processed {count}")
+                variant_annotation_cells = [None] * 7
+                gnomad_cells = [None] * 4
                 transcript_annotations_cells = [None] * len(transcript_annotation_keys)
+                substituted_transcript_version = None
+
                 if build := c.allele_info.grch38:
                     if build.variant:
                         status = "matched-but-no-annotations"
@@ -77,23 +90,45 @@ class Command(BaseCommand):
                                 if variant_annotation:
                                     status = "variant-annotated"
 
-                                if variant_annotation and variant_annotation.has_spliceai():
-                                    variant_annotation_cells = [
-                                        variant_annotation.spliceai_pred_ds_ag,
-                                        variant_annotation.spliceai_pred_ds_al,
-                                        variant_annotation.spliceai_pred_ds_dg,
-                                        variant_annotation.spliceai_pred_ds_dl
+                                    if variant_annotation.has_spliceai():
+                                        variant_annotation_cells = [
+                                            variant_annotation.spliceai_pred_ds_ag,
+                                            variant_annotation.spliceai_pred_ds_al,
+                                            variant_annotation.spliceai_pred_ds_dg,
+                                            variant_annotation.spliceai_pred_ds_dl,
+                                        ]
+                                    gnomad_cells = [
+                                        variant_annotation.gnomad_af,
+                                        variant_annotation.gnomad_popmax,
+                                        variant_annotation.gnomad_popmax_af,
+                                        variant_annotation.gnomad_url
                                     ]
 
-                                annotation_data = vts.get_transcript_annotation(transcript_version)
-                                # the above line will throw an exception if the transcript's not annotated
-                                status = "transcript-annotated"
+                                annotation_data: Optional[dict] = None
+                                try:
+                                    annotation_data = vts.get_transcript_annotation(transcript_version)
+                                    # the above line will throw an exception if the transcript's not annotated
+                                    status = "transcript-annotated"
+                                except:
+                                    all_transcript_versions = transcript_version.transcript.transcriptversion_set.filter(genome_build=genome_build)
+                                    lower_versions = list(sorted((v for v in all_transcript_versions if v.version < transcript_version.version), reverse=True))
+                                    higher_versions = list(sorted((v for v in all_transcript_versions if v.version > transcript_version.version)))
+                                    attempt_versions = higher_versions + lower_versions
+                                    for attempt_version in attempt_versions:
+                                        try:
+                                            annotation_data = vts.get_transcript_annotation(attempt_version)
+                                            substituted_transcript_version = attempt_version.version
+                                            status = "transcript-annotated (sub)"
+                                            break
+                                        except:
+                                            pass
 
-                                transcript_annotations_cells = []
-                                for key in transcript_annotation_keys:
-                                    transcript_annotations_cells.append(annotation_data.get(key))
+                                if annotation_data:
+                                    transcript_annotations_cells = []
+                                    for key in transcript_annotation_keys:
+                                        transcript_annotations_cells.append(annotation_data.get(key))
 
-                        except Exception:
+                        except Exception as e:
                             pass
 
                 row = [
@@ -101,7 +136,8 @@ class Command(BaseCommand):
                     c.lab.group_name,
                     c.lab_record_id,
                     c.chgvs_grch38,
+                    substituted_transcript_version,
                     status
-                ] + variant_annotation_cells + transcript_annotations_cells
+                ] + gnomad_cells + variant_annotation_cells + transcript_annotations_cells
 
                 csv_writer.writerow(row)
