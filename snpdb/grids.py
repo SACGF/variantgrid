@@ -503,7 +503,5 @@ class LiftoverColumns(DatatableConfig[Liftover]):
             label = import_status.label
         return label
 
-
     def get_initial_queryset(self) -> QuerySet[TagColorsCollection]:
         return Liftover.objects.all()
-

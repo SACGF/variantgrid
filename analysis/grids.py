@@ -211,7 +211,7 @@ class VariantGrid(AbstractVariantGrid):
         packed_data_replace = dict(Zygosity.CHOICES)
         # Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for
         # empty values (what CyVCF2 returns using format()) @see https://github.com/SACGF/variantgrid/issues/59
-        MISSING_VALUES = [CohortGenotype.MISSING_NUMBER_VALUE, -2147483648] #
+        MISSING_VALUES = [CohortGenotype.MISSING_NUMBER_VALUE, -2147483648]
         packed_data_replace.update({mv: VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE for mv in MISSING_VALUES})
 
         # Record the 1st cohort a sample appears in, and the concatenated cohorts index
