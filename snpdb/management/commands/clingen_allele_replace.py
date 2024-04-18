@@ -1,7 +1,6 @@
 from datetime import date
 
 from django.core.management import BaseCommand
-from django.db.models import Q
 from django.utils import timezone
 
 from snpdb.clingen_allele import ClinGenAlleleRegistryAPI

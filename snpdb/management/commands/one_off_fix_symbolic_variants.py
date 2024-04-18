@@ -1,10 +1,10 @@
 from django.core.management.base import BaseCommand
+from django.db.models import Q
+from django.db.models.functions import Length
 
 from annotation.models import AnnotationRangeLock, ClinVar
 from genes.hgvs import HGVSMatcher
 from snpdb.models import Variant, Sequence, GenomeBuild, Locus
-from django.db.models.functions import Length
-from django.db.models import Q
 
 
 class Command(BaseCommand):
