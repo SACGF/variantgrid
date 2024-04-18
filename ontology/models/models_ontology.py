@@ -270,7 +270,7 @@ class OntologyIdNormalized:
 
         try:
             if expected_length := OntologyService.EXPECTED_LENGTHS[prefix]:
-                postfix = str(int(postfix)) # strip leading 0s so we can then add the correct number
+                postfix = str(int(postfix))  # strip leading 0s so we can then add the correct number
                 postfix = postfix.rjust(expected_length, '0')
             clean_id = f"{prefix}:{postfix}"
             return OntologyIdNormalized(prefix=prefix, postfix=postfix, full_id=clean_id, clean=True)
