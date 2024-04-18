@@ -10,7 +10,6 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import PermissionDenied, ImproperlyConfigured, ObjectDoesNotExist
-from django.db.models import Q
 from django.db.utils import IntegrityError
 from django.forms.models import inlineformset_factory, ALL_FIELDS
 from django.forms.widgets import TextInput
@@ -72,7 +71,7 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
     VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, SampleStats, \
-    SampleStatsPassingFilter, TagColorsCollection, Contig, Liftover, AlleleSource
+    SampleStatsPassingFilter, TagColorsCollection, Contig, Liftover
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, SequenceRole
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
