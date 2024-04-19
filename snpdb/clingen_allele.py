@@ -344,7 +344,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
                                               genome_build=genome_build,
                                               allele=allele,
                                               origin=AlleleOrigin.variant_origin(variant, allele, genome_build),
-                                              error=api_response)
+                                              clingen_error=api_response)
 
     else:
         clingen_allele_id = ClinGenAllele.get_id_from_response(api_response)

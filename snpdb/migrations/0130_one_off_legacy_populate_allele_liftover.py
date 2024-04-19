@@ -20,21 +20,6 @@ def _one_off_allele_liftover(apps, schema_editor):
     # Any existing ones were once error, so set to be error
     AlleleLiftover.objects.all().update(status=PROCESSING_STATUS_ERROR)
 
-    # We need to represent a "failed clingen" LiftoverRun - just make 1 and link all fails we don't actually run
-    # To that
-
-    # Or should we create a new FailedClinGen liftover run all the time? But we don't want to run it...
-
-    clingen_failures = []
-    for va in VariantAllele.objects.filter(clingen_error__isnull=False):
-        try:
-            other_va = VariantAllele.objects.filter(allele=va.allele).exclude(pk=va.pk).get()
-            al = AlleleLiftover()
-        except VariantAllele.DoesNotExist:
-            pass
-
-
-    # For every VariantAllele that has a clingen error - we couldn't use that for liftover to another build
 
 
 
