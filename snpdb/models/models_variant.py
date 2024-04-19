@@ -84,8 +84,8 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
     @cached_property
     def clingen_error(self):
         error = None
-        if va := self.variantallele_set.filter(error__isnull=False).first():
-            error = va.error
+        if va := self.variantallele_set.filter(clingen_error__isnull=False).first():
+            error = va.clingen_error
         return error
 
     def variant_alleles(self) -> QuerySet['VariantAllele']:
@@ -210,7 +210,7 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
             for va in other_allele.variantallele_set.all():
                 try:
                     va.allele = self
-                    va.error = None  # clear any errors
+                    va.clingen_error = None  # clear any errors
                     va.allele_linking_tool = allele_linking_tool
                     va.save()
                 except IntegrityError:

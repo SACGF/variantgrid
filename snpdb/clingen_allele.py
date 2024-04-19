@@ -212,7 +212,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
             existing_va = allele_missing_clingen_by_variant_id.get(variant_id)
             if "errorType" in api_response:
                 if existing_va:
-                    existing_va.error = api_response
+                    existing_va.clingen_error = api_response
                     modified_variant_alleles_list.append(existing_va)
                 else:
                     clingen_errors_by_variant_id[variant_id] = api_response
@@ -400,8 +400,8 @@ def get_clingen_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
     va = get_variant_allele_for_variant(genome_build, variant, clingen_api=clingen_api)
     if va.allele.clingen_allele is None:
         logging.error("ClinGen Allele failed!")
-        if va.error:
-            ClinGenAlleleRegistryAPI.check_api_response(va.error)
+        if va.clingen_error:
+            ClinGenAlleleRegistryAPI.check_api_response(va.clingen_error)
         if not settings.CLINGEN_ALLELE_REGISTRY_LOGIN:
             raise ClinGenAlleleAPIException("'settings.CLINGEN_ALLELE_REGISTRY_LOGIN' not set")
         raise ClinGenAlleleAPIException(f"Allele {va.allele} has no clingen_allele or error")
