@@ -259,7 +259,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
 
     if variant_id_allele_error:
         variant_allele_list = []
-        for variant_id, allele, error in variant_id_allele_error:
+        for variant_id, allele, clingen_error in variant_id_allele_error:
             if variant_id in normalized_variants:
                 origin = AlleleOrigin.IMPORTED_NORMALIZED
             else:
@@ -269,7 +269,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
                                genome_build=genome_build,
                                allele=allele,
                                origin=origin,
-                               error=error)
+                               clingen_error=clingen_error)
             variant_allele_list.append(va)
 
         logging.debug("Creating %d VariantAlleles", len(variant_allele_list))
@@ -335,7 +335,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
     va: VariantAllele
     if "errorType" in api_response:
         if existing_variant_allele:
-            existing_variant_allele.error = api_response
+            existing_variant_allele.clingen_error = api_response
             existing_variant_allele.save()
             va = existing_variant_allele
         else:
@@ -364,7 +364,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
                 existing_variant_allele.allele.clingen_allele = clingen_allele
                 existing_variant_allele.allele.save()
 
-            existing_variant_allele.error = None
+            existing_variant_allele.clingen_error = None
             existing_variant_allele.save()
             allele = existing_variant_allele.allele
         else:

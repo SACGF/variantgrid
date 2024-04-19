@@ -71,7 +71,7 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
     VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, SampleStats, \
-    SampleStatsPassingFilter, TagColorsCollection, Contig, Liftover
+    SampleStatsPassingFilter, TagColorsCollection, Contig, LiftoverRun
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, SequenceRole
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
@@ -1504,7 +1504,7 @@ def liftover(request):
 
 @require_superuser
 def view_liftover(request, liftover_id):
-    liftover = Liftover.objects.get(pk=liftover_id)
+    liftover = LiftoverRun.objects.get(pk=liftover_id)
     context = {
         "liftover": liftover
     }

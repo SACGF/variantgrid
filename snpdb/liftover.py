@@ -18,9 +18,9 @@ from library.genomics.vcf_utils import write_vcf_from_tuples
 from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
-from snpdb.models.models_enums import ImportSource, AlleleConversionTool, AlleleOrigin
+from snpdb.models.models_enums import ImportSource, AlleleConversionTool, AlleleOrigin, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
-from snpdb.models.models_variant import AlleleSource, Liftover, Allele, Variant, VariantAlleleCollectionSource, \
+from snpdb.models.models_variant import AlleleSource, LiftoverRun, Allele, Variant, VariantAlleleCollectionSource, \
     VariantAllele, VariantAlleleCollectionRecord
 from upload.models import UploadedFile, UploadedLiftover, UploadPipeline, UploadedFileTypes
 from upload.upload_processing import process_upload_pipeline
@@ -38,7 +38,7 @@ def create_liftover_pipelines(user: User, allele_source: AlleleSource,
             if conversion_tool == AlleleConversionTool.SAME_CONTIG:
                 _liftover_using_same_contig(genome_build, av_tuples)
             else:
-                liftover = Liftover.objects.create(user=user,
+                liftover = LiftoverRun.objects.create(user=user,
                                                    allele_source=allele_source,
                                                    conversion_tool=conversion_tool,
                                                    genome_build=genome_build)
@@ -127,8 +127,9 @@ def _get_build_liftover_tuples(allele_source: AlleleSource, inserted_genome_buil
                     avt = (chrom, position, allele.pk, ref, alt, svlen)
                 build_liftover_vcf_tuples[genome_build][conversion_tool].append(avt)
             elif settings.LIFTOVER_NCBI_REMAP_ENABLED:
-                if allele.liftovererror_set.filter(liftover__genome_build=genome_build,
-                                                   liftover__conversion_tool=AlleleConversionTool.NCBI_REMAP).exists():
+                if allele.alleleliftover_set.filter(liftover__genome_build=genome_build,
+                                                    liftover__conversion_tool=AlleleConversionTool.NCBI_REMAP,
+                                                    status=ProcessingStatus.ERROR).exists():
                     continue  # Skip as already failed NCBI liftover to desired build
 
                 # Return VCF tuples in inserted genome build

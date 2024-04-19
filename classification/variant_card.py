@@ -8,9 +8,8 @@ from annotation.manual_variant_entry import check_can_create_variants, CreateMan
 from annotation.models import VariantAnnotation
 from annotation.templatetags.clinvar_tags import ClinVarDetails
 from classification.models import Classification, ImportedAlleleInfo
-from genes.hgvs import HGVSMatcher
-from snpdb.models import Allele, GenomeBuild, VariantAllele, VariantAlleleSource, GenomeFasta, Contig, Liftover, \
-    Variant, AlleleOrigin, AlleleMergeLog
+from snpdb.models import Allele, GenomeBuild, VariantAllele, VariantAlleleSource, GenomeFasta, Contig, \
+    Variant, AlleleOrigin, AlleleMergeLog, LiftoverRun, ProcessingStatus
 from snpdb.variant_links import variant_link_info
 
 
@@ -19,7 +18,7 @@ class VariantCard:
     def __init__(self, user: User, allele: Allele, genome_build: GenomeBuild):
 
         variant_allele: VariantAllele = allele.variant_alleles().filter(genome_build=genome_build).first()
-        unfinished_liftover: Optional[Liftover] = None
+        unfinished_liftover: Optional[LiftoverRun] = None
         can_create_variant = False
         variant: Optional[Variant] = None
 
@@ -50,7 +49,7 @@ class VariantCard:
 
     @cached_property
     def liftover_error_qs(self):
-        return self.allele.liftovererror_set.filter(liftover__genome_build=self.genome_build)
+        return self.allele.alleleliftover_set.filter(status=ProcessingStatus.ERROR, liftover__genome_build=self.genome_build)
 
     @property
     def has_operation(self) -> bool:

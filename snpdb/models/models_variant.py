@@ -753,7 +753,9 @@ class VariantAllele(TimeStampedModel):
     allele = models.ForeignKey(Allele, on_delete=CASCADE)
     origin = models.CharField(max_length=1, choices=AlleleOrigin.choices)
     allele_linking_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)
-    error = models.JSONField(null=True)  # Only set on error
+    # We call CAR to populate ClinGenAllele on Allele - if there's any error have to store it here
+    # as we need a PK back to create ClinGenAllele() model, and can fail on 1 build succeed on another
+    clingen_error = models.JSONField(null=True)  # null on success
 
     class Meta:
         unique_together = ("variant", "genome_build", "allele")
@@ -764,15 +766,14 @@ class VariantAllele(TimeStampedModel):
 
     def needs_clingen_call(self):
         if settings.CLINGEN_ALLELE_REGISTRY_LOGIN and self.allele.clingen_allele is None:
-            if self.error:
+            if self.clingen_error:
                 # Retry if server was down
-                return self.error.get("errorType") == ClinGenAllele.CLINGEN_ALLELE_SERVER_ERROR_TYPE
+                return self.clingen_error.get("errorType") == ClinGenAllele.CLINGEN_ALLELE_SERVER_ERROR_TYPE
             return True
         return False
 
     def __str__(self):
         return f"{self.allele} - {self.variant_id}({self.genome_build}/{self.allele_linking_tool})"
-
 
 class VariantCollection(RelatedModelsPartitionModel):
     """ A set of variants - usually used as a cached result """
@@ -838,10 +839,10 @@ class VariantAlleleSource(AlleleSource):
         return Variant.objects.filter(variantallele=self.variant_allele)
 
     @staticmethod
-    def get_liftover_for_allele(allele, genome_build) -> Optional['Liftover']:
+    def get_liftover_for_allele(allele, genome_build) -> Optional['LiftoverRun']:
         """ Only works if liftover was done via VariantAlleleSource """
         allele_sources_qs = VariantAlleleSource.objects.filter(variant_allele__allele=allele)
-        return Liftover.objects.filter(allele_source__in=allele_sources_qs, genome_build=genome_build).first()
+        return LiftoverRun.objects.filter(allele_source__in=allele_sources_qs, genome_build=genome_build).first()
 
 
 class VariantAlleleCollectionSource(AlleleSource):
@@ -862,7 +863,7 @@ class VariantAlleleCollectionRecord(models.Model):
     variant_allele = models.ForeignKey(VariantAllele, on_delete=CASCADE)
 
 
-class Liftover(TimeStampedModel):
+class LiftoverRun(TimeStampedModel):
     """ Liftover pipeline involves reading through a VCF where ID is set to Allele.pk and then creating
         VariantAllele entries for the variant/allele
 
@@ -900,14 +901,21 @@ class Liftover(TimeStampedModel):
         return f"Liftover {source}to {self.genome_build} via {self.get_conversion_tool_display()}"
 
 
-class LiftoverError(models.Model):
-    liftover = models.ForeignKey(Liftover, on_delete=CASCADE)
+class AlleleLiftover(models.Model):
+    liftover = models.ForeignKey(LiftoverRun, on_delete=CASCADE)
     allele = models.ForeignKey(Allele, on_delete=CASCADE)
-    variant = models.ForeignKey(Variant, null=True, on_delete=CASCADE)  # Optional, if got a variant but invalid
-    error_message = models.TextField()
+    # There will only ever be 1 successful AlleleLiftover for a VariantAllele - the one that populated it
+    variant_allele = models.OneToOneField(VariantAllele, null=True, blank=True, on_delete=CASCADE)
+    status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)
+    error_message = models.TextField() # This will be deleted
+    error = models.JSONField(null=True)  # Only set on error - uses "message" key in dict
 
     class Meta:
         unique_together = ('liftover', 'allele')
 
     def __str__(self):
-        return f"{self.allele} failed {self.liftover}: {self.error_message}"
+        s = f"{self.allele} failed {self.liftover}: {self.get_status_display()}"
+        if self.error:
+            if msg := self.error.get("message"):
+                s += f" error: {msg}"
+        return s

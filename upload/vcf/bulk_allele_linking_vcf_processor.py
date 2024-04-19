@@ -2,7 +2,7 @@ import logging
 
 from django.conf import settings
 
-from snpdb.models import AlleleOrigin, VariantAllele, Allele, SequenceRole, Variant, LiftoverError
+from snpdb.models import AlleleOrigin, VariantAllele, Allele, SequenceRole, Variant, AlleleLiftover
 from upload.models import ModifiedImportedVariant
 from upload.vcf.bulk_minimal_vcf_processor import BulkMinimalVCFProcessor
 
@@ -45,10 +45,10 @@ class BulkAlleleLinkingVCFProcessor(BulkMinimalVCFProcessor):
             allele_id = int(allele_id)
             if invalid_contig := invalid_contig_variant_ids.get(variant_id):
                 error_message = f"settings.LIFTOVER_TO_CHROMOSOMES_ONLY=True disabled liftover to non-chrom contig: {invalid_contig}"
-                liftover_error = LiftoverError(liftover=self.liftover,
-                                               allele_id=allele_id,
-                                               variant_id=variant_id,
-                                               error_message=error_message)
+                liftover_error = AlleleLiftover(liftover=self.liftover,
+                                                allele_id=allele_id,
+                                                variant_id=variant_id,
+                                                error_message=error_message)
                 liftover_errors.append(liftover_error)
                 continue
 
@@ -71,7 +71,7 @@ class BulkAlleleLinkingVCFProcessor(BulkMinimalVCFProcessor):
             variant_alleles.append(va)
 
         if liftover_errors:
-            LiftoverError.objects.bulk_create(liftover_errors, ignore_conflicts=True)
+            AlleleLiftover.objects.bulk_create(liftover_errors, ignore_conflicts=True)
 
         if variant_alleles:
             logging.info("Inserting %d variant_alleles", len(variant_alleles))

@@ -14,7 +14,7 @@ from library.utils import calculate_age, JsonDataType
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
     GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig, GenomeBuild, ClinGenAllele, \
-    VariantZygosityCountCollection, TagColorsCollection, Liftover, AlleleConversionTool
+    VariantZygosityCountCollection, TagColorsCollection, LiftoverRun, AlleleConversionTool
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs, remove_soft_deleted_vcfs_task
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
@@ -464,7 +464,7 @@ class TagColorsCollectionColumns(DatatableConfig[TagColorsCollection]):
         return TagColorsCollection.filter_for_user(self.user)
 
 
-class LiftoverColumns(DatatableConfig[Liftover]):
+class LiftoverColumns(DatatableConfig[LiftoverRun]):
 
     def __init__(self, request):
         super().__init__(request)
@@ -504,4 +504,4 @@ class LiftoverColumns(DatatableConfig[Liftover]):
         return label
 
     def get_initial_queryset(self) -> QuerySet[TagColorsCollection]:
-        return Liftover.objects.all()
+        return LiftoverRun.objects.all()
