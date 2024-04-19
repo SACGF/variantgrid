@@ -42,18 +42,29 @@ def annotation_scheduler(active=True):
         log_traceback()
 
 
-def _handle_range_lock(range_lock):
-    for pipeline_type in VariantAnnotationPipelineType:
-        annotation_run = AnnotationRun.objects.create(annotation_range_lock=range_lock, pipeline_type=pipeline_type)
-        annotate_variants.apply_async((annotation_run.pk,))  # @UndefinedVariable
+def _handle_range_lock(range_lock, pipeline_type=None):
+    pipeline_types = []
+    if pipeline_type is not None:
+        pipeline_types.append(pipeline_type)
+    else:
+        pipeline_types = list(VariantAnnotationPipelineType)
+
+    for pipeline_type in pipeline_types:
+        annotation_run, created = AnnotationRun.objects.get_or_create(annotation_range_lock=range_lock,
+                                                                      pipeline_type=pipeline_type)
+        if created:
+            annotate_variants.apply_async((annotation_run.pk,))  # @UndefinedVariable
 
 
 def _handle_variant_annotation_version(variant_annotation_version):
-    # If we crash in the wrong place, we may end up with unassigned range locks
-    for range_lock in AnnotationRangeLock.objects.filter(version=variant_annotation_version,
-                                                         annotationrun__isnull=True):
-        logging.warning("Assigned orphaned annotation range lock")
-        _handle_range_lock(range_lock)
+    # If we crash in the wrong place, we may end up with unassigned range locks (need 1 of each type)
+    arl_qs = AnnotationRangeLock.objects.filter(version=variant_annotation_version)
+    for pipeline_type in VariantAnnotationPipelineType:
+        # Look for missing any AnnotationRun for this lock
+        for range_lock in arl_qs.exclude(annotationrun__pipeline_type=pipeline_type):
+            logging.warning("Assigned orphaned annotation range lock: %s, run type: %s",
+                            range_lock, VariantAnnotationPipelineType(pipeline_type).label)
+            _handle_range_lock(range_lock, pipeline_type)
 
     range_lock, unannotated_count = get_annotation_range_lock_and_unannotated_count(variant_annotation_version,
                                                                                     settings.ANNOTATION_VEP_BATCH_MIN,
