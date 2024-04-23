@@ -83,10 +83,8 @@
                         {% for vc in allele_card.variant_cards %}
 
                             <h5>{{ vc.genome_build }}</h5>
-                            {% labelled label="Imported As" %}{{ vc.variant_allele.get_origin_display }}{% endlabelled %}
-                            {% if not vc.is_imported_directly %}
-                                {% labelled label="Liftover" %}{{ vc.variant_allele.get_allele_linking_tool_display }}{% endlabelled %}
-                            {% endif %}
+                            {% labelled label="Origin" %}{{ vc.variant_allele.get_origin_display }}{% endlabelled %}
+                            {% labelled label="Allele Linked Via" %}{{ vc.variant_allele.get_allele_linking_tool_display }}{% endlabelled %}
 
                             {% if vc.liftover_error_qs.exists %}
                                 {% for liftover_error in vc.liftover_error_qs %}

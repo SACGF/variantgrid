@@ -2,13 +2,9 @@ import logging
 from collections import defaultdict
 
 from django.core.management.base import BaseCommand
-from django.db.models import Q, Min, F
-from django.db.models.functions import Length
-
-from annotation.models import AnnotationRangeLock, ClinVar
-from genes.hgvs import HGVSMatcher
+from django.db.models import Min, F, Count
 from library.guardian_utils import admin_bot
-from snpdb.models import Variant, Sequence, GenomeBuild, Locus, Allele, ClinGenAllele, Contig, VariantAllele, \
+from snpdb.models import GenomeBuild, Allele, ClinGenAllele, Contig, VariantAllele, \
     AlleleLiftover, LiftoverRun, VariantAlleleCollectionSource, AlleleConversionTool, ProcessingStatus
 
 
@@ -23,6 +19,11 @@ class Command(BaseCommand):
         parser.add_argument('--dry-run', action='store_true')
 
     def handle(self, *args, **options):
+        use_optimisation_exclusion = False  # Optimisation attempt for lots of allele sources
+
+        if num_non_errors := AlleleLiftover.objects.exclude(status=ProcessingStatus.ERROR).count():
+            raise ValueError(f"Error: {num_non_errors} non-error AlleleLiftover records existing - was this run tiwce?")
+
         # By taking the first VariantAllele we'll get the original ones (ie not lifted over)
         allele_non_liftover_build = defaultdict(set)
         for allele_id, genome_build in Allele.objects.all().annotate(first_va_id=Min("variantallele__pk")).filter(
@@ -30,21 +31,6 @@ class Command(BaseCommand):
             allele_non_liftover_build[allele_id].add(genome_build)
 
         genome_builds = [GenomeBuild.objects.get(name=name) for name in ["GRCh37", "GRCh38"]]
-        records = []
-
-        # Handle ClinGen API errors
-        logging.info("Looking for ClinGen API errors...")
-        clingen_api_errors = {}  # Store for later error lookup
-        for va in VariantAllele.objects.filter(clingen_error__isnull=False):
-            clingen_api_errors[va.allele] = va.clingen_error
-            try:
-                other_va = VariantAllele.objects.filter(allele=va.allele).exclude(pk=va.pk).get()
-                al = AlleleLiftover(liftover=va.liftover, allele=va.allele,
-                                    error=other_va.clingen_error, status=ProcessingStatus.ERROR)
-                records.append(al)
-            except VariantAllele.DoesNotExist:
-                pass
-
         # We need to represent a "failed clingen" LiftoverRun - just make 1 and link all fails we don't actually run
         # going forward we'll
         failed_clingen_liftovers_by_build = {}
@@ -58,6 +44,13 @@ class Command(BaseCommand):
                                             conversion_tool=AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
             failed_clingen_liftovers_by_build[genome_build] = lr
 
+        records = []
+
+        # Handle ClinGen API errors
+        logging.info("Looking for ClinGen API errors...")
+        clingen_api_errors = {}  # Store for later error lookup
+        for va in VariantAllele.objects.filter(clingen_error__isnull=False):
+            clingen_api_errors[va.allele] = va.clingen_error
 
         # Get the ones that were never lifted over by ClinGen because they couldn't be (eg missing for that build)
         logging.info("Looking for those unable to be lifted over via ClinGen...")
@@ -88,8 +81,17 @@ class Command(BaseCommand):
 
         # Insert the 1st for each status (success/failure)
         # Or should we create a new FailedClinGen liftover run all the time? But we don't want to run it...
+        # allele/genome_build/status/tool
         allele_conversion_tool_initial_liftover = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
-        for i, lr in enumerate(LiftoverRun.objects.all().order_by("created")):
+        existing_allele_id_liftovers = defaultdict(set)
+        # Load existing AlleleLiftover - these are errors...
+        for al in AlleleLiftover.objects.all():
+            existing_allele_id_liftovers[al.allele_id].add(al.liftover)
+
+        liftover_run_qs = LiftoverRun.objects.all().order_by("created")
+        # liftover_run_qs = LiftoverRun.objects.none()
+
+        for i, lr in enumerate(liftover_run_qs):
             if i % 10 == 0:
                 logging.info("Assigning alleles to Liftover runs - %d/%d", i, num_liftover_runs)
             try:
@@ -100,29 +102,33 @@ class Command(BaseCommand):
                 continue
             allele_qs = lr.get_allele_qs()
 
-            # TODO: We could optimise here - find all the alleles that have already been handled by this
-            # Run before/after to verify that it's the same...
-            if False:
+            # Performance really degrades when you have heaps of all allele sources
+            # This optimisation is slower for most sources, but tries to reduce worst case when you have lots of
+            # all allele sources (meaning you have to loop again and again)
+            if use_optimisation_exclusion:
                 handled_allele_ids = set()
                 for allele_id, genome_build_set in allele_non_liftover_build.items():
-                    if lr.genome_build_id in genome_build_set:
+                    if lr.genome_build in genome_build_set:
                         handled_allele_ids.add(allele_id)
 
-                for allele, data in allele_conversion_tool_initial_liftover.items():
-                    if data.get(lr.genome_build_id, {}).get(status, {}).get(lr.conversion_tool):
-                        handled_allele_ids.add(allele.pk)
+                for allele_id, data in allele_conversion_tool_initial_liftover.items():
+                    if data.get(lr.genome_build, {}).get(status, {}).get(lr.conversion_tool):
+                        handled_allele_ids.add(allele_id)
 
                 allele_qs = allele_qs.exclude(pk__in=handled_allele_ids)
 
-            for allele in allele_qs:
-                if lr.genome_build_id not in allele_non_liftover_build[allele.pk]:
-                    act = allele_conversion_tool_initial_liftover[allele][lr.genome_build_id][status]
+            for allele_id in allele_qs.values_list("pk", flat=True):
+                if lr in existing_allele_id_liftovers[allele_id]:
+                    continue
+
+                if lr.genome_build_id not in allele_non_liftover_build[allele_id]:
+                    act = allele_conversion_tool_initial_liftover[allele_id][lr.genome_build][status]
                     if lr.conversion_tool not in act:
                         act[lr.conversion_tool] = lr
                         error = None
                         if status != ProcessingStatus.SUCCESS:
                             error = {"message": f"LiftoverRun {lr.pk} failed"}
-                        al = AlleleLiftover(liftover=lr, allele=allele, error=error, status=status)
+                        al = AlleleLiftover(liftover=lr, allele_id=allele_id, error=error, status=status)
                         records.append(al)
 
         # The way things happened historically is:
@@ -131,11 +137,45 @@ class Command(BaseCommand):
         # * Then in liftover we called conversion_tool, variant_id_or_coordinate = allele.get_liftover_tuple(genome_build) to determine what to run
         # * If the liftover worked, we then populated things and set the 
 
-        # How are we going to handle the AllClassifications - just do them all again and again?
+        if records:
+            logging.info("Creating %d records...", len(records))
+            AlleleLiftover.objects.bulk_create(records, batch_size=1000)
+            records = []
 
+        # Leftover alleles
 
-        # What if there are some left that have been lifted over, but don't have anything with them??
+        logging.info("Assigning any remaining Alleles (linked via web)")
+
+        # There are some Alleles that have VariantAllele for both - but no official liftover run
+        # This is done via the web (variant/allele page) when variants from both builds are already there
+
+        allele_wo_liftover = Allele.objects.filter(alleleliftover__isnull=True)
+        allele_wo_liftover_both_builds = allele_wo_liftover.annotate(num_builds=Count("variantallele")).filter(num_builds__gt=1)
+
+        allele_linked_first_last_build = defaultdict(lambda: defaultdict(list))
+        for allele in allele_wo_liftover_both_builds:
+            first_va, second_va, *_ = tuple(allele.variantallele_set.order_by("pk"))
+            allele_linked_first_last_build[first_va.genome_build][second_va.genome_build].append(second_va)
+
+        for source_build in genome_builds:
+            for dest_build in genome_builds:
+                if source_build == dest_build:
+                    continue
+                if source_to_dest := allele_linked_first_last_build[source_build][dest_build]:
+                    logging.info("Leftovers - %s first, linked to %s: %d", source_build, dest_build, len(source_to_dest))
+                    allele_source = VariantAlleleCollectionSource.objects.create(genome_build=source_build)
+                    lr = LiftoverRun.objects.create(user=admin_bot(),
+                                                    allele_source=allele_source,
+                                                    source_genome_build=source_build,
+                                                    genome_build=dest_build,
+                                                    conversion_tool=AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
+                    for va in source_to_dest:
+                        al = AlleleLiftover(liftover=lr, allele=va.allele, status=ProcessingStatus.SUCCESS)
+                        records.append(al)
 
         if records:
             logging.info("Creating %d records...", len(records))
             AlleleLiftover.objects.bulk_create(records, batch_size=1000)
+
+        if num_left := allele_wo_liftover.count():
+            logging.info("%d Alleles left without any liftover (could be from variant page)", num_left)
