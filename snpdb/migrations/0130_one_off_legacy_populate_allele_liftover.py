@@ -21,12 +21,10 @@ def _one_off_allele_liftover(apps, schema_editor):
     AlleleLiftover.objects.all().update(status=PROCESSING_STATUS_ERROR)
 
 
-
-
 def _has_allele_and_liftover(apps):
     Allele = apps.get_model("snpdb", "Allele")
-    Liftover = apps.get_model("snpdb", "Liftover")
-    return Allele.objects.exists() and Liftover.objects.exists()
+    LiftoverRun = apps.get_model("snpdb", "LiftoverRun")
+    return Allele.objects.exists() and LiftoverRun.objects.exists()
 
 
 class Migration(migrations.Migration):
