@@ -898,7 +898,7 @@ class LiftoverRun(TimeStampedModel):
         source = ""
         if self.source_genome_build:
             source = f"from {self.source_genome_build.name} "
-        return f"Liftover {source}to {self.genome_build} via {self.get_conversion_tool_display()}"
+        return f"Liftover({self.pk}) {source}to {self.genome_build} via {self.get_conversion_tool_display()}"
 
 
 class AlleleLiftover(models.Model):
