@@ -46,7 +46,8 @@ from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import CustomGeneListForm, UserGeneListForm, GeneAndTranscriptForm
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList
 from library.constants import WEEK_SECS, HOUR_SECS
-from library.django_utils import add_save_message, get_model_fields, set_form_read_only, require_superuser
+from library.django_utils import add_save_message, get_model_fields, set_form_read_only, require_superuser, \
+    get_field_counts
 from library.guardian_utils import DjangoPermission
 from library.keycloak import Keycloak
 from library.utils import full_class_name, import_class, rgb_invert
@@ -1505,8 +1506,13 @@ def liftover_runs(request):
 @require_superuser
 def view_liftover_run(request, liftover_run_id):
     liftover_run = LiftoverRun.objects.get(pk=liftover_run_id)
+    qs = liftover_run.alleleliftover_set.all()
+    raw_status_counts = get_field_counts(qs, "status")
+    status_counts = {ProcessingStatus(k).label: v for k, v in raw_status_counts.items() if k is not None}
+
     context = {
-        "liftover_run": liftover_run
+        "liftover_run": liftover_run,
+        "status_counts": status_counts,
     }
     return render(request, "snpdb/liftover/view_liftover_run.html", context)
 

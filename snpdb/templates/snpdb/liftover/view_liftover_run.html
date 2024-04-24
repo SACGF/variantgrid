@@ -49,10 +49,27 @@
             </div>
         </div>
 
+        <div class="card">
+            <div class="card-header">Allele liftover Statuses</div>
+            <div class="card-body">
+                {% if status_counts %}
+                    <table>
+                        {% for status, count in status_counts.items %}
+                            {% labelled hint="tiny" label=status %}{{ count }}{% endlabelled %}
+                        {% endfor %}
+                    </table>
+                {% else %}
+                    No linked allele liftovers
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+
+    {% if status_counts %}
         <!-- It's also possible to display all the variants linked via allele source?? -->
         <table data-datatable-url="{% url 'allele_liftover_datatable' %}" data-datatable-data='datatableFilter' class="import-table sticky-header" responsive="true"></table>
-
-    </div>
+    {% endif %}
 
 
 {% endblock %}

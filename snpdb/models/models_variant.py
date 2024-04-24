@@ -874,7 +874,7 @@ class LiftoverRun(TimeStampedModel):
 
         The VCF (in genome_build build) is set in UploadedFile for the UploadPipeline """
     user = models.ForeignKey(User, on_delete=CASCADE)
-    allele_source = models.ForeignKey(AlleleSource, on_delete=CASCADE)
+    allele_source = models.ForeignKey(AlleleSource, null=True, on_delete=CASCADE)
     conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)
     source_vcf = models.TextField(null=True)
     source_genome_build = models.ForeignKey(GenomeBuild, null=True, on_delete=CASCADE,

@@ -51,4 +51,13 @@ class Migration(migrations.Migration):
                 to="snpdb.variantallele",
             ),
         ),
+        migrations.AlterField(
+            model_name="liftoverrun",
+            name="allele_source",
+            field=models.ForeignKey(
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="snpdb.allelesource",
+            ),
+        ),
     ]

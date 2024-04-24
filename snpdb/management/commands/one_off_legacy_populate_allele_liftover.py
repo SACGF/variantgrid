@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand
 from django.db.models import Min, F, Count
 from library.guardian_utils import admin_bot
 from snpdb.models import GenomeBuild, Allele, ClinGenAllele, Contig, VariantAllele, \
-    AlleleLiftover, LiftoverRun, VariantAlleleCollectionSource, AlleleConversionTool, ProcessingStatus
+    AlleleLiftover, LiftoverRun, VariantAlleleCollectionSource, AlleleConversionTool, ProcessingStatus, AlleleSource
 
 
 class Command(BaseCommand):
@@ -180,6 +180,17 @@ class Command(BaseCommand):
         if num_left := allele_wo_liftover.count():
             logging.info("%d Alleles left without any liftover (could be from variant page)", num_left)
 
-        # Delete any LiftoverRuns
+        # Delete any unused LiftoverRuns
         unused_liftover_runs_qs = LiftoverRun.objects.all().annotate(num_alleles=Count("alleleliftover")).filter(num_alleles=0)
+        for lr in unused_liftover_runs_qs:
+            try:
+                lr.uploadedliftover.uploaded_file.delete()
+            except:
+                pass
         unused_liftover_runs_qs.delete()
+
+        # Remove so we don't get cascade delete
+        LiftoverRun.objects.all().update(allele_source=None)
+
+        # This is to signal that we have successfully completed migration
+        AlleleSource.objects.all().delete()
