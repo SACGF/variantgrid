@@ -1497,18 +1497,18 @@ def labs_graph_detail(request):
 
 
 @require_superuser
-def liftover(request):
+def liftover_runs(request):
     context = {}
-    return render(request, "snpdb/liftover/liftover.html", context)
+    return render(request, "snpdb/liftover/liftover_runs.html", context)
 
 
 @require_superuser
-def view_liftover(request, liftover_id):
-    liftover = LiftoverRun.objects.get(pk=liftover_id)
+def view_liftover_run(request, liftover_run_id):
+    liftover_run = LiftoverRun.objects.get(pk=liftover_run_id)
     context = {
-        "liftover": liftover
+        "liftover_run": liftover_run
     }
-    return render(request, "snpdb/liftover/view_liftover.html", context)
+    return render(request, "snpdb/liftover/view_liftover_run.html", context)
 
 
 @login_not_required

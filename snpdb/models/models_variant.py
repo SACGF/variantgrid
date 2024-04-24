@@ -882,7 +882,7 @@ class LiftoverRun(TimeStampedModel):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)  # destination
 
     def get_absolute_url(self):
-        return reverse("view_liftover", kwargs={"liftover_id": self.pk})
+        return reverse("view_liftover_run", kwargs={"liftover_run_id": self.pk})
 
     def get_allele_source(self) -> AlleleSource:
         """ Returns subclass instance """

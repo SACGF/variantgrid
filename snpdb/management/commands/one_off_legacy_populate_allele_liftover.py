@@ -179,3 +179,7 @@ class Command(BaseCommand):
 
         if num_left := allele_wo_liftover.count():
             logging.info("%d Alleles left without any liftover (could be from variant page)", num_left)
+
+        # Delete any LiftoverRuns
+        unused_liftover_runs_qs = LiftoverRun.objects.all().annotate(num_alleles=Count("alleleliftover")).filter(num_alleles=0)
+        unused_liftover_runs_qs.delete()
