@@ -42,6 +42,7 @@ class Command(BaseCommand):
                                             allele_source=allele_source,
                                             genome_build=genome_build,
                                             conversion_tool=AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
+            logging.info("Created %s: for failed clingen liftovers", lr)
             failed_clingen_liftovers_by_build[genome_build] = lr
 
         records = []

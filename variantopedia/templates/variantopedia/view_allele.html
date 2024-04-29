@@ -86,20 +86,25 @@
                             {% labelled label="Origin" %}{{ vc.variant_allele.get_origin_display }}{% endlabelled %}
                             {% labelled label="Allele Linked Via" %}{{ vc.variant_allele.get_allele_linking_tool_display }}{% endlabelled %}
 
-                            {% if vc.liftover_error_qs.exists %}
-                                {% for liftover_error in vc.liftover_error_qs %}
-                                    <div>
-                                        Liftover Failed: {{ liftover_error.liftover }} on {% timestamp liftover_error.liftover.modified %}
-                                        {% if liftover_error.variant %}
-                                            <p>
-                                                {{ liftover_error.liftover.get_allele_linking_tool_display }} returned:
-                                                <a href="{% url 'view_variant' liftover_error.variant.pk %}">{{ liftover_error.variant }}</a>
-                                                 which is NOT linked to this allele.
-                                            </p>
-                                        {% endif %}
-                                        {{ liftover_error.error_message }}
-                                    </div>
+                            {% if vc.allele_liftover_qs.exists %}
+                                <table>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Tool</th>
+                                        <th>Status</th>
+                                        <th>Liftover Run</th>
+                                        <th>Error</th>
+                                    </tr>
+                                {% for allele_liftover in vc.allele_liftover_qs %}
+                                    <tr>
+                                        <td>{% timestamp allele_liftover.liftover.created %}</td>
+                                        <td>{{ allele_liftover.liftover.get_conversion_tool_display }}</td>
+                                        <td>{{ allele_liftover.get_status_display }}</td>
+                                        <td><a href="{{ allele_liftover.liftover.get_absolute_url }}">View LiftoverRun {{ allele_liftover.liftover_id }}</a></a></td>
+                                        <td>{{ allele_liftover.error }}</td>
+                                    </tr>
                                 {% endfor %}
+                                </table>
                             {% endif %}
 
                         {% endfor %}

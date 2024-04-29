@@ -48,8 +48,8 @@ class VariantCard:
         self.variant = variant
 
     @cached_property
-    def liftover_error_qs(self):
-        return self.allele.alleleliftover_set.filter(status=ProcessingStatus.ERROR, liftover__genome_build=self.genome_build)
+    def allele_liftover_qs(self):
+        return self.allele.alleleliftover_set.filter(liftover__genome_build=self.genome_build).order_by("liftover__created")
 
     @property
     def has_operation(self) -> bool:

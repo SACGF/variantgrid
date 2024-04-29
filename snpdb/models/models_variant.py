@@ -914,7 +914,7 @@ class AlleleLiftover(models.Model):
         unique_together = ('liftover', 'allele')
 
     def __str__(self):
-        s = f"{self.allele} failed {self.liftover}: {self.get_status_display()}"
+        s = f"{self.allele}/{self.liftover}: {self.get_status_display()}"
         if self.error:
             if msg := self.error.get("message"):
                 s += f" error: {msg}"
