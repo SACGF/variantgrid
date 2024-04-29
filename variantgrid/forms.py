@@ -9,5 +9,6 @@ class ReCaptchaSignupForm(RegistrationForm):
     captcha = ReCaptchaField(widget=ReCaptchaV3)
 
     helper = FormHelper()
-    helper.add_input(Submit('submit', 'Submit', css_class='btn-primary w-100'))
+    # name can't be 'submit' see https://github.com/django-recaptcha/django-recaptcha/issues/203#issuecomment-700997270
+    helper.add_input(Submit('my_submit', 'Submit', css_class='btn-primary w-100'))
     helper.form_method = 'POST'
