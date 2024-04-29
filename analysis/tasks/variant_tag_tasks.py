@@ -6,7 +6,7 @@ from analysis.models.nodes.node_utils import update_analysis
 from library.guardian_utils import admin_bot
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import ImportSource, VariantAlleleSource, VariantAllele, Tag
+from snpdb.models import ImportSource, VariantAllele, Tag
 
 
 def analysis_tag_nodes_set_dirty(analysis: Analysis, tag: Tag, visible: bool):
@@ -50,5 +50,4 @@ def _liftover_variant_tag(variant_tag: VariantTag):
         variant_tag.allele = variant_allele.allele
         variant_tag.save()
 
-    allele_source = VariantAlleleSource.objects.create(variant_allele=variant_allele)
-    create_liftover_pipelines(admin_bot(), allele_source, ImportSource.WEB, variant_tag.genome_build)
+    create_liftover_pipelines(admin_bot(), [variant_allele.allele], ImportSource.WEB, variant_tag.genome_build)

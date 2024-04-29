@@ -12,8 +12,7 @@ from library.guardian_utils import assign_permission_to_user_and_groups
 from library.pandas_utils import df_nan_to_none
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import GenomeBuild, Variant, ImportSource, Tag, VariantAlleleCollectionSource, VariantAllele, \
-    VariantAlleleCollectionRecord, VariantCoordinate
+from snpdb.models import GenomeBuild, Variant, ImportSource, Tag, VariantAllele, VariantCoordinate, Allele
 from upload.models import UploadedVariantTags, UploadStep, ModifiedImportedVariant, SimpleVCFImportInfo
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
@@ -191,12 +190,8 @@ class VariantTagsInsertTask(ImportVCFStepTask):
             VariantTag.objects.bulk_update(variant_tags, fields=["created"], batch_size=2000)
 
         logging.info("Creating liftover pipelines")
-        allele_source = VariantAlleleCollectionSource.objects.create(genome_build=genome_build)
-        va_collection_records = []
-        for va in VariantAllele.objects.filter(variant__in=variant_list):
-            va_collection_records.append(VariantAlleleCollectionRecord(collection=allele_source, variant_allele=va))
-        VariantAlleleCollectionRecord.objects.bulk_create(va_collection_records, batch_size=2000)
-        create_liftover_pipelines(variant_tags_import.user, allele_source, ImportSource.WEB, genome_build)
+        allele_qs = Allele.objects.filter(variantallele__variant__in=variant_list)
+        create_liftover_pipelines(variant_tags_import.user, allele_qs, ImportSource.WEB, genome_build)
 
 
 VariantTagsCreateVCFTask = app.register_task(VariantTagsCreateVCFTask())

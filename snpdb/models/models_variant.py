@@ -886,13 +886,19 @@ class LiftoverRun(TimeStampedModel):
 
     def get_allele_source(self) -> AlleleSource:
         """ Returns subclass instance """
+
+        if self.allele_source is None:
+            raise ValueError("Shouldn't call get_allele_source() on new liftovers")
+
         return AlleleSource.objects.get_subclass(pk=self.allele_source_id)
 
     def get_allele_qs(self) -> QuerySet:
         return self.get_allele_source().get_allele_qs()
 
     def complete(self):
-        self.get_allele_source().liftover_complete(genome_build=self.genome_build)
+        # Raise a signal here??
+        # AlleleLiftover.objects.filter(liftover=self)
+        pass
 
     def __str__(self):
         source = ""

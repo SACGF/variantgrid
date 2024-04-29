@@ -4,11 +4,12 @@ from django.core.management.base import BaseCommand
 from classification.autopopulate_evidence_keys.evidence_from_variant import \
     get_clingen_allele_and_evidence_value_for_variant
 from classification.enums import SpecialEKeys, SubmissionSource
-from classification.models.classification import Classification, AllClassificationsAlleleSource
+from classification.models.classification import Classification
 from library.git import Git
 from library.guardian_utils import admin_bot
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
+from snpdb.models import Variant, Allele
 from snpdb.models.models_enums import ImportSource
 from snpdb.models.models_genome import GenomeBuild
 
@@ -23,14 +24,17 @@ class Command(BaseCommand):
         add_clingen_allele = options["add_clingen_allele"]
         for genome_build in GenomeBuild.builds_with_annotation():
             defaults = {"git_hash": Git(settings.BASE_DIR).hash}
-            allele_source, _ = AllClassificationsAlleleSource.objects.get_or_create(script=script,
-                                                                                    genome_build=genome_build,
-                                                                                    defaults=defaults)
-            variants_qs = allele_source.get_variants_qs()
-            if variants_qs.count():
+
+            # Note: This deliberately only gets classifications where the submitting variant was against this genome build
+            # ie we don't use Classification.get_variant_q_from_classification_qs() to get liftovers
+            contigs_q = Variant.get_contigs_q(self.genome_build)
+            variants_qs = Variant.objects.filter(contigs_q, importedalleleinfo__isnull=False)
+            if variants_qs.exists():
                 print(f"{genome_build} has variants - creating Allele/ClinGen + liftover")
                 populate_clingen_alleles_for_variants(genome_build, variants_qs)
-                create_liftover_pipelines(admin_bot(), allele_source, ImportSource.COMMAND_LINE, genome_build)
+
+                allele_qs = Allele.objects.filter(variantallele__variant__in=variants_qs)
+                create_liftover_pipelines(admin_bot(), allele_qs, ImportSource.COMMAND_LINE, genome_build)
 
                 if add_clingen_allele:
                     # Patch those ClinGen alleles into the variant classifications
