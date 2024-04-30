@@ -26,7 +26,11 @@
             <div class="card-header">{{ liftover_run }}</div>
             <div class="card-body">
                 {% labelled hint="tiny" label="Id" %}{{ liftover_run.pk }}{% endlabelled %}
-                {% labelled hint="tiny" label="Allele Source" %}{{ liftover_run.get_allele_source }}{% endlabelled %}
+                {% labelled hint="tiny" label="Allele Source" %}
+                    {% if liftover_run.allele_source %}
+                        {{ liftover_run.get_allele_source }}
+                    {% endif %}
+                {% endlabelled %}
                 {% labelled hint="tiny" label="Conversion Tool" %}{{ liftover_run.get_conversion_tool_display }}{% endlabelled %}
                 {% labelled hint="tiny" label="Source VCF" %}{{ liftover_run.source_vcf }}{% endlabelled %}
                 {% labelled hint="tiny" label="Source Build" %}{{ liftover_run.source_genome_build }}{% endlabelled %}

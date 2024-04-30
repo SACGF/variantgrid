@@ -3,6 +3,7 @@ import re
 from functools import cached_property
 from typing import Optional, Iterable, Union, Any
 
+import django
 import pydantic
 from bioutils.sequences import reverse_complement
 from django.conf import settings
@@ -863,6 +864,9 @@ class VariantAlleleCollectionRecord(models.Model):
     variant_allele = models.ForeignKey(VariantAllele, on_delete=CASCADE)
 
 
+liftover_run_complete_signal = django.dispatch.Signal()
+
+
 class LiftoverRun(TimeStampedModel):
     """ Liftover pipeline involves reading through a VCF where ID is set to Allele.pk and then creating
         VariantAllele entries for the variant/allele
@@ -893,9 +897,15 @@ class LiftoverRun(TimeStampedModel):
         return AlleleSource.objects.get_subclass(pk=self.allele_source_id)
 
     def get_allele_qs(self) -> QuerySet:
-        return self.get_allele_source().get_allele_qs()
+        if self.allele_source:
+            allele_qs = self.get_allele_source().get_allele_qs()
+        else:
+            allele_qs = Allele.objects.filter(alleleliftover__liftover=self)
+        return allele_qs
 
     def complete(self):
+        liftover_run_complete_signal.send_robust(sender=self.__class__, instance=self)
+
         # Raise a signal here??
         # AlleleLiftover.objects.filter(liftover=self)
         pass

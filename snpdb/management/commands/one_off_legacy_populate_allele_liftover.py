@@ -89,7 +89,8 @@ class Command(BaseCommand):
         for al in AlleleLiftover.objects.all():
             existing_allele_id_liftovers[al.allele_id].add(al.liftover)
 
-        liftover_run_qs = LiftoverRun.objects.all().order_by("created")
+        # Legacy ones had allele_source set, new ones won't
+        liftover_run_qs = LiftoverRun.objects.filter(allele_source__isnull=False).order_by("created")
         # liftover_run_qs = LiftoverRun.objects.none()
 
         for i, lr in enumerate(liftover_run_qs):
