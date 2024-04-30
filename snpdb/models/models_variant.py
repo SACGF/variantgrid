@@ -839,12 +839,6 @@ class VariantAlleleSource(AlleleSource):
     def get_variants_qs(self):
         return Variant.objects.filter(variantallele=self.variant_allele)
 
-    @staticmethod
-    def get_liftover_for_allele(allele, genome_build) -> Optional['LiftoverRun']:
-        """ Only works if liftover was done via VariantAlleleSource """
-        allele_sources_qs = VariantAlleleSource.objects.filter(variant_allele__allele=allele)
-        return LiftoverRun.objects.filter(allele_source__in=allele_sources_qs, genome_build=genome_build).first()
-
 
 class VariantAlleleCollectionSource(AlleleSource):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)

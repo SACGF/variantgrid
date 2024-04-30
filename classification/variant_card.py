@@ -8,8 +8,8 @@ from annotation.manual_variant_entry import check_can_create_variants, CreateMan
 from annotation.models import VariantAnnotation
 from annotation.templatetags.clinvar_tags import ClinVarDetails
 from classification.models import Classification, ImportedAlleleInfo
-from snpdb.models import Allele, GenomeBuild, VariantAllele, VariantAlleleSource, GenomeFasta, Contig, \
-    Variant, AlleleOrigin, AlleleMergeLog, LiftoverRun, ProcessingStatus
+from snpdb.models import Allele, GenomeBuild, VariantAllele, GenomeFasta, Contig, \
+    Variant, AlleleOrigin, AlleleMergeLog, LiftoverRun, AlleleLiftover
 from snpdb.variant_links import variant_link_info
 
 
@@ -25,7 +25,9 @@ class VariantCard:
         if variant_allele:
             variant = variant_allele.variant
         else:
-            unfinished_liftover = VariantAlleleSource.get_liftover_for_allele(allele, genome_build)
+            unfinished_liftover = None
+            if al := AlleleLiftover.objects.filter(allele=allele, liftover__genome_build=genome_build).first():
+                unfinished_liftover = al.liftover
             if unfinished_liftover is None:
                 try:
                     check_can_create_variants(user)

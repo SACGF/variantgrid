@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand
 from django.db.models import Min, F, Count
 from library.guardian_utils import admin_bot
 from snpdb.models import GenomeBuild, Allele, ClinGenAllele, Contig, VariantAllele, \
-    AlleleLiftover, LiftoverRun, VariantAlleleCollectionSource, AlleleConversionTool, ProcessingStatus, AlleleSource
+    AlleleLiftover, LiftoverRun, AlleleConversionTool, ProcessingStatus, AlleleSource
 
 
 class Command(BaseCommand):
@@ -37,9 +37,7 @@ class Command(BaseCommand):
         for genome_build in genome_builds:
             # TODO: Should we only have 1 failed ClinGen allele liftover?
             # Should we have notes on liftover run?
-            allele_source = VariantAlleleCollectionSource.objects.create(genome_build=genome_build)
             lr = LiftoverRun.objects.create(user=admin_bot(),
-                                            allele_source=allele_source,
                                             genome_build=genome_build,
                                             conversion_tool=AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
             logging.info("Created %s: for failed clingen liftovers", lr)
@@ -165,9 +163,7 @@ class Command(BaseCommand):
                     continue
                 if source_to_dest := allele_linked_first_last_build[source_build][dest_build]:
                     logging.info("Leftovers - %s first, linked to %s: %d", source_build, dest_build, len(source_to_dest))
-                    allele_source = VariantAlleleCollectionSource.objects.create(genome_build=source_build)
                     lr = LiftoverRun.objects.create(user=admin_bot(),
-                                                    allele_source=allele_source,
                                                     source_genome_build=source_build,
                                                     genome_build=dest_build,
                                                     conversion_tool=AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)

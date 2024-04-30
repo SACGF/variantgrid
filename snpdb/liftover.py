@@ -20,8 +20,7 @@ from library.log_utils import log_traceback
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.models.models_enums import ImportSource, AlleleConversionTool, AlleleOrigin, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
-from snpdb.models.models_variant import AlleleSource, LiftoverRun, Allele, Variant, VariantAlleleCollectionSource, \
-    VariantAllele, VariantAlleleCollectionRecord, AlleleLiftover
+from snpdb.models.models_variant import LiftoverRun, Allele, Variant, VariantAllele, AlleleLiftover
 from upload.models import UploadedFile, UploadedLiftover, UploadPipeline, UploadedFileTypes
 from upload.upload_processing import process_upload_pipeline
 
@@ -157,19 +156,9 @@ def liftover_alleles(allele_qs, user: User = None):
         user = admin_bot()
 
     for genome_build in GenomeBuild.builds_with_annotation():
-        allele_source = VariantAlleleCollectionSource.objects.create(genome_build=genome_build)
-
-        records = []
-        for variant_allele in VariantAllele.objects.filter(genome_build=genome_build, allele__in=allele_qs):
-            records.append(VariantAlleleCollectionRecord(collection=allele_source,
-                                                         variant_allele=variant_allele))
-        if records:
-            VariantAlleleCollectionRecord.objects.bulk_create(records)
-
-            variants_qs = allele_source.get_variants_qs()
-            populate_clingen_alleles_for_variants(genome_build, variants_qs)
-            create_liftover_pipelines(user, allele_source, ImportSource.WEB,
-                                      inserted_genome_build=genome_build)
+        variants_qs = Variant.objects.filter(variantallele__allele__in=allele_qs)
+        populate_clingen_alleles_for_variants(genome_build, variants_qs)
+        create_liftover_pipelines(user, allele_qs, ImportSource.WEB, inserted_genome_build=genome_build)
 
 
 def _liftover_using_same_contig(liftover, av_tuples: list[tuple[int, int]]):

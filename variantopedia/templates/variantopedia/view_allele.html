@@ -170,35 +170,14 @@
                 </tr>
             </thead>
             <tbody>
-                {% comment %}
-                <tr>
-                    <th class="text-right">Variant Coordinate</th>
-                    {% for vc in allele_card.variant_cards %}
-                        <td>
-                            {% if vc.variant %}
-                                <a class="hover-link" href="{% url 'view_variant' vc.variant.pk %}">{{ vc.variant }}</a>
-                                {% if vc.variant.is_abbreviated %}
-                                    <a class="ml-2" data-toggle="collapse" href="#variant-coordinate-{{ vc.variant.pk }}">Show all bases</a>
-                                    <div class="collapse" id="variant-coordinate-{{ vc.pk }}">
-                                        {{ vc.variant.full_string  }}
-                                    </div>
-                                {% endif %}
-                            {% elif vc.unfinished_liftover %}
-                                    This variant is being lifted over via {{ vc.unfinished_liftover.get_conversion_tool_display }}
-                                    <br/>(last updated {% timestamp vc.unfinished_liftover.modified time_ago=True %} ago)
-                            {% else %}
-                                {{ 'E' | severity_icon}} Not Lifted Over
-                            {% endif %}
-                        </td>
-                    {% endfor %}
-                </tr>
-                {% endcomment %}
-
                 <tr>
                     <th class="text-right">g.HGVS</th>
                     {% for vc in allele_card.variant_cards %}<td>
                         {% if vc.variant %}
                             <a class="hover-link" href="{% url 'view_variant' vc.variant.pk %}">{% c_hgvs vc.g_hgvs %}</a>
+                        {% elif vc.unfinished_liftover %}
+                                This variant is being lifted over via {{ vc.unfinished_liftover.get_conversion_tool_display }}
+                                <br/>(last updated {% timestamp vc.unfinished_liftover.modified time_ago=True %} ago)
                         {% endif %}
                     </td>
                     {% endfor %}
