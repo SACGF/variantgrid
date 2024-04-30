@@ -153,7 +153,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
     va_qs = VariantAllele.objects.filter(genome_build=genome_build, variant__in=variants)
     variant_ids_with_allele = set(va_qs.values_list("variant_id", flat=True))
     allele_missing_clingen_by_variant_id = {}
-    for va in va_qs.filter(error__isnull=True, allele__clingen_allele__isnull=True):
+    for va in va_qs.filter(clingen_error__isnull=True, allele__clingen_allele__isnull=True):
         allele_missing_clingen_by_variant_id[va.variant_id] = va
 
     if allele_missing_clingen_by_variant_id:
