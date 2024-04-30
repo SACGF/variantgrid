@@ -906,10 +906,6 @@ class LiftoverRun(TimeStampedModel):
     def complete(self):
         liftover_run_complete_signal.send_robust(sender=self.__class__, instance=self)
 
-        # Raise a signal here??
-        # AlleleLiftover.objects.filter(liftover=self)
-        pass
-
     def __str__(self):
         source = ""
         if self.source_genome_build:
