@@ -1,0 +1,35 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load js_tags %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% block title %}Liftover{% endblock %}
+{% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
+{% block content %}
+    <div class="container">
+        <h3>Liftover Runs</h3>
+
+        <table id="liftover-datatable" data-datatable-url="{% url 'liftover_runs_datatable' %}" class="sticky-header responsive"></table>
+    </div>
+
+    <div class="container">
+        {% for genome_build in genome_builds %}
+            <script>
+                function datatableFilter{{ genome_build.name }}(data) {
+                    data.genome_build_name = "{{ genome_build.name }}";
+                }
+            </script>
+
+            <h3>Failed Liftover to {{ genome_build }}</h3>
+
+            <table data-datatable-url="{% url 'allele_liftover_failures_datatable' %}" data-datatable-data='datatableFilter{{ genome_build.name }}' class="import-table sticky-header" responsive="true"></table>
+
+        {% endfor %}
+    </div>
+
+
+{% endblock %}
+
+

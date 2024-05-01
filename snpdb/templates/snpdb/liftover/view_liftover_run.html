@@ -1,0 +1,79 @@
+{% extends "uicore/page/base.html" %}
+{% load english_tags %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% load js_tags %}
+{% load humanize %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
+{% load ui_tabs_builder %}
+{% block title %}{{ liftover_run }}{% endblock title %}
+{% block content %}
+    <script>
+        function datatableFilter(data) {
+            data.liftover_run_id = {{ liftover_run.pk }};
+        }
+    </script>
+
+    <div class="current-record-menu-item">
+        <div class="text-small text-muted">viewing</div>
+        <i class="fa-solid fa-circle main-icon mr-1" style="color:#bbb; font-size:8pt"></i><label>{{ liftover }}</label>
+    </div>
+
+    <div class="container" style="position:relative">
+        <a href="{% url 'liftover_runs' %}">Back to liftover runs...</a>
+
+        <div class="card">
+            <div class="card-header">{{ liftover_run }}</div>
+            <div class="card-body">
+                {% labelled hint="tiny" label="Id" %}{{ liftover_run.pk }}{% endlabelled %}
+                {% labelled hint="tiny" label="Allele Source" %}
+                    {% if liftover_run.allele_source %}
+                        {{ liftover_run.get_allele_source }}
+                    {% endif %}
+                {% endlabelled %}
+                {% labelled hint="tiny" label="Conversion Tool" %}{{ liftover_run.get_conversion_tool_display }}{% endlabelled %}
+                {% labelled hint="tiny" label="Source VCF" %}{{ liftover_run.source_vcf }}{% endlabelled %}
+                {% labelled hint="tiny" label="Source Build" %}{{ liftover_run.source_genome_build }}{% endlabelled %}
+                {% labelled hint="tiny" label="(Dest) Build" %}{{ liftover_run.genome_build }}{% endlabelled %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Upload Processing</div>
+            <div class="card-body">
+                {% with up=liftover_run.uploadedliftover.uploaded_file.uploadpipeline %}
+                    {% if up %}
+                        <a href="{% url 'view_upload_pipeline' upload_pipeline_id=up.pk %}">View upload processing</a>
+                        {% labelled hint="tiny" label="Status" %}{{ up.get_status_display }}{% endlabelled %}
+                        {% labelled hint="tiny" label="Items processed" %}{{ up.items_processed }}{% endlabelled %}
+                    {% else %}
+                        No associated upload pipeline
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Allele liftover Statuses</div>
+            <div class="card-body">
+                {% if status_counts %}
+                    <table>
+                        {% for status, count in status_counts.items %}
+                            {% labelled hint="tiny" label=status %}{{ count }}{% endlabelled %}
+                        {% endfor %}
+                    </table>
+                {% else %}
+                    No linked allele liftovers
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+
+    {% if status_counts %}
+        <!-- It's also possible to display all the variants linked via allele source?? -->
+        <table data-datatable-url="{% url 'allele_liftover_datatable' %}" data-datatable-data='datatableFilter' class="import-table sticky-header" responsive="true"></table>
+    {% endif %}
+
+
+{% endblock %}

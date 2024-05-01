@@ -69,8 +69,8 @@ class ClinVarDetails(pydantic.BaseModel):
                 allele = Allele.objects.get(pk=allele)
             variant = allele.variant_for_build_optional(genome_build)
             if not variant:
-                variant = allele.variants.first()
-                genome_build = first(variant.genome_builds)
+                if variant := allele.variants.first():
+                    genome_build = first(variant.genome_builds)
                 is_desired_build = False
 
         if not annotation_version:
@@ -78,20 +78,21 @@ class ClinVarDetails(pydantic.BaseModel):
 
         clinvar_record: Optional[ClinVar] = None
 
-        if variant.can_have_annotation:
-            clinvar_qs = ClinVar.objects.filter(variant=variant, version=annotation_version.clinvar_version)
-            try:
-                clinvar_record = clinvar_qs.get()
-            except ClinVar.MultipleObjectsReturned:
-                # Report this - but carry on for the user
-                report_exc_info({"target": f"Variant {variant.pk}), Annotation Version {annotation_version.pk}"})
-                clinvar_record = clinvar_qs.first()
-            except ClinVar.DoesNotExist:
-                pass
-
         g_hgvs: Optional[str] = None
-        if not clinvar_record and variant.can_make_g_hgvs:
-            g_hgvs = VariantAnnotation.get_hgvs_g(variant)
+        if variant:
+            if variant.can_have_annotation:
+                clinvar_qs = ClinVar.objects.filter(variant=variant, version=annotation_version.clinvar_version)
+                try:
+                    clinvar_record = clinvar_qs.get()
+                except ClinVar.MultipleObjectsReturned:
+                    # Report this - but carry on for the user
+                    report_exc_info({"target": f"Variant {variant.pk}), Annotation Version {annotation_version.pk}"})
+                    clinvar_record = clinvar_qs.first()
+                except ClinVar.DoesNotExist:
+                    pass
+
+            if not clinvar_record and variant.can_make_g_hgvs:
+                g_hgvs = VariantAnnotation.get_hgvs_g(variant)
 
         return ClinVarDetails(
             clinvar=clinvar_record,

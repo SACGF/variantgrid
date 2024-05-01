@@ -1,6 +1,6 @@
 import logging
 import re
-from functools import cached_property
+from functools import cached_property, lru_cache
 from typing import Optional
 
 from django.conf import settings
@@ -36,6 +36,20 @@ class ClinGenAllele(TimeStampedModel):
 
     class ClinGenHGVSReferenceBaseUnavailableError(ClinGenAlleleRegistryException):
         """ HGVS doesn't have reference """
+
+    @staticmethod
+    @lru_cache
+    def refseq_valid_and_invalid_contigs(genome_build) -> tuple[set,set]:
+        invalid_contigs = Contig.objects.none()
+        valid_contigs = genome_build.contigs
+        if settings.LIFTOVER_TO_CHROMOSOMES_ONLY:
+            valid_contigs = valid_contigs.filter(role=SequenceRole.ASSEMBLED_MOLECULE)
+            invalid_contigs = genome_build.contigs.exclude(role=SequenceRole.ASSEMBLED_MOLECULE)
+
+        refseq_contigs = set(valid_contigs.values_list("refseq_accession", flat=True))
+        refseq_invalid_contigs = set(invalid_contigs.values_list("refseq_accession", flat=True))
+
+        return refseq_contigs, refseq_invalid_contigs
 
     @staticmethod
     def _strip_transcript_version(transcript_id):
@@ -161,14 +175,7 @@ class ClinGenAllele(TimeStampedModel):
         return None, None
 
     def get_g_hgvs(self, genome_build: GenomeBuild):
-        invalid_contigs = Contig.objects.none()
-        valid_contigs = genome_build.contigs
-        if settings.LIFTOVER_TO_CHROMOSOMES_ONLY:
-            valid_contigs = valid_contigs.filter(role=SequenceRole.ASSEMBLED_MOLECULE)
-            invalid_contigs = genome_build.contigs.exclude(role=SequenceRole.ASSEMBLED_MOLECULE)
-
-        refseq_contigs = set(valid_contigs.values_list("refseq_accession", flat=True))
-        refseq_invalid_contigs = set(invalid_contigs.values_list("refseq_accession", flat=True))
+        refseq_contigs, refseq_invalid_contigs = self.refseq_valid_and_invalid_contigs(genome_build)
         genomic_alleles = self.api_response["genomicAlleles"]
 
         invalid_contigs = set()

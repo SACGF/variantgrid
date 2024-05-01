@@ -3,9 +3,10 @@ from functools import reduce
 from typing import Optional, Any
 
 from django.conf import settings
-from django.db.models import F, QuerySet
-from django.db.models.aggregates import Count
+from django.db.models import F, QuerySet, OuterRef, Subquery
+from django.db.models.aggregates import Count, Max
 from django.db.models.query_utils import Q
+from django.shortcuts import get_object_or_404
 from guardian.shortcuts import get_objects_for_user
 
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
@@ -14,9 +15,11 @@ from library.utils import calculate_age, JsonDataType
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
     GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig, GenomeBuild, ClinGenAllele, \
-    VariantZygosityCountCollection, TagColorsCollection, Liftover, AlleleConversionTool
+    VariantZygosityCountCollection, TagColorsCollection, LiftoverRun, AlleleConversionTool, AlleleLiftover, \
+    ProcessingStatus, Allele
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs, remove_soft_deleted_vcfs_task
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
+from uicore.templatetags.js_tags import jsonify_for_js
 
 
 class VCFListGrid(JqGridUserRowConfig):
@@ -464,7 +467,7 @@ class TagColorsCollectionColumns(DatatableConfig[TagColorsCollection]):
         return TagColorsCollection.filter_for_user(self.user)
 
 
-class LiftoverColumns(DatatableConfig[Liftover]):
+class LiftoverRunColumns(DatatableConfig[LiftoverRun]):
 
     def __init__(self, request):
         super().__init__(request)
@@ -480,6 +483,7 @@ class LiftoverColumns(DatatableConfig[Liftover]):
             # Don't bother with modified as always same time as created
             # RichColumn(key='allele_source', orderable=True),
             RichColumn(key='conversion_tool', renderer=self.render_conversion_tool, orderable=True),
+            RichColumn(key='num_alleles', label='Num Alleles', orderable=True),
             RichColumn(key='source_vcf', orderable=True),
             RichColumn(key='source_genome_build', label='Source Build', orderable=True),
             RichColumn(key='genome_build', label='Dest Build', orderable=True),
@@ -503,5 +507,71 @@ class LiftoverColumns(DatatableConfig[Liftover]):
             label = import_status.label
         return label
 
-    def get_initial_queryset(self) -> QuerySet[TagColorsCollection]:
-        return Liftover.objects.all()
+    def get_initial_queryset(self) -> QuerySet[LiftoverRun]:
+        qs = LiftoverRun.objects.all()
+        return qs.annotate(num_alleles=Count("alleleliftover"))
+
+
+class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
+
+    def __init__(self, request):
+        super().__init__(request)
+        self.user = request
+        self.liftover_run = None
+
+        self.rich_columns = [
+            RichColumn(key="allele", orderable=True,
+                       renderer=self.render_allele, client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="status", label="Status", renderer=self.render_status, orderable=True),
+            RichColumn(key="error", label="Error", renderer=self.render_json, orderable=True),
+        ]
+
+    def render_allele(self, row: dict[str, Any]) -> JsonDataType:
+        data = {}
+        if allele_id := row['allele']:
+            allele = get_object_or_404(Allele, id=allele_id)
+            allele.preview
+            data = {
+                "text": str(allele),
+                "url": allele.get_absolute_url(),
+            }
+        return data
+
+    def render_status(self, row: dict[str, Any]) -> JsonDataType:
+        label = ""
+        if status := row['status']:
+            processing_status = ProcessingStatus(status)
+            label = processing_status.label
+        return label
+
+    def render_json(self, row: dict[str, Any]) -> JsonDataType:
+        js = row["error"]
+        return jsonify_for_js(js, pretty=True)
+
+
+class LiftoverRunAlleleLiftoverColumns(AbstractAlleleLiftoverColumns):
+    def get_initial_queryset(self) -> QuerySet[AlleleLiftover]:
+        liftover_run_id = self.get_query_param("liftover_run_id")
+        if liftover_run_id is None:
+            raise ValueError("liftover_run_id not provided")
+        liftover_run = get_object_or_404(LiftoverRun, pk=liftover_run_id)
+        return AlleleLiftover.objects.filter(liftover=liftover_run)
+
+
+class AlleleLiftoverFailureColumns(AbstractAlleleLiftoverColumns):
+    def get_initial_queryset(self) -> QuerySet[AlleleLiftover]:
+        genome_build_name = self.get_query_param("genome_build_name")
+        if genome_build_name is None:
+            raise ValueError("genome_build_name not provided")
+        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+
+        qs = AlleleLiftover.objects.filter(liftover__genome_build=genome_build,
+                                           status=ProcessingStatus.ERROR)
+        qs = qs.annotate(
+            max_id=Max('allele__alleleliftover__id')
+        ).filter(
+            id=F('max_id')
+        )
+        return qs
+
+

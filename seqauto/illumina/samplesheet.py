@@ -109,11 +109,11 @@ def convert_sheet_to_df(sheet, date_on_file: str = None):
         sample_id = 'SampleID'
 
     if len(date_on_file) != 6:
-        raise ValueError(f"{sheet}: date indicated in the file name ({date_on_file}) not in format YY-MM-DD")
+        raise ValueError(f"{sheet}: date indicated in the file name ({date_on_file}) not in format YYMMDD")
 
     yy, mm, dd = date_on_file[:2], date_on_file[2:4], date_on_file[4:]
     if int(mm) > 12 or int(dd) > 31:
-        raise ValueError(f"{sheet}: date indicated in the file name ({date_on_file}) not in format YY-MM-DD")
+        raise ValueError(f"{sheet}: date indicated in the file name ({date_on_file}) not in format YYMMDD")
 
     date = f'20{yy}-{mm}-{dd}T00:00:00+0930'
 

@@ -5,18 +5,16 @@ from collections import defaultdict, Counter
 
 from celery.result import AsyncResult
 from django.conf import settings
-from django.db.models import Max, F
+from django.db.models import F
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
-from analysis.models import AnalysisVariable, AnalysisTemplate, AnalysisTemplateType, NodeCount, \
-    AnalysisTemplateVersion, VariantTag
+from analysis.models import AnalysisVariable, AnalysisTemplate, NodeCount, VariantTag
 from analysis.models.enums import TagLocation
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeStatus, AnalysisEdge, AnalysisNodeAlleleSource, \
-    AnalysisNode
+from analysis.models.nodes.analysis_node import NodeStatus, AnalysisEdge, AnalysisNode
 from analysis.models.nodes.filter_child import create_filter_child_node
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
@@ -25,6 +23,7 @@ from analysis.models.nodes.node_types import get_node_types_hash_by_class_name
 from analysis.models.nodes.node_utils import reload_analysis_nodes, update_analysis, \
     get_toposorted_nodes, get_rendering_dict
 from analysis.serializers import VariantTagSerializer
+from analysis.tasks.analysis_update_tasks import populate_clingen_alleles_from_analysis_node
 from analysis.views.analysis_permissions import get_analysis_or_404, get_node_subclass_or_404, \
     get_node_subclass_or_non_fatal_exception
 from analysis.views.node_json_view import NodeJSONPostView
@@ -32,7 +31,6 @@ from library.django_utils import require_superuser
 from ontology.models import OntologyTerm, OntologyVersion
 from ontology.serializers import OntologyTermSerializer
 from snpdb.models import Tag, BuiltInFilters, GenomeBuild, Sample
-from snpdb.tasks.clingen_tasks import populate_clingen_alleles_from_allele_source
 from variantgrid.celery import app
 
 
@@ -408,8 +406,8 @@ def analysis_set_panel_size(request, analysis_id):
 @require_superuser
 def node_populate_clingen_alleles(request, analysis_id, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
-    an_as, _ = AnalysisNodeAlleleSource.objects.get_or_create(node=node)
-    populate_clingen_alleles_from_allele_source.si(an_as.pk, settings.CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS).apply_async()
+    node.analysis.check_can_view(request.user)
+    populate_clingen_alleles_from_analysis_node.si(node_id, settings.CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS).apply_async()
     return JsonResponse({})
 
 

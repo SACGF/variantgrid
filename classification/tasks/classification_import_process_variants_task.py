@@ -3,12 +3,11 @@ from typing import Optional, Any
 from django.conf import settings
 
 from classification.models import ImportedAlleleInfo
-from classification.models.classification import ClassificationImport, \
-    ClassificationImportAlleleSource
+from classification.models.classification import ClassificationImport
 from library.log_utils import report_exc_info
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import GenomeBuild, ImportSource, Variant, VariantCoordinate
+from snpdb.models import GenomeBuild, ImportSource, Variant, VariantCoordinate, Allele
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import ModifiedImportedVariant, UploadStep
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
@@ -110,9 +109,10 @@ def liftover_classification_import(
         classification_import: ClassificationImport,
         import_source: ImportSource):
     if settings.LIFTOVER_CLASSIFICATIONS:
-        allele_source = ClassificationImportAlleleSource.objects.create(classification_import=classification_import)
+        variants_qs = classification_import.get_variants_qs()
+        allele_qs = Allele.objects.filter(variantallele__variant__in=variants_qs)
         genome_build = classification_import.genome_build
-        create_liftover_pipelines(classification_import.user, allele_source, import_source, genome_build)
+        create_liftover_pipelines(classification_import.user, allele_qs, import_source, genome_build)
 
 
 ClassificationImportProcessVariantsTask = app.register_task(ClassificationImportProcessVariantsTask())

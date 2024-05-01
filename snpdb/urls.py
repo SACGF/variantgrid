@@ -7,7 +7,8 @@ from rest_framework.urlpatterns import format_suffix_patterns
 from library.django_utils.jqgrid_view import JQGridView
 from library.preview_request import preview_view
 from snpdb.grids import CohortListGrid, CohortSampleListGrid, SamplesListGrid, GenomicIntervalsListGrid, \
-    CustomColumnsCollectionColumns, TriosListGrid, VCFListGrid, TagColorsCollectionColumns, LiftoverColumns
+    CustomColumnsCollectionColumns, TriosListGrid, VCFListGrid, TagColorsCollectionColumns, \
+    LiftoverRunColumns, LiftoverRunAlleleLiftoverColumns, AlleleLiftoverFailureColumns
 from snpdb.views import views, views_json, views_rest, \
     views_autocomplete
 from snpdb.views.datatable_view import DatabaseTableView
@@ -93,8 +94,8 @@ urlpatterns = [
     perm_path('wiki_save/<class_name>/<unique_keyword>/<unique_value>', views.wiki_save, name='wiki_save'),
     perm_path('labs', views.labs, name='labs'),
     perm_path('labs_graph_detail', views.labs_graph_detail, name='labs_graph_detail'),
-    perm_path('liftover', views.liftover, name='liftover'),
-    perm_path('liftover/view_liftover/<liftover_id>', views.view_liftover, name='view_liftover'),
+    perm_path('liftover', views.liftover_runs, name='liftover_runs'),
+    perm_path('liftover/view_liftover_run/<liftover_run_id>', views.view_liftover_run, name='view_liftover_run'),
     perm_path('maps', views.maps, name='maps'),
     perm_path('index', views.index, name='index'),
     perm_path('user_global_sample_gene_matrix', views.user_global_sample_gene_matrix, name='user_global_sample_gene_matrix'),
@@ -107,8 +108,13 @@ urlpatterns = [
     perm_path('cohort_sample/grid/<int:cohort_id>/<slug:op>/', JQGridView.as_view(grid=CohortSampleListGrid), name='cohort_sample_grid'),
     perm_path('sample/grid/<slug:op>/', JQGridView.as_view(grid=SamplesListGrid, delete_row=True), name='samples_grid'),
     perm_path('genomic_intervals/grid/<slug:op>/', JQGridView.as_view(grid=GenomicIntervalsListGrid, delete_row=True), name='genomic_intervals_grid'),
-    perm_path('liftover/datatable', DatabaseTableView.as_view(column_class=LiftoverColumns),
-              name='liftover_datatable'),
+    perm_path('liftover/liftover_runs/datatable', DatabaseTableView.as_view(column_class=LiftoverRunColumns),
+              name='liftover_runs_datatable'),
+    perm_path('liftover/allele_liftover/datatable', DatabaseTableView.as_view(column_class=LiftoverRunAlleleLiftoverColumns),
+              name='allele_liftover_datatable'),
+    perm_path('liftover/allele_liftover_failures/datatable',
+              DatabaseTableView.as_view(column_class=AlleleLiftoverFailureColumns),
+              name='allele_liftover_failures_datatable'),
     perm_path('settings/custom_columns/collection/datatable',
               DatabaseTableView.as_view(column_class=CustomColumnsCollectionColumns),
               name='custom_columns_collections_datatable'),

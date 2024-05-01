@@ -10,10 +10,11 @@ import networkx as nx
 from celery.canvas import Signature, chain
 from django.db.models import Q
 
-from analysis.models import Analysis, AnalysisEdge, NodeStatus, NodeTask
+from analysis.models import Analysis, AnalysisEdge, NodeStatus, NodeTask, AnalysisNode
 from analysis.models.nodes.node_utils import get_nodes_by_id, get_toposorted_nodes_from_parent_value_data
 from analysis.tasks.node_update_tasks import wait_for_node
 from library.log_utils import log_traceback
+from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 
 
 @celery.shared_task
@@ -165,3 +166,13 @@ def _get_node_dependencies(nodes_by_id, parent_value_data):
         node_dependencies.update(ancestors)
 
     return node_dependencies
+
+
+@celery.shared_task
+def populate_clingen_alleles_from_analysis_node(node_id, max_variants=0):
+    node = AnalysisNode.objects.get_subclass(pk=node_id)
+    variants_qs = node.get_queryset()
+    if max_variants:
+        # If we're going to limit it, make sure we only get useful ones....
+        variants_qs = variants_qs.filter(variantallele__allele__clingen_allele__isnull=True)[:max_variants]
+    populate_clingen_alleles_for_variants(node.analysis.genome_build, variants_qs)
