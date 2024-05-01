@@ -1499,7 +1499,9 @@ def labs_graph_detail(request):
 
 @require_superuser
 def liftover_runs(request):
-    context = {}
+    context = {
+        "genome_builds": GenomeBuild.builds_with_annotation()
+    }
     return render(request, "snpdb/liftover/liftover_runs.html", context)
 
 

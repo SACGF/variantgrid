@@ -8,7 +8,7 @@ from library.django_utils.jqgrid_view import JQGridView
 from library.preview_request import preview_view
 from snpdb.grids import CohortListGrid, CohortSampleListGrid, SamplesListGrid, GenomicIntervalsListGrid, \
     CustomColumnsCollectionColumns, TriosListGrid, VCFListGrid, TagColorsCollectionColumns, \
-    LiftoverRunColumns, LiftoverRunAlleleLiftoverColumns
+    LiftoverRunColumns, LiftoverRunAlleleLiftoverColumns, AlleleLiftoverFailureColumns
 from snpdb.views import views, views_json, views_rest, \
     views_autocomplete
 from snpdb.views.datatable_view import DatabaseTableView
@@ -112,6 +112,9 @@ urlpatterns = [
               name='liftover_runs_datatable'),
     perm_path('liftover/allele_liftover/datatable', DatabaseTableView.as_view(column_class=LiftoverRunAlleleLiftoverColumns),
               name='allele_liftover_datatable'),
+    perm_path('liftover/allele_liftover_failures/datatable',
+              DatabaseTableView.as_view(column_class=AlleleLiftoverFailureColumns),
+              name='allele_liftover_failures_datatable'),
     perm_path('settings/custom_columns/collection/datatable',
               DatabaseTableView.as_view(column_class=CustomColumnsCollectionColumns),
               name='custom_columns_collections_datatable'),

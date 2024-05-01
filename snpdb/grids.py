@@ -3,8 +3,8 @@ from functools import reduce
 from typing import Optional, Any
 
 from django.conf import settings
-from django.db.models import F, QuerySet
-from django.db.models.aggregates import Count
+from django.db.models import F, QuerySet, OuterRef, Subquery
+from django.db.models.aggregates import Count, Max
 from django.db.models.query_utils import Q
 from django.shortcuts import get_object_or_404
 from guardian.shortcuts import get_objects_for_user
@@ -512,7 +512,7 @@ class LiftoverRunColumns(DatatableConfig[LiftoverRun]):
         return qs.annotate(num_alleles=Count("alleleliftover"))
 
 
-class LiftoverRunAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
+class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
 
     def __init__(self, request):
         super().__init__(request)
@@ -548,10 +548,30 @@ class LiftoverRunAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
         js = row["error"]
         return jsonify_for_js(js, pretty=True)
 
+
+class LiftoverRunAlleleLiftoverColumns(AbstractAlleleLiftoverColumns):
     def get_initial_queryset(self) -> QuerySet[AlleleLiftover]:
         liftover_run_id = self.get_query_param("liftover_run_id")
         if liftover_run_id is None:
             raise ValueError("liftover_run_id not provided")
         liftover_run = get_object_or_404(LiftoverRun, pk=liftover_run_id)
         return AlleleLiftover.objects.filter(liftover=liftover_run)
+
+
+class AlleleLiftoverFailureColumns(AbstractAlleleLiftoverColumns):
+    def get_initial_queryset(self) -> QuerySet[AlleleLiftover]:
+        genome_build_name = self.get_query_param("genome_build_name")
+        if genome_build_name is None:
+            raise ValueError("genome_build_name not provided")
+        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+
+        qs = AlleleLiftover.objects.filter(liftover__genome_build=genome_build,
+                                           status=ProcessingStatus.ERROR)
+        qs = qs.annotate(
+            max_id=Max('allele__alleleliftover__id')
+        ).filter(
+            id=F('max_id')
+        )
+        return qs
+
 
