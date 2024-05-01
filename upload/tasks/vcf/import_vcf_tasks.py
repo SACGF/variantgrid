@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from annotation.tasks.annotation_scheduler_task import annotation_scheduler
 from library.log_utils import log_traceback
 from library.utils import full_class_name, import_class
+from snpdb.models import AlleleLiftover
 from snpdb.models.models_enums import ProcessingStatus, AlleleConversionTool
 from snpdb.ncbi_remap import ncbi_remap
 from upload.models import UploadStep, UploadStepTaskType, VCFPipelineStage, UploadedVCF
@@ -137,6 +138,8 @@ class LiftoverCreateVCFTask(ImportVCFStepTask):
     def process_items(self, upload_step: UploadStep):
         upload_pipeline = upload_step.upload_pipeline
         liftover = upload_pipeline.uploaded_file.uploadedliftover.liftover
+        AlleleLiftover.objects.filter(liftover=liftover).update(status=ProcessingStatus.PROCESSING)
+
         if liftover.conversion_tool == AlleleConversionTool.NCBI_REMAP:
             ncbi_remap(upload_step.input_filename, liftover.source_genome_build,
                        upload_step.output_filename, liftover.genome_build)

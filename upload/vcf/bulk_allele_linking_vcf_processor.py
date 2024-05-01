@@ -2,7 +2,7 @@ import logging
 
 from django.conf import settings
 
-from snpdb.models import AlleleOrigin, VariantAllele, Allele, SequenceRole, Variant, LiftoverError
+from snpdb.models import AlleleOrigin, VariantAllele, Allele, SequenceRole, Variant, AlleleLiftover, ProcessingStatus
 from upload.models import ModifiedImportedVariant
 from upload.vcf.bulk_minimal_vcf_processor import BulkMinimalVCFProcessor
 
@@ -13,6 +13,9 @@ class BulkAlleleLinkingVCFProcessor(BulkMinimalVCFProcessor):
         super().__init__(*args, **kwargs)
         self.allele_ids = []
         self.liftover = self.upload_pipeline.uploaded_file.uploadedliftover.liftover
+        self.allele_liftovers_by_allele_id = {}
+        for al in AlleleLiftover.objects.filter(liftover=self.liftover):
+            self.allele_liftovers_by_allele_id[al.allele_id] = al
 
     @property
     def genome_build(self):
@@ -39,23 +42,28 @@ class BulkAlleleLinkingVCFProcessor(BulkMinimalVCFProcessor):
 
         normalized_variants = set(miv_qs.values_list("variant_id", flat=True))
         variant_alleles = []
-        liftover_errors = []
+        updated_allele_liftovers = []
         for variant_id, allele_id in zip(variant_ids, self.allele_ids):
             variant_id = int(variant_id)
             allele_id = int(allele_id)
+
+            al = self.allele_liftovers_by_allele_id[allele_id]
+            updated_allele_liftovers.append(al)
+
             if invalid_contig := invalid_contig_variant_ids.get(variant_id):
                 error_message = f"settings.LIFTOVER_TO_CHROMOSOMES_ONLY=True disabled liftover to non-chrom contig: {invalid_contig}"
-                liftover_error = LiftoverError(liftover=self.liftover,
-                                               allele_id=allele_id,
-                                               variant_id=variant_id,
-                                               error_message=error_message)
-                liftover_errors.append(liftover_error)
+                al.status = ProcessingStatus.ERROR
+                al.error = {"message": error_message}
                 continue
 
             existing_allele_id = variants_with_existing_allele.get(variant_id)
             if existing_allele_id:
+                al.status = ProcessingStatus.SKIPPED
+                error_message = f"{variant_id=} already linked to AlleleID={existing_allele_id}"
                 if allele_id != existing_allele_id:
                     self.merge_alleles(allele_id, existing_allele_id)
+                    error_message += f" (merged {allele_id=} + {existing_allele_id=})"
+                al.error = {"message": error_message}
                 continue  # Only one VariantAllele allowed, bulk_create below would have not inserted anything
 
             if variant_id in normalized_variants:
@@ -69,9 +77,10 @@ class BulkAlleleLinkingVCFProcessor(BulkMinimalVCFProcessor):
                                origin=origin,
                                allele_linking_tool=self.liftover.conversion_tool)
             variant_alleles.append(va)
+            al.status = ProcessingStatus.SUCCESS
 
-        if liftover_errors:
-            LiftoverError.objects.bulk_create(liftover_errors, ignore_conflicts=True)
+        if updated_allele_liftovers:
+            AlleleLiftover.objects.bulk_update(updated_allele_liftovers, fields=["status", "error"])
 
         if variant_alleles:
             logging.info("Inserting %d variant_alleles", len(variant_alleles))

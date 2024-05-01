@@ -21,7 +21,7 @@ from library.genomics import format_chrom
 from library.preview_request import PreviewData
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import Variant, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DbSNP, DBSNP_PATTERN, VariantCoordinate, \
-    ClinGenAllele, GenomeBuild, Contig, HGVS_UNCLEANED_PATTERN, VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN
+    ClinGenAllele, GenomeBuild, Contig, HGVS_UNCLEANED_PATTERN, VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN, Allele
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample, SearchResult, SearchMessageOverall, \
     SearchMessage, INVALID_INPUT
 from upload.models import ModifiedImportedVariant
@@ -602,8 +602,23 @@ DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
     sub_name="ID",
     example=SearchExample(
         note="Provide the variant ID as it appears in VCF exports",
-        examples=[f"{settings.VARIANT_VCF_DB_PREFIX}4638674"]
+        examples=["v42", f"{settings.VARIANT_VCF_DB_PREFIX}4638674"]
     )
 )
 def search_variant_id(search_input: SearchInputInstance):
     yield Variant.objects.filter(pk=search_input.match.group(2))
+
+
+ALLELE_ID_SEARCH_PATTERN = re.compile(fr"^a(\d+)$")
+
+@search_receiver(
+    search_type=Allele,
+    pattern=ALLELE_ID_SEARCH_PATTERN,
+    sub_name="ID",
+    example=SearchExample(
+        note="Provide the Allele ID as it appears in URLs",
+        examples=["a42", "a256"]
+    )
+)
+def search_allele_id(search_input: SearchInputInstance):
+    yield Allele.objects.filter(pk=search_input.match.group(1))

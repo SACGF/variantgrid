@@ -795,7 +795,8 @@ class ImportedAlleleInfo(TimeStampedModel):
                 self[genome_build] = ResolvedVariantInfo.get_or_create(self, genome_build, variant)
 
     @staticmethod
-    def relink_variants(vc_import: Optional['ClassificationImport'] = None):
+    def relink_variants(vc_import: Optional['ClassificationImport'] = None,
+                        liftover_run: Optional['LiftoverRun'] = None):
         """
             Call after import/liftover as variants may not have been processed enough at the time of "set_variant"
             Updates all records that have a variant but not cached c.hgvs values or no clinical context.
@@ -807,6 +808,9 @@ class ImportedAlleleInfo(TimeStampedModel):
         relink_qs = ImportedAlleleInfo.objects.all()
         if vc_import:
             relink_qs = relink_qs.filter(classification_import=vc_import)
+
+        if liftover_run:
+            relink_qs = relink_qs.filter(allele__alleleliftover__liftover=liftover_run).distinct()
 
         for allele_info in relink_qs:
             allele_info.refresh_and_save()

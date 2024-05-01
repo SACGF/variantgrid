@@ -6,7 +6,7 @@ import operator
 import os
 from collections import defaultdict
 from functools import reduce
-from typing import Any, Union
+from typing import Any, Union, Iterable
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -18,31 +18,29 @@ from library.genomics.vcf_utils import write_vcf_from_tuples
 from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
-from snpdb.models.models_enums import ImportSource, AlleleConversionTool, AlleleOrigin
+from snpdb.models.models_enums import ImportSource, AlleleConversionTool, AlleleOrigin, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
-from snpdb.models.models_variant import AlleleSource, Liftover, Allele, Variant, VariantAlleleCollectionSource, \
-    VariantAllele, VariantAlleleCollectionRecord
+from snpdb.models.models_variant import LiftoverRun, Allele, Variant, VariantAllele, AlleleLiftover
 from upload.models import UploadedFile, UploadedLiftover, UploadPipeline, UploadedFileTypes
 from upload.upload_processing import process_upload_pipeline
 
 
-def create_liftover_pipelines(user: User, allele_source: AlleleSource,
+def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                               import_source: ImportSource,
                               inserted_genome_build: GenomeBuild,
                               destination_genome_builds: list[GenomeBuild] = None):
     """ Creates and runs a liftover pipeline for each destination GenomeBuild (default = all other builds) """
 
-    build_liftover_vcf_tuples = _get_build_liftover_tuples(allele_source, inserted_genome_build, destination_genome_builds)
+    build_liftover_vcf_tuples = _get_build_liftover_tuples(alleles, inserted_genome_build, destination_genome_builds)
     for genome_build, liftover_tuples in build_liftover_vcf_tuples.items():
         for conversion_tool, av_tuples in liftover_tuples.items():
-            if conversion_tool == AlleleConversionTool.SAME_CONTIG:
-                _liftover_using_same_contig(genome_build, av_tuples)
-            else:
-                liftover = Liftover.objects.create(user=user,
-                                                   allele_source=allele_source,
-                                                   conversion_tool=conversion_tool,
-                                                   genome_build=genome_build)
+            liftover = LiftoverRun.objects.create(user=user,
+                                                  conversion_tool=conversion_tool,
+                                                  genome_build=genome_build)
 
+            if conversion_tool == AlleleConversionTool.SAME_CONTIG:
+                _liftover_using_same_contig(liftover, av_tuples)
+            else:
                 # Because we need to normalise / insert etc, it's easier just to write a VCF
                 # and run through upload pipeline
                 working_dir = get_import_processing_dir(liftover.pk, "liftover")
@@ -54,6 +52,16 @@ def create_liftover_pipelines(user: User, allele_source: AlleleSource,
                     liftover.source_vcf = vcf_filename
                     liftover.source_genome_build = inserted_genome_build
                     liftover.save()
+
+                allele_liftover_records = []
+                for avt in av_tuples:
+                    al = AlleleLiftover(allele_id=avt[2],
+                                        liftover=liftover,
+                                        status=ProcessingStatus.CREATED)
+                    allele_liftover_records.append(al)
+
+                if allele_liftover_records:
+                    AlleleLiftover.objects.bulk_create(allele_liftover_records, batch_size=2000)
 
                 write_vcf_from_tuples(vcf_filename, av_tuples, tuples_have_id_field=True)
                 uploaded_file = UploadedFile.objects.create(path=liftover_vcf_filename,
@@ -72,7 +80,7 @@ VCF_ROW = tuple[str, int, int, str, str]
 LIFTOVER_TUPLE = list[Union[tuple[int, int], VCF_ROW]]
 
 
-def _get_build_liftover_tuples(allele_source: AlleleSource, inserted_genome_build: GenomeBuild,
+def _get_build_liftover_tuples(alleles: Iterable[Allele], inserted_genome_build: GenomeBuild,
                                destination_genome_builds: list[GenomeBuild] = None) -> dict[Any, dict[Any, LIFTOVER_TUPLE]]:
     """ ID column set to allele_id """
     if destination_genome_builds is None:
@@ -93,16 +101,16 @@ def _get_build_liftover_tuples(allele_source: AlleleSource, inserted_genome_buil
 
     other_build_contigs_q = reduce(operator.or_, other_build_contigs_q_list)
 
-    allele_qs = allele_source.get_allele_qs().select_related("clingen_allele")
+    # Store builds where alleles have already been lifted over
     allele_builds = defaultdict(set)
-    # We want to do a left outer join to variant allele
-    qs = Allele.objects.filter(other_build_contigs_q, pk__in=allele_qs)
+    allele_ids = [allele.pk for allele in alleles]
+    qs = Allele.objects.filter(other_build_contigs_q, pk__in=allele_ids)
     for allele_id, genome_build_name in qs.values_list("pk", "variantallele__genome_build"):
         allele_builds[allele_id].add(genome_build_name)
 
     build_liftover_vcf_tuples = defaultdict(lambda: defaultdict(list))
 
-    for allele in allele_qs:
+    for allele in alleles:
         existing_builds = allele_builds[allele.pk]
         for genome_build in other_builds:
             if genome_build.pk in existing_builds:
@@ -127,8 +135,9 @@ def _get_build_liftover_tuples(allele_source: AlleleSource, inserted_genome_buil
                     avt = (chrom, position, allele.pk, ref, alt, svlen)
                 build_liftover_vcf_tuples[genome_build][conversion_tool].append(avt)
             elif settings.LIFTOVER_NCBI_REMAP_ENABLED:
-                if allele.liftovererror_set.filter(liftover__genome_build=genome_build,
-                                                   liftover__conversion_tool=AlleleConversionTool.NCBI_REMAP).exists():
+                if allele.alleleliftover_set.filter(liftover__genome_build=genome_build,
+                                                    liftover__conversion_tool=AlleleConversionTool.NCBI_REMAP,
+                                                    status=ProcessingStatus.ERROR).exists():
                     continue  # Skip as already failed NCBI liftover to desired build
 
                 # Return VCF tuples in inserted genome build
@@ -147,32 +156,32 @@ def liftover_alleles(allele_qs, user: User = None):
         user = admin_bot()
 
     for genome_build in GenomeBuild.builds_with_annotation():
-        allele_source = VariantAlleleCollectionSource.objects.create(genome_build=genome_build)
-
-        records = []
-        for variant_allele in VariantAllele.objects.filter(genome_build=genome_build, allele__in=allele_qs):
-            records.append(VariantAlleleCollectionRecord(collection=allele_source,
-                                                         variant_allele=variant_allele))
-        if records:
-            VariantAlleleCollectionRecord.objects.bulk_create(records)
-
-            variants_qs = allele_source.get_variants_qs()
-            populate_clingen_alleles_for_variants(genome_build, variants_qs)
-            create_liftover_pipelines(user, allele_source, ImportSource.WEB,
-                                      inserted_genome_build=genome_build)
+        variants_qs = Variant.objects.filter(variantallele__allele__in=allele_qs)
+        populate_clingen_alleles_for_variants(genome_build, variants_qs)
+        create_liftover_pipelines(user, allele_qs, ImportSource.WEB, inserted_genome_build=genome_build)
 
 
-def _liftover_using_same_contig(genome_build, av_tuples: list[tuple[int, int]]):
+def _liftover_using_same_contig(liftover, av_tuples: list[tuple[int, int]]):
     """ Special case of e.g. Mitochondria that has the same contig across multiple builds
         we just need to create a VariantAllele object - will already have annotation for both builds """
 
     variant_alleles = []
+    allele_liftovers = []
     for allele_id, variant_id in av_tuples:
         va = VariantAllele(variant_id=variant_id,
-                           genome_build=genome_build,
+                           genome_build=liftover.genome_build,
                            allele_id=allele_id,
                            origin=AlleleOrigin.LIFTOVER,
                            allele_linking_tool=AlleleConversionTool.SAME_CONTIG)
         variant_alleles.append(va)
 
-    VariantAllele.objects.bulk_create(variant_alleles, ignore_conflicts=True, batch_size=2000)
+        al = AlleleLiftover(allele_id=allele_id,
+                            liftover=liftover,
+                            status=ProcessingStatus.SUCCESS)
+        allele_liftovers.append(al)
+
+    if variant_alleles:
+        VariantAllele.objects.bulk_create(variant_alleles, ignore_conflicts=True, batch_size=2000)
+
+    if allele_liftovers:
+        AlleleLiftover.objects.bulk_create(allele_liftovers, batch_size=2000)

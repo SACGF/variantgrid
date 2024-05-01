@@ -14,7 +14,7 @@ from library.utils.file_utils import name_from_filename
 from patients.models import PatientRecords
 from pedigree.models import PedFile
 from snpdb.models import GenomicIntervalsCollection, ImportStatus, Sample, ImportedWikiCollection
-from snpdb.models.models_variant import Liftover
+from snpdb.models.models_variant import LiftoverRun
 from upload.bed_file_processing import process_bed_file
 from upload.models import UploadedFile
 
@@ -96,7 +96,7 @@ class UploadedClassificationImport(models.Model):
 
 class UploadedLiftover(models.Model):
     uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
-    liftover = models.OneToOneField(Liftover, null=True, on_delete=CASCADE)
+    liftover = models.OneToOneField(LiftoverRun, null=True, on_delete=CASCADE)
 
     def get_data(self):
         return self.liftover

@@ -56,6 +56,7 @@ class ProcessingStatus(models.TextChoices):
     TERMINATED_EARLY = 'T', 'Terminated Early'
     TIMED_OUT = 'Z', 'Timed Out'
 
+    RUNNING_STATES = Constant([e[0] for e in (CREATED, PROCESSING)])
     FINISHED_STATES = Constant([e[0] for e in (ERROR, SUCCESS, SKIPPED, TERMINATED_EARLY, TIMED_OUT)])
 
 

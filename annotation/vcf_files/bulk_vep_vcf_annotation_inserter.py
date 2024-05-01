@@ -429,8 +429,7 @@ class BulkVEPVCFAnnotationInserter:
     def add_calculated_variant_annotation_columns(self, variant_coordinate, transcript_data):
         self._add_hemi_count(transcript_data)
         self._add_hgvs_g(variant_coordinate, transcript_data)
-        if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STANDARD:
-            self._add_calculated_num_predictions(transcript_data)
+        self._add_calculated_num_predictions(transcript_data)
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
             self._calculate_gnomad_sv_overlap_percentage(variant_coordinate, transcript_data)
 

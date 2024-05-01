@@ -43,7 +43,7 @@ from snpdb.forms import TagForm, get_settings_form_features
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleConversionTool, ImportSource, AlleleOrigin, \
-    VariantAlleleSource, VariantGridColumn, Tag
+    VariantGridColumn, Tag
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.search import search_data
@@ -520,8 +520,7 @@ def create_variant_for_allele(request, allele_id, genome_build_name):
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     non_liftover_origin = [AlleleOrigin.IMPORTED_TO_DATABASE, AlleleOrigin.IMPORTED_NORMALIZED]
     if variant_allele := allele.variantallele_set.filter(origin__in=non_liftover_origin).first():
-        allele_source = VariantAlleleSource.objects.create(variant_allele=variant_allele)
-        create_liftover_pipelines(admin_bot(), allele_source, ImportSource.WEB, variant_allele.genome_build, [genome_build])
+        create_liftover_pipelines(admin_bot(), [allele], ImportSource.WEB, variant_allele.genome_build, [genome_build])
     return redirect(allele)
 
 

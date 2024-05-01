@@ -47,7 +47,7 @@ class ClinGenAlleleTestCase(TestCase):
                                                 existing_variant_allele=variant_allele,
                                                 clingen_api=clingen_api_success)
         self.assertIsNotNone(variant_allele.allele.clingen_allele, "Allele.clingen_allele set after API success")
-        self.assertIsNone(variant_allele.error, "VariantAllele.error cleared after API success")
+        self.assertIsNone(variant_allele.clingen_error, "VariantAllele.clingen_error cleared after API success")
 
     def test_fail_then_retry_success_existing_allele(self):
         # Used to have a "ValueError: Cannot assign" due to assigning an Allele field a VariantAllele

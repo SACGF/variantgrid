@@ -10,3 +10,4 @@ from classification.signals.discordance_report_review_detail import *  # so we l
 from classification.signals.classification_hooks_import_notifications import *  # so we load the receivers
 from classification.signals.discordance_report_triage_changes import *  # so we load the receivers
 from classification.signals.discordance_report_search import *  # so we load the receivers
+from classification.signals.classification_liftover import *  # so we load the receivers

@@ -83,25 +83,28 @@
                         {% for vc in allele_card.variant_cards %}
 
                             <h5>{{ vc.genome_build }}</h5>
-                            {% labelled label="Imported As" %}{{ vc.variant_allele.get_origin_display }}{% endlabelled %}
-                            {% if not vc.is_imported_directly %}
-                                {% labelled label="Liftover" %}{{ vc.variant_allele.get_allele_linking_tool_display }}{% endlabelled %}
-                            {% endif %}
+                            {% labelled label="Origin" %}{{ vc.variant_allele.get_origin_display }}{% endlabelled %}
+                            {% labelled label="Allele Linked Via" %}{{ vc.variant_allele.get_allele_linking_tool_display }}{% endlabelled %}
 
-                            {% if vc.liftover_error_qs.exists %}
-                                {% for liftover_error in vc.liftover_error_qs %}
-                                    <div>
-                                        Liftover Failed: {{ liftover_error.liftover }} on {% timestamp liftover_error.liftover.modified %}
-                                        {% if liftover_error.variant %}
-                                            <p>
-                                                {{ liftover_error.liftover.get_allele_linking_tool_display }} returned:
-                                                <a href="{% url 'view_variant' liftover_error.variant.pk %}">{{ liftover_error.variant }}</a>
-                                                 which is NOT linked to this allele.
-                                            </p>
-                                        {% endif %}
-                                        {{ liftover_error.error_message }}
-                                    </div>
+                            {% if vc.allele_liftover_qs.exists %}
+                                <table>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Tool</th>
+                                        <th>Status</th>
+                                        <th>Liftover Run</th>
+                                        <th>Error</th>
+                                    </tr>
+                                {% for allele_liftover in vc.allele_liftover_qs %}
+                                    <tr>
+                                        <td>{% timestamp allele_liftover.liftover.created %}</td>
+                                        <td>{{ allele_liftover.liftover.get_conversion_tool_display }}</td>
+                                        <td>{{ allele_liftover.get_status_display }}</td>
+                                        <td><a href="{{ allele_liftover.liftover.get_absolute_url }}">View LiftoverRun {{ allele_liftover.liftover_id }}</a></a></td>
+                                        <td>{{ allele_liftover.error }}</td>
+                                    </tr>
                                 {% endfor %}
+                                </table>
                             {% endif %}
 
                         {% endfor %}
@@ -167,35 +170,17 @@
                 </tr>
             </thead>
             <tbody>
-                {% comment %}
-                <tr>
-                    <th class="text-right">Variant Coordinate</th>
-                    {% for vc in allele_card.variant_cards %}
-                        <td>
-                            {% if vc.variant %}
-                                <a class="hover-link" href="{% url 'view_variant' vc.variant.pk %}">{{ vc.variant }}</a>
-                                {% if vc.variant.is_abbreviated %}
-                                    <a class="ml-2" data-toggle="collapse" href="#variant-coordinate-{{ vc.variant.pk }}">Show all bases</a>
-                                    <div class="collapse" id="variant-coordinate-{{ vc.pk }}">
-                                        {{ vc.variant.full_string  }}
-                                    </div>
-                                {% endif %}
-                            {% elif vc.unfinished_liftover %}
-                                    This variant is being lifted over via {{ vc.unfinished_liftover.get_conversion_tool_display }}
-                                    <br/>(last updated {% timestamp vc.unfinished_liftover.modified time_ago=True %} ago)
-                            {% else %}
-                                {{ 'E' | severity_icon}} Not Lifted Over
-                            {% endif %}
-                        </td>
-                    {% endfor %}
-                </tr>
-                {% endcomment %}
-
                 <tr>
                     <th class="text-right">g.HGVS</th>
                     {% for vc in allele_card.variant_cards %}<td>
                         {% if vc.variant %}
                             <a class="hover-link" href="{% url 'view_variant' vc.variant.pk %}">{% c_hgvs vc.g_hgvs %}</a>
+                        {% elif vc.unfinished_liftover %}
+                            This variant is being <a href="{% url 'view_liftover_run' vc.unfinished_liftover.pk %}">lifted</a> over via {{ vc.unfinished_liftover.get_conversion_tool_display }}
+                            <br/>(last updated {% timestamp vc.unfinished_liftover.modified time_ago=True %} ago)
+                        {% elif vc.last_failed_liftover %}
+                            This variant failed a <a href="{% url 'view_liftover_run' vc.last_failed_liftover.pk %}">liftover attempt</a> over via {{ vc.last_failed_liftover.get_conversion_tool_display }}
+                            <br/>(last updated {% timestamp vc.last_failed_liftover.modified time_ago=True %} ago)
                         {% endif %}
                     </td>
                     {% endfor %}

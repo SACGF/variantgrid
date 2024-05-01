@@ -46,7 +46,8 @@ from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import CustomGeneListForm, UserGeneListForm, GeneAndTranscriptForm
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList
 from library.constants import WEEK_SECS, HOUR_SECS
-from library.django_utils import add_save_message, get_model_fields, set_form_read_only, require_superuser
+from library.django_utils import add_save_message, get_model_fields, set_form_read_only, require_superuser, \
+    get_field_counts
 from library.guardian_utils import DjangoPermission
 from library.keycloak import Keycloak
 from library.utils import full_class_name, import_class, rgb_invert
@@ -71,7 +72,7 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
     VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, SampleStats, \
-    SampleStatsPassingFilter, TagColorsCollection, Contig, Liftover
+    SampleStatsPassingFilter, TagColorsCollection, Contig, LiftoverRun
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, SequenceRole
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
@@ -1497,18 +1498,25 @@ def labs_graph_detail(request):
 
 
 @require_superuser
-def liftover(request):
-    context = {}
-    return render(request, "snpdb/liftover/liftover.html", context)
+def liftover_runs(request):
+    context = {
+        "genome_builds": GenomeBuild.builds_with_annotation()
+    }
+    return render(request, "snpdb/liftover/liftover_runs.html", context)
 
 
 @require_superuser
-def view_liftover(request, liftover_id):
-    liftover = Liftover.objects.get(pk=liftover_id)
+def view_liftover_run(request, liftover_run_id):
+    liftover_run = LiftoverRun.objects.get(pk=liftover_run_id)
+    qs = liftover_run.alleleliftover_set.all()
+    raw_status_counts = get_field_counts(qs, "status")
+    status_counts = {ProcessingStatus(k).label: v for k, v in raw_status_counts.items() if k is not None}
+
     context = {
-        "liftover": liftover
+        "liftover_run": liftover_run,
+        "status_counts": status_counts,
     }
-    return render(request, "snpdb/liftover/view_liftover.html", context)
+    return render(request, "snpdb/liftover/view_liftover_run.html", context)
 
 
 @login_not_required
