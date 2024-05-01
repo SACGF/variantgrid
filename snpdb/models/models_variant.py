@@ -925,3 +925,22 @@ class AlleleLiftover(models.Model):
             if msg := self.error.get("message"):
                 s += f" error: {msg}"
         return s
+
+    @staticmethod
+    def get_last_failed_liftover_run(allele, genome_build) -> Optional['LiftoverRun']:
+        last_failed_liftover_run = None
+        allele_liftover_qs = AlleleLiftover.objects.filter(allele=allele,
+                                                           status=ProcessingStatus.ERROR,
+                                                           liftover__genome_build=genome_build)
+        if al := allele_liftover_qs.order_by("liftover__modified").last():
+            last_failed_liftover_run = al.liftover
+        return last_failed_liftover_run
+
+    @staticmethod
+    def get_unfinished_liftover_run(allele, genome_build) -> Optional['LiftoverRun']:
+        unfinished_liftover_run = None
+        if al := AlleleLiftover.objects.filter(allele=allele,
+                                               status__in=ProcessingStatus.RUNNING_STATES,
+                                               liftover__genome_build=genome_build).first():
+            unfinished_liftover_run = al.liftover
+        return unfinished_liftover_run
