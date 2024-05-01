@@ -25,6 +25,7 @@ class UserAwardLevel(models.TextChoices):
     def __lt__(self, other):
         return self.int_value < other.int_value
 
+
 class ImportSource(models.TextChoices):
     """ Keeps track of where uploaded files came from """
 

@@ -14,7 +14,7 @@ from django.db.models.query_utils import Q
 
 from genes.hgvs import HGVSMatcher
 from library.django_utils.django_file_utils import get_import_processing_dir
-from library.genomics.vcf_utils import write_vcf_from_tuples
+from library.genomics.vcf_utils import write_vcf_from_tuples, get_vcf_header_contig_lines
 from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
@@ -23,6 +23,14 @@ from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
 from snpdb.models.models_variant import LiftoverRun, Allele, Variant, VariantAllele, AlleleLiftover
 from upload.models import UploadedFile, UploadedLiftover, UploadPipeline, UploadedFileTypes
 from upload.upload_processing import process_upload_pipeline
+
+
+def get_used_contigs_header_lines(genome_build, used_contigs: set) -> list[str]:
+    contigs = []
+    for contig in genome_build.contigs:
+        if contig.name in used_contigs:
+            contigs.append((contig.name, contig.length, genome_build.name))
+    return get_vcf_header_contig_lines(contigs)
 
 
 def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
@@ -54,7 +62,9 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                     liftover.save()
 
                 allele_liftover_records = []
+                used_contigs = set()
                 for avt in av_tuples:
+                    used_contigs.add(avt[0])
                     al = AlleleLiftover(allele_id=avt[2],
                                         liftover=liftover,
                                         status=ProcessingStatus.CREATED)
@@ -63,7 +73,8 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                 if allele_liftover_records:
                     AlleleLiftover.objects.bulk_create(allele_liftover_records, batch_size=2000)
 
-                write_vcf_from_tuples(vcf_filename, av_tuples, tuples_have_id_field=True)
+                header_lines = get_used_contigs_header_lines(liftover.source_genome_build, used_contigs)
+                write_vcf_from_tuples(vcf_filename, av_tuples, tuples_have_id_field=True, header_lines=header_lines)
                 uploaded_file = UploadedFile.objects.create(path=liftover_vcf_filename,
                                                             import_source=import_source,
                                                             name='Liftover',
@@ -121,6 +132,7 @@ def _get_build_liftover_tuples(alleles: Iterable[Allele], inserted_genome_build:
             conversion_tool = None
             variant_id_or_coordinate = None
             try:
+                # Try and get coordinates for builds we want
                 conversion_tool, variant_id_or_coordinate = allele.get_liftover_tuple(genome_build,
                                                                                       hgvs_matcher=hgvs_matcher)
             except (Contig.ContigNotInBuildError, GenomeFasta.ContigNotInFastaError):
@@ -134,18 +146,31 @@ def _get_build_liftover_tuples(alleles: Iterable[Allele], inserted_genome_build:
                     chrom, position, ref, alt, svlen = variant_id_or_coordinate
                     avt = (chrom, position, allele.pk, ref, alt, svlen)
                 build_liftover_vcf_tuples[genome_build][conversion_tool].append(avt)
-            elif settings.LIFTOVER_NCBI_REMAP_ENABLED:
-                if allele.alleleliftover_set.filter(liftover__genome_build=genome_build,
-                                                    liftover__conversion_tool=AlleleConversionTool.NCBI_REMAP,
-                                                    status=ProcessingStatus.ERROR).exists():
-                    continue  # Skip as already failed NCBI liftover to desired build
+            else:
+                # Try tools that write other builds, then run conversion
+                options = [
+                    (settings.LIFTOVER_NCBI_REMAP_ENABLED, AlleleConversionTool.NCBI_REMAP),
+                    (settings.LIFTOVER_BCFTOOLS_ENABLED, AlleleConversionTool.BCFTOOLS_LIFTOVER),
+                ]
+
+                conversion_tool = None
+                for enabled, potential_conversion_tool in options:
+                    if enabled:
+                        if allele.alleleliftover_set.filter(liftover__genome_build=genome_build,
+                                                            liftover__conversion_tool=potential_conversion_tool,
+                                                            status=ProcessingStatus.ERROR).exists():
+                            continue  # Skip as already failed NCBI liftover to desired build
+                        conversion_tool = potential_conversion_tool
+                        logging.info("Picked conversion tool: %s", conversion_tool)
+                        break  # Just want 1st one
 
                 # Return VCF tuples in inserted genome build
                 chrom, position, ref, alt, svlen = allele.variant_for_build(inserted_genome_build).as_tuple()
                 if alt == Variant.REFERENCE_ALT:
                     alt = "."  # NCBI works with '.' but not repeating ref (ie ref = alt)
+                # contig_accession = inserted_genome_build.convert_chrom_to_contig_accession(chrom)
                 avt = (chrom, position, allele.pk, ref, alt, svlen)
-                build_liftover_vcf_tuples[genome_build][AlleleConversionTool.NCBI_REMAP].append(avt)
+                build_liftover_vcf_tuples[genome_build][conversion_tool].append(avt)
 
     return build_liftover_vcf_tuples
 
