@@ -1,3 +1,5 @@
+from library.genomics.vcf_utils import get_vcf_header_contig_lines
+
 
 def get_vcf_header_lines(top_lines=None, info_dict=None, formats=None, contigs=None, samples=None):
     """ info_dict - values = dict with keys of 'type', 'description' (optional 'number' default = 1)
@@ -24,9 +26,7 @@ def get_vcf_header_lines(top_lines=None, info_dict=None, formats=None, contigs=N
         header_lines.extend(formats)
 
     if contigs:
-        for contig, length, assembly in contigs:
-            line = f"##contig=<ID={contig},length={length},assembly={assembly}>"
-            header_lines.append(line)
+        header_lines.extend(get_vcf_header_contig_lines(contigs))
 
     colnames = ['CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO']
     if use_format:

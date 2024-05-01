@@ -418,6 +418,10 @@ LIFTOVER_DBSNP_ENABLED = False  # Default=False - doesn't work so well due to db
 LIFTOVER_NCBI_REMAP_ENABLED = False
 LIFTOVER_NCBI_REMAP_PERLBREW_RUNNER_SCRIPT = None  # os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
 
+LIFTOVER_BCFTOOLS_ENABLED = False
+LIFTOVER_BCFTOOLS_PLUGIN_DIR = "/usr/share/bcftools/plugins"
+LIFTOVER_BCFTOOLS_DATA_DIR = "/data/annotation/liftover"
+
 PANEL_APP_CACHE_DAYS = 7  # Automatically re-check after this time
 GENE_RELATION_PANEL_APP_LIVE_UPDATE = False  # Use GenCC cached result if False, poll panel app if True
 

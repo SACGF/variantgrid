@@ -34,8 +34,11 @@ def cyvcf2_get_contig_lengths_dict(cyvcf2_reader):
         return {}
 
 
-def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=False):
+def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=False, header_lines: list[str] = None):
     """ variant_tuples can have either 4 or 5 fields (tuples_have_id_field) """
+
+    if header_lines is None:
+        header_lines = []
 
     if tuples_have_id_field:
         vcf_tuples = variant_tuples
@@ -49,7 +52,7 @@ def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=Fal
         '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">',
     ]
     columns = "\t".join(["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"])
-    header = "\n".join(["##fileformat=VCFv4.1", "##source=VariantGrid"] + info + ["#" + columns])
+    header = "\n".join(["##fileformat=VCFv4.1", "##source=VariantGrid"] + info + header_lines + ["#" + columns])
     empty_qual_filter_info = ('.', '.', '.')
     with open(vcf_filename, "wt", encoding="utf-8") as f:
         f.write(header + "\n")
@@ -116,3 +119,11 @@ def vcf_get_ref_alt_svlen(variant: cyvcf2.Variant):
     else:
         svlen = None
     return ref, alt, svlen
+
+
+def get_vcf_header_contig_lines(contigs: list[tuple]):
+    header_lines = []
+    for contig, length, assembly in contigs:
+        line = f"##contig=<ID={contig},length={length},assembly={assembly}>"
+        header_lines.append(line)
+    return header_lines
