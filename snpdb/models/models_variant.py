@@ -129,7 +129,10 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
 
     def get_liftover_tuple(self, genome_build: GenomeBuild,
                            hgvs_matcher=None) -> tuple[AlleleConversionTool, Union[int, 'VariantCoordinate']]:
-        """ Used by to write VCF coordinates during liftover. Can be slow (API call)
+        """ This returns tuples FOR a genome build (if something can look them up)
+
+            Used by to write VCF coordinates during liftover. Can be slow (API call)
+
             If you know a VariantAllele exists for your build, use variant_for_build(genome_build).as_tuple()
 
             Optionally pass in hgvs_matcher to save re-instantiating it all the time """
@@ -171,6 +174,59 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
                 variant_coordinate = get_hgvs_variant_coordinate(g_hgvs, genome_build)
 
         return conversion_tool, variant_coordinate
+
+    def get_liftover_tuple_from_other_build(self, source_genome_build: GenomeBuild,
+                                            dest_genome_build: GenomeBuild) -> Optional[tuple[AlleleConversionTool, tuple]]:
+        """ This gets tuples from another build to run through a tool """
+
+        # Try tools that write other builds, then run conversion
+        options = [
+            (settings.LIFTOVER_BCFTOOLS_ENABLED, AlleleConversionTool.BCFTOOLS_LIFTOVER),
+        ]
+
+        conversion_tool = None
+        for enabled, potential_conversion_tool in options:
+            if enabled:
+                if self.alleleliftover_set.filter(liftover__genome_build=dest_genome_build,
+                                                  liftover__conversion_tool=potential_conversion_tool,
+                                                  status=ProcessingStatus.ERROR).exists():
+                    continue  # Skip as already failed liftover method to desired build
+                conversion_tool = potential_conversion_tool
+                break  # Just want 1st one
+
+        if conversion_tool:
+            # Return VCF tuples in inserted genome build
+            try:
+                chrom, position, ref, alt, svlen = self.variant_for_build(source_genome_build).as_tuple()
+                # BCFTools fails with "Unable to fetch sequence" if any variant is outside contig size
+                if errors := Variant.validate(source_genome_build, chrom, position):
+                    raise ValueError("\n".join(errors))
+            except ValueError as e:  # No variant for source build (merged allele?)
+                logging.warning("Skipped %s: %s", self, e)
+                return None
+
+            if alt == Variant.REFERENCE_ALT:
+                alt = "."  # NCBI works with '.' but not repeating ref (ie ref = alt)
+            # contig_accession = inserted_genome_build.convert_chrom_to_contig_accession(chrom)
+            return conversion_tool, (chrom, position, self.pk, ref, alt, svlen)
+
+        return None
+
+    def can_attempt_liftover(self, genome_build) -> bool:
+        try:
+            # See if we can have data already to liftover
+            conversion_tool, _ = self.get_liftover_tuple(genome_build)
+            if conversion_tool is not None:
+                return True
+        except:
+            pass
+
+        for va in self.variantallele_set.exclude(genome_build=genome_build):
+            if self.get_liftover_tuple_from_other_build(va.genome_build, genome_build):
+                return True
+
+        return False
+
 
     def merge(self, allele_linking_tool, other_allele: "Allele") -> bool:
         """ Merge other_allele into this allele """
