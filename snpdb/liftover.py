@@ -149,7 +149,6 @@ def _get_build_liftover_tuples(alleles: Iterable[Allele], inserted_genome_build:
             else:
                 # Try tools that write other builds, then run conversion
                 options = [
-                    (settings.LIFTOVER_NCBI_REMAP_ENABLED, AlleleConversionTool.NCBI_REMAP),
                     (settings.LIFTOVER_BCFTOOLS_ENABLED, AlleleConversionTool.BCFTOOLS_LIFTOVER),
                 ]
 
@@ -159,7 +158,7 @@ def _get_build_liftover_tuples(alleles: Iterable[Allele], inserted_genome_build:
                         if allele.alleleliftover_set.filter(liftover__genome_build=genome_build,
                                                             liftover__conversion_tool=potential_conversion_tool,
                                                             status=ProcessingStatus.ERROR).exists():
-                            continue  # Skip as already failed NCBI liftover to desired build
+                            continue  # Skip as already failed liftover method to desired build
                         conversion_tool = potential_conversion_tool
                         break  # Just want 1st one
 

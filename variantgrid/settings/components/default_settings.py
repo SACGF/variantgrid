@@ -415,8 +415,6 @@ IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS = not DEBUG
 LIFTOVER_CLASSIFICATIONS = True
 LIFTOVER_TO_CHROMOSOMES_ONLY = True  # False = Liftover to alt/patches
 LIFTOVER_DBSNP_ENABLED = False  # Default=False - doesn't work so well due to dbSNP IDs being for loci
-LIFTOVER_NCBI_REMAP_ENABLED = False
-LIFTOVER_NCBI_REMAP_PERLBREW_RUNNER_SCRIPT = None  # os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
 
 LIFTOVER_BCFTOOLS_ENABLED = False
 LIFTOVER_BCFTOOLS_PLUGIN_DIR = "/usr/share/bcftools/plugins"
