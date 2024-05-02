@@ -342,11 +342,13 @@ class UploadStep(models.Model):
     def error_exception(self, e):
         status = ProcessingStatus.ERROR
         self.status = status
-        self.error_message = str(e) + "\n" + get_traceback()
+        self.error_message = str(e)
+        try:
+            self.error_message += "\n" + get_traceback()
+        except:
+            pass
+        self.upload_pipeline.error(self.error_message)
 
-        qs = UploadPipeline.objects.filter(pk=self.upload_pipeline.pk)
-        progress_status = f"Failure in import step id: {self.pk}, ({self.error_message})"
-        qs.update(status=status, progress_status=progress_status)
 
     @transaction.atomic()
     def mark_timed_out(self, user: Optional[User] = None):

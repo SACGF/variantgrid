@@ -203,7 +203,7 @@ def run_vep(vcf_filename, output_filename, genome_build: GenomeBuild, annotation
     """ executes VEP command. Returns (command_line, code, stdout, stderr) """
 
     cmd = get_vep_command(vcf_filename, output_filename, genome_build, annotation_consortium, pipeline_type)
-    return execute_cmd(cmd)
+    return execute_cmd(cmd, shell=True)
 
 
 def get_vep_version(genome_build: GenomeBuild, annotation_consortium):

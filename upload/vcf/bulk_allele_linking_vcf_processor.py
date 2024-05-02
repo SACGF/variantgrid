@@ -95,3 +95,25 @@ class BulkAlleleLinkingVCFProcessor(BulkMinimalVCFProcessor):
         allele_1 = Allele.objects.get(pk=allele_1_id)
         allele_2 = Allele.objects.get(pk=allele_2_id)
         allele_1.merge(self.liftover.conversion_tool, allele_2)
+
+
+class FailedLiftoverVCFProcessor(BulkMinimalVCFProcessor):
+    """ Reads VCF with allele_id as ID column - """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.allele_ids = []
+        self.liftover = self.upload_pipeline.uploaded_file.uploadedliftover.liftover
+
+    @property
+    def genome_build(self):
+        return self.upload_step.genome_build
+
+    def process_entry(self, variant):
+        # In May 2024 I raised an issue about adding rejection details
+        # maybe this has been implemented, and we can store it, https://github.com/freeseek/score/issues/10
+        self.allele_ids.append(variant.ID)
+
+    def finish(self):
+        error = {"message": "BCFTools +liftover rejected variant"}
+        qs = AlleleLiftover.objects.filter(liftover=self.liftover, allele__in=self.allele_ids)
+        self.rows_processed = qs.update(status=ProcessingStatus.ERROR, error=error)

@@ -900,6 +900,10 @@ class LiftoverRun(TimeStampedModel):
     def complete(self):
         liftover_run_complete_signal.send_robust(sender=self.__class__, instance=self)
 
+    def error(self):
+        self.alleleliftover_set.update(status=ProcessingStatus.ERROR,
+                                       error={"message": f"{self} failed"})
+
     def __str__(self):
         source = ""
         if self.source_genome_build:

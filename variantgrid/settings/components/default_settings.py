@@ -1022,7 +1022,7 @@ CLINVAR_EXPORT = None
 BASH_ZCAT = 'zcat'
 # If True, will run a series of bash commands as one long string with Shell=True
 # otherwise will pipe each command into the next more safely with Shell=False
-POPEN_SHELL = True  # For vcf split - todo put back...
+VCF_IMPORT_PREPROCESS_POPEN_SHELL = True  # For vcf split
 
 # Bootstrapped themed messages
 from django.contrib.messages import constants as messages

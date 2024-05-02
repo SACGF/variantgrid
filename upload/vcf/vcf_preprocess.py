@@ -130,7 +130,7 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
 
     # if POPEN_SHELL=True we're running this all as one command as native shell text
     # this is not recommended, less portable and if commands have errors
-    if settings.POPEN_SHELL:
+    if settings.VCF_IMPORT_PREPROCESS_POPEN_SHELL:
         print("single_commands: %s" % " | ".join([' '.join(x) for x in pipe_commands.values()]))
         p = Popen(
             piped_command,

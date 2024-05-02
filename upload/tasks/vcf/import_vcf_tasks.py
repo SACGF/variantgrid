@@ -5,15 +5,15 @@ from django.contrib.auth.models import User
 
 from annotation.tasks.annotation_scheduler_task import annotation_scheduler
 from library.log_utils import log_traceback
-from library.utils import full_class_name, import_class
+from library.utils import import_class
 from snpdb.models import AlleleLiftover
 from snpdb.models.models_enums import ProcessingStatus, AlleleConversionTool
 from snpdb.ncbi_remap import ncbi_remap
 from snpdb.bcftools_liftover import bcftools_liftover
-from upload.models import UploadStep, UploadStepTaskType, VCFPipelineStage, UploadedVCF
+from upload.models import UploadStep, UploadedVCF
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_vcf_file
-from upload.vcf.bulk_allele_linking_vcf_processor import BulkAlleleLinkingVCFProcessor
+from upload.vcf.bulk_allele_linking_vcf_processor import BulkAlleleLinkingVCFProcessor, FailedLiftoverVCFProcessor
 from upload.vcf.bulk_minimal_vcf_processor import BulkMinimalVCFProcessor
 from upload.vcf.vcf_import import import_vcf_file, get_preprocess_vcf_import_info
 from upload.vcf.vcf_preprocess import preprocess_vcf
@@ -63,25 +63,11 @@ class ScheduleMultiFileOutputTasksTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
         child_task_class = import_class(upload_step.child_script)
-        child_class_name = full_class_name(child_task_class)
-        sort_order = upload_step.upload_pipeline.get_max_step_sort_order()
-
         multi_steps = upload_step.get_multi_input_files_and_records()
         if not multi_steps:
             raise ValueError("No split VCF records. This is caused by pipeline error or empty VCF after cleaning")
 
-        for input_filename, items_to_process in multi_steps:
-            sort_order += 1
-            child_step = UploadStep.objects.create(upload_pipeline=upload_step.upload_pipeline,
-                                                   name=UploadStep.PROCESS_VCF_TASK_NAME,
-                                                   sort_order=sort_order,
-                                                   task_type=UploadStepTaskType.CELERY,
-                                                   pipeline_stage=VCFPipelineStage.DATA_INSERTION,
-                                                   script=child_class_name,
-                                                   input_filename=input_filename,
-                                                   items_to_process=items_to_process)
-            child_step.launch_task(child_task_class)
-
+        self._schedule_steps(child_task_class, upload_step, multi_steps)
         return 0
 
 
@@ -145,10 +131,27 @@ class LiftoverCreateVCFTask(ImportVCFStepTask):
             ncbi_remap(upload_step.input_filename, liftover.source_genome_build,
                        upload_step.output_filename, liftover.genome_build)
         elif liftover.conversion_tool == AlleleConversionTool.BCFTOOLS_LIFTOVER:
-            bcftools_liftover(upload_step.input_filename, liftover.source_genome_build,
-                              upload_step.output_filename, liftover.genome_build)
+            reject_vcf, num_rejected = bcftools_liftover(upload_step.input_filename, liftover.source_genome_build,
+                                                         upload_step.output_filename, liftover.genome_build)
+            if num_rejected:
+                child_task_class = LiftoverProcessFailureVCFTask
+                self._schedule_steps(child_task_class, upload_step, [(reject_vcf, num_rejected)])
+
         else:
             raise ValueError(f"Don't know how to produce liftover VCF for {liftover.get_conversion_tool_display()}")
+
+    def _error(self, upload_step: UploadStep, error_message: str):
+        super()._error(upload_step, error_message)
+        liftover = upload_step.upload_pipeline.uploaded_file.uploadedliftover.liftover
+        liftover.error()
+
+
+class LiftoverProcessFailureVCFTask(ImportVCFStepTask):
+
+    def process_items(self, upload_step: UploadStep):
+        preprocess_vcf_import_info = get_preprocess_vcf_import_info(upload_step.upload_pipeline)
+        bulk_inserter = FailedLiftoverVCFProcessor(upload_step, preprocess_vcf_import_info)
+        return import_vcf_file(upload_step, bulk_inserter)
 
 
 class LiftoverCompleteTask(ImportVCFStepTask):
@@ -182,4 +185,5 @@ ProcessVCFSetMaxVariantTask = app.register_task(ProcessVCFSetMaxVariantTask())
 ProcessVCFLinkAllelesSetMaxVariantTask = app.register_task(ProcessVCFLinkAllelesSetMaxVariantTask())
 DoNothingVCFTask = app.register_task(DoNothingVCFTask())
 LiftoverCreateVCFTask = app.register_task(LiftoverCreateVCFTask())
+LiftoverProcessFailureVCFTask = app.register_task(LiftoverProcessFailureVCFTask())
 LiftoverCompleteTask = app.register_task(LiftoverCompleteTask())

@@ -46,6 +46,17 @@
                         <a href="{% url 'view_upload_pipeline' upload_pipeline_id=up.pk %}">View upload processing</a>
                         {% labelled hint="tiny" label="Status" %}{{ up.get_status_display }}{% endlabelled %}
                         {% labelled hint="tiny" label="Items processed" %}{{ up.items_processed }}{% endlabelled %}
+
+                        {% with up_errors=up.get_errors  %}
+                            {% if up_errors %}
+                                {% for msg, _ in up_errors %}
+                                    <div class="alert import-message error alert-danger" role="alert">
+                                        <i class="fas fa-info-circle text-info"></i> {{ msg }}
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+
                     {% else %}
                         No associated upload pipeline
                     {% endif %}

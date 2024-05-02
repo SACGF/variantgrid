@@ -235,7 +235,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
 
         if modified_variant_alleles_list:
             logging.debug("Updating %d VariantAlleles w/Error", len(modified_variant_alleles_list))
-            VariantAllele.objects.bulk_update(modified_variant_alleles_list, ["error"], batch_size=2000)
+            VariantAllele.objects.bulk_update(modified_variant_alleles_list, ["clingen_error"], batch_size=2000)
 
         if modified_alleles_list:
             logging.debug("Updating %d Alleles w/ClinGenAlleleID", len(modified_alleles_list))

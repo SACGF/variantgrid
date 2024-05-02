@@ -161,16 +161,24 @@ def _get_build_liftover_tuples(alleles: Iterable[Allele], inserted_genome_build:
                                                             status=ProcessingStatus.ERROR).exists():
                             continue  # Skip as already failed NCBI liftover to desired build
                         conversion_tool = potential_conversion_tool
-                        logging.info("Picked conversion tool: %s", conversion_tool)
                         break  # Just want 1st one
 
-                # Return VCF tuples in inserted genome build
-                chrom, position, ref, alt, svlen = allele.variant_for_build(inserted_genome_build).as_tuple()
-                if alt == Variant.REFERENCE_ALT:
-                    alt = "."  # NCBI works with '.' but not repeating ref (ie ref = alt)
-                # contig_accession = inserted_genome_build.convert_chrom_to_contig_accession(chrom)
-                avt = (chrom, position, allele.pk, ref, alt, svlen)
-                build_liftover_vcf_tuples[genome_build][conversion_tool].append(avt)
+                if conversion_tool:
+                    # Return VCF tuples in inserted genome build
+                    try:
+                        chrom, position, ref, alt, svlen = allele.variant_for_build(inserted_genome_build).as_tuple()
+                        # BCFTools fails with "Unable to fetch sequence" if any variant is outside contig size
+                        if errors := Variant.validate(inserted_genome_build, chrom, position):
+                            raise ValueError("\n".join(errors))
+                    except ValueError as e:  # No variant for source build (merged allele?)
+                        logging.warning("Skipped %s: %s", allele, e)
+                        continue
+
+                    if alt == Variant.REFERENCE_ALT:
+                        alt = "."  # NCBI works with '.' but not repeating ref (ie ref = alt)
+                    # contig_accession = inserted_genome_build.convert_chrom_to_contig_accession(chrom)
+                    avt = (chrom, position, allele.pk, ref, alt, svlen)
+                    build_liftover_vcf_tuples[genome_build][conversion_tool].append(avt)
 
     return build_liftover_vcf_tuples
 
