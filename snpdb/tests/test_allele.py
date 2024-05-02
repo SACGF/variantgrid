@@ -15,4 +15,4 @@ class AlleleTestCase(TestCase):
         allele_1 = Allele.objects.create()
         allele_2 = Allele.objects.create()
 
-        allele_1.merge(AlleleConversionTool.NCBI_REMAP, allele_2)
+        allele_1.merge(AlleleConversionTool.BCFTOOLS_LIFTOVER, allele_2)

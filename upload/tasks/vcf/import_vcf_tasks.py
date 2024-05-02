@@ -8,7 +8,6 @@ from library.log_utils import log_traceback
 from library.utils import import_class
 from snpdb.models import AlleleLiftover
 from snpdb.models.models_enums import ProcessingStatus, AlleleConversionTool
-from snpdb.ncbi_remap import ncbi_remap
 from snpdb.bcftools_liftover import bcftools_liftover
 from upload.models import UploadStep, UploadedVCF
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
@@ -127,10 +126,7 @@ class LiftoverCreateVCFTask(ImportVCFStepTask):
         liftover = upload_pipeline.uploaded_file.uploadedliftover.liftover
         AlleleLiftover.objects.filter(liftover=liftover).update(status=ProcessingStatus.PROCESSING)
 
-        if liftover.conversion_tool == AlleleConversionTool.NCBI_REMAP:
-            ncbi_remap(upload_step.input_filename, liftover.source_genome_build,
-                       upload_step.output_filename, liftover.genome_build)
-        elif liftover.conversion_tool == AlleleConversionTool.BCFTOOLS_LIFTOVER:
+        if liftover.conversion_tool == AlleleConversionTool.BCFTOOLS_LIFTOVER:
             reject_vcf, num_rejected = bcftools_liftover(upload_step.input_filename, liftover.source_genome_build,
                                                          upload_step.output_filename, liftover.genome_build)
             if num_rejected:
