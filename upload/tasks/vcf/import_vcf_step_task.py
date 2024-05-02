@@ -9,9 +9,9 @@ from django.db.models.expressions import F
 from django.utils import timezone
 
 from library.log_utils import get_traceback
-from library.utils import import_class
+from library.utils import import_class, full_class_name
 from upload.models import UploadPipeline, ProcessingStatus, \
-    UploadStep, PipelineFailedJobTerminateEarlyException, VCFPipelineStage, SkipUploadStepException
+    UploadStep, PipelineFailedJobTerminateEarlyException, VCFPipelineStage, SkipUploadStepException, UploadStepTaskType
 
 
 class ImportVCFStepTask(Task):
@@ -44,6 +44,9 @@ class ImportVCFStepTask(Task):
         if not non_finish_jobs_qs.exists():
             schedule_pipeline_stage_steps.apply_async((upload_pipeline.pk, VCFPipelineStage.FINISH))
 
+    def _error(self, upload_step: UploadStep, error_message: str):
+        upload_step.error_exception(error_message)
+
     def run(self, upload_step_id, pipeline_fraction=0):
 
         def load_upload_step():
@@ -52,13 +55,14 @@ class ImportVCFStepTask(Task):
         upload_step = load_upload_step()
         upload_pipeline = upload_step.upload_pipeline
         upload_pipeline_qs = UploadPipeline.objects.filter(id=upload_pipeline.pk)
+        error_message = None
 
         try:
             this_task = self.request.id
             if upload_step.celery_task is not None and upload_step.celery_task != this_task:
                 params = (upload_step.upload_pipeline.pk, upload_step.pk, this_task, upload_step.celery_task)
-                message = "It appears Pipeline %d, step %d is being run twice - this task='%s', upload_step.celery_task already set to '%s'" % params
-                raise Exception(message)
+                msg = "It appears Pipeline %d, step %d is being run twice - this task='%s', upload_step.celery_task already set to '%s'" % params
+                raise Exception(msg)
 
             upload_step.start()
             upload_step.celery_task = this_task
@@ -88,18 +92,16 @@ class ImportVCFStepTask(Task):
         except SkipUploadStepException:
             upload_step.status = ProcessingStatus.SKIPPED
         except subprocess.CalledProcessError as e:
-            message = e.output
-            upload_step.error_exception(message)
-            upload_pipeline.error(message)
+            error_message = f"Error executing: {e}"
         except Exception as e:
-            message = str(e)
+            error_message = str(e)
             if not upload_pipeline_qs.exists():
                 logging.warning("UploadPipeline was deleted, causing error:")
-                logging.warning(message)
+                logging.warning(error_message)
                 return
 
-            upload_step.error_exception(message)
-            upload_pipeline.error(message)
+        if error_message:
+            self._error(upload_step, error_message)
 
         upload_step.end_date = timezone.now()
         upload_step.save()
@@ -111,6 +113,23 @@ class ImportVCFStepTask(Task):
         upload_pipeline = upload_pipeline_qs.get()  # Reload from DB
         if upload_pipeline.status == ProcessingStatus.PROCESSING:
             self.check_pipeline_stage(upload_pipeline, upload_step)
+
+    @staticmethod
+    def _schedule_steps(child_task_class, upload_step, multi_steps: list[tuple[str, int]]):
+        child_class_name = full_class_name(child_task_class)
+        sort_order = upload_step.upload_pipeline.get_max_step_sort_order()
+
+        for input_filename, items_to_process in multi_steps:
+            sort_order += 1
+            child_step = UploadStep.objects.create(upload_pipeline=upload_step.upload_pipeline,
+                                                   name=UploadStep.PROCESS_VCF_TASK_NAME,
+                                                   sort_order=sort_order,
+                                                   task_type=UploadStepTaskType.CELERY,
+                                                   pipeline_stage=VCFPipelineStage.DATA_INSERTION,
+                                                   script=child_class_name,
+                                                   input_filename=input_filename,
+                                                   items_to_process=items_to_process)
+            child_step.launch_task(child_task_class)
 
 
 @celery.shared_task

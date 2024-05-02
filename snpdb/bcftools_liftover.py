@@ -9,7 +9,9 @@ from library.utils import execute_cmd
 from snpdb.models import GenomeBuild
 
 
-def bcftools_liftover(source_vcf: str, source_genome_build: GenomeBuild, out_vcf: str, out_genome_build: GenomeBuild):
+def bcftools_liftover(source_vcf: str, source_genome_build: GenomeBuild,
+                      out_vcf: str, out_genome_build: GenomeBuild) -> tuple[str, int]:
+    """ returns reject file and items to process if any failed """
     vc_37 = VEPConfig(GenomeBuild.grch37())
     vc_38 = VEPConfig(GenomeBuild.grch38())
 
@@ -45,18 +47,17 @@ def bcftools_liftover(source_vcf: str, source_genome_build: GenomeBuild, out_vcf
         if not os.path.exists(filename):
             raise ValueError(f"BCFTools +liftover '{description}' ('{filename}') does not exist.")
 
+    reject_vcf = get_reject_vcf_filename(out_vcf)
     bcftools_cmd = "bcftools"  # Installed in path
-
     cmd = [
         bcftools_cmd,
         "+liftover",
-        "-Oz",
-        "-o", out_vcf,
         source_vcf,
         "--",
         "--src-fasta-ref", source_fasta_filename,
         "--fasta-ref", dest_fasta_filename,
         "--chain", chain_filename,
+        "--reject", reject_vcf,
     ]
 
     env = {
@@ -64,9 +65,18 @@ def bcftools_liftover(source_vcf: str, source_genome_build: GenomeBuild, out_vcf
     }
 
     logging.info("Executing BCFTools +liftover")
-    cmd_str = " ".join(cmd)
+    liftover_cmd_str = " ".join(cmd)
+    # bcftools +liftover doesn't sort VCF - @see https://github.com/freeseek/score/issues/8
+    sort_cmd = [
+        bcftools_cmd,
+        "sort",
+        "-Oz",
+        "-o", out_vcf,
+    ]
+    sort_cmd_str = " ".join(sort_cmd)
+    cmd_str = " | ".join((liftover_cmd_str, sort_cmd_str))
     logging.info(cmd_str)
-    return_code, std_out, std_err = execute_cmd(cmd, env=env)
+    return_code, std_out, std_err = execute_cmd([cmd_str], env=env, shell=True)
     print(f"return_code: {return_code}")
     if std_out:
         print("stdout:")
@@ -77,3 +87,24 @@ def bcftools_liftover(source_vcf: str, source_genome_build: GenomeBuild, out_vcf
 
     if return_code:
         raise CalledProcessError(return_code, cmd_str, output=std_out, stderr=std_err)
+
+    items_to_process = 0
+    if os.path.exists(reject_vcf):
+        items_to_process = count_non_header_lines(reject_vcf)
+
+    return reject_vcf, items_to_process
+
+
+def get_reject_vcf_filename(out_vcf_filename: str) -> str:
+    basename = os.path.basename(out_vcf_filename)
+    dirname = os.path.dirname(out_vcf_filename)
+    return os.path.join(dirname, "rejected_" + basename)
+
+
+def count_non_header_lines(filename) -> int:
+    count = 0
+    with open(filename, 'r') as file:
+        for line in file:
+            if not line.startswith('#'):
+                count += 1
+    return count

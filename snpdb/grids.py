@@ -503,8 +503,8 @@ class LiftoverRunColumns(DatatableConfig[LiftoverRun]):
     def render_import_status(self, row: dict[str, Any]) -> JsonDataType:
         label = ""
         if status := row['uploadedliftover__uploaded_file__uploadpipeline__status']:
-            import_status = ImportStatus(status)
-            label = import_status.label
+            processing_status = ProcessingStatus(status)
+            label = processing_status.label
         return label
 
     def get_initial_queryset(self) -> QuerySet[LiftoverRun]:

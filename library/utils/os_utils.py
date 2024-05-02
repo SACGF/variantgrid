@@ -6,9 +6,7 @@ from django.conf import settings
 
 
 def execute_cmd(cmd: list, **kwargs) -> tuple[int, Optional[str], Optional[str]]:
-    shell = kwargs.get("shell", settings.POPEN_SHELL)
-
-    if shell:
+    if kwargs.pop("shell", False):
         command = ' '.join(cmd)
         logging.info('About to call %s', command)
         pipes = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
