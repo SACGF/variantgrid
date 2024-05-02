@@ -31,12 +31,7 @@ class VariantCard:
             if unfinished_liftover is None:
                 try:
                     check_can_create_variants(user)
-                    try:
-                        # See if we can have data already to liftover
-                        conversion_tool, _ = allele.get_liftover_tuple(genome_build)
-                        can_create_variant = conversion_tool is not None
-                    except (Contig.ContigNotInBuildError, GenomeFasta.ContigNotInFastaError):
-                        pass
+                    can_create_variant = allele.can_attempt_liftover(genome_build)
                 except CreateManualVariantForbidden:
                     pass
 

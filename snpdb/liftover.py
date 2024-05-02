@@ -54,8 +54,10 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                 working_dir = get_import_processing_dir(liftover.pk, "liftover")
                 liftover_vcf_filename = os.path.join(working_dir, f"liftover_variants.{genome_build.name}.vcf")
                 if AlleleConversionTool.vcf_tuples_in_destination_build(conversion_tool):
+                    vcf_genome_build = genome_build
                     vcf_filename = liftover_vcf_filename  # Can write directly
                 else:
+                    vcf_genome_build = inserted_genome_build
                     vcf_filename = os.path.join(working_dir, f"source_variants.{inserted_genome_build.name}.vcf")
                     liftover.source_vcf = vcf_filename
                     liftover.source_genome_build = inserted_genome_build
@@ -73,7 +75,7 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                 if allele_liftover_records:
                     AlleleLiftover.objects.bulk_create(allele_liftover_records, batch_size=2000)
 
-                header_lines = get_used_contigs_header_lines(liftover.source_genome_build, used_contigs)
+                header_lines = get_used_contigs_header_lines(vcf_genome_build, used_contigs)
                 write_vcf_from_tuples(vcf_filename, av_tuples, tuples_have_id_field=True, header_lines=header_lines)
                 uploaded_file = UploadedFile.objects.create(path=liftover_vcf_filename,
                                                             import_source=import_source,
@@ -147,36 +149,8 @@ def _get_build_liftover_tuples(alleles: Iterable[Allele], inserted_genome_build:
                     avt = (chrom, position, allele.pk, ref, alt, svlen)
                 build_liftover_vcf_tuples[genome_build][conversion_tool].append(avt)
             else:
-                # Try tools that write other builds, then run conversion
-                options = [
-                    (settings.LIFTOVER_BCFTOOLS_ENABLED, AlleleConversionTool.BCFTOOLS_LIFTOVER),
-                ]
-
-                conversion_tool = None
-                for enabled, potential_conversion_tool in options:
-                    if enabled:
-                        if allele.alleleliftover_set.filter(liftover__genome_build=genome_build,
-                                                            liftover__conversion_tool=potential_conversion_tool,
-                                                            status=ProcessingStatus.ERROR).exists():
-                            continue  # Skip as already failed liftover method to desired build
-                        conversion_tool = potential_conversion_tool
-                        break  # Just want 1st one
-
-                if conversion_tool:
-                    # Return VCF tuples in inserted genome build
-                    try:
-                        chrom, position, ref, alt, svlen = allele.variant_for_build(inserted_genome_build).as_tuple()
-                        # BCFTools fails with "Unable to fetch sequence" if any variant is outside contig size
-                        if errors := Variant.validate(inserted_genome_build, chrom, position):
-                            raise ValueError("\n".join(errors))
-                    except ValueError as e:  # No variant for source build (merged allele?)
-                        logging.warning("Skipped %s: %s", allele, e)
-                        continue
-
-                    if alt == Variant.REFERENCE_ALT:
-                        alt = "."  # NCBI works with '.' but not repeating ref (ie ref = alt)
-                    # contig_accession = inserted_genome_build.convert_chrom_to_contig_accession(chrom)
-                    avt = (chrom, position, allele.pk, ref, alt, svlen)
+                if other_build_data := allele.get_liftover_tuple_from_other_build(inserted_genome_build, genome_build):
+                    conversion_tool, avt = other_build_data
                     build_liftover_vcf_tuples[genome_build][conversion_tool].append(avt)
 
     return build_liftover_vcf_tuples
