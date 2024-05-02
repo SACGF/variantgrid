@@ -103,6 +103,7 @@ class FailedLiftoverVCFProcessor(BulkMinimalVCFProcessor):
         super().__init__(*args, **kwargs)
         self.allele_ids = []
         self.liftover = self.upload_pipeline.uploaded_file.uploadedliftover.liftover
+        self.set_max_variant_called = True  # Just need warning to go away
 
     @property
     def genome_build(self):
