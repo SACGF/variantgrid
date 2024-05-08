@@ -202,9 +202,8 @@ ANNOTATION_VEP_BATCH_MIN = 5000  # Dont' set too low due to overhead of running 
 ANNOTATION_VEP_BATCH_MAX = 100000  # Set to None to do all in 1 job (probably want to set FORK higher)
 ANNOTATION_VEP_ARGS = []  # ["--buffer_size", "1000"] # default = 5000
 ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "VEP")
-ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "ensembl-vep")
+ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", "110", "ensembl-vep")
 ANNOTATION_VEP_CACHE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_cache")
-ANNOTATION_VEP_PLUGINS_DIR = os.path.join(ANNOTATION_VEP_CACHE_DIR, "Plugins")  # Default location
 
 # @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_pick_order
 ANNOTATION_VEP_PICK_ORDER = None
