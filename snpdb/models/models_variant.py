@@ -227,7 +227,6 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
 
         return False
 
-
     def merge(self, allele_linking_tool, other_allele: "Allele") -> bool:
         """ Merge other_allele into this allele """
 
@@ -280,6 +279,11 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
     @property
     def build_names(self) -> str:
         return ", ".join(sorted(self.variantallele_set.values_list("genome_build__name", flat=True)))
+
+    @staticmethod
+    def missing_variants_for_build(genome_build) -> QuerySet['Allele']:
+        alleles_with_variants_qs = Allele.objects.filter(variantallele__isnull=False)
+        return alleles_with_variants_qs.filter(~Q(variantallele__genome_build=genome_build))
 
     def __str__(self):
         name = f"Allele {self.pk}"

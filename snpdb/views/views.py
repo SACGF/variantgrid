@@ -72,10 +72,11 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
     VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, SampleStats, \
-    SampleStatsPassingFilter, TagColorsCollection, Contig, LiftoverRun
+    SampleStatsPassingFilter, TagColorsCollection, Contig, LiftoverRun, Allele
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, SequenceRole
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
+from snpdb.tasks.liftover_tasks import liftover_alleles
 from snpdb.utils import LabNotificationBuilder, get_tag_styles_and_colors
 from upload.models import UploadedVCF
 from upload.uploaded_file_type import retry_upload_pipeline
@@ -1499,9 +1500,27 @@ def labs_graph_detail(request):
 
 @require_superuser
 def liftover_runs(request):
+    genome_builds = GenomeBuild.builds_with_annotation()
+    if request.method == 'POST':
+        dest_genome_build = None
+        for genome_build in genome_builds:
+            if f"liftover_to_{genome_build.name}" in request.POST:
+                dest_genome_build = genome_build
+                break
+        if dest_genome_build is None:
+            raise ValueError("Could not determine dest genome build from liftover_runs POST")
+        messages.add_message(request, messages.INFO, f"Lifting over alleles to {dest_genome_build}")
+        liftover_alleles.si(request.user.username, dest_genome_build.name).apply_async()
+
+    alleles_missing_variants = {}
+    for genome_build in genome_builds:
+        alleles_missing_variants[genome_build.name] = Allele.missing_variants_for_build(genome_build).count()
+
     context = {
-        "genome_builds": GenomeBuild.builds_with_annotation()
+        "genome_builds": genome_builds,
+        "alleles_missing_variants": alleles_missing_variants,
     }
+
     return render(request, "snpdb/liftover/liftover_runs.html", context)
 
 

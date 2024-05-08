@@ -559,6 +559,21 @@ class LiftoverRunAlleleLiftoverColumns(AbstractAlleleLiftoverColumns):
 
 
 class AlleleLiftoverFailureColumns(AbstractAlleleLiftoverColumns):
+    def __init__(self, request):
+        super().__init__(request)
+        ct_column = RichColumn(key="liftover__conversion_tool",
+                               label="Conversion Tool", renderer=self.render_conversion_tool,
+                               orderable=True)
+        self.rich_columns.insert(1, ct_column)
+
+    def render_conversion_tool(self, row: dict[str, Any]) -> JsonDataType:
+        label = ""
+        if status := row['liftover__conversion_tool']:
+            conversion_tool = AlleleConversionTool(status)
+            label = conversion_tool.label
+        return label
+
+
     def get_initial_queryset(self) -> QuerySet[AlleleLiftover]:
         genome_build_name = self.get_query_param("genome_build_name")
         if genome_build_name is None:

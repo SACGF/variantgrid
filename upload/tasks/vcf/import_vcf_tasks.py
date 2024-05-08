@@ -132,7 +132,6 @@ class LiftoverCreateVCFTask(ImportVCFStepTask):
             if num_rejected:
                 child_task_class = LiftoverProcessFailureVCFTask
                 self._schedule_steps(child_task_class, upload_step, [(reject_vcf, num_rejected)])
-
         else:
             raise ValueError(f"Don't know how to produce liftover VCF for {liftover.get_conversion_tool_display()}")
 
