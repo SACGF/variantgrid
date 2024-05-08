@@ -18,6 +18,7 @@ def _test_has_missing_37_to_38_chain_file(apps):
 def _test_has_missing_38_to_37_chain_file(apps):
     return not os.path.exists(LIFTOVER_38_TO_37)
 
+
 class Migration(migrations.Migration):
 
     dependencies = [

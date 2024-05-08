@@ -24,7 +24,8 @@ def bcftools_liftover(source_vcf: str, source_genome_build: GenomeBuild,
     source_fasta_filename = source_vep_config["fasta"]
     dest_fasta_filename = dest_vep_config["fasta"]
 
-    chain_filename = source_vep_config["liftover"].get(out_genome_build.name)
+    annotation_build_config = settings.ANNOTATION[source_genome_build.name]
+    chain_filename = annotation_build_config["liftover"].get(out_genome_build.name)
     required_files = {
         "source_fasta_filename": source_fasta_filename,
         "dest_fasta_filename": dest_fasta_filename,

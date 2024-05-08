@@ -9,6 +9,23 @@
 {% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
 {% block content %}
     <div class="container">
+        <h3>Alleles</h3>
+        <form method="post">
+            {% csrf_token %}
+
+            <table>
+            {% for genome_build_name, count in alleles_missing_variants.items %}
+                <tr>
+                    <th>Alleles missing {{ genome_build_name }} variants: </th>
+                    <td>{{ count }}</td>
+                    <td>{% if count %}<button name="liftover_to_{{ genome_build_name }}" class="btn btn-secondary">Liftover variants</button>{% endif %}</td>
+                </tr>
+            {% endfor %}
+            </table>
+        </form>
+    </div>
+
+    <div class="container">
         <h3>Liftover Runs</h3>
 
         <table id="liftover-datatable" data-datatable-url="{% url 'liftover_runs_datatable' %}" class="sticky-header responsive"></table>
