@@ -434,11 +434,10 @@ def analysis_template_save(request, pk):
     analysis_template = AnalysisTemplate.get_for_user(request.user, pk, write=True)
 
     try:
-        analysis_template.new_version()
+        atv = analysis_template.new_version()
+        return JsonResponse({"version": atv.version})
     except ValueError as e:
         return JsonResponse({"error": str(e)})
-
-    return JsonResponse({"version": analysis_template.version})
 
 
 @require_POST
