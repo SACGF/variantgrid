@@ -12,29 +12,19 @@ from snpdb.models import GenomeBuild
 def bcftools_liftover(source_vcf: str, source_genome_build: GenomeBuild,
                       out_vcf: str, out_genome_build: GenomeBuild) -> tuple[str, int]:
     """ returns reject file and items to process if any failed """
-    vc_37 = VEPConfig(GenomeBuild.grch37())
-    vc_38 = VEPConfig(GenomeBuild.grch38())
 
-
-    ASSEMBLIES = {
-        # These are UCSC ones
-        # "GRCh37": os.path.join(settings.LIFTOVER_BCFTOOLS_DATA_DIR, "GRCh37", "human_g1k_v37.fasta"),
-        # "GRCh38": os.path.join(settings.LIFTOVER_BCFTOOLS_DATA_DIR, "GRCh38", "GCA_000001405.15_GRCh38_no_alt_analysis_set.fna"),
-        # Ensembl ones
-        "GRCh37": vc_37["fasta"],
-        "GRCh38": vc_38["fasta"],
+    VEP_CONFIG = {
+        "GRCh37": VEPConfig(GenomeBuild.grch37()),
+        "GRCh38": VEPConfig(GenomeBuild.grch38()),
     }
 
-    source_fasta_filename = ASSEMBLIES.get(source_genome_build.name)
-    dest_fasta_filename = ASSEMBLIES.get(out_genome_build.name)
+    source_vep_config = VEP_CONFIG[source_genome_build.name]
+    dest_vep_config = VEP_CONFIG[out_genome_build.name]
 
-    chain_dir = os.path.join(settings.LIFTOVER_BCFTOOLS_DATA_DIR, "chain")
-    chain_files = {
-        "GRCh37": {"GRCh38": os.path.join(chain_dir, "GRCh37_to_GRCh38.chain.gz")},
-        "GRCh38": {"GRCh37": os.path.join(chain_dir, "GRCh38_to_GRCh37.chain.gz")},
-    }
-    chain_filename = chain_files.get(source_genome_build.name, {}).get(out_genome_build.name)
+    source_fasta_filename = source_vep_config["fasta"]
+    dest_fasta_filename = dest_vep_config["fasta"]
 
+    chain_filename = source_vep_config["liftover"].get(out_genome_build.name)
     required_files = {
         "source_fasta_filename": source_fasta_filename,
         "dest_fasta_filename": dest_fasta_filename,

@@ -233,6 +233,9 @@ ANNOTATION = {
         "cytoband": os.path.join(VG_REFERENCE_DIR, "hg19", "cytoband.hg19.txt.gz"),
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.25_GRCh37.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
+        "liftover": {
+            "GRCh38": os.path.join(ANNOTATION_BASE_DIR,"liftover/GRCh37_to_GRCh38.chain.gz"),
+        },
 
         # VEP paths are relative to ANNOTATION_VEP_BASE_DIR - worked out at runtime
         # so you can change just that variable and have everything else work
@@ -270,6 +273,9 @@ ANNOTATION = {
         "cytoband": os.path.join(VG_REFERENCE_DIR, "hg38", "cytoband.hg38.txt.gz"),
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.39_GRCh38.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
+        "liftover": {
+            "GRCh37": os.path.join(ANNOTATION_BASE_DIR, "liftover/GRCh38_to_GRCh37.chain.gz"),
+        },
 
         # VEP paths are relative to ANNOTATION_VEP_BASE_DIR - worked out at runtime
         # so you can change just that variable and have everything else work
@@ -418,7 +424,6 @@ LIFTOVER_DBSNP_ENABLED = False  # Default=False - doesn't work so well due to db
 
 LIFTOVER_BCFTOOLS_ENABLED = False
 LIFTOVER_BCFTOOLS_PLUGIN_DIR = "/usr/share/bcftools/plugins"
-LIFTOVER_BCFTOOLS_DATA_DIR = "/data/annotation/liftover"
 
 PANEL_APP_CACHE_DAYS = 7  # Automatically re-check after this time
 GENE_RELATION_PANEL_APP_LIVE_UPDATE = False  # Use GenCC cached result if False, poll panel app if True
