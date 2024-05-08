@@ -22,7 +22,7 @@ def _test_has_missing_37_fasta(apps):
 
 
 def _test_has_missing_38_fasta(apps):
-    return _test_has_missing_fasta("GRCh37")
+    return _test_has_missing_fasta("GRCh38")
 
 
 class Migration(migrations.Migration):
