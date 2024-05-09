@@ -56,6 +56,7 @@ class Command(BaseCommand):
 
         ref_standard_bases_pattern = re.compile(r"[GATC]")
         alt_standard_bases_pattern = re.compile(r"[GATC,\.]")  # Can be multi-alts, or "." for reference
+        contig_regex = re.compile(r"^##contig=<ID=(.+),length=(\d+)")
 
         skip_patterns = {}
         if skip_regex := getattr(settings, "VCF_IMPORT_SKIP_RECORD_REGEX", {}):
@@ -66,6 +67,19 @@ class Command(BaseCommand):
         defined_filters = None
         for line in f:
             if line[0] == '#':
+                if m := contig_regex.match(line):
+                    contig_name, provided_contig_length = m.groups()
+                    if contig_id := chrom_to_contig_id.get(contig_name):
+                        if fasta_chrom := contig_to_fasta_names.get(contig_id):
+                            provided_contig_length = int(provided_contig_length)
+                            ref_contig_length = contig_lengths[contig_id]
+                            if provided_contig_length != ref_contig_length:
+                                msg = f"VCF header contig '{contig_name}' (length={provided_contig_length}) has " + \
+                                    f"different length than ref contig {fasta_chrom} (length={ref_contig_length})"
+                                raise ValueError(msg)
+                            # This contig would be replaced below, so change header
+                            line = f"##contig=<ID={fasta_chrom},length={ref_contig_length}>\n"
+
                 vcf_header_lines.append(line)
                 sys.stdout.write(line)
             else:
