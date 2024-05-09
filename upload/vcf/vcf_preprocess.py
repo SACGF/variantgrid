@@ -67,7 +67,6 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     VCF_CLEAN_AND_FILTER_SUB_STEP = "vcf_clean_and_filter"
     DECOMPOSE_SUB_STEP = "decompose"
     NORMALIZE_SUB_STEP = "normalize"
-    UNIQ_SUB_STEP = "uniq"
     REMOVE_HEADER_SUB_STEP = "remove_header"
     SPLIT_VCF_SUB_STEP = "split_vcf"
 
@@ -109,7 +108,9 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     # VT isn't the bottleneck here, it's my programs - so no speed advantage to using "+" for Uncompressed BCF streams
     pipe_commands[DECOMPOSE_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "decompose", "-s", "-"]
     pipe_commands[NORMALIZE_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "normalize", "-n", "-r", genome_build.reference_fasta, "-"]
-    pipe_commands[UNIQ_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "uniq", "-"]
+    # We don't run 'uniq' anymore as neither Vt or Bcftools handle SVLEN properly (so removed from sub_step_name loop below)
+    # @see https://github.com/SACGF/variantgrid/issues/818
+    # pipe_commands[UNIQ_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "uniq", "-"]
 
     # Split up the VCF
     split_vcf_dir = upload_pipeline.get_pipeline_processing_subdir("split_vcf")
@@ -122,7 +123,7 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
                                          "--lines", str(settings.VCF_IMPORT_FILE_SPLIT_ROWS),
                                          f"--filter='sh -c \"{{ cat {split_headers_filename}; cat; }} | bgzip -c > {split_vcf_dir}/$FILE\"'"]
 
-    for sub_step_name in [DECOMPOSE_SUB_STEP, NORMALIZE_SUB_STEP, UNIQ_SUB_STEP]:
+    for sub_step_name in [DECOMPOSE_SUB_STEP, NORMALIZE_SUB_STEP]:
         sub_step_commands = pipe_commands[sub_step_name]
         sub_steps[sub_step_name] = create_sub_step(upload_step, sub_step_name, sub_step_commands)
 
