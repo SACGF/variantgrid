@@ -62,7 +62,7 @@
         {% csrf_token %}
         <table>
         <tr>
-            <th>Gene: <td> {{ gene_form.gene }}{{ gene_form.gene.errors }}
+            <th>Gene: <td> {{ gene_form.gene_symbol }}{{ gene_form.gene_symbol.errors }}
             <th>Upstream: <td> {{ gene_form.upstream_kb }}{{ gene_form.upstream_kb.errors }} (KB)
             <th>Downstream: <td> {{ gene_form.downstream_kb }}{{ gene_form.downstream_kb.errors }} (KB)
         {% if has_write_permission %}
@@ -93,7 +93,7 @@
     <h3>Previous Karyomap Gene Regions</h3>
     <table>
     {% for kag in karyomapping_analysis.karyomappinggene_set.all %}
-        <tr><td><a href="javascript:openKaryomapGene('{{ kag.pk }}')">View</a> {{ kag.gene }} (Up: {{ kag.upstream_kb }}, Down: {{ kag.downstream_kb }})
+        <tr><td><a href="javascript:openKaryomapGene('{{ kag.pk }}')">View</a> {{ kag.gene_symbol }} (Up: {{ kag.upstream_kb }}, Down: {{ kag.downstream_kb }})
     {% endfor %}
     </table>
 {% endif %}

@@ -330,7 +330,7 @@ class KaryomappingGeneForm(forms.ModelForm):
     class Meta:
         exclude = ('karyomapping_analysis',)
         model = KaryomappingGene
-        widgets = {'gene': ModelSelect2(url='gene_autocomplete',
+        widgets = {'gene_symbol': ModelSelect2(url='gene_symbol_autocomplete',
                                         attrs={'data-placeholder': 'Gene...'}),
                    "upstream": NumberInput(attrs={'class': 'narrow', 'min': '0', 'step': '1000'}),
                    "downstream": NumberInput(attrs={'class': 'narrow', 'min': '0', 'step': '1000'})}

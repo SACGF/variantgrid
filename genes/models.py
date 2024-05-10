@@ -207,6 +207,9 @@ class GeneSymbol(models.Model, PreviewModelMixin):
         # use over get_genes when possible
         return list(self.get_genes().all())
 
+    def latest_gene_version(self, genome_build: GenomeBuild):
+        return self.geneversion_set.filter(genome_build=genome_build).order_by("-version").first()
+
     def get_absolute_url(self):
         return reverse("view_gene_symbol", kwargs={"gene_symbol": self.symbol})
 
