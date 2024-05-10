@@ -567,6 +567,9 @@ class Variant(PreviewModelMixin, models.Model):
         There is only 1 Variant for a given locus/alt per database (handled via insertion queues) """
 
     REFERENCE_ALT = "="
+    _BASES = "GATC"
+    _REGEX_2_PLUS_BASES = f"^[GATC]{2,}$"
+
     locus = models.ForeignKey(Locus, on_delete=CASCADE)
     alt = models.ForeignKey(Sequence, on_delete=CASCADE)
     # end is a calculated field, but we store as an optimisation for overlap queries (start = locus.position)
@@ -590,13 +593,37 @@ class Variant(PreviewModelMixin, models.Model):
         return Q(locus__contig__genomebuildcontig__genome_build=genome_build)
 
     @staticmethod
+    def get_reference_q() -> Q:
+        return Q(alt__seq=Variant.REFERENCE_ALT)
+
+    @staticmethod
     def get_no_reference_q() -> Q:
-        return ~Q(alt__seq=Variant.REFERENCE_ALT)
+        return ~Variant.get_reference_q()
 
     @staticmethod
     def get_snp_q() -> Q:
-        bases = "GATC"
-        return Q(locus__ref__seq__in=bases) & Q(alt__seq__in=bases)
+        return Q(locus__ref__seq__in=Variant._BASES) & Q(alt__seq__in=Variant._BASES)
+
+    @staticmethod
+    def get_insertion_q() -> Q:
+        return Q(locus__ref__seq__in=Variant._BASES) & Q(alt__seq__regex=Variant._REGEX_2_PLUS_BASES)
+
+    @staticmethod
+    def get_deletion_q() -> Q:
+        return Q(locus__ref__seq__regex=Variant._REGEX_2_PLUS_BASES) & Q(alt__seq__in=Variant._BASES)
+
+    @staticmethod
+    def get_indel_q() -> Q:
+        return Variant.get_insertion_q() | Variant.get_deletion_q()
+
+    @staticmethod
+    def get_complex_subsitution_q() -> Q:
+        regex_2_plus_bases = f"^[GATC]{2,}$"
+        return Q(locus__ref__seq__regex=regex_2_plus_bases) & Q(alt__seq__regex=regex_2_plus_bases)
+
+    @staticmethod
+    def get_symbolic_q() -> Q:
+        return Q(locus__ref__seq__startswith="<") & Q(alt__seq__startswith="<")
 
     @staticmethod
     def annotate_variant_string(qs, name="variant_string", path_to_variant=""):
