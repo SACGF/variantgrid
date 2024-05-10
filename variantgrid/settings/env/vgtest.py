@@ -18,13 +18,8 @@ DEBUG = False
 ANNOTATION_ENTREZ_EMAIL = 'davmlaw@gmail.com'
 SLACK['emoji'] = ':mouse:'
 
-_BIG_DISK_BASE_DIR = "/data"
-ANNOTATION_REFERENCE_BASE_DIR = os.path.join(_BIG_DISK_BASE_DIR, "annotation")
-ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "VEP")
-ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "ensembl-vep")
-ANNOTATION_VEP_CACHE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_cache")
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
-_ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "fasta")
+_ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "fasta")
 
 PYTHON_COMMAND = os.path.join(BASE_DIR, "env", "bin", "python3")
 MANAGE_COMMAND = [PYTHON_COMMAND, os.path.join(BASE_DIR, "manage.py")]
@@ -53,7 +48,7 @@ ANNOTATION[BUILD_GRCH38]["vep_config"].update({
     "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2023.10.02-grch38.vcf.gz",
 })
 
-ANNOTATION_VCF_DUMP_DIR = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, 'scratch')
+ANNOTATION_VCF_DUMP_DIR = os.path.join(ANNOTATION_BASE_DIR, 'scratch')
 
 GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID = 1  # MedEx
 DEFAULT_FROM_EMAIL = 'noreply@variantgrid.com'
@@ -88,7 +83,7 @@ VG_TEST_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "va
 STATICFILES_DIRS = (VG_TEST_STATIC_FILES_DIR,) + STATICFILES_DIRS
 
 SOMALIER["enabled"] = True
-SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "somalier")
+SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_BASE_DIR, "somalier")
 
 USER_CREATE_ORG_LABS = {
     "unknown": "unknown",
