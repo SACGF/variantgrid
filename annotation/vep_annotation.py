@@ -97,7 +97,9 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         vep_cmd,
         "-i", vcf_filename,
         "-o", output_filename,
-        "--cache", "--dir", settings.ANNOTATION_VEP_CACHE_DIR,
+        "--cache",
+        "--dir_cache", settings.ANNOTATION_VEP_CACHE_DIR,
+        "--dir_plugins", settings.ANNOTATION_VEP_PLUGINS_DIR,
         # Need to provide VEP a fasta rather than use the default - https://github.com/Ensembl/VEP_plugins/issues/708
         "--fasta", vc["fasta"],
         "--assembly", genome_build.name,
