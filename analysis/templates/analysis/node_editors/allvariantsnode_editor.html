@@ -30,11 +30,31 @@ input.narrow {
 			<label for="{{ form.gene_symbol.id_for_label }}">Gene:</label>
 			{{ form.gene_symbol }}
 		</span>
-		<span class="fieldWrapper">
-			{{ form.reference.errors }}
-			<label for="{{ form.reference.id_for_label }}">Show reference variants:</label>
-			{{ form.reference }}
-		</span>
+        <div>
+            <span class="fieldWrapper">
+                {{ form.reference.errors }}
+                <label for="{{ form.reference.id_for_label }}">Reference variants:</label>
+                {{ form.reference }}
+            </span>
+            |
+            <span class="fieldWrapper">
+                {{ form.snps.errors }}
+                <label for="{{ form.snps.id_for_label }}">SNPs:</label>
+                {{ form.snps }}
+            </span>
+            |
+            <span class="fieldWrapper">
+                {{ form.indels.errors }}
+                <label for="{{ form.indels.id_for_label }}">indels:</label>
+                {{ form.indels }}
+            </span>
+            |
+            <span class="fieldWrapper">
+                {{ form.structural_variants.errors }}
+                <label for="{{ form.structural_variants.id_for_label }}">Structural Variants:</label>
+                {{ form.structural_variants }}
+            </span>
+        </div>
 
 		<table id="zygosity-table">
 			<tr>
