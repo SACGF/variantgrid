@@ -10,7 +10,7 @@ from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
-from genes.models import Gene
+from genes.models import Gene, GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from patients.models_enums import Zygosity
 from snpdb.models import GenomicInterval, Trio, Variant
@@ -163,7 +163,7 @@ class KaryomappingAnalysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedM
 
 class KaryomappingGene(models.Model):
     karyomapping_analysis = models.ForeignKey(KaryomappingAnalysis, on_delete=CASCADE)
-    gene = models.ForeignKey(Gene, on_delete=CASCADE)
+    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
     upstream_kb = models.IntegerField(default=0)
     downstream_kb = models.IntegerField(default=0)
 
@@ -173,7 +173,7 @@ class KaryomappingGene(models.Model):
         return iv
 
     def get_genomic_interval_and_strand(self) -> tuple[GenomicInterval, str]:
-        gene_version = self.gene.latest_gene_version(self.karyomapping_analysis.trio.genome_build)
+        gene_version = self.gene_symbol.latest_gene_version(self.karyomapping_analysis.trio.genome_build)
         start_position = gene_version.start
         end_position = gene_version.end
         if gene_version.strand == '+':
@@ -197,7 +197,7 @@ class KaryomappingGene(models.Model):
         return KaryotypeBins.get_karyomapping_bins(self.karyomapping_analysis.trio, self.get_q())
 
     def __str__(self):
-        return f"{self.gene} for {self.karyomapping_analysis}"
+        return f"{self.gene_symbol} for {self.karyomapping_analysis}"
 
 
 class KaryotypeCounts(models.Model):

@@ -12,19 +12,19 @@ function reverseArray(array) {
 }
 
 function showKaryotypeScatter() {
-    var data = []
+    let data = []
      
-    for(var i=0 ; i<KARYOTYPE_BIN_LABELS.length ; i++) {
-        var k = KARYOTYPE_BIN_LABELS[i];
-        var k_data = KARYOTYPE_BIN_SCATTER_DATA[k];
+    for(let i=0 ; i<KARYOTYPE_BIN_LABELS.length ; i++) {
+        let k = KARYOTYPE_BIN_LABELS[i];
+        let k_data = KARYOTYPE_BIN_SCATTER_DATA[k];
         // console.log("k: " + k);
         // console.log(k_data);
-        var x_data = k_data['x'];
+        let x_data = k_data['x'];
         if (!x_data.length) {
             x_data = [null]; // always show even if empty
         }
         
-        var trace = {
+        let trace = {
           x: x_data,
           y: Array(x_data.length).fill(k),
           mode: 'markers',
@@ -37,11 +37,11 @@ function showKaryotypeScatter() {
         data.push(trace);
     }
 
-    var description = 'Karyomapping {{ kag.karyomapping_analysis.proband.sample }}';
-    var geneDescription = "{{ kag.gene }} ('{{ strand }}' strand) Up: {{ kag.upstream_kb }}KB, Down: {{ kag.downstream_kb }})KB";
-    var coordinates = "{{ iv }}";
+    const description = 'Karyomapping {{ kag.karyomapping_analysis.proband.sample }}';
+    const geneDescription = "{{ kag.gene_symbol }} ('{{ strand }}' strand) Up: {{ kag.upstream_kb }}KB, Down: {{ kag.downstream_kb }})KB";
+    const coordinates = "{{ iv }}";
     
-    var layout = {
+    let layout = {
         title: [description, geneDescription, coordinates].join('\n'),
         showlegend: false,
         type: 'category',
