@@ -6,6 +6,7 @@ let VCLink = (function() {
         this.missing = params.missing;
         this.title = params.title;
         this.build = params.build;
+        this.geneLink = Boolean(params.geneLink);
     };
 
     VCLink.prototype = {
@@ -59,7 +60,8 @@ EMPTY_LINK = new VCLink({
     href: null,
     missing: true,
     title: null,
-    build: null
+    build: null,
+    geneLink: false,
 });
 
 let VCLinks = (function() {
@@ -142,6 +144,24 @@ let VCLinks = (function() {
             return links;
         },
 
+        filterLinks(links, allowMissing, allowList, blockList) {
+            const allowSet = new Set(allowList);
+            const blockSet = new Set(blockList);
+            if (allowSet.size && blockSet.size) {
+                throw new Error("filterLinks: can only pass EITHER allowList OR blockList not both")
+            }
+            if (!allowMissing) {
+                links = links.filter(link => !link.isMissing());
+            }
+            if (allowSet.size) {
+                links = links.filter(link => allowSet.has(link.text));
+            }
+            if (blockSet.size) {
+                links = links.filter(link => !blockSet.has(link.text));
+            }
+            return links;
+        },
+
         buildName() {
             let genome_build = this.data[SpecialEKeys.GENOME_BUILD];
             if (genome_build) {
@@ -164,17 +184,18 @@ let VCLinks = (function() {
         generateMonarchLink() {
             let hgnc_id = this.hgncIdSafe();
             if (hgnc_id) {
-                return new VCLink({text: 'Monarch Phen.', title:"Monarch Phenotype (Gene)", href: `https://monarchinitiative.org/gene/${hgnc_id}`});
+                return new VCLink({text: 'Monarch Phen.', title:"Monarch Phenotype (Gene)", href: `https://monarchinitiative.org/gene/${hgnc_id}`, geneLink: true});
             }
             let gene_symbol = this.data[SpecialEKeys.GENE_SYMBOL];
             if (gene_symbol) {
-                return new VCLink({text: 'Monarch Phen,', title:"Monarch Phenotype (Gene)", href: `https://monarchinitiative.org/search/${gene_symbol}`});
+                return new VCLink({text: 'Monarch Phen,', title:"Monarch Phenotype (Gene)", href: `https://monarchinitiative.org/search/${gene_symbol}`, geneLink: true});
             }
 
             return new VCLink({
                 text: 'Monarch Phen',
                 href: 'https://monarchinitiative.org',
-                missing: this.eKeys.key(SpecialEKeys.HGNC_ID).label
+                missing: this.eKeys.key(SpecialEKeys.HGNC_ID).label,
+                geneLink: true
             });
         },
 
@@ -182,18 +203,19 @@ let VCLinks = (function() {
             let hgnc_id = this.hgncIdSafe();
             if (hgnc_id) {
                 let link = `https://search.clinicalgenome.org/kb/genes/${hgnc_id}`;
-                return new VCLink({text: 'ClinGen KB', href: link});
+                return new VCLink({text: 'ClinGen KB', href: link, geneLink: true});
             }
             let gene_symbol = this.data[SpecialEKeys.GENE_SYMBOL];
             if (gene_symbol) {
                 let link = `https://search.clinicalgenome.org/kb/genes?search=${gene_symbol}`;
-                return new VCLink({text: 'ClinGen KB', href: link});
+                return new VCLink({text: 'ClinGen KB', href: link, geneLink: true});
             }
 
             return new VCLink({
                 text: 'ClinGen KB',
                 href: 'https://search.clinicalgenome.org/kb/genes',
-                missing: this.eKeys.key(SpecialEKeys.HGNC_ID).label
+                missing: this.eKeys.key(SpecialEKeys.HGNC_ID).label,
+                geneLink: true,
             });
         },
 
@@ -344,12 +366,13 @@ let VCLinks = (function() {
         },
 
         makeLink(text, link, param, key, title) {
+            let geneLink = key == SpecialEKeys.GENE_SYMBOL;
             let val = this.data[key];
             if (val) {
                 link = link + param.replace('@@', encodeURIComponent(val));
-                return new VCLink({text:text, href:link, title: title});
+                return new VCLink({text:text, href:link, title: title, geneLink: geneLink});
             } else {
-                return new VCLink({text:text, href:link, missing:this.eKeys.key(key).label, title: title});
+                return new VCLink({text:text, href:link, missing:this.eKeys.key(key).label, title: title, geneLink: geneLink});
             }
         }
     };

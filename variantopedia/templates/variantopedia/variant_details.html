@@ -339,10 +339,15 @@ function populateVariantAllele(data) {
     }
 
     EKeys.load().then(eKeys => {
+        const allowList = {{ quick_lists_allow_list | jsonify }};
+        const blockList = {{ quick_links_block_list | jsonify }};
         let vcLinks = new VCLinks(eKeys);
         let links = vcLinks.generateLinks(data.link_data);
-        let anchors = links.filter(link => !link.isMissing()).map(link => link.asAnchor("bootstrap"));
-        $('#quick-links').html($("<ul>", {class:"list-group", html:anchors}));
+        links = vcLinks.filterLinks(links, false, allowList, blockList);
+
+        let variantLinks = links.filter(link => !link.geneLink);
+        let variantAnchors = variantLinks.map(link => link.asAnchor("bootstrap"));
+        $('#quick-links').html($("<ul>", {class:"list-group", html:variantAnchors}));
     });
 }
 
