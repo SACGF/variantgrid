@@ -42,7 +42,6 @@
                     deleteEnabled: {{ delete_enabled | jsonify }},
                     attachmentsEnabled: {{ attachments_enabled | jsonify }},
                     withdrawReasons: {{ withdraw_reasons | jsonify }},
-                    conditionResolution: {{ condition_text_match.pk | jsonify }},
                     conditionMatchingIsViewEnabled: {{ "condition_matching" | is_view_enabled | jsonify }},
                 },
                 keys,

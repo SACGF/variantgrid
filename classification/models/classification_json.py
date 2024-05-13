@@ -194,7 +194,8 @@ def populate_classification_json(classification: Classification, params: Classif
         'data': classification.get_visible_evidence(classification.evidence, lowest_share_level),
         'resolved_condition': classification.condition_resolution_dict,
         'withdrawn': classification.withdrawn,
-        'allele_origin_bucket': classification.allele_origin_bucket
+        'allele_origin_bucket': classification.allele_origin_bucket,
+        'condition_text_match': classification.condition_text_record.pk if classification.condition_text_record else None
     }
     if latest_modification:
         content['version'] = latest_modification.created.timestamp()

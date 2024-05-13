@@ -366,10 +366,10 @@ def view_classification(request: HttpRequest, classification_id: str):
         'attachments_enabled': settings.CLASSIFICATION_FILE_ATTACHMENTS,
         'delete_enabled': settings.CLASSIFICATION_ALLOW_DELETE,
         'duplicate_records': duplicate_records,
-        'withdraw_reasons': withdraw_reasons,
-        'condition_text_match': vc.condition_text_record if vc.condition_text_record else None,
+        'withdraw_reasons': withdraw_reasons
     }
     return render(request, 'classification/classification.html', context)
+
 
 def view_classification_diff(request):
     extra_data = {}
@@ -753,8 +753,8 @@ def clin_sig_change_data(request):
         def de_number(clin_sig: str) -> str:
             if clin_sig:
                 clin_sig = clin_sig.strip()
-                if match := de_number_re.match(clin_sig):
-                    return match.group(1)
+                if number_match := de_number_re.match(clin_sig):
+                    return number_match.group(1)
                 return clin_sig
 
         all_flags_qs = Flag.objects.filter(flag_type=classification_flag_types.significance_change)
