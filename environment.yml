@@ -18,22 +18,22 @@ dependencies:
   - celery=5.2
   - configargparse=1.5
   - coreapi=2.3
-  - cyvcf2==0.30.28
-  - htseq=2.0
+#  - cyvcf2=0.30.28 (claims it doesn't work with python 3.11)
+#  - htseq=2.0.5 (claims it doesn't work with python 3.11)
   - ijson=3.1
   - ipython=8.15
   - kombu=5.3  # was kombu==5.2.3
   - levenshtein==0.21  # was levenshtein==0.20.9
   - markdown=3.2  # was 3.1
   - matplotlib=3.8.4
-  - networkx=2.4
+  - networkx=2.7.1
   - nltk=3.8  # was 3.7
   - numpy=1.25 # was 1.22
   - oauthlib=3.1
-  - pandas=1.4
+  - pandas=2.2.2
   - psycopg2=2.9.9
   - pypdf2=2.11  # was 2.6
-  - pysam==0.21  # was 0.18
+#  - pysam=0.22.1  # was 0.18
   - python-dateutil=2.8
   - pyvcf3=1.0
   - redis=3.5 # was redis==3.5.3
@@ -49,7 +49,14 @@ dependencies:
   - pydantic=2.3.0
   - deepdiff=6.5.0
   - gdal=3.9  # needed for geo
+  - lxml=5.2.1
+  #- setuptools-rust=1.9.0
   - pip:
+      - setuptools_rust==1.9.0
+      - fastobo==0.12.3
+      - cyvcf2==0.30.28
+      - htseq==2.0.5
+      - pysam==0.22.1
       - cdot==0.2.21
       - stream-zip==0.0.47
       # - bgzip==0.4.0
@@ -73,7 +80,6 @@ dependencies:
       - django-leaflet==0.28.2
       - django_model_utils==4.2.0
       - django-postgres-extra==2.0.5
-      - django_recaptcha==3.0.0
       - django-registration-redux==2.9
       - django_termsandconditions==2.0.12
       - django-reversion-compare==0.15.0
@@ -89,9 +95,9 @@ dependencies:
       - git+https://github.com/davmlaw/django-starfield#egg=django_starfield
       - git+https://github.com/davmlaw/django-js-reverse#egg=django-js-reverse
       - git+https://github.com/SACGF/hgvs#egg=pyhgvs
-      - git+https://github.com/davmlaw/hgvs@f3701a44b389ebad3f4cc7da8dbe672d9ae4e6cb#egg=hgvs
+      - git+https://github.com/biocommons/hgvs#egg=hgvs
       - nameparser==1.1.1 # nameparser hasn't been updated in conda since 1.0.5
       - rollbar==0.16.3
       - frozendict==2.3.4
-      - pronto==2.4.7  # pronto causes a lot of dependancy issues that we're going to sweep under pip's rug
+      - pronto==2.5.7  # pronto causes a lot of dependancy issues that we're going to sweep under pip's rug
       - django_recaptcha==4.0.0
