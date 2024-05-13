@@ -23,6 +23,7 @@
                                 {% if lab_summ.clinical_significance_from == "No Data" %}<span class="no-value">No Data</span>
                                 {% else %}{{ lab_summ.clinical_significance_from|ekey:'clinical_significance' }}
                                 {% endif %}
+                            </span>
                         {% endif %}
                         {% if include_acmg %}
                             {% if lab_summ.acmg_summary %}{{ lab_summ.acmg_summary }}{% else %}No Criteria Provided{% endif %}

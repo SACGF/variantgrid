@@ -15,7 +15,8 @@ from django.utils.safestring import mark_safe
 from classification.criteria_strengths import CriteriaStrength, AcmgPointScore
 from classification.enums import SpecialEKeys, AlleleOriginBucket
 from classification.enums.classification_enums import ShareLevel
-from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo
+from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo, \
+    EvidenceMixin
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
     ClassificationGroupUtils
@@ -192,15 +193,27 @@ def classification_changes(changes):
 
 
 @register.inclusion_tag("classification/tags/clinical_significance.html")
-def clinical_significance(value):
-    key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE, show_if_none=True):
+    if isinstance(value, EvidenceMixin):
+        value = value.get(evidence_key)
+    if value is None and not show_if_none:
+        return {"skip": True}
+
+    key = EvidenceKeyMap.cached_key(evidence_key)
     label = key.option_dictionary.get(value, value) or "No Data"
+    title = key.pretty_label
     if value == "withdrawn":
         label = "Withdrawn"
 
+    prefix = "cs" if key.key == SpecialEKeys.CLINICAL_SIGNIFICANCE else "scs"
+    css_value = value.lower() if value else "none"
+    css_class = f"{prefix} {prefix}-{css_value}"
+
     return {
-        "key": value.lower(),
-        "label": label
+        "css_class": css_class,
+        "label": label,
+        "prefix": "cs" if key.key == SpecialEKeys.CLINICAL_SIGNIFICANCE else "scs",
+        "title": title
     }
 
 @register.inclusion_tag("classification/tags/clinical_significance_inline.html")
