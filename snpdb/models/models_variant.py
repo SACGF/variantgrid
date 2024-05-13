@@ -739,7 +739,7 @@ class Variant(PreviewModelMixin, models.Model):
 
     @property
     def can_have_c_hgvs(self) -> bool:
-        return self.can_have_annotation and abs(self.svlen) <= settings.HGVS_MAX_SEQUENCE_LENGTH
+        return self.can_have_annotation and self.svlen is None or abs(self.svlen) <= settings.HGVS_MAX_SEQUENCE_LENGTH
 
     def as_tuple(self) -> tuple[str, int, str, str, int]:
         return self.locus.contig.name, self.locus.position, self.locus.ref.seq, self.alt.seq, self.svlen
@@ -797,7 +797,7 @@ class Variant(PreviewModelMixin, models.Model):
     def get_canonical_c_hgvs(self, genome_build):
         c_hgvs = None
         if cta := self.get_canonical_transcript_annotation(genome_build):
-            c_hgvs = cta.hgvs_c
+            c_hgvs = cta.get_hgvs_c_with_symbol()
         return c_hgvs
 
     @property

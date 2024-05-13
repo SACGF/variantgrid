@@ -967,6 +967,16 @@ class AbstractVariantAnnotation(models.Model):
                 pass  # Skip "?"
         raise ValueError(f"Unable to handle protein_position={protein_position}")
 
+    def get_hgvs_c_with_symbol(self) -> str:
+        hgvs_c = self.hgvs_c
+        if hgvs_c and self.symbol:
+            from genes.hgvs import HGVSMatcher
+            hgvs_matcher = HGVSMatcher(self.version.genome_build)
+            hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_c)
+            hgvs_variant.gene = self.symbol
+            hgvs_c = str(hgvs_variant)
+        return hgvs_c
+
 
 class VariantAnnotation(AbstractVariantAnnotation):
     """ This is the "representative transcript" chosen (1 per variant/annotation version) """
