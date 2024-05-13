@@ -86,12 +86,12 @@ class HealthCheckRecentActivity(HealthCheckStat):
     def as_html(self):
         amount_str = self.amount
         if self.amount:
-            amount_str = f"<b>{amount_str}</b>"
-        result = f"{amount_str} : {self.name}"
+            amount_str = f"<span class='health-value'>{amount_str}</span>"
+        result = f"{amount_str} {self.name}"
         if self.sub_type:
             result = f"{result} {self.sub_type}"
         if self.extra:
-            result = f"{result} : {self.extra}"
+            result = f"{result} {self.extra}"
         return result
 
     @classmethod
@@ -202,8 +202,8 @@ class HealthCheckTotalAmount(HealthCheckStat):
     def as_html(self):
         amount_str = self.amount
         if self.amount:
-            amount_str = f"<b>{amount_str:,}</b>"
-        result = f"{amount_str} : {self.name}"
+            amount_str = f"<span class='health-value'>{amount_str:,}</span>"
+        result = f"{amount_str} {self.name}"
         if self.extra:
             result = f"{result} - {self.extra}"
         return result
@@ -269,8 +269,8 @@ class HealthCheckAge(HealthCheckStat):
 
     def as_html(self):
         if not self.last_performed_tz:
-            return f"<b> Never Run </b> : {self.name}"
-        return f"<b> {self.age_in_days} </b> days old : {self.name}"
+            return f"<span class='health-value'>Never Run</span> {self.name}"
+        return f"<span class='health-value'><b>{self.age_in_days}</b> days old</span> {self.name}"
 
     _MULTIPLIER_TO_FACE = {
         0: ":simple_smile:",

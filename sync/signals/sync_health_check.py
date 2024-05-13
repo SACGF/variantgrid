@@ -11,14 +11,14 @@ from sync.models import SyncRun, SyncDestination, SyncStatus
 def sync_health_check(sender, health_request: HealthCheckRequest, **kwargs):
     # Report when each enabled sync run was last successfully performed
     responses: list[HealthCheckAge] = []
-    for sync_destination in SyncDestination.objects.filter(enabled=True):
+    for sync_destination in SyncDestination.objects.all():
         last_successful_sync_run = SyncRun.objects.filter(
                 destination=sync_destination,
                 status__in=(SyncStatus.SUCCESS, SyncStatus.NO_RECORDS)
         ).order_by('-created').values_list('created', flat=True).first()
         responses.append(
             HealthCheckAge(
-                name=sync_destination.name,
+                name="SYNC (" + sync_destination.name + ")" + (" *disabled*" if not sync_destination.enabled else ""),
                 now=health_request.now,
                 last_performed=last_successful_sync_run,
                 warning_age=timedelta(days=1)

@@ -6,16 +6,14 @@
 {% load english_tags %}
 {% load js_tags %}
 {% load static %}
-
 {% load classification_tags %}
 
-
 <div class="container">
-    <div class="card">
+    <div class="card health-check">
         <div class="card-header">Recent Activity</div>
         <div class="card-body">
             {% for line in dashboard_notices.recent_lines_with_previews %}
-                <b>{{ line.amount }}</b> : {{ line.name }} {% if line.sub_type %} {{ line.sub_type }} {% endif %} {% if line.extra %} - {{ line.extra }} {% endif %} <br>
+                <span class="health-value">{{ line.amount }}</span> {{ line.name }} {% if line.sub_type %} {{ line.sub_type }} {% endif %} {% if line.extra %} - {{ line.extra }} {% endif %} <br>
                 {% if line.preview|length >= 1 %}
                     {% modal id=modal_id label=line.name show_prefix=True %}
                         <div class="modal-body">
@@ -32,7 +30,7 @@
                                             <a class="toggle-link" data-toggle="collapse" href="#active-users{{ preview.obj | id_safe }}">View Events</a>
                                         </div>
 
-                                            {% user_view_events preview.obj dashboard_notices.days_ago as user_views %}
+                                        {% user_view_events preview.obj dashboard_notices.days_ago as user_views %}
 
                                     {% else %}
                                         <div class="col-5">
