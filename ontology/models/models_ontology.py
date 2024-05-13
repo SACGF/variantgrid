@@ -1068,7 +1068,7 @@ class OntologySnake:
             source_term__ontology_service=OntologyService.MONDO
         )
         terms = terms.union(set(mondos.values_list("source_term_id", flat=True)))
-        omim_ids = otr_qs.objects.filter(
+        omim_ids = otr_qs.filter(
             q_relation,
             dest_term=gene_ontology,
             source_term__ontology_service=OntologyService.OMIM
