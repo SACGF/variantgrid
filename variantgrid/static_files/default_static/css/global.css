@@ -2568,6 +2568,7 @@ a .c-hgvs-body .c-hgvs-nomen {
 }
 .c-pill.scs-none, .c-pill.cs-none {
   border: none !important;
+  background-color: #eeeeee;
 }
 .c-pill.scs-tier_1 {
   background-color: #ffcccc;

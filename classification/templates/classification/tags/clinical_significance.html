@@ -1,1 +1,1 @@
-<span class="cs cs-{{ key }}">{{ label }}</span>
+{% if skip %}{% else %}<span title="{{ title }}" class="d-inline-block c-pill {{css_class }}">{{ label }}</span>{% endif %}
