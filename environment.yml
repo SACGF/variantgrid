@@ -59,7 +59,7 @@ dependencies:
       - pysam==0.22.1
       - cdot==0.2.21
       - stream-zip==0.0.47
-      # - bgzip==0.4.0
+      # - bgzip==0.4.0 (using py-bgzip in conda instead)
       - Django==4.2.10
       - django-amazon-ses==4.0.1
       - django-storages==1.12.3
