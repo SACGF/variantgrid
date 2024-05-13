@@ -981,7 +981,7 @@ const VCForm = (function() {
                 let condition = this.value(SpecialEKeys.CONDITION);
                 let condition_url = Urls.condition_matching(this.conditionResolution);
 
-                if (this.isEditMode() && this.conditionMatchingIsViewEnabled) {
+                if (this.record.can_write && this.conditionMatchingIsViewEnabled) {
                     conditionElement = $('<a>', {href: condition_url , text: condition, class: 'hover-link', target: '_blank'});
                 } else {
                     conditionElement = $('<span>', { text: condition });
