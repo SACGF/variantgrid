@@ -50,6 +50,12 @@ input.narrow {
             </span>
             |
             <span class="fieldWrapper">
+                {{ form.complex_subsitution.errors }}
+                <label for="{{ form.complex_subsitution.id_for_label }}">complex sub:</label>
+                {{ form.complex_subsitution }}
+            </span>
+            |
+            <span class="fieldWrapper">
                 {{ form.structural_variants.errors }}
                 <label for="{{ form.structural_variants.id_for_label }}">Structural Variants:</label>
                 {{ form.structural_variants }}

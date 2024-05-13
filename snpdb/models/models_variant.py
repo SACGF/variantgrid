@@ -568,7 +568,7 @@ class Variant(PreviewModelMixin, models.Model):
 
     REFERENCE_ALT = "="
     _BASES = "GATC"
-    _REGEX_2_PLUS_BASES = f"^[GATC]{2,}$"
+    _REGEX_2_PLUS_BASES = "^[GATC]{2,}$"
 
     locus = models.ForeignKey(Locus, on_delete=CASCADE)
     alt = models.ForeignKey(Sequence, on_delete=CASCADE)
@@ -618,12 +618,11 @@ class Variant(PreviewModelMixin, models.Model):
 
     @staticmethod
     def get_complex_subsitution_q() -> Q:
-        regex_2_plus_bases = f"^[GATC]{2,}$"
-        return Q(locus__ref__seq__regex=regex_2_plus_bases) & Q(alt__seq__regex=regex_2_plus_bases)
+        return Q(locus__ref__seq__regex=Variant._REGEX_2_PLUS_BASES) & Q(alt__seq__regex=Variant._REGEX_2_PLUS_BASES)
 
     @staticmethod
     def get_symbolic_q() -> Q:
-        return Q(locus__ref__seq__startswith="<") & Q(alt__seq__startswith="<")
+        return Q(svlen__isnull=False)
 
     @staticmethod
     def annotate_variant_string(qs, name="variant_string", path_to_variant=""):

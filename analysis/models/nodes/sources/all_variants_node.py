@@ -74,10 +74,29 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
         return arg_q_dict
 
     def get_node_name(self):
-        name = ""
+        name_lines = []
         if self.gene_symbol:
-            name = self.gene_symbol_id
-        return name
+            name_lines.append(self.gene_symbol_id)
+
+        name_lookup = [
+            # Field to enable, on by default, name
+            (self.reference, False, "ref"),
+            (self.snps, True, "snps"),
+            (self.indels, True, "indels"),
+            (self.complex_subsitution, True, "complex sub"),
+            (self.structural_variants, True, "SVs"),
+        ]
+        name_description = []
+        all_default = True
+        for test, on_by_default, type_name in name_lookup:
+            all_default &= (test == on_by_default)
+            if test:
+                name_description.append(type_name)
+
+        if not all_default:
+            name_lines.append(f"(type: {', '.join(name_description)})")
+
+        return "\n".join(name_lines)
 
     @staticmethod
     def get_help_text() -> str:
