@@ -165,7 +165,8 @@ class AnalysisOutputNodeChoiceForm(forms.Form):
 class AllVariantsNodeForm(BaseNodeForm):
     class Meta:
         model = AllVariantsNode
-        fields = ('max_variant', "gene_symbol", "reference",
+        fields = ('max_variant', "gene_symbol",
+                  "reference", "snps", "indels", "complex_subsitution", "structural_variants",
                   "min_het_or_hom_count", "max_het_or_hom_count",
                   "min_unk_count", "max_unk_count", "min_ref_count", "max_ref_count",
                   "min_hom_count", "max_hom_count", "min_het_count", "max_het_count")

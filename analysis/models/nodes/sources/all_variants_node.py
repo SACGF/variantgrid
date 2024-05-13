@@ -1,4 +1,5 @@
-from functools import cached_property
+import operator
+from functools import cached_property, reduce
 from typing import Optional
 
 from django.db import models
@@ -15,6 +16,10 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
     max_variant = models.ForeignKey(Variant, null=True, on_delete=SET_NULL)
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, blank=True, on_delete=CASCADE)
     reference = models.BooleanField(default=False, blank=True)
+    snps = models.BooleanField(default=True, blank=True)
+    indels = models.BooleanField(default=True, blank=True)
+    complex_subsitution = models.BooleanField(default=True, blank=True)
+    structural_variants = models.BooleanField(default=True, blank=True)
     min_inputs = 0
     max_inputs = 0
 
@@ -43,19 +48,55 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
             q_gene = Q(variantgeneoverlap__gene__in=genes)
             q_dict[str(q_gene)] = q_gene
 
-        if not self.reference:
-            q_no_ref = Variant.get_no_reference_q()
-            q_dict[str(q_no_ref)] = q_no_ref
+        q_lookup = [
+            (self.reference, Variant.get_reference_q()),
+            (self.snps, Variant.get_snp_q()),
+            (self.indels, Variant.get_indel_q()),
+            (self.complex_subsitution, Variant.get_complex_subsitution_q()),
+            (self.structural_variants, Variant.get_symbolic_q()),
+        ]
+
+        filters = []
+        all_true = True
+        for test, q in q_lookup:
+            all_true &= test
+            if test:
+                filters.append(q)
+
+        if not all_true:
+            if filters:
+                q_dict["variant_types"] = reduce(operator.or_, filters)
+            else:
+                q_dict["empty"] = Q(pk__isnull=False)
 
         arg_q_dict = {None: q_dict}
         self.merge_arg_q_dicts(arg_q_dict, self.get_zygosity_count_arg_q_dict())
         return arg_q_dict
 
     def get_node_name(self):
-        name = ""
+        name_lines = []
         if self.gene_symbol:
-            name = self.gene_symbol_id
-        return name
+            name_lines.append(self.gene_symbol_id)
+
+        name_lookup = [
+            # Field to enable, on by default, name
+            (self.reference, False, "ref"),
+            (self.snps, True, "snps"),
+            (self.indels, True, "indels"),
+            (self.complex_subsitution, True, "complex sub"),
+            (self.structural_variants, True, "SVs"),
+        ]
+        name_description = []
+        all_default = True
+        for test, on_by_default, type_name in name_lookup:
+            all_default &= (test == on_by_default)
+            if test:
+                name_description.append(type_name)
+
+        if not all_default:
+            name_lines.append(f"(type: {', '.join(name_description)})")
+
+        return "\n".join(name_lines)
 
     @staticmethod
     def get_help_text() -> str:

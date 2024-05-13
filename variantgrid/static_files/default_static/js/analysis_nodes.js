@@ -512,11 +512,14 @@ function attachVariantCounters(nodes_selector, nodeCountTypes) {
 	const LOCK_SIZE = 16;
 	
 	nodes_selector.filter("[output_endpoint=true]").each(function() {
+		const jsplumb_attachment_height = 12;
+		const horizontal_padding = 6;
 		const counts_size = COUNTER_SIZE * nodeCountTypes.length;
 
 		const node_width = $(this).width();
 		const count_overlay = $("<div class='count-overlay'><span class='node-counts'></span></div>");
-		count_overlay.css({width: node_width + COUNTER_SIZE, height: $(this).height() + counts_size});
+		const counts_containment_height = counts_size + jsplumb_attachment_height;
+		count_overlay.css({width: node_width + COUNTER_SIZE + horizontal_padding, height: $(this).height() + counts_containment_height});
 		count_overlay.appendTo(this);
 		const node_counts = $(".node-counts", count_overlay);
 		node_counts.css({height: counts_size});
