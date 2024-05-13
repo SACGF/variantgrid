@@ -13,18 +13,17 @@ def variant_link_info(variant: Variant, genome_build: GenomeBuild) -> dict[str, 
     link_data['variant_string'] = str(variant)
     link_data['variant_svlen'] = variant.svlen
     link_data['genome_build'] = genome_build.name
-    link_data['canonical_c_hgvs'] = variant.get_canonical_c_hgvs(genome_build)
+
+    if cta := variant.get_canonical_transcript_annotation(genome_build):
+        link_data['canonical_c_hgvs'] = cta.get_hgvs_c_with_symbol()
+        link_data['gene_symbol'] = cta.symbol
 
     # If we can include these in link_data we'll get more links
     #
-    # SpecialEKeys.C_HGVS,
-    # SpecialEKeys.VARIANT_COORDINATE,
-    # SpecialEKeys.GENE_SYMBOL,
     # SpecialEKeys.REFSEQ_TRANSCRIPT_ID,
     # SpecialEKeys.P_HGVS,
     #
     # SpecialEKeys.CLINGEN_ALLELE_ID,
-    # SpecialEKeys.GENOME_BUILD,
     # SpecialEKeys.UNIPROT_ID,
     # SpecialEKeys.CLINVAR_VARIANTION_ID,
     # SpecialEKeys.HGNC_ID,
