@@ -8,7 +8,7 @@ channels:
   - anaconda
   - defaults
 dependencies:
-  - python=3.10
+  - python=3.11
   - pip
   - py-bgzip
   - setuptools=68.0
@@ -18,20 +18,20 @@ dependencies:
   - celery=5.2
   - configargparse=1.5
   - coreapi=2.3
-  - cyvcf2==0.30.16
+  - cyvcf2==0.30.28
   - htseq=2.0
   - ijson=3.1
   - ipython=8.15
   - kombu=5.3  # was kombu==5.2.3
   - levenshtein==0.21  # was levenshtein==0.20.9
   - markdown=3.2  # was 3.1
-  - matplotlib=3.5
+  - matplotlib=3.8.4
   - networkx=2.4
   - nltk=3.8  # was 3.7
   - numpy=1.25 # was 1.22
   - oauthlib=3.1
   - pandas=1.4
-  - psycopg2=2.9
+  - psycopg2=2.9.9
   - pypdf2=2.11  # was 2.6
   - pysam==0.21  # was 0.18
   - python-dateutil=2.8
@@ -48,12 +48,12 @@ dependencies:
   - pyspellchecker=0.6
   - pydantic=2.3.0
   - deepdiff=6.5.0
-  - gdal=3.7  # needed for geo
+  - gdal=3.9  # needed for geo
   - pip:
       - cdot==0.2.21
       - stream-zip==0.0.47
       # - bgzip==0.4.0
-      - Django==4.2.5
+      - Django==4.2.10
       - django-amazon-ses==4.0.1
       - django-storages==1.12.3
       - django_autocomplete_light==3.9.1
