@@ -180,6 +180,11 @@
         {% endif %}
 
         function alleleOriginToggle(filterValue) {
+            // default to showing all if filter value hasn't been picked up from a toggle
+            if (!filterValue) {
+                filterValue = "A";
+            }
+
             if (filterValue === "A") {
                 table.column(8).search("").draw();
             } else {
