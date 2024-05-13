@@ -12,12 +12,16 @@ def _new_ekey_testing_context(apps, _schema_editor):
         sub_label="Somatic",
         value_type="S",
         options=[
-            {"key": "solid tumor", "label": "Solid Tumour", "index": 1},
+            {"key": "solid_tumor", "label": "Solid Tumour", "index": 1},
             {"key": "haematology", "index": 2},
-            {"key": "non-cancer somatic", "label": "Non-Cancer Somatic", "index": 3}
+            {"key": "non_cancer_somatic", "label": "Non-Cancer Somatic", "index": 3}
         ],
         evidence_category="HT"
     )
+
+def _delete_new_ekey(apps, _schema_editor):
+    EvidenceKey = apps.get_model("classification", "EvidenceKey")
+    EvidenceKey.objects.filter(key="somatic:testing_context").delete()
 
 
 class Migration(migrations.Migration):
@@ -27,5 +31,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(_new_ekey_testing_context)
+        migrations.RunPython(_new_ekey_testing_context, _delete_new_ekey)
     ]
