@@ -214,20 +214,12 @@ def server_status(request):
             disk_free["status"] = "warning"
         disk_free["messages"].append(message)
 
-    total_counts = {
-        "classifications_shared": Classification.dashboard_total_shared_classifications(),
-        "classifications_unshared": Classification.dashboard_total_unshared_classifications()
-    }
-
     context = {
         "celery_workers": celery_workers,
         "queries": long_running_sql(0),
         "can_access_reference": can_access_reference,
-        "disk_free": disk_free,
         "highest_variant_annotated": highest_variant_annotated,
-        "sample_enrichment_kits_df": sample_enrichment_kits_df,
-        "total_counts": total_counts,
-        "sync_destination_reports": SyncDestination.get_reports()
+        "sample_enrichment_kits_df": sample_enrichment_kits_df
     }
     return render(request, "variantopedia/server_status.html", context)
 
@@ -266,7 +258,7 @@ def health_check_details(request):
             results.append(result)
 
     checks = flatten_nested_lists(results)
-    checks = sorted(checks, key=lambda hc: hc.sort_order())
+    checks = sorted(checks, key=lambda hc: (hc.sort_order(), hc.name if hasattr(hc, "name") else "z"))
     overall_lines = []
     for check in checks:
         line_content = check.as_html()

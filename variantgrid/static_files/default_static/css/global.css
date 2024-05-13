@@ -2615,4 +2615,15 @@ a .c-hgvs-body .c-hgvs-nomen {
   letter-spacing: 1px;
 }
 
+.health-check .health-value {
+  display: inline-block;
+  text-align: right;
+  min-width: 120px;
+  padding-right: 20px;
+  font-weight: 500;
+}
+.health-check .modal-link {
+  margin-left: 122px;
+}
+
 /*# sourceMappingURL=global.css.map */
