@@ -351,15 +351,16 @@ def _grid_item_to_vcf_record(info_dict, obj, sample_ids, sample_names):  # , get
 
     if sample_ids:
         for i, (sample_id, sample) in enumerate(zip(sample_ids, sample_names)):
-            ad = obj[f"{sample_id}_samples_allele_depth"]
-            zygosity = obj[f"{sample_id}_samples_zygosity"]
+            sample_prefix = f"sample_{sample_id}_samples"
+            ad = obj[f"{sample_prefix}_allele_depth"]
+            zygosity = obj[f"{sample_prefix}_zygosity"]
             gt = Zygosity.get_genotype_from_expanded_zygosity(zygosity)
-            dp = obj[f"{sample_id}_samples_read_depth"]
-            af = obj[f"{sample_id}_samples_allele_frequency"]
+            dp = obj[f"{sample_prefix}_read_depth"]
+            af = obj[f"{sample_prefix}_allele_frequency"]
             # GQ/PL/FT are optional now
             # TODO: Ideally, we'd not write them out
-            pl = obj.get(f"{sample_id}_samples_phred_likelihood", ".")
-            gq = obj.get(f"{sample_id}_samples_genotype_quality", ".")
+            pl = obj.get(f"{sample_prefix}_phred_likelihood", ".")
+            gq = obj.get(f"{sample_prefix}_genotype_quality", ".")
             # TODO: Need to grab information for reference base to be able to properly fill in this data.
             data_args = {'AD': ['.', ad],
                          'GT': gt,
