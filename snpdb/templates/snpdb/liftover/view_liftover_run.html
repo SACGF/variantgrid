@@ -26,6 +26,7 @@
             <div class="card-header">{{ liftover_run }}</div>
             <div class="card-body">
                 {% labelled label="Id" %}{{ liftover_run.pk }}{% endlabelled %}
+                {% labelled label="Run Date" %}{% timestamp liftover_run.created %}{% endlabelled %}
                 {% labelled label="Allele Source" %}
                     {% if liftover_run.allele_source %}
                         {{ liftover_run.get_allele_source }}
@@ -79,7 +80,9 @@
 
         {% if status_counts %}
             <!-- It's also possible to display all the variants linked via allele source?? -->
-            <table data-datatable-url="{% url 'allele_liftover_datatable' %}" data-datatable-data='datatableFilter' class="import-table sticky-header" responsive="true"></table>
+            <div class="mt-4">
+                <table data-datatable-url="{% url 'allele_liftover_datatable' %}" data-datatable-data='datatableFilter' class="import-table sticky-header" responsive="true"></table>
+            </div>
         {% endif %}
     </div>
 
