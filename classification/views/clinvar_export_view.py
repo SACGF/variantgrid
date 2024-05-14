@@ -562,7 +562,7 @@ def clinvar_export_create_batch(request: HttpRequest, clinvar_key_id: str) -> Ht
         # find the IDs that didn't exist for the lab
         found_ids = set(clinvar_export_qs.values_list('pk', flat=True).all())
         missing = sorted(all_ids - found_ids)
-        missing_str = ", ".join(missing)
+        missing_str = ", ".join(str(m) for m in missing)
         messages.add_message(request, level=messages.ERROR, message=f"Could not find some of the IDs for this ClinVarKey - not creating a batch. Missing IDs : {missing_str}")
     elif id_count == 0:
         messages.add_message(request, level=messages.ERROR, message=f"No IDs provided")
