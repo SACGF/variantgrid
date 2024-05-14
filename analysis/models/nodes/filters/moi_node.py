@@ -4,6 +4,7 @@ from datetime import date
 from functools import reduce
 from typing import Optional
 
+from auditlog.registry import auditlog
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.query_utils import Q
@@ -259,3 +260,6 @@ class MOINodeSubmitter(models.Model):
 
     class Meta:
         unique_together = ("node", "submitter")
+
+
+auditlog.register(MOINode)

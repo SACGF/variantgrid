@@ -2,6 +2,7 @@ import logging
 from functools import cached_property
 from typing import Optional
 
+from auditlog.registry import auditlog
 from django.db import models
 from django.db.models import Q
 from django.db.models.deletion import SET_NULL, CASCADE
@@ -260,3 +261,7 @@ class GeneListNodePanelAppPanel(models.Model):
             self.panel_app_panel_local_cache = get_panel_app_local_cache(self.panel_app_panel)
             self.save()
         return self.panel_app_panel_local_cache.get_gene_list(self.gene_list_node.min_panel_app_confidence)
+
+
+auditlog.register(GeneListNode)
+auditlog.register(GeneListNodeGeneList)

@@ -1,5 +1,6 @@
 from typing import Optional
 
+from auditlog.registry import auditlog
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
@@ -39,3 +40,6 @@ class SelectedInParentNode(AnalysisNode):
 class NodeVariant(models.Model):
     variant = models.ForeignKey(Variant, on_delete=CASCADE)
     node = models.ForeignKey(AnalysisNode, on_delete=CASCADE)
+
+
+auditlog.register(SelectedInParentNode)

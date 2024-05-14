@@ -1,5 +1,6 @@
 from typing import Optional
 
+from auditlog.registry import auditlog
 from django.db import models
 from django.db.models import Q
 
@@ -86,3 +87,6 @@ class BuiltInFilterNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Built In Filter"
+
+
+auditlog.register(BuiltInFilterNode)

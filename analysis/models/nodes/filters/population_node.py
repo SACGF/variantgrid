@@ -2,6 +2,7 @@ import operator
 from functools import reduce
 from typing import Optional
 
+from auditlog.registry import auditlog
 from cache_memoize import cache_memoize
 from django.db import models
 from django.db.models.deletion import CASCADE
@@ -272,3 +273,6 @@ class PopulationNode(AnalysisNode):
 class PopulationNodeGnomADPopulation(models.Model):
     population_node = models.ForeignKey(PopulationNode, on_delete=CASCADE)
     population = models.CharField(max_length=3, choices=GnomADPopulation.choices)
+
+
+auditlog.register(PopulationNode)

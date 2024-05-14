@@ -1,5 +1,6 @@
 from typing import Optional
 
+from auditlog.registry import auditlog
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models import SET_NULL
@@ -208,3 +209,6 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             patient_args = self.sample.patient.get_json_dict()
 
         return {"patient": patient_args}
+
+
+auditlog.register(SampleNode)

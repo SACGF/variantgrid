@@ -4,6 +4,7 @@ import operator
 from functools import cached_property, reduce
 from typing import Optional
 
+from auditlog.registry import auditlog
 from cache_memoize import cache_memoize
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
@@ -235,3 +236,6 @@ class PhenotypeNodeOntologyTerm(models.Model):
 
     class Meta:
         unique_together = ("phenotype_node", "ontology_term")
+
+
+auditlog.register(PhenotypeNode)
