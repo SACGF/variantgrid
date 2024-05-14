@@ -563,8 +563,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @property
     def condition_text_record(self) -> 'ConditionText':
-        if ctm := self.conditiontextmatch:
-            return ctm.condition_text
+        try:
+            if ctm := self.conditiontextmatch:
+                return ctm.condition_text
+        except Classification.conditiontextmatch.RelatedObjectDoesNotExist:
+            pass
         return None
 
     @property
