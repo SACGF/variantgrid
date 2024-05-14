@@ -1,27 +1,29 @@
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta, datetime, date
 from typing import Iterator
-
 from dateutil.tz import gettz
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import Q, Min
-
+from django.db.models import Q, Min, QuerySet
 from eventlog.models import ViewEvent
 from library.django_utils import require_superuser
 from library.utils import ExportRow, export_column
 
 
+class ReportKeys:
+    SEARCHES = "searches"
+    ALLELES = "alleles"
+    GENE_SYMBOLS = "gene_symbols"
+    CLASSIFICATIONS = "classifications"
+
+
 @dataclass
-class ReportDataRow(ExportRow):
+class UserActivitiesRow(ExportRow):
     date: date
-    users: int
-    search_counts: int
-    allele_counts: int
-    gene_symbols_counts: int
-    classification_counts: int
-    overall_activity: int
+    unique_users: set[int] = field(default_factory=set)
+    view_counts: dict = field(default_factory=lambda: defaultdict(int))
+    overall_activity: int = 0
 
     @export_column(label="Date")
     def date_column(self) -> date:
@@ -29,23 +31,23 @@ class ReportDataRow(ExportRow):
 
     @export_column(label="Users")
     def user_column(self) -> int:
-        return self.users
+        return len(self.unique_users)
 
-    @export_column(label="Number of Searches")
+    @export_column(label="Searches")
     def searches_column(self) -> int:
-        return self.search_counts
+        return self.view_counts[ReportKeys.SEARCHES]
 
     @export_column(label="Alleles Viewed")
     def alleles_viewed_column(self) -> int:
-        return self.allele_counts
+        return self.view_counts[ReportKeys.ALLELES]
 
     @export_column(label="Gene Symbols Viewed")
     def gene_symbols_viewed_column(self) -> int:
-        return self.gene_symbols_counts
+        return self.view_counts[ReportKeys.GENE_SYMBOLS]
 
     @export_column(label="Classifications Viewed")
     def classifications_viewed_column(self) -> int:
-        return self.classification_counts
+        return self.view_counts[ReportKeys.CLASSIFICATIONS]
 
     @export_column(label="Overall Activity")
     def overall_activity_column(self) -> int:
@@ -56,68 +58,60 @@ def week_start_date(freq: datetime.date) -> datetime.date:
     return freq - timedelta(days=date.weekday(freq))
 
 
-def stream_report_rows(interval) -> Iterator[ReportDataRow]:
+_VIEW_NAMES_TO_KEYS = {
+    'variantopedia:search': ReportKeys.SEARCHES,
+    'variantopedia:view_allele': ReportKeys.ALLELES,
+    'genes:view_gene_symbol': ReportKeys.GENE_SYMBOLS,
+    'classification:view_classification': ReportKeys.CLASSIFICATIONS,
+}
 
-    # start_of_time_period = datetime.now() - timedelta(days=365)
-    latest_created_date = ViewEvent.objects.aggregate(Min('created'))['created__min']
-    start_of_time_period = latest_created_date.date()
-    report_data = defaultdict(lambda: {'users': set(), 'search_count': 0, 'allele_count': 0,
-                                       'gene_symbol_count': 0, 'classification_count': 0,
-                                       'overall_activity': 0})
+
+def stream_user_activity_rows(interval: timedelta) -> Iterator[UserActivitiesRow]:
+    """
+    Returns a generator of UserActivitiesRow used for making a CSV report on how much the product was used per interval
+    Excludes admins, bots, testers from metrics
+    :param interval: A timedelta describing how big the rows should be - should typically be 1 or 7
+    """
+
+    start_of_time_period = ViewEvent.objects.order_by('created').first().created.date()
+    if interval.days > 1:
+        # if we're reporting weekly, start on a Monday
+        start_of_time_period = start_of_time_period - timedelta(days=start_of_time_period.weekday())
+    report_end = start_of_time_period + interval
+    report_data = UserActivitiesRow(
+        date=start_of_time_period
+    )
+
+    # don't include tests, bots or admins in report
     excluded_users = User.objects.filter(
-        Q(is_superuser=True) | Q(groups__name__in={'variantgrid/tester', 'variantgrid/bot'}))
+        Q(is_superuser=True) | Q(groups__name__in={'variantgrid/tester', 'variantgrid/bot'})
+    )
 
-    metrics_definitions = [
-        ('variantopedia:search', 'search_count', ~Q(args__search="")),
-        ('variantopedia:view_allele', 'allele_count'),
-        ('genes:view_gene_symbol', 'gene_symbol_count', ~Q(args__gene_symbol="")),
-        ('classification:view_classification', 'classification_count'),
-        ('', 'overall_activity'),
-    ]
+    # exclude blank searches (which is the user going to advanced search) as well as the
+    # occasionally blank gene symbol when viewing a gene symbol (caused by admins putting in bad URL data tpyically)
+    ve_qs = ViewEvent.objects.all()\
+        .exclude(user__in=excluded_users)\
+        .exclude(Q(view_name='genes:variantopedia:search') & Q(args__search=""))\
+        .exclude(Q(view_name='genes:view_gene_symbol') & Q(args__gene_symbol="")) \
+        .order_by('created')
 
     ve: ViewEvent
-    for view_name, key, *extra_filters in metrics_definitions:
-        if view_name == '':
-            metric_data = ViewEvent.objects.filter(
-                created__gte=start_of_time_period
-            ).exclude(user__in=excluded_users)
-        else:
-            metric_data = ViewEvent.objects.filter(
-                created__gte=start_of_time_period,
-                view_name=view_name
-            ).exclude(user__in=excluded_users)
+    for ve in ve_qs.iterator():
+        while ve.created.date() >= report_end:
+            # cycle through report data dates until we have a report data interval for the current view event
+            yield report_data
+            report_data = UserActivitiesRow(date=report_end)
+            report_end = report_end + interval
 
-        if extra_filters:
-            metric_data = metric_data.filter(*extra_filters)
-        for ve in metric_data.iterator():
-            created_dt: datetime = ve.created
-            the_date = created_dt.astimezone(gettz(settings.TIME_ZONE)).date()
-            if interval != 1:
-                the_date = week_start_date(the_date)
+        # if the view event is for a specific page type, increment the count
+        if view_key := _VIEW_NAMES_TO_KEYS.get(ve.view_name):
+            report_data.view_counts[view_key] += 1
 
-            if user_id := ve.user_id:
-                report_dict = report_data[the_date]
-                report_dict["users"].add(user_id)
-                report_dict[key] += 1
-
-    current_date = week_start_date(start_of_time_period)
-    today = datetime.now().date()
-
-    while current_date <= today:
-        data = report_data.get(current_date, {'users': set(), 'search_count': 0, 'allele_count': 0,
-                                              'gene_symbol_count': 0, 'classification_count': 0,
-                                              'overall_activity': 0})
-        user_count = len(data['users'])
-        searches = data['search_count']
-        allele_count = data['allele_count']
-        gene_symbol_count = data['gene_symbol_count']
-        classification_count = data['classification_count']
-        overall_activity = data['overall_activity']
-        yield ReportDataRow(date=current_date, users=user_count, search_counts=searches,
-                            allele_counts=allele_count, gene_symbols_counts=gene_symbol_count,
-                            classification_counts=classification_count,
-                            overall_activity=overall_activity)
-        current_date += timedelta(days=(1 if interval == 1 else 7))
+        # if the view had a user (nearly all of them should) record the user_id and increment overall activity
+        if user_id := ve.user_id:
+            report_data.overall_activity += 1
+            report_data.unique_users.add(user_id)
+    yield report_data
 
 
 @require_superuser
@@ -125,5 +119,7 @@ def download_search_data(request):
     frequency = 1
     if frequency_param := request.GET.get('frequency'):
         frequency = int(frequency_param)
-    return ReportDataRow.streaming_csv(stream_report_rows(frequency),
-                                       filename="search_data.csv")
+    return UserActivitiesRow.streaming_csv(
+        stream_user_activity_rows(timedelta(days=frequency)),
+        filename="search_data.csv"
+    )
