@@ -6,7 +6,13 @@
 {% load ui_help %}
 {% load ui_menu_bars %}
 {% block title %}Liftover{% endblock %}
-{% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
+{% block submenu %}
+{% if 'variants'|is_view_enabled %}
+    {% menu_bar_variants %}
+{% else %}
+    {% menu_bar_settings %}
+{% endif %}
+{% endblock submenu %}
 {% block content %}
     <div class="container">
         <h3>Alleles</h3>
