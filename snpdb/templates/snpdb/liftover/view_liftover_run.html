@@ -20,32 +20,32 @@
     </div>
 
     <div class="container" style="position:relative">
-        <a href="{% url 'liftover_runs' %}">Back to liftover runs...</a>
+        <a class="link-back" href="{% url 'liftover_runs' %}">Back to liftover runs...</a>
 
         <div class="card">
             <div class="card-header">{{ liftover_run }}</div>
             <div class="card-body">
-                {% labelled hint="tiny" label="Id" %}{{ liftover_run.pk }}{% endlabelled %}
-                {% labelled hint="tiny" label="Allele Source" %}
+                {% labelled label="Id" %}{{ liftover_run.pk }}{% endlabelled %}
+                {% labelled label="Allele Source" %}
                     {% if liftover_run.allele_source %}
                         {{ liftover_run.get_allele_source }}
                     {% endif %}
                 {% endlabelled %}
-                {% labelled hint="tiny" label="Conversion Tool" %}{{ liftover_run.get_conversion_tool_display }}{% endlabelled %}
-                {% labelled hint="tiny" label="Source VCF" %}{{ liftover_run.source_vcf }}{% endlabelled %}
-                {% labelled hint="tiny" label="Source Build" %}{{ liftover_run.source_genome_build }}{% endlabelled %}
-                {% labelled hint="tiny" label="(Dest) Build" %}{{ liftover_run.genome_build }}{% endlabelled %}
+                {% labelled label="Conversion Tool" %}{{ liftover_run.get_conversion_tool_display }}{% endlabelled %}
+                {% labelled label="Source VCF" %}{{ liftover_run.source_vcf }}{% endlabelled %}
+                {% labelled label="Source Build" %}{{ liftover_run.source_genome_build }}{% endlabelled %}
+                {% labelled label="(Dest) Build" %}{{ liftover_run.genome_build }}{% endlabelled %}
             </div>
         </div>
 
-        <div class="card">
+        <div class="card mt-4">
             <div class="card-header">Upload Processing</div>
             <div class="card-body">
                 {% with up=liftover_run.uploadedliftover.uploaded_file.uploadpipeline %}
                     {% if up %}
                         <a href="{% url 'view_upload_pipeline' upload_pipeline_id=up.pk %}">View upload processing</a>
-                        {% labelled hint="tiny" label="Status" %}{{ up.get_status_display }}{% endlabelled %}
-                        {% labelled hint="tiny" label="Items processed" %}{{ up.items_processed }}{% endlabelled %}
+                        {% labelled label="Status" %}{{ up.get_status_display }}{% endlabelled %}
+                        {% labelled label="Items processed" %}{{ up.items_processed }}{% endlabelled %}
 
                         {% with up_errors=up.get_errors  %}
                             {% if up_errors %}
@@ -64,27 +64,23 @@
             </div>
         </div>
 
-        <div class="card">
+        <div class="card mt-4">
             <div class="card-header">Allele liftover Statuses</div>
             <div class="card-body">
                 {% if status_counts %}
-                    <table>
-                        {% for status, count in status_counts.items %}
-                            {% labelled hint="tiny" label=status %}{{ count }}{% endlabelled %}
-                        {% endfor %}
-                    </table>
+                    {% for status, count in status_counts.items %}
+                        {% labelled label=status %}{{ count }}{% endlabelled %}
+                    {% endfor %}
                 {% else %}
                     No linked allele liftovers
                 {% endif %}
             </div>
         </div>
+
+        {% if status_counts %}
+            <!-- It's also possible to display all the variants linked via allele source?? -->
+            <table data-datatable-url="{% url 'allele_liftover_datatable' %}" data-datatable-data='datatableFilter' class="import-table sticky-header" responsive="true"></table>
+        {% endif %}
     </div>
-
-
-    {% if status_counts %}
-        <!-- It's also possible to display all the variants linked via allele source?? -->
-        <table data-datatable-url="{% url 'allele_liftover_datatable' %}" data-datatable-data='datatableFilter' class="import-table sticky-header" responsive="true"></table>
-    {% endif %}
-
 
 {% endblock %}

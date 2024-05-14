@@ -87,23 +87,27 @@
                             {% labelled label="Allele Linked Via" %}{{ vc.variant_allele.get_allele_linking_tool_display }}{% endlabelled %}
 
                             {% if vc.allele_liftover_qs.exists %}
-                                <table>
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Tool</th>
-                                        <th>Status</th>
-                                        <th>Liftover Run</th>
-                                        <th>Error</th>
-                                    </tr>
-                                {% for allele_liftover in vc.allele_liftover_qs %}
-                                    <tr>
-                                        <td>{% timestamp allele_liftover.liftover.created %}</td>
-                                        <td>{{ allele_liftover.liftover.get_conversion_tool_display }}</td>
-                                        <td>{{ allele_liftover.get_status_display }}</td>
-                                        <td><a href="{{ allele_liftover.liftover.get_absolute_url }}">View LiftoverRun {{ allele_liftover.liftover_id }}</a></a></td>
-                                        <td>{{ allele_liftover.error }}</td>
-                                    </tr>
-                                {% endfor %}
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Tool</th>
+                                            <th>Status</th>
+                                            <th>Liftover Run</th>
+                                            <th>Error</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for allele_liftover in vc.allele_liftover_qs %}
+                                            <tr>
+                                                <td>{% timestamp allele_liftover.liftover.created %}</td>
+                                                <td>{{ allele_liftover.liftover.get_conversion_tool_display }}</td>
+                                                <td>{{ allele_liftover.get_status_display }}</td>
+                                                <td><a href="{{ allele_liftover.liftover.get_absolute_url }}">View LiftoverRun {{ allele_liftover.liftover_id }}</a></a></td>
+                                                <td>{{ allele_liftover.error }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
                                 </table>
                             {% endif %}
 
