@@ -555,7 +555,9 @@ function enhanceAndMonitor() {
 function cardToModal(content) {
     let modalContentDiv = content.closest('.modal-content');
     if (modalContentDiv.length) {
-        if (content.find('.card')) {
+        console.log("Looking to convert card to modal");
+        if (content.find('.card .modalable')) {
+            console.log("Converting to card to modal");
             content.find('.card').removeClass('card');
             let cardHeader = content.find(".card-header");
             let h5 = $("<h5>", {"class": "modal-title"}).append(cardHeader.contents());
@@ -606,7 +608,7 @@ function loadAjaxModal(linkDom, size) {
     let modalDialog = modalContent.modal({focus:true, show:false});
 
     loadAjaxBlock(content, url).then(() => {
-        if (content.find('.card').length) {
+        if (content.find('.modalable').length == 1) {
             modalContentDiv.children().detach();
             content.appendTo(modalContentDiv);
             cardToModal(modalContentDiv);

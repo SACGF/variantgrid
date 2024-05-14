@@ -97,7 +97,7 @@ class LazyRender(Generic[T]):
             )
         else:
             return (
-                '<div class="card">',
+                '<div class="card modalable">',
                 mode,  # could be Modal or Card
                 '</div>'
             )
