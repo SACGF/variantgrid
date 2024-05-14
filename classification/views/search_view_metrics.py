@@ -2,10 +2,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import timedelta, datetime, date
 from typing import Iterator
-from dateutil.tz import gettz
-from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import Q, Min, QuerySet
+from django.db.models import Q
 from eventlog.models import ViewEvent
 from library.django_utils import require_superuser
 from library.utils import ExportRow, export_column
@@ -87,8 +85,8 @@ def stream_user_activity_rows(interval: timedelta) -> Iterator[UserActivitiesRow
         Q(is_superuser=True) | Q(groups__name__in={'variantgrid/tester', 'variantgrid/bot'})
     )
 
-    # exclude blank searches (which is the user going to advanced search) as well as the
-    # occasionally blank gene symbol when viewing a gene symbol (caused by admins putting in bad URL data tpyically)
+    # exclude blank searches (which is the user going to the advanced search) as well as the
+    # occasionally blank gene symbol when viewing a gene symbol (caused by admins putting in bad URL data typically)
     ve_qs = ViewEvent.objects.all()\
         .exclude(user__in=excluded_users)\
         .exclude(Q(view_name='genes:variantopedia:search') & Q(args__search=""))\
