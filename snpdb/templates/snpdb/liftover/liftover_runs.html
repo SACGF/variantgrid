@@ -15,54 +15,58 @@
 {% endblock submenu %}
 {% block content %}
     <div class="container">
-        <h3>Liftover Stats</h3>
+        <h4>Liftover Stats</h4>
 
         <p class="text-info">Note: We only run some tools after others have failed</p>
         <table class="table">
-            <tr>
-                <th>Tool</th>
-            {% for pc in processing_status_cols %}
-                <th>{{ pc.label }}</th>
-            {% endfor %}
-                <th>Failure %</th>
-            </tr>
-
-        {% for act, data in tool_status.items %}
-            <tr>
-                <td>{{ act }}</td>
-            {% for pc in processing_status_cols %}
-                <td>{{ data|get_item:pc|default_if_none:0 }}</td>
-            {% endfor %}
-                <td>{{ failure_rate|get_item:act|default_if_none:'-'|floatformat:2 }}</td>
-            </tr>
-        {% endfor %}
+            <thead>
+                <tr>
+                    <th>Tool</th>
+                    {% for pc in processing_status_cols %}
+                        <th>{{ pc.label }}</th>
+                    {% endfor %}
+                    <th>Failure %</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for act, data in tool_status.items %}
+                    <tr>
+                        <th>{{ act }}</th>
+                        {% for pc in processing_status_cols %}
+                            <td>{{ data|get_item:pc|default_if_none:0 }}</td>
+                        {% endfor %}
+                        <td>{{ failure_rate|get_item:act|default_if_none:'-'|floatformat:2 }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
         </table>
-    </div>
 
-    <div class="container">
-        <h3>Alleles</h3>
+        <h4>Alleles Missing Variants</h4>
         <form method="post">
             {% csrf_token %}
 
-            <table>
-            {% for genome_build_name, count in alleles_missing_variants.items %}
-                <tr>
-                    <th>Alleles missing {{ genome_build_name }} variants: </th>
-                    <td>{{ count }}</td>
-                    <td>{% if count %}<button name="liftover_to_{{ genome_build_name }}" class="btn btn-secondary">Liftover variants</button>{% endif %}</td>
-                </tr>
-            {% endfor %}
+            <table class="table">
+                <thead>
+                    <th>Genome Build</th>
+                    <th class="num">Missing Count</th>
+                    <th>Action</th>
+                </thead>
+                <tbody>
+                    {% for genome_build_name, count in alleles_missing_variants.items %}
+                        <tr>
+                            <th>{{ genome_build_name }}</th>
+                            <th class="num">{{ count }}</th>
+                            <td>{% if count %}<button name="liftover_to_{{ genome_build_name }}" class="btn btn-secondary">Liftover variants</button>{% endif %}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
             </table>
         </form>
-    </div>
 
-    <div class="container">
-        <h3>Liftover Runs</h3>
+        <h4>Liftover Runs</h4>
 
         <table id="liftover-datatable" data-datatable-url="{% url 'liftover_runs_datatable' %}" class="sticky-header responsive"></table>
-    </div>
 
-    <div class="container">
         {% for genome_build in genome_builds %}
             <script>
                 function datatableFilter{{ genome_build.name }}(data) {
@@ -70,14 +74,9 @@
                 }
             </script>
 
-            <h3>Failed Liftover to {{ genome_build }}</h3>
-
+            <h4>Failed Liftover to {{ genome_build }}</h4>
             <table data-datatable-url="{% url 'allele_liftover_failures_datatable' %}" data-datatable-data='datatableFilter{{ genome_build.name }}' class="import-table sticky-header" responsive="true"></table>
 
         {% endfor %}
     </div>
-
-
 {% endblock %}
-
-
