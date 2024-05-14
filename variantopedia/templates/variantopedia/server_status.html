@@ -60,21 +60,25 @@
 	<div class="container">
         <h3>Server Status</h3>
         {% ui_register_tab_embedded tab_set="server_status" label="Server Status" %}
-            <h4>Sequencing</h4>
-
-            {% if seqauto_enabled %}
-            <div>
-            {% sample_enrichment_kits_graph sample_enrichment_kits_df 'Samples By Month' "month_offset" %}
-            </div>
-            {% endif %}
-
-            {% if not can_access_reference %}
-            <div id="reference-check">
-                <b>Reference:</b> <span class="status-check error">Can't access reference directory.</span>
-            </div>
-            {% endif %}
 
             {% labelled id="highest_variant" label="Highest Variant Annotated w/latest" %}<div class="alert alert-{{ highest_variant_annotated.status }}">{{ highest_variant_annotated.message }}</div>{% endlabelled %}
+
+            {% if seqauto_enabled or not can_access_reference %}
+                <a class='toggle-link' data-toggle="collapse" href="#sequencing">Toggle Sequencing Stats</a>
+                <div id="sequencing" class="collapse">
+                    {% if seqauto_enabled %}
+                        <div>
+                        {% sample_enrichment_kits_graph sample_enrichment_kits_df 'Samples By Month' "month_offset" %}
+                        </div>
+                    {% endif %}
+
+                    {% if not can_access_reference %}
+                        <div id="reference-check">
+                            <b>Reference:</b> <span class="status-check error">Can't access reference directory.</span>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
 
             {% if queries %}
                 <form method="POST" id="kill-query">
@@ -126,12 +130,13 @@
                 {% endfor %}
             {% endif %}
 
+            <div data-toggle="ajax" href="{% url 'health_check_details' %}"></div>
+
         {% end_ui_register_tab_embedded %}
 
         {% ui_register_tab url="view_upload_stats_detail" url_check=True label="Upload Stats" tab_set="server_status" %}
         {% ui_register_tab url="database_statistics_detail" label="Database Graphs" tab_set="server_status" %}
         {% ui_register_tab url='server_status_settings_detail' label="Settings" tab_set="server_status" %}
-        {% ui_register_tab url="health_check_details" label="Overall Statistics" tab_set="server_status" %}
         {% ui_register_tab url="server_status_activity_detail" param=1 label="Activity 24 hours" tab_set="server_status" %}
         {% ui_register_tab url="server_status_activity_detail" param=2 label="Activity 48 hours" tab_set="server_status" %}
         {% ui_register_tab url="server_status_activity_detail" param=30 label="Activity 30 days" tab_set="server_status" %}
