@@ -89,7 +89,7 @@ def stream_user_activity_rows(interval: timedelta) -> Iterator[UserActivitiesRow
     # occasionally blank gene symbol when viewing a gene symbol (caused by admins putting in bad URL data typically)
     ve_qs = ViewEvent.objects.all()\
         .exclude(user__in=excluded_users)\
-        .exclude(Q(view_name='genes:variantopedia:search') & Q(args__search=""))\
+        .exclude(Q(view_name='variantopedia:search') & Q(args__search=""))\
         .exclude(Q(view_name='genes:view_gene_symbol') & Q(args__gene_symbol="")) \
         .order_by('created')
 
