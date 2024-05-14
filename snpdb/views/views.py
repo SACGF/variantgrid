@@ -72,8 +72,8 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
     VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, SampleStats, \
-    SampleStatsPassingFilter, TagColorsCollection, Contig, LiftoverRun, Allele
-from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, SequenceRole
+    SampleStatsPassingFilter, TagColorsCollection, Contig, LiftoverRun, Allele, AlleleLiftover
+from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, SequenceRole, AlleleConversionTool
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.tasks.liftover_tasks import liftover_alleles
@@ -1516,9 +1516,31 @@ def liftover_runs(request):
     for genome_build in genome_builds:
         alleles_missing_variants[genome_build.name] = Allele.missing_variants_for_build(genome_build).count()
 
+    qs_allele_liftover = AlleleLiftover.objects.all()
+
+    tool_status = {}
+    failure_rate = {}
+    for act in AlleleConversionTool:
+        qs_act = qs_allele_liftover.filter(liftover__conversion_tool=act)
+        if act_data := get_field_counts(qs_act, "status"):
+            tool_status[act.label] = {ProcessingStatus(k): v for k, v in act_data.items()}
+            num_error = act_data.get(ProcessingStatus.ERROR, 0)
+            num_success = act_data.get(ProcessingStatus.SUCCESS, 0)
+            total = num_error + num_success
+            if total:
+                failure_rate[act.label] = 100.0 * num_error / total
+
+    used_states = set()
+    for s in [d.keys() for d in tool_status.values()]:
+        used_states.update(s)
+
+    processing_status_cols = [ps for ps in ProcessingStatus if ps in used_states]  # In ProcessingStatus order
     context = {
         "genome_builds": genome_builds,
         "alleles_missing_variants": alleles_missing_variants,
+        "processing_status_cols": processing_status_cols,
+        "tool_status": tool_status,
+        "failure_rate": failure_rate,
     }
 
     return render(request, "snpdb/liftover/liftover_runs.html", context)
