@@ -483,14 +483,14 @@ class LiftoverRunColumns(DatatableConfig[LiftoverRun]):
             # Don't bother with modified as always same time as created
             # RichColumn(key='allele_source', orderable=True),
             RichColumn(key='conversion_tool', renderer=self.render_conversion_tool, orderable=True),
-            RichColumn(key='num_alleles', label='Num Alleles', orderable=True),
-            RichColumn(key='source_vcf', orderable=True),
+            RichColumn(key='num_alleles', label='Num Alleles', orderable=True, css_class="num"),
+            RichColumn(key='source_vcf', orderable=True, css_class="formatted-text"),
             RichColumn(key='source_genome_build', label='Source Build', orderable=True),
             RichColumn(key='genome_build', label='Dest Build', orderable=True),
             RichColumn(key="uploadedliftover__uploaded_file__uploadpipeline__status",
                        label='Status', renderer=self.render_import_status, orderable=True),
             RichColumn(key="uploadedliftover__uploaded_file__uploadpipeline__items_processed",
-                       label='Processed', orderable=True),
+                       label='Processed', orderable=True, css_class="num"),
         ]
 
     def render_conversion_tool(self, row: dict[str, Any]) -> JsonDataType:

@@ -14,6 +14,11 @@
 {% endif %}
 {% endblock submenu %}
 {% block content %}
+    <style>
+        .import-table td {
+            width: 25%;
+        }
+    </style>
     <div class="container">
         <h4>Liftover Stats</h4>
 
@@ -23,7 +28,7 @@
                 <tr>
                     <th>Tool</th>
                     {% for pc in processing_status_cols %}
-                        <th>{{ pc.label }}</th>
+                        <th class="num">{{ pc.label }}</th>
                     {% endfor %}
                     <th>Failure %</th>
                 </tr>
@@ -33,9 +38,9 @@
                     <tr>
                         <th>{{ act }}</th>
                         {% for pc in processing_status_cols %}
-                            <td>{{ data|get_item:pc|default_if_none:0 }}</td>
+                            <td class="num">{{ data|get_item:pc|default_if_none:0 }}</td>
                         {% endfor %}
-                        <td>{{ failure_rate|get_item:act|default_if_none:'-'|floatformat:2 }}</td>
+                        <td class="num">{{ failure_rate|get_item:act|default_if_none:'-'|floatformat:2 }}</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -74,9 +79,10 @@
                 }
             </script>
 
-            <h4>Failed Liftover to {{ genome_build }}</h4>
-            <table data-datatable-url="{% url 'allele_liftover_failures_datatable' %}" data-datatable-data='datatableFilter{{ genome_build.name }}' class="import-table sticky-header" responsive="true"></table>
-
+            <div style="margin-top: 60px">
+                <h4>Failed Liftover to {{ genome_build }}</h4>
+                <table data-datatable-url="{% url 'allele_liftover_failures_datatable' %}" data-datatable-data='datatableFilter{{ genome_build.name }}' class="import-table sticky-header" responsive="true"></table>
+            </div>
         {% endfor %}
     </div>
 {% endblock %}
