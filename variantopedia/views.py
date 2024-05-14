@@ -609,8 +609,6 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
         "vts": vts,
-        "quick_links_allow_list": settings.VARIANT_DETAILS_QUICK_LINKS_ALLOW_LIST,
-        "quick_links_block_list": settings.VARIANT_DETAILS_QUICK_LINKS_BLOCK_LIST,
     }
     if extra_context:
         context.update(extra_context)

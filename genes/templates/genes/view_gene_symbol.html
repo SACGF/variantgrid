@@ -110,18 +110,27 @@
         }
 
         $(document).ready(() => {
-            let tableDom = $('#vc-datatable');
-            if (tableDom.length) {
-                EKeys.load().then(() => {
-                    {% if not classifications_new_grouping %}
-                        {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='classification_datatables' data='classificationFilter' hide_filter_count=True %};
-                        let vcDatatable = $('#vc-datatable');
-                        vcDatatable.on('draw.dt', () => {
-                            Flags.instance.init({userId: '{{user.id}}'});
-                        });
-                    {% endif %}
-                });
-            }
+            EKeys.load().then(eKeys => {
+                {% if not classifications_new_grouping %}
+                    {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='classification_datatables' data='classificationFilter' hide_filter_count=True %};
+                    let vcDatatable = $('#vc-datatable');
+                    vcDatatable.on('draw.dt', () => {
+                        Flags.instance.init({userId: '{{user.id}}'});
+                    });
+                {% endif %}
+
+                {% settings_value 'VARIANT_DETAILS_QUICK_LINKS_ALLOW_LIST' as quick_links_allow_list %}
+                {% settings_value 'VARIANT_DETAILS_QUICK_LINKS_BLOCK_LIST' as quick_links_block_list %}
+                const allowList = {{ quick_links_allow_list | jsonify }};
+                const blockList = {{ quick_links_block_list | jsonify }};
+                let vcLinks = new VCLinks(eKeys);
+                let links = vcLinks.generateLinks({gene_symbol: "{{gene_symbol}}"});
+                links = vcLinks.filterLinks(links, false, allowList, blockList);
+
+                let geneLinks = links.filter(link => link.geneLink);
+                let geneAnchors = geneLinks.map(link => link.asAnchor("bootstrap"));
+                $('#gene-quick-links').html($("<ul>", {class:"list-group", html:geneAnchors}));
+            });
 
             {% if show_classifications_hotspot_graph %}
                 load_classifications_hotspot_graph("{{ gene_symbol }}");
@@ -246,6 +255,8 @@
 
                         <a class="toggle-link" data-toggle="collapse" href="#more-external-ids">Show external IDs...</a>
                         <div id="more-external-ids" class="collapse">
+                            {% labelled id="gene-quick-links" label="Quick Links" %}Loading...{% endlabelled %}
+
                             {% if hgnc.ccds_list %}
                                 {% labelled label="CCDS" help=annotation_description.ccds_ids %}
                                     {% for ccds_id in hgnc.ccds_list %}
