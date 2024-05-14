@@ -208,7 +208,7 @@ class DiscordanceReportTemplateData:
             no_longer_considered.append(DiscordanceNoLongerConsiders("Un-matched", unmatched))
         for key in changed_context.keys():
             no_longer_considered.append(
-                DiscordanceNoLongerConsiders(f"Changed context to {key.name}", changed_context[key]))
+                DiscordanceNoLongerConsiders(f"Changed Context to \"{key.name_pretty}\" (no longer considered for this discordance)", changed_context[key]))
 
         return effectives, no_longer_considered
 

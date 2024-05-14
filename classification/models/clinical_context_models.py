@@ -321,7 +321,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
     @property
     def name_pretty(self):
         if self.name == ClinicalContext.default_name:
-            return self.allele_origin_bucket.label
+            return self.get_allele_origin_bucket_display()
         else:
             return self.name
 
