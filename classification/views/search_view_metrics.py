@@ -16,7 +16,7 @@ from library.utils import ExportRow, export_column
 @dataclass
 class ReportDataRow(ExportRow):
     date: date
-    user: int
+    users: int
     search_counts: int
     allele_counts: int
     gene_symbols_counts: int
@@ -27,9 +27,9 @@ class ReportDataRow(ExportRow):
     def date_column(self) -> date:
         return self.date
 
-    @export_column(label="User")
+    @export_column(label="Users")
     def user_column(self) -> int:
-        return self.user
+        return self.users
 
     @export_column(label="Number of Searches")
     def searches_column(self) -> int:
@@ -107,13 +107,13 @@ def stream_report_rows(interval) -> Iterator[ReportDataRow]:
         data = report_data.get(current_date, {'users': set(), 'search_count': 0, 'allele_count': 0,
                                               'gene_symbol_count': 0, 'classification_count': 0,
                                               'overall_activity': 0})
-        user_list = len(data['users'])
+        user_count = len(data['users'])
         searches = data['search_count']
         allele_count = data['allele_count']
         gene_symbol_count = data['gene_symbol_count']
         classification_count = data['classification_count']
         overall_activity = data['overall_activity']
-        yield ReportDataRow(date=current_date, user=user_list, search_counts=searches,
+        yield ReportDataRow(date=current_date, users=user_count, search_counts=searches,
                             allele_counts=allele_count, gene_symbols_counts=gene_symbol_count,
                             classification_counts=classification_count,
                             overall_activity=overall_activity)
