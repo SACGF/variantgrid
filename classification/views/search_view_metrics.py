@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import timedelta, datetime, date
+from datetime import timedelta, date
 from typing import Iterator
 from django.contrib.auth.models import User
 from django.db.models import Q
@@ -35,25 +35,21 @@ class UserActivitiesRow(ExportRow):
     def searches_column(self) -> int:
         return self.view_counts[ReportKeys.SEARCHES]
 
-    @export_column(label="Alleles Viewed")
+    @export_column(label="Allele Viewings")
     def alleles_viewed_column(self) -> int:
         return self.view_counts[ReportKeys.ALLELES]
 
-    @export_column(label="Gene Symbols Viewed")
+    @export_column(label="Gene Symbol Viewings")
     def gene_symbols_viewed_column(self) -> int:
         return self.view_counts[ReportKeys.GENE_SYMBOLS]
 
-    @export_column(label="Classifications Viewed")
+    @export_column(label="Classification Viewings")
     def classifications_viewed_column(self) -> int:
         return self.view_counts[ReportKeys.CLASSIFICATIONS]
 
     @export_column(label="Overall Activity")
     def overall_activity_column(self) -> int:
         return self.overall_activity
-
-
-def week_start_date(freq: datetime.date) -> datetime.date:
-    return freq - timedelta(days=date.weekday(freq))
 
 
 _VIEW_NAMES_TO_KEYS = {
