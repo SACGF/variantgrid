@@ -1,10 +1,15 @@
 {% load ui_menus %}
+{% load ui_utils %}
 
 {% menu_item 'admin' href="/admin/" admin_only=True external=True%}
 {% menu_item 'eventlog' title="Event Log" admin_only=True %}
 {% menu_item 'email_log' title="Email Log" admin_only=True %}
 {% menu_item 'keycloak_admin' title="Keycloak" admin_only=True %}
 {% menu_item 'server_status' admin_only=True %}
+{% if not 'variants'|is_view_enabled %}
+    {% comment %}Put here for Shariant that is missing 'variants' menu{% endcomment %}
+    {% menu_item 'liftover_runs' title="Liftover" admin_only=True %}
+{% endif %}
 
 {% menu_item 'change_password' %}
 {% menu_item 'custom_columns' %}
