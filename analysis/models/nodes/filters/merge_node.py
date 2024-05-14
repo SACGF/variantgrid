@@ -3,6 +3,7 @@ from collections import defaultdict, Counter
 from functools import cached_property, reduce
 from typing import Optional
 
+from auditlog.registry import auditlog
 from django.db.models import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
@@ -156,3 +157,6 @@ class MergeNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Merge"
+
+
+auditlog.register(MergeNode)

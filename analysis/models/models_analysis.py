@@ -2,6 +2,7 @@ from collections import defaultdict
 from functools import cached_property
 from typing import Union, Optional
 
+from auditlog.registry import auditlog
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -653,3 +654,7 @@ class SampleAnalysisTemplateRun(models.Model):
 
     class Meta:
         unique_together = ('sample', 'analysis_template_run')
+
+
+
+auditlog.register(Analysis)

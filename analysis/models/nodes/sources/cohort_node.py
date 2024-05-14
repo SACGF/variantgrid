@@ -1,6 +1,7 @@
 from functools import cached_property
 from typing import Optional
 
+from auditlog.registry import auditlog
 from django.db import models
 from django.db.models import Q
 from django.db.models.deletion import SET_NULL, CASCADE
@@ -352,3 +353,6 @@ class CohortNodeZygosityFilter(models.Model):
     zygosity_none = models.BooleanField(default=True)
 
     unique_together = ("collection", "cohort_sample")
+
+
+auditlog.register(CohortNode)

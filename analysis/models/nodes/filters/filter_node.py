@@ -1,6 +1,7 @@
 import json
 from typing import Optional
 
+from auditlog.registry import auditlog
 from django.db import models
 from django.db.models import Q
 from django.db.models.deletion import CASCADE
@@ -124,3 +125,7 @@ class FilterNodeItem(models.Model):
         if self.data:
             description += " " + self.data
         return description
+
+
+auditlog.register(FilterNode)
+auditlog.register(FilterNodeItem)

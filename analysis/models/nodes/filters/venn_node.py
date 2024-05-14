@@ -5,6 +5,7 @@ from functools import cached_property
 from typing import Optional
 
 import celery
+from auditlog.registry import auditlog
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.query_utils import Q
@@ -298,3 +299,6 @@ def venn_cache_count(vennode_cache_id):
         vc.status = ProcessingStatus.ERROR
 
     vc.save()
+
+
+auditlog.register(VennNode)

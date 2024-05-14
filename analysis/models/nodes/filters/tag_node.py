@@ -1,6 +1,7 @@
 import operator
 from functools import cached_property, reduce
 
+from auditlog.registry import auditlog
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.query_utils import Q
@@ -130,3 +131,6 @@ class TagNodeTag(models.Model):
 
     class Meta:
         unique_together = ("tag_node", "tag")
+
+
+auditlog.register(TagNode)

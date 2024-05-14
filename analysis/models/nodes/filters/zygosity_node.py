@@ -1,5 +1,6 @@
 from typing import Optional
 
+from auditlog.registry import auditlog
 from django.db import models
 from django.db.models.deletion import SET_NULL
 from django.db.models.query_utils import Q
@@ -69,3 +70,6 @@ class ZygosityNode(AncestorSampleMixin, AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Zygosity"
+
+
+auditlog.register(ZygosityNode)

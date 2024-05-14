@@ -1,5 +1,6 @@
 from typing import Optional
 
+from auditlog.registry import auditlog
 from django.db import models
 from django.db.models import Q, CASCADE
 
@@ -74,3 +75,6 @@ class ClassificationsNode(AnalysisNode):
 class ClassificationsNodeLab(models.Model):
     node = models.ForeignKey(ClassificationsNode, on_delete=CASCADE)
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
+
+
+auditlog.register(ClassificationsNode)

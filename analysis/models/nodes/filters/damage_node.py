@@ -3,6 +3,7 @@ import operator
 from functools import reduce
 from typing import Optional
 
+from auditlog.registry import auditlog
 from django.db import models
 from django.db.models.query_utils import Q
 
@@ -308,3 +309,6 @@ class DamageNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "EffectNode"
+
+
+auditlog.register(DamageNode)

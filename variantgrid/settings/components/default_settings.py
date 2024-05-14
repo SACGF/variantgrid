@@ -754,6 +754,7 @@ INSTALLED_APPS = [
     'django.contrib.admin',
     "django.contrib.postgres",
     # 3rd party libraries
+    'auditlog',
     'dal',  # Django Autocomplete Light v3
     'dal_select2',  # DAL Plugin
     'django_messages',

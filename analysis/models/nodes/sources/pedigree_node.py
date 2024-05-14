@@ -1,5 +1,6 @@
 from typing import Optional
 
+from auditlog.registry import auditlog
 from django.db import models
 from django.db.models import Q
 from django.db.models.deletion import SET_NULL
@@ -96,3 +97,6 @@ class PedigreeNode(AbstractCohortBasedNode):
 
     def __str__(self):
         return self.get_node_name()
+
+
+auditlog.register(Pedigree)
