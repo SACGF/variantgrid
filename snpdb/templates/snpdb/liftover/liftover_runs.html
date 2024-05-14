@@ -15,6 +15,31 @@
 {% endblock submenu %}
 {% block content %}
     <div class="container">
+        <h3>Liftover Stats</h3>
+
+        Note: We only run some tools after others have failed
+        <table class="table">
+            <tr>
+                <th>Tool</th>
+            {% for pc in processing_status_cols %}
+                <th>{{ pc.label }}</th>
+            {% endfor %}
+                <th>Failure %</th>
+            </tr>
+
+        {% for act, data in tool_status.items %}
+            <tr>
+                <td>{{ act }}</td>
+            {% for pc in processing_status_cols %}
+                <td>{{ data|get_item:pc|default_if_none:0 }}</td>
+            {% endfor %}
+                <td>{{ failure_rate|get_item:act|default_if_none:'-'|floatformat:2 }}</td>
+            </tr>
+        {% endfor %}
+        </table>
+    </div>
+
+    <div class="container">
         <h3>Alleles</h3>
         <form method="post">
             {% csrf_token %}
