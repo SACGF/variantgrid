@@ -1,0 +1,16 @@
+{% load js_tags %}
+
+<div id='analysis-settings-audit-log-tab'>
+    <style>
+    </style>
+    <script>
+        function analysisLogEntrydatatableFilter(data) {
+            data.analysis_id = "{{ analysis.pk }}";
+        }
+    </script>
+
+
+    <table data-datatable-url="{% url 'analysis_log_entry_datatable' %}" data-datatable-data='analysisLogEntrydatatableFilter' class="import-table sticky-header" responsive="true"></table>
+
+
+</div>

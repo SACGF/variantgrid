@@ -7,6 +7,7 @@ from functools import cached_property
 
 import numpy as np
 import pandas as pd
+from auditlog.models import LogEntry
 from celery.contrib.abortable import AbortableAsyncResult
 from django.conf import settings
 from django.contrib import messages
@@ -778,6 +779,24 @@ def analysis_settings_template_run_tab(request, analysis_id):
     context = {"analysis_template_run": analysis.analysistemplaterun,
                "node_variables": defaultdict_to_dict(node_variables)}
     return render(request, 'analysis/analysis_settings_template_run_tab.html', context)
+
+
+class AnalysisLogEntryWrapper:
+    def __init__(self, log_entry: LogEntry):
+        self.log_entry = log_entry
+
+
+def analysis_settings_audit_log_tab(request, analysis_id):
+    analysis = get_analysis_or_404(request.user, analysis_id)
+    log_entry_wrappers = [
+        AnalysisLogEntryWrapper(le) for le in analysis.log_entry_qs()
+    ]
+
+    context = {
+        "analysis": analysis,
+        "log_entry_wrappers": log_entry_wrappers
+    }
+    return render(request, 'analysis/analysis_settings_audit_log_tab.html', context)
 
 
 @require_POST
