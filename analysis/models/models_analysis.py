@@ -95,9 +95,8 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         return (not is_snapshot) and super().can_write(user_or_group)
 
     def log_entry_qs(self) -> QuerySet[LogEntry]:
-        node_ids = list(self.analysisnode_set.values_list("pk", flat=True))
-        return LogEntry.objects.filter(content_type__app_label='analysis',
-                                       object_pk__in=list(node_ids))
+        # This is put on there via AnalysisNode.get_additional_data
+        return LogEntry.objects.filter(additional_data__analysis_id=self.pk)
 
     def has_audit_log(self) -> bool:
         return self.log_entry_qs().exists()

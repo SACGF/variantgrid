@@ -7,6 +7,7 @@ from random import random
 from time import time
 from typing import Sequence, Optional
 
+from auditlog.models import AuditlogHistoryField
 from cache_memoize import cache_memoize
 from celery.canvas import Signature
 from django.conf import settings
@@ -58,6 +59,7 @@ class NodeInheritanceManager(InheritanceManager):
 class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     model = Variant
     objects = NodeInheritanceManager()
+    history = AuditlogHistoryField()
     analysis = models.ForeignKey(Analysis, on_delete=CASCADE)
     name = models.TextField(blank=True)
     x = models.IntegerField(default=_default_position)
@@ -109,6 +111,10 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     def get_subclass(self):
         """ Returns the node loaded as a subclass """
         return AnalysisNode.objects.get_subclass(pk=self.pk)
+
+    def get_additional_data(self):
+        """ For Django audit log """
+        return {"analysis_id": self.analysis_id}
 
     def check_still_valid(self):
         """ Checks that the node is still there and has the version we expect - or throw exception """
@@ -1300,3 +1306,5 @@ class NodeAlleleFrequencyRange(models.Model):
 class AnalysisClassification(models.Model):
     analysis = models.ForeignKey(Analysis, on_delete=CASCADE)
     classification = models.ForeignKey(Classification, on_delete=CASCADE)
+
+
