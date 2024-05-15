@@ -1,7 +1,8 @@
 from collections import defaultdict
-from typing import Optional
+from typing import Optional, Any
 
 import pandas as pd
+from auditlog.models import LogEntry
 from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied
@@ -22,7 +23,7 @@ from library.jqgrid.jqgrid_sql import get_overrides
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
 from library.unit_percent import get_allele_frequency_formatter
-from library.utils import md5sum_str, update_dict_of_dict_values
+from library.utils import md5sum_str, update_dict_of_dict_values, JsonDataType
 from ontology.grids import AbstractOntologyGenesGrid
 from ontology.models import OntologyTermRelation, GeneDiseaseClassification, OntologyVersion
 from patients.models_enums import Zygosity
@@ -33,6 +34,8 @@ from snpdb.grid_columns.grid_sample_columns import get_available_format_columns,
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, CohortGenotype
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.views.datatable_view import DatatableConfig, RichColumn
+from uicore.templatetags.js_tags import jsonify_for_js
 
 
 class VariantGrid(AbstractVariantGrid):
@@ -561,3 +564,39 @@ class NodeGeneListGenesColumns(GeneListGenesColumns):
         if not gene_list_in_node:
             raise PermissionDenied(f"GeneList {gene_list_id} not part of GeneListNode gene lists")
         return gene_list
+
+
+class AnalysisLogEntryColumns(DatatableConfig[LogEntry]):
+
+    def __init__(self, request):
+        super().__init__(request)
+        self.user = request.user
+        self.analysis = None
+
+        self.rich_columns = [
+            RichColumn(key="timestamp", orderable=True, client_renderer='TableFormat.timestamp'),
+            RichColumn(key="actor__username", orderable=True),
+            RichColumn(key="object_id", label="Node ID"),
+            RichColumn(key="object_repr", label="Object"),
+            RichColumn(key="action", label="Action", renderer=self.render_action),
+            RichColumn(key="changes", label="Changes", renderer=self.render_json),
+        ]
+
+    def render_action(self, row: dict[str, Any]) -> JsonDataType:
+        label = ""
+        action = row['action']
+        if action is not None:
+            lookup = dict(LogEntry.Action.choices)
+            label = lookup[action]
+        return label
+
+    def render_json(self, row: dict[str, Any]) -> JsonDataType:
+        js = row["changes"]
+        return jsonify_for_js(js, pretty=True)
+
+    def get_initial_queryset(self) -> QuerySet[LogEntry]:
+        analysis_id = self.get_query_param("analysis_id")
+        if analysis_id is None:
+            raise ValueError("analysis not provided")
+        analysis = Analysis.get_for_user(self.user, pk=analysis_id)
+        return analysis.log_entry_qs()

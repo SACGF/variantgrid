@@ -2,12 +2,13 @@ from collections import defaultdict
 from functools import cached_property
 from typing import Union, Optional
 
+from auditlog.models import LogEntry
 from auditlog.registry import auditlog
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.db import models
-from django.db.models import Model, Q, Count, Max
+from django.db.models import Model, Q, Count, Max, QuerySet
 from django.db.models.deletion import SET_NULL, CASCADE, SET_DEFAULT, PROTECT, ProtectedError
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
@@ -92,6 +93,14 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         """ Use parent to see if we have Guardian permissions to write """
         is_snapshot = AnalysisTemplateVersion.objects.filter(analysis_snapshot=self).exists()
         return (not is_snapshot) and super().can_write(user_or_group)
+
+    def log_entry_qs(self) -> QuerySet[LogEntry]:
+        node_ids = list(self.analysisnode_set.values_list("pk", flat=True))
+        return LogEntry.objects.filter(content_type__app_label='analysis',
+                                       object_pk__in=list(node_ids))
+
+    def has_audit_log(self) -> bool:
+        return self.log_entry_qs().exists()
 
     def lock_history(self):
         return self.analysislock_set.order_by("pk")

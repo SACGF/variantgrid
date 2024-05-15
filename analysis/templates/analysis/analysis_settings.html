@@ -78,6 +78,9 @@
         {% if analysis.analysistemplaterun %}
             {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_template_run_tab' param=analysis.pk label="Template Run" %}
         {% endif %}
+        {% if analysis.has_audit_log %}
+            {% ui_register_tab tab_set="analysis_tab" url='analysis_settings_audit_log_tab' param=analysis.pk label="Audit Log" %}
+        {% endif %}
 
         {% if analysis.template_type != 'T' %}
             {% ui_register_tab_embedded tab_set="analysis_tab" label="Create Template" %}
