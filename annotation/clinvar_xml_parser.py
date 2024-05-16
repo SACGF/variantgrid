@@ -22,6 +22,8 @@ CLINVAR_TO_VG_CLIN_SIG = {
     "likely benign": "LB",
     "uncertain significance": "VUS",
     "variant of unknown significance": "VUS",
+    "likely oncogenic": "LO", # untested
+    "oncogenic": "O", # untested
     "likely pathogenic": "LP",
     "pathogenic": "P",
     "risk factor": "R",

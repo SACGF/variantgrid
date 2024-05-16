@@ -4,6 +4,7 @@ from Bio import Entrez
 
 from annotation.clinvar_xml_parser import ClinVarXmlParser, ClinVarXmlParserOutput, CLINVAR_REVIEW_STATUS_TO_STARS, \
     CLINVAR_TO_VG_CLIN_SIG, SOMATIC_CLIN_SIG_VALUE
+from classification.enums import AlleleOriginBucket
 from library.utils.xml_utils import parser_path, PP
 
 
@@ -39,6 +40,7 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
     @parser_path(on_start=True)
     def new_record(self, elem):
         self.reset()
+        self.latest.allele_origin_bucket = AlleleOriginBucket.UNKNOWN
         self.latest.submitter_date = ClinVarXmlParser.parse_xml_date(elem.get("SubmissionDate"))
 
     @parser_path(PP("ClinVarAccession", Type="SCV"))
@@ -77,7 +79,7 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         "GermlineClassification")
     def parse_clinical_significance_desc(self, elem):
         if cs := elem.text:
-            self.latest.allele_origin_bucket = "G"
+            self.latest.allele_origin_bucket = AlleleOriginBucket.GERMLINE
             cs = cs.lower()
             self.latest.clinical_significance = CLINVAR_TO_VG_CLIN_SIG.get(cs, cs)
 
@@ -86,10 +88,21 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         "SomaticClinicalImpact")
     def parse_somatic_clinical_significance_desc(self, elem):
         if cs := elem.text:
-            self.latest.allele_origin_bucket = "S"
+            self.latest.allele_origin_bucket = AlleleOriginBucket.SOMATIC
             cs = cs.lower()
             cs = cs.split("-")[0].strip()
             self.latest.somatic_clinical_significance = SOMATIC_CLIN_SIG_VALUE.get(cs, cs)
+
+    @parser_path(
+        "Classification",
+        "OncogenicityClassification",
+        "Description")
+    def parse_somatic_clinical_significance_desc(self, elem):
+        if cs := elem.text:
+            self.latest.allele_origin_bucket = AlleleOriginBucket.SOMATIC
+            cs = cs.lower()
+            self.latest.clinical_significance = CLINVAR_TO_VG_CLIN_SIG.get(cs, cs)
+
 
     @parser_path(
         "Classification",
