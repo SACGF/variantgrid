@@ -1,14 +1,14 @@
 import inspect
 import json
 import re
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Iterable, Optional, Any, Type, Iterator
-
+from itertools import chain
+from typing import Iterable, Optional, Any, Type, Iterator, Callable
 from dateutil.tz import gettz
 from django.conf import settings
 from django.http import HttpRequest, StreamingHttpResponse
-
 from library.utils.date_utils import local_date_string
 from library.utils.json_utils import JsonObjType
 from library.utils.text_utils import delimited_row
@@ -21,7 +21,11 @@ class ExportDataType(str, Enum):
     any = "any"
 
 
-def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None, categories: dict[str, Any] = None, data_type: ExportDataType = ExportDataType.any):
+def export_column(
+        label: Optional[str] = None,
+        sub_data: Optional[Type] = None,
+        categories: dict[str, Any] = None,
+        data_type: ExportDataType = ExportDataType.any):
     """
     Extend ExportRow and annotate methods with export_column.
     The order of defined methods determines the order that the results will appear in an export file
@@ -79,7 +83,7 @@ class ExportSettings:
         if export_format == ExportFormat.csv:
             if data_type == ExportDataType.datetime and isinstance(value, datetime):
                 value = value.astimezone(self.tz)
-                # want to put the timzone in the string %z or %Z BUT... Excel doesn't support that
+                # want to put the timezone in the string %z or %Z BUT... Excel doesn't support that
                 # because the one constant through history is Excel ruins everything
                 return value.strftime("%Y-%m-%d %H:%M")
         elif export_format == ExportFormat.json:
@@ -96,10 +100,73 @@ class ExportSettings:
         return ExportSettings(tz=UserSettingsManager.get_user_timezone())
 
 
+@dataclass
+class ExportTweak:
+    """
+    Provides some high level changes (primarily to CSV export)
+    """
+    sub_label_joiner: Callable[[str, str], str] = lambda a, b: a + "." + b
+    """
+    A method that combine labels and sub labels
+    """
+
+    categories: Optional[dict[str, Any]] = None
+    """
+    key, value pairs that will determine which columns are included
+    """
+
+    force_method_heading: bool = False
+    """
+    If true, use method names rather than export column labels (more used internally for making mappings)
+    """
+
+
+ExportTweak.DEFAULT = ExportTweak()
+
+
+class _ColumnZipperRow:
+    """
+    Class that helps us combine columns with sub data together (if desired)
+    Used for headers and regular rows
+    """
+
+    def __init__(self, sub_data_zip_types: set[type]):
+        self.row = []
+        self.sub_data_zip_types = sub_data_zip_types
+        self.sub_data_zips: list[list] = []
+        self.last_sub_data_zip_type: Optional[type] = None
+
+    def _apply_sub_data_zips(self):
+        if self.sub_data_zips:
+            flatten = list(chain(*zip(*self.sub_data_zips)))
+            self.row.extend(flatten)
+        self.last_sub_data_zip_type = None
+        self.sub_data_zips.clear()
+
+    def add_cell(self, value):
+        self._apply_sub_data_zips()
+        self.row.append(value)
+
+    def add_sub_data(self, sub_data_type: type, values: list):
+        if sub_data_type in self.sub_data_zip_types:
+            if self.last_sub_data_zip_type is not None and sub_data_type != self.last_sub_data_zip_type:
+                # more zipped sub data, but different type
+                self._apply_sub_data_zips()
+
+            self.sub_data_zips.append(values)
+        else:
+            self._apply_sub_data_zips()
+            self.row.extend(values)
+
+    def get_row(self) -> list:
+        self._apply_sub_data_zips()
+        return self.row
+
+
 class ExportRow:
 
     @staticmethod
-    def get_export_methods(klass, categories: Optional[dict[str, Any]] = None):
+    def get_export_methods(klass, export_tweak: ExportTweak = ExportTweak.DEFAULT):
         # TODO, provide export_methods in ExportRow but still work out if we need to search or not
         if not hasattr(klass, 'export_methods'):
             export_methods = [func for _, func in inspect.getmembers(klass, lambda x: getattr(x, 'is_export', False))]
@@ -110,6 +177,9 @@ class ExportRow:
                 raise ValueError(f"ExportRow class {klass} has no @export_columns, make sure you annotate @export_column(), not @export_column")
 
         export_methods = klass.export_methods
+        categories = None
+        if export_tweak:
+            categories = export_tweak.categories
         if categories:
             def passes_filter(export_method) -> bool:
                 nonlocal categories
@@ -146,14 +216,14 @@ class ExportRow:
             yield row_data
 
     @classmethod
-    def csv_generator(cls, data: Iterable[Any], delimiter=',', include_header=True, categories: Optional[dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> Iterator[str]:
+    def csv_generator(cls, data: Iterable[Any], delimiter=',', include_header=True, export_tweak: ExportTweak = ExportTweak.DEFAULT, export_settings: Optional[ExportSettings] = None) -> Iterator[str]:
         if not export_settings:
             export_settings = ExportSettings.get_for_request()
         try:
             if include_header:
-                yield delimited_row(cls.csv_header(categories=categories, export_settings=export_settings), delimiter=delimiter)
+                yield delimited_row(cls.csv_header(export_tweak=export_tweak, export_settings=export_settings), delimiter=delimiter)
             for row_data in cls._data_generator(data):
-                yield delimited_row(row_data.to_csv(categories=categories, export_settings=export_settings), delimiter=delimiter)
+                yield delimited_row(row_data.to_csv(export_tweak=export_tweak, export_settings=export_settings), delimiter=delimiter)
         except:
             from library.log_utils import report_exc_info
             report_exc_info(extra_data={"activity": "Exporting"})
@@ -163,11 +233,11 @@ class ExportRow:
     # Warning: We don't actually do anything with the formatting of JSON objects
 
     @classmethod
-    def json_generator(cls, data: Iterable[Any], records_key: str = "records", categories: Optional[dict[str, Any]] = None) -> Iterator[str]:
+    def json_generator(cls, data: Iterable[Any], records_key: str = "records", export_tweak: ExportTweak = ExportTweak.DEFAULT) -> Iterator[str]:
         """
         :param data: Iterable data of either cls or that can be passed to cls's constructor
         :param records_key:
-        :param categories:
+        :param export_tweak:
         :return: A generator that will produce several strings, that when concat makes valid Json
         """
         first_row = True
@@ -180,7 +250,7 @@ class ExportRow:
                 if not first_row:
                     text += ",\n"
                 first_row = False
-                text += json.dumps(row_data.to_json(categories=categories))
+                text += json.dumps(row_data.to_json(export_tweak=export_tweak))
                 yield text
 
             if records_key:
@@ -192,49 +262,68 @@ class ExportRow:
             raise
 
     @classmethod
-    def csv_header(cls, categories: Optional[dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> list[str]:
-        if not export_settings:
-            export_settings = ExportSettings.get_for_request()
-        row = []
-        for method in ExportRow.get_export_methods(cls, categories=categories):
-            label = method.label or method.__name__
-            label = export_settings.format_heading(export_format=ExportFormat.csv, data_type=method.data_type, label=label)
-            if sub_data := method.sub_data:
-                sub_header = sub_data.csv_header(categories=categories, export_settings=export_settings)
-                for sub in sub_header:
-                    row.append(label + "." + sub)
-            else:
-                row.append(label)
-        return row
+    def zip_sub_data(cls) -> set[type]:
+        return set()
 
-    def to_csv(self, categories: Optional[dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> list[str]:
+    @classmethod
+    def csv_header(cls, export_tweak: ExportTweak = ExportTweak.DEFAULT, export_settings: Optional[ExportSettings] = None) -> list[str]:
+        # a bit of duplication between generating the header
+        # and generating the data
+        # consider making a model where we calculate cells (in the correct order) and can then query those cells
+        # for labels or values (given an input)
         if not export_settings:
             export_settings = ExportSettings.get_for_request()
-        row = []
-        for method in ExportRow.get_export_methods(self.__class__, categories=categories):
+
+        row = _ColumnZipperRow(sub_data_zip_types=cls.zip_sub_data())
+
+        for method in ExportRow.get_export_methods(cls, export_tweak=export_tweak):
+            label: str
+            if export_tweak.force_method_heading:
+                label = method.__name__
+            else:
+                label = method.label or method.__name__
+                label = export_settings.format_heading(export_format=ExportFormat.csv, data_type=method.data_type, label=label)
+
+            if sub_data := method.sub_data:
+                sub_header = sub_data.csv_header(export_tweak=export_tweak, export_settings=export_settings)
+                sub_headings = [export_tweak.sub_label_joiner(label, sub) for sub in sub_header]
+                row.add_sub_data(sub_data, sub_headings)
+            else:
+                row.add_cell(label)
+        return row.get_row()
+
+    def to_csv(self, export_tweak: ExportTweak = ExportTweak.DEFAULT, export_settings: Optional[ExportSettings] = None) -> list[str]:
+        if not export_settings:
+            export_settings = ExportSettings.get_for_request()
+
+        row = _ColumnZipperRow(sub_data_zip_types=self.zip_sub_data())
+
+        for method in ExportRow.get_export_methods(self.__class__, export_tweak=export_tweak):
             result = method(self)
             if sub_data := method.sub_data:
+                sub_data_values: list
                 if result is None:
-                    for _ in sub_data.csv_header(categories=categories):
-                        row.append("")
+                    sub_data_values = [""] * len(sub_data.csv_header(export_tweak=export_tweak, export_settings=export_settings))
                 else:
-                    row += result.to_csv(categories=categories, export_settings=export_settings)
+                    sub_data_values = result.to_csv(export_tweak=export_tweak, export_settings=export_settings)
+
+                row.add_sub_data(sub_data, sub_data_values)
             else:
                 result = export_settings.format_value(export_format=ExportFormat.csv, data_type=method.data_type, value=result)
-                row.append(result)
-        return row
+                row.add_cell(result)
+        return row.get_row()
 
-    def to_json(self, categories: Optional[dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> JsonObjType:
+    def to_json(self, export_tweak: ExportTweak = ExportTweak.DEFAULT, export_settings: Optional[ExportSettings] = None) -> JsonObjType:
         if not export_settings:
             export_settings = ExportSettings.get_for_request()
         row = {}
-        for method in ExportRow.get_export_methods(self.__class__, categories=categories):
+        for method in ExportRow.get_export_methods(self.__class__, export_tweak=export_tweak):
             result = method(self)
             value: Any
             if result is None:
                 value = None
             elif method.sub_data:
-                value = result.to_json(categories=categories, export_settings=export_settings)
+                value = result.to_json(export_tweak=export_tweak, export_settings=export_settings)
             else:
                 value = result
 
@@ -249,27 +338,27 @@ class ExportRow:
         return row
 
     @classmethod
-    def streaming(cls, request: HttpRequest, data: Iterable[Any], filename: str, categories: Optional[dict[str, Any]] = None):
+    def streaming(cls, request: HttpRequest, data: Iterable[Any], filename: str, export_tweak: ExportTweak = ExportTweak.DEFAULT):
         if request.GET.get('format') == 'json':
-            return cls.streaming_json(data, filename, categories=categories)
+            return cls.streaming_json(data, filename, export_tweak=export_tweak)
         else:
-            return cls.streaming_csv(data, filename, categories=categories)
+            return cls.streaming_csv(data, filename, export_tweak=export_tweak)
 
     @classmethod
-    def streaming_csv(cls, data: Iterable[Any], filename: str, categories: Optional[dict[str, Any]] = None):
+    def streaming_csv(cls, data: Iterable[Any], filename: str, export_tweak: ExportTweak = ExportTweak.DEFAULT):
         date_str = local_date_string()
 
-        response = StreamingHttpResponse(cls.csv_generator(data, categories=categories), content_type='text/csv')
+        response = StreamingHttpResponse(cls.csv_generator(data, export_tweak=export_tweak), content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_str}.csv"'
         return response
 
     @classmethod
-    def streaming_json(cls, data: Iterable[Any], filename: str, records_key: str = None, categories: Optional[dict[str, Any]] = None):
+    def streaming_json(cls, data: Iterable[Any], filename: str, records_key: str = None, export_tweak: ExportTweak = ExportTweak.DEFAULT):
         date_str = local_date_string()
 
         if not records_key:
             records_key = filename.replace(" ", "_")
 
-        response = StreamingHttpResponse(cls.json_generator(data, records_key, categories=categories), content_type='application/json')
+        response = StreamingHttpResponse(cls.json_generator(data, records_key, export_tweak=export_tweak), content_type='application/json')
         response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_str}.json"'
         return response

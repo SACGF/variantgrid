@@ -15,7 +15,7 @@ from classification.views.exports.classification_export_filter import AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter, \
     ClassificationExportExtraData
 from classification.views.exports.classification_export_utils import CitationCounter
-from library.utils import delimited_row, export_column, ExportRow, ExportDataType, html_to_text
+from library.utils import delimited_row, export_column, ExportRow, ExportDataType, html_to_text, ExportTweak
 from snpdb.models import GenomeBuild
 
 
@@ -237,7 +237,7 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
         return "csv"
 
     def header(self) -> list[str]:
-        header = RowID.csv_header(self._categories) + ClassificationMeta.csv_header(self._categories) + self.used_keys.header()
+        header = RowID.csv_header(export_tweak=self._export_tweak) + ClassificationMeta.csv_header(export_tweak=self._export_tweak) + self.used_keys.header()
         return [delimited_row(header, delimiter=',')]
 
     def row(self, allele_data: AlleleData) -> list[str]:
@@ -265,23 +265,23 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
             )
 
     @cached_property
-    def _categories(self) -> Optional[dict]:
+    def _export_tweak(self) -> Optional[ExportTweak]:
         categories = {}
         if self.format_details.exclude_transient:
             categories["transient"] = None
         if not self.grouping_utils.any_pending_changes:
             categories["pending_changes"] = None
-        return categories
+        return ExportTweak(categories=categories)
 
     def to_row(self, vcm: ClassificationModification, allele_data: AlleleData, message=None) -> str:
         row_data = \
-            RowID(cm=vcm, allele_data=allele_data, message=message).to_csv(categories=self._categories) + \
+            RowID(cm=vcm, allele_data=allele_data, message=message).to_csv(export_tweak=self._export_tweak) + \
             ClassificationMeta(
                 cm=vcm,
                 discordance_status=self.classification_filter.is_discordant(vcm),
                 pending_clin_sig=self.grouping_utils.pending_changes_for(vcm),
                 e_keys=self.e_keys
-            ).to_csv(categories=self._categories) + \
+            ).to_csv(export_tweak=self._export_tweak) + \
             self.used_keys.row(classification_modification=vcm, formatter=self.format_details.html_handling.format)
 
         return delimited_row(row_data, delimiter=',')

@@ -47,8 +47,10 @@ class SpecialEKeys:
     CONDITION = 'condition'
     CLINICAL_SIGNIFICANCE = 'clinical_significance'
     SOMATIC_CLINICAL_SIGNIFICANCE = 'somatic:clinical_significance'
+    CURATED_BY = 'curated_by'
     CURATION_DATE = 'curation_date'
     CURATION_VERIFIED_DATE = 'curation_verified_date'
+    CURATION_VERIFIED_BY = 'curation_verified_by'
     SAMPLE_DATE = 'sample_date'
     VARIANT_TAGS = 'variant_tags'
 
