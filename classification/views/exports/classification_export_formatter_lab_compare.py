@@ -2,13 +2,16 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 from django.http import HttpRequest
+from django.urls import reverse
+
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
+from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column, delimited_row, ExportTweak
-from snpdb.models import Lab
+from snpdb.models import Lab, Allele
 
 
 class ClassificationLab(ExportRow):
@@ -63,6 +66,7 @@ class ClassificationLab(ExportRow):
 @dataclass
 class ClassificationLabCompare(ExportRow):
 
+    allele: Allele
     lab_a_data: ClassificationLab
     lab_b_data: ClassificationLab
     e_keys: EvidenceKeyMap
@@ -72,6 +76,11 @@ class ClassificationLabCompare(ExportRow):
         # zip sub data means Lab A and Lab B data will be combined rather than 1 right after the other
         # e.g. Lab A.Record Count, Lab B.Record Count, Lab A.c.HGVS, Lab B.c.HGVS etc
         return {ClassificationLab}
+
+    @export_column("Allele")
+    def _allele(self):
+        if self.allele:
+            return get_url_from_view_path(reverse('view_allele', kwargs={"allele_id": self.allele.pk}))
 
     @export_column("Lab A", sub_data=ClassificationLab)
     def _lab_a(self):
@@ -165,5 +174,5 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
         lab_b_data = ClassificationLab(self.lab_b, lab_b_cs)
 
         return [delimited_row(
-            ClassificationLabCompare(lab_a_data, lab_b_data, self.e_keys).to_csv())
+            ClassificationLabCompare(allele_data.allele, lab_a_data, lab_b_data, self.e_keys).to_csv())
         ]
