@@ -28,7 +28,7 @@ ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'test_annotation_sc
 
 LIFTOVER_BCFTOOLS_ENABLED = True
 
-# SEARCH_HGVS_GENE_SYMBOL_USE_MANE = True
+SEARCH_HGVS_GENE_SYMBOL_USE_MANE = True
 
 SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
 SHARIANT_TEST_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_test_static")
