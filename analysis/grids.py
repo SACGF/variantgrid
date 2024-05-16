@@ -566,6 +566,48 @@ class NodeGeneListGenesColumns(GeneListGenesColumns):
         return gene_list
 
 
+
+def get_analysis_log_entry_summary(action, content_type_model, changes, additional_data) -> Optional[str]:
+    """ If it can come up with a summary, return something, otherwise nothing, and the
+        caller can do it themselves """
+    if content_type_model == "analysisedge":
+        parent = additional_data["parent"]
+        child = additional_data["child"]
+        parent_desc = f"(id={parent['id']})"
+        if parent_rep := parent['object_repr']:
+            parent_desc += f" '{parent_rep}'"
+        child_desc = f"(id={child['id']})"
+        if child_rep := child['object_repr']:
+            child_desc += f" '{child_rep}'"
+
+        if action == LogEntry.Action.CREATE:
+            op = "Attached"
+            desc = "to"
+        elif action == LogEntry.Action.DELETE:
+            op = "Detached"
+            desc = "from"
+        else:
+            raise ValueError("Don't know how to handle analysisedge UPDATE")
+        return f"{op} Parent: {parent_desc} {desc} Child: {child_desc}"
+
+    if action == LogEntry.Action.CREATE:
+        return "Created"
+    elif action == LogEntry.Action.DELETE:
+        return "Deleted"
+    elif action == LogEntry.Action.UPDATE:
+        # Just a move operation
+        changes_set = set(changes.keys())
+        if changes_set.issuperset({"x", "y"}):  # Only for moves
+            return f"Moved to {changes['x'][1]},{changes['y'][1]}"
+
+        is_save = changes_set == {"count", "status", "version", "appearance_version"}
+        is_save &= changes.get("status", [None, None])[1] == NodeStatus.DIRTY
+        if is_save:
+            return "Saved"
+    return None
+
+
+
 class AnalysisLogEntryColumns(DatatableConfig[LogEntry]):
 
     def __init__(self, request):
@@ -576,10 +618,14 @@ class AnalysisLogEntryColumns(DatatableConfig[LogEntry]):
         self.rich_columns = [
             RichColumn(key="timestamp", orderable=True, client_renderer='TableFormat.timestamp'),
             RichColumn(key="actor__username", orderable=True),
+            RichColumn(key="content_type__model", orderable=True),
             RichColumn(key="object_id", label="Node ID"),
             RichColumn(key="object_repr", label="Object"),
             RichColumn(key="action", label="Action", renderer=self.render_action),
-            RichColumn(key="changes", label="Changes", renderer=self.render_json),
+            RichColumn(key=None, name='summary', label='Summary',
+                       renderer=self.render_summary, client_renderer='renderAnalysisAuditLogSummary'),
+            RichColumn(key="changes", visible=False),
+            RichColumn(key="additional_data", visible=False),
         ]
 
     def render_action(self, row: dict[str, Any]) -> JsonDataType:
@@ -590,9 +636,19 @@ class AnalysisLogEntryColumns(DatatableConfig[LogEntry]):
             label = lookup[action]
         return label
 
-    def render_json(self, row: dict[str, Any]) -> JsonDataType:
-        js = row["changes"]
-        return jsonify_for_js(js, pretty=True)
+    def render_summary(self, row: dict[str, Any]) -> JsonDataType:
+        action = row['action']
+        content_type_model = row["content_type__model"]
+        changes = row["changes"]
+        additional_data = row["additional_data"]
+
+        summary_json = {}
+        if summary_text := get_analysis_log_entry_summary(action, content_type_model, changes, additional_data):
+            summary_json["summary_text"] = summary_text
+        else:
+            summary_json['changes'] = changes
+            summary_json['additional_data'] = additional_data
+        return summary_json
 
     def get_initial_queryset(self) -> QuerySet[LogEntry]:
         analysis_id = self.get_query_param("analysis_id")

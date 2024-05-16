@@ -8,6 +8,7 @@ from time import time
 from typing import Sequence, Optional
 
 from auditlog.models import AuditlogHistoryField
+from auditlog.registry import auditlog
 from cache_memoize import cache_memoize
 from celery.canvas import Signature
 from django.conf import settings
@@ -36,6 +37,7 @@ from library.django_utils import thread_safe_unique_together_get_or_create
 from library.log_utils import report_event, log_traceback
 from library.utils import format_percent
 from library.utils.database_utils import queryset_to_sql
+from library.utils.django_utils import get_model_content_type_dict
 from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, \
     ProcessingStatus, GenomeBuild, AlleleSource, Contig, SampleFilePath
 from snpdb.variant_collection import write_sql_to_variant_collection
@@ -113,7 +115,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         return AnalysisNode.objects.get_subclass(pk=self.pk)
 
     def get_additional_data(self):
-        """ For Django audit log """
+        """ For django-audit-log """
         return {"analysis_id": self.analysis_id}
 
     def check_still_valid(self):
@@ -1039,7 +1041,21 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
 
 class AnalysisEdge(edge_factory(AnalysisNode, concrete=False)):
-    pass
+    def get_additional_data(self):
+        """ For django-audit-log """
+        return {
+            "analysis_id": self.parent.analysis_id,
+            "parent": {
+                "id": self.parent.pk,
+                "content_type": get_model_content_type_dict(self.parent),
+                "object_repr": str(self.parent),
+            },
+            "child": {
+                "id": self.child.pk,
+                "content_type": get_model_content_type_dict(self.child),
+                "object_repr": str(self.child),
+            }
+        }
 
 
 class NodeTask(TimeStampedModel):
@@ -1308,3 +1324,4 @@ class AnalysisClassification(models.Model):
     classification = models.ForeignKey(Classification, on_delete=CASCADE)
 
 
+auditlog.register(AnalysisEdge)
