@@ -19,7 +19,7 @@ from classification.views.exports.classification_export_filter import AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
 from classification.views.exports.classification_export_utils import CHGVSData, CitationCounter
 from library.django_utils import get_url_from_view_path
-from library.utils import delimited_row, export_column, ExportRow
+from library.utils import delimited_row, export_column, ExportRow, ExportTweak
 from snpdb.models import Allele
 
 
@@ -352,7 +352,7 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
     def header(self):
         # reset first row as we could be split over multiple files
         if self.file_format == FormatDetailsMVLFileFormat.TSV:
-            return [delimited_row(MVLEntry.csv_header(categories={"format": "tsv"}), delimiter='\t')]
+            return [delimited_row(MVLEntry.csv_header(export_tweak=ExportTweak(categories={"format": "tsv"})), delimiter='\t')]
         elif self.file_format == FormatDetailsMVLFileFormat.JSON:
 
             def make_json_safe(obj: Any) -> str:
@@ -409,7 +409,7 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
                 ) for c_data in c_datas),
                 delimiter='\t',
                 include_header=False,
-                categories={"format": "tsv"}
+                export_tweak=ExportTweak(categories={"format": "tsv"})
             ))
         elif self.file_format == FormatDetailsMVLFileFormat.JSON:
             output: list[str] = []
@@ -419,7 +419,7 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
                     self.format_details,
                     self.grouping_utils
                 )
-                row_json = json.dumps(MVLEntry(export_row).to_json(categories={"format": "json"}))
+                row_json = json.dumps(MVLEntry(export_row).to_json(export_tweak=ExportTweak(categories={"format": "json"})))
                 output.append(row_json)
             return output
 

@@ -1,108 +1,133 @@
 import re
-from collections import defaultdict
+from dataclasses import dataclass
 from typing import Optional
-
 from django.http import HttpRequest
-from django.urls.base import reverse
-
 from classification.enums import SpecialEKeys
+from classification.models import ClassificationModification, EvidenceKeyMap
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
-from library.django_utils import get_url_from_view_path
-from library.utils import ExportRow, export_column, delimited_row
+from library.utils import ExportRow, export_column, delimited_row, ExportTweak
+from snpdb.models import Lab
 
 
-class ClassificationlabCompareRow(ExportRow):
+class ClassificationLab(ExportRow):
 
-    def __init__(self,  allele_data: AlleleData, c_hgvs: Optional[str] = None, lab_1: Optional[str] = None, lab_2: Optional[str] = None,
-                 comment: Optional[str] = None, lab_1_authorised_date: Optional[str] = None,
-                 lab_2_authorised_date: Optional[str] = None, lab_1_curated_date: Optional[str] = None,
-                 lab_2_curated_date: Optional[str] = None, lab_1_interpretation_summary: Optional[str] = None,
-                 lab_2_interpretation_summary: Optional[str] = None,
-                 patient_id: Optional[str] = None):
-        self.AlleleData = allele_data.allele_id
-        self.c_hgvs = c_hgvs
-        self.lab1 = lab_1
-        self.lab2 = lab_2
-        self.comment = comment
-        self.lab_1_authorised_date = lab_1_authorised_date
-        self.lab_2_authorised_date = lab_2_authorised_date
-        self.lab_1_curated_date = lab_1_curated_date
-        self.lab_2_curated_date = lab_2_curated_date
-        self.Patient_id = patient_id
-        self.lab_1_interpretation_summary = lab_1_interpretation_summary
-        self.lab_2_interpretation_summary = lab_2_interpretation_summary
+    def __init__(self, lab: Lab, cms: list[ClassificationModification]):
+        self.lab = lab
+        self.cms = cms
 
-    @export_column("Allele URL")
-    def allele_url(self):
-        url = get_url_from_view_path(reverse('view_allele', kwargs={"allele_id": self.AlleleData}))
-        return url
+    def list_of(self, *args: list[str]) -> Optional[str]:
+        """
+        Return a single string that's the combination of all the evidence keys found in args
+        :param args: strings that match EvidenceKey keys
+        :return: "\n" seperated unique combined values for the given evidence keys
+        """
+        value_set = set()
+        for cm in self.cms:
+            value_tuple = [cm.get(e_key) for e_key in args]
+            value_tuple = tuple(str(x) if x else None for x in value_tuple)
+            if any(value_tuple):
+                value_set.add(value_tuple)
+        if value_set:
+            value_set_strs = []
+            for vs in sorted(value_set):
+                value_set_strs.append(" ".join(v or "#" for v in vs))
+            return "\n".join(value_set_strs)
 
-    @export_column("Lab 1")
-    def lab_clinical_significance(self):
-        return self.lab1
+    @export_column("Record Count")
+    def record_count(self):
+        return len(self.cms)
 
-    @export_column("Lab 2")
-    def lab2_clinical_significance(self):
-        return self.lab2
-
-    @export_column("Classification")
-    def difference(self, lab_name1, lab_name2):
-        if (self.lab1 != '' and self.lab2 != '') and self.lab1 == self.lab2:
-            return 'Same'
-        elif self.lab1 == '' and self.lab2 != '':
-            return lab_name2
-        elif self.lab1 != '' and self.lab2 == '':
-            return lab_name1
-        elif self.lab1 != self.lab2:
-            return 'Different'
-        elif self.lab1 == '' and self.lab2 == '':
-            return 'No data'
-
-    @export_column("Authorised Date Difference")
-    def authorised_date_diff(self):
-        if not self.lab_1_authorised_date or not self.lab_2_authorised_date:
-            return 'No Overlap'
-        elif self.lab_1_authorised_date != self.lab_2_authorised_date:
-            return 'Different'
-        elif self.lab_1_authorised_date == self.lab_2_authorised_date:
-            return 'Same'
-        else:
-            return ''
-
-    @export_column("Created Date Difference")
-    def created_date_diff(self):
-        if not self.lab_1_curated_date or not self.lab_2_curated_date:
-            return 'No Overlap'
-        elif self.lab_1_curated_date != self.lab_2_curated_date:
-            return 'Different'
-        elif self.lab_1_curated_date == self.lab_2_curated_date:
-            return 'Same'
-        else:
-            return ''
-
-    @export_column("Fields With Differences")
-    def comment(self):
-        return ''
-
-    @export_column("Patient ID")
-    def patient_id(self):
-        return self.Patient_id
-
-    @export_column("c.HGVS")
+    @export_column("c.HGVSs")
     def c_hgvs(self):
-        return self.c_hgvs
+        return self.list_of(SpecialEKeys.C_HGVS)
+
+    @export_column("Patient IDs")
+    def patient_ids(self):
+        return self.list_of(SpecialEKeys.PATIENT_ID)
+
+    @export_column("Curation Details")
+    def curation_details(self):
+        return self.list_of(SpecialEKeys.CURATION_DATE, SpecialEKeys.CURATED_BY)
+
+    @export_column("Curation Verified Details")
+    def curation_verified_details(self):
+        return self.list_of(SpecialEKeys.CURATION_VERIFIED_DATE, SpecialEKeys.CURATION_VERIFIED_BY)
+
+    @export_column("Interpretation Summary")
+    def interpretation_summary(self):
+        return self.list_of(SpecialEKeys.INTERPRETATION_SUMMARY)
+
+
+@dataclass
+class ClassificationLabCompare(ExportRow):
+
+    lab_a_data: ClassificationLab
+    lab_b_data: ClassificationLab
+    e_keys: EvidenceKeyMap
+
+    @classmethod
+    def zip_sub_data(cls) -> set[type]:
+        # zip sub data means Lab A and Lab B data will be combined rather than 1 right after the other
+        # e.g. Lab A.Record Count, Lab B.Record Count, Lab A.c.HGVS, Lab B.c.HGVS etc
+        return {ClassificationLab}
+
+    @export_column("Lab A", sub_data=ClassificationLab)
+    def _lab_a(self):
+        return self.lab_a_data
+
+    @export_column("Lab B", sub_data=ClassificationLab)
+    def _lab_b(self):
+        return self.lab_b_data
+
+    @staticmethod
+    def tokenize(data: Optional[str]):
+        if data is None:
+            return set()
+        return set(re.findall(r'\b\w+\b', data.lower()))
+
+    @export_column("Fields with Differences")
+    def differences(self):
+        if not self.lab_a_data.cms:
+            return "ONLY " + self.lab_b_data.lab.name
+        elif not self.lab_b_data.cms:
+            return "ONLY " + self.lab_a_data.lab.name
+
+        different_keys = list()
+        for key in self.e_keys.all_keys:
+            a_values = ClassificationLabCompare.tokenize(self.lab_a_data.list_of(key.key))
+            b_values = ClassificationLabCompare.tokenize(self.lab_b_data.list_of(key.key))
+            if a_values != b_values:
+                different_keys.append(key.pretty_label)
+
+        if different_keys:
+            return ", ".join(different_keys)
+        else:
+            return "SAME"
 
 
 @register_classification_exporter("lab_compare")
 class ClassificationExportInternalCompare(ClassificationExportFormatter):
+    """
+    Formatter typically used to compare old lab data to new lab data (after the labs have been inserted into test as
+    different labs). Identifies what has accidentally changed
+    """
 
     @classmethod
-    def from_request(cls, request: HttpRequest) -> 'ClassificationExportInternalCompare':
+    def from_request(cls, request: HttpRequest) -> 'ClassificationExportInternalCompare2':
         return ClassificationExportInternalCompare(
             classification_filter=ClassificationFilter.from_request(request),
         )
+
+    def __init__(self, classification_filter: ClassificationFilter):
+        super().__init__(classification_filter)
+        if not self.classification_filter.include_sources or len(self.classification_filter.include_sources) != 2:
+            raise ValueError("2 labs must be included")
+        two_labs = list(sorted(self.classification_filter.include_sources))
+        self.lab_a = two_labs[0]
+        self.lab_b = two_labs[1]
+        self.e_keys = EvidenceKeyMap.cached()
 
     def content_type(self) -> str:
         return "text/csv"
@@ -110,140 +135,35 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
     def extension(self) -> str:
         return "csv"
 
-    def header(self) -> list[str]:
-        if self.classification_filter.include_sources and len(self.classification_filter.include_sources) == 2:
-            lab_names = sorted([str(lab) for lab in self.classification_filter.include_sources])
-            return [delimited_row(['Allele URL', 'C_HGVS', 'Patient_Id', lab_names[0], lab_names[1],
-                                   'Classification',
-                                   f'{lab_names[0]} Authorised Date',
-                                   f'{lab_names[1]} Authorised Date',
-                                   'Authorised Date Difference',
-                                   f'{lab_names[0]} Curated Date',
-                                   f'{lab_names[1]} Curated Date',
-                                   'Curated Date Difference',
-                                   'Fields With Differences',
-                                   f'{lab_names[0]} Interpretation Summary',
-                                   f'{lab_names[1]} Interpretation Summary'
-                                   ], ',')]
-        else:
-            raise ValueError("Must specify 2 labs to compare")
+    def lab_label(self, lab_key: str, field_name: str):
+        if lab_key == "Lab A":
+            lab_key = self.lab_a.name
+        elif lab_key == "Lab B":
+            lab_key = self.lab_b.name
+        return f"{field_name} ({lab_key})"
 
-    def footer(self) -> list[str]:
-        return []
+    def header(self) -> list[str]:
+        return [
+            delimited_row(
+                ClassificationLabCompare.csv_header(export_tweak=ExportTweak(sub_label_joiner=self.lab_label))
+            )
+        ]
 
     def row(self, allele_data: AlleleData) -> list[str]:
+        lab_a_cs: list[ClassificationModification] = []
+        lab_b_cs: list[ClassificationModification] = []
+        for cm in allele_data.cms_regardless_of_issues:
+            if cm.lab == self.lab_a:
+                lab_a_cs.append(cm)
+            elif cm.lab == self.lab_b:
+                lab_b_cs.append(cm)
 
-        lab1_comment_data = defaultdict(list)
-        lab2_comment_data = defaultdict(list)
-
-        rows: list[str] = []
-        lab1 = set()
-        lab2 = set()
-        message = ''
-        patient_ids = set()
-        authorised_date_lab1 = set()
-        authorised_date_lab2 = set()
-        created_date_lab1 = set()
-        created_date_lab2 = set()
-        interpretation_summary_lab1 = set()
-        interpretation_summary_lab2 = set()
-        c_hgvs = ''
-
-        if not allele_data.allele_id:
+        if not lab_a_cs and not lab_b_cs:
             return []
-        if self.classification_filter.include_sources:
-            lab_name1, lab_name2 = sorted(self.classification_filter.include_sources)
-            for cm in allele_data.cms_regardless_of_issues:
-                authorised_by = cm.get('curation_verified_by', '')
-                authorised_date = cm.get(SpecialEKeys.CURATION_VERIFIED_DATE, '')
-                created_by = cm.get('curated_by', '')
-                created_date = cm.get(SpecialEKeys.CURATION_DATE, '')
-                patient_id = cm.get(SpecialEKeys.PATIENT_ID, '')
-                c_hgvs = cm.get(SpecialEKeys.C_HGVS, '')
-                interpretation_summary = cm.get(SpecialEKeys.INTERPRETATION_SUMMARY, '')
-                cs = cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-                if patient_id != '':
-                    patient_ids.add(patient_id)
-                if cm.lab == lab_name1:
-                    if cs and cs != 'None':
-                        lab1.add(cs)
-                    for key, value in cm.evidence.items():
-                        lab1_comment_data[key].append(value)
-                    authorised_date_lab1.add(authorised_by + ' ' + authorised_date)
-                    created_date_lab1.add(created_by + ' ' + created_date)
-                    interpretation_summary_lab1.add(interpretation_summary)
-                if cm.lab == lab_name2:
-                    if cs and cs != 'None':
-                        lab2.add(cs)
-                    for key, value in cm.evidence.items():
-                        lab2_comment_data[key].append(value)
-                    authorised_date_lab2.add(authorised_by + ' ' + authorised_date)
-                    created_date_lab2.add(created_by + ' ' + created_date)
-                    interpretation_summary_lab2.add(interpretation_summary)
 
-            lab1_set = ','.join(sorted(lab1))
-            lab2_set = ','.join(sorted(lab2))
-            patient_id_set = ','.join(sorted(patient_ids))
-            authorised_date_lab1_set = ','.join(sorted(authorised_date_lab1))
-            authorised_date_lab2_set = ','.join(sorted(authorised_date_lab2))
-            created_date_lab1_set = ','.join(sorted(created_date_lab1))
-            created_date_lab2_set = ','.join(sorted(created_date_lab2))
-            interpretation_summary_lab1_set = ','.join(sorted(interpretation_summary_lab1))
-            interpretation_summary_lab2_set = ','.join(sorted(interpretation_summary_lab2))
+        lab_a_data = ClassificationLab(self.lab_a, lab_a_cs)
+        lab_b_data = ClassificationLab(self.lab_b, lab_b_cs)
 
-            if lab1_comment_data and lab2_comment_data:
-                for key in lab1_comment_data.keys():
-                    lab1_values = lab1_comment_data[key]
-                    lab2_values = lab2_comment_data[key]
-
-                    comment_data_same = self.compare_comment_data(lab1_values, lab2_values)
-
-                    if not comment_data_same:
-                        message += f'{key}, '
-            else:
-                message = 'No Overlap'
-
-            row = ClassificationlabCompareRow(allele_data=allele_data, c_hgvs=c_hgvs, patient_id=patient_id_set,
-                                              lab_1=lab1_set,
-                                              lab_2=lab2_set,
-                                              lab_1_authorised_date=authorised_date_lab1_set,
-                                              lab_2_authorised_date=authorised_date_lab2_set,
-                                              lab_1_curated_date=created_date_lab1_set,
-                                              lab_2_curated_date=created_date_lab2_set,
-                                              lab_1_interpretation_summary=interpretation_summary_lab1_set,
-                                              lab_2_interpretation_summary=interpretation_summary_lab2_set,
-                                              comment=message
-                                              )
-            rows.append(delimited_row([row.allele_url(), row.c_hgvs, row.patient_id(),
-                                       row.lab_clinical_significance(),
-                                       row.lab2_clinical_significance(),
-                                       row.difference(lab_name1, lab_name2),
-                                       row.lab_1_authorised_date,
-                                       row.lab_2_authorised_date,
-                                       row.authorised_date_diff(),
-                                       row.lab_1_curated_date,
-                                       row.lab_2_curated_date,
-                                       row.created_date_diff(),
-                                       row.comment,
-                                       row.lab_1_interpretation_summary,
-                                       row.lab_2_interpretation_summary,
-                                       ], ','))
-        else:
-            raise ValueError("Error comparing labs")
-        return rows
-
-    def tokenize_text(self, text):
-        tokens = re.findall(r'\b\w+\b', text.lower())
-        return set(tokens)
-
-    def compare_comment_data(self, lab1_values, lab2_values):
-        lab1_tokens = set()
-        lab2_tokens = set()
-
-        for value in lab1_values:
-            lab1_tokens.update(self.tokenize_text(str(value).replace('\\n', ' ')))
-
-        for value in lab2_values:
-            lab2_tokens.update(self.tokenize_text(str(value).replace('\\n', ' ')))
-
-        return lab1_tokens == lab2_tokens
+        return [delimited_row(
+            ClassificationLabCompare(lab_a_data, lab_b_data, self.e_keys).to_csv())
+        ]
