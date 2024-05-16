@@ -7,14 +7,14 @@ from random import random
 from time import time
 from typing import Sequence, Optional
 
-from auditlog.models import AuditlogHistoryField
+from auditlog.models import AuditlogHistoryField, LogEntry
 from auditlog.registry import auditlog
 from cache_memoize import cache_memoize
 from celery.canvas import Signature
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection, models
-from django.db.models import Value, IntegerField
+from django.db.models import Value, IntegerField, QuerySet
 from django.db.models.aggregates import Count
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
@@ -114,9 +114,20 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         """ Returns the node loaded as a subclass """
         return AnalysisNode.objects.get_subclass(pk=self.pk)
 
+    def log_entry_qs(self) -> QuerySet[LogEntry]:
+        # This is put on there via AnalysisNode.get_additional_data
+        return LogEntry.objects.filter(additional_data__analysis_id=self.analysis_id,
+                                       additional_data__node_id=self.pk)
+
+    def has_audit_log(self) -> bool:
+        return self.log_entry_qs().exists()
+
     def get_additional_data(self):
         """ For django-audit-log """
-        return {"analysis_id": self.analysis_id}
+        return {
+            "analysis_id": self.analysis_id,
+            "node_id": self.pk,
+        }
 
     def check_still_valid(self):
         """ Checks that the node is still there and has the version we expect - or throw exception """
@@ -1045,6 +1056,7 @@ class AnalysisEdge(edge_factory(AnalysisNode, concrete=False)):
         """ For django-audit-log """
         return {
             "analysis_id": self.parent.analysis_id,
+            "node_id": self.child.pk,
             "parent": {
                 "id": self.parent.pk,
                 "content_type": get_model_content_type_dict(self.parent),

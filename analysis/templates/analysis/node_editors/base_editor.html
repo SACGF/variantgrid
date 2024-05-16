@@ -214,6 +214,9 @@
 				{% else %}
 					{% block node_editor_not_visible_tab_links %}{% endblock node_editor_not_visible_tab_links %}
 				{% endif %}
+				{% if node.has_audit_log %}
+					<li><a id='tab-link-node-audit-log' href="{% url 'node_audit_log' node.analysis_id node.analysis.version node.pk node.version extra_filters %}">Audit Log</a></li>
+				{% endif %}
 				{% if node_debug_tab %}
 					<li><a id='tab-link-debug' href="{% url 'node_debug' node.analysis_id node.analysis.version node.pk node.version extra_filters %}">Debug</a></li>
 				{% endif %}

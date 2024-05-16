@@ -351,6 +351,18 @@ def node_debug(request, analysis_id, analysis_version, node_id, node_version, ex
     return render(request, "analysis/node_editors/grid_editor_debug_tab.html", context)
 
 
+@not_minified_response
+# @cache_page(WEEK_SECS)
+# @vary_on_cookie
+def node_audit_log(request, analysis_id, analysis_version, node_id, node_version, extra_filters):
+    """ We use analysis version to be able to expire cache if the custom columns etc change """
+    node = get_node_subclass_or_404(request.user, node_id, version=node_version)
+    context = {
+        "node": node
+    }
+    return render(request, "analysis/node_editors/grid_editor_audit_log_tab.html", context)
+
+
 def node_doc(request, analysis_id, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
     has_write_permission = node.analysis.can_write(request.user)
