@@ -979,8 +979,6 @@ const VCForm = (function() {
                 conditionElement = VCForm.format_condition(this.record.resolved_condition);
             } else {
                 let condition = this.value(SpecialEKeys.CONDITION);
-                let condition_url = Urls.condition_matching(this.record.condition_text_match);
-
                 //  if condition matching is enabled, if the user has permission to edit this record
                 //  if the record is germline (somatic text resolution not enabled yet)
                 // AND if the record doesn't have changes (which could cause confusion if there is un-submitted condition text change)
@@ -988,7 +986,8 @@ const VCForm = (function() {
                     this.record.can_write &&
                     this.record.allele_origin_bucket === "G" &&
                     !this.record.has_changes) {
-                    conditionElement = $('<a>', {href: condition_url , title:`Resolve condition text<br>"${_.escape(condition)}"<br>to a standard term`, text: condition, class: 'hover-link edit-link', target: '_blank'});
+                    let conditionUrl = Urls.condition_matching(this.record.condition_text_match);
+                    conditionElement = $('<a>', {href: conditionUrl , title:`Resolve condition text<br>"${_.escape(condition)}"<br>to a standard term`, text: condition, class: 'hover-link edit-link', target: '_blank'});
                 } else {
                     conditionElement = $('<span>', { text: condition });
                 }
