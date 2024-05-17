@@ -1,11 +1,12 @@
 import json
 from typing import Optional
 
+from auditlog.registry import auditlog
 from django.db import models
 from django.db.models import Q
 from django.db.models.deletion import CASCADE
 
-from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from library.jqgrid.jqgrid import JqGrid, format_operation
 from snpdb.models import VariantGridColumn, Variant
 
@@ -107,7 +108,7 @@ class FilterNode(AnalysisNode):
         return copy
 
 
-class FilterNodeItem(models.Model):
+class FilterNodeItem(NodeAuditLogMixin, models.Model):
     filter_node = models.ForeignKey(FilterNode, on_delete=CASCADE)
     sort_order = models.IntegerField()
     operation = models.CharField(max_length=2)
@@ -118,9 +119,16 @@ class FilterNodeItem(models.Model):
     def column(self):
         return VariantGridColumn.objects.get(variant_column=self.field)
 
+    def _get_node(self):
+        return self.filter_node
+
     def __str__(self):
         op = format_operation(self.operation)
         description = f"{self.column.grid_column_name} {op}"
         if self.data:
             description += " " + self.data
         return description
+
+
+auditlog.register(FilterNode)
+auditlog.register(FilterNodeItem)

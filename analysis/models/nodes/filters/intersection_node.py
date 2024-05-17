@@ -3,6 +3,7 @@ import os
 import subprocess
 from typing import Optional
 
+from auditlog.registry import auditlog
 from django.conf import settings
 from django.db import models
 from django.db.models.deletion import SET_NULL
@@ -196,3 +197,6 @@ class IntersectionNode(AnalysisNode):
 def post_delete_intersection_node(sender, instance, **kwargs):  # pylint: disable=unused-argument
     if instance.genomic_interval is not None:
         instance.genomic_interval.delete()
+
+
+auditlog.register(IntersectionNode)

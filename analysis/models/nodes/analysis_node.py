@@ -1,4 +1,5 @@
 """ AnalysisNode is the base class that all analysis nodes inherit from. """
+import abc
 import logging
 import operator
 from collections import defaultdict
@@ -7,12 +8,14 @@ from random import random
 from time import time
 from typing import Sequence, Optional
 
+from auditlog.models import AuditlogHistoryField, LogEntry
+from auditlog.registry import auditlog
 from cache_memoize import cache_memoize
 from celery.canvas import Signature
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection, models
-from django.db.models import Value, IntegerField
+from django.db.models import Value, IntegerField, QuerySet
 from django.db.models.aggregates import Count
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
@@ -35,6 +38,7 @@ from library.django_utils import thread_safe_unique_together_get_or_create
 from library.log_utils import report_event, log_traceback
 from library.utils import format_percent
 from library.utils.database_utils import queryset_to_sql
+from library.utils.django_utils import get_model_content_type_dict
 from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, \
     ProcessingStatus, GenomeBuild, AlleleSource, Contig, SampleFilePath
 from snpdb.variant_collection import write_sql_to_variant_collection
@@ -55,9 +59,24 @@ class NodeInheritanceManager(InheritanceManager):
                                        "analysis__annotation_version__variant_annotation_version__gene_annotation_release")
 
 
-class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
+class NodeAuditLogMixin:
+    @abc.abstractmethod
+    def _get_node(self):
+        self.node
+
+    def get_additional_data(self):
+        """ For django-audit-log """
+        node = self._get_node()
+        return {
+            "analysis_id": node.analysis_id,
+            "node_id": node.pk,
+        }
+
+
+class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     model = Variant
     objects = NodeInheritanceManager()
+    history = AuditlogHistoryField()
     analysis = models.ForeignKey(Analysis, on_delete=CASCADE)
     name = models.TextField(blank=True)
     x = models.IntegerField(default=_default_position)
@@ -109,6 +128,17 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     def get_subclass(self):
         """ Returns the node loaded as a subclass """
         return AnalysisNode.objects.get_subclass(pk=self.pk)
+
+    def log_entry_qs(self) -> QuerySet[LogEntry]:
+        # This is put on there via AnalysisNode.get_additional_data
+        return LogEntry.objects.filter(additional_data__analysis_id=self.analysis_id,
+                                       additional_data__node_id=self.pk)
+
+    def has_audit_log(self) -> bool:
+        return self.log_entry_qs().exists()
+
+    def _get_node(self):
+        return self
 
     def check_still_valid(self):
         """ Checks that the node is still there and has the version we expect - or throw exception """
@@ -1032,8 +1062,27 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         return l
 
 
-class AnalysisEdge(edge_factory(AnalysisNode, concrete=False)):
-    pass
+class AnalysisEdge(NodeAuditLogMixin, edge_factory(AnalysisNode, concrete=False)):
+    def _get_node(self):
+        return self.child
+
+    def get_additional_data(self):
+        """ For django-audit-log """
+
+        additional_data = super().get_additional_data()
+        additional_data.update({
+            "parent": {
+                "id": self.parent.pk,
+                "content_type": get_model_content_type_dict(self.parent),
+                "object_repr": str(self.parent),
+            },
+            "child": {
+                "id": self.child.pk,
+                "content_type": get_model_content_type_dict(self.child),
+                "object_repr": str(self.child),
+            }
+        })
+        return additional_data
 
 
 class NodeTask(TimeStampedModel):
@@ -1192,10 +1241,13 @@ class NodeColumnSummaryData(models.Model):
     count = models.IntegerField(null=False)
 
 
-class NodeVCFFilter(models.Model):
+class NodeVCFFilter(NodeAuditLogMixin, models.Model):
     """ If these exist, they mean use that filter """
     node = models.ForeignKey(AnalysisNode, on_delete=CASCADE)
     vcf_filter = models.ForeignKey(VCFFilter, on_delete=CASCADE, null=True)  # null = 'PASS'
+
+    def _get_node(self):
+        return self.node
 
     @staticmethod
     def get_filter_ids(node):
@@ -1215,10 +1267,13 @@ class NodeVCFFilter(models.Model):
         return filter_codes
 
 
-class NodeAlleleFrequencyFilter(models.Model):
+class NodeAlleleFrequencyFilter(NodeAuditLogMixin, models.Model):
     """ Used for various nodes """
     node = models.OneToOneField(AnalysisNode, on_delete=CASCADE)
     group_operation = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ANY)
+
+    def _get_node(self):
+        return self.node
 
     def get_q(self, allele_frequency_path: str, allele_frequency_percent: bool) -> Optional[Q]:
         af_q = None
@@ -1273,13 +1328,16 @@ class NodeAlleleFrequencyFilter(models.Model):
         return description
 
 
-class NodeAlleleFrequencyRange(models.Model):
+class NodeAlleleFrequencyRange(NodeAuditLogMixin, models.Model):
     MIN_VALUE = 0
     MAX_VALUE = 1
 
     filter = models.ForeignKey(NodeAlleleFrequencyFilter, on_delete=CASCADE)
     min = models.FloatField(null=False)
     max = models.FloatField(null=False)
+
+    def _get_node(self):
+        return self.filter.node
 
     def __str__(self):
         has_min = self.min is not None and self.min > self.MIN_VALUE
@@ -1300,3 +1358,9 @@ class NodeAlleleFrequencyRange(models.Model):
 class AnalysisClassification(models.Model):
     analysis = models.ForeignKey(Analysis, on_delete=CASCADE)
     classification = models.ForeignKey(Classification, on_delete=CASCADE)
+
+
+auditlog.register(AnalysisEdge)
+auditlog.register(NodeVCFFilter)
+auditlog.register(NodeAlleleFrequencyFilter)
+auditlog.register(NodeAlleleFrequencyRange)

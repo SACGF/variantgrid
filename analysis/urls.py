@@ -1,6 +1,7 @@
 from analysis.grids import AnalysesGrid, NodeColumnSummaryGrid, KaromappingAnalysesGrid, AnalysisTemplatesGrid, \
     AnalysisNodeIssuesGrid, NodeOntologyGenesGrid, NodeGeneDiseaseClassificationGenesGrid, \
-    NodeTissueExpressionGenesGrid, NodeTissueUniProtTissueSpecificityGenesGrid, NodeGeneListGenesColumns
+    NodeTissueExpressionGenesGrid, NodeTissueUniProtTissueSpecificityGenesGrid, NodeGeneListGenesColumns, \
+    AnalysisLogEntryColumns
 from analysis.views import views, views_json, views_grid, views_karyomapping, views_autocomplete
 from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
@@ -28,6 +29,9 @@ urlpatterns = [
     perm_path('<int:analysis_id>/<int:analysis_version>/node/view/<int:node_id>/<int:node_version>/<slug:extra_filters>/', views.node_view, name='node_view'),
     perm_path('<int:analysis_id>/node_update/<int:node_id>/', views_json.NodeUpdate.as_view(), name='node_update'),
     perm_path('<int:analysis_id>/<int:analysis_version>/node_debug/<int:node_id>/<int:node_version>/<slug:extra_filters>/', views.node_debug, name='node_debug'),
+    perm_path(
+        '<int:analysis_id>/<int:analysis_version>/node_audit_log/<int:node_id>/<int:node_version>/<slug:extra_filters>/',
+        views.node_audit_log, name='node_audit_log'),
     perm_path('<int:analysis_id>/node_doc/<int:node_id>/', views.node_doc, name='node_doc'),
     perm_path('<int:analysis_id>/node_load/<int:node_id>/', views.node_load, name='node_load'),
     perm_path('<int:analysis_id>/node_cancel_load/<int:node_id>/', views.node_cancel_load, name='node_cancel_load'),
@@ -65,6 +69,8 @@ urlpatterns = [
     perm_path('<int:analysis_id>/settings_node_counts_tab/', views.analysis_settings_node_counts_tab, name='analysis_settings_node_counts_tab'),
     perm_path('<int:analysis_id>/settings_template_run_tab/', views.analysis_settings_template_run_tab,
               name='analysis_settings_template_run_tab'),
+    perm_path('<int:analysis_id>/settings_audit_log_tab/', views.analysis_settings_audit_log_tab,
+              name='analysis_settings_audit_log_tab'),
     perm_path('<int:analysis_id>/reload/', views_json.analysis_reload, name='analysis_reload'),
     perm_path('<int:analysis_id>/input_samples/', views.analysis_input_samples, name='analysis_input_samples'),
     perm_path('sample_patient_gene_disease/<int:sample_id>', views_json.sample_patient_gene_disease, name='sample_patient_gene_disease'),
@@ -122,6 +128,9 @@ urlpatterns = [
               name='analysis_node_gene_list_genes_datatable'),
 
     perm_path('analysis_issues', views.view_analysis_issues, name='analysis_issues'),
+    perm_path('analysis_log_entry/datatable',
+              DatabaseTableView.as_view(column_class=AnalysisLogEntryColumns),
+              name='analysis_log_entry_datatable'),
 
     # Mutational Signature
     perm_path('view_mutational_signature/<int:pk>/', views.view_mutational_signature, name='view_mutational_signature'),

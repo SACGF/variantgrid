@@ -1,5 +1,6 @@
 from typing import Optional, TypeVar
 
+from django.contrib.contenttypes.models import ContentType
 from django.db.models import Model
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
@@ -31,3 +32,11 @@ ModelT = TypeVar("T", bound=Model)
 
 def refresh_for_update(obj: ModelT) -> ModelT:
     return type(obj).objects.filter(pk=obj.pk).select_for_update().get()
+
+
+def get_model_content_type_dict(model):
+    content_type = ContentType.objects.get_for_model(model)
+    return {
+        'app_label': content_type.app_label,
+        'model': content_type.model
+    }

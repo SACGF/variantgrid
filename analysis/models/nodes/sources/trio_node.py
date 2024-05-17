@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from auditlog.registry import auditlog
 from cache_memoize import cache_memoize
 from django.db import models
 from django.db.models import Count
@@ -309,3 +310,7 @@ class TrioNode(AbstractCohortBasedNode):
 
     def __str__(self):
         return f"TrioNode: {self.pk}"
+
+
+auditlog.register(TrioNode)
+

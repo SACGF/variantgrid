@@ -2,6 +2,7 @@ import operator
 from functools import cached_property, reduce
 from typing import Optional
 
+from auditlog.registry import auditlog
 from django.db import models
 from django.db.models import Q, CASCADE, SET_NULL
 
@@ -142,3 +143,6 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
     @property
     def any_zygosity_count_column(self):
         return self.db_counts.germline_counts_alias
+
+
+auditlog.register(AllVariantsNode)

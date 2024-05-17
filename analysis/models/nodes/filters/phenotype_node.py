@@ -4,12 +4,13 @@ import operator
 from functools import cached_property, reduce
 from typing import Optional
 
+from auditlog.registry import auditlog
 from cache_memoize import cache_memoize
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.query_utils import Q
 
-from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from annotation.models import VariantTranscriptAnnotation, OntologyTerm
 from genes.models import GeneSymbol
 from library.constants import DAY_SECS
@@ -229,9 +230,19 @@ class PhenotypeNode(AnalysisNode):
         return "Phenotype"
 
 
-class PhenotypeNodeOntologyTerm(models.Model):
+class PhenotypeNodeOntologyTerm(NodeAuditLogMixin, models.Model):
     phenotype_node = models.ForeignKey(PhenotypeNode, on_delete=CASCADE)
     ontology_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE)
 
     class Meta:
         unique_together = ("phenotype_node", "ontology_term")
+
+    def _get_node(self):
+        return self.phenotype_node
+
+    def __str__(self):
+        return f"PhenoTypeNode: {self.phenotype_node_id} Ontology: {self.ontology_term}"
+
+
+auditlog.register(PhenotypeNode)
+auditlog.register(PhenotypeNodeOntologyTerm)

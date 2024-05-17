@@ -1,7 +1,8 @@
 from collections import defaultdict
-from typing import Optional
+from typing import Optional, Any
 
 import pandas as pd
+from auditlog.models import LogEntry
 from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied
@@ -22,7 +23,7 @@ from library.jqgrid.jqgrid_sql import get_overrides
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
 from library.unit_percent import get_allele_frequency_formatter
-from library.utils import md5sum_str, update_dict_of_dict_values
+from library.utils import md5sum_str, update_dict_of_dict_values, JsonDataType
 from ontology.grids import AbstractOntologyGenesGrid
 from ontology.models import OntologyTermRelation, GeneDiseaseClassification, OntologyVersion
 from patients.models_enums import Zygosity
@@ -33,6 +34,8 @@ from snpdb.grid_columns.grid_sample_columns import get_available_format_columns,
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, CohortGenotype
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.views.datatable_view import DatatableConfig, RichColumn
+from uicore.templatetags.js_tags import jsonify_for_js
 
 
 class VariantGrid(AbstractVariantGrid):
@@ -561,3 +564,113 @@ class NodeGeneListGenesColumns(GeneListGenesColumns):
         if not gene_list_in_node:
             raise PermissionDenied(f"GeneList {gene_list_id} not part of GeneListNode gene lists")
         return gene_list
+
+
+
+def get_analysis_log_entry_summary(action, content_type_model, changes, additional_data) -> Optional[str]:
+    """ If it can come up with a summary, return something, otherwise nothing, and the
+        caller can do it themselves """
+    if content_type_model == "analysisedge":
+        parent = additional_data["parent"]
+        child = additional_data["child"]
+        parent_desc = f"(id={parent['id']},type:{parent['content_type']['model']})"
+        if parent_rep := parent['object_repr']:
+            parent_desc += f" '{parent_rep}'"
+        child_desc = f"(id={child['id']},type:{child['content_type']['model']})"
+        if child_rep := child['object_repr']:
+            child_desc += f" '{child_rep}'"
+
+        if action == LogEntry.Action.CREATE:
+            op = "Attached"
+            desc = "to"
+        elif action == LogEntry.Action.DELETE:
+            op = "Detached"
+            desc = "from"
+        else:
+            raise ValueError("Don't know how to handle analysisedge UPDATE")
+        return f"{op} Parent: {parent_desc} {desc} Child: {child_desc}"
+
+    if action == LogEntry.Action.CREATE:
+        return "Created"
+    elif action == LogEntry.Action.DELETE:
+        return "Deleted"
+    elif action == LogEntry.Action.UPDATE:
+        # Just a move operation
+        changes_set = set(changes.keys())
+        move_set = {"x", "y"}
+        # If only x/y it's a move
+        if changes_set | move_set and not (changes_set - move_set):
+            x = changes.get("x")
+            y = changes.get("y")
+            if x is not None:
+                if y is not None:
+                    return f"Moved to {changes['x'][1]},{changes['y'][1]}"
+                else:
+                    return f"Moved to x={x[1]}"
+            else:
+                return f"Moved to y={y[1]}"
+
+        is_save = changes_set == {"count", "status", "version", "appearance_version"}
+        is_save &= changes.get("status", [None, None])[1] == NodeStatus.DIRTY
+        if is_save:
+            return "Saved"
+    return None
+
+
+
+class AnalysisLogEntryColumns(DatatableConfig[LogEntry]):
+
+    def __init__(self, request):
+        super().__init__(request)
+        self.user = request.user
+        self.analysis = None
+
+        self.rich_columns = [
+            RichColumn(key="timestamp", orderable=True, client_renderer='TableFormat.timestamp'),
+            RichColumn(key="actor__username", orderable=True),
+            RichColumn(key="content_type__model", orderable=True),
+            RichColumn(key=None, name="node_id", label="Node ID", renderer=self.render_node_id),
+            RichColumn(key="object_repr", label="Object"),
+            RichColumn(key="action", label="Action", renderer=self.render_action),
+            RichColumn(key=None, name='summary', label='Summary',
+                       renderer=self.render_summary, client_renderer='renderAnalysisAuditLogSummary'),
+            RichColumn(key="changes", visible=False),
+            RichColumn(key="additional_data", visible=False),
+        ]
+
+    def render_action(self, row: dict[str, Any]) -> JsonDataType:
+        label = ""
+        action = row['action']
+        if action is not None:
+            lookup = dict(LogEntry.Action.choices)
+            label = lookup[action]
+        return label
+
+    def render_node_id(self, row: dict[str, Any]) -> JsonDataType:
+        return row["additional_data"].get("node_id")
+
+    def render_summary(self, row: dict[str, Any]) -> JsonDataType:
+        action = row['action']
+        content_type_model = row["content_type__model"]
+        changes = row["changes"]
+        additional_data = row["additional_data"]
+
+        summary_json = {}
+        if summary_text := get_analysis_log_entry_summary(action, content_type_model, changes, additional_data):
+            summary_json["summary_text"] = summary_text
+        else:
+            summary_json['changes'] = changes
+            summary_json['additional_data'] = additional_data
+        return summary_json
+
+    def get_initial_queryset(self) -> QuerySet[LogEntry]:
+        if node_id := self.get_query_param("node_id"):
+            node = get_node_subclass_or_404(self.user, node_id)
+            qs = node.log_entry_qs()
+        else:
+            analysis_id = self.get_query_param("analysis_id")
+            if analysis_id is None:
+                raise ValueError("'analysis_id' not provided")
+            analysis = Analysis.get_for_user(self.user, pk=analysis_id)
+            qs = analysis.log_entry_qs()
+        return qs

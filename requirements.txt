@@ -1,3 +1,4 @@
+auditlog==3.0.0
 stream-zip==0.0.47
 more-itertools==8.12.0
 beautifulsoup4==4.10.0

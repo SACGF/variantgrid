@@ -676,6 +676,7 @@ MIDDLEWARE = (
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'global_login_required.GlobalLoginRequiredMiddleware',  # Must be after other auth middleware
     'library.django_utils.rollbar_middleware.CustomRollbarNotifierMiddleware',
+    'auditlog.middleware.AuditlogMiddleware',
     #'rollbar.contrib.django.middleware.RollbarNotifierMiddleware',
     # if you want to always avoid 404, use
     # 'rollbar.contrib.django.middleware.RollbarNotifierMiddlewareExcluding404'
@@ -754,6 +755,7 @@ INSTALLED_APPS = [
     'django.contrib.admin',
     "django.contrib.postgres",
     # 3rd party libraries
+    'auditlog',
     'dal',  # Django Autocomplete Light v3
     'dal_select2',  # DAL Plugin
     'django_messages',

@@ -1,5 +1,6 @@
 from typing import Optional
 
+from auditlog.registry import auditlog
 from django.db import models
 from django.db.models import Q
 from django.db.models.deletion import SET_NULL
@@ -57,3 +58,6 @@ class AlleleFrequencyNode(AncestorSampleMixin, AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Allele Frequency"
+
+
+auditlog.register(AlleleFrequencyNode)

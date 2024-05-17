@@ -7,6 +7,7 @@ from functools import cached_property
 
 import numpy as np
 import pandas as pd
+from auditlog.models import LogEntry
 from celery.contrib.abortable import AbortableAsyncResult
 from django.conf import settings
 from django.contrib import messages
@@ -348,6 +349,18 @@ def node_debug(request, analysis_id, analysis_version, node_id, node_version, ex
         except EmptyResultSet:
             pass
     return render(request, "analysis/node_editors/grid_editor_debug_tab.html", context)
+
+
+@not_minified_response
+# @cache_page(WEEK_SECS)
+# @vary_on_cookie
+def node_audit_log(request, analysis_id, analysis_version, node_id, node_version, extra_filters):
+    """ We use analysis version to be able to expire cache if the custom columns etc change """
+    node = get_node_subclass_or_404(request.user, node_id, version=node_version)
+    context = {
+        "node": node
+    }
+    return render(request, "analysis/node_editors/grid_editor_audit_log_tab.html", context)
 
 
 def node_doc(request, analysis_id, node_id):
@@ -778,6 +791,24 @@ def analysis_settings_template_run_tab(request, analysis_id):
     context = {"analysis_template_run": analysis.analysistemplaterun,
                "node_variables": defaultdict_to_dict(node_variables)}
     return render(request, 'analysis/analysis_settings_template_run_tab.html', context)
+
+
+class AnalysisLogEntryWrapper:
+    def __init__(self, log_entry: LogEntry):
+        self.log_entry = log_entry
+
+
+def analysis_settings_audit_log_tab(request, analysis_id):
+    analysis = get_analysis_or_404(request.user, analysis_id)
+    log_entry_wrappers = [
+        AnalysisLogEntryWrapper(le) for le in analysis.log_entry_qs()
+    ]
+
+    context = {
+        "analysis": analysis,
+        "log_entry_wrappers": log_entry_wrappers
+    }
+    return render(request, 'analysis/analysis_settings_audit_log_tab.html', context)
 
 
 @require_POST

@@ -1,0 +1,17 @@
+{% load static %}
+{% load js_tags %}
+
+<div id='node-audit-log-tab'>
+    <script src="{% static 'js/datatables_client_renderers.js' %}"></script>
+    <style>
+    </style>
+    <script>
+        function nodeLogEntrydatatableFilter(data) {
+            data.analysis_id = "{{ node.analysis_id }}";
+            data.node_id = "{{ node.pk }}";
+        }
+    </script>
+
+    <table data-datatable-url="{% url 'analysis_log_entry_datatable' %}" data-datatable-data='nodeLogEntrydatatableFilter' class="import-table sticky-header" responsive="true"></table>
+
+</div>
