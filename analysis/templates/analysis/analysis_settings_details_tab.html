@@ -34,8 +34,6 @@
         const columnsLink = $(`<span><a target='_blank' href='${columnsUrl}'>Manage Custom Columns</a> (opens in new window)</span>`);
         columnsSelect.after(columnsLink);
         
-        $('#force-reload-nodes-button').click(reloadNodes);
-        
         $('#id_annotation_version').change(function() {
             const warningId = 'annotation-version-warning';
             const messages = $('.messages', analysisForm);

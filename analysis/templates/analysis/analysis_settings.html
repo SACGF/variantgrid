@@ -57,6 +57,7 @@
         let analysisTemplateForm = $('form#analysis-template-form');
         analysisTemplateForm.ajaxForm(options);
 
+        $('#force-reload-nodes-button').click(reloadNodes);
         $("button#lock-analysis-button").click(function() { lockAnalysis(); });
         $("button#unlock-analysis-button").click(function() { lockAnalysis(false); });
         // TODO: Lock history...
