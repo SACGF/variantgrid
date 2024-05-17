@@ -399,19 +399,19 @@ $(document).ready(function() {
     if (variantAllele) {
         populateVariantAllele(variantAllele);
     } else {
-    {% if variant.can_have_clingen_allele %}
         // Use Ajax to create + retrieve ClinGenAllele
         let variantAlleleForVariantUrl = "{% url 'variant_allele_for_variant' variant.pk genome_build.pk %}";
         $.ajax(variantAlleleForVariantUrl, {
             suppressErrors: true,
-            success: populateVariantAllele
+            success: populateVariantAllele,
+            error: function() {
+                console.log("Error retrieving allele");
+                // Can't retrieve, just show basics
+                let variantString = "{{ variant|safe }}";
+                let linkData = {variant_string: variantString, variant_coordinate: variantString};
+                populateVariantAllele({link_data: linkData});
+            }
         });
-    {% else %}
-        // Can't retrieve, just show basics
-        let variantString = "{{ variant|safe }}";
-        let linkData = {variant_string: variantString, variant_coordinate: variantString};
-        populateVariantAllele({link_data: linkData});
-    {% endif %}
     }
 
     handlePubMedLinks("{{ variant_annotation.pubmed|default_if_none:''|safe }}");
