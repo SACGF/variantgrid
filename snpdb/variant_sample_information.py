@@ -114,8 +114,13 @@ class VariantSampleInformation:
 
             cgc = CohortGenotypeCollection.objects.get(pk=cgc_id)
             if cgc.cohort_version != cgc.cohort.version:
-                logging.warning("CohortGenotypeCollection %s out of date with Cohort.version", cgc.pk)
-                continue
+                logging.warning("CohortGenotypeCollection (without VCF) %s v.%d out of date with Cohort v.%d",
+                    cgc.pk, cgc.cohort_version, cgc.cohort.version)
+
+                cohort_can_change = cgc.cohort.vcf is None
+                if cohort_can_change:
+                    continue  # Otherwise not really out of date, just a bug - see issue #1053
+
             samples_qs = cgc.cohort.get_samples()
 
             ontology_path = f"patient__{PATIENT_ONTOLOGY_TERM_PATH}__name"
