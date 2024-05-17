@@ -2,6 +2,7 @@ import logging
 import time
 from collections import defaultdict
 
+from auditlog.context import disable_auditlog
 from celery.canvas import Signature
 from django.db.models import F
 from django.db.models.query_utils import Q
@@ -69,50 +70,50 @@ def update_analysis(analysis_id):
 
 
 def reload_analysis_nodes(analysis_id):
-    start = time.time()
+    with disable_auditlog():
+        start = time.time()
+        analysis = Analysis.objects.get(pk=analysis_id)
+        nodes_qs = analysis.analysisnode_set.all()
+        nodes_by_id = get_nodes_by_id(nodes_qs.select_subclasses())
+        parents = defaultdict(list)
+        for parent, child in AnalysisEdge.objects.filter(parent__analysis=analysis).values_list("parent", "child"):
+            parents[child].append(nodes_by_id[parent])
 
-    analysis = Analysis.objects.get(pk=analysis_id)
-    nodes_qs = analysis.analysisnode_set.all()
-    nodes_by_id = get_nodes_by_id(nodes_qs.select_subclasses())
-    parents = defaultdict(list)
-    for parent, child in AnalysisEdge.objects.filter(parent__analysis=analysis).values_list("parent", "child"):
-        parents[child].append(nodes_by_id[parent])
+        analysis_errors = analysis.get_errors()
+        num_nodes = len(nodes_by_id)
+        valid_nodes = []
+        invalid_nodes = []
+        for node_id, node in nodes_by_id.items():
+            node._cached_analysis_errors = analysis_errors
+            node._cached_parents = parents.get(node_id, [])
+            if node.get_errors():
+                invalid_nodes.append(node_id)
+            else:
+                valid_nodes.append(node_id)
 
-    analysis_errors = analysis.get_errors()
-    num_nodes = len(nodes_by_id)
-    valid_nodes = []
-    invalid_nodes = []
-    for node_id, node in nodes_by_id.items():
-        node._cached_analysis_errors = analysis_errors
-        node._cached_parents = parents.get(node_id, [])
-        if node.get_errors():
-            invalid_nodes.append(node_id)
-        else:
-            valid_nodes.append(node_id)
+        update_kwargs = {
+            "status": NodeStatus.DIRTY,
+            "count": None,
+            "errors": None,
+            "cloned_from": None,
+            "version": F("version") + 1,
+            "appearance_version": F("appearance_version") + 1,
+        }
+        if valid_nodes:
+            nodes_qs.filter(pk__in=valid_nodes).update(valid=True, shadow_color=NodeColors.VALID, **update_kwargs)
+        if invalid_nodes:
+            nodes_qs.filter(pk__in=invalid_nodes).update(valid=False, shadow_color=NodeColors.ERROR, **update_kwargs)
 
-    update_kwargs = {
-        "status": NodeStatus.DIRTY,
-        "count": None,
-        "errors": None,
-        "cloned_from": None,
-        "version": F("version") + 1,
-        "appearance_version": F("appearance_version") + 1,
-    }
-    if valid_nodes:
-        nodes_qs.filter(pk__in=valid_nodes).update(valid=True, shadow_color=NodeColors.VALID, **update_kwargs)
-    if invalid_nodes:
-        nodes_qs.filter(pk__in=invalid_nodes).update(valid=False, shadow_color=NodeColors.ERROR, **update_kwargs)
+        node_versions = []
+        for node_id, version in nodes_qs.values_list("pk", "version"):
+            node_versions.append(NodeVersion(node_id=node_id, version=version))
+        if node_versions:
+            NodeVersion.objects.bulk_create(node_versions, ignore_conflicts=True)
 
-    node_versions = []
-    for node_id, version in nodes_qs.values_list("pk", "version"):
-        node_versions.append(NodeVersion(node_id=node_id, version=version))
-    if node_versions:
-        NodeVersion.objects.bulk_create(node_versions, ignore_conflicts=True)
-
-    Analysis.objects.filter(pk=analysis_id).update(modified=timezone.now())
-    end = time.time()
-    logging.info("%d saves took %.2f secs", num_nodes, end-start)
-    return update_analysis(analysis_id)
+        Analysis.objects.filter(pk=analysis_id).update(modified=timezone.now())
+        end = time.time()
+        logging.info("%d saves took %.2f secs", num_nodes, end-start)
+        return update_analysis(analysis_id)
 
 
 def get_rendering_dict(node):
