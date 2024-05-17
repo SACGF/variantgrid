@@ -1327,6 +1327,9 @@ class NodeAlleleFrequencyFilter(NodeAuditLogMixin, models.Model):
             description = f"{self.get_group_operation_display()} of {len(af_ranges)} filters"
         return description
 
+    def __str__(self):
+        return self.get_description()
+
 
 class NodeAlleleFrequencyRange(NodeAuditLogMixin, models.Model):
     MIN_VALUE = 0

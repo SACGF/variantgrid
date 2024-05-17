@@ -29,3 +29,11 @@ function renderAnalysisAuditLogSummary(summary, type, row) {
     }
 
 }
+
+
+function renderExpandAnalysisAuditLogEntry(x) {
+    return formatJson({
+        "changes": x["changes"],
+        "additional_data": x["additional_data"],
+    })
+}

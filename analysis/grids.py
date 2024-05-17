@@ -625,6 +625,7 @@ class AnalysisLogEntryColumns(DatatableConfig[LogEntry]):
         self.user = request.user
         self.analysis = None
 
+        self.expand_client_renderer = "renderExpandAnalysisAuditLogEntry"
         self.rich_columns = [
             RichColumn(key="timestamp", orderable=True, client_renderer='TableFormat.timestamp'),
             RichColumn(key="actor__username", orderable=True),
