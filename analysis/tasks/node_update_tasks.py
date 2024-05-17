@@ -2,6 +2,7 @@ import logging
 from time import sleep
 
 import celery
+from auditlog.context import disable_auditlog
 from celery.contrib.abortable import AbortableTask
 from celery.result import AsyncResult
 from django.db.models import OuterRef, Subquery, F
@@ -28,49 +29,51 @@ def wait_for_task(celery_task):
 
 @celery.shared_task(base=AbortableTask)
 def update_node_task(node_id, version):
-    try:
-        node = AnalysisNode.objects.get_subclass(pk=node_id, version=version)
-    except AnalysisNode.DoesNotExist:  # @UndefinedVariable
-        # Node was deleted or version bumped - this task is obsolete
-        return
+    with disable_auditlog():
 
-    errors = None
-    node_errors = node.get_errors()
-    if not node_errors:
         try:
-            # Even if no errors now, parent nodes can be removed on us during load causing failure
-            # Also will throw NodeOutOfDateException if node already bumped (before calling expensive load())
-            node.set_node_task_and_status(update_node_task.request.id, NodeStatus.LOADING)
-            node.load()
-            # Check if we need to clear shadow color
-            if node.shadow_color == NodeColors.ERROR and node.is_valid():
-                node.update(shadow_color=None)
-            return  # load already modified status, no need to save again below
-        except NodeOutOfDateException:
-            logging.warning("Node %d/%d out of date - exiting Celery task", node.pk, node.version)
-            return  # Other job will handle...
-        except OperationalError:
-            status = NodeStatus.CANCELLED
-        except NodeConfigurationException:
-            status = NodeStatus.ERROR_CONFIGURATION
-        except NodeParentErrorsException:
-            status = NodeStatus.ERROR_WITH_PARENT
-        except Exception:
-            errors = get_traceback()
-            status = NodeStatus.ERROR
-    else:
-        status = AnalysisNode.get_status_from_errors(node_errors)
+            node = AnalysisNode.objects.get_subclass(pk=node_id, version=version)
+        except AnalysisNode.DoesNotExist:  # @UndefinedVariable
+            # Node was deleted or version bumped - this task is obsolete
+            return
 
-    try:
-        logging.info("Node %d/%d status: %s (old: %s) errored: %s ", node.pk, node.version, status, node.status, errors)
-        if NodeStatus.is_error(status):
-            shadow_color = NodeColors.ERROR
+        errors = None
+        node_errors = node.get_errors()
+        if not node_errors:
+            try:
+                # Even if no errors now, parent nodes can be removed on us during load causing failure
+                # Also will throw NodeOutOfDateException if node already bumped (before calling expensive load())
+                node.set_node_task_and_status(update_node_task.request.id, NodeStatus.LOADING)
+                node.load()
+                # Check if we need to clear shadow color
+                if node.shadow_color == NodeColors.ERROR and node.is_valid():
+                    node.update(shadow_color=None)
+                return  # load already modified status, no need to save again below
+            except NodeOutOfDateException:
+                logging.warning("Node %d/%d out of date - exiting Celery task", node.pk, node.version)
+                return  # Other job will handle...
+            except OperationalError:
+                status = NodeStatus.CANCELLED
+            except NodeConfigurationException:
+                status = NodeStatus.ERROR_CONFIGURATION
+            except NodeParentErrorsException:
+                status = NodeStatus.ERROR_WITH_PARENT
+            except Exception:
+                errors = get_traceback()
+                status = NodeStatus.ERROR
         else:
-            shadow_color = None
-        node.update(status=status, errors=errors, shadow_color=shadow_color)
-    except (IntegrityError, NodeOutOfDateException) as e:
-        logging.warning("Node %d/%d out of date: {%s} - exiting Celery task", node.pk, node.version, e)
-        pass  # Out of date or deleted - just ignore
+            status = AnalysisNode.get_status_from_errors(node_errors)
+
+        try:
+            logging.info("Node %d/%d status: %s (old: %s) errored: %s ", node.pk, node.version, status, node.status, errors)
+            if NodeStatus.is_error(status):
+                shadow_color = NodeColors.ERROR
+            else:
+                shadow_color = None
+            node.update(status=status, errors=errors, shadow_color=shadow_color)
+        except (IntegrityError, NodeOutOfDateException) as e:
+            logging.warning("Node %d/%d out of date: {%s} - exiting Celery task", node.pk, node.version, e)
+            pass  # Out of date or deleted - just ignore
 
 
 @celery.shared_task
@@ -137,8 +140,9 @@ def node_cache_task(node_id, version):
     variant_collection.save()
 
     if node.status != NodeStatus.READY:
-        node.status = status
-        node.save()
+        with disable_auditlog():
+            node.status = status
+            node.save()
 
 
 @celery.shared_task

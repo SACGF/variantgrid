@@ -2,6 +2,7 @@ from collections import defaultdict
 from functools import cached_property
 from typing import Union, Optional
 
+from auditlog.context import disable_auditlog
 from auditlog.models import LogEntry
 from auditlog.registry import auditlog
 from django.apps import apps
@@ -219,60 +220,63 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         from analysis.models import AnalysisNode, AnalysisEdge
         from analysis.models.nodes.node_utils import get_toposorted_nodes
 
-        # TODO: Import all the other funcs locally as deps screwed up
+        # No point documenting all this copying
+        with disable_auditlog():
 
-        now = timezone.now()
-        analysis_id = self.pk
-        analysis_copy = self
-        analysis_copy.pk = None  # to save as new
-        analysis_copy.name = f"Copy of {self.name}"
-        analysis_copy.created = now
-        analysis_copy.modified = now
-        if user:
-            analysis_copy.user = user
-        analysis_copy.template_type = None
-        analysis_copy.save()
+            # TODO: Import all the other funcs locally as deps screwed up
 
-        nodes_qs = AnalysisNode.objects.filter(analysis_id=analysis_id).select_subclasses()
-        topo_sorted = get_toposorted_nodes(nodes_qs)
+            now = timezone.now()
+            analysis_id = self.pk
+            analysis_copy = self
+            analysis_copy.pk = None  # to save as new
+            analysis_copy.name = f"Copy of {self.name}"
+            analysis_copy.created = now
+            analysis_copy.modified = now
+            if user:
+                analysis_copy.user = user
+            analysis_copy.template_type = None
+            analysis_copy.save()
 
-        # Still need to copy the edges. Probably need to build up a table of old vs new
-        old_version_and_new_mapping: dict[tuple] = {}
-        old_new_map = {}
+            nodes_qs = AnalysisNode.objects.filter(analysis_id=analysis_id).select_subclasses()
+            topo_sorted = get_toposorted_nodes(nodes_qs)
 
-        nodes = []
-        for group in topo_sorted:
-            for node in group:
-                old_id = node.pk
-                old_version = node.version
-                node.analysis = analysis_copy
-                try:
-                    copy = node.save_clone()
-                except NotImplementedError as nie:
-                    raise NotImplementedError(f"Could not clone node {old_id}") from nie
-                copy.adjust_cloned_parents(old_new_map)
-                copy.save()
+            # Still need to copy the edges. Probably need to build up a table of old vs new
+            old_version_and_new_mapping: dict[tuple] = {}
+            old_new_map = {}
 
-                nodes.append(copy)
+            nodes = []
+            for group in topo_sorted:
+                for node in group:
+                    old_id = node.pk
+                    old_version = node.version
+                    node.analysis = analysis_copy
+                    try:
+                        copy = node.save_clone()
+                    except NotImplementedError as nie:
+                        raise NotImplementedError(f"Could not clone node {old_id}") from nie
+                    copy.adjust_cloned_parents(old_new_map)
+                    copy.save()
 
-                old_version_and_new_mapping[old_id] = (old_version, copy.pk)
-                old_new_map[old_id] = copy
+                    nodes.append(copy)
 
-        for edge in AnalysisEdge.objects.filter(parent__analysis_id=analysis_id):
-            edge.parent_id = old_version_and_new_mapping[edge.parent_id][1]
-            edge.child_id = old_version_and_new_mapping[edge.child_id][1]
-            edge.pk = None
-            edge.save()
+                    old_version_and_new_mapping[old_id] = (old_version, copy.pk)
+                    old_new_map[old_id] = copy
 
-        # re-save all the nodes to re-validate them after all joined up
-        for node in nodes:
-            node.save()
+            for edge in AnalysisEdge.objects.filter(parent__analysis_id=analysis_id):
+                edge.parent_id = old_version_and_new_mapping[edge.parent_id][1]
+                edge.child_id = old_version_and_new_mapping[edge.child_id][1]
+                edge.pk = None
+                edge.save()
 
-        for av in AnalysisVariable.objects.filter(node__analysis_id=analysis_id):
-            new_node = old_new_map[av.node.pk]
-            av.pk = None
-            av.node = new_node
-            av.save()
+            # re-save all the nodes to re-validate them after all joined up
+            for node in nodes:
+                node.save()
+
+            for av in AnalysisVariable.objects.filter(node__analysis_id=analysis_id):
+                new_node = old_new_map[av.node.pk]
+                av.pk = None
+                av.node = new_node
+                av.save()
 
         return analysis_copy
 
@@ -558,31 +562,32 @@ class AnalysisTemplateRun(TimeStampedModel):
         return AnalysisTemplateRun.objects.create(template_version=template_version, analysis=analysis)
 
     def populate_arguments(self, data: dict):
-        for av in AnalysisVariable.objects.filter(node__analysis=self.analysis):
-            if obj := data.get(av.field):
-                # If variable is a model instance - need to load object
-                variable_class = apps.get_model(av.class_name)
-                if isinstance(variable_class, type(Model)):
-                    if isinstance(obj, (str, int)):
-                        obj = variable_class.objects.get(pk=obj)
-                        # Guardian security check (if available)
-                        if check_can_view := getattr(obj, "check_can_view", None):
-                            check_can_view(self.analysis.user)
+        with disable_auditlog():
+            for av in AnalysisVariable.objects.filter(node__analysis=self.analysis):
+                if obj := data.get(av.field):
+                    # If variable is a model instance - need to load object
+                    variable_class = apps.get_model(av.class_name)
+                    if isinstance(variable_class, type(Model)):
+                        if isinstance(obj, (str, int)):
+                            obj = variable_class.objects.get(pk=obj)
+                            # Guardian security check (if available)
+                            if check_can_view := getattr(obj, "check_can_view", None):
+                                check_can_view(self.analysis.user)
 
-                object_class_name = obj._meta.label
-                object_pk = None
-                error = None
-                if object_class_name == av.class_name:
-                    if isinstance(obj, Model):
-                        object_pk = obj.pk
-                else:
-                    error = f"{av} type was: {object_class_name} expected: {av.class_name}"
+                    object_class_name = obj._meta.label
+                    object_pk = None
+                    error = None
+                    if object_class_name == av.class_name:
+                        if isinstance(obj, Model):
+                            object_pk = obj.pk
+                    else:
+                        error = f"{av} type was: {object_class_name} expected: {av.class_name}"
 
-                AnalysisTemplateRunArgument.objects.create(template_run=self,
-                                                           variable=av,
-                                                           object_pk=object_pk,
-                                                           value=str(obj),
-                                                           error=error)
+                    AnalysisTemplateRunArgument.objects.create(template_run=self,
+                                                               variable=av,
+                                                               object_pk=object_pk,
+                                                               value=str(obj),
+                                                               error=error)
 
     def _get_unset_or_errored_variables(self):
         av_qs = AnalysisVariable.objects.filter(node__analysis=self.analysis)
