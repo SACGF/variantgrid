@@ -8,7 +8,7 @@ from django.db.models.query_utils import Q
 
 from analysis.models.enums import TagNodeMode
 from analysis.models.models_variant_tag import VariantTag
-from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from snpdb.models import Tag
 
 
@@ -124,7 +124,7 @@ class TagNode(AnalysisNode):
         return node
 
 
-class TagNodeTag(models.Model):
+class TagNodeTag(NodeAuditLogMixin, models.Model):
     """ Stores multi-select values """
     tag_node = models.ForeignKey(TagNode, on_delete=CASCADE)
     tag = models.ForeignKey(Tag, null=True, blank=True, on_delete=SET_NULL)
@@ -132,5 +132,12 @@ class TagNodeTag(models.Model):
     class Meta:
         unique_together = ("tag_node", "tag")
 
+    def _get_node(self):
+        return self.tag_node
+
+    def __str__(self):
+        return f"TagNodeTag {self.tag_node_id}: {self.tag}"
+
 
 auditlog.register(TagNode)
+auditlog.register(TagNodeTag)

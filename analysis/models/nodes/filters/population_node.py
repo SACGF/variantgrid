@@ -9,7 +9,7 @@ from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
 
 from analysis.models.enums import GroupOperation
-from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from annotation.models.models import VariantAnnotation
 from classification.enums import ClinicalSignificance
 from classification.models.classification import Classification
@@ -270,9 +270,16 @@ class PopulationNode(AnalysisNode):
         return "Population"
 
 
-class PopulationNodeGnomADPopulation(models.Model):
+class PopulationNodeGnomADPopulation(NodeAuditLogMixin, models.Model):
     population_node = models.ForeignKey(PopulationNode, on_delete=CASCADE)
     population = models.CharField(max_length=3, choices=GnomADPopulation.choices)
 
+    def _get_node(self):
+        return self.population_node
+
+    def __str__(self):
+        return f"PopNode {self.population_node_id}: {self.get_population_display()}"
+
 
 auditlog.register(PopulationNode)
+auditlog.register(PopulationNodeGnomADPopulation)

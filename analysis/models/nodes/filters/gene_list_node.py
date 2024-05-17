@@ -9,7 +9,7 @@ from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
 
-from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
 from analysis.models.nodes.gene_coverage_mixin import GeneCoverageMixin
 from annotation.models import VariantTranscriptAnnotation
@@ -240,17 +240,23 @@ def post_delete_gene_list_node(sender, instance, **kwargs):  # pylint: disable=u
         instance.custom_text_gene_list.delete()
 
 
-class GeneListNodeGeneList(models.Model):
+class GeneListNodeGeneList(NodeAuditLogMixin, models.Model):
     gene_list_node = models.ForeignKey(GeneListNode, on_delete=CASCADE)
     gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
 
+    def _get_node(self):
+        return self.gene_list_node
 
-class GeneListNodePanelAppPanel(models.Model):
+
+class GeneListNodePanelAppPanel(NodeAuditLogMixin, models.Model):
     # We want the GeneListNodeForm to save fast, so just store the required panel_app_panel
     # We call the API and retrieve a local cache of the gene list async during node loading
     gene_list_node = models.ForeignKey(GeneListNode, on_delete=CASCADE)
     panel_app_panel = models.ForeignKey(PanelAppPanel, on_delete=CASCADE)
     panel_app_panel_local_cache = models.ForeignKey(PanelAppPanelLocalCache, null=True, on_delete=CASCADE)
+
+    def _get_node(self):
+        return self.gene_list_node
 
     @cached_property
     def gene_list(self):
@@ -262,6 +268,9 @@ class GeneListNodePanelAppPanel(models.Model):
             self.save()
         return self.panel_app_panel_local_cache.get_gene_list(self.gene_list_node.min_panel_app_confidence)
 
+    def __str__(self):
+        return f"GeneListNode {self.gene_list_node_id} panel_app: {self.panel_app_panel}"
 
 auditlog.register(GeneListNode)
+auditlog.register(GeneListNodePanelAppPanel)
 auditlog.register(GeneListNodeGeneList)

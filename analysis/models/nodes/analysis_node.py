@@ -1,4 +1,5 @@
 """ AnalysisNode is the base class that all analysis nodes inherit from. """
+import abc
 import logging
 import operator
 from collections import defaultdict
@@ -58,7 +59,21 @@ class NodeInheritanceManager(InheritanceManager):
                                        "analysis__annotation_version__variant_annotation_version__gene_annotation_release")
 
 
-class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
+class NodeAuditLogMixin:
+    @abc.abstractmethod
+    def _get_node(self):
+        self.node
+
+    def get_additional_data(self):
+        """ For django-audit-log """
+        node = self._get_node()
+        return {
+            "analysis_id": node.analysis_id,
+            "node_id": node.pk,
+        }
+
+
+class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     model = Variant
     objects = NodeInheritanceManager()
     history = AuditlogHistoryField()
@@ -122,12 +137,8 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     def has_audit_log(self) -> bool:
         return self.log_entry_qs().exists()
 
-    def get_additional_data(self):
-        """ For django-audit-log """
-        return {
-            "analysis_id": self.analysis_id,
-            "node_id": self.pk,
-        }
+    def _get_node(self):
+        return self
 
     def check_still_valid(self):
         """ Checks that the node is still there and has the version we expect - or throw exception """
@@ -1051,12 +1062,15 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         return l
 
 
-class AnalysisEdge(edge_factory(AnalysisNode, concrete=False)):
+class AnalysisEdge(NodeAuditLogMixin, edge_factory(AnalysisNode, concrete=False)):
+    def _get_node(self):
+        return self.child
+
     def get_additional_data(self):
         """ For django-audit-log """
-        return {
-            "analysis_id": self.parent.analysis_id,
-            "node_id": self.child.pk,
+
+        additional_data = super().get_additional_data()
+        additional_data.update({
             "parent": {
                 "id": self.parent.pk,
                 "content_type": get_model_content_type_dict(self.parent),
@@ -1067,7 +1081,8 @@ class AnalysisEdge(edge_factory(AnalysisNode, concrete=False)):
                 "content_type": get_model_content_type_dict(self.child),
                 "object_repr": str(self.child),
             }
-        }
+        })
+        return additional_data
 
 
 class NodeTask(TimeStampedModel):
@@ -1226,10 +1241,13 @@ class NodeColumnSummaryData(models.Model):
     count = models.IntegerField(null=False)
 
 
-class NodeVCFFilter(models.Model):
+class NodeVCFFilter(NodeAuditLogMixin, models.Model):
     """ If these exist, they mean use that filter """
     node = models.ForeignKey(AnalysisNode, on_delete=CASCADE)
     vcf_filter = models.ForeignKey(VCFFilter, on_delete=CASCADE, null=True)  # null = 'PASS'
+
+    def _get_node(self):
+        return self.node
 
     @staticmethod
     def get_filter_ids(node):
@@ -1249,10 +1267,13 @@ class NodeVCFFilter(models.Model):
         return filter_codes
 
 
-class NodeAlleleFrequencyFilter(models.Model):
+class NodeAlleleFrequencyFilter(NodeAuditLogMixin, models.Model):
     """ Used for various nodes """
     node = models.OneToOneField(AnalysisNode, on_delete=CASCADE)
     group_operation = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ANY)
+
+    def _get_node(self):
+        return self.node
 
     def get_q(self, allele_frequency_path: str, allele_frequency_percent: bool) -> Optional[Q]:
         af_q = None
@@ -1307,13 +1328,16 @@ class NodeAlleleFrequencyFilter(models.Model):
         return description
 
 
-class NodeAlleleFrequencyRange(models.Model):
+class NodeAlleleFrequencyRange(NodeAuditLogMixin, models.Model):
     MIN_VALUE = 0
     MAX_VALUE = 1
 
     filter = models.ForeignKey(NodeAlleleFrequencyFilter, on_delete=CASCADE)
     min = models.FloatField(null=False)
     max = models.FloatField(null=False)
+
+    def _get_node(self):
+        return self.filter.node
 
     def __str__(self):
         has_min = self.min is not None and self.min > self.MIN_VALUE
@@ -1337,3 +1361,6 @@ class AnalysisClassification(models.Model):
 
 
 auditlog.register(AnalysisEdge)
+auditlog.register(NodeVCFFilter)
+auditlog.register(NodeAlleleFrequencyFilter)
+auditlog.register(NodeAlleleFrequencyRange)

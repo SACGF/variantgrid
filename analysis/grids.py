@@ -573,10 +573,10 @@ def get_analysis_log_entry_summary(action, content_type_model, changes, addition
     if content_type_model == "analysisedge":
         parent = additional_data["parent"]
         child = additional_data["child"]
-        parent_desc = f"(id={parent['id']})"
+        parent_desc = f"(id={parent['id']},type:{parent['content_type']['model']})"
         if parent_rep := parent['object_repr']:
             parent_desc += f" '{parent_rep}'"
-        child_desc = f"(id={child['id']})"
+        child_desc = f"(id={child['id']},type:{child['content_type']['model']})"
         if child_rep := child['object_repr']:
             child_desc += f" '{child_rep}'"
 
@@ -597,8 +597,18 @@ def get_analysis_log_entry_summary(action, content_type_model, changes, addition
     elif action == LogEntry.Action.UPDATE:
         # Just a move operation
         changes_set = set(changes.keys())
-        if changes_set.issuperset({"x", "y"}):  # Only for moves
-            return f"Moved to {changes['x'][1]},{changes['y'][1]}"
+        move_set = {"x", "y"}
+        # If only x/y it's a move
+        if changes_set | move_set and not (changes_set - move_set):
+            x = changes.get("x")
+            y = changes.get("y")
+            if x is not None:
+                if y is not None:
+                    return f"Moved to {changes['x'][1]},{changes['y'][1]}"
+                else:
+                    return f"Moved to x={x[1]}"
+            else:
+                return f"Moved to y={y[1]}"
 
         is_save = changes_set == {"count", "status", "version", "appearance_version"}
         is_save &= changes.get("status", [None, None])[1] == NodeStatus.DIRTY
@@ -619,7 +629,7 @@ class AnalysisLogEntryColumns(DatatableConfig[LogEntry]):
             RichColumn(key="timestamp", orderable=True, client_renderer='TableFormat.timestamp'),
             RichColumn(key="actor__username", orderable=True),
             RichColumn(key="content_type__model", orderable=True),
-            RichColumn(key="object_id", label="Node ID"),
+            RichColumn(key=None, name="node_id", label="Node ID", renderer=self.render_node_id),
             RichColumn(key="object_repr", label="Object"),
             RichColumn(key="action", label="Action", renderer=self.render_action),
             RichColumn(key=None, name='summary', label='Summary',
@@ -636,6 +646,9 @@ class AnalysisLogEntryColumns(DatatableConfig[LogEntry]):
             label = lookup[action]
         return label
 
+    def render_node_id(self, row: dict[str, Any]) -> JsonDataType:
+        return row["additional_data"].get("node_id")
+
     def render_summary(self, row: dict[str, Any]) -> JsonDataType:
         action = row['action']
         content_type_model = row["content_type__model"]
@@ -651,8 +664,13 @@ class AnalysisLogEntryColumns(DatatableConfig[LogEntry]):
         return summary_json
 
     def get_initial_queryset(self) -> QuerySet[LogEntry]:
-        analysis_id = self.get_query_param("analysis_id")
-        if analysis_id is None:
-            raise ValueError("analysis not provided")
-        analysis = Analysis.get_for_user(self.user, pk=analysis_id)
-        return analysis.log_entry_qs()
+        if node_id := self.get_query_param("node_id"):
+            node = get_node_subclass_or_404(self.user, node_id)
+            qs = node.log_entry_qs()
+        else:
+            analysis_id = self.get_query_param("analysis_id")
+            if analysis_id is None:
+                raise ValueError("'analysis_id' not provided")
+            analysis = Analysis.get_for_user(self.user, pk=analysis_id)
+            qs = analysis.log_entry_qs()
+        return qs
