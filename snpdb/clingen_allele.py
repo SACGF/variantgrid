@@ -282,10 +282,6 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
         Successful calls link variants in all builds (that exist)
         errors are only stored on the requesting build """
 
-    if not variant.can_have_clingen_allele:
-        msg = f"No ClinGenAllele for variant: {variant}"
-        raise ClinGenAlleleAPIException(msg)
-
     # In a very rare race condition, we may have 2 VariantAlleles created, in which case just use 1st
     if va := VariantAllele.objects.filter(variant=variant, genome_build=genome_build).order_by("pk").first():
         if va.needs_clingen_call():
@@ -295,10 +291,11 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
                 pass  # Got the allele, have to accept can't get ClinGen
     else:
         if settings.CLINGEN_ALLELE_REGISTRY_LOGIN:
-            try:
-                va = variant_allele_clingen(genome_build, variant, clingen_api=clingen_api)
-            except ClinGenAlleleTooLargeException:
-                pass  # only recoverable exception
+            if variant.can_have_clingen_allele:
+                try:
+                    va = variant_allele_clingen(genome_build, variant, clingen_api=clingen_api)
+                except ClinGenAlleleTooLargeException:
+                    pass  # only recoverable exception
 
         if va is None:
             logging.debug("Not using ClinGen")
@@ -396,6 +393,10 @@ def get_clingen_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
     """ Retrieves from DB or calls API then caches in DB   """
     if clingen_api is None:
         clingen_api = ClinGenAlleleRegistryAPI()
+
+    if not variant.can_have_clingen_allele:
+        msg = f"No ClinGenAllele possible for variant: {variant}"
+        raise ClinGenAlleleAPIException(msg)
 
     va = get_variant_allele_for_variant(genome_build, variant, clingen_api=clingen_api)
     if va.allele.clingen_allele is None:
