@@ -64,8 +64,8 @@ class NodeUpdate(NodeJSONPostView):
         logging.debug("Loaded node %s version %d", node.pk, node.version)
 
         if op == "move":
-            node.x = params['x']
-            node.y = params['y']
+            node.x = int(params['x'])
+            node.y = int(params['y'])
             node.save()
         elif op == "update_connection":
             parent_id = params["parent_id"]

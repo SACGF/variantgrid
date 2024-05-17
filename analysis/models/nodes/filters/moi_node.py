@@ -9,7 +9,7 @@ from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.query_utils import Q
 
-from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.analysis_node import AnalysisNode, NodeAuditLogMixin
 from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
 from annotation.models import VariantTranscriptAnnotation, OntologyTerm
 from genes.models import GeneSymbol
@@ -236,15 +236,21 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
         return "Mode of Inheritance"
 
 
-class MOINodeOntologyTerm(models.Model):
+class MOINodeOntologyTerm(NodeAuditLogMixin, models.Model):
     node = models.ForeignKey(MOINode, on_delete=CASCADE)
     ontology_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE)
 
     class Meta:
         unique_together = ("node", "ontology_term")
 
+    def _get_node(self):
+        return self.node
 
-class MOINodeModeOfInheritance(models.Model):
+    def __str__(self):
+        return f"MOINode {self.node_id}: ont={self.ontology_term}"
+
+
+class MOINodeModeOfInheritance(NodeAuditLogMixin, models.Model):
     """ If you have none of these, use any """
     node = models.ForeignKey(MOINode, on_delete=CASCADE)
     mode_of_inheritance = models.TextField()
@@ -252,8 +258,14 @@ class MOINodeModeOfInheritance(models.Model):
     class Meta:
         unique_together = ("node", "mode_of_inheritance")
 
+    def _get_node(self):
+        return self.node
 
-class MOINodeSubmitter(models.Model):
+    def __str__(self):
+        return f"MOINode {self.node_id}: MOI {self.mode_of_inheritance}"
+
+
+class MOINodeSubmitter(NodeAuditLogMixin, models.Model):
     """ If you have none of these, use any """
     node = models.ForeignKey(MOINode, on_delete=CASCADE)
     submitter = models.TextField()
@@ -261,5 +273,14 @@ class MOINodeSubmitter(models.Model):
     class Meta:
         unique_together = ("node", "submitter")
 
+    def _get_node(self):
+        return self.node
+
+    def __str__(self):
+        return f"MOINode {self.node_id}: sub: {self.submitter}"
+
 
 auditlog.register(MOINode)
+auditlog.register(MOINodeOntologyTerm)
+auditlog.register(MOINodeModeOfInheritance)
+auditlog.register(MOINodeSubmitter)
