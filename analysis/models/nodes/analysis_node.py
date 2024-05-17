@@ -8,6 +8,7 @@ from random import random
 from time import time
 from typing import Sequence, Optional
 
+from auditlog.context import disable_auditlog
 from auditlog.models import AuditlogHistoryField, LogEntry
 from auditlog.registry import auditlog
 from cache_memoize import cache_memoize
@@ -1011,43 +1012,44 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         """ If you need to do something with old/new parents """
 
     def save_clone(self):
-        node_id = self.pk
-        try:
-            # Have sometimes had race condition where we try to clone a node that has been updated
-            # In that case we'll just miss out on the cache
-            original_node_version = self.node_version
-        except NodeVersion.DoesNotExist:
-            original_node_version = None
+        with disable_auditlog():
+            node_id = self.pk
+            try:
+                # Have sometimes had race condition where we try to clone a node that has been updated
+                # In that case we'll just miss out on the cache
+                original_node_version = self.node_version
+            except NodeVersion.DoesNotExist:
+                original_node_version = None
 
-        copy = self
-        # Have to set both id/pk to None when using model inheritance
-        copy.id = None
-        copy.pk = None
-        copy.version = 1  # 0 is for those being constructed in analysis templates
-        # Store cloned_from so we can use original's NodeCounts
-        copy.cloned_from = original_node_version
-        copy.save()
+            copy = self
+            # Have to set both id/pk to None when using model inheritance
+            copy.id = None
+            copy.pk = None
+            copy.version = 1  # 0 is for those being constructed in analysis templates
+            # Store cloned_from so we can use original's NodeCounts
+            copy.cloned_from = original_node_version
+            copy.save()
 
-        for npf in NodeVCFFilter.objects.filter(node_id=node_id):
-            npf.pk = None
-            npf.node = copy
-            npf.save()
+            for npf in NodeVCFFilter.objects.filter(node_id=node_id):
+                npf.pk = None
+                npf.node = copy
+                npf.save()
 
-        naff = NodeAlleleFrequencyFilter.objects.filter(node_id=node_id).first()  # 1-to-1
-        if naff:
-            af_frequency_ranges = list(naff.nodeallelefrequencyrange_set.all().values_list("min", "max"))
-            # Use existing if already created for node (eg AlleleFrequencyNode always makes one)
-            copy_naff, created = NodeAlleleFrequencyFilter.objects.get_or_create(node=copy)
-            if not created:
-                # Wipe out defaults to clear way for clone
-                copy_naff.nodeallelefrequencyrange_set.all().delete()
-            copy_naff.group_operation = naff.group_operation
-            copy_naff.save()
+            naff = NodeAlleleFrequencyFilter.objects.filter(node_id=node_id).first()  # 1-to-1
+            if naff:
+                af_frequency_ranges = list(naff.nodeallelefrequencyrange_set.all().values_list("min", "max"))
+                # Use existing if already created for node (eg AlleleFrequencyNode always makes one)
+                copy_naff, created = NodeAlleleFrequencyFilter.objects.get_or_create(node=copy)
+                if not created:
+                    # Wipe out defaults to clear way for clone
+                    copy_naff.nodeallelefrequencyrange_set.all().delete()
+                copy_naff.group_operation = naff.group_operation
+                copy_naff.save()
 
-            for min_value, max_value in af_frequency_ranges:
-                copy_naff.nodeallelefrequencyrange_set.create(min=min_value, max=max_value)
+                for min_value, max_value in af_frequency_ranges:
+                    copy_naff.nodeallelefrequencyrange_set.create(min=min_value, max=max_value)
 
-        return copy
+            return copy
 
     def __str__(self):
         return self.name
