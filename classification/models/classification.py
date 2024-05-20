@@ -536,16 +536,16 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return None
 
     @property
-    def chgvs_grch37_full(self) -> Optional[str]:
+    def chgvs_grch37_compat(self) -> Optional[str]:
         try:
-            return self.allele_info.grch37.c_hgvs_full
+            return self.allele_info.grch37.c_hgvs_compat
         except AttributeError:
             return None
 
     @property
-    def chgvs_grch38_full(self) -> Optional[str]:
+    def chgvs_grch38_compat(self) -> Optional[str]:
         try:
-            return self.allele_info.grch38.c_hgvs_full
+            return self.allele_info.grch38.c_hgvs_compat
         except AttributeError:
             return None
 
@@ -2076,11 +2076,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 })
         return c_hgvs
 
-    def get_c_hgvs(self, genome_build: GenomeBuild, use_full: bool = False) -> Optional[str]:
+    def get_c_hgvs(self, genome_build: GenomeBuild, use_compat: bool = False) -> Optional[str]:
         if genome_build == genome_build.grch37():
-            return self.chgvs_grch37 if not use_full else self.chgvs_grch37_full
+            return self.chgvs_grch37 if not use_compat else self.chgvs_grch37_compat
         if genome_build == genome_build.grch38():
-            return self.chgvs_grch38 if not use_full else self.chgvs_grch38_full
+            return self.chgvs_grch38 if not use_compat else self.chgvs_grch38_compat
         return self._generate_c_hgvs(genome_build)
 
     def __str__(self) -> str:

@@ -478,7 +478,7 @@ class HGVSVariant(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def format(self, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH):
+    def format(self, use_compat=False, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH):
         pass
 
     def __repr__(self):
