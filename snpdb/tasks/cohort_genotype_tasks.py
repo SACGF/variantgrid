@@ -75,19 +75,23 @@ def create_cohort_genotype_collection(cohort):
     name = f"{cohort.name} ({cohort.pk}:{cohort.version})"
     num_samples = cohort.cohortsample_set.count()
     common_collection = None
+    kwargs = {
+        "cohort": cohort,
+        "cohort_version": cohort.version,
+        "num_samples": num_samples,
+    }
+
     if common_filter := get_common_filter(cohort.genome_build):
         common_collection = CohortGenotypeCollection.objects.create(name=f"{name} common",
-                                                                    cohort=cohort,
-                                                                    cohort_version=0,  # so it isn't retrieved
                                                                     common_filter=common_filter,
-                                                                    num_samples=num_samples)
+                                                                    collection_type=CohortGenotypeCollectionType.COMMON,
+                                                                    **kwargs)
         logging.info(f"Created common collection: {common_collection}")
 
     collection = CohortGenotypeCollection.objects.create(name=name,
-                                                         cohort=cohort,
-                                                         cohort_version=cohort.version,
                                                          common_collection=common_collection,
-                                                         num_samples=num_samples)
+                                                         collection_type=CohortGenotypeCollectionType.UNCOMMON,
+                                                         **kwargs)
 
     logging.info(f"Created {collection}")
     return collection
@@ -95,6 +99,7 @@ def create_cohort_genotype_collection(cohort):
 
 def _get_sample_zygosity_count_sql(sample_value, zygosity):
     return f'CASE WHEN (({sample_value}) = \'{zygosity}\') THEN 1 ELSE 0 END'
+
 
 def _get_left_outer_join_on_variant(partition_table):
     return f'LEFT OUTER JOIN "{partition_table}" ON ("snpdb_variant"."id" = "{partition_table}"."variant_id")'
