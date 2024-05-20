@@ -35,7 +35,6 @@ from snpdb.grids import AbstractVariantGrid
 from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, CohortGenotype
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.views.datatable_view import DatatableConfig, RichColumn
-from uicore.templatetags.js_tags import jsonify_for_js
 
 
 class VariantGrid(AbstractVariantGrid):

@@ -8,8 +8,8 @@ from annotation.manual_variant_entry import check_can_create_variants, CreateMan
 from annotation.models import VariantAnnotation
 from annotation.templatetags.clinvar_tags import ClinVarDetails
 from classification.models import Classification, ImportedAlleleInfo
-from snpdb.models import Allele, GenomeBuild, VariantAllele, GenomeFasta, Contig, \
-    Variant, AlleleOrigin, AlleleMergeLog, LiftoverRun, AlleleLiftover, ProcessingStatus
+from snpdb.models import Allele, GenomeBuild, VariantAllele, \
+    Variant, AlleleOrigin, AlleleMergeLog, LiftoverRun, AlleleLiftover
 from snpdb.variant_links import variant_link_info
 
 

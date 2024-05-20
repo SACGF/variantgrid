@@ -1,13 +1,10 @@
-from collections import defaultdict
-from dataclasses import dataclass
-from typing import Set, Optional, List
+from typing import Set
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
-from more_itertools import first
 
 from classification.enums import SpecialEKeys, ShareLevel
 from classification.models import ImportedAlleleInfo

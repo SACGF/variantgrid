@@ -10,8 +10,8 @@ from django.utils import timezone
 
 from annotation.clinvar_xml_parser import CLINVAR_RECORD_CACHE_DAYS, ClinVarXmlParser
 from annotation.clinvar_xml_parser_via_vcv import ClinVarXmlParserViaVCV
-from annotation.models import ClinVarRecordCollection, ClinVar, ClinVarVersion
-from snpdb.models import VariantAllele, GenomeBuild, Allele
+from annotation.models import ClinVarRecordCollection, ClinVarVersion
+from snpdb.models import GenomeBuild, Allele
 
 
 @dataclass

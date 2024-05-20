@@ -1,7 +1,7 @@
 # DO NOT import any models, so keep this safe to be used by migrations
 import contextlib
 from collections import defaultdict
-from typing import Optional, Any
+from typing import Optional
 
 
 class OptionUpdator:

@@ -10,7 +10,7 @@ from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
-from genes.models import Gene, GeneSymbol
+from genes.models import GeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from patients.models_enums import Zygosity
 from snpdb.models import GenomicInterval, Trio, Variant
