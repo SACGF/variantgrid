@@ -258,6 +258,16 @@ class ClinVarRecord(TimeStampedModel):
     allele_origin = models.TextField(null=True, blank=True)
     allele_origin_bucket = models.TextField(choices=AlleleOriginBucket.choices, null=True, blank=True)
 
+    @property
+    def conditions(self) -> list[str]:
+        if condition := self.condition:
+            if ":" in condition and ";" in condition:
+                parts = [p.strip() for p in condition.split(";")]
+                return parts
+            else:
+                return [condition]
+        return []
+
     def mark_invalid(self):
         setattr(self, '_invalid', True)
 

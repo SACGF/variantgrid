@@ -62,7 +62,7 @@
                             <span class="no-value">-</span>
                         {% endif %}
                     </td>
-                    <td class="dt-condition">{% if record.condition %}{% ontology_term record.condition %}{% else %}<span class="no-value">-</span>{% endif %}</td>
+                    <td class="dt-condition">{% for condition in record.conditions %}<div>{% ontology_term condition %}</div>{% empty %}<span class="no-value">-</span>{% endfor %}</td>
                     <td class="dt-created text-center">{% timestamp record.date_last_evaluated time_ago=True %}</td>
                 </tr>
             {% endfor %}
