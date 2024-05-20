@@ -123,7 +123,7 @@ class ClinVarXmlParser(XmlParser, ABC):
         self.reset()
 
     @staticmethod
-    def clean_term_id_from_elem(elem):
+    def clean_term_id_from_elem(elem) -> str:
         db = elem.get("DB")
         id = elem.get("ID")
         final_value = None
