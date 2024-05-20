@@ -2,8 +2,6 @@ import logging
 import subprocess
 from typing import Optional
 
-from django.conf import settings
-
 
 def execute_cmd(cmd: list, **kwargs) -> tuple[int, Optional[str], Optional[str]]:
     if kwargs.pop("shell", False):
