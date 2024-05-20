@@ -62,6 +62,6 @@ class GenesConfig(AppConfig):
                 version_required()
             else:
                 version_str = metadata.version(name)
-                version = tuple([int(i) for i in version_str.split(".")])
+                version = tuple(int(i) for i in version_str.split("."))
                 if version < version_required:
                     logging.error("Library %s (%s) requires version >= %s", name, version, version_required)
