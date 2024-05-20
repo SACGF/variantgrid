@@ -52,6 +52,7 @@ dependencies:
   - lxml=5.2.1
   #- setuptools-rust=1.9.0
   - pip:
+      - django-auditlog==3.0.0
       - setuptools_rust==1.9.0
       - fastobo==0.12.3
       - cyvcf2==0.30.28
