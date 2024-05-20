@@ -163,7 +163,7 @@ class ClinVarExportSync:
         if batch.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
             raise ClinVarRequestException(
                 exception_type=ClinVarRequestExceptionType.NOT_SUPPORTED_YET,
-                message=f"Cannot yet action non-germline submissions"
+                message="Cannot yet action non-germline submissions"
             )
 
         clinvar_request: ClinVarExportRequest

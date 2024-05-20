@@ -5,7 +5,7 @@ from ontology.models import OntologyTerm
 
 def condition_text_search(search_text: str, row_limit: int = 10) -> list[OntologyTerm]:
     response = requests.get(
-        f'https://api.monarchinitiative.org/v3/api/search', {
+        'https://api.monarchinitiative.org/v3/api/search', {
             "q": search_text,
             "category": "biolink:Disease",
             "limit": row_limit
