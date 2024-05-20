@@ -12,8 +12,8 @@ from library.utils import single_quote
 from library.utils.database_utils import run_sql
 from patients.models_enums import Zygosity
 from snpdb.common_variants import get_common_filter
-from snpdb.models import Cohort, ImportStatus, CohortGenotypeCommonFilterVersion, Variant, CommonVariantClassified
-from snpdb.models import CohortGenotypeCollection, CohortGenotype, CohortGenotypeTaskVersion
+from snpdb.models import Cohort, ImportStatus, CohortGenotypeCommonFilterVersion, Variant, CommonVariantClassified, \
+    CohortGenotypeCollection, CohortGenotype, CohortGenotypeTaskVersion, CohortGenotypeCollectionType
 
 
 def create_cohort_genotype_and_launch_task(cohort, run_async=True):
