@@ -179,8 +179,12 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
 
     @cached_property
     def cohort_genotype_collection(self):
+        """ This is used to get the alias - which is either UNCOMMON if doing a rare filter, or BOTH common/uncommon
+            if not doing rare pop filter """
         cohort = self.get_base_cohort()
-        return CohortGenotypeCollection.objects.get(cohort=cohort, cohort_version=cohort.version)
+        return CohortGenotypeCollection.objects.get(cohort=cohort,
+                                                    cohort_version=cohort.version,
+                                                    collection_type=CohortGenotypeCollectionType.UNCOMMON)
 
     def get_vcf(self):
         return self.get_base_cohort().vcf
