@@ -176,7 +176,7 @@ class TestClinVarExport(TestCase):
             variant=variant,
             allele_info=allele_info,
             c_hgvs="NM_000001.2(TECTA):c.1913G>A",
-            c_hgvs_full="NM_000001.2(TECTA):c.1913G>A"
+            c_hgvs_compat="NM_000001.2(TECTA):c.1913G>A"
         )
         allele_info.grch37 = variant_info
         allele_info.latest_validation = validation

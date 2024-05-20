@@ -75,7 +75,7 @@ class ResolvedVariantInfo(TimeStampedModel):
             c_hgvs.genome_build = self.genome_build
             return c_hgvs
 
-    c_hgvs_full = TextField(null=True, blank=True)
+    c_hgvs_compat = TextField(null=True, blank=True)
     """ c.HGVS with all bases explicit in the case of dels & dups """
 
     gene_symbol = ForeignKey(GeneSymbol, null=True, on_delete=SET_NULL)
@@ -115,7 +115,7 @@ class ResolvedVariantInfo(TimeStampedModel):
             raise ValueError("set_variant_and_save requires a non-None variant")
 
         self.c_hgvs = None
-        self.c_hgvs_full = None
+        self.c_hgvs_compat = None
         self.gene_symbol = None
         self.transcript_version: Optional[TranscriptVersion] = None
 
@@ -131,7 +131,8 @@ class ResolvedVariantInfo(TimeStampedModel):
             c_hgvs = hgvs_variant.format()
             c_hgvs_obj = CHGVS(c_hgvs)
             self.c_hgvs = c_hgvs
-            self.c_hgvs_full = hgvs_variant.format(max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH)
+            self.c_hgvs_compat = hgvs_variant.format(use_compat=True,
+                                                     max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH)
             self.transcript_version = c_hgvs_obj.transcript_version_model(genome_build=genome_build)
             self.gene_symbol = GeneSymbol.objects.filter(symbol=c_hgvs_obj.gene_symbol).first()
         except Exception as exception:

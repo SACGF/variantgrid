@@ -5,6 +5,7 @@ from importlib import metadata
 from bioutils.sequences import reverse_complement
 from django.conf import settings
 from hgvs.assemblymapper import AssemblyMapper
+from hgvs.edit import NARefAlt
 from hgvs.exceptions import HGVSDataNotAvailableError, HGVSError, HGVSInvalidVariantError
 from hgvs.extras.babelfish import Babelfish
 from hgvs.normalizer import Normalizer
@@ -80,9 +81,16 @@ class BioCommonsHGVSVariant(HGVSVariant):
     def get_cdna_coords(self) -> str:
         return str(self._sequence_variant.posedit.pos.start)
 
-    def format(self, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH):
+    def format(self, use_compat=False, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH):
+        sv: SequenceVariant = self._sequence_variant
+        if use_compat:
+            if sv.posedit.edit.type == "inv":
+                ref = sv.posedit.edit.ref
+                sv.posedit.edit = NARefAlt(ref=ref, alt=reverse_complement(ref))
+
         conf = {"max_ref_length": max_ref_length}
-        return self._sequence_variant.format(conf)
+        return sv.format(conf)
+
 
 
 class BioCommonsHGVSConverter(HGVSConverter):

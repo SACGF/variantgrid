@@ -66,18 +66,18 @@ class CHGVSData:
     @staticmethod
     def split_into_c_hgvs(
             allele_data: AlleleData,
-            use_full: bool) -> Iterable['CHGVSData']:
+            use_compat: bool) -> Iterable['CHGVSData']:
         """
         Break up an AlleleData into sub CHGVSDatas
         :param allele_data: The Alissa data to split
-        :param use_full: Should the c.hgvs use explicit bases when optional (required by Alissa)
+        :param use_compat: Subset of HGVS supported by Agilent Alissa)
         :return: An array of c.hgvs based data, most often will only be 1 record
         """
         by_versionless_transcript: dict[str, TranscriptGroup] = defaultdict(TranscriptGroup)
 
         genome_build = allele_data.source.genome_build
         for vcm in allele_data.cms:
-            c_parts = CHGVS(vcm.classification.get_c_hgvs(genome_build=genome_build, use_full=use_full))
+            c_parts = CHGVS(vcm.classification.get_c_hgvs(genome_build=genome_build, use_compat=use_compat))
             if c_parts:
                 transcript_parts = c_parts.transcript_parts
                 if transcript_parts:

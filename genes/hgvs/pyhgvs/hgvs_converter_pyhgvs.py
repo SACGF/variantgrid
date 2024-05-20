@@ -59,7 +59,7 @@ class PyHGVSVariant(HGVSVariant):
     def get_cdna_coords(self) -> str:
         return self._hgvs_name.format_cdna_coords()
 
-    def format(self, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH) -> Optional[str]:
+    def format(self, use_compat=False, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH) -> Optional[str]:
         # would be better practise to throw an error if we couldn't generate
         # but this keeps existing behaviour
         if not self._hgvs_name:

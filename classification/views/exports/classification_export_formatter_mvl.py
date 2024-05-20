@@ -383,7 +383,7 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
             return []
 
     def row(self, allele_data: AlleleData) -> list[str]:
-        c_datas = CHGVSData.split_into_c_hgvs(allele_data, use_full=True)
+        c_datas = CHGVSData.split_into_c_hgvs(allele_data, use_compat=True)
 
         if self.file_format == FormatDetailsMVLFileFormat.HTML:
             output = []
