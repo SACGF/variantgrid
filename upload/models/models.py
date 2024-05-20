@@ -349,7 +349,6 @@ class UploadStep(models.Model):
             pass
         self.upload_pipeline.error(self.error_message)
 
-
     @transaction.atomic()
     def mark_timed_out(self, user: Optional[User] = None):
         self.status = ProcessingStatus.TIMED_OUT

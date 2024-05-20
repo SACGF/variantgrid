@@ -313,4 +313,3 @@ class TrioNode(AbstractCohortBasedNode):
 
 
 auditlog.register(TrioNode)
-

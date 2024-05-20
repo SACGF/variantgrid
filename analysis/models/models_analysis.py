@@ -669,5 +669,4 @@ class SampleAnalysisTemplateRun(models.Model):
         unique_together = ('sample', 'analysis_template_run')
 
 
-
 auditlog.register(Analysis)

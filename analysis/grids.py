@@ -566,7 +566,6 @@ class NodeGeneListGenesColumns(GeneListGenesColumns):
         return gene_list
 
 
-
 def get_analysis_log_entry_summary(action, content_type_model, changes, additional_data) -> Optional[str]:
     """ If it can come up with a summary, return something, otherwise nothing, and the
         caller can do it themselves """
@@ -615,7 +614,6 @@ def get_analysis_log_entry_summary(action, content_type_model, changes, addition
         if is_save:
             return "Saved"
     return None
-
 
 
 class AnalysisLogEntryColumns(DatatableConfig[LogEntry]):
