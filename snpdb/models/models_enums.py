@@ -227,3 +227,8 @@ class DataState(models.TextChoices):
     @staticmethod
     def should_create_new_record(data_state):
         return data_state not in [DataState.DELETED, DataState.SKIPPED]
+
+
+class CohortGenotypeCollectionType(models.TextChoices):
+    COMMON = "C", "Common"
+    UNCOMMON = "U", "Uncommon"

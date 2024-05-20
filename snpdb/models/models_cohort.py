@@ -26,7 +26,7 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsA
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import invert_dict
 from patients.models_enums import Zygosity
-from snpdb.models.models_enums import ImportStatus
+from snpdb.models.models_enums import ImportStatus, CohortGenotypeCollectionType
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant
 from snpdb.models.models_vcf import VCF, Sample
@@ -376,13 +376,23 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
     celery_task = models.CharField(max_length=36, null=True)
     task_version = models.ForeignKey(CohortGenotypeTaskVersion, null=True, on_delete=CASCADE)
     marked_for_deletion = models.BooleanField(null=False, default=False)
-    # common_collection will be set on the 'interesting/rare' CGC
+    collection_type = models.CharField(max_length=1, choices=CohortGenotypeCollectionType.choices,
+                                       default=CohortGenotypeCollectionType.UNCOMMON)
+    # common_collection will be set on the 'uncommon' (interesting/rare) CGC
     common_collection = models.OneToOneField('self', null=True, related_name="uncommon", on_delete=CASCADE)
     # common filter will be set on the 'common' CGC
     common_filter = models.ForeignKey(CohortGenotypeCommonFilterVersion, null=True, on_delete=PROTECT)
 
     class Meta:
-        unique_together = ('cohort', 'cohort_version')
+        unique_together = ('cohort', 'cohort_version', 'collection_type')
+
+    def __str__(self) -> str:
+        parts = [f"CohortGenotypeCollection: {self.cohort}"]
+        if self.cohort_version != self.cohort.version:
+            parts.append(f"(v.{self.cohort.version} != {self.cohort_version})")
+        if self.common_filter:
+            parts.append(str(self.common_filter))
+        return " ".join(parts)
 
     def percent_common(self) -> float:
         common = self.common_collection.cohortgenotype_set.count()
