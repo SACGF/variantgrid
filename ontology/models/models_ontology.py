@@ -44,9 +44,11 @@ class OntologyService(models.TextChoices):
     HPO = "HP", "HP"
     HGNC = "HGNC", "HGNC"
 
+    #Not stored locally
     DOID = "DOID", "DOID"
     ORPHANET = "ORPHA", "ORPHA"
     MEDGEN = "MedGen", "MedGen"
+    MeSH = "MeSH", "MeSH"
 
     EXPECTED_LENGTHS: dict[str, int] = Constant({
         MONDO[0]: 7,
@@ -55,7 +57,8 @@ class OntologyService(models.TextChoices):
         HGNC[0]: 1,  # HGNC ids aren't typically 0 padded, because they're not monsters
         DOID[0]: None,  # variable length with padded 0s
         ORPHANET[0]: 1,  # ORPHANET ids aren't typically 0 padded
-        MEDGEN[0]: None
+        MEDGEN[0]: None,
+        MeSH[0]: None
     })
 
     IMPORTANCE: dict[str, int] = Constant({
@@ -65,7 +68,8 @@ class OntologyService(models.TextChoices):
         DOID[0]: 5,
         ORPHANET[0]: 6,
         HGNC[0]: 1,  # show gene relationships first
-        MEDGEN[0]: 7
+        MEDGEN[0]: 7,
+        MeSH[0]: 8
     })
 
     URLS: dict[str, str] = Constant({
@@ -75,7 +79,8 @@ class OntologyService(models.TextChoices):
         HGNC[0]: "https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:${1}",
         DOID[0]: "https://www.ebi.ac.uk/ols/ontologies/doid/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FDOID_${1}",
         ORPHANET[0]: "https://www.orpha.net/consor/cgi-bin/OC_Exp.php?lng=EN&Expert=${1}",
-        MEDGEN[0]: "https://www.ncbi.nlm.nih.gov/medgen/${1}"
+        MEDGEN[0]: "https://www.ncbi.nlm.nih.gov/medgen/${1}",
+        MeSH[0]: "https://meshb.nlm.nih.gov/record/ui?ui=${1}"
     })
 
     LOCAL_ONTOLOGY_PREFIXES: set[str] = Constant({
@@ -91,7 +96,8 @@ class OntologyService(models.TextChoices):
         HPO[0],
         DOID[0],
         ORPHANET[0],
-        MEDGEN[0]
+        MEDGEN[0],
+        MeSH[0]
     })
 
     @staticmethod
@@ -266,11 +272,14 @@ class OntologyIdNormalized:
         elif prefix.upper() == "MEDGEN":
             prefix = "MedGen"
             postfix = postfix.upper()
+        elif prefix.upper() == "MESH":
+            prefix = "MeSH"
+            postfix = postfix.upper()
         prefix = OntologyService(prefix)
 
         try:
             if expected_length := OntologyService.EXPECTED_LENGTHS[prefix]:
-                postfix = str(int(postfix))  # strip leading 0s so we can then add the correct number
+                postfix = str(int(postfix))  # strip leading 0s, so we can then add the correct number
                 postfix = postfix.rjust(expected_length, '0')
             clean_id = f"{prefix}:{postfix}"
             return OntologyIdNormalized(prefix=prefix, postfix=postfix, full_id=clean_id, clean=True)
