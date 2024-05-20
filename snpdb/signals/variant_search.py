@@ -609,7 +609,7 @@ def search_variant_id(search_input: SearchInputInstance):
     yield Variant.objects.filter(pk=search_input.match.group(2))
 
 
-ALLELE_ID_SEARCH_PATTERN = re.compile(fr"^a(\d+)$")
+ALLELE_ID_SEARCH_PATTERN = re.compile(r"^a(\d+)$")
 
 @search_receiver(
     search_type=Allele,
