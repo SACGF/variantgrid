@@ -11,7 +11,7 @@ from library.utils.xml_utils import parser_path, PP
 
 class ClinVarXmlParserViaVCV(ClinVarXmlParser):
 
-    PARSER_VERSION = 207  # change this whenever the parsing changes, so we know to ignore the old cache
+    PARSER_VERSION = 208  # change this whenever the parsing changes, so we know to ignore the old cache
 
     RE_LEGACY_CS = re.compile("^Converted during submission to (.*?).?$")
 
