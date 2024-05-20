@@ -133,10 +133,10 @@ class XmlParser:
 
     def set_yieldable(self, obj):
         self._clear()
-        self.apply_extra(obj)
+        self.post_record_parse(obj)
         self._yieldable = obj
 
-    def apply_extra(self, obj):
+    def post_record_parse(self, obj):
         pass
 
     def yield_me(self):

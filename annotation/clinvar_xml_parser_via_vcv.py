@@ -1,4 +1,5 @@
 import re
+from typing import Optional
 
 from Bio import Entrez
 
@@ -8,6 +9,24 @@ from annotation.models import ClinVarRecord
 from classification.enums import AlleleOriginBucket
 from library.utils.xml_utils import parser_path, PP
 
+
+class ConditionList:
+
+    def __init__(self):
+        self.disease: list[str] = []
+        self.findings: list[str] = []
+        self.choices: list[str] = []
+
+    @property
+    def result(self) -> Optional[str]:
+        if self.disease:
+            return self.disease[0]
+        elif self.findings:
+            return self.findings[0]
+        elif self.choices:
+            return "; ".join(self.choices)
+        else:
+            return None
 
 class ClinVarXmlParserViaVCV(ClinVarXmlParser):
 
@@ -34,6 +53,14 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         )
 
     def __init__(self):
+        self.allele_origin_set = set()
+        self.human = False
+        self.non_human = False
+        self.somatic_clinical_impact = False
+        self.oncogenicity_classification = False
+        self.germline_classification = False
+        self.condition_list = ConditionList()
+
         super().__init__(
             prefix=["ClinVarResult-Set", "VariationArchive", "ClassifiedRecord", "ClinicalAssertionList", "ClinicalAssertion"]
         )
@@ -41,20 +68,29 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
     @parser_path(on_start=True)
     def new_record(self, elem):
         self.reset()
+        self.human = False
+        self.non_human = False
+        self.somatic_clinical_impact = False
+        self.oncogenicity_classification = False
+        self.germline_classification = False
+        self.condition_list = ConditionList()
+
         self.latest.allele_origin_bucket = AlleleOriginBucket.UNKNOWN
         self.latest.submitter_date = ClinVarXmlParser.parse_xml_date(elem.get("SubmissionDate"))
 
+    def reset(self):
+        super().reset()
+
     @parser_path("ObservedInList", "ObservedIn", "Sample", "Origin")
     def allele_origin(self, elem):
-        self.latest.extra["allele_origin"] = self.latest.extra.get("allele_origin", set())
-        self.latest.extra["allele_origin"].add(elem.text)
+        self.allele_origin_set.add(elem.text)
 
     @parser_path("ObservedInList", "ObservedIn", "Sample", "Species")
     def species(self, elem):
         if elem.text == "human":
-            self.latest.extra["human"] = True
+            self.human = True
         else:
-            self.latest.extra["non-human"] = True
+            self.non_human = True
 
     @parser_path(PP("ClinVarAccession", Type="SCV"))
     def record_id(self, elem):
@@ -92,7 +128,7 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         "GermlineClassification")
     def parse_clinical_significance_desc(self, elem):
         if cs := elem.text:
-            self.latest.extra["germline_classification"] = True
+            self.germline_classification = True
             cs = cs.lower()
             self.latest.clinical_significance = CLINVAR_TO_VG_CLIN_SIG.get(cs, cs)
 
@@ -101,7 +137,7 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         "SomaticClinicalImpact")
     def parse_somatic_clinical_significance_desc(self, elem):
         if cs := elem.text:
-            self.latest.extra["somatic_clinical_impact"] = True
+            self.somatic_clinical_impact = True
             cs = cs.lower()
             cs = cs.split("-")[0].strip()
             self.latest.somatic_clinical_significance = SOMATIC_CLIN_SIG_VALUE.get(cs, cs)
@@ -112,7 +148,7 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         "Description")
     def parse_oncogenicity_classification(self, elem):
         if cs := elem.text:
-            self.latest.extra["oncogenicity_classification"] = True
+            self.oncogenicity_classification = True
             cs = cs.lower()
             self.latest.clinical_significance = CLINVAR_TO_VG_CLIN_SIG.get(cs, cs)
 
@@ -121,7 +157,7 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         "OncogenicityClassification")
     def parse_oncogenicity_classification(self, elem):
         if cs := elem.text:
-            self.latest.extra["oncogenicity_classification"] = True
+            self.oncogenicity_classification = True
             cs = cs.lower()
             self.latest.clinical_significance = CLINVAR_TO_VG_CLIN_SIG.get(cs, cs)
 
@@ -181,7 +217,25 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
     def parse_condition(self, elem):
         if not self.latest.condition or ":" not in self.latest.condition:
             if final_value := ClinVarXmlParser.clean_term_id_from_elem(elem):
-                self.latest.condition = final_value
+                self.condition_list.disease.append(final_value)
+
+    @parser_path(
+        PP("TraitSet", Type="Finding"),
+        PP("Trait", Type="Finding"),
+        "XRef")
+    def parse_condition_finding(self, elem):
+        if not self.latest.condition or ":" not in self.latest.condition:
+            if final_value := ClinVarXmlParser.clean_term_id_from_elem(elem):
+                self.condition_list.findings.append(final_value)
+
+    @parser_path(
+        PP("TraitSet", Type="TraitChoice"),
+        PP("Trait", Type="Disease"),
+        "XRef")
+    def parse_trait_choices(self, elem):
+        if not self.latest.condition or ":" not in self.latest.condition:
+            if final_value := ClinVarXmlParser.clean_term_id_from_elem(elem):
+                self.condition_list.choices.append(final_value)
 
     @parser_path(
         PP("TraitSet", Type="DrugResponse"),
@@ -190,7 +244,7 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         PP("ElementValue", Type="Preferred"))
     def parse_drug_response(self, elem):
         if not self.latest.condition:
-            self.latest.condition = elem.text
+            self.condition_list.disease.append(elem.text)
 
     @parser_path(
         PP("TraitSet", Type="Disease"),
@@ -201,16 +255,17 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         if not self.latest.condition:
             condition_text = elem.text
             if condition_text.lower() not in ("not specified", "not provided"):
-                self.latest.condition = elem.text
+                self.condition_list.disease.append(elem.text)
 
-    def apply_extra(self, obj: ClinVarRecord):
-        if obj.extra.get("non-human") and not obj.extra.get("human"):
-            obj.extra["invalid"] = True
+    def post_record_parse(self, obj: ClinVarRecord):
+        if self.non_human and not obj.human:
+            obj.mark_invalid()
         else:
-            allele_origins = obj.extra.get("allele_origin", set())
-            if ("somatic" in allele_origins) or obj.extra.get("somatic_clinical_impact") or obj.extra.get("oncogenicity_classification"):
+            allele_origins = self.allele_origin_set
+            if ("somatic" in allele_origins) or self.somatic_clinical_impact or self.oncogenicity_classification:
                 obj.allele_origin_bucket = AlleleOriginBucket.SOMATIC
             elif "germline" in allele_origins:
                 obj.allele_origin_bucket = AlleleOriginBucket.GERMLINE
             else:
                 obj.allele_origin_bucket = AlleleOriginBucket.UNKNOWN
+        self.latest.condition = self.condition_list.result
