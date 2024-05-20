@@ -573,7 +573,6 @@ class AlleleLiftoverFailureColumns(AbstractAlleleLiftoverColumns):
             label = conversion_tool.label
         return label
 
-
     def get_initial_queryset(self) -> QuerySet[AlleleLiftover]:
         genome_build_name = self.get_query_param("genome_build_name")
         if genome_build_name is None:
@@ -588,5 +587,3 @@ class AlleleLiftoverFailureColumns(AbstractAlleleLiftoverColumns):
             id=F('max_id')
         )
         return qs
-
-

@@ -25,4 +25,3 @@ def liftover_alleles(username, genome_build_name):
         logging.info("/ finished creating pipelines")
     except Exception as e:
         logging.error(e)
-

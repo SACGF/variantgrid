@@ -1003,7 +1003,7 @@ class AlleleLiftover(models.Model):
     # There will only ever be 1 successful AlleleLiftover for a VariantAllele - the one that populated it
     variant_allele = models.OneToOneField(VariantAllele, null=True, blank=True, on_delete=CASCADE)
     status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)
-    error_message = models.TextField() # This will be deleted
+    error_message = models.TextField()  # This will be deleted
     error = models.JSONField(null=True)  # Only set on error - uses "message" key in dict
 
     class Meta:

@@ -135,7 +135,7 @@ class Command(BaseCommand):
         # * Liftover had an "allele source"
         # * We checked the alleles for whether it had already been lifted over - if not it was just skipped
         # * Then in liftover we called conversion_tool, variant_id_or_coordinate = allele.get_liftover_tuple(genome_build) to determine what to run
-        # * If the liftover worked, we then populated things and set the 
+        # * If the liftover worked, we then populate things
 
         if records:
             logging.info("Creating %d records...", len(records))
