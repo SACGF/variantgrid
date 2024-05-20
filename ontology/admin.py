@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from ontology.models import OntologyTerm, OntologyImport
+from ontology.models import OntologyTerm, OntologyImport, OntologyTermRelation
 from snpdb.admin_utils import ModelAdminBasics
 
 
@@ -25,6 +25,15 @@ class OntologyImportAdmin(ModelAdminBasics):
 
     def is_readonly_field(self, f) -> bool:
         return True
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(OntologyTermRelation)
+class OntologyImportAdmin(ModelAdminBasics):
+    search_fields = ('relation', 'from_import__import_source', 'from_import__context')
+    list_filter = ('from_import__import_source',)
 
     def has_add_permission(self, request):
         return False

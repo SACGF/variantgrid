@@ -83,6 +83,7 @@ def export_view(request: HttpRequest) -> Response:
     format_json = {'id': 'json', 'name': 'JSON'}
     format_spelling = {'id': 'spelling', 'name': 'Spelling Report', 'admin_only': True}
     format_lab_compare = {'id': 'lab_compare', 'name': 'Lab Compare', 'admin_only': True}
+    format_condition_resolution = {'id': 'condition_resolution', 'name': 'Condition Resolution', 'admin_only': True}
     format_redcap = {'id': 'redcap', 'name': 'REDCap'}
     format_vcf = {'id': 'vcf', 'name': 'VCF'}
     formats = [
@@ -92,6 +93,7 @@ def export_view(request: HttpRequest) -> Response:
         format_clinvar_expert_compare,
         format_spelling,
         format_lab_compare,
+        format_condition_resolution,
         format_json,
         format_mvl
     ]

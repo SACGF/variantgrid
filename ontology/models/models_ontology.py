@@ -148,6 +148,31 @@ class OntologyRelation:
     "http://purl.obolibrary.org/obo/RO_0004030": "disease arises from structure"
     """
 
+class PanelAppClassification(models.TextChoices):
+    GREEN = "1", "Expert Review Green"
+    AMBER = "2", "Expert Review Amber"
+    RED = "3", "Expert Review Red"
+
+    @property
+    def is_strong_enough(self) -> bool:
+        return self == PanelAppClassification.GREEN
+
+    @staticmethod
+    def get_by_label_pac(label: str) -> 'PanelAppClassification':
+        for pac in PanelAppClassification:
+            if pac.label == label:
+                return pac
+        raise ValueError(f"No PanelAppClassification for {label}")
+
+    @staticmethod
+    def get_above_min(min_classification: str) -> list[str]:
+        classifications = []
+        for e in reversed(PanelAppClassification):
+            classifications.append(e.label)
+            if e.value == min_classification:
+                break
+        return classifications
+
 
 class GeneDiseaseClassification(models.TextChoices):
     # @see https://thegencc.org/faq.html#validity-termsdelphi-survey - where sort order comes from
@@ -585,10 +610,14 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
         return OntologyRelation.DISPLAY_NAMES.get(self.relation, self.relation)
 
     @property
-    def gencc_quality(self) -> Optional[GeneDiseaseClassification]:
+    def gencc_quality(self) -> GeneDiseaseClassification | PanelAppClassification | None:
         if extra := self.extra:
             if strongest := extra.get('strongest_classification'):
-                return GeneDiseaseClassification.get_by_label(strongest)
+                try:
+                    label = GeneDiseaseClassification.get_by_label(strongest)
+                except ValueError:
+                    label = PanelAppClassification.get_by_label_pac(strongest)
+                return label
         return None
 
     @staticmethod
