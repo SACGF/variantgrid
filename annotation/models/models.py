@@ -258,6 +258,17 @@ class ClinVarRecord(TimeStampedModel):
     allele_origin = models.TextField(null=True, blank=True)
     allele_origin_bucket = models.TextField(choices=AlleleOriginBucket.choices, null=True, blank=True)
 
+    @property
+    def extra(self) -> dict:
+        if not hasattr(self, '_extra'):
+            setattr(self, '_extra', {})
+        return self._extra
+
+    def __bool__(self) -> bool:
+        if hasattr(self, '_extra'):
+            return self.extra.get("invalid") is not True
+        return True
+
     def __lt__(self, other):
         def sort_key(record: ClinVarRecord):
             return record.stars, record.date_last_evaluated or record.submitter_date
@@ -268,7 +279,7 @@ class ClinVarRecord(TimeStampedModel):
         if date_last_evaluated := self.date_last_evaluated or self.submitter_date:
             date_last_evaluated_str = date_last_evaluated.strftime('%Y-%m-%d')
 
-        return f"{self.record_id} {self.stars} stars, {self.clinical_significance}, {date_last_evaluated_str}"
+        return f"{self.record_id} {self.get_allele_origin_bucket_display()}, {self.stars} stars, class={self.clinical_significance} somatic clin sig={self.somatic_clinical_significance}, {date_last_evaluated_str}"
 
     @property
     def is_expert_panel_or_greater(self):

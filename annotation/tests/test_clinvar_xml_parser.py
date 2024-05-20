@@ -18,14 +18,24 @@ class TestClinVarXmlParser(TestCase):
         with open(xml_file, "rb") as xml_input:
             records = ClinVarXmlParserViaVCV.load_from_input(xml_input)
 
-        clinvar_record_collection = ClinVarRecordCollection.objects.create(clinvar_variation_id=clinvar_variation_id)
+        return records
+
+    def test_parsing_17662(self):
+        records = self._check_valid(clinvar_variation_id=17662)
+        clinvar_record_collection = ClinVarRecordCollection.objects.create(clinvar_variation_id=17662)
         for record in records:
             print(record)
             record.clinvar_record_collection = clinvar_record_collection
             record.save()
+        # TODO validation
 
-    def test_parsing_17662(self):
-        self._check_valid(clinvar_variation_id=17662)
+    def test_parsing_97006(self):
+        records = self._check_valid(clinvar_variation_id=97006)
+        clinvar_record_collection = ClinVarRecordCollection.objects.create(clinvar_variation_id=17662)
+        for record in records:
+            print(record)
+            record.clinvar_record_collection = clinvar_record_collection
+            record.save()
 
     # def test_doing_it_live_41650(self):
     #     records = ClinVarXmlParser.load_from_clinvar_id(14650).all_records

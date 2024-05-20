@@ -4,6 +4,7 @@ from Bio import Entrez
 
 from annotation.clinvar_xml_parser import ClinVarXmlParser, ClinVarXmlParserOutput, CLINVAR_REVIEW_STATUS_TO_STARS, \
     CLINVAR_TO_VG_CLIN_SIG, SOMATIC_CLIN_SIG_VALUE
+from annotation.models import ClinVarRecord
 from classification.enums import AlleleOriginBucket
 from library.utils.xml_utils import parser_path, PP
 
@@ -43,6 +44,18 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         self.latest.allele_origin_bucket = AlleleOriginBucket.UNKNOWN
         self.latest.submitter_date = ClinVarXmlParser.parse_xml_date(elem.get("SubmissionDate"))
 
+    @parser_path("ObservedInList", "ObservedIn", "Sample", "Origin")
+    def allele_origin(self, elem):
+        self.latest.extra["allele_origin"] = self.latest.extra.get("allele_origin", set())
+        self.latest.extra["allele_origin"].add(elem.text)
+
+    @parser_path("ObservedInList", "ObservedIn", "Sample", "Species")
+    def species(self, elem):
+        if elem.text == "human":
+            self.latest.extra["human"] = True
+        else:
+            self.latest.extra["non-human"] = True
+
     @parser_path(PP("ClinVarAccession", Type="SCV"))
     def record_id(self, elem):
         self.latest.record_id = elem.get("Accession")
@@ -79,7 +92,7 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         "GermlineClassification")
     def parse_clinical_significance_desc(self, elem):
         if cs := elem.text:
-            self.latest.allele_origin_bucket = AlleleOriginBucket.GERMLINE
+            self.latest.extra["germline_classification"] = True
             cs = cs.lower()
             self.latest.clinical_significance = CLINVAR_TO_VG_CLIN_SIG.get(cs, cs)
 
@@ -88,7 +101,7 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         "SomaticClinicalImpact")
     def parse_somatic_clinical_significance_desc(self, elem):
         if cs := elem.text:
-            self.latest.allele_origin_bucket = AlleleOriginBucket.SOMATIC
+            self.latest.extra["somatic_clinical_impact"] = True
             cs = cs.lower()
             cs = cs.split("-")[0].strip()
             self.latest.somatic_clinical_significance = SOMATIC_CLIN_SIG_VALUE.get(cs, cs)
@@ -97,12 +110,20 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         "Classification",
         "OncogenicityClassification",
         "Description")
-    def parse_somatic_clinical_significance_desc(self, elem):
+    def parse_oncogenicity_classification(self, elem):
         if cs := elem.text:
-            self.latest.allele_origin_bucket = AlleleOriginBucket.SOMATIC
+            self.latest.extra["oncogenicity_classification"] = True
             cs = cs.lower()
             self.latest.clinical_significance = CLINVAR_TO_VG_CLIN_SIG.get(cs, cs)
 
+    @parser_path(
+        "Classification",
+        "OncogenicityClassification")
+    def parse_oncogenicity_classification(self, elem):
+        if cs := elem.text:
+            self.latest.extra["oncogenicity_classification"] = True
+            cs = cs.lower()
+            self.latest.clinical_significance = CLINVAR_TO_VG_CLIN_SIG.get(cs, cs)
 
     @parser_path(
         "Classification",
@@ -181,3 +202,15 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
             condition_text = elem.text
             if condition_text.lower() not in ("not specified", "not provided"):
                 self.latest.condition = elem.text
+
+    def apply_extra(self, obj: ClinVarRecord):
+        if obj.extra.get("non-human") and not obj.extra.get("human"):
+            obj.extra["invalid"] = True
+        else:
+            allele_origins = obj.extra.get("allele_origin", set())
+            if ("somatic" in allele_origins) or obj.extra.get("somatic_clinical_impact") or obj.extra.get("oncogenicity_classification"):
+                obj.allele_origin_bucket = AlleleOriginBucket.SOMATIC
+            elif "germline" in allele_origins:
+                obj.allele_origin_bucket = AlleleOriginBucket.GERMLINE
+            else:
+                obj.allele_origin_bucket = AlleleOriginBucket.UNKNOWN

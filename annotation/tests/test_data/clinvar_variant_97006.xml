@@ -1,0 +1,951 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<ClinVarResult-Set><VariationArchive VariationID="97006" VariationName="NM_004343.3(CALR):c.1092_1143del52 (p.Leu367Thrfs)" VariationType="Deletion" Accession="VCV000097006" Version="3" RecordType="classified" NumberOfSubmissions="7" NumberOfSubmitters="3" DateLastUpdated="2024-05-01" DateCreated="2014-05-05" MostRecentSubmission="2024-03-05">
+  <RecordStatus>current</RecordStatus>
+  <Species>Homo sapiens</Species>
+  <ClassifiedRecord>
+    <SimpleAllele AlleleID="102915" VariationID="97006">
+      <GeneList>
+        <Gene Symbol="CALR" FullName="calreticulin" GeneID="811" HGNC_ID="HGNC:1455" Source="submitted" RelationshipType="within single gene">
+          <Location>
+            <CytogeneticLocation>19p13.13</CytogeneticLocation>
+            <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="19" Accession="NC_000019.10" start="12938609" stop="12944489" display_start="12938609" display_stop="12944489" Strand="+"/>
+            <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="19" Accession="NC_000019.9" start="13049413" stop="13055303" display_start="13049413" display_stop="13055303" Strand="+"/>
+          </Location>
+          <OMIM>109091</OMIM>
+        </Gene>
+      </GeneList>
+      <Name>NM_004343.3(CALR):c.1092_1143del52 (p.Leu367Thrfs)</Name>
+      <VariantType>Deletion</VariantType>
+      <Location>
+        <CytogeneticLocation>19p13.13</CytogeneticLocation>
+        <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" forDisplay="true" AssemblyStatus="current" Chr="19" Accession="NC_000019.10" start="12943751" stop="12943802" display_start="12943751" display_stop="12943802" variantLength="52" positionVCF="12943750" referenceAlleleVCF="AGCAGAGGCTTAAGGAGGAGGAAGAAGACAAGAAACGCAAAGAGGAGGAGGAG" alternateAlleleVCF="A"/>
+        <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="19" Accession="NC_000019.9" start="13054565" stop="13054616" display_start="13054565" display_stop="13054616" variantLength="52" positionVCF="13054564" referenceAlleleVCF="AGCAGAGGCTTAAGGAGGAGGAAGAAGACAAGAAACGCAAAGAGGAGGAGGAG" alternateAlleleVCF="A"/>
+      </Location>
+      <ProteinChange>L367fs</ProteinChange>
+      <HGVSlist>
+        <HGVS Assembly="GRCh38" Type="genomic, top-level">
+          <NucleotideExpression sequenceAccessionVersion="NC_000019.10" sequenceAccession="NC_000019" sequenceVersion="10" change="g.12943758_12943809del" Assembly="GRCh38">
+            <Expression>NC_000019.10:g.12943758_12943809del</Expression>
+          </NucleotideExpression>
+        </HGVS>
+        <HGVS Assembly="GRCh37" Type="genomic, top-level">
+          <NucleotideExpression sequenceAccessionVersion="NC_000019.9" sequenceAccession="NC_000019" sequenceVersion="9" change="g.13054572_13054623del" Assembly="GRCh37">
+            <Expression>NC_000019.9:g.13054572_13054623del</Expression>
+          </NucleotideExpression>
+        </HGVS>
+        <HGVS Type="genomic">
+          <NucleotideExpression sequenceAccessionVersion="NG_029662.1" sequenceAccession="NG_029662" sequenceVersion="1" change="g.10159_10210del">
+            <Expression>NG_029662.1:g.10159_10210del</Expression>
+          </NucleotideExpression>
+        </HGVS>
+        <HGVS Type="coding">
+          <NucleotideExpression sequenceAccessionVersion="NM_004343.4" sequenceAccession="NM_004343" sequenceVersion="4" change="c.1099_1150del" MANESelect="true">
+            <Expression>NM_004343.4:c.1099_1150del</Expression>
+          </NucleotideExpression>
+          <ProteinExpression sequenceAccessionVersion="NP_004334.1" sequenceAccession="NP_004334" sequenceVersion="1" change="p.Leu367fs">
+            <Expression>NP_004334.1:p.Leu367fs</Expression>
+          </ProteinExpression>
+          <MolecularConsequence ID="SO:0001589" Type="frameshift variant" DB="SO"/>
+        </HGVS>
+        <HGVS Type="genomic">
+          <NucleotideExpression sequenceAccessionVersion="LRG_828" sequenceAccession="LRG_828">
+            <Expression>LRG_828:g.10159_10210del</Expression>
+          </NucleotideExpression>
+        </HGVS>
+        <HGVS Type="coding">
+          <NucleotideExpression sequenceAccessionVersion="NM_004343.3" sequenceAccession="NM_004343" sequenceVersion="3" change="c.1092_1143del52">
+            <Expression>NM_004343.3:c.1092_1143del52</Expression>
+          </NucleotideExpression>
+        </HGVS>
+      </HGVSlist>
+      <XRefList>
+        <XRef ID="CA149708" DB="ClinGen"/>
+        <XRef ID="nssv3761626" DB="dbVar"/>
+        <XRef ID="nsv1067850" DB="dbVar"/>
+        <XRef Type="Allelic variant" ID="109091.0001" DB="OMIM"/>
+        <XRef Type="rs" ID="1555760738" DB="dbSNP"/>
+      </XRefList>
+      <Comment DataSource="NCBI curation" Type="public">52-nt deletion from exon 9 of CALR.</Comment>
+    </SimpleAllele>
+    <RCVList>
+      <RCVAccession Title="NM_004343.3(CALR):c.1092_1143del52 (p.Leu367Thrfs) AND Primary myelofibrosis" Accession="RCV000083256" Version="5">
+        <ClassifiedConditionList TraitSetID="6477">
+          <ClassifiedCondition DB="MedGen" ID="C0001815">Primary myelofibrosis</ClassifiedCondition>
+        </ClassifiedConditionList>
+        <RCVClassifications>
+          <GermlineClassification>
+            <ReviewStatus>no assertion criteria provided</ReviewStatus>
+            <Description DateLastEvaluated="2013-12-19" SubmissionCount="1">Pathogenic</Description>
+          </GermlineClassification>
+        </RCVClassifications>
+      </RCVAccession>
+      <RCVAccession Title="NM_004343.3(CALR):c.1092_1143del52 (p.Leu367Thrfs) AND Thrombocythemia 1" Accession="RCV000083257" Version="5">
+        <ClassifiedConditionList TraitSetID="2608">
+          <ClassifiedCondition DB="MedGen" ID="C3277671">Thrombocythemia 1</ClassifiedCondition>
+        </ClassifiedConditionList>
+        <RCVClassifications>
+          <GermlineClassification>
+            <ReviewStatus>no assertion criteria provided</ReviewStatus>
+            <Description DateLastEvaluated="2013-12-19" SubmissionCount="1">Pathogenic</Description>
+          </GermlineClassification>
+        </RCVClassifications>
+      </RCVAccession>
+      <RCVAccession Title="NM_004343.3(CALR):c.1092_1143del52 (p.Leu367Thrfs) AND multiple conditions" Accession="RCV002498437" Version="1">
+        <ClassifiedConditionList TraitSetID="19309">
+          <ClassifiedCondition DB="MedGen" ID="C0001815">Primary myelofibrosis</ClassifiedCondition>
+          <ClassifiedCondition DB="MedGen" ID="C3277671">Thrombocythemia 1</ClassifiedCondition>
+        </ClassifiedConditionList>
+        <RCVClassifications>
+          <GermlineClassification>
+            <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+            <Description DateLastEvaluated="2022-02-10" SubmissionCount="1">Pathogenic</Description>
+          </GermlineClassification>
+        </RCVClassifications>
+      </RCVAccession>
+      <RCVAccession Title="NM_004343.3(CALR):c.1092_1143del52 (p.Leu367Thrfs) AND Essential thrombocythemia" Accession="RCV003883131" Version="1">
+        <ClassifiedConditionList TraitSetID="22296">
+          <ClassifiedCondition DB="MedGen" ID="C0040028">Essential thrombocythemia</ClassifiedCondition>
+        </ClassifiedConditionList>
+        <RCVClassifications>
+          <SomaticClinicalImpact>
+            <ReviewStatus>no assertion criteria provided</ReviewStatus>
+            <Description ClinicalImpactAssertionType="diagnostic" ClinicalImpactClinicalSignificance="supports diagnosis" DateLastEvaluated="2024-01-24" SubmissionCount="1">Tier I - Strong</Description>
+            <Description ClinicalImpactAssertionType="prognostic" ClinicalImpactClinicalSignificance="better outcome" DateLastEvaluated="2024-01-24" SubmissionCount="1">Tier I - Strong</Description>
+          </SomaticClinicalImpact>
+        </RCVClassifications>
+      </RCVAccession>
+      <RCVAccession Title="NM_004343.3(CALR):c.1092_1143del52 (p.Leu367Thrfs) AND Acute myeloid leukemia" Accession="RCV003883130" Version="1">
+        <ClassifiedConditionList TraitSetID="6288">
+          <ClassifiedCondition DB="MedGen" ID="C0023467">Acute myeloid leukemia</ClassifiedCondition>
+        </ClassifiedConditionList>
+        <RCVClassifications>
+          <SomaticClinicalImpact>
+            <ReviewStatus>no assertion criteria provided</ReviewStatus>
+            <Description DateLastEvaluated="2024-01-24" SubmissionCount="1">Tier III - Unknown</Description>
+          </SomaticClinicalImpact>
+          <OncogenicityClassification>
+            <ReviewStatus>no assertion criteria provided</ReviewStatus>
+            <Description DateLastEvaluated="2024-01-24" SubmissionCount="1">Uncertain significance</Description>
+          </OncogenicityClassification>
+        </RCVClassifications>
+      </RCVAccession>
+    </RCVList>
+    <Classifications>
+      <GermlineClassification DateLastEvaluated="2022-02-10" NumberOfSubmissions="3" NumberOfSubmitters="2" DateCreated="2014-05-05" MostRecentSubmission="2022-12-31">
+        <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+        <Description>Pathogenic</Description>
+        <Citation Type="general">
+          <ID Source="PubMed">24325356</ID>
+        </Citation>
+        <Citation Type="general">
+          <ID Source="PubMed">24325359</ID>
+        </Citation>
+        <ConditionList>
+          <TraitSet ID="2608" Type="Disease" ContributesToAggregateClassification="false">
+            <Trait ID="4546" Type="Disease">
+              <Name>
+                <ElementValue Type="Alternate">THROMBOCYTHEMIA, SOMATIC</ElementValue>
+                <XRef Type="Allelic variant" ID="109091.0001" DB="OMIM"/>
+                <XRef Type="Allelic variant" ID="605093.0002" DB="OMIM"/>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Idiopathic thrombocythemia</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">THROMBOCYTOSIS 1</ElementValue>
+                <XRef Type="MIM" ID="187950" DB="OMIM"/>
+              </Name>
+              <Name>
+                <ElementValue Type="Preferred">Thrombocythemia 1</ElementValue>
+                <XRef ID="MONDO:0008554" DB="MONDO"/>
+              </Name>
+              <Symbol>
+                <ElementValue Type="Preferred">THCYT1</ElementValue>
+                <XRef Type="MIM" ID="187950" DB="OMIM"/>
+              </Symbol>
+              <XRef ID="C3277671" DB="MedGen"/>
+              <XRef ID="MONDO:0008554" DB="MONDO"/>
+              <XRef Type="MIM" ID="187950" DB="OMIM"/>
+            </Trait>
+          </TraitSet>
+          <TraitSet ID="6477" Type="Disease" ContributesToAggregateClassification="false">
+            <Trait ID="5580" Type="Disease">
+              <Name>
+                <ElementValue Type="Preferred">Primary myelofibrosis</ElementValue>
+                <XRef ID="MONDO:0009692" DB="MONDO"/>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Myelofibrosis, somatic</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Suspected idiopathic myelofibrosis</ElementValue>
+              </Name>
+              <AttributeSet>
+                <Attribute Type="GARD id" integerValue="8618"/>
+                <XRef ID="8618" DB="Office of Rare Diseases"/>
+              </AttributeSet>
+              <AttributeSet>
+                <Attribute Type="keyword">Hereditary cancer syndrome</Attribute>
+              </AttributeSet>
+              <XRef ID="824" DB="Orphanet"/>
+              <XRef ID="C0001815" DB="MedGen"/>
+              <XRef ID="D055728" DB="MeSH"/>
+              <XRef ID="MONDO:0009692" DB="MONDO"/>
+              <XRef Type="MIM" ID="254450" DB="OMIM"/>
+            </Trait>
+          </TraitSet>
+          <TraitSet ID="19309" Type="Disease" ContributesToAggregateClassification="true">
+            <Trait ID="4546" Type="Disease">
+              <Name>
+                <ElementValue Type="Alternate">THROMBOCYTHEMIA, SOMATIC</ElementValue>
+                <XRef Type="Allelic variant" ID="109091.0001" DB="OMIM"/>
+                <XRef Type="Allelic variant" ID="605093.0002" DB="OMIM"/>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Idiopathic thrombocythemia</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">THROMBOCYTOSIS 1</ElementValue>
+                <XRef Type="MIM" ID="187950" DB="OMIM"/>
+              </Name>
+              <Name>
+                <ElementValue Type="Preferred">Thrombocythemia 1</ElementValue>
+                <XRef ID="MONDO:0008554" DB="MONDO"/>
+              </Name>
+              <Symbol>
+                <ElementValue Type="Preferred">THCYT1</ElementValue>
+                <XRef Type="MIM" ID="187950" DB="OMIM"/>
+              </Symbol>
+              <XRef ID="C3277671" DB="MedGen"/>
+              <XRef ID="MONDO:0008554" DB="MONDO"/>
+              <XRef Type="MIM" ID="187950" DB="OMIM"/>
+            </Trait>
+            <Trait ID="5580" Type="Disease">
+              <Name>
+                <ElementValue Type="Preferred">Primary myelofibrosis</ElementValue>
+                <XRef ID="MONDO:0009692" DB="MONDO"/>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Myelofibrosis, somatic</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Suspected idiopathic myelofibrosis</ElementValue>
+              </Name>
+              <AttributeSet>
+                <Attribute Type="GARD id" integerValue="8618"/>
+                <XRef ID="8618" DB="Office of Rare Diseases"/>
+              </AttributeSet>
+              <AttributeSet>
+                <Attribute Type="keyword">Hereditary cancer syndrome</Attribute>
+              </AttributeSet>
+              <XRef ID="824" DB="Orphanet"/>
+              <XRef ID="C0001815" DB="MedGen"/>
+              <XRef ID="D055728" DB="MeSH"/>
+              <XRef ID="MONDO:0009692" DB="MONDO"/>
+              <XRef Type="MIM" ID="254450" DB="OMIM"/>
+            </Trait>
+          </TraitSet>
+        </ConditionList>
+      </GermlineClassification>
+      <SomaticClinicalImpact DateLastEvaluated="2024-01-24" NumberOfSubmissions="3" NumberOfSubmitters="1" DateCreated="2024-03-05" MostRecentSubmission="2024-03-05">
+        <ReviewStatus>no assertion criteria provided</ReviewStatus>
+        <Description>Tier I - Strong</Description>
+        <Citation Type="general">
+          <ID Source="PubMed">24325356</ID>
+        </Citation>
+        <Citation Type="general">
+          <ID Source="PubMed">24325359</ID>
+        </Citation>
+        <ConditionList>
+          <TraitSet ID="6288" Type="Disease" ContributesToAggregateClassification="false" LowerLevelOfEvidence="true">
+            <Trait ID="15736" Type="Disease">
+              <Name>
+                <ElementValue Type="Alternate">Acute myeloid leukemia, adult</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">AML adult</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Acute myelogenous leukemia</ElementValue>
+                <XRef ID="Acute+Myeloid+Leukemia%2C+Adult/204" DB="Genetic Alliance"/>
+                <XRef ID="HP:0004808" DB="Human Phenotype Ontology"/>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Acute non-lymphocytic leukemia</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Acute granulocytic leukemia</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Leukemia, acute myelogenous, somatic</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Leukemia, acute myeloid, somatic</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Preferred">Acute myeloid leukemia</ElementValue>
+                <XRef ID="HP:0004808" DB="Human Phenotype Ontology"/>
+                <XRef ID="MONDO:0018874" DB="MONDO"/>
+                <XRef ID="519" DB="Orphanet"/>
+                <XRef ID="17788007" DB="SNOMED CT"/>
+              </Name>
+              <Symbol>
+                <ElementValue Type="Preferred">AML</ElementValue>
+                <XRef ID="GTR000500636" DB="Genetic Testing Registry (GTR)"/>
+                <XRef Type="MIM" ID="601626" DB="OMIM"/>
+              </Symbol>
+              <AttributeSet>
+                <Attribute Type="disease mechanism">Constitutively activated FLT3</Attribute>
+                <XRef ID="GTR000552464" DB="Genetic Testing Registry (GTR)"/>
+              </AttributeSet>
+              <AttributeSet>
+                <Attribute Type="public definition">A clonal expansion of myeloid blasts in the bone marrow, blood or other tissues. The classification of acute myeloid leukemias (AMLs) encompasses four major categories: 1) AML with recurrent genetic abnormalities; 2) AML with multilineage dysplasia; 3) Therapy-related AML; 4) AML not otherwise specified. The required bone marrow or peripheral blood blast percentage for the diagnosis of AML is 20% (WHO classification)</Attribute>
+              </AttributeSet>
+              <AttributeSet>
+                <Attribute Type="GARD id" integerValue="12757"/>
+                <XRef ID="12757" DB="Office of Rare Diseases"/>
+              </AttributeSet>
+              <Citation Type="review" Abbrev="GeneReviews">
+                <ID Source="PubMed">20963938</ID>
+                <ID Source="BookShelf">NBK47457</ID>
+              </Citation>
+              <Citation Type="Translational/Evidence-based" Abbrev="NCCN, 2011">
+                <ID Source="PubMed">22138009</ID>
+              </Citation>
+              <Citation Type="general" Abbrev="ESMO, 2013">
+                <ID Source="PubMed">23970018</ID>
+              </Citation>
+              <Citation Type="review" Abbrev="GeneReviews">
+                <ID Source="PubMed">33226740</ID>
+                <ID Source="BookShelf">NBK564234</ID>
+              </Citation>
+              <Citation Type="review" Abbrev="GeneReviews">
+                <ID Source="PubMed">33661592</ID>
+                <ID Source="BookShelf">NBK568319</ID>
+              </Citation>
+              <Citation Type="review" Abbrev="GeneReviews">
+                <ID Source="PubMed">34723452</ID>
+                <ID Source="BookShelf">NBK574843</ID>
+              </Citation>
+              <Citation Type="general" Abbrev="ESMO, 2020">
+                <ID Source="PubMed">32171751</ID>
+              </Citation>
+              <Citation Type="practice guideline" Abbrev="NCCN, 2023">
+                <URL>https://www.nccn.org/professionals/physician_gls/pdf/all.pdf</URL>
+                <CitationText>NCCN Clinical Practice Guidelines in Oncology (NCCN Guidelines®) Acute Lymphoblastic Leukemia, 2023</CitationText>
+              </Citation>
+              <Citation Type="practice guideline" Abbrev="NCCN, 2023">
+                <URL>https://www.nccn.org/professionals/physician_gls/pdf/aml.pdf</URL>
+                <CitationText>NCCN Clinical Practice Guidelines in Oncology (NCCN Guidelines®) Acute Myeloid Leukemia, 2023</CitationText>
+              </Citation>
+              <XRef ID="519" DB="Orphanet"/>
+              <XRef ID="C0023467" DB="MedGen"/>
+              <XRef ID="D015470" DB="MeSH"/>
+              <XRef ID="MONDO:0018874" DB="MONDO"/>
+              <XRef Type="MIM" ID="601626" DB="OMIM"/>
+              <XRef Type="primary" ID="HP:0004808" DB="Human Phenotype Ontology"/>
+              <XRef Type="secondary" ID="HP:0001914" DB="Human Phenotype Ontology"/>
+              <XRef Type="secondary" ID="HP:0004843" DB="Human Phenotype Ontology"/>
+              <XRef Type="secondary" ID="HP:0005516" DB="Human Phenotype Ontology"/>
+              <XRef Type="secondary" ID="HP:0006724" DB="Human Phenotype Ontology"/>
+              <XRef Type="secondary" ID="HP:0006728" DB="Human Phenotype Ontology"/>
+            </Trait>
+          </TraitSet>
+          <TraitSet ID="22296" Type="Finding" ContributesToAggregateClassification="true">
+            <Trait ID="34078" Type="Finding">
+              <Name>
+                <ElementValue Type="Alternate">Suspected essential thromboythemia</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">essential thrombocytemia</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Preferred">Essential thrombocythemia</ElementValue>
+                <XRef ID="MONDO:0005029" DB="MONDO"/>
+              </Name>
+              <AttributeSet>
+                <Attribute Type="GARD id" integerValue="6594"/>
+                <XRef ID="6594" DB="Office of Rare Diseases"/>
+              </AttributeSet>
+              <Citation Type="general" Abbrev="BSH, 2022">
+                <ID Source="PubMed">35645034</ID>
+              </Citation>
+              <XRef ID="3318" DB="Orphanet"/>
+              <XRef ID="C0040028" DB="MedGen"/>
+              <XRef ID="D013920" DB="MeSH"/>
+              <XRef ID="MONDO:0005029" DB="MONDO"/>
+            </Trait>
+          </TraitSet>
+        </ConditionList>
+      </SomaticClinicalImpact>
+      <OncogenicityClassification DateLastEvaluated="2024-01-24" NumberOfSubmissions="1" NumberOfSubmitters="1" DateCreated="2024-03-05" MostRecentSubmission="2024-03-05">
+        <ReviewStatus>no assertion criteria provided</ReviewStatus>
+        <Description>Uncertain significance</Description>
+        <Citation Type="general">
+          <ID Source="PubMed">31562135</ID>
+        </Citation>
+        <ConditionList>
+          <TraitSet ID="6288" Type="Disease" ContributesToAggregateClassification="true">
+            <Trait ID="15736" Type="Disease">
+              <Name>
+                <ElementValue Type="Alternate">Acute myeloid leukemia, adult</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">AML adult</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Acute myelogenous leukemia</ElementValue>
+                <XRef ID="Acute+Myeloid+Leukemia%2C+Adult/204" DB="Genetic Alliance"/>
+                <XRef ID="HP:0004808" DB="Human Phenotype Ontology"/>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Acute non-lymphocytic leukemia</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Acute granulocytic leukemia</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Leukemia, acute myelogenous, somatic</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Leukemia, acute myeloid, somatic</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Preferred">Acute myeloid leukemia</ElementValue>
+                <XRef ID="HP:0004808" DB="Human Phenotype Ontology"/>
+                <XRef ID="MONDO:0018874" DB="MONDO"/>
+                <XRef ID="519" DB="Orphanet"/>
+                <XRef ID="17788007" DB="SNOMED CT"/>
+              </Name>
+              <Symbol>
+                <ElementValue Type="Preferred">AML</ElementValue>
+                <XRef ID="GTR000500636" DB="Genetic Testing Registry (GTR)"/>
+                <XRef Type="MIM" ID="601626" DB="OMIM"/>
+              </Symbol>
+              <AttributeSet>
+                <Attribute Type="disease mechanism">Constitutively activated FLT3</Attribute>
+                <XRef ID="GTR000552464" DB="Genetic Testing Registry (GTR)"/>
+              </AttributeSet>
+              <AttributeSet>
+                <Attribute Type="public definition">A clonal expansion of myeloid blasts in the bone marrow, blood or other tissues. The classification of acute myeloid leukemias (AMLs) encompasses four major categories: 1) AML with recurrent genetic abnormalities; 2) AML with multilineage dysplasia; 3) Therapy-related AML; 4) AML not otherwise specified. The required bone marrow or peripheral blood blast percentage for the diagnosis of AML is 20% (WHO classification)</Attribute>
+              </AttributeSet>
+              <AttributeSet>
+                <Attribute Type="GARD id" integerValue="12757"/>
+                <XRef ID="12757" DB="Office of Rare Diseases"/>
+              </AttributeSet>
+              <Citation Type="review" Abbrev="GeneReviews">
+                <ID Source="PubMed">20963938</ID>
+                <ID Source="BookShelf">NBK47457</ID>
+              </Citation>
+              <Citation Type="Translational/Evidence-based" Abbrev="NCCN, 2011">
+                <ID Source="PubMed">22138009</ID>
+              </Citation>
+              <Citation Type="general" Abbrev="ESMO, 2013">
+                <ID Source="PubMed">23970018</ID>
+              </Citation>
+              <Citation Type="review" Abbrev="GeneReviews">
+                <ID Source="PubMed">33226740</ID>
+                <ID Source="BookShelf">NBK564234</ID>
+              </Citation>
+              <Citation Type="review" Abbrev="GeneReviews">
+                <ID Source="PubMed">33661592</ID>
+                <ID Source="BookShelf">NBK568319</ID>
+              </Citation>
+              <Citation Type="review" Abbrev="GeneReviews">
+                <ID Source="PubMed">34723452</ID>
+                <ID Source="BookShelf">NBK574843</ID>
+              </Citation>
+              <Citation Type="general" Abbrev="ESMO, 2020">
+                <ID Source="PubMed">32171751</ID>
+              </Citation>
+              <Citation Type="practice guideline" Abbrev="NCCN, 2023">
+                <URL>https://www.nccn.org/professionals/physician_gls/pdf/all.pdf</URL>
+                <CitationText>NCCN Clinical Practice Guidelines in Oncology (NCCN Guidelines®) Acute Lymphoblastic Leukemia, 2023</CitationText>
+              </Citation>
+              <Citation Type="practice guideline" Abbrev="NCCN, 2023">
+                <URL>https://www.nccn.org/professionals/physician_gls/pdf/aml.pdf</URL>
+                <CitationText>NCCN Clinical Practice Guidelines in Oncology (NCCN Guidelines®) Acute Myeloid Leukemia, 2023</CitationText>
+              </Citation>
+              <XRef ID="519" DB="Orphanet"/>
+              <XRef ID="C0023467" DB="MedGen"/>
+              <XRef ID="D015470" DB="MeSH"/>
+              <XRef ID="MONDO:0018874" DB="MONDO"/>
+              <XRef Type="MIM" ID="601626" DB="OMIM"/>
+              <XRef Type="primary" ID="HP:0004808" DB="Human Phenotype Ontology"/>
+              <XRef Type="secondary" ID="HP:0001914" DB="Human Phenotype Ontology"/>
+              <XRef Type="secondary" ID="HP:0004843" DB="Human Phenotype Ontology"/>
+              <XRef Type="secondary" ID="HP:0005516" DB="Human Phenotype Ontology"/>
+              <XRef Type="secondary" ID="HP:0006724" DB="Human Phenotype Ontology"/>
+              <XRef Type="secondary" ID="HP:0006728" DB="Human Phenotype Ontology"/>
+            </Trait>
+          </TraitSet>
+        </ConditionList>
+      </OncogenicityClassification>
+    </Classifications>
+    <ClinicalAssertionList>
+      <ClinicalAssertion ID="202976" SubmissionDate="2014-04-24" DateLastUpdated="2014-05-05" DateCreated="2014-02-11">
+        <ClinVarSubmissionID localKey="109091.0001_THROMBOCYTHEMIA, SOMATIC" title="CALR, 52-BP DEL, EX9_THROMBOCYTHEMIA, SOMATIC"/>
+        <ClinVarAccession Accession="SCV000115336" DateUpdated="2014-05-05" DateCreated="2014-02-11" Type="SCV" Version="2" SubmitterName="OMIM" OrgID="3" OrganizationCategory="resource"/>
+        <RecordStatus>current</RecordStatus>
+        <Classification DateLastEvaluated="2013-12-19">
+          <ReviewStatus>no assertion criteria provided</ReviewStatus>
+          <GermlineClassification>Pathogenic</GermlineClassification>
+        </Classification>
+        <Assertion>variation to included disease</Assertion>
+        <ObservedInList>
+          <ObservedIn>
+            <Sample>
+              <Origin>somatic</Origin>
+              <Species>human</Species>
+              <AffectedStatus>not provided</AffectedStatus>
+            </Sample>
+            <Method>
+              <MethodType>literature only</MethodType>
+            </Method>
+            <ObservedData>
+              <Attribute Type="Description">Klampfl et al. (2013) and Nangalia et al. (2013) identified a somatic 52-bp deletion in exon 9 of the CALR gene (1092_1143del) in patients with myeloproliferative neoplasms, including myelofibrosis (254450) and essential thrombocythemia (see 187950). CALR mutations and JAK2 and MPL mutations were mutually exclusive. The 52-bp mutation resulted in frameshift and premature termination (L367fsTer46). Klampfl et al. (2013) identified a total of 36 types of somatic insertion or deletion within exon 9 of CALR, all of which caused a frameshift to the same alternative reading frame and generated a novel C-terminal peptide in the mutant calreticulin. Klampfl et al. (2013) identified insertions or deletions in exon 9 of CALR in 88% of individuals with primary myelofibrosis with nonmutated JAK2 or MPL. The 52-bp deletion accounted for 53% of all cases of mutated CALR among several types of myeloproliferative neoplasm. Overexpression of this mutation resulted in cytokine-independent growth in vitro through the activation of STAT5 (601511). Nangalia et al. (2013) identified 23 patients with myelofibrosis who carried the L367fsTer46 mutation. Overall, Nangalia et al. (2013) identified 19 different somatic CALR mutations, all in exon 9 and all of which generated a +1 frameshift resulting in a mutant protein with a novel C terminal. CALR mutations were present in 18 of 32 patients (56%) with primary myelofibrosis and in 12 of 14 patients (86%) with progression of essential thrombocythemia to myelofibrosis. Neither Klampfl et al. (2013) nor Nangalia et al. (2013) detected CALR mutation in individuals with polycythemia vera.</Attribute>
+              <Citation>
+                <ID Source="PubMed">24325356</ID>
+              </Citation>
+              <Citation>
+                <ID Source="PubMed">24325359</ID>
+              </Citation>
+              <XRef DB="OMIM" ID="254450" Type="MIM"/>
+              <XRef DB="OMIM" ID="187950" Type="MIM"/>
+              <XRef DB="OMIM" ID="601511" Type="MIM"/>
+            </ObservedData>
+          </ObservedIn>
+        </ObservedInList>
+        <SimpleAllele>
+          <GeneList>
+            <Gene Symbol="CALR"/>
+          </GeneList>
+          <Name>CALR, 52-BP DEL, EX9</Name>
+          <VariantType>Variation</VariantType>
+          <OtherNameList>
+            <Name Type="NonHGVS">52-BP DEL, EX9</Name>
+          </OtherNameList>
+          <XRefList>
+            <XRef DB="OMIM" ID="109091.0001" Type="Allelic variant"/>
+          </XRefList>
+        </SimpleAllele>
+        <TraitSet Type="Disease">
+          <Trait Type="Disease">
+            <Name>
+              <ElementValue Type="included">THROMBOCYTHEMIA, SOMATIC</ElementValue>
+            </Name>
+          </Trait>
+        </TraitSet>
+      </ClinicalAssertion>
+      <ClinicalAssertion ID="202975" SubmissionDate="2014-04-24" DateLastUpdated="2014-05-05" DateCreated="2014-02-11">
+        <ClinVarSubmissionID localKey="109091.0001_MYELOFIBROSIS, SOMATIC" title="CALR, 52-BP DEL, EX9_MYELOFIBROSIS, SOMATIC"/>
+        <ClinVarAccession Accession="SCV000115335" DateUpdated="2014-05-05" DateCreated="2014-02-11" Type="SCV" Version="2" SubmitterName="OMIM" OrgID="3" OrganizationCategory="resource"/>
+        <RecordStatus>current</RecordStatus>
+        <Classification DateLastEvaluated="2013-12-19">
+          <ReviewStatus>no assertion criteria provided</ReviewStatus>
+          <GermlineClassification>Pathogenic</GermlineClassification>
+        </Classification>
+        <Assertion>variation to disease</Assertion>
+        <ObservedInList>
+          <ObservedIn>
+            <Sample>
+              <Origin>somatic</Origin>
+              <Species>human</Species>
+              <AffectedStatus>not provided</AffectedStatus>
+            </Sample>
+            <Method>
+              <MethodType>literature only</MethodType>
+            </Method>
+            <ObservedData>
+              <Attribute Type="Description">Klampfl et al. (2013) and Nangalia et al. (2013) identified a somatic 52-bp deletion in exon 9 of the CALR gene (1092_1143del) in patients with myeloproliferative neoplasms, including myelofibrosis (254450) and essential thrombocythemia (see 187950). CALR mutations and JAK2 and MPL mutations were mutually exclusive. The 52-bp mutation resulted in frameshift and premature termination (L367fsTer46). Klampfl et al. (2013) identified a total of 36 types of somatic insertion or deletion within exon 9 of CALR, all of which caused a frameshift to the same alternative reading frame and generated a novel C-terminal peptide in the mutant calreticulin. Klampfl et al. (2013) identified insertions or deletions in exon 9 of CALR in 88% of individuals with primary myelofibrosis with nonmutated JAK2 or MPL. The 52-bp deletion accounted for 53% of all cases of mutated CALR among several types of myeloproliferative neoplasm. Overexpression of this mutation resulted in cytokine-independent growth in vitro through the activation of STAT5 (601511). Nangalia et al. (2013) identified 23 patients with myelofibrosis who carried the L367fsTer46 mutation. Overall, Nangalia et al. (2013) identified 19 different somatic CALR mutations, all in exon 9 and all of which generated a +1 frameshift resulting in a mutant protein with a novel C terminal. CALR mutations were present in 18 of 32 patients (56%) with primary myelofibrosis and in 12 of 14 patients (86%) with progression of essential thrombocythemia to myelofibrosis. Neither Klampfl et al. (2013) nor Nangalia et al. (2013) detected CALR mutation in individuals with polycythemia vera.</Attribute>
+              <Citation>
+                <ID Source="PubMed">24325356</ID>
+              </Citation>
+              <Citation>
+                <ID Source="PubMed">24325359</ID>
+              </Citation>
+              <XRef DB="OMIM" ID="254450" Type="MIM"/>
+              <XRef DB="OMIM" ID="187950" Type="MIM"/>
+              <XRef DB="OMIM" ID="601511" Type="MIM"/>
+            </ObservedData>
+          </ObservedIn>
+        </ObservedInList>
+        <SimpleAllele>
+          <GeneList>
+            <Gene Symbol="CALR"/>
+          </GeneList>
+          <Name>CALR, 52-BP DEL, EX9</Name>
+          <VariantType>Variation</VariantType>
+          <OtherNameList>
+            <Name Type="NonHGVS">52-BP DEL, EX9</Name>
+          </OtherNameList>
+          <XRefList>
+            <XRef DB="OMIM" ID="109091.0001" Type="Allelic variant"/>
+          </XRefList>
+        </SimpleAllele>
+        <TraitSet Type="Disease">
+          <Trait Type="Disease">
+            <Name>
+              <ElementValue Type="Preferred">MYELOFIBROSIS, SOMATIC</ElementValue>
+            </Name>
+          </Trait>
+        </TraitSet>
+      </ClinicalAssertion>
+      <ClinicalAssertion ID="5461412" SubmissionDate="2022-12-13" DateLastUpdated="2022-12-31" DateCreated="2022-12-31">
+        <ClinVarSubmissionID localKey="NM_004343.4:c.1099_1150del|OMIM:187950;254450" submittedAssembly="GRCh37"/>
+        <ClinVarAccession Accession="SCV002812646" DateUpdated="2022-12-31" DateCreated="2022-12-31" Type="SCV" Version="1" SubmitterName="Fulgent Genetics, Fulgent Genetics" OrgID="500105" OrganizationCategory="laboratory"/>
+        <RecordStatus>current</RecordStatus>
+        <Classification DateLastEvaluated="2022-02-10">
+          <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+          <GermlineClassification>Pathogenic</GermlineClassification>
+        </Classification>
+        <Assertion>variation to disease</Assertion>
+        <AttributeSet>
+          <Attribute Type="AssertionMethod">ACMG Guidelines, 2015</Attribute>
+          <Citation>
+            <ID Source="PubMed">25741868</ID>
+          </Citation>
+        </AttributeSet>
+        <ObservedInList>
+          <ObservedIn>
+            <Sample>
+              <Origin>unknown</Origin>
+              <Species TaxonomyId="9606">human</Species>
+              <AffectedStatus>unknown</AffectedStatus>
+            </Sample>
+            <Method>
+              <MethodType>clinical testing</MethodType>
+            </Method>
+            <ObservedData>
+              <Attribute Type="Description">not provided</Attribute>
+            </ObservedData>
+          </ObservedIn>
+        </ObservedInList>
+        <SimpleAllele>
+          <VariantType>Variation</VariantType>
+          <AttributeSet>
+            <Attribute Type="HGVS">NM_004343.4:c.1099_1150del</Attribute>
+          </AttributeSet>
+        </SimpleAllele>
+        <TraitSet Type="TraitChoice">
+          <Trait Type="Disease">
+            <XRef DB="OMIM" ID="187950" Type="MIM"/>
+          </Trait>
+          <Trait Type="Disease">
+            <XRef DB="OMIM" ID="254450" Type="MIM"/>
+          </Trait>
+        </TraitSet>
+        <SubmissionNameList>
+          <SubmissionName>SUB12390657</SubmissionName>
+        </SubmissionNameList>
+      </ClinicalAssertion>
+      <ClinicalAssertion ID="8771190" SubmissionDate="2024-02-15" DateLastUpdated="2024-03-05" DateCreated="2024-03-05">
+        <ClinVarSubmissionID localKey="NM_004343.3:c.1092_1143del52|MeSH:D015470|OncogenicityClassification" submittedAssembly="GRCh37"/>
+        <ClinVarAccession Accession="SCV004697530" DateUpdated="2024-03-05" DateCreated="2024-03-05" Type="SCV" Version="1" SubmitterName="Molecular Diagnostics Laboratory, Fox Chase Cancer Center - Temple Health" OrgID="509422" OrganizationCategory="laboratory"/>
+        <RecordStatus>current</RecordStatus>
+        <Classification DateLastEvaluated="2024-01-24">
+          <ReviewStatus>no assertion criteria provided</ReviewStatus>
+          <OncogenicityClassification>Uncertain significance</OncogenicityClassification>
+          <Citation>
+            <ID Source="PubMed">31562135</ID>
+          </Citation>
+          <Comment>While there are strong associations of this variant to thrombocythemia and myeloproliferative neoplasms, its oncogenicity and clinical impact in this case of acute myeloid leukemia is uncertain because the allele frequency decreased over time from 11% (progressive thrombocythemia) to 3% (AML in remission) to undetectable at AML relapse.</Comment>
+        </Classification>
+        <Assertion>variation to disease</Assertion>
+        <ObservedInList>
+          <ObservedIn>
+            <Sample>
+              <Origin>somatic</Origin>
+              <Tissue>bone marrow with 37% blasts</Tissue>
+              <SomaticVariantInNormalTissue>not tested</SomaticVariantInNormalTissue>
+              <SomaticVariantAlleleFraction>3%</SomaticVariantAlleleFraction>
+              <Species TaxonomyId="9606">human</Species>
+              <Age Type="minimum" age_unit="years">70</Age>
+              <Age Type="maximum" age_unit="years">79</Age>
+              <AffectedStatus>yes</AffectedStatus>
+              <NumberTested>1</NumberTested>
+              <Gender>female</Gender>
+            </Sample>
+            <Method>
+              <NamePlatform>NextSeq 500</NamePlatform>
+              <TypePlatform>Next-gen sequencing</TypePlatform>
+              <Description>Average 800x coverage of all exons from 275 cancer-related genes.</Description>
+              <MethodType>clinical testing</MethodType>
+              <MethodAttribute>
+                <Attribute Type="TestName">Comprehensive Cancer Panel</Attribute>
+              </MethodAttribute>
+            </Method>
+            <ObservedData>
+              <Attribute Type="Description">not provided</Attribute>
+            </ObservedData>
+            <TraitSet DateLastEvaluated="2021-10-15" Type="Finding">
+              <Trait ClinicalFeaturesAffectedStatus="present" Type="Finding">
+                <XRef DB="HP" ID="HP:0031020"/>
+              </Trait>
+              <Trait ClinicalFeaturesAffectedStatus="present" Type="Finding">
+                <XRef DB="HP" ID="HP:0012138"/>
+              </Trait>
+            </TraitSet>
+          </ObservedIn>
+        </ObservedInList>
+        <SimpleAllele>
+          <GeneList>
+            <Gene Symbol="CALR"/>
+          </GeneList>
+          <VariantType>Variation</VariantType>
+          <AttributeSet>
+            <Attribute Type="HGVS">NM_004343.3:c.1092_1143del52</Attribute>
+          </AttributeSet>
+        </SimpleAllele>
+        <TraitSet Type="Disease">
+          <Trait Type="Disease">
+            <XRef DB="MeSH" ID="D015470"/>
+          </Trait>
+        </TraitSet>
+        <SubmissionNameList>
+          <SubmissionName>SUB14244255</SubmissionName>
+        </SubmissionNameList>
+      </ClinicalAssertion>
+      <ClinicalAssertion ID="8771187" SubmissionDate="2024-02-15" DateLastUpdated="2024-03-05" DateCreated="2024-03-05">
+        <ClinVarSubmissionID localKey="NM_004343.3:c.1092_1143del52|MeSH:D013920|ClinicalImpactClassification|diagnostic" submittedAssembly="GRCh37"/>
+        <ClinVarAccession Accession="SCV004697527" DateUpdated="2024-03-05" DateCreated="2024-03-05" Type="SCV" Version="1" SubmitterName="Molecular Diagnostics Laboratory, Fox Chase Cancer Center - Temple Health" OrgID="509422" OrganizationCategory="laboratory"/>
+        <RecordStatus>current</RecordStatus>
+        <Classification DateLastEvaluated="2024-01-24">
+          <ReviewStatus>no assertion criteria provided</ReviewStatus>
+          <SomaticClinicalImpact ClinicalImpactAssertionType="diagnostic" ClinicalImpactClinicalSignificance="supports diagnosis">Tier I - Strong</SomaticClinicalImpact>
+          <Citation>
+            <ID Source="PubMed">24325359</ID>
+          </Citation>
+          <Citation>
+            <ID Source="PubMed">24325356</ID>
+          </Citation>
+          <Comment>A large majority of myeloproliferative neoplasms with nonmutated JAK2 exhibit somatic CALR mutations. In a subset of such cases with essential thrombocythemia, 67% had CALR mutation.</Comment>
+        </Classification>
+        <Assertion>variation to disease</Assertion>
+        <ObservedInList>
+          <ObservedIn>
+            <Sample>
+              <Origin>somatic</Origin>
+              <Tissue>bone marrow with ET and 5-9% blasts</Tissue>
+              <SomaticVariantInNormalTissue>not tested</SomaticVariantInNormalTissue>
+              <SomaticVariantAlleleFraction>11%</SomaticVariantAlleleFraction>
+              <Species TaxonomyId="9606">human</Species>
+              <Age Type="minimum" age_unit="years">70</Age>
+              <Age Type="maximum" age_unit="years">79</Age>
+              <AffectedStatus>yes</AffectedStatus>
+              <NumberTested>1</NumberTested>
+              <Gender>female</Gender>
+            </Sample>
+            <Method>
+              <NamePlatform>ABI 3500</NamePlatform>
+              <TypePlatform>Sanger sequencing</TypePlatform>
+              <MethodType>clinical testing</MethodType>
+              <MethodAttribute>
+                <Attribute Type="TestName">CALR</Attribute>
+              </MethodAttribute>
+            </Method>
+            <ObservedData>
+              <Attribute Type="Description">not provided</Attribute>
+            </ObservedData>
+            <TraitSet DateLastEvaluated="2021-04-15" Type="Finding">
+              <Trait ClinicalFeaturesAffectedStatus="present" Type="Finding">
+                <XRef DB="HP" ID="HP:0031020"/>
+              </Trait>
+            </TraitSet>
+            <Comment>A patient with a 10-year history of elevated and increasing platelet counts had a bone marrow biopsy in the absence of symptoms. The biopsy revealed thrombocythemia, with normal cytogenetics and without mutation of JAK2. CALR was not tested at that time. Approximately 2 ½ years later, a second BM biopsy was performed when the patient began having symptoms and counts were worsening. The biopsy had hypercellular marrow with 5-9% blasts and normal karyotype, but revealed this CALR exon 9 mutation at 11% allele frequency. She was started on 5-azyctadine; however, five months later, a BM biopsy showed 37% blasts positive for CD33, CD34, CD117, and HLA-DR, consistent with acute myeloid leukemia, and the karyotype included a novel translocation, t(4;7)(q12;q21.2), in 17 of 20 metaphase spreads examined. After induction chemotherapy with cytarabine and daunorubicin, a day-14 biopsy showed response to therapy, with a hypercellular marrow (80%) that displayed panmyelosis (trilineage hyperplasia), granulocytic hyperplasia, and megakaryocytic atypia without an increase in blasts, consistent with residual/persistent myeloid disease. A PB specimen revealed normocytic normochromatic anemia, leukocytosis, and thrombocytosis. Chromosome microarray analysis and NGS of DNA from a BM sample revealed no detectable genomic imbalances, the CALR deletion at 3.2% allele frequency, and no other pathogenic variants. After eight months in remission, the AML relapsed with blood DNA showing oncogenic somatic mutations at around 50% allele frequency, but no evidence of the CALR deletion.</Comment>
+          </ObservedIn>
+        </ObservedInList>
+        <SimpleAllele>
+          <GeneList>
+            <Gene Symbol="CALR"/>
+          </GeneList>
+          <VariantType>Variation</VariantType>
+          <AttributeSet>
+            <Attribute Type="HGVS">NM_004343.3:c.1092_1143del52</Attribute>
+          </AttributeSet>
+        </SimpleAllele>
+        <TraitSet Type="Finding">
+          <Trait Type="Finding">
+            <XRef DB="MeSH" ID="D013920"/>
+          </Trait>
+        </TraitSet>
+        <SubmissionNameList>
+          <SubmissionName>SUB14244255</SubmissionName>
+        </SubmissionNameList>
+      </ClinicalAssertion>
+      <ClinicalAssertion ID="8771188" SubmissionDate="2024-02-15" DateLastUpdated="2024-03-05" DateCreated="2024-03-05">
+        <ClinVarSubmissionID localKey="NM_004343.3:c.1092_1143del52|MeSH:D013920|ClinicalImpactClassification|prognostic" submittedAssembly="GRCh37"/>
+        <ClinVarAccession Accession="SCV004697528" DateUpdated="2024-03-05" DateCreated="2024-03-05" Type="SCV" Version="1" SubmitterName="Molecular Diagnostics Laboratory, Fox Chase Cancer Center - Temple Health" OrgID="509422" OrganizationCategory="laboratory"/>
+        <RecordStatus>current</RecordStatus>
+        <Classification DateLastEvaluated="2024-01-24">
+          <ReviewStatus>no assertion criteria provided</ReviewStatus>
+          <SomaticClinicalImpact ClinicalImpactAssertionType="prognostic" ClinicalImpactClinicalSignificance="better outcome">Tier I - Strong</SomaticClinicalImpact>
+          <Citation>
+            <ID Source="PubMed">24325356</ID>
+          </Citation>
+          <Comment>In a cohort of 1107 myeloproliferative neoplasm patients, those with "mutated CALR had a lower risk of thromobsis and longer overall survival than patients with mutated JAK2."</Comment>
+        </Classification>
+        <Assertion>variation to disease</Assertion>
+        <ObservedInList>
+          <ObservedIn>
+            <Sample>
+              <Origin>somatic</Origin>
+              <Tissue>bone marrow with ET and 5-9% blasts</Tissue>
+              <SomaticVariantInNormalTissue>not tested</SomaticVariantInNormalTissue>
+              <SomaticVariantAlleleFraction>11%</SomaticVariantAlleleFraction>
+              <Species TaxonomyId="9606">human</Species>
+              <Age Type="minimum" age_unit="years">70</Age>
+              <Age Type="maximum" age_unit="years">79</Age>
+              <AffectedStatus>yes</AffectedStatus>
+              <NumberTested>1</NumberTested>
+              <Gender>female</Gender>
+            </Sample>
+            <Method>
+              <NamePlatform>ABI 3500</NamePlatform>
+              <TypePlatform>Sanger sequencing</TypePlatform>
+              <MethodType>clinical testing</MethodType>
+              <MethodAttribute>
+                <Attribute Type="TestName">CALR</Attribute>
+              </MethodAttribute>
+            </Method>
+            <ObservedData>
+              <Attribute Type="Description">not provided</Attribute>
+            </ObservedData>
+            <TraitSet DateLastEvaluated="2021-04-15" Type="Finding">
+              <Trait ClinicalFeaturesAffectedStatus="present" Type="Finding">
+                <XRef DB="HP" ID="HP:0031020"/>
+              </Trait>
+            </TraitSet>
+          </ObservedIn>
+        </ObservedInList>
+        <SimpleAllele>
+          <GeneList>
+            <Gene Symbol="CALR"/>
+          </GeneList>
+          <VariantType>Variation</VariantType>
+          <AttributeSet>
+            <Attribute Type="HGVS">NM_004343.3:c.1092_1143del52</Attribute>
+          </AttributeSet>
+        </SimpleAllele>
+        <TraitSet Type="Finding">
+          <Trait Type="Finding">
+            <XRef DB="MeSH" ID="D013920"/>
+          </Trait>
+        </TraitSet>
+        <SubmissionNameList>
+          <SubmissionName>SUB14244255</SubmissionName>
+        </SubmissionNameList>
+      </ClinicalAssertion>
+      <ClinicalAssertion ID="8771189" SubmissionDate="2024-02-15" DateLastUpdated="2024-03-05" DateCreated="2024-03-05">
+        <ClinVarSubmissionID localKey="NM_004343.3:c.1092_1143del52|MeSH:D015470|ClinicalImpactClassification" submittedAssembly="GRCh37"/>
+        <ClinVarAccession Accession="SCV004697529" DateUpdated="2024-03-05" DateCreated="2024-03-05" Type="SCV" Version="1" SubmitterName="Molecular Diagnostics Laboratory, Fox Chase Cancer Center - Temple Health" OrgID="509422" OrganizationCategory="laboratory"/>
+        <RecordStatus>current</RecordStatus>
+        <Classification DateLastEvaluated="2024-01-24">
+          <ReviewStatus>no assertion criteria provided</ReviewStatus>
+          <SomaticClinicalImpact>Tier III - Unknown</SomaticClinicalImpact>
+          <Comment>While there are strong associations of this variant to thrombocythemia and myeloproliferative neoplasms, its oncogenicity and clinical impact in this case of acute myeloid leukemia is uncertain because the allele frequency decreased over time from 11% (progressive thrombocythemia) to 3% (AML in remission) to undetectable at AML relapse.</Comment>
+        </Classification>
+        <Assertion>variation to disease</Assertion>
+        <ObservedInList>
+          <ObservedIn>
+            <Sample>
+              <Origin>somatic</Origin>
+              <Tissue>bone marrow with 37% blasts</Tissue>
+              <SomaticVariantInNormalTissue>not tested</SomaticVariantInNormalTissue>
+              <SomaticVariantAlleleFraction>3%</SomaticVariantAlleleFraction>
+              <Species TaxonomyId="9606">human</Species>
+              <Age Type="minimum" age_unit="years">70</Age>
+              <Age Type="maximum" age_unit="years">79</Age>
+              <AffectedStatus>yes</AffectedStatus>
+              <NumberTested>1</NumberTested>
+              <Gender>female</Gender>
+            </Sample>
+            <Method>
+              <NamePlatform>NextSeq 500</NamePlatform>
+              <TypePlatform>Next-gen sequencing</TypePlatform>
+              <Description>Average 800x coverage of all exons from 275 cancer-related genes.</Description>
+              <MethodType>clinical testing</MethodType>
+              <MethodAttribute>
+                <Attribute Type="TestName">Comprehensive Cancer Panel</Attribute>
+              </MethodAttribute>
+            </Method>
+            <ObservedData>
+              <Attribute Type="Description">not provided</Attribute>
+            </ObservedData>
+            <TraitSet DateLastEvaluated="2021-10-15" Type="Finding">
+              <Trait ClinicalFeaturesAffectedStatus="present" Type="Finding">
+                <XRef DB="HP" ID="HP:0031020"/>
+              </Trait>
+              <Trait ClinicalFeaturesAffectedStatus="present" Type="Finding">
+                <XRef DB="HP" ID="HP:0012138"/>
+              </Trait>
+            </TraitSet>
+          </ObservedIn>
+        </ObservedInList>
+        <SimpleAllele>
+          <GeneList>
+            <Gene Symbol="CALR"/>
+          </GeneList>
+          <VariantType>Variation</VariantType>
+          <AttributeSet>
+            <Attribute Type="HGVS">NM_004343.3:c.1092_1143del52</Attribute>
+          </AttributeSet>
+        </SimpleAllele>
+        <TraitSet Type="Disease">
+          <Trait Type="Disease">
+            <XRef DB="MeSH" ID="D015470"/>
+          </Trait>
+        </TraitSet>
+        <SubmissionNameList>
+          <SubmissionName>SUB14244255</SubmissionName>
+        </SubmissionNameList>
+      </ClinicalAssertion>
+    </ClinicalAssertionList>
+    <TraitMappingList>
+      <TraitMapping ClinicalAssertionID="8771189" TraitType="Disease" MappingType="XRef" MappingValue="D015470" MappingRef="MeSH">
+        <MedGen CUI="C0023467" Name="Acute myeloid leukemia"/>
+      </TraitMapping>
+      <TraitMapping ClinicalAssertionID="8771190" TraitType="Finding" MappingType="XRef" MappingValue="HP:0012138" MappingRef="HP">
+        <MedGen CUI="C4023028" Name="Granulocytic hyperplasia"/>
+      </TraitMapping>
+      <TraitMapping ClinicalAssertionID="5461412" TraitType="Disease" MappingType="XRef" MappingValue="187950" MappingRef="OMIM">
+        <MedGen CUI="C3277671" Name="Thrombocythemia 1"/>
+      </TraitMapping>
+      <TraitMapping ClinicalAssertionID="8771188" TraitType="Finding" MappingType="XRef" MappingValue="HP:0031020" MappingRef="HP">
+        <MedGen CUI="C0427703" Name="Bone marrow hypercellularity"/>
+      </TraitMapping>
+      <TraitMapping ClinicalAssertionID="5461412" TraitType="Disease" MappingType="XRef" MappingValue="254450" MappingRef="OMIM">
+        <MedGen CUI="C0001815" Name="Primary myelofibrosis"/>
+      </TraitMapping>
+      <TraitMapping ClinicalAssertionID="8771187" TraitType="Finding" MappingType="XRef" MappingValue="D013920" MappingRef="MeSH">
+        <MedGen CUI="C0040028" Name="Essential thrombocythemia"/>
+      </TraitMapping>
+      <TraitMapping ClinicalAssertionID="8771188" TraitType="Finding" MappingType="XRef" MappingValue="D013920" MappingRef="MeSH">
+        <MedGen CUI="C0040028" Name="Essential thrombocythemia"/>
+      </TraitMapping>
+      <TraitMapping ClinicalAssertionID="8771190" TraitType="Finding" MappingType="XRef" MappingValue="HP:0031020" MappingRef="HP">
+        <MedGen CUI="C0427703" Name="Bone marrow hypercellularity"/>
+      </TraitMapping>
+      <TraitMapping ClinicalAssertionID="8771187" TraitType="Finding" MappingType="XRef" MappingValue="HP:0031020" MappingRef="HP">
+        <MedGen CUI="C0427703" Name="Bone marrow hypercellularity"/>
+      </TraitMapping>
+      <TraitMapping ClinicalAssertionID="8771189" TraitType="Finding" MappingType="XRef" MappingValue="HP:0031020" MappingRef="HP">
+        <MedGen CUI="C0427703" Name="Bone marrow hypercellularity"/>
+      </TraitMapping>
+      <TraitMapping ClinicalAssertionID="202976" TraitType="Disease" MappingType="Name" MappingValue="THROMBOCYTHEMIA, SOMATIC" MappingRef="Alternate">
+        <MedGen CUI="C3277671" Name="Thrombocythemia 1"/>
+      </TraitMapping>
+      <TraitMapping ClinicalAssertionID="8771190" TraitType="Disease" MappingType="XRef" MappingValue="D015470" MappingRef="MeSH">
+        <MedGen CUI="C0023467" Name="Acute myeloid leukemia"/>
+      </TraitMapping>
+      <TraitMapping ClinicalAssertionID="8771189" TraitType="Finding" MappingType="XRef" MappingValue="HP:0012138" MappingRef="HP">
+        <MedGen CUI="C4023028" Name="Granulocytic hyperplasia"/>
+      </TraitMapping>
+      <TraitMapping ClinicalAssertionID="202975" TraitType="Disease" MappingType="Name" MappingValue="MYELOFIBROSIS, SOMATIC" MappingRef="Preferred">
+        <MedGen CUI="C0001815" Name="Primary myelofibrosis"/>
+      </TraitMapping>
+    </TraitMappingList>
+  </ClassifiedRecord>
+</VariationArchive>
+</ClinVarResult-Set>
