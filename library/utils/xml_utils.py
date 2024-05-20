@@ -1,5 +1,5 @@
 import inspect
-from typing import Callable, Optional
+from typing import Callable, Optional, Any
 
 from lxml import etree
 
@@ -63,17 +63,20 @@ class PathPredicates:
 
 class ParserMethod:
 
-    def __init__(self, method, path: PathPredicates, on_start):
+    def __init__(self, method: Callable, path: PathPredicates, on_start: bool, debug: Optional[str] = None):
         self.method = method
         self.path = path
         self.on_start = on_start
+        if not debug:
+            debug = f"{path} {method.__name__}"
+        self.debug = debug
 
     def test_and_remainder(self, elem) -> Optional['ParserMethod']:
         if sub_test := self.path.queue_test(elem):
-            return ParserMethod(method=self.method, path=sub_test, on_start=self.on_start)
+            return ParserMethod(method=self.method, path=sub_test, on_start=self.on_start, debug=self.debug)
 
     def __repr__(self):
-        return f"PM:{self.path}"
+        return self.debug
 
     @property
     def is_satisfied(self):
@@ -92,6 +95,7 @@ def parser_path(*args, on_start=False):
         wrapper.is_parser = True
         wrapper.path = PathPredicates(args)
         wrapper.on_start = on_start
+        wrapper.__name__ = method.__name__
         return wrapper
     return decorator
 
@@ -109,7 +113,7 @@ class XmlParser:
     """
 
     @classmethod
-    def get_parser_methods(cls, prefix: list):
+    def get_parser_methods(cls, prefix: list) -> list[ParserMethod]:
         if not hasattr(cls, 'parser_methods'):
             parser_methods = [func for _, func in inspect.getmembers(cls, lambda x: getattr(x, 'is_parser', False))]
             cls.parser_methods = [ParserMethod(method=pm, path=pm.path.with_prefix(prefix), on_start=pm.on_start) for pm in parser_methods]
@@ -123,13 +127,17 @@ class XmlParser:
     def __init__(self, prefix: Optional[list] = None):
         self._prefix = prefix or []
         self._stack: list = []
-        self._candidates: list[list[Callable]] = []
-        self._execute: list[list[Callable]] = []
-        self._yieldable: Optional = None
+        self._candidates: list[ParserMethod] = []
+        self._execute: list[ParserMethod] = []
+        self._yieldable: Optional[Any] = None
 
     def set_yieldable(self, obj):
         self._clear()
+        self.apply_extra(obj)
         self._yieldable = obj
+
+    def apply_extra(self, obj):
+        pass
 
     def yield_me(self):
         if temp := self._yieldable:
@@ -158,7 +166,7 @@ class XmlParser:
             yield result
 
     @property
-    def _peek_candidates(self):
+    def _peek_candidates(self) -> list[ParserMethod]:
         return self._candidates[-1]
 
     def _push(self, elem):
@@ -171,6 +179,7 @@ class XmlParser:
             if candidate.is_satisfied:
                 if candidate.on_start:
                     # execute now
+                    # print(f"Executing ({candidate}) {candidate.method.__name__}")
                     candidate.method(self, elem)
                 else:
                     execute_later.append(candidate)
@@ -183,7 +192,9 @@ class XmlParser:
     def _pop(self):
         if last_execute := self._execute.pop():
             for method in last_execute:
-                method.method(self, self._peek)
+                candidate = self._peek
+                # print(f"Executing ({method}) {method.method.__name__}")
+                method.method(self, candidate)
         self._stack.pop()
         self._candidates.pop()
 
