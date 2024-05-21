@@ -12,9 +12,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         fcs = FlagComment.objects.filter(text=options["text"])
-        if user_id := options["user_id"]:
-            fcs = fcs.filter(user_id=user_id)
         flag_qs = Flag.objects.filter(pk__in=fcs.values_list("flag_id", flat=True))
+        if user_id := options["user_id"]:
+            flag_qs = flag_qs.filter(user_id=user_id)
 
         open_flags_qs = flag_qs.filter(resolution__status=FlagStatus.OPEN)
         closed_flags_qs = flag_qs.exclude(resolution__status=FlagStatus.OPEN)
