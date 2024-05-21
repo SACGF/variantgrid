@@ -258,7 +258,7 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
                 self.condition_list.disease.append(elem.text)
 
     def post_record_parse(self, obj: ClinVarRecord):
-        if self.non_human and not obj.human:
+        if self.non_human and not self.human:
             obj.mark_invalid()
         else:
             allele_origins = self.allele_origin_set
