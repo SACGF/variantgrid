@@ -87,7 +87,7 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
 
     @parser_path("ObservedInList", "ObservedIn", "Sample", "Species")
     def species(self, elem):
-        if elem.text == "human":
+        if elem.text == "human" or ("homo" in elem.text.lower() and "sapiens" in elem.text.lower()):
             self.human = True
         else:
             self.non_human = True
