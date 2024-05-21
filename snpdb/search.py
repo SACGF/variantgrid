@@ -29,6 +29,7 @@ HAS_3_ANY = re.compile(r"\S{3,}")
 _SPLIT_GAPS = re.compile(r"[\s,]+")
 HAS_SCV = re.compile(r"SCV\d+")
 CE_SEARCH = re.compile(r"CE_\d+", re.IGNORECASE)
+CB_SEARCH = re.compile(r"CB_\d+", re.IGNORECASE)
 
 MAX_VARIANT_RESULTS = 100
 MAX_RESULTS_PER_SEARCH = 25
