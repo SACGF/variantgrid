@@ -134,8 +134,8 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
             cols.append(contig.name)  # CHROM
             cols.append(locus.position)  # POS
             cols.append(self.format_details.db_prefix + str(target_variant.id))  # ID
-            cols.append(locus.ref)  # REF
-            cols.append(target_variant.alt)  # ALT
+            cols.append(locus.ref.seq)  # REF
+            cols.append(target_variant.alt.seq)  # ALT
             cols.append('.')  # QUAL
             cols.append('PASS')  # FILTER
             info = f'count={len(vcms)}'
