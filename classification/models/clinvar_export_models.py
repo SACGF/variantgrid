@@ -254,7 +254,7 @@ def acmg_citation():
     }
 
 
-class ClinVarExportBatch(TimeStampedModel):
+class ClinVarExportBatch(TimeStampedModel, PreviewModelMixin):
     class Meta:
         verbose_name = "ClinVar export batch"
 
@@ -339,6 +339,30 @@ class ClinVarExportBatch(TimeStampedModel):
             batch_maker.add_record(record, force_update)
 
         return batch_maker.all_batches
+
+    def get_absolute_url(self):
+        return reverse('clinvar_export_batch_detail', kwargs={'clinvar_export_batch_id': self.pk})
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-file-arrow-up"
+
+    @classmethod
+    def preview_category(cls) -> str:
+        return "ClinVar Export Batch"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> str:
+        return "clinvar_export_batch_detail"
+
+    @property
+    def preview(self) -> PreviewData:
+        extra = [
+            PreviewKeyValue(key="ClinVar Key:", value=self.clinvar_key),
+        ]
+        return PreviewData.for_object(obj=self, summary_extra=extra,
+                                      icon=self.preview_icon(),
+                                      category=self.preview_category())
 
 
 class ClinVarExportSubmissionStatus(TextChoices):

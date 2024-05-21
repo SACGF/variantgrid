@@ -26,6 +26,7 @@ from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path, require_superuser, RequireSuperUserView
 from library.utils import html_to_text, export_column, ExportRow, local_date_string, ExportDataType, JsonDataType
+from library.utils.django_utils import render_ajax_view
 from ontology.models import OntologyTerm, AncestorCalculator, OntologyTermRelation
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import ClinVarKey, Lab, Allele, GenomeBuild
@@ -78,7 +79,7 @@ def clinvar_export_batch_detail(request, clinvar_export_batch_id: int):
     clinvar_export_batch.clinvar_key.check_user_can_access(request.user)
     submissions = clinvar_export_batch.clinvarexportsubmission_set.order_by('created')
 
-    return render(request, 'classification/clinvar_export_batch_detail.html', {
+    return render_ajax_view(request, 'classification/clinvar_export_batch_detail.html', {
         "batch": clinvar_export_batch,
         "submissions": submissions
     })
