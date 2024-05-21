@@ -810,7 +810,8 @@ def search_receiver(
         admin_only: bool = False,
         sub_name: Optional[str] = None,
         example: Optional[SearchExample] = None,
-        match_strength: Optional[SearchResultMatchStrength] = SearchResultMatchStrength.STRONG_MATCH
+        match_strength: Optional[SearchResultMatchStrength] = SearchResultMatchStrength.STRONG_MATCH,
+        enabled: bool = True,
     ) -> Callable[[Callable], Callable[[SearchInput], SearchResponse]]:
     """
     Wrap around a Callable[[SearchInputInstance], Generator[Any]]
@@ -934,7 +935,8 @@ def search_receiver(
 
             return response
 
-        search_signal.connect(search_func)
-        return search_func
+        if enabled:
+            search_signal.connect(search_func)
+            return search_func
 
     return _decorator

@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.db.models import QuerySet
 from django.urls import reverse
 
+from annotation.cosmic import CosmicAPI
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from classification.models import Classification, CreateNoClassificationForbidden
 from genes.hgvs import HGVSMatcher, HGVSException
@@ -92,20 +93,30 @@ class VariantExtra:
     sub_name="COSMIC",
     example=SearchExample(
         note="Provide the COSMIC ID",
-        examples=["COSV53567516"]
-    )
+        examples=["COSV53567516", "COSM7659094"]
+    ),
+    enabled=settings.SEARCH_COSMIC_ENABLED,
 )
 def variant_cosmic_search(search_input: SearchInputInstance):
-    search_string = search_input.search_string.upper()
+    # Do via API as a full table scan takes way too long with big data
     for genome_build in search_input.genome_builds:
-        variant_qs = search_input.get_visible_variants(genome_build)
-        # COSMIC IDs are in a text field and separated by "&"
-        # commonly there's 0 or 1 COSMIC ID, but if there's multiple we have to check for it starting with
-        # the start of the field or an &, and ending with the end of the line or an &
-        if search_input.match.group(1).upper() == "COSV":
-            yield variant_qs.filter(variantannotation__cosmic_id__regex=f"(?:^|&){search_string}(?:$|&)")
-        elif search_input.match.group(1).upper() == "COSM":
-            yield variant_qs.filter(variantannotation__cosmic_legacy_id__regex=f"(?:^|&){search_string}(?:$|&)")
+        matcher = HGVSMatcher(genome_build)
+        cosmic = CosmicAPI(search_input.search_string, genome_build)
+        results_by_variant_identifier: dict[str, list[SearchResult]] = defaultdict(list)
+        hgvs_by_variant_identifier: dict[str, list[str]] = defaultdict(list)
+
+        for hgvs_string in cosmic.get_hgvs_list():
+            for result in _yield_results_from_hgvs(search_input, genome_build, matcher, hgvs_string):
+                if result.preview.category == "Variant":
+                    variant_identifier = result.preview.identifier
+                    results_by_variant_identifier[variant_identifier].append(result)
+                    hgvs_by_variant_identifier[variant_identifier].append(hgvs_string)
+
+        for variant_identifier, results_for_record in results_by_variant_identifier.items():
+            search_message = SearchMessage(f"COSMIC {search_input.search_string} resolved to: {', '.join(hgvs_by_variant_identifier[variant_identifier])}",
+                                           severity=LogLevel.INFO)
+            preview = results_for_record[0].preview  # These will all be the same
+            yield SearchResult(preview=preview, messages=[search_message])
 
 
 @search_receiver(
@@ -294,20 +305,27 @@ def search_variant_db_snp(search_input: SearchInputInstance):
         matcher = HGVSMatcher(genome_build)
         for data in dbsnp.get_alleles_for_genome_build(genome_build):
             if hgvs_string := data.get("hgvs"):
-                dbsnp_message = SearchMessage(f'dbSNP "{search_input.search_string}" resolved to "{hgvs_string}"', severity=LogLevel.INFO)
-                variant_tuple = matcher.get_variant_coordinate(hgvs_string)
-                results = get_results_from_variant_coordinate(genome_build, search_input.get_visible_variants(genome_build), variant_tuple)
-                if results.exists():
-                    for r in results:
-                        yield r, dbsnp_message
-                else:
-                    variant_string = Variant.format_tuple(*variant_tuple)
-                    if create_manual := VariantExtra.create_manual_variant(
-                        for_user=search_input.user,
-                        variant_string=variant_string,
-                        genome_build=genome_build
-                    ):
-                        yield create_manual, dbsnp_message
+                search_message = SearchMessage(f'dbSNP "{search_input.search_string}" resolved to "{hgvs_string}"',
+                                               severity=LogLevel.INFO)
+                for r in _yield_results_from_hgvs(search_input, genome_build, matcher, hgvs_string):
+                    yield r, search_message
+
+
+def _yield_results_from_hgvs(search_input, genome_build, matcher, hgvs_string) -> Iterable[SearchResult]:
+    variant_tuple = matcher.get_variant_coordinate(hgvs_string)
+    results = get_results_from_variant_coordinate(genome_build, search_input.get_visible_variants(genome_build),
+                                                  variant_tuple)
+    if results.exists():
+        for r in results:
+            yield r
+    else:
+        variant_string = Variant.format_tuple(*variant_tuple)
+        if create_manual := VariantExtra.create_manual_variant(
+                for_user=search_input.user,
+                variant_string=variant_string,
+                genome_build=genome_build
+        ):
+            yield SearchResult(create_manual)
 
 
 def _search_hgvs_using_gene_symbol(
