@@ -359,18 +359,15 @@ class ClinVarExportConverter:
                                               OntologyService.HPO, OntologyService.MONDO):
             messages += JsonMessages.error(f"Ontology \"{condition.ontology_service}\" is not supported by ClinVar")
 
-        if condition.ontology_service in (OntologyService.OMIM, OntologyService.HPO, OntologyService.MONDO) and not condition.is_valid_for_condition:
-            # we don't keep Orphanet records, so just hope for the best with them
-
-            if condition.status == OntologyTermStatus.STUB:
-                messages += JsonMessages.error(f"We have no record of condition \"{condition}\". If this is valid it will be automatically resolved when our system refreshes ontology terms next.")
-            elif condition.status == OntologyTermStatus.DEPRECATED:
-                messages += JsonMessages.error(
-                    f"Term \"{condition}\" has been marked as deprecated. You will need to condition match to a newer term to submit this data to ClinVar.")
-            elif condition.status == OntologyTermStatus.NON_CONDITION:
-                messages += JsonMessages.error(
-                    f"Term \"{condition}\" is not valid to use as a condition under curation. You will need to condition match to a newer term to submit this data to ClinVar."
-                )
+        if condition.status == OntologyTermStatus.STUB:
+            messages += JsonMessages.error(f"We have no record of condition \"{condition}\". If this is valid it will be automatically resolved when our system refreshes ontology terms next.")
+        elif condition.status == OntologyTermStatus.DEPRECATED:
+            messages += JsonMessages.error(
+                f"Term \"{condition}\" has been marked as deprecated. You will need to condition match to a newer term to submit this data to ClinVar.")
+        elif condition.status == OntologyTermStatus.NON_CONDITION:
+            messages += JsonMessages.error(
+                f"Term \"{condition}\" is not valid to use as a condition under curation. You will need to condition match to a newer term to submit this data to ClinVar."
+            )
 
         """
         # Examples
