@@ -11,7 +11,7 @@ from classification.views.exports.classification_export_formatter import Classif
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column, delimited_row
 from ontology.models import OntologyTerm, OntologyTermRelation, OntologyRelation, OntologyImportSource, \
-    PanelAppClassification
+    PanelAppClassification, OntologySnake, OntologyService, GeneDiseaseClassification
 
 
 class ClassificationConditionResolutionRow(ExportRow):
@@ -29,7 +29,7 @@ class ClassificationConditionResolutionRow(ExportRow):
     def classification_id(self):
         return self.vc.id
 
-    @export_column('C.HGVS')
+    @export_column('c.HGVS')
     def c_hgvs(self):
         return self.vc.c_parts.full_c_hgvs
 
@@ -86,6 +86,24 @@ class ClassificationExportFormatterConditionResolution(ClassificationExportForma
                 strongest_classification = ''
                 ontology_term = OntologyTerm.get_gene_symbol(gene)
                 panel_app_relations = OntologyTermRelation.objects.filter(dest_term_id=ontology_term.id)
+
+                # JAMES EDIT STARTS
+                for gene_symbol in vcm.classification.allele_info.gene_symbols:
+                    # on the off chance there are 2 gene symbols
+                    all_relationships = list(OntologySnake.get_all_term_to_gene_relationships(condition, gene))
+                    # we now have a list of potential PanelApp, MONDO, GenCC relationships all of different strengths to the exact condition term
+                    # find the best strength for each kind of relationship and put it in one row
+                    has_direct_panel_app_relationship = True  # TODO - determine if there actually is a panel app relationship
+
+                    if not has_direct_panel_app_relationship:
+                        if all_relationships_snakes := OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO, quality_q=GeneDiseaseClassification.DISPUTED):
+                            all_relationships = all_relationships_snakes.leaf_relations()
+                            # we now have a list of potential PanelApp, MONDO, GenCC relationships all of different strengths to various condition terms
+                            # get a list of all conditions and make a row for each
+                            # mark the fact that it's not a direct match
+                # JAMES EDIT ENDS
+
+                # I have not edited the below
                 for rel in panel_app_relations:
                     if rel.source_term.name:
                         if rel.from_import.import_source == OntologyImportSource.PANEL_APP_AU:
