@@ -78,46 +78,57 @@ class ClassificationExportFormatterConditionResolution(ClassificationExportForma
     def row(self, allele_data: AlleleData) -> list[str]:
         rows: list[str] = []
         for vcm in allele_data.cms:
-            if condition := vcm.classification.condition_resolution:
-                gene = vcm.classification.allele_info.gene_symbols[
-                    0].symbol if vcm.classification.allele_info.gene_symbols else None
-                panel_app_data = set()
-                other_relations = set()
-                strongest_classification = ''
-                ontology_term = OntologyTerm.get_gene_symbol(gene)
-                panel_app_relations = OntologyTermRelation.objects.filter(dest_term_id=ontology_term.id)
+            if condition_obj := vcm.classification.condition_resolution_obj:
+                if not condition_obj.is_multi_condition and condition_obj.terms and condition_obj.terms[0].ontology_service in {OntologyService.MONDO, OntologyService.OMIM}:
+                    # only work for single conditions in MONDO or OMIM
+                    condition_term = condition_obj.terms[0]
 
-                # JAMES EDIT STARTS
-                for gene_symbol in vcm.classification.allele_info.gene_symbols:
-                    # on the off chance there are 2 gene symbols
-                    all_relationships = list(OntologySnake.get_all_term_to_gene_relationships(condition, gene))
-                    # we now have a list of potential PanelApp, MONDO, GenCC relationships all of different strengths to the exact condition term
-                    # find the best strength for each kind of relationship and put it in one row
-                    has_direct_panel_app_relationship = True  # TODO - determine if there actually is a panel app relationship
+                    # gene = vcm.classification.allele_info.gene_symbols[
+                    #     0].symbol if vcm.classification.allele_info.gene_symbols else None
+                    # panel_app_data = set()
+                    # other_relations = set()
+                    # strongest_classification = ''
+                    # ontology_term = OntologyTerm.get_gene_symbol(gene)
+                    # panel_app_relations = OntologyTermRelation.objects.filter(dest_term_id=ontology_term.id)
 
-                    if not has_direct_panel_app_relationship:
-                        if all_relationships_snakes := OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO, quality_q=GeneDiseaseClassification.DISPUTED):
-                            all_relationships = all_relationships_snakes.leaf_relations()
-                            # we now have a list of potential PanelApp, MONDO, GenCC relationships all of different strengths to various condition terms
-                            # get a list of all conditions and make a row for each
-                            # mark the fact that it's not a direct match
-                # JAMES EDIT ENDS
+                    # JAMES EDIT STARTS
 
-                # I have not edited the below
-                for rel in panel_app_relations:
-                    if rel.source_term.name:
-                        if rel.from_import.import_source == OntologyImportSource.PANEL_APP_AU:
-                            if rel.extra.get('strongest_classification', '') != 'Expert Review Green':
-                                strongest_classification = rel.extra.get('strongest_classification', '')
-                                panel_app_data.add(rel.source_term.name)
-                        elif rel.from_import.import_source in [OntologyImportSource.MONDO, OntologyImportSource.GENCC]:
-                            other_relations.add(f'({rel.from_import.import_source}): {rel.source_term.name} ')
+                    for gene_symbol in vcm.classification.allele_info.gene_symbols:
+                        # on the off chance there are 2 gene symbols, we can make results for each gene symbol individually
+                        all_relationships = list(OntologySnake.get_all_term_to_gene_relationships(condition_term, gene_symbol))
+                        panel_app_relationships = [relation for relation in all_relationships if relation.relation == OntologyRelation.PANEL_APP_AU]
+                        # we now have a list of potential PanelApp, MONDO, GenCC relationships all of different strengths to the exact condition term
+                        # find the best strength for each kind of relationship and put it in one row
+                        has_direct_panel_app_relationship = bool(panel_app_relationships)
+                        print(panel_app_relationships)
 
-                panel_app_data_str = ','.join(panel_app_data)
-                others_str = ','.join(other_relations)
+                        if all_relationships:
+                            # make one row, including the biggest strength of each type of relationship
+                            pass
 
-                row = ClassificationConditionResolutionRow(vcm, condition, gene, strongest_classification,
-                                                           panel_app_data_str, others_str)
-                rows.append(delimited_row(row.to_csv()))
+                        if not has_direct_panel_app_relationship:
+                            # there may or may not have been any relationships, but there wasn't one from panel app, so now lets look at all conditions for the gene symbol and make a row for each one
+                            if all_relationships_snakes := OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO, min_classification=GeneDiseaseClassification.DISPUTED):
+                                all_relationships = all_relationships_snakes.leaf_relations()
+                                # group all relationships by destination term
+                                # then make one row per destination term, mark it as not being for the term the condition was matched to
+
+                    # JAMES EDIT ENDS
+
+                    # for rel in panel_app_relations:
+                    #     if rel.source_term.name:
+                    #         if rel.from_import.import_source == OntologyImportSource.PANEL_APP_AU:
+                    #             if rel.extra.get('strongest_classification', '') != 'Expert Review Green':
+                    #                 strongest_classification = rel.extra.get('strongest_classification', '')
+                    #                 panel_app_data.add(rel.source_term.name)
+                    #         elif rel.from_import.import_source in [OntologyImportSource.MONDO, OntologyImportSource.GENCC]:
+                    #             other_relations.add(f'({rel.from_import.import_source}): {rel.source_term.name} ')
+                    #
+                    # panel_app_data_str = ','.join(panel_app_data)
+                    # others_str = ','.join(other_relations)
+                    #
+                    # row = ClassificationConditionResolutionRow(vcm, condition, gene, strongest_classification,
+                    #                                            panel_app_data_str, others_str)
+                    # rows.append(delimited_row(row.to_csv()))
 
         return rows
