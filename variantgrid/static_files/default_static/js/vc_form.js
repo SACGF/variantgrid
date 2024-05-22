@@ -983,6 +983,7 @@ const VCForm = (function() {
                 //  if the record is germline (somatic text resolution not enabled yet)
                 // AND if the record doesn't have changes (which could cause confusion if there is un-submitted condition text change)
                 if (this.conditionMatchingIsViewEnabled &&
+                    this.record.condition_text_match &&
                     this.record.can_write &&
                     this.record.allele_origin_bucket === "G" &&
                     !this.record.has_changes) {
