@@ -1,0 +1,55 @@
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load js_tags %}
+{% load lab_tags %}
+{% load static %}
+{% load ui_tabs_builder %}
+{% load classification_tags %}
+
+<div>
+    {% labelled label="Share Levels" %}
+        <div class="form-check">
+            <label class="form-check-label">
+                <input checked="checked" id="share_level_public" name="share_level" value="public" type="radio" class="form-check-input" />
+                <img src="{% static 'icons/share_level/logged_in_users.png' %}" class="tiny-icon" />
+                <img src="{% static 'icons/share_level/public.png' %}" class="tiny-icon" />
+                Shared with Application and 3rd Party Databases
+            </label>
+        </div>
+        <div class="form-check">
+            <label class="form-check-label">
+                <input id="share_level_any" name="share_level" value="any" type="radio" class="form-check-input" />
+                <img src="{% static 'icons/share_level/lab.png' %}" class="tiny-icon" />
+                <img src="{% static 'icons/share_level/institution.png' %}" class="tiny-icon" />
+                <img src="{% static 'icons/share_level/logged_in_users.png' %}" class="tiny-icon" />
+                <img src="{% static 'icons/share_level/public.png' %}" class="tiny-icon" />
+                Any record I have access to (e.g. records shared at my lab).
+            </label>
+        </div>
+    {% endlabelled %}
+    {% labelled label="Genome Build" %}
+        {% for genome_build in genome_builds %}
+            {% if genome_build.enabled %}
+                <div class="form-check">
+                    <label class="form-check-label">
+                        <input class="form-check-input" {% if genome_build.name == default_genome_build.name %}checked="checked"{% endif %} id="genome_build_{{ genome_build.name }}" type="radio" name="genome_build" value="{{ genome_build.name }}" />
+                        {{ genome_build.name }}
+                    </label>
+                </div>
+            {% endif %}
+        {% endfor %}
+    {% endlabelled %}
+    {% labelled label="Allele Origin" %}
+        {% allele_origin_toggle show_label=False %}
+        <div class="text-muted">Note that records with an allele origin other than germline or somatic will always be included in downloads.</div>
+    {% endlabelled %}
+    {% labelled label="Genomic Location"%}
+        <div class="form-check px-2">
+            <label class="form-check-label">
+                <textarea class="form-control" rows="6" cols="80" id="genomic_location" name="genomic_location"></textarea>
+            </label>
+        </div>
+    {% endlabelled %}
+</div>
+

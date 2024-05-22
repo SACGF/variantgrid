@@ -624,3 +624,8 @@ def user_view_events(user: User, days: int = 1):
             'args': json.dumps(event.args)
         })
     return view_event_data
+
+
+@register.inclusion_tag("classification/tags/internal_lab_download.html")
+def internal_lab_download():
+    return {}
