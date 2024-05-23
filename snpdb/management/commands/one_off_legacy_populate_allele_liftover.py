@@ -102,22 +102,32 @@ class Command(BaseCommand):
                 continue
             allele_qs = lr.get_allele_qs()
 
+            handled_allele_ids = set()
+            for allele_id, genome_build_set in allele_non_liftover_build.items():
+                if lr.genome_build in genome_build_set:
+                    handled_allele_ids.add(allele_id)
+
+            for allele_id, data in allele_conversion_tool_initial_liftover.items():
+                if build_data := data.get(lr.genome_build):
+                    # If there was a previous success, we would never run another tool
+                    if build_data.get(ProcessingStatus.SUCCESS):
+                        handled_allele_ids.add(allele_id)
+                    elif status != ProcessingStatus.SUCCESS:
+                        # We only want to record the first of each status
+                        if build_data.get(status, {}).get(lr.conversion_tool):
+                            handled_allele_ids.add(allele_id)
+
             # Performance really degrades when you have heaps of all allele sources
             # This optimisation is slower for most sources, but tries to reduce worst case when you have lots of
             # all allele sources (meaning you have to loop again and again)
             if use_optimisation_exclusion:
-                handled_allele_ids = set()
-                for allele_id, genome_build_set in allele_non_liftover_build.items():
-                    if lr.genome_build in genome_build_set:
-                        handled_allele_ids.add(allele_id)
-
-                for allele_id, data in allele_conversion_tool_initial_liftover.items():
-                    if data.get(lr.genome_build, {}).get(status, {}).get(lr.conversion_tool):
-                        handled_allele_ids.add(allele_id)
-
                 allele_qs = allele_qs.exclude(pk__in=handled_allele_ids)
 
             for allele_id in allele_qs.values_list("pk", flat=True):
+                # If use_optimisation_exclusion=True these shouldn't be in queryset
+                if allele_id in handled_allele_ids:
+                    continue
+
                 if lr in existing_allele_id_liftovers[allele_id]:
                     continue
 
