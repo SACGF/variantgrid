@@ -1193,6 +1193,7 @@ class SingleTermH:
     def __repr__(self):
         return f"{self.term} depth: {self.depth}"
 
+
 class AncestorCalculator:
 
     def __init__(self, terms: Iterable[OntologyTerm]):
