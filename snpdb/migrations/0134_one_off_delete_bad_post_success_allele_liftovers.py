@@ -17,8 +17,11 @@ def _one_off_delete_bad_post_success_allele_liftovers(apps, _schema_editor):
         qs_failed_clingen = AlleleLiftover.objects.filter(liftover__genome_build=genome_build, status='E',
                                                           error__icontains='genomicAlleles')
         alleles_failed_clingen = list(qs_failed_clingen.values_list("allele_id", flat=True))
-        AlleleLiftover.objects.filter(liftover__genome_build=genome_build, liftover__conversion_tool='CA', status='S',
-                                      allele__in=alleles_failed_clingen).delete()
+        data = AlleleLiftover.objects.filter(liftover__genome_build=genome_build, liftover__conversion_tool='CA',
+                                             status='S', allele__in=alleles_failed_clingen).delete()
+        if data:
+            logging.info("%s, deleted incorrect clingen success (where also failure): %s",
+                         genome_build_name, data)
 
         # Now find first success - anything after that wouldn't have run
         qs = AlleleLiftover.objects.filter(liftover__genome_build=genome_build, status='S')
@@ -33,7 +36,8 @@ def _one_off_delete_bad_post_success_allele_liftovers(apps, _schema_editor):
 
         data = AlleleLiftover.objects.filter(pk__in=delete_set).delete()
         if data:
-            logging.info("Deleted %s", data)
+            logging.info("%s, deleted incorrect liftover after previous success %s",
+                         genome_build_name, data)
 
 
 class Migration(migrations.Migration):
