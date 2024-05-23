@@ -66,7 +66,7 @@ class AlleleData:
     """
     source: 'ClassificationFilter'
     allele_id: int
-    allele_origin_bucket: AlleleOriginBucket
+    allele_origin_bucket: Optional[AlleleOriginBucket] = None
     all_cms: List[ClassificationIssue] = field(default_factory=list)  # misleading name, should be all_ci or something
 
     def sort(self):
@@ -211,6 +211,7 @@ class ClassificationFilter:
     user: User
     genome_build: GenomeBuild
     allele_origin_filter: AlleleOriginFilterDefault = AlleleOriginFilterDefault.SHOW_ALL
+    allele_origin_split: bool = False  # if true, subdivide allele data by allele origin bucket
     exclude_sources: Optional[Set[Union[Lab, Organization]]] = None
     include_sources: Optional[Set[Lab]] = None
     since: Optional[datetime] = None
@@ -526,9 +527,11 @@ class ClassificationFilter:
         for cm in self.cms_qs.iterator(chunk_size=1000):
             if allele_info := cm.classification.allele_info:
                 allele_id = cm.classification.allele_id
+                # note only care about allele origin bucket if self.allele_origin_split is True
                 allele_origin_bucket = cm.classification.allele_origin_bucket
 
-                if not allele_data or allele_id != allele_data.allele_id or allele_origin_bucket != allele_data.allele_origin_bucket:
+                if not allele_data or allele_id != allele_data.allele_id or \
+                        (self.allele_origin_split and allele_origin_bucket != allele_data.allele_origin_bucket):
                     if allele_data:
                         allele_data.sort()
                         yield allele_data
@@ -536,7 +539,7 @@ class ClassificationFilter:
                     allele_data = AlleleData.from_allele_info(
                         source=self,
                         allele_info=allele_info,
-                        allele_origin_bucket=allele_origin_bucket
+                        allele_origin_bucket=allele_origin_bucket if not self.allele_origin_split else None
                     )
                 allele_data.all_cms.append(self._record_issues(allele_id=allele_id, cm=cm))
 

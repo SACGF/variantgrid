@@ -58,6 +58,7 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
     @classmethod
     def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterVCF':
         classification_filter = ClassificationFilter.from_request(request)
+        classification_filter.allele_origin_split = True
         return ClassificationExportFormatterVCF(
             classification_filter=classification_filter,
             format_details=FormatDetailsVCF.from_request(request)
