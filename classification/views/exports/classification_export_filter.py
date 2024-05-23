@@ -12,7 +12,7 @@ from django.http import HttpRequest
 from guardian.shortcuts import get_objects_for_user
 from threadlocals.threadlocals import get_current_request
 
-from classification.enums import ShareLevel, ClinicalContextStatus
+from classification.enums import ShareLevel, ClinicalContextStatus, AlleleOriginBucket
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
     DiscordanceReport, ClinicalContext, ImportedAlleleInfo, ClinVarExport
@@ -66,6 +66,7 @@ class AlleleData:
     """
     source: 'ClassificationFilter'
     allele_id: int
+    allele_origin_bucket: AlleleOriginBucket
     all_cms: List[ClassificationIssue] = field(default_factory=list)  # misleading name, should be all_ci or something
 
     def sort(self):
@@ -79,13 +80,14 @@ class AlleleData:
     cached_data: Dict[str, Any] = None
 
     @staticmethod
-    def from_allele_info(source: 'ClassificationFilter', allele_info: ImportedAlleleInfo):
+    def from_allele_info(source: 'ClassificationFilter', allele_info: ImportedAlleleInfo, allele_origin_bucket: AlleleOriginBucket):
         variant: Optional[Variant] = None
         if variant_info := allele_info[source.genome_build]:
             variant = variant_info.variant
         return AlleleData(
             source=source,
             allele_id=allele_info.allele_id,
+            allele_origin_bucket=allele_origin_bucket,
             cached_allele=allele_info.allele,
             cached_variant=variant
         )
@@ -469,7 +471,7 @@ class ClassificationFilter:
             genome_build_str = '38'
 
         genomic_sort = f'classification__allele_info__grch{genome_build_str}__genomic_sort'
-        cms = cms.order_by(genomic_sort, 'classification__allele_info__allele', 'classification__lab', '-classification__id')
+        cms = cms.order_by(genomic_sort, 'classification__allele_info__allele', 'classification__allele_origin_bucket', 'classification__lab', '-classification__id')
 
         cms = cms.select_related(
             'classification',
@@ -520,16 +522,22 @@ class ClassificationFilter:
         Is not filtered at this point
         """
         allele_data: Optional[AlleleData] = None
+        cm: ClassificationModification
         for cm in self.cms_qs.iterator(chunk_size=1000):
             if allele_info := cm.classification.allele_info:
                 allele_id = cm.classification.allele_id
+                allele_origin_bucket = cm.classification.allele_origin_bucket
 
-                if not allele_data or allele_id != allele_data.allele_id:
+                if not allele_data or allele_id != allele_data.allele_id or allele_origin_bucket != allele_data.allele_origin_bucket:
                     if allele_data:
                         allele_data.sort()
                         yield allele_data
 
-                    allele_data = AlleleData.from_allele_info(source=self, allele_info=cm.classification.allele_info)
+                    allele_data = AlleleData.from_allele_info(
+                        source=self,
+                        allele_info=allele_info,
+                        allele_origin_bucket=allele_origin_bucket
+                    )
                 allele_data.all_cms.append(self._record_issues(allele_id=allele_id, cm=cm))
 
         if allele_data:

@@ -8,7 +8,7 @@ from django.contrib.sites.models import Site
 from django.http import HttpRequest
 from django.urls import reverse
 
-from classification.enums import SpecialEKeys
+from classification.enums import SpecialEKeys, AlleleOriginBucket
 from classification.models import EvidenceKey, ClassificationModification, EvidenceKeyMap
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
@@ -37,6 +37,12 @@ class FormatDetailsVCF:
             encoding_level=encoding_level
         )
 
+
+ALLELE_ORIGIN_BUCKET_TO_LABEL = {
+    AlleleOriginBucket.SOMATIC: "somatic",
+    AlleleOriginBucket.GERMLINE: "germline",
+    AlleleOriginBucket.UNKNOWN: "unknown"
+}
 
 @register_classification_exporter("vcf")
 class ClassificationExportFormatterVCF(ClassificationExportFormatter):
@@ -111,7 +117,8 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
             '##INFO=<ID=multiple_clinical_significances,Number=0,Type=Flag,Description="Present if there are multiple clinical significances for the variant">',
             '##INFO=<ID=discordant,Number=.,Type=Integer,Description="If 1, indicates that the corresponding classification is in discordance">',
             '##INFO=<ID=condition,Number=.,Type=String,Description="Condition Under Curation">',
-            '##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Difference in length between REF and ALT alleles">',
+            '##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Difference in length between REF and ALT alleles">',
+            '##INFO=<ID=allele_origin,Number=1,Type=String,Description="Allele origin bucket, values will be: somatic, germline or unknown'
         ]
         for e_key in self.report_keys:
             out += [self.generate_info_for_key(e_key)]
@@ -182,6 +189,7 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
                 info_flags.append("multiple_clinical_significances")
             info_dict['discordant'] = ','.join(discordances)
             info_dict['condition'] = ','.join(conditions)
+            info_dict['allele_origin'] = ALLELE_ORIGIN_BUCKET_TO_LABEL.get(data.allele_origin_bucket)
 
             # loop through all the keys we're choosing to print out
             for ekey in self.report_keys:
