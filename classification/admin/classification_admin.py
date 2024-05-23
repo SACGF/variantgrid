@@ -726,32 +726,35 @@ class DiscordanceReportAdminExport(ExportRow):
 
     @export_column("Umbrella Condition")
     def _umbrella_condition(self):
-        umbrellas = ""
-        conditions: set[OntologyTerm] = set()
-        unresolved_conditions: set[str] = set()
-        for summary in self.summaries:
-            for drc in summary.drcs:
-                has_resolved_conditions = False
-                if condition_obj := drc.classification_original.classification.condition_resolution_obj:
-                    if mondo := condition_obj.as_mondo_if_possible():
-                        conditions.update(mondo.terms)
-                        has_resolved_conditions = True
-                if not has_resolved_conditions:
-                    if raw_condition := drc.classification_effective.get(SpecialEKeys.CONDITION):
-                        unresolved_conditions.add(raw_condition)
+        try:
+            umbrellas = ""
+            conditions: set[OntologyTerm] = set()
+            unresolved_conditions: set[str] = set()
+            for summary in self.summaries:
+                for drc in summary.drcs:
+                    has_resolved_conditions = False
+                    if condition_obj := drc.classification_original.classification.condition_resolution_obj:
+                        if mondo := condition_obj.as_mondo_if_possible():
+                            conditions.update(mondo.terms)
+                            has_resolved_conditions = True
+                    if not has_resolved_conditions:
+                        if raw_condition := drc.classification_effective.get(SpecialEKeys.CONDITION):
+                            unresolved_conditions.add(raw_condition)
 
-        if conditions:
-            ancestor = AncestorCalculator.common_ancestor(conditions)
-            umbrellas = str(ancestor)
+            if conditions:
+                ancestor = AncestorCalculator.common_ancestor(conditions)
+                umbrellas = str(ancestor)
 
-        if unresolved_conditions:
-            unresolved_str = ", ".join(sorted(unresolved_conditions))
-            if umbrellas:
-                umbrellas += f", **({unresolved_str})"
-            else:
-                umbrellas = unresolved_str
+            if unresolved_conditions:
+                unresolved_str = ", ".join(sorted(unresolved_conditions))
+                if umbrellas:
+                    umbrellas += f", **({unresolved_str})"
+                else:
+                    umbrellas = unresolved_str
 
-        return umbrellas.strip()
+            return umbrellas.strip()
+        except ValueError:
+            return "No common ancestor could be found"
 
     @export_column("Clinically Significant")
     def _clinically_significant(self):
