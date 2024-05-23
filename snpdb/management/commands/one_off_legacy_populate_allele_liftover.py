@@ -53,6 +53,7 @@ class Command(BaseCommand):
 
         # Get the ones that were never lifted over by ClinGen because they couldn't be (eg missing for that build)
         logging.info("Looking for those unable to be lifted over via ClinGen...")
+        failed_clingen_allele_ids = set()
         for allele in Allele.objects.all().select_related("clingen_allele"):
             for genome_build in genome_builds:
                 if genome_build.name in allele_non_liftover_build[allele.pk]:
@@ -63,6 +64,7 @@ class Command(BaseCommand):
                     try:
                         _ = cga.get_g_hgvs(genome_build)  # Fails if missing
                     except (ClinGenAllele.ClinGenBuildNotInResponseError, Contig.ContigNotInBuildError) as e:
+                        failed_clingen_allele_ids.add(allele.pk)
                         al = AlleleLiftover(liftover=failed_clingen_liftover, allele=allele,
                                             error={"message": str(e)}, status=ProcessingStatus.ERROR)
                         records.append(al)
@@ -130,6 +132,10 @@ class Command(BaseCommand):
 
                 if lr in existing_allele_id_liftovers[allele_id]:
                     continue
+
+                if lr.conversion_tool == AlleleConversionTool.CLINGEN_ALLELE_REGISTRY:
+                    if allele_id in failed_clingen_allele_ids:
+                        continue  # Once we fail clingen, will always fail, don't touch again
 
                 if lr.genome_build_id not in allele_non_liftover_build[allele_id]:
                     act = allele_conversion_tool_initial_liftover[allele_id][lr.genome_build][status]
