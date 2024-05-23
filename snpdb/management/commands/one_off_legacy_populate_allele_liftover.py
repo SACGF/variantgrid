@@ -200,5 +200,5 @@ class Command(BaseCommand):
         # Remove so we don't get cascade delete
         LiftoverRun.objects.all().update(allele_source=None)
 
-        # This is to signal that we have successfully completed migration
-        AlleleSource.objects.all().delete()
+        # Don't delete these - we won't use them anymore but useful to keep around if we find this process went wrong
+        # AlleleSource.objects.all().delete()
