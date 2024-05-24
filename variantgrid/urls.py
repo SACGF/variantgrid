@@ -6,6 +6,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import path
+from django.views.generic import RedirectView
 
 from variantgrid import views
 from variantgrid.views import ContactFormView
@@ -36,6 +37,7 @@ APPS_WITH_URLS = [
 urlpatterns = [
     path('', views.index),
     path('admin/', admin.site.urls),
+    path('admin', RedirectView.as_view(url='admin/', permanent=False)),
     path('authenticated', views.authenticated, name='authenticated'),
     path('messages/', include('django_messages.urls')),
     path('external_help', views.external_help, name='external_help'),
