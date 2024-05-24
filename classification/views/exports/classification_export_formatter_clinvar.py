@@ -18,7 +18,7 @@ from classification.views.exports.classification_export_filter import Classifica
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column, delimited_row, first, ExportDataType
-from snpdb.models import GenomeBuild
+from snpdb.models import GenomeBuild, Variant, VariantAllele
 
 
 class ClinVarCompareValue(int, Enum):
@@ -221,25 +221,29 @@ class ClassificationExportFormatterClinVarCompare(ClassificationExportFormatter)
     def batch_pre_cache(self) -> Optional[Callable[[list[AlleleData]], None]]:
         # do we want to try all clinvar versions?
         def handle_batch(batch: list[AlleleData]):
-            variant_to_batches = {}
-            for ad in batch:
-                if allele := ad.allele:
-                    for variant in allele.variants:
-                        variant_to_batches[variant.pk] = ad
-            clinvars = ClinVar.objects.filter(variant__in=variant_to_batches.keys(), version__in=self.clinvar_versions)
+            allele_id_to_batch = {ad.allele_id: ad for ad in batch}
+            variant_id_to_allele_id = {}
+            all_allele_ids = set([ad.allele_id for ad in batch])
+            for allele_id, variant_id in VariantAllele.objects.filter(allele_id__in=all_allele_ids).values_list('allele_id', 'variant_id'):
+                variant_id_to_allele_id[variant_id] = allele_id
+
+            clinvars = ClinVar.objects.filter(variant__in=variant_id_to_allele_id.keys(), version__in=self.clinvar_versions)
             for clinvar in clinvars:
-                if ad := variant_to_batches.get(clinvar.variant_id):
-                    if (existing := ad["clinvar"]) and existing.stars > clinvar.stars:
-                        # most likely these are just clinvar in different builds pointing to the same clinvar variation ID
-                        # if one has stars and one doesn't, take the bigger stars
-                        pass
-                    ad["clinvar"] = clinvar
+                variant_id = clinvar.variant_id
+                if allele_id := variant_id_to_allele_id.get(variant_id):
+                    if ad := allele_id_to_batch.get(allele_id):
+                        if (existing := ad["clinvar"]) and existing.stars > clinvar.stars:
+                            # most likely these are just clinvar in different builds pointing to the same clinvar variation ID
+                            # if one has stars and one doesn't, take the bigger stars
+                            pass
+                        else:
+                            ad["clinvar"] = clinvar
         return handle_batch
 
     @cached_property
     def clinvar_versions(self) -> list[ClinVarVersion]:
         versions = []
-        for genome_build in GenomeBuild.builds_with_annotation():
+        for genome_build in GenomeBuild.builds_with_annotation_cached():
             if clinvar_version := ClinVarVersion.objects.filter(genome_build=genome_build).order_by('-created').first():
                 versions.append(clinvar_version)
         return versions
