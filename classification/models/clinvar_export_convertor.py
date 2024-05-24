@@ -439,6 +439,9 @@ class ClinVarExportConverter:
             if not self.classification_based_on.classification.allele_info.latest_validation.include:
                 messages += JsonMessages.error("There are outstanding variant matching warnings for this record")
 
+            if self.clinvar_export_record.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
+                messages += JsonMessages.error("Somatic support is under development, only Germline can be exported to ClinVar currently")
+
             # see if other shared classifications for the clinvar_key variant combo don't have a resolved condition
             # but only if they don't have an open don't share flag
             allele = self.clinvar_export_record.clinvar_allele.allele
