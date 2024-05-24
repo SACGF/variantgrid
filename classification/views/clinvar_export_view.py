@@ -26,6 +26,7 @@ from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path, require_superuser, RequireSuperUserView
 from library.utils import html_to_text, export_column, ExportRow, local_date_string, ExportDataType, JsonDataType
+from library.utils.django_utils import render_ajax_view
 from ontology.models import OntologyTerm, AncestorCalculator, OntologyTermRelation
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import ClinVarKey, Lab, Allele, GenomeBuild
@@ -78,7 +79,7 @@ def clinvar_export_batch_detail(request, clinvar_export_batch_id: int):
     clinvar_export_batch.clinvar_key.check_user_can_access(request.user)
     submissions = clinvar_export_batch.clinvarexportsubmission_set.order_by('created')
 
-    return render(request, 'classification/clinvar_export_batch_detail.html', {
+    return render_ajax_view(request, 'classification/clinvar_export_batch_detail.html', {
         "batch": clinvar_export_batch,
         "submissions": submissions
     })
@@ -435,6 +436,22 @@ class ClinVarExportSummary(ExportRow):
             duplicates = ClinVarExport.objects.filter(clinvar_allele=self.clinvar_export.clinvar_allele).exclude(
                 pk=self.clinvar_export.pk).order_by('pk')
             return ", ".join(str(duplicate) for duplicate in duplicates)
+
+    @export_column("Common Condition w Others")
+    def _common_condition(self):
+        if self.has_duplicates:
+            all_for_allele = ClinVarExport.objects.filter(clinvar_allele=self.clinvar_export.clinvar_allele).order_by('pk')
+            all_conditions = list()
+            for other in all_for_allele:
+                all_conditions += other.condition_resolved.terms
+            all_conditions = list(sorted(set(all_conditions)))
+            all_conditions_str = ", ".join(f"{term.pk} {term.name}" for term in all_conditions)
+            try:
+                if common_condition := AncestorCalculator.common_ancestor(all_conditions):
+                    return str(common_condition) + f" from ({all_conditions_str})"
+            except ValueError:
+                return f"No common condition found from ({all_conditions_str})"
+        return ""
 
     @export_column("Messages")
     def _messages(self):

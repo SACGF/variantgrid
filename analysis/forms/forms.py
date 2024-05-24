@@ -332,19 +332,26 @@ class KaryomappingGeneForm(forms.ModelForm):
         model = KaryomappingGene
         widgets = {'gene_symbol': ModelSelect2(url='gene_symbol_autocomplete',
                                         attrs={'data-placeholder': 'Gene...'}),
-                   "upstream": NumberInput(attrs={'class': 'narrow', 'min': '0', 'step': '1000'}),
-                   "downstream": NumberInput(attrs={'class': 'narrow', 'min': '0', 'step': '1000'})}
+                   "upstream_kb": NumberInput(attrs={'class': 'narrow', 'min': '0', 'step': '1000'}),
+                   "downstream_kb": NumberInput(attrs={'class': 'narrow', 'min': '0', 'step': '1000'})}
 
     def __init__(self, *args, **kwargs):
         self.karyomapping_analysis = kwargs.pop("karyomapping_analysis")
         super().__init__(*args, **kwargs)
 
     def save(self, commit=True):
-        m = super().save(commit=False)
-        m.karyomapping_analysis = self.karyomapping_analysis
         if commit:
-            m.save()
-        return m
+            # We don't want to keep creating the same genes again and again, so reuse
+            cleaned_data = self.cleaned_data
+            obj, created = KaryomappingGene.objects.get_or_create(
+                karyomapping_analysis=self.karyomapping_analysis,
+                gene_symbol=cleaned_data["gene_symbol"],
+                upstream_kb=cleaned_data["upstream_kb"],
+                downstream_kb=cleaned_data["downstream_kb"],
+            )
+        else:
+            obj = super().save(commit=False)
+        return obj
 
 
 class InputSamplesForm(forms.Form):

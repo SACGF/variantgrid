@@ -125,7 +125,7 @@ class ClinVarLegacyColumn(str, Enum):
 class ClinVarLegacyRow:
     """
     Legacy refers to this is the export from ClinVar for a lab prior to using Shariant
-    We want to match up the reocrds with ones within
+    We want to match up the records with ones within
     """
     clinvar_key: ClinVarKey
     data: dict[str, str]
@@ -257,10 +257,9 @@ class ClinVarLegacyRow:
                         pass
         return terms
 
-    def find_variant_grid_allele(self, force_variant_search: bool = False) -> list[ClinVarLegacyMatches]:
+    def find_variant_grid_allele(self) -> list[ClinVarLegacyMatches]:
 
         allele_to_match_types: dict[Allele, set[ClinVarLegacyAlleleMatchType]] = defaultdict(set)
-        found_variant_id_match = False
 
         # TODO need to change this to some kind of default genome build
         # TODO, can we cache this? It's going to be recalculated every turn
@@ -278,12 +277,16 @@ class ClinVarLegacyRow:
                 search_input = SearchInput(user=admin_bot(), search_string=c_hgvs_preferred_str, genome_build_preferred=GenomeBuild.grch38())
                 try:
                     response = search_hgvs(sender=None, search_input=search_input)
+                    # note, the method signature is correct, the annotation on search_hgvs makes it take a search_input not a search_input_instance
                     for result_entry in response.results:
                         result = result_entry.preview.obj
+                        allele: Optional[Allele] = None
                         if isinstance(result, Variant):
-                            if allele := result.allele:
-                                allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_VARIANT)
+                            allele = result.allele
                         elif isinstance(result, Allele):
+                            allele = result
+
+                        if allele:
                             allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_VARIANT)
 
                 except:
@@ -327,7 +330,7 @@ class ClinVarLegacyRow:
                             clinical_significance = classification_based_on.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
                             if clinical_significance == self.clinical_significance_code:
                                 export_match_types.add(ClinVarLegacyExportMatchType.CLINICAL_SIGNIFICANCE_MATCHES)
-                            #if CHGVS(classification_based_on.get(SpecialEKeys.C_HGVS)) == self.c_hgvs_with_gene_symbol:
+                            # if CHGVS(classification_based_on.get(SpecialEKeys.C_HGVS)) == self.c_hgvs_with_gene_symbol:
                             #    export_match_types.add(ClinVarLegacyExportMatchType.C_HGVS_MATCHES)
 
                         umbrella = clinvar_export.condition_resolved.terms

@@ -68,10 +68,13 @@
             }
             params.transcript_strategy = $("input[name='transcript_strategy']:checked").val();
 
-
             let detailLevelChecked = $("input[name='mvl_detail']:checked")
             if (detailLevelChecked.length) {
                 params.mvl_detail = detailLevelChecked.val();
+            }
+
+            if (!allele_origin || allele_origin === "A") {
+                inputError = 'MVL download must choose Germline or Somatic';
             }
         } else if (format === 'vcf') {
             params.encoding = $("input[name='encoding']:checked").val();
@@ -109,8 +112,8 @@
             inputError = 'You must include at least 1 lab';
         }
         if (format === 'lab_compare'){
-            if (selectedLabs.length !== 2) {
-                inputError = 'You must select 2 labs';
+            if (selectedLabs.length !== 2 || labSelectionMode !== "include") {
+                inputError = 'You must select to include 2 labs';
             }
         }
 

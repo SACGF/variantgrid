@@ -29,6 +29,7 @@ HAS_3_ANY = re.compile(r"\S{3,}")
 _SPLIT_GAPS = re.compile(r"[\s,]+")
 HAS_SCV = re.compile(r"SCV\d+")
 CE_SEARCH = re.compile(r"CE_\d+", re.IGNORECASE)
+CB_SEARCH = re.compile(r"CB_\d+", re.IGNORECASE)
 
 MAX_VARIANT_RESULTS = 100
 MAX_RESULTS_PER_SEARCH = 25
@@ -809,7 +810,8 @@ def search_receiver(
         admin_only: bool = False,
         sub_name: Optional[str] = None,
         example: Optional[SearchExample] = None,
-        match_strength: Optional[SearchResultMatchStrength] = SearchResultMatchStrength.STRONG_MATCH
+        match_strength: Optional[SearchResultMatchStrength] = SearchResultMatchStrength.STRONG_MATCH,
+        enabled: bool = True,
     ) -> Callable[[Callable], Callable[[SearchInput], SearchResponse]]:
     """
     Wrap around a Callable[[SearchInputInstance], Generator[Any]]
@@ -933,7 +935,8 @@ def search_receiver(
 
             return response
 
-        search_signal.connect(search_func)
-        return search_func
+        if enabled:
+            search_signal.connect(search_func)
+            return search_func
 
     return _decorator

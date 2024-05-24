@@ -15,7 +15,7 @@ from threadlocals.threadlocals import get_current_request
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
 from library.guardian_utils import bot_group
 from library.log_utils import NotificationBuilder, report_exc_info
-from snpdb.models import GenomeBuild
+from snpdb.models import GenomeBuild, AlleleOriginFilterDefault
 
 
 @dataclass(frozen=True)
@@ -55,6 +55,10 @@ class ClassificationExportFormatter(ABC):
         :return: The appropriate filename
         """
         filename_parts: list[str] = [self.classification_filter.file_prefix]
+
+        if self.classification_filter.allele_origin_filter != AlleleOriginFilterDefault.SHOW_ALL:
+            filename_parts.append(self.classification_filter.allele_origin_filter.label.lower())
+
         if self.classification_filter.file_include_date:
             filename_parts.append(self.classification_filter.date_str)
 

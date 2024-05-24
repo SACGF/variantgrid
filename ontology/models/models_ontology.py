@@ -607,7 +607,7 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
 
         q_dest_service = Q(source_term=term) & Q(dest_term__ontology_service=service)
         q_source_service = Q(dest_term=term) & Q(source_term__ontology_service=service)
-        otr_qs = OntologyTermRelation.objects.filter(q_dest_service | q_source_service, relation=OntologyRelation.EXACT)
+        otr_qs = OntologyVersion.get_latest_and_live_ontology_qs().filter(q_dest_service | q_source_service, relation=OntologyRelation.EXACT)
         if mondo_rel := otr_qs.first():
             return mondo_rel.other_end(term)
         return None
@@ -996,7 +996,6 @@ class OntologySnake:
 
         if otr_qs is None:
             otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
-            # otr_qs = OntologyTermRelation.objects.all()
 
         seen: set[OntologyTerm] = set()
         seen.add(term)
@@ -1085,7 +1084,11 @@ class OntologySnake:
 
         if omim_ids:
             # relationships are always MONDO -> OMIM, and MONDO -> HGNC, OMIM -> HGNC
-            via_omim_mondos = OntologyTermRelation.objects.filter(source_term__ontology_service=OntologyService.MONDO, dest_term_id__in=omim_ids).exclude(relation__in={OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM}).values_list("source_term_id", flat=True)
+            via_omim_mondos = OntologyVersion.get_latest_and_live_ontology_qs().filter(
+                source_term__ontology_service=OntologyService.MONDO, dest_term_id__in=omim_ids).\
+                exclude(relation__in={OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM}).\
+                values_list("source_term_id", flat=True)
+
             terms = terms.union(set(via_omim_mondos))
         if terms:
             return set(OntologyTerm.objects.filter(pk__in=terms))
@@ -1192,6 +1195,7 @@ class SingleTermH:
 
     def __repr__(self):
         return f"{self.term} depth: {self.depth}"
+
 
 class AncestorCalculator:
 

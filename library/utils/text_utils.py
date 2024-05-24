@@ -71,9 +71,20 @@ def format_significant_digits(a_number, sig_digits=3) -> str:
     return rounded_number_str
 
 
-def delimited_row(data: list, delimiter: str = ',') -> str:
-    out = io.StringIO()
-    writer = csv.writer(out, delimiter=delimiter)
+class VCFDialect(csv.Dialect):
+    delimiter = ','
+    lineterminator = "\n"
+    quoting = csv.QUOTE_NONE
+
+
+def delimited_row(data: list, delimiter: str = ',', dialect=None) -> str:
+    kwargs = {}
+    if dialect is not None:
+        kwargs["dialect"] = dialect
+    # https://docs.python.org/3/library/csv.html#csv.writer
+    # If csvfile is a file object, it should be opened with newline=''
+    out = io.StringIO(newline='')
+    writer = csv.writer(out, delimiter=delimiter, **kwargs)
     writer.writerow(data)
     return out.getvalue()
 

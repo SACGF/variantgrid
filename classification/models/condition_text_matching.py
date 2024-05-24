@@ -804,7 +804,8 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                             return gene_symbol
 
                 if gene_symbol_related := includes_gene_symbol_related():
-                    cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Found {matched_term.id} in text, but also '{gene_symbol_related}-related', was this a placeholder term?"))
+                    cms.add_message(ConditionMatchingMessage(severity="info", text=f"Found {matched_term.id} in text, marked as related to \"{gene_symbol_related}\""))
+                    passed = True
                 elif len(extra_words) >= 3:  # 3 extra words and for words that are in common aren't longer than 9 letters combined
                     cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Found {matched_term.id} in text, but also apparently unrelated words : {pretty_set(extra_words)}"))
                 else:
