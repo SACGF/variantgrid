@@ -439,16 +439,16 @@ def send_notification(
         if blocks:
             data["blocks"] = blocks
 
-        r = requests.post(
-            headers={"Content-Type": "application/json"},
-            url=slack_webhook_url,
-            json=data,
-            timeout=MINUTE_SECS,
-        )
-        try:
-            r.raise_for_status()
-        except HTTPError:
-            report_exc_info()
+        # r = requests.post(
+        #     headers={"Content-Type": "application/json"},
+        #     url=slack_webhook_url,
+        #     json=data,
+        #     timeout=MINUTE_SECS,
+        # )
+        # try:
+        #     r.raise_for_status()
+        # except HTTPError:
+        #     report_exc_info()
     else:
         # fallback to Rollbar if Slack isn't configured
         report_event(name=message)
