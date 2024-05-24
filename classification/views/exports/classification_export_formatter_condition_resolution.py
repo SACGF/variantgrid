@@ -35,11 +35,11 @@ class ClassificationConditionResolutionRow(ExportRow):
 
     @export_column('Condition')
     def condition(self):
-        return self.condition.get('display_text')
+        return self.condition
 
     @export_column('Gene Symbol')
     def gene_symbol(self):
-        return self.vc.allele_info.gene_symbols[0].symbol if self.vc.allele_info.gene_symbols else None
+        return self.gene_symbol
 
     @export_column('Strongest Classification')
     def strongest_classification(self):
@@ -95,7 +95,10 @@ class ClassificationExportFormatterConditionResolution(ClassificationExportForma
 
                     for gene_symbol in vcm.classification.allele_info.gene_symbols:
                         # on the off chance there are 2 gene symbols, we can make results for each gene symbol individually
-                        all_relationships = list(OntologySnake.get_all_term_to_gene_relationships(condition_term, gene_symbol))
+                        all_relationships = []
+                        for relation in OntologySnake.get_all_term_to_gene_relationships(condition_term, gene_symbol):
+                            all_relationships.append(relation)
+
                         panel_app_relationships = [relation for relation in all_relationships if relation.relation == OntologyRelation.PANEL_APP_AU]
                         # we now have a list of potential PanelApp, MONDO, GenCC relationships all of different strengths to the exact condition term
                         # find the best strength for each kind of relationship and put it in one row
@@ -104,6 +107,7 @@ class ClassificationExportFormatterConditionResolution(ClassificationExportForma
 
                         if all_relationships:
                             # make one row, including the biggest strength of each type of relationship
+                            print('all_relationships', all_relationships)
                             pass
 
                         if not has_direct_panel_app_relationship:
@@ -111,24 +115,18 @@ class ClassificationExportFormatterConditionResolution(ClassificationExportForma
                             if all_relationships_snakes := OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO, min_classification=GeneDiseaseClassification.DISPUTED):
                                 all_relationships = all_relationships_snakes.leaf_relations()
                                 # group all relationships by destination term
+                                grouped_relationships = {}
+                                for relation in all_relationships:
+                                    if relation.dest_term not in grouped_relationships:
+                                        grouped_relationships[relation.dest_term] = []
+                                    grouped_relationships[relation.dest_term].append(relation)
+                                print('grouped_relations', grouped_relationships)
                                 # then make one row per destination term, mark it as not being for the term the condition was matched to
 
-                    # JAMES EDIT ENDS
+                                for dest_term, relations in grouped_relationships.items():
+                                    row = ClassificationConditionResolutionRow(vcm, condition_obj, gene_symbol, '', '', relations)
+                                    rows.append(delimited_row(row.to_csv()))
 
-                    # for rel in panel_app_relations:
-                    #     if rel.source_term.name:
-                    #         if rel.from_import.import_source == OntologyImportSource.PANEL_APP_AU:
-                    #             if rel.extra.get('strongest_classification', '') != 'Expert Review Green':
-                    #                 strongest_classification = rel.extra.get('strongest_classification', '')
-                    #                 panel_app_data.add(rel.source_term.name)
-                    #         elif rel.from_import.import_source in [OntologyImportSource.MONDO, OntologyImportSource.GENCC]:
-                    #             other_relations.add(f'({rel.from_import.import_source}): {rel.source_term.name} ')
-                    #
-                    # panel_app_data_str = ','.join(panel_app_data)
-                    # others_str = ','.join(other_relations)
-                    #
-                    # row = ClassificationConditionResolutionRow(vcm, condition, gene, strongest_classification,
-                    #                                            panel_app_data_str, others_str)
-                    # rows.append(delimited_row(row.to_csv()))
 
+        print('rows:', rows)
         return rows
