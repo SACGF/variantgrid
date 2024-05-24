@@ -135,7 +135,9 @@
         {% end_ui_register_tab_embedded %}
 
         {% ui_register_tab url="view_upload_stats_detail" url_check=True label="Upload Stats" tab_set="server_status" %}
-        {% ui_register_tab url="database_statistics_detail" label="Database Graphs" tab_set="server_status" %}
+        {% if url_name_visible.analysis %}
+            {% ui_register_tab url="database_statistics_detail" label="Database Graphs" tab_set="server_status" %}
+        {% endif %}
         {% ui_register_tab url='server_status_settings_detail' label="Settings" tab_set="server_status" %}
         {% ui_register_tab url="server_status_activity_detail" param=1 label="Activity 24 hours" tab_set="server_status" %}
         {% ui_register_tab url="server_status_activity_detail" param=2 label="Activity 48 hours" tab_set="server_status" %}
