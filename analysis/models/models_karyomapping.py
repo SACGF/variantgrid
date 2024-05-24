@@ -101,7 +101,7 @@ class KaryotypeBins:
         if q:
             q_list.append(q)
         qs = qs.filter(reduce(operator.and_, q_list))
-        return qs.values_list("id", "locus__contig", "locus__position",
+        return qs.values_list("id", "locus__contig__name", "locus__position",
                               "locus__ref__seq", "alt__seq", "svlen", "cohortgenotype__samples_zygosity")
 
     @staticmethod
@@ -112,10 +112,10 @@ class KaryotypeBins:
         get_genotypes = KaryotypeBins.create_get_genotypes_function(trio)  # GT indexes
         variant_data_and_genotypes = []
 
-        for variant_id, contig_id, position, ref, alt, svlen, samples_zygosity in values_list:
+        for variant_id, chrom, position, ref, alt, svlen, samples_zygosity in values_list:
             proband_gt, father_gt, mother_gt = get_genotypes(samples_zygosity)
 
-            variant_data = (variant_id, contig_id, position, ref, alt, svlen)
+            variant_data = (variant_id, chrom, position, ref, alt, svlen)
             genotype_tuple = (proband_gt, father_gt, mother_gt)
             variant_data_and_genotypes.append((variant_data, genotype_tuple))
         return variant_data_and_genotypes
@@ -166,6 +166,9 @@ class KaryomappingGene(models.Model):
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
     upstream_kb = models.IntegerField(default=0)
     downstream_kb = models.IntegerField(default=0)
+
+    class Meta:
+        unique_together = ('karyomapping_analysis', 'gene_symbol', 'upstream_kb', 'downstream_kb')
 
     def get_genomic_interval(self) -> GenomicInterval:
         """ returns a snpdb.models.GenomicInterval object for gene up/downstream region """

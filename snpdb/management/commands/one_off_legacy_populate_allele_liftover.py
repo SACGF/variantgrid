@@ -53,6 +53,7 @@ class Command(BaseCommand):
 
         # Get the ones that were never lifted over by ClinGen because they couldn't be (eg missing for that build)
         logging.info("Looking for those unable to be lifted over via ClinGen...")
+        failed_clingen_allele_ids = set()
         for allele in Allele.objects.all().select_related("clingen_allele"):
             for genome_build in genome_builds:
                 if genome_build.name in allele_non_liftover_build[allele.pk]:
@@ -63,6 +64,7 @@ class Command(BaseCommand):
                     try:
                         _ = cga.get_g_hgvs(genome_build)  # Fails if missing
                     except (ClinGenAllele.ClinGenBuildNotInResponseError, Contig.ContigNotInBuildError) as e:
+                        failed_clingen_allele_ids.add(allele.pk)
                         al = AlleleLiftover(liftover=failed_clingen_liftover, allele=allele,
                                             error={"message": str(e)}, status=ProcessingStatus.ERROR)
                         records.append(al)
@@ -102,24 +104,38 @@ class Command(BaseCommand):
                 continue
             allele_qs = lr.get_allele_qs()
 
+            handled_allele_ids = set()
+            for allele_id, genome_build_set in allele_non_liftover_build.items():
+                if lr.genome_build in genome_build_set:
+                    handled_allele_ids.add(allele_id)
+
+            for allele_id, data in allele_conversion_tool_initial_liftover.items():
+                if build_data := data.get(lr.genome_build):
+                    # If there was a previous success, we would never run another tool
+                    if build_data.get(ProcessingStatus.SUCCESS):
+                        handled_allele_ids.add(allele_id)
+                    elif status != ProcessingStatus.SUCCESS:
+                        # We only want to record the first of each status
+                        if build_data.get(status, {}).get(lr.conversion_tool):
+                            handled_allele_ids.add(allele_id)
+
             # Performance really degrades when you have heaps of all allele sources
             # This optimisation is slower for most sources, but tries to reduce worst case when you have lots of
             # all allele sources (meaning you have to loop again and again)
             if use_optimisation_exclusion:
-                handled_allele_ids = set()
-                for allele_id, genome_build_set in allele_non_liftover_build.items():
-                    if lr.genome_build in genome_build_set:
-                        handled_allele_ids.add(allele_id)
-
-                for allele_id, data in allele_conversion_tool_initial_liftover.items():
-                    if data.get(lr.genome_build, {}).get(status, {}).get(lr.conversion_tool):
-                        handled_allele_ids.add(allele_id)
-
                 allele_qs = allele_qs.exclude(pk__in=handled_allele_ids)
 
             for allele_id in allele_qs.values_list("pk", flat=True):
+                # If use_optimisation_exclusion=True these shouldn't be in queryset
+                if allele_id in handled_allele_ids:
+                    continue
+
                 if lr in existing_allele_id_liftovers[allele_id]:
                     continue
+
+                if lr.conversion_tool == AlleleConversionTool.CLINGEN_ALLELE_REGISTRY:
+                    if allele_id in failed_clingen_allele_ids:
+                        continue  # Once we fail clingen, will always fail, don't touch again
 
                 if lr.genome_build_id not in allele_non_liftover_build[allele_id]:
                     act = allele_conversion_tool_initial_liftover[allele_id][lr.genome_build][status]
@@ -190,5 +206,5 @@ class Command(BaseCommand):
         # Remove so we don't get cascade delete
         LiftoverRun.objects.all().update(allele_source=None)
 
-        # This is to signal that we have successfully completed migration
-        AlleleSource.objects.all().delete()
+        # Don't delete these - we won't use them anymore but useful to keep around if we find this process went wrong
+        # AlleleSource.objects.all().delete()

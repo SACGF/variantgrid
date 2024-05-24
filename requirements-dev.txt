@@ -26,6 +26,8 @@ django-geojson
 django_glrm
 django-guardian
 django_htmlmin
+django-js-reverse
+django_json_widget
 django-leaflet
 django_model_utils
 django-postgres-extra
@@ -35,11 +37,9 @@ django_termsandconditions
 djangorestframework
 easy_thumbnails
 fontawesomefree==6.4.0
-git+https://github.com/davmlaw/django-json-widget#egg=django_json_widget
 git+https://github.com/davmlaw/django-jfu#egg=django-jfu
 git+https://github.com/davmlaw/django-messages/#egg=django-messages
 git+https://github.com/davmlaw/django-starfield#egg=django_starfield
-git+https://github.com/davmlaw/django-js-reverse#egg=django-js-reverse
 git+https://github.com/SACGF/hgvs#egg=pyhgvs
 # Need https://github.com/biocommons/hgvs/issues/722 fixed
 git+https://github.com/davmlaw/hgvs@variantgrid#egg=hgvs

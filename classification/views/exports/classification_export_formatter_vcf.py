@@ -8,13 +8,13 @@ from django.contrib.sites.models import Site
 from django.http import HttpRequest
 from django.urls import reverse
 
-from classification.enums import SpecialEKeys
+from classification.enums import SpecialEKeys, AlleleOriginBucket
 from classification.models import EvidenceKey, ClassificationModification, EvidenceKeyMap
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
 from library.django_utils import get_url_from_view_path
-from library.utils import delimited_row
+from library.utils import delimited_row, VCFDialect
 from snpdb.models import GenomeBuildContig
 
 
@@ -38,6 +38,12 @@ class FormatDetailsVCF:
         )
 
 
+ALLELE_ORIGIN_BUCKET_TO_LABEL = {
+    AlleleOriginBucket.SOMATIC: "somatic",
+    AlleleOriginBucket.GERMLINE: "germline",
+    AlleleOriginBucket.UNKNOWN: "unknown"
+}
+
 @register_classification_exporter("vcf")
 class ClassificationExportFormatterVCF(ClassificationExportFormatter):
     """
@@ -52,6 +58,7 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
     @classmethod
     def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterVCF':
         classification_filter = ClassificationFilter.from_request(request)
+        classification_filter.allele_origin_split = True
         return ClassificationExportFormatterVCF(
             classification_filter=classification_filter,
             format_details=FormatDetailsVCF.from_request(request)
@@ -81,13 +88,14 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
             return value
 
     def header(self) -> list[str]:
-        out = []
-        out += [
-            '##fileformat=VCFv4.1',
-            '##ALT=<ID=NON_REF,Description="Represents any possible alternative allele at this location">'
-        ]
         genome_build = self.classification_filter.genome_build
         assembly = genome_build.name
+
+        out = [
+            '##fileformat=VCFv4.1',
+            '##ALT=<ID=NON_REF,Description="Represents any possible alternative allele at this location">',
+            f'##reference={genome_build.name}',
+        ]
 
         genome_build_str = '37'
         if self.genome_build.is_version(38):
@@ -103,13 +111,15 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
         # fixme - substitute application name
 
         out += [
-            f'##INFO=<ID=count,Number=1,Type=Integer,Description="Number of records for this variant">',
-            f'##INFO=<ID=url,Number=1,Type=String,Description="Shariant URL record">',
-            f'##INFO=<ID=lab,Number=.,Type=String,Description="Source lab for the variant classifications">',
+            '##INFO=<ID=count,Number=1,Type=Integer,Description="Number of records for this variant">',
+            '##INFO=<ID=url,Number=1,Type=String,Description="Shariant URL record">',
+            '##INFO=<ID=lab,Number=.,Type=String,Description="Source lab for the variant classifications">',
             f'##INFO=<ID=chgvs,Number=.,Type=String,Description="The c.hgvs for the variants in {self.genome_build.name}">',
-            f'##INFO=<ID=multiple_clinical_significances,Number=0,Type=Flag,Description="Present if there are multiple clinical significances for the variant">',
-            f'##INFO=<ID=discordant,Number=.,Type=Number,Description="If 1, indicates that the corresponding classification is in discordance">',
-            f'##INFO=<ID=condition,Number=.,Type=String,Description="Condition Under Curation">'
+            '##INFO=<ID=multiple_clinical_significances,Number=0,Type=Flag,Description="Present if there are multiple clinical significances for the variant">',
+            '##INFO=<ID=discordant,Number=.,Type=Integer,Description="If 1, indicates that the corresponding classification is in discordance">',
+            '##INFO=<ID=condition,Number=.,Type=String,Description="Condition Under Curation">',
+            '##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Difference in length between REF and ALT alleles">',
+            '##INFO=<ID=allele_origin,Number=1,Type=String,Description="Allele origin bucket, values will be: somatic, germline or unknown'
         ]
         for e_key in self.report_keys:
             out += [self.generate_info_for_key(e_key)]
@@ -123,7 +133,8 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
         # if len(self.error_message_ids):
         #     out += [f'##readme=Warning at least {len(self.error_message_ids)} records had issues with their variants and could not be included']
 
-        out += [delimited_row(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO'], delimiter='\t')]
+        header_cols = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO']
+        out += [delimited_row(header_cols, delimiter='\t', dialect=VCFDialect)]
         return out
 
     def row(self, data: AlleleData) -> list[str]:
@@ -138,9 +149,14 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
             cols.append(target_variant.alt.seq)  # ALT
             cols.append('.')  # QUAL
             cols.append('PASS')  # FILTER
-            info = f'count={len(vcms)}'
             url = get_url_from_view_path(reverse("view_allele_from_variant", kwargs={"variant_id": target_variant.id}))
-            info += f';url={self.vcf_safe(url)}'
+
+            info_dict = {
+                "count": len(vcms),
+                "url": self.vcf_safe(url),
+            }
+            if target_variant.svlen:
+                info_dict['SVLEN'] = target_variant.svlen
 
             # add lab names, and also calculate if we have conflicting classifications and include that flag if appropriate
             cs_counts: dict[str, int] = {}
@@ -167,23 +183,27 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
                 discordances.append('1' if self.classification_filter.is_discordant(record) else '0')
                 conditions.append(self.vcf_safe(record.condition_text))
 
-            info += f';lab=' + ','.join(lab_names) + ';chgvs=' + ','.join(c_hgvses)
+            info_dict['lab'] = ','.join(lab_names)
+            info_dict["chgvs"] = ','.join(c_hgvses)
+            info_flags = []
             if len(cs_counts) > 1:
-                info += ';multiple_clinical_significances'
-            info += f';discordant=' + ','.join(discordances)
-            info += f';condition=' + ','.join(conditions)
+                info_flags.append("multiple_clinical_significances")
+            info_dict['discordant'] = ','.join(discordances)
+            info_dict['condition'] = ','.join(conditions)
+            info_dict['allele_origin'] = ALLELE_ORIGIN_BUCKET_TO_LABEL.get(data.allele_origin_bucket)
 
             # loop through all the keys we're choosing to print out
             for ekey in self.report_keys:
-                info += f';{ekey.key}='
                 parts = []
                 for record in vcms:
                     parts.append(self.generate_value_for_key(ekey, record))
-                info += ','.join(parts)
+                info_dict[ekey.key] = ','.join(parts)
 
+            info_list = [f"{k}={v}" for k, v in info_dict.items()] + info_flags
+            info = ";".join(info_list)
             cols.append(info)  # INFO
 
-            return [delimited_row(cols, '\t')]
+            return [delimited_row(cols, delimiter='\t', dialect=VCFDialect)]
         else:
             return []
 
