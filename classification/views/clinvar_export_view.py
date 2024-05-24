@@ -437,6 +437,22 @@ class ClinVarExportSummary(ExportRow):
                 pk=self.clinvar_export.pk).order_by('pk')
             return ", ".join(str(duplicate) for duplicate in duplicates)
 
+    @export_column("Common Condition w Others")
+    def _common_condition(self):
+        if self.has_duplicates:
+            all_for_allele = ClinVarExport.objects.filter(clinvar_allele=self.clinvar_export.clinvar_allele).order_by('pk')
+            all_conditions = list()
+            for other in all_for_allele:
+                all_conditions += other.condition_resolved.terms
+            all_conditions = list(sorted(set(all_conditions)))
+            all_conditions_str = ", ".join(f"{term.pk} {term.name}" for term in all_conditions)
+            try:
+                if common_condition := AncestorCalculator.common_ancestor(all_conditions):
+                    return str(common_condition) + f" from ({all_conditions_str})"
+            except ValueError:
+                return f"No common condition found from ({all_conditions_str})"
+        return ""
+
     @export_column("Messages")
     def _messages(self):
         all_messages: List[str] = []
