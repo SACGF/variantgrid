@@ -1170,7 +1170,7 @@ class OntologySnake:
             report_exc_info()
             return False
 
-    def get_all_term_to_gene_relationships(term: Union[OntologyTerm, str], gene_symbol: Union[GeneSymbol, str], try_related_terms: bool = True) -> Iterator['OntologyTermRelation']:
+    def get_all_term_to_gene_relationships(term: Union[OntologyTerm, str], gene_symbol: Union[GeneSymbol, str], try_related_terms: bool = True) -> Iterator['OntologySnake']:
         # iterates all ontology term relationships between the term and the gene symbol (as well as any relationships to the equiv MONDO/OMIM)
         from ontology.panel_app_ontology import update_gene_relations
         update_gene_relations(gene_symbol)
@@ -1184,6 +1184,9 @@ class OntologySnake:
             otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
             for relationship in otr_qs.filter(source_term=term, dest_term=gene_term):
                 yield OntologySnake(source_term=term, leaf_term=gene_term, paths=[relationship])
+
+            if not try_related_terms:
+                return None
 
             # optimisations for OMIM/MONDO
             if term.ontology_service in {OntologyService.MONDO, OntologyService.OMIM}:

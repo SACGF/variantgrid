@@ -96,10 +96,10 @@ class ClassificationExportFormatterConditionResolution(ClassificationExportForma
                     for gene_symbol in vcm.classification.allele_info.gene_symbols:
                         # on the off chance there are 2 gene symbols, we can make results for each gene symbol individually
                         all_relationships = []
-                        for relation in OntologySnake.get_all_term_to_gene_relationships(condition_term, gene_symbol):
-                            all_relationships.append(relation)
+                        for snake in OntologySnake.get_all_term_to_gene_relationships(condition_term, gene_symbol):
+                            all_relationships.append(snake.leaf_relationship)
 
-                        panel_app_relationships = [relation for relation in all_relationships if relation.relation == OntologyRelation.PANEL_APP_AU]
+                        panel_app_relationships = [relation for relation in all_relationships if relation == OntologyRelation.PANEL_APP_AU]
                         # we now have a list of potential PanelApp, MONDO, GenCC relationships all of different strengths to the exact condition term
                         # find the best strength for each kind of relationship and put it in one row
                         has_direct_panel_app_relationship = bool(panel_app_relationships)
