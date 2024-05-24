@@ -25,9 +25,31 @@ def get_vt_tool_version(vt_command):
     return tool_version
 
 
+def get_bcftools_tool_version(bcftools_command):
+    p = Popen([bcftools_command, "--version"], stdout=PIPE, stderr=PIPE)
+    stdout, stderr = p.communicate()
+    stdout = stdout.decode()
+    stderr = stderr.decode()
+    if p.returncode:
+        raise CalledProcessError(f"Error running '{bcftools_command} --version': {stderr=}, returned: {p.returncode}")
+
+    output_list = stdout.split("\n")
+    bcftools_version = output_list[0]
+    if not bcftools_version.startswith("bcftools"):
+        raise CalledProcessError(f"Expected to find bcftools on 1st line of output of '{bcftools_command} --version' output: {bcftools_version}")
+    htslib_version = output_list[1]
+    if not htslib_version.contains("htslib"):
+        raise CalledProcessError(f"Expected to find htslib version on 2nd line of '{bcftools_command} --version' output: {htslib_version}")
+
+    version = f"{bcftools_version}, {htslib_version}"
+    tool_version, _ = ToolVersion.objects.get_or_create(name='bcftools', version=version)
+    return tool_version
+
+
 def create_sub_step(upload_step, sub_step_name, sub_step_commands):
     start_date = timezone.now()
     tool_version = get_vt_tool_version(settings.VCF_IMPORT_VT_COMMAND)
+    # tool_version = get_bcftools_tool_version(settings.BCFTOOLS_COMMAND)
     command_line = ' '.join(sub_step_commands)
     return UploadStep.objects.create(name=sub_step_name,
                                      script=command_line,
@@ -105,12 +127,24 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     pipe_commands[VCF_CLEAN_AND_FILTER_SUB_STEP] = read_variants_cmd
     sub_steps[VCF_CLEAN_AND_FILTER_SUB_STEP] = create_sub_step(upload_step, VCF_CLEAN_AND_FILTER_SUB_STEP, read_variants_cmd)
 
-    # VT isn't the bottleneck here, it's my programs - so no speed advantage to using "+" for Uncompressed BCF streams
-    pipe_commands[DECOMPOSE_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "decompose", "-s", "-"]
-    pipe_commands[NORMALIZE_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "normalize", "-n", "-r", genome_build.reference_fasta, "-"]
-    # We don't run 'uniq' anymore as neither Vt or Bcftools handle SVLEN properly (so removed from sub_step_name loop below)
-    # @see https://github.com/SACGF/variantgrid/issues/818
-    # pipe_commands[UNIQ_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "uniq", "-"]
+    use_vt = False
+    norm_substep_names = []
+    if use_vt:
+        # VT isn't the bottleneck here, it's my programs - so no speed advantage to using "+" for Uncompressed BCF streams
+        pipe_commands[DECOMPOSE_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "decompose", "-s", "-"]
+        pipe_commands[NORMALIZE_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "normalize", "-n", "-r", genome_build.reference_fasta, "-"]
+        # We don't run 'uniq' anymore as neither Vt or Bcftools handle SVLEN properly (so removed from sub_step_name loop below)
+        # @see https://github.com/SACGF/variantgrid/issues/818
+        # pipe_commands[UNIQ_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "uniq", "-"]
+        pipe_commands[REMOVE_HEADER_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "view", "-"]
+        norm_substep_names = [DECOMPOSE_SUB_STEP, NORMALIZE_SUB_STEP]
+    else:
+        pipe_commands[NORMALIZE_SUB_STEP] = [settings.BCFTOOLS_COMMAND, "norm",
+                                             "--multiallelics=-", "--rm-dup=exact",
+                                             # "--check-ref=w", # Not sure if this works?
+                                             f"--fasta-ref={genome_build.reference_fasta}", "-"]
+        pipe_commands[REMOVE_HEADER_SUB_STEP] = [settings.BCFTOOLS_COMMAND, "view", "--no-header", "-"]
+        norm_substep_names = [NORMALIZE_SUB_STEP]  # Just 1
 
     # Split up the VCF
     split_vcf_dir = upload_pipeline.get_pipeline_processing_subdir("split_vcf")
@@ -118,12 +152,11 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     split_headers_filename = os.path.join(split_vcf_dir, name_from_filename(vcf_filename, remove_gz=True))
     _write_split_headers(vcf_filename, remove_info, split_headers_filename)
 
-    pipe_commands[REMOVE_HEADER_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "view", "-"]
     pipe_commands[SPLIT_VCF_SUB_STEP] = ["split", "-", vcf_name, "--additional-suffix=.vcf.gz", "--numeric-suffixes",
                                          "--lines", str(settings.VCF_IMPORT_FILE_SPLIT_ROWS),
                                          f"--filter='sh -c \"{{ cat {split_headers_filename}; cat; }} | bgzip -c > {split_vcf_dir}/$FILE\"'"]
 
-    for sub_step_name in [DECOMPOSE_SUB_STEP, NORMALIZE_SUB_STEP]:
+    for sub_step_name in norm_substep_names:
         sub_step_commands = pipe_commands[sub_step_name]
         sub_steps[sub_step_name] = create_sub_step(upload_step, sub_step_name, sub_step_commands)
 

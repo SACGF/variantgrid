@@ -426,6 +426,7 @@ LIFTOVER_DBSNP_ENABLED = False  # Default=False - doesn't work so well due to db
 
 LIFTOVER_BCFTOOLS_ENABLED = False
 LIFTOVER_BCFTOOLS_PLUGIN_DIR = "/usr/share/bcftools/plugins"
+BCFTOOLS_COMMAND = "bcftools"  # if not absolute, needs to be in path
 
 PANEL_APP_CACHE_DAYS = 7  # Automatically re-check after this time
 GENE_RELATION_PANEL_APP_LIVE_UPDATE = False  # Use GenCC cached result if False, poll panel app if True
