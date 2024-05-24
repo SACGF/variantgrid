@@ -5,11 +5,12 @@ from functools import cached_property
 from itertools import groupby
 from typing import Optional, Callable
 
+from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.urls import reverse
 
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
-from annotation.models import ClinVar, ClinVarVersion, ClinVarRecord
+from annotation.models import ClinVar, ClinVarVersion, ClinVarRecord, ClinVarReviewStatus
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 from classification.enums import SpecialEKeys
 from classification.models import EvidenceKeyMap, ClassificationModification
@@ -52,7 +53,6 @@ class ClinVarCompareValue(int, Enum):
 
 
 class ClinVarCompareRow(ExportRow):
-
     CLINSIG_TO_VGSIG = {
         "Benign": "B",
         "Likely_benign": "LB",
@@ -218,17 +218,26 @@ class ClassificationExportFormatterClinVarCompare(ClassificationExportFormatter)
             classification_filter=ClassificationFilter.from_request(request)
         )
 
+    def filter_clinvars(self, queryset: QuerySet[ClinVar]) -> QuerySet[ClinVar]:
+        return queryset
+
     def batch_pre_cache(self) -> Optional[Callable[[list[AlleleData]], None]]:
         # do we want to try all clinvar versions?
         def handle_batch(batch: list[AlleleData]):
             allele_id_to_batch = {ad.allele_id: ad for ad in batch}
             variant_id_to_allele_id = {}
             all_allele_ids = set([ad.allele_id for ad in batch])
-            for allele_id, variant_id in VariantAllele.objects.filter(allele_id__in=all_allele_ids).values_list('allele_id', 'variant_id'):
+            for allele_id, variant_id in VariantAllele.objects.filter(allele_id__in=all_allele_ids).values_list(
+                    'allele_id', 'variant_id'):
                 variant_id_to_allele_id[variant_id] = allele_id
 
-            clinvars = ClinVar.objects.filter(variant__in=variant_id_to_allele_id.keys(), version__in=self.clinvar_versions)
-            for clinvar in clinvars:
+            expert_panel_clinvars = ClinVar.objects.filter(
+                variant__in=variant_id_to_allele_id.keys(),
+                version__in=self.clinvar_versions
+            )
+            expert_panel_clinvars = self.filter_clinvars(expert_panel_clinvars)
+
+            for clinvar in expert_panel_clinvars:
                 variant_id = clinvar.variant_id
                 if allele_id := variant_id_to_allele_id.get(variant_id):
                     if ad := allele_id_to_batch.get(allele_id):
@@ -238,6 +247,7 @@ class ClassificationExportFormatterClinVarCompare(ClassificationExportFormatter)
                             pass
                         else:
                             ad["clinvar"] = clinvar
+
         return handle_batch
 
     @cached_property
@@ -263,9 +273,9 @@ class ClassificationExportFormatterClinVarCompare(ClassificationExportFormatter)
         else:
             return []
 
-                        ####################
-                        ### EXPERT PANEL ###
-                        ####################
+            ####################
+            ### EXPERT PANEL ###
+            ####################
 
 
 class ClinVarExpertCompareRow(ExportRow):
@@ -380,7 +390,8 @@ class ClinVarExpertCompareRow(ExportRow):
     def is_clinvar_newer(self):
         if server_evaluated := self.server_last_evaluated_date:
             if clinvar_evaluated := self.clinvar_expert_record.date_last_evaluated:
-                return datetime(year=clinvar_evaluated.year, month=clinvar_evaluated.month, day=clinvar_evaluated.day) > server_evaluated
+                return datetime(year=clinvar_evaluated.year, month=clinvar_evaluated.month,
+                                day=clinvar_evaluated.day) > server_evaluated
 
 
 @register_classification_exporter("clinvar_compare_expert")
@@ -401,34 +412,37 @@ class ClassificationExportFormatterClinVarCompareExpert(ClassificationExportForm
     def header(self) -> list[str]:
         return [delimited_row(ClinVarExpertCompareRow.csv_header())]
 
+    def filter_clinvars(self, queryset: QuerySet[ClinVar]) -> QuerySet[ClinVar]:
+        return queryset.filter(clinvar_review_status__in = (ClinVarReviewStatus.REVIEWED_BY_EXPERT_PANEL[0], ClinVarReviewStatus.PRACTICE_GUIDELINE[0]))
+
     def row(self, allele_data: AlleleData) -> list[str]:
         rows = []
         if allele_data.allele_id:
             clinvar_record: ClinVar
             if clinvar_record := allele_data["clinvar"]:
-                if clinvar_record.is_expert_panel_or_greater:
-                    records = ClinVarFetchRequest(
-                        clinvar_variation_id=clinvar_record.clinvar_variation_id,
-                        clinvar_versions=self.clinvar_versions
-                    ).fetch().records_with_min_stars(CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE)
-                    if records:
-                        if len(records) > 1:
-                            logging.warning(f"For allele {allele_data.allele_id} we have {len(records)} expert panels")
+                records = ClinVarFetchRequest(
+                    clinvar_variation_id=clinvar_record.clinvar_variation_id,
+                    clinvar_versions=self.clinvar_versions
+                ).fetch().records_with_min_stars(CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE)
+                if records:
+                    if len(records) > 1:
+                        logging.warning(f"For allele {allele_data.allele_id} we have {len(records)} expert panels")
 
-                        def sort_key(cm):
-                            return cm.classification.lab
+                    def sort_key(cm):
+                        return cm.classification.lab
 
-                        all_cms = sorted([cm for cm in allele_data.all_cms if not cm.withdrawn], key=sort_key)
-                        for lab, cms_by_lab in groupby(all_cms, key=sort_key):
-                            new_rows = [delimited_row(
-                                ClinVarExpertCompareRow(
-                                    allele_group=allele_data,
-                                    cms=list([cm.classification for cm in cms_by_lab]),
-                                    clinvar=clinvar_record,
-                                    clinvar_expert_record=first(records)
-                                ).to_csv())
-                            ]
-                            rows += new_rows
-                    else:
-                        logging.warning(f"Expected clinvar_variation_id {clinvar_record.clinvar_variation_id} to have an expert panel or higher")
+                    all_cms = sorted([cm for cm in allele_data.all_cms if not cm.withdrawn], key=sort_key)
+                    for lab, cms_by_lab in groupby(all_cms, key=sort_key):
+                        new_rows = [delimited_row(
+                            ClinVarExpertCompareRow(
+                                allele_group=allele_data,
+                                cms=list([cm.classification for cm in cms_by_lab]),
+                                clinvar=clinvar_record,
+                                clinvar_expert_record=first(records)
+                            ).to_csv())
+                        ]
+                        rows += new_rows
+                else:
+                    logging.warning(
+                        f"Expected clinvar_variation_id {clinvar_record.clinvar_variation_id} to have an expert panel or higher")
         return rows
