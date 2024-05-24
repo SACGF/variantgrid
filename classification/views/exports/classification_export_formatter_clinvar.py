@@ -417,32 +417,31 @@ class ClassificationExportFormatterClinVarCompareExpert(ClassificationExportForm
 
     def row(self, allele_data: AlleleData) -> list[str]:
         rows = []
-        if allele_data.allele_id:
-            clinvar_record: ClinVar
-            if clinvar_record := allele_data["clinvar"]:
-                records = ClinVarFetchRequest(
-                    clinvar_variation_id=clinvar_record.clinvar_variation_id,
-                    clinvar_versions=self.clinvar_versions
-                ).fetch().records_with_min_stars(CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE)
-                if records:
-                    if len(records) > 1:
-                        logging.warning(f"For allele {allele_data.allele_id} we have {len(records)} expert panels")
+        clinvar_record: ClinVar
+        if clinvar_record := allele_data["clinvar"]:
+            records = ClinVarFetchRequest(
+                clinvar_variation_id=clinvar_record.clinvar_variation_id,
+                clinvar_versions=self.clinvar_versions
+            ).fetch().records_with_min_stars(CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE)
+            if records:
+                if len(records) > 1:
+                    logging.warning(f"For allele {allele_data.allele_id} we have {len(records)} expert panels")
 
-                    def sort_key(cm):
-                        return cm.classification.lab
+                def sort_key(cm):
+                    return cm.classification.lab
 
-                    all_cms = sorted([cm for cm in allele_data.all_cms if not cm.withdrawn], key=sort_key)
-                    for lab, cms_by_lab in groupby(all_cms, key=sort_key):
-                        new_rows = [delimited_row(
-                            ClinVarExpertCompareRow(
-                                allele_group=allele_data,
-                                cms=list([cm.classification for cm in cms_by_lab]),
-                                clinvar=clinvar_record,
-                                clinvar_expert_record=first(records)
-                            ).to_csv())
-                        ]
-                        rows += new_rows
-                else:
-                    logging.warning(
-                        f"Expected clinvar_variation_id {clinvar_record.clinvar_variation_id} to have an expert panel or higher")
+                all_cms = sorted([cm for cm in allele_data.all_cms if not cm.withdrawn], key=sort_key)
+                for lab, cms_by_lab in groupby(all_cms, key=sort_key):
+                    new_rows = [delimited_row(
+                        ClinVarExpertCompareRow(
+                            allele_group=allele_data,
+                            cms=list([cm.classification for cm in cms_by_lab]),
+                            clinvar=clinvar_record,
+                            clinvar_expert_record=first(records)
+                        ).to_csv())
+                    ]
+                    rows += new_rows
+            else:
+                logging.warning(
+                    f"Expected clinvar_variation_id {clinvar_record.clinvar_variation_id} to have an expert panel or higher")
         return rows
