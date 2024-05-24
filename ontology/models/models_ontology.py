@@ -636,7 +636,7 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
 
         q_dest_service = Q(source_term=term) & Q(dest_term__ontology_service=service)
         q_source_service = Q(dest_term=term) & Q(source_term__ontology_service=service)
-        otr_qs = OntologyVersion.get_latest_and_live_ontology_qs().objects.filter(q_dest_service | q_source_service, relation=OntologyRelation.EXACT)
+        otr_qs = OntologyVersion.get_latest_and_live_ontology_qs().filter(q_dest_service | q_source_service, relation=OntologyRelation.EXACT)
         if mondo_rel := otr_qs.first():
             return mondo_rel.other_end(term)
         return None
