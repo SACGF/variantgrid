@@ -4,12 +4,12 @@ import os
 from collections import OrderedDict
 from subprocess import Popen, PIPE, CalledProcessError
 
-import cyvcf2
 import pandas as pd
 from django.conf import settings
 from django.utils import timezone
 
 from library.django_utils.django_file_utils import get_import_processing_filename
+from library.genomics.vcf_utils import write_cleaned_vcf_header
 from library.utils.file_utils import name_from_filename
 from upload.models import ModifiedImportedVariants, ToolVersion, UploadStep, \
     UploadStepTaskType, VCFSkippedContigs, VCFSkippedContig, UploadStepMultiFileOutput, VCFPipelineStage, \
@@ -61,26 +61,17 @@ def create_sub_step(upload_step, sub_step_name, sub_step_commands):
                                      task_type=UploadStepTaskType.TOOL)
 
 
-def _write_split_headers(vcf_filename: str, remove_info: bool, split_headers_filename: str):
-    """ Add VT normalize INFO to header, strip if remove_info = True """
+def _write_cleaned_header(genome_build, upload_pipeline, vcf_filename) -> str:
+    # We clean/replace header. Used for initial read of vcf_clean_and_filter then added on top of every splice vcf
+    clean_vcf_dir = upload_pipeline.get_pipeline_processing_subdir("clean_vcf_dir")
+    cleaned_vcf_header_filename = os.path.join(clean_vcf_dir, name_from_filename(vcf_filename, remove_gz=True) + ".header.vcf")
+    # TODO need to change this for bcftools whatever it uses
     VT_HEADERS = [
         '##INFO=<ID=OLD_MULTIALLELIC,Number=1,Type=String,Description="Original chr:pos:ref:alt encoding">',
         '##INFO=<ID=OLD_VARIANT,Number=.,Type=String,Description="Original chr:pos:ref:alt encoding">',
     ]
-    with open(split_headers_filename, "w") as f:
-        written_vt_headers = False
-        for line in cyvcf2.Reader(vcf_filename).raw_header.split("\n"):
-            info_line = line.startswith("##INFO")
-            if info_line or line.startswith("#CHROM"):
-                if not written_vt_headers:
-                    for vt_line in VT_HEADERS:
-                        f.write(vt_line + "\n")
-                    written_vt_headers = True
-
-                if info_line and remove_info:
-                    continue
-            if line:
-                f.write(line + "\n")
+    write_cleaned_vcf_header(genome_build, vcf_filename, cleaned_vcf_header_filename, new_info_lines=VT_HEADERS)
+    return cleaned_vcf_header_filename
 
 
 def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
@@ -112,10 +103,14 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     skipped_records_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_records.tsv")
     skipped_filters_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_filters.tsv")
 
+    cleaned_vcf_header_filename = _write_cleaned_header(genome_build, upload_pipeline, vcf_filename)
+
     manage_command = settings.MANAGE_COMMAND
     read_variants_cmd = manage_command + ["vcf_clean_and_filter",
                                           "--genome-build",
                                           genome_build.name,
+                                          "--replace-header",
+                                          cleaned_vcf_header_filename,
                                           "--skipped-contigs-stats-file",
                                           skipped_contigs_stats_file,
                                           "--skipped-records-stats-file",
@@ -141,20 +136,16 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     else:
         pipe_commands[NORMALIZE_SUB_STEP] = [settings.BCFTOOLS_COMMAND, "norm",
                                              "--multiallelics=-", "--rm-dup=exact",
-                                             # "--check-ref=w", # Not sure if this works?
+                                             "--check-ref=w", # Not sure if this works?
                                              f"--fasta-ref={genome_build.reference_fasta}", "-"]
         pipe_commands[REMOVE_HEADER_SUB_STEP] = [settings.BCFTOOLS_COMMAND, "view", "--no-header", "-"]
         norm_substep_names = [NORMALIZE_SUB_STEP]  # Just 1
 
     # Split up the VCF
     split_vcf_dir = upload_pipeline.get_pipeline_processing_subdir("split_vcf")
-    # We'll cat split_headers_filename on top of every split VCF
-    split_headers_filename = os.path.join(split_vcf_dir, name_from_filename(vcf_filename, remove_gz=True))
-    _write_split_headers(vcf_filename, remove_info, split_headers_filename)
-
     pipe_commands[SPLIT_VCF_SUB_STEP] = ["split", "-", vcf_name, "--additional-suffix=.vcf.gz", "--numeric-suffixes",
                                          "--lines", str(settings.VCF_IMPORT_FILE_SPLIT_ROWS),
-                                         f"--filter='sh -c \"{{ cat {split_headers_filename}; cat; }} | bgzip -c > {split_vcf_dir}/$FILE\"'"]
+                                         f"--filter='sh -c \"{{ cat {cleaned_vcf_header_filename}; cat; }} | bgzip -c > {split_vcf_dir}/$FILE\"'"]
 
     for sub_step_name in norm_substep_names:
         sub_step_commands = pipe_commands[sub_step_name]
