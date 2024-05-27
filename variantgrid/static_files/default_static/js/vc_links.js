@@ -122,7 +122,7 @@ let VCLinks = (function() {
             // links.push(this.makeLink('CIViC (Variant)', 'https://civicdb.org', '/links/allele_registry/@@', SpecialEKeys.CLINGEN_ALLELE_ID));
             links.push(this.makeLink('ClinGen Allele Reg.', 'http://reg.clinicalgenome.org', '/redmine/projects/registry/genboree_registry/by_caid?caid=@@', SpecialEKeys.CLINGEN_ALLELE_ID, 'Clingen Allele Registry'));
             links.push(this.generateClingenKb());
-            links.push(this.makeLink('Clin Trials (Gene)', 'https://clinicaltrials.gov', '/search?term=@@', SpecialEKeys.GENE_SYMBOL, 'Clinical Trials gov'));
+            links.push(this.makeLink('Clin Trials (Gene)', 'https://clinicaltrials.gov', '/search?term=@@', SpecialEKeys.GENE_SYMBOL, 'ClinicalTrials.gov'));
             links.push(this.makeLink('Clinvar Variant', 'https://www.ncbi.nlm.nih.gov', '/clinvar/variation/@@', SpecialEKeys.CLINVAR_VARIANTION_ID));
             links.push(this.makeLink('Cosmic (Gene)', 'https://cancer.sanger.ac.uk/cosmic', '/gene/analysis?ln=@@', SpecialEKeys.GENE_SYMBOL));
             links.push(this.makeLink('GHR (Gene)', 'https://ghr.nlm.nih.gov', '/gene/@@', SpecialEKeys.GENE_SYMBOL, 'Genetics Home Reference'));
