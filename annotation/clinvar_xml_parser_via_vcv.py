@@ -20,10 +20,11 @@ class ConditionList:
     @property
     def result(self) -> Optional[str]:
         if self.disease:
-            return self.disease[0]
+            return "; ".join(self.choices)
         elif self.findings:
-            return self.findings[0]
+            return "; ".join(self.choices)
         elif self.choices:
+            # maybe choices should be uncertain?
             return "; ".join(self.choices)
         else:
             return None
@@ -31,7 +32,7 @@ class ConditionList:
 
 class ClinVarXmlParserViaVCV(ClinVarXmlParser):
 
-    PARSER_VERSION = 209  # change this whenever the parsing changes, so we know to ignore the old cache
+    PARSER_VERSION = 210  # change this whenever the parsing changes, so we know to ignore the old cache
 
     RE_LEGACY_CS = re.compile("^Converted during submission to (.*?).?$")
 
