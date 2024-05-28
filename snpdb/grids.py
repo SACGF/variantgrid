@@ -530,7 +530,6 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
         data = {}
         if allele_id := row['allele']:
             allele = get_object_or_404(Allele, id=allele_id)
-            allele.preview
             data = {
                 "text": str(allele),
                 "url": allele.get_absolute_url(),
@@ -539,9 +538,23 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
 
     def render_status(self, row: dict[str, Any]) -> JsonDataType:
         label = ""
+        current = ""
         if status := row['status']:
             processing_status = ProcessingStatus(status)
             label = processing_status.label
+
+        has_build_to_icon = {
+            True: "✅",
+            False: "❌"
+        }
+
+        if allele_id := row['allele']:
+            allele: Allele
+            if allele := Allele.objects.filter(id=allele_id).first():
+                has_37 = bool(allele.variant_for_build_optional(GenomeBuild.grch37()))
+                has_38 = bool(allele.variant_for_build_optional(GenomeBuild.grch37()))
+                label += f" (Current: {has_build_to_icon[has_37]} GRCh37, {has_build_to_icon[has_38]} GRCh38)"
+
         return label
 
     def render_json(self, row: dict[str, Any]) -> JsonDataType:
