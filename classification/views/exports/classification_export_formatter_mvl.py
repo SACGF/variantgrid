@@ -20,7 +20,7 @@ from classification.views.exports.classification_export_formatter import Classif
 from classification.views.exports.classification_export_utils import CHGVSData, CitationCounter
 from library.django_utils import get_url_from_view_path
 from library.utils import delimited_row, export_column, ExportRow, ExportTweak
-from snpdb.models import Allele
+from snpdb.models import Allele, AlleleOriginFilterDefault
 
 
 class FormatDetailsMVLFileFormat(str, Enum):
@@ -335,6 +335,9 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
     def __init__(self, classification_filter: ClassificationFilter, format_details: FormatDetailsMVL):
         self.format_details = format_details
         self.grouping_utils = ClassificationGroupUtils()
+        if classification_filter.allele_origin_filter != AlleleOriginFilterDefault.GERMLINE:
+            raise ValueError("MVL export only supports Germline filter")
+
         super().__init__(classification_filter=classification_filter)
 
     @property

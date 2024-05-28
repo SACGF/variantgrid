@@ -72,8 +72,8 @@
                 params.mvl_detail = detailLevelChecked.val();
             }
 
-            if (!allele_origin || allele_origin === "A") {
-                inputError = 'MVL download must choose Germline or Somatic';
+            if (!allele_origin || allele_origin !== "G") {
+                inputError = 'MVL download only supports Allele Origin Filter: Germline';
             }
         } else if (format === 'vcf') {
             params.encoding = $("input[name='encoding']:checked").val();
