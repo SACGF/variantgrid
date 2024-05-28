@@ -13,6 +13,7 @@ from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap
 from classification.models.classification_groups import ClassificationGroups, ClassificationGroupUtils
 from classification.views.classification_export_utils import ConflictStrategy
+from classification.views.classification_export_view import InvalidExportParameter
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
     DiscordanceReportStatus
@@ -336,7 +337,7 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
         self.format_details = format_details
         self.grouping_utils = ClassificationGroupUtils()
         if classification_filter.allele_origin_filter != AlleleOriginFilterDefault.GERMLINE:
-            raise ValueError("MVL export only supports Germline filter")
+            raise InvalidExportParameter("MVL export requires Allele Origin to be set to Germline.")
 
         super().__init__(classification_filter=classification_filter)
 
