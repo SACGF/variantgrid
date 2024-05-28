@@ -20,6 +20,11 @@
         baseUriRedirect = '{% url 'classification_export_redirect' %}';
     }
 
+    function scrollToAlleleOrigin() {
+        document.getElementById("allele-origin-toggle").scrollIntoView({ behavior: "smooth", block: "end"});
+        $("#allele-origin-toggle").delay(400).fadeOut().fadeIn();
+    }
+
     function generateUrl() {
         let params = {};
         let inputError = null;
@@ -73,7 +78,7 @@
             }
 
             if (!allele_origin || allele_origin !== "G") {
-                inputError = 'MVL download only supports Germline.<br/>Please set <b>Allele Origin</b> to <b>Germline</b> if you wish to use MVL.';
+                inputError = 'MVL download only supports Germline.<br/>Please set <a class="hover-link" onclick="scrollToAlleleOrigin()">Allele Origin</a> to <b>Germline</b> if you wish to export as MVL.';
             }
         } else if (format === 'vcf') {
             params.encoding = $("input[name='encoding']:checked").val();
