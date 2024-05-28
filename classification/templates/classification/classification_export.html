@@ -73,7 +73,7 @@
             }
 
             if (!allele_origin || allele_origin !== "G") {
-                inputError = 'MVL download only supports Allele Origin Filter: Germline';
+                inputError = 'MVL download only supports Germline. Please set <b>Allele Origin</b> to <b>Germline</b>';
             }
         } else if (format === 'vcf') {
             params.encoding = $("input[name='encoding']:checked").val();
@@ -112,7 +112,7 @@
         }
         if (format === 'lab_compare'){
             if (selectedLabs.length !== 2 || labSelectionMode !== "include") {
-                inputError = 'You must select to include 2 labs';
+                inputError = 'You must select to <b>include</b> 2 labs';
             }
         }
 
@@ -151,11 +151,15 @@
             target = '_blank';
         }
         url += paramString;
-        let a = $('#export_url');
+        let a = $('#export-url');
+        let error_box = $('#export-error');
+        let error_text = $('#export-error-text');
         if (inputError) {
-            a.attr('href', null);
-            a.text(inputError);
+            error_text.html(inputError);
+            a.hide();
+            error_box.show();
         } else {
+            error_box.hide();
             a.attr('href', url);
             a.attr('target', target);
             a.text(url);
@@ -164,6 +168,7 @@
             } else {
                 a.removeClass('download-link');
             }
+            a.show();
         }
     }
 
@@ -181,7 +186,7 @@
     });
 </script>
 <style>
-    #export_url {
+    #export-url {
         word-break: break-all;
     }
 </style>
@@ -524,7 +529,8 @@
         </div>
     </div>
     {% labelled label="Generated URL" %}
-        <a class="hover-link" id="export_url" href="{{base_url_redirect}}">{{base_url_redirect}}</a>
+        <a class="hover-link" id="export-url" href="{{base_url_redirect}}">{{base_url_redirect}}</a>
+        <div id="export-error" class="hidden text-danger">{{ "E" | severity_icon }}<span id="export-error-text"></span></div>
     {% endlabelled %}
 </div>
 
