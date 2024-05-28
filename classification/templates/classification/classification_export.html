@@ -73,7 +73,7 @@
             }
 
             if (!allele_origin || allele_origin !== "G") {
-                inputError = 'MVL download only supports Germline. Please set <b>Allele Origin</b> to <b>Germline</b>';
+                inputError = 'MVL download only supports Germline.<br/>Please set <b>Allele Origin</b> to <b>Germline</b> if you wish to use MVL.';
             }
         } else if (format === 'vcf') {
             params.encoding = $("input[name='encoding']:checked").val();
