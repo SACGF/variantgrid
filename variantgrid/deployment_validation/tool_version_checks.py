@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 import subprocess
 from subprocess import check_call
@@ -17,8 +18,8 @@ def _check_bcftools_version():
     return False
 
 
-def _run_ensure_success(command_list):
-    check_call(command_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+def _run_ensure_success(command_list, **kwargs):
+    check_call(command_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
     return True
 
 
@@ -39,6 +40,14 @@ def check_tool_versions():
     if madeline2_cmd := settings.PEDIGREE_MADELINE2_COMMAND:
         tools["ped_parser"] = lambda: _run_ensure_success(["ped_parser", "--version"])
         tools["madeline2"] = lambda: _run_ensure_success([madeline2_cmd, "--version"])
+
+    if settings.LIFTOVER_BCFTOOLS_ENABLED:
+        liftover_cmd = [
+            "bcftools", "+liftover", "--version"
+        ]
+        env = os.environ.copy()
+        env["BCFTOOLS_PLUGINS"] = settings.LIFTOVER_BCFTOOLS_PLUGIN_DIR
+        tools["bcftools +liftover"] = lambda: _run_ensure_success(liftover_cmd, env=env)
 
     tool_versions = {}
     for tool_name, func in tools.items():
