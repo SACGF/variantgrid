@@ -124,6 +124,9 @@ class SoftwareVersion(models.Model):
     name = models.TextField()
     version = models.TextField()
 
+    def __str__(self):
+        return f"{self.name} ({self.version})"
+
     class Meta:
         abstract = True
 

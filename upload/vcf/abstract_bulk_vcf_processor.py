@@ -53,21 +53,27 @@ class AbstractBulkVCFProcessor:
         return None  # No variants, or only reference
 
     def add_modified_imported_variant(self, variant, variant_hash, miv_hash_list=None, miv_list=None):
-        old_multiallelic = variant.INFO.get("OLD_MULTIALLELIC")
-        old_variant = variant.INFO.get("OLD_VARIANT")
-
-        if old_multiallelic or old_variant:
+        # This used to handle VT tags: OLD_MULTIALLELIC / OLD_VARIANT but now we handle BCFTOOLS only
+        if bcftools_old_variant := variant.INFO.get(ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG):
             if miv_hash_list is None:
                 miv_hash_list = self.modified_imported_variant_hashes
             if miv_list is None:
                 miv_list = self.modified_imported_variants
 
-            miv_hash_list.append(variant_hash)
-            if old_variant:
-                old_variant_formatted = ModifiedImportedVariant.format_old_variant(old_variant, self.genome_build)
+            if "," in bcftools_old_variant:  # Was a multi-allelic
+                old_multiallelic = bcftools_old_variant
             else:
-                old_variant_formatted = [None]
-            for ov in old_variant_formatted:
+                old_multiallelic = None
+
+            old_position = int(bcftools_old_variant.split("|")[1])
+            if old_position != variant.locus.position:
+                old_variant = old_position
+            else:
+                old_variant = None  # Wasn't normalized
+
+            for ov in ModifiedImportedVariant.bcftools_format_old_variant(bcftools_old_variant, self.genome_build):
+                # These 2 need to be in sync
+                miv_hash_list.append(variant_hash)
                 miv_list.append((old_multiallelic, old_variant, ov))
 
     def process_modified_imported_variants(self, variant_ids_by_hash):

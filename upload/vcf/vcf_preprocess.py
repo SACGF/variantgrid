@@ -13,16 +13,8 @@ from library.genomics.vcf_utils import write_cleaned_vcf_header
 from library.utils.file_utils import name_from_filename
 from upload.models import ModifiedImportedVariants, ToolVersion, UploadStep, \
     UploadStepTaskType, VCFSkippedContigs, VCFSkippedContig, UploadStepMultiFileOutput, VCFPipelineStage, \
-    SimpleVCFImportInfo
+    SimpleVCFImportInfo, ModifiedImportedVariant
 from upload.tasks.vcf.unknown_variants_task import SeparateUnknownVariantsTask, AnnotateImportedVCFTask
-
-
-def get_vt_tool_version(vt_command):
-    p = Popen([vt_command, "--version"], stderr=PIPE)
-    _, stderr = p.communicate()
-    vt_version = stderr.decode().split('\n')[0]
-    tool_version, _ = ToolVersion.objects.get_or_create(name='vt', version=vt_version)
-    return tool_version
 
 
 def get_bcftools_tool_version(bcftools_command):
@@ -48,8 +40,7 @@ def get_bcftools_tool_version(bcftools_command):
 
 def create_sub_step(upload_step, sub_step_name, sub_step_commands):
     start_date = timezone.now()
-    tool_version = get_vt_tool_version(settings.VCF_IMPORT_VT_COMMAND)
-    # tool_version = get_bcftools_tool_version(settings.BCFTOOLS_COMMAND)
+    tool_version = get_bcftools_tool_version(settings.BCFTOOLS_COMMAND)
     command_line = ' '.join(sub_step_commands)
     return UploadStep.objects.create(name=sub_step_name,
                                      script=command_line,
@@ -65,12 +56,11 @@ def _write_cleaned_header(genome_build, upload_pipeline, vcf_filename) -> str:
     # We clean/replace header. Used for initial read of vcf_clean_and_filter then added on top of every splice vcf
     clean_vcf_dir = upload_pipeline.get_pipeline_processing_subdir("clean_vcf_dir")
     cleaned_vcf_header_filename = os.path.join(clean_vcf_dir, name_from_filename(vcf_filename, remove_gz=True) + ".header.vcf")
-    # TODO need to change this for bcftools whatever it uses
-    VT_HEADERS = [
-        '##INFO=<ID=OLD_MULTIALLELIC,Number=1,Type=String,Description="Original chr:pos:ref:alt encoding">',
-        '##INFO=<ID=OLD_VARIANT,Number=.,Type=String,Description="Original chr:pos:ref:alt encoding">',
+    tag = ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG
+    HEADERS = [
+        f'##INFO=<ID={tag},Number=1,Type=String,Description="Original variant. Format: CHR|POS|REF|ALT|USED_ALT_IDX">',
     ]
-    write_cleaned_vcf_header(genome_build, vcf_filename, cleaned_vcf_header_filename, new_info_lines=VT_HEADERS)
+    write_cleaned_vcf_header(genome_build, vcf_filename, cleaned_vcf_header_filename, new_info_lines=HEADERS)
     return cleaned_vcf_header_filename
 
 
@@ -78,7 +68,6 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     MAX_STDERR_OUTPUT = 5000  # How much stderr output per process to store in DB
 
     VCF_CLEAN_AND_FILTER_SUB_STEP = "vcf_clean_and_filter"
-    DECOMPOSE_SUB_STEP = "decompose"
     NORMALIZE_SUB_STEP = "normalize"
     REMOVE_HEADER_SUB_STEP = "remove_header"
     SPLIT_VCF_SUB_STEP = "split_vcf"
@@ -122,24 +111,13 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     pipe_commands[VCF_CLEAN_AND_FILTER_SUB_STEP] = read_variants_cmd
     sub_steps[VCF_CLEAN_AND_FILTER_SUB_STEP] = create_sub_step(upload_step, VCF_CLEAN_AND_FILTER_SUB_STEP, read_variants_cmd)
 
-    use_vt = False
-    norm_substep_names = []
-    if use_vt:
-        # VT isn't the bottleneck here, it's my programs - so no speed advantage to using "+" for Uncompressed BCF streams
-        pipe_commands[DECOMPOSE_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "decompose", "-s", "-"]
-        pipe_commands[NORMALIZE_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "normalize", "-n", "-r", genome_build.reference_fasta, "-"]
-        # We don't run 'uniq' anymore as neither Vt or Bcftools handle SVLEN properly (so removed from sub_step_name loop below)
-        # @see https://github.com/SACGF/variantgrid/issues/818
-        # pipe_commands[UNIQ_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "uniq", "-"]
-        pipe_commands[REMOVE_HEADER_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "view", "-"]
-        norm_substep_names = [DECOMPOSE_SUB_STEP, NORMALIZE_SUB_STEP]
-    else:
-        pipe_commands[NORMALIZE_SUB_STEP] = [settings.BCFTOOLS_COMMAND, "norm",
-                                             "--multiallelics=-", "--rm-dup=exact",
-                                             "--check-ref=w", # Not sure if this works?
-                                             f"--fasta-ref={genome_build.reference_fasta}", "-"]
-        pipe_commands[REMOVE_HEADER_SUB_STEP] = [settings.BCFTOOLS_COMMAND, "view", "--no-header", "-"]
-        norm_substep_names = [NORMALIZE_SUB_STEP]  # Just 1
+    pipe_commands[NORMALIZE_SUB_STEP] = [settings.BCFTOOLS_COMMAND, "norm",
+                                         "--multiallelics=-", "--rm-dup=exact",
+                                         "--check-ref=w",
+                                         f"--old-rec-tag={ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG}",
+                                         f"--fasta-ref={genome_build.reference_fasta}", "-"]
+    pipe_commands[REMOVE_HEADER_SUB_STEP] = [settings.BCFTOOLS_COMMAND, "view", "--no-header", "-"]
+    norm_substep_names = [NORMALIZE_SUB_STEP]
 
     # Split up the VCF
     split_vcf_dir = upload_pipeline.get_pipeline_processing_subdir("split_vcf")
@@ -223,7 +201,8 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     _store_vcf_skip_stats(skipped_filters_stats_file, clean_sub_step, "FILTER")
 
     # Create this here so downstream tasks can add modified imported variant messages
-    import_info, _ = ModifiedImportedVariants.objects.get_or_create(upload_step=upload_step)
+    normalize_sub_step = sub_steps[NORMALIZE_SUB_STEP]
+    import_info, _ = ModifiedImportedVariants.objects.get_or_create(upload_step=normalize_sub_step)
     vcf_import_annotate_dir = upload_pipeline.get_pipeline_processing_subdir("vcf_import_annotate")
     sort_order = upload_pipeline.get_max_step_sort_order()
     for split_vcf_filename in glob.glob(f"{split_vcf_dir}/*.vcf.gz"):
