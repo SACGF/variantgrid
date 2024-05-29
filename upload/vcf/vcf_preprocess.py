@@ -38,7 +38,7 @@ def get_bcftools_tool_version(bcftools_command):
     if not bcftools_version.startswith("bcftools"):
         raise CalledProcessError(f"Expected to find bcftools on 1st line of output of '{bcftools_command} --version' output: {bcftools_version}")
     htslib_version = output_list[1]
-    if not htslib_version.contains("htslib"):
+    if not "htslib" in htslib_version:
         raise CalledProcessError(f"Expected to find htslib version on 2nd line of '{bcftools_command} --version' output: {htslib_version}")
 
     version = f"{bcftools_version}, {htslib_version}"
