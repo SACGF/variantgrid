@@ -539,7 +539,7 @@ class ClassificationFilter:
                     allele_data = AlleleData.from_allele_info(
                         source=self,
                         allele_info=allele_info,
-                        allele_origin_bucket=allele_origin_bucket if not self.allele_origin_split else None
+                        allele_origin_bucket=allele_origin_bucket if self.allele_origin_split else None
                     )
                 allele_data.all_cms.append(self._record_issues(allele_id=allele_id, cm=cm))
 
