@@ -94,10 +94,10 @@ class ClinVarCompareRowAbstract(ExportRow):
         return cs_set
 
     @cached_property
-    def server_clinical_significance_set(self) -> set[str]:
+    def somatic_clinical_significance_set(self) -> set[str]:
         cs_set: set[str] = set()
-        for cm in self.cms:
-            if classified := cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE):
+        for cm in self.allele_group.cms_regardless_of_issues:
+            if classified := cm.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE):
                 cs_set.add(classified)
         return cs_set
 
@@ -130,17 +130,22 @@ class ClinVarCompareRow(ClinVarCompareRowAbstract):
     def _allele_url(self) -> str:
         return self.allele_url
 
-    @export_column("$site_name c.HGVS")
-    def _server_c_hgvs(self) -> str:
-        return self.c_hgvs
-
     @export_column("Clinvar URL")
     def _clinvar_url(self) -> str:
         return self.clinvar_url
 
+    @export_column("c.HGVS")
+    def _server_c_hgvs(self) -> str:
+        return self.c_hgvs
+
     @export_column("Gene Symbol")
     def _gene_symbol(self) -> str:
         return self.gene_symbol
+
+    @export_column("$site_name Resolution Issues")
+    def issues(self) -> str:
+        if issues := self.allele_group.issues:
+            return "\n".join(sorted(set(issue.message for issue in issues)))
 
     @cached_property
     def clinvar_clinical_significance_set(self) -> tuple[set[str], set[str]]:
@@ -164,13 +169,22 @@ class ClinVarCompareRow(ClinVarCompareRowAbstract):
                         unknown_set.add(part)
         return cs_set, unknown_set
 
-    @export_column("$site_name Clinical Significances")
-    def servers_clinical_significance(self) -> str:
+    @export_column("$site_name Allele Origins")
+    def _allele_origins(self):
+        return self.allele_origins
+
+    @export_column("ClinVar Allele Origins")
+    def clinvar_origin(self) -> str:
+        if clinvar := self.clinvar:
+            return ", ".join(clinvar.allele_origins) + f" ({clinvar.allele_origin_bucket.label})"
+
+    @export_column("$site_name Classification")
+    def servers_classification(self) -> str:
         (cs_list := list(self.clinical_significance_set)).sort()
         return ";".join(cs_list)
 
-    @export_column("ClinVar Clinical Significances")
-    def clinvar_clinical_significance(self) -> str:
+    @export_column("ClinVar Classification")
+    def clinvar_classification(self) -> str:
         known, unknown = self.clinvar_clinical_significance_set
         resolved_values = sorted(known)
         if unknown:
@@ -179,20 +193,14 @@ class ClinVarCompareRow(ClinVarCompareRowAbstract):
         if resolved_values:
             return ";".join(resolved_values)
 
-    @export_column("ClinVar Clinical Significances Raw")
+    @export_column("$site_name Somatic Clinical Significances")
+    def servers_somatic_clinical_significance(self) -> str:
+        (cs_list := list(self.somatic_clinical_significance_set)).sort()
+        return ";".join(cs_list)
+
+    @export_column("ClinVar Somatic Clinical Significances")
     def clinvar_clinical_significance_raw(self) -> str:
-        if clinvar := self.clinvar:
-            return clinvar.clinical_significance
-        return ""
-
-    @export_column("ClinVar Allele Origins")
-    def clinvar_origin(self) -> str:
-        if clinvar := self.clinvar:
-            return ", ".join(clinvar.allele_origins) + f" ({clinvar.allele_origin_bucket.label})"
-
-    @export_column("$site_name Allele Origins")
-    def _allele_origins(self):
-        return self.allele_origins
+        return "not-supported-yet"
 
     @export_column("ClinVar Stars")
     def clinvar_stars(self) -> str:
@@ -347,10 +355,6 @@ class ClinVarExpertCompareRow(ClinVarCompareRowAbstract):
         if clinvar := self.clinvar:
             return f"https://www.ncbi.nlm.nih.gov/clinvar/variation/{clinvar.clinvar_variation_id}/"
 
-    @export_column("Lab")
-    def lab(self) -> str:
-        return str(self.cms[0].classification.lab)
-
     @export_column("c.HGVS")
     def _c_hgvs(self) -> str:
         return self.c_hgvs
@@ -369,9 +373,13 @@ class ClinVarExpertCompareRow(ClinVarCompareRowAbstract):
         (cs_list := list(self.clinical_significance_set)).sort()
         return ";".join(cs_list)
 
-    @export_column("Expert Panel Clinical Significance")
+    @export_column("ClinVar Expert Panel Classification")
     def clinvar_clinical_significance(self):
         return self.clinvar_expert_record.clinical_significance
+
+    @export_column("ClinVar Expert Panel Somatic Significance")
+    def clinvar_clinical_significance(self):
+        return self.clinvar_expert_record.somatic_clinical_significance
 
     @export_column("Status")
     def status(self):
