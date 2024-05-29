@@ -12,14 +12,14 @@ from django.urls import reverse
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
 from annotation.models import ClinVar, ClinVarVersion, ClinVarRecord, ClinVarReviewStatus
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
-from classification.enums import SpecialEKeys
+from classification.enums import SpecialEKeys, AlleleOriginBucket
 from classification.models import EvidenceKeyMap, ClassificationModification
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column, delimited_row, first, ExportDataType
-from snpdb.models import GenomeBuild, Variant, VariantAllele
+from snpdb.models import GenomeBuild, VariantAllele
 
 
 class ClinVarCompareValue(int, Enum):
@@ -52,7 +52,68 @@ class ClinVarCompareValue(int, Enum):
         return f"{self.value} {self.label}"
 
 
-class ClinVarCompareRow(ExportRow):
+class ClinVarCompareRowAbstract(ExportRow):
+
+    def __init__(self,
+                 allele_group: AlleleData,
+                 clinvar: ClinVar):
+        self.allele_group = allele_group
+        self.clinvar = clinvar
+
+    @cached_property
+    def allele_url(self):
+        if allele_id := self.allele_group.allele_id:
+            return get_url_from_view_path(reverse('view_allele', kwargs={"allele_id": allele_id}))
+
+    @cached_property
+    def c_hgvs(self) -> str:
+        for cm in self.allele_group.cms_regardless_of_issues:
+            if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
+                if full_c_hgvs := c_hgvs.full_c_hgvs:
+                    return full_c_hgvs
+
+    @cached_property
+    def clinvar_url(self) -> str:
+        clinvar: ClinVar
+        if clinvar := self.clinvar:
+            return f"https://www.ncbi.nlm.nih.gov/clinvar/variation/{clinvar.clinvar_variation_id}/"
+
+    @cached_property
+    def gene_symbol(self) -> str:
+        for cm in self.allele_group.cms_regardless_of_issues:
+            if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
+                if gene_symbol := c_hgvs.gene_symbol:
+                    return gene_symbol
+
+    @cached_property
+    def clinical_significance_set(self) -> set[str]:
+        cs_set: set[str] = set()
+        for cm in self.allele_group.cms_regardless_of_issues:
+            if classified := cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE):
+                cs_set.add(classified)
+        return cs_set
+
+    @cached_property
+    def server_clinical_significance_set(self) -> set[str]:
+        cs_set: set[str] = set()
+        for cm in self.cms:
+            if classified := cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE):
+                cs_set.add(classified)
+        return cs_set
+
+    @cached_property
+    def allele_origins(self):
+        allele_origins = set()
+        for cm in self.allele_group.cms_regardless_of_issues:
+            allele_origins |= set(cm.get_value_list(SpecialEKeys.ALLELE_ORIGIN))
+        e_key = EvidenceKeyMap.cached_key(SpecialEKeys.ALLELE_ORIGIN)
+
+        allele_origin_values = ", ".join(e_key.pretty_value(val) for val in e_key.sort_values(allele_origins)) if allele_origins else "no-value"
+        return f"{allele_origin_values} ({self.allele_group.allele_origin_bucket.label})"
+
+
+class ClinVarCompareRow(ClinVarCompareRowAbstract):
+
     CLINSIG_TO_VGSIG = {
         "Benign": "B",
         "Likely_benign": "LB",
@@ -65,41 +126,21 @@ class ClinVarCompareRow(ExportRow):
         "drug_response": "D"
     }
 
-    def __init__(self, allele_group: AlleleData):
-        self.allele_group = allele_group
-
     @export_column("Allele URL")
-    def allele_url(self) -> str:
-        if allele_id := self.allele_group.allele_id:
-            return get_url_from_view_path(reverse('view_allele', kwargs={"allele_id": allele_id}))
+    def _allele_url(self) -> str:
+        return self.allele_url
 
-    @export_column("ClinVar URL")
-    def clinvar_url(self) -> str:
-        clinvar: ClinVar
-        if clinvar := self.clinvar:
-            return f"https://www.ncbi.nlm.nih.gov/clinvar/variation/{clinvar.clinvar_variation_id}/"
+    @export_column("$site_name c.HGVS")
+    def _server_c_hgvs(self) -> str:
+        return self.c_hgvs
 
-    @export_column("c.HGVS")
-    def c_hgvs(self) -> str:
-        for cm in self.allele_group.cms_regardless_of_issues:
-            if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
-                if full_c_hgvs := c_hgvs.full_c_hgvs:
-                    return full_c_hgvs
+    @export_column("Clinvar URL")
+    def _clinvar_url(self) -> str:
+        return self.clinvar_url
 
     @export_column("Gene Symbol")
-    def gene_symbol(self) -> str:
-        for cm in self.allele_group.cms_regardless_of_issues:
-            if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
-                if gene_symbol := c_hgvs.gene_symbol:
-                    return gene_symbol
-
-    @cached_property
-    def server_clinical_significance_set(self) -> set[str]:
-        cs_set: set[str] = set()
-        for cm in self.allele_group.cms_regardless_of_issues:
-            if classified := cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE):
-                cs_set.add(classified)
-        return cs_set
+    def _gene_symbol(self) -> str:
+        return self.gene_symbol
 
     @cached_property
     def clinvar_clinical_significance_set(self) -> tuple[set[str], set[str]]:
@@ -123,9 +164,9 @@ class ClinVarCompareRow(ExportRow):
                         unknown_set.add(part)
         return cs_set, unknown_set
 
-    @export_column("Clinical Significances")
+    @export_column("$site_name Clinical Significances")
     def servers_clinical_significance(self) -> str:
-        (cs_list := list(self.server_clinical_significance_set)).sort()
+        (cs_list := list(self.clinical_significance_set)).sort()
         return ";".join(cs_list)
 
     @export_column("ClinVar Clinical Significances")
@@ -144,11 +185,14 @@ class ClinVarCompareRow(ExportRow):
             return clinvar.clinical_significance
         return ""
 
-    @export_column("ClinVar Origin")
+    @export_column("ClinVar Allele Origins")
     def clinvar_origin(self) -> str:
-        clinvar: ClinVar
         if clinvar := self.clinvar:
-            return clinvar.get_origin_display()
+            return ", ".join(clinvar.allele_origins) + f" ({clinvar.allele_origin_bucket.label})"
+
+    @export_column("$site_name Allele Origins")
+    def _allele_origins(self):
+        return self.allele_origins
 
     @export_column("ClinVar Stars")
     def clinvar_stars(self) -> str:
@@ -158,7 +202,7 @@ class ClinVarCompareRow(ExportRow):
 
     @export_column("Comparison")
     def diff_value(self) -> ClinVarCompareValue:
-        our_clins: set[str] = self.server_clinical_significance_set
+        our_clins: set[str] = self.clinical_significance_set
         clinvar_clins: set[str]
         clinvar_unknown_clins: set[str]
         clinvar_clins, clinvar_unknown_clins = self.clinvar_clinical_significance_set
@@ -204,16 +248,14 @@ class ClinVarCompareRow(ExportRow):
         if issues := self.allele_group.issues:
             return "\n".join(sorted(set(issue.message for issue in issues)))
 
-    @cached_property
-    def clinvar(self) -> Optional[ClinVar]:
-        return self.allele_group["clinvar"]
-
 
 @register_classification_exporter("clinvar_compare")
 class ClassificationExportFormatterClinVarCompare(ClassificationExportFormatter):
 
     @classmethod
-    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatter2CSV':
+    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterClinVarCompare':
+        cf = ClassificationFilter.from_request(request)
+        cf.allele_origin_split = True
         return ClassificationExportFormatterClinVarCompare(
             classification_filter=ClassificationFilter.from_request(request)
         )
@@ -241,12 +283,13 @@ class ClassificationExportFormatterClinVarCompare(ClassificationExportFormatter)
                 variant_id = clinvar.variant_id
                 if allele_id := variant_id_to_allele_id.get(variant_id):
                     if ad := allele_id_to_batch.get(allele_id):
-                        if (existing := ad["clinvar"]) and existing.stars > clinvar.stars:
-                            # most likely these are just clinvar in different builds pointing to the same clinvar variation ID
-                            # if one has stars and one doesn't, take the bigger stars
-                            pass
-                        else:
-                            ad["clinvar"] = clinvar
+                        if clinvar.allele_origin_bucket == AlleleOriginBucket.UNKNOWN or clinvar.allele_origin_bucket == ad.allele_origin_bucket:
+                            if (existing := ad["clinvar"]) and existing.stars > clinvar.stars:
+                                # most likely these are just clinvar in different builds pointing to the same clinvar variation ID
+                                # if one has stars and one doesn't, take the bigger stars
+                                pass
+                            else:
+                                ad["clinvar"] = clinvar
 
         return handle_batch
 
@@ -269,16 +312,19 @@ class ClassificationExportFormatterClinVarCompare(ClassificationExportFormatter)
 
     def row(self, allele_data: AlleleData) -> list[str]:
         if allele_data.allele_id:
-            return [delimited_row(ClinVarCompareRow(allele_data).to_csv())]
+            return [delimited_row(ClinVarCompareRow(
+                allele_data,
+                allele_data["clinvar"]
+            ).to_csv())]
         else:
             return []
 
-            ####################
-            ### EXPERT PANEL ###
-            ####################
+####################
+### EXPERT PANEL ###
+####################
 
 
-class ClinVarExpertCompareRow(ExportRow):
+class ClinVarExpertCompareRow(ClinVarCompareRowAbstract):
 
     def __init__(self,
                  allele_group: AlleleData,
@@ -286,9 +332,8 @@ class ClinVarExpertCompareRow(ExportRow):
                  clinvar: ClinVar,
                  clinvar_expert_record: ClinVarRecord):
 
-        self.allele_group = allele_group
+        super().__init__(allele_group, clinvar)
         self.cms = cms
-        self.clinvar = clinvar
         self.clinvar_expert_record = clinvar_expert_record
 
     @export_column("Allele URL")
@@ -307,26 +352,12 @@ class ClinVarExpertCompareRow(ExportRow):
         return str(self.cms[0].classification.lab)
 
     @export_column("c.HGVS")
-    def c_hgvs(self) -> str:
-        for cm in self.cms:
-            if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
-                if full_c_hgvs := c_hgvs.full_c_hgvs:
-                    return full_c_hgvs
+    def _c_hgvs(self) -> str:
+        return self.c_hgvs
 
     @export_column("Gene Symbol")
-    def gene_symbol(self) -> str:
-        for cm in self.allele_group.cms_regardless_of_issues:
-            if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
-                if gene_symbol := c_hgvs.gene_symbol:
-                    return gene_symbol
-
-    @cached_property
-    def server_clinical_significance_set(self) -> set[str]:
-        cs_set: set[str] = set()
-        for cm in self.cms:
-            if classified := cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE):
-                cs_set.add(classified)
-        return cs_set
+    def _gene_symbol(self) -> str:
+        return self.gene_symbol
 
     @export_column("$site_name Resolution Issues")
     def issues(self) -> str:
@@ -334,8 +365,8 @@ class ClinVarExpertCompareRow(ExportRow):
             return "\n".join(sorted(set(issue.message for issue in issues)))
 
     @export_column("$site_name Clinical Significances")
-    def server_clinical_significance_set_labels(self):
-        (cs_list := list(self.server_clinical_significance_set)).sort()
+    def _server_clinical_significance_set_labels(self):
+        (cs_list := list(self.clinical_significance_set)).sort()
         return ";".join(cs_list)
 
     @export_column("Expert Panel Clinical Significance")
@@ -347,7 +378,7 @@ class ClinVarExpertCompareRow(ExportRow):
         bucket_map = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
         bucket_map["no known pathogenicity"] = 1
 
-        server_cs_set = self.server_clinical_significance_set
+        server_cs_set = self.clinical_significance_set
 
         bucket_list = [bucket_map.get(cs) for cs in server_cs_set]
         buckets = {b for b in bucket_list if b is not None}  # Drug Response doesn't have a bucket for example
@@ -360,7 +391,7 @@ class ClinVarExpertCompareRow(ExportRow):
 
         if len(buckets) > 1:
             return "Discordance"
-        all_css = set().union(self.server_clinical_significance_set)
+        all_css = set().union(self.clinical_significance_set)
         all_css.add(self.clinvar_expert_record.clinical_significance)
         if len(all_css) > 1:
             return "Confidence"
@@ -386,6 +417,14 @@ class ClinVarExpertCompareRow(ExportRow):
     def clinvar_last_evaluated(self):
         return self.clinvar_expert_record.date_last_evaluated
 
+    @export_column("ClinVar Allele Origins")
+    def _clinvar_allele_origins(self) -> str:
+        return (self.clinvar_expert_record.allele_origin or "no-value") + f" ({AlleleOriginBucket(self.clinvar_expert_record.allele_origin_bucket).label})"
+
+    @export_column("$site_name Allele Origin")
+    def _allele_origin(self):
+        return self.allele_origins
+
     @export_column("Is ClinVar Newer")
     def is_clinvar_newer(self):
         if server_evaluated := self.server_last_evaluated_date:
@@ -398,7 +437,7 @@ class ClinVarExpertCompareRow(ExportRow):
 class ClassificationExportFormatterClinVarCompareExpert(ClassificationExportFormatterClinVarCompare):
 
     @classmethod
-    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatter2CSV':
+    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterClinVarCompareExpert':
         return ClassificationExportFormatterClinVarCompareExpert(
             classification_filter=ClassificationFilter.from_request(request)
         )
@@ -424,23 +463,27 @@ class ClassificationExportFormatterClinVarCompareExpert(ClassificationExportForm
                 clinvar_versions=self.clinvar_versions
             ).fetch().records_with_min_stars(CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE)
             if records:
-                if len(records) > 1:
-                    logging.warning(f"For allele {allele_data.allele_id} we have {len(records)} expert panels")
+                if records := [rec for rec in records if rec.allele_origin_bucket in (AlleleOriginBucket.UNKNOWN, allele_data.allele_origin_bucket)]:
+                    if len(records) > 1:
+                        logging.warning(f"For allele {allele_data.allele_id}, {allele_data.allele_origin_bucket.label} we have {len(records)} expert panels")
 
-                def sort_key(cm):
-                    return cm.classification.lab
+                    def sort_key(cm):
+                        return cm.classification.lab
 
-                all_cms = sorted([cm for cm in allele_data.all_cms if not cm.withdrawn], key=sort_key)
-                for lab, cms_by_lab in groupby(all_cms, key=sort_key):
-                    new_rows = [delimited_row(
-                        ClinVarExpertCompareRow(
-                            allele_group=allele_data,
-                            cms=list([cm.classification for cm in cms_by_lab]),
-                            clinvar=clinvar_record,
-                            clinvar_expert_record=first(records)
-                        ).to_csv())
-                    ]
-                    rows += new_rows
+                    all_cms = sorted([cm for cm in allele_data.all_cms if not cm.withdrawn], key=sort_key)
+                    for lab, cms_by_lab in groupby(all_cms, key=sort_key):
+                        new_rows = [delimited_row(
+                            ClinVarExpertCompareRow(
+                                allele_group=allele_data,
+                                cms=list([cm.classification for cm in cms_by_lab]),
+                                clinvar=clinvar_record,
+                                clinvar_expert_record=first(records)
+                            ).to_csv())
+                        ]
+                        rows += new_rows
+                else:
+                    # we have records for this allele, just not this allele origin
+                    pass
             else:
                 logging.warning(
                     f"Expected clinvar_variation_id {clinvar_record.clinvar_variation_id} to have an expert panel or higher")

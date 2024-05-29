@@ -528,7 +528,7 @@ class ClassificationFilter:
             if allele_info := cm.classification.allele_info:
                 allele_id = cm.classification.allele_id
                 # note only care about allele origin bucket if self.allele_origin_split is True
-                allele_origin_bucket = cm.classification.allele_origin_bucket
+                allele_origin_bucket = AlleleOriginBucket(cm.classification.allele_origin_bucket)
 
                 if not allele_data or allele_id != allele_data.allele_id or \
                         (self.allele_origin_split and allele_origin_bucket != allele_data.allele_origin_bucket):

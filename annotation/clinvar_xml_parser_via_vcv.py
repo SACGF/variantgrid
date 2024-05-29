@@ -32,7 +32,7 @@ class ConditionList:
 
 class ClinVarXmlParserViaVCV(ClinVarXmlParser):
 
-    PARSER_VERSION = 211  # change this whenever the parsing changes, so we know to ignore the old cache
+    PARSER_VERSION = 212  # change this whenever the parsing changes, so we know to ignore the old cache
 
     RE_LEGACY_CS = re.compile("^Converted during submission to (.*?).?$")
 
@@ -273,4 +273,5 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
                 obj.allele_origin_bucket = AlleleOriginBucket.SOMATIC
             else:
                 obj.allele_origin_bucket = AlleleOriginBucket.UNKNOWN
+            self.latest.allele_origin = ", ".join(sorted(self.allele_origin_set))
         self.latest.condition = self.condition_list.result
