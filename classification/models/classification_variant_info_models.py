@@ -187,7 +187,7 @@ _VALIDATION_TO_SEVERITY: [str, ALLELE_INFO_VALIDATION_SEVERITY] = {
     'transcript_type_not_supported': "E",
     'transcript_id_change': "E",
     'transcript_version_change': "W",
-    'gene_symbol_change': "E",
+    'gene_symbol_change': "W",
     'c_nomen_change': "E",
     'missing_37': "E",
     'missing_38': "E",
@@ -292,9 +292,9 @@ class ImportedAlleleInfoValidation(TimeStampedModel):
     def __str__(self):
         tag_string = ""
         if validation_tags_list := self.validation_tags_list:
-            tag_string = "\n".join([str(tag) for tag in validation_tags_list])
+            tag_string = ",\n".join([str(tag) for tag in validation_tags_list])
 
-        output = f"Include : {self.include}\nConfirmed : {self.confirmed}\n{tag_string}".strip()
+        output = f"Include : {self.include},\nConfirmed : {self.confirmed},\n{tag_string}".strip()
         if self.confirmed_by_note:
             output = f"CONFIRMED BY NOTE: \"{self.confirmed_by_note}\"\n" + output
         return output

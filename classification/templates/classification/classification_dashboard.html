@@ -134,8 +134,8 @@
 
     {% labelled hint="tiny" label="Records with Pending Changes" %}{{ dlab.counts.pending_changes | number:'W' }}{% endlabelled %}
     {% labelled hint="tiny" label="Records in Internal Review" %}{{ dlab.counts.internal_review | number:'W' }}{% endlabelled %}
-    {% labelled hint="tiny" label="Records with Outstanding Classification Changes" %}{{ dlab.counts.significance_change | number:'W' }}{% endlabelled %}
-    {% labelled hint="tiny" label=" Records Excluded from ClinVar" %}{{ dlab.counts.clinvar_exclude | number }}{% endlabelled %}
+    {% labelled hint="tiny" label="Records with Outstanding Assertion Changes" %}{{ dlab.counts.significance_change | number:'W' }}{% endlabelled %}
+    {% labelled hint="tiny" label="Records Excluded from ClinVar" %}{{ dlab.counts.clinvar_exclude | number }}{% endlabelled %}
     <hr/>
     {% labelled hint="tiny" label="Records waiting on Variant Matching Review" %}
         {{ dlab.counts.variant_matching_issues | number:'W' }}

@@ -13,6 +13,7 @@ from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap
 from classification.models.classification_groups import ClassificationGroups, ClassificationGroupUtils
 from classification.views.classification_export_utils import ConflictStrategy
+from classification.views.classification_export_view import InvalidExportParameter
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
     DiscordanceReportStatus
@@ -20,7 +21,7 @@ from classification.views.exports.classification_export_formatter import Classif
 from classification.views.exports.classification_export_utils import CHGVSData, CitationCounter
 from library.django_utils import get_url_from_view_path
 from library.utils import delimited_row, export_column, ExportRow, ExportTweak
-from snpdb.models import Allele
+from snpdb.models import Allele, AlleleOriginFilterDefault
 
 
 class FormatDetailsMVLFileFormat(str, Enum):
@@ -335,6 +336,9 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
     def __init__(self, classification_filter: ClassificationFilter, format_details: FormatDetailsMVL):
         self.format_details = format_details
         self.grouping_utils = ClassificationGroupUtils()
+        if classification_filter.allele_origin_filter != AlleleOriginFilterDefault.GERMLINE:
+            raise InvalidExportParameter("MVL export requires Allele Origin to be set to Germline.")
+
         super().__init__(classification_filter=classification_filter)
 
     @property

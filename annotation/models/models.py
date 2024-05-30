@@ -111,6 +111,12 @@ class ClinVar(models.Model):
                      512: 'tested-inconclusive',
                      1073741824: 'other'}
 
+    ALLELE_ORIGIN_BUCKETS = {
+        0: AlleleOriginBucket.UNKNOWN,
+        1: AlleleOriginBucket.GERMLINE,
+        2: AlleleOriginBucket.SOMATIC
+    }
+
     SUSPECT_REASON_CODES = {0: 'unspecified',
                             1: 'Paralog',
                             2: 'byEST',
@@ -169,6 +175,30 @@ class ClinVar(models.Model):
     def get_origin_display(self):
         return ClinVar.ALLELE_ORIGIN.get(self.clinvar_origin)
 
+    @cached_property
+    def allele_origins(self) -> list[str]:
+        origins: list[str] = []
+        for flag, label in ClinVar.ALLELE_ORIGIN.items():
+            if flag:
+                if self.clinvar_origin & flag:
+                    origins.append(label)
+        if not origins:
+            origins.append("unknown")
+        return origins
+
+    @property
+    def allele_origin_bucket(self) -> AlleleOriginBucket:
+        is_germline = "germline" in self.allele_origins
+        is_somatic = "somatic" in self.allele_origins
+        if is_germline and is_somatic:
+            return AlleleOriginBucket.UNKNOWN  # technically both, but unknown gets treated like both
+        elif is_germline:
+            return AlleleOriginBucket.GERMLINE
+        elif is_somatic:
+            return AlleleOriginBucket.SOMATIC
+        else:
+            return AlleleOriginBucket.UNKNOWN
+
     def get_suspect_reason_code_display(self):
         return ClinVar.SUSPECT_REASON_CODES.get(self.clinvar_suspect_reason_code)
 
@@ -209,7 +239,7 @@ class ClinVarRecordCollection(TimeStampedModel):
     def records_with_min_stars(self, min_stars: int) -> list['ClinVarRecord']:
         return list(sorted(self.clinvarrecord_set.filter(stars__gte=min_stars), reverse=True))
 
-    def update_with_records_and_save(self, records: list['ClinVarRecord']):
+    def update_with_records_and_save(self, records: list['ClinVarR ecord']):
         records = list(sorted(records, reverse=True))
         self.clinvarrecord_set.all().delete()
         for record in records:

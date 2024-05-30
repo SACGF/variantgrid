@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
-from django.http.response import HttpResponseServerError, JsonResponse
+from django.http.response import HttpResponseServerError, JsonResponse, HttpResponseNotFound
 from django.shortcuts import redirect, render
 from django.template.loader import get_template, render_to_string
 from django.urls.base import resolve, reverse
@@ -48,25 +48,27 @@ def page_not_found(request, exception):
         message = "Could not determine page."
         exception = None
     context = {"message": message, "exception": exception}
-    return custom_error_view(request, context)
+    response = _get_custom_error_response(request, context)
+    return HttpResponseNotFound(response)
 
 
 @login_not_required
 def server_error(request):
     message = "There was an internal server error (sorry!). This has been logged and will be investigated by the development team. "
     context = {"message": message}
-    return custom_error_view(request, context)
+    response = _get_custom_error_response(request, context)
+    return HttpResponseServerError(response)
 
 
 @login_not_required
 def csrf_error(request, reason=''):
     message = "Your session token has changed. Please try your operation again."
     context = {"message": message}
-    return custom_error_view(request, context)
+    response = _get_custom_error_response(request, context)
+    return HttpResponseServerError(response)
 
 
-@login_not_required
-def custom_error_view(request, context=None):
+def _get_custom_error_response(request, context=None):
     # Django 404 and 500 pages dont pass context to templates.
     # This is a hack to do so, as I want to use static files etc.
 
@@ -75,8 +77,7 @@ def custom_error_view(request, context=None):
     else:
         template_name = "server_error_unauth.html"
     t = get_template(template_name)
-    response = t.render(request=request, context=context)
-    return HttpResponseServerError(response)
+    return t.render(request=request, context=context)
 
 
 @login_not_required

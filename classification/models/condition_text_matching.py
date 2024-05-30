@@ -11,6 +11,7 @@ from django.db import models, transaction
 from django.db.models import CASCADE, QuerySet, SET_NULL, Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.urls import reverse
 from guardian.shortcuts import assign_perm
 from model_utils.models import TimeStampedModel
 
@@ -90,6 +91,9 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
     @property
     def gene_levels(self) -> QuerySet['ConditionTextMatch']:
         return self.conditiontextmatch_set.filter(condition_text=self, gene_symbol__isnull=False, mode_of_inheritance__isnull=True, classification=None)
+
+    def get_absolute_url(self):
+        return reverse("condition_matching", kwargs={"pk": self.pk})
 
 
 class MultiCondition(models.TextChoices):
@@ -407,7 +411,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
     def as_resolved_condition(self) -> Optional[ConditionResolvedDict]:
         """
-        Converts this specific ConditionTextMatch to a ConditionResolvedDict (suitabe for saving on a classification).
+        Converts this specific ConditionTextMatch to a ConditionResolvedDict (suitable for saving on a classification).
         will not look up the hierarchy for a valid term, do that beforehand
         """
         if terms := self.condition_xref_terms:
@@ -851,7 +855,7 @@ def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> Co
                     omim_name = omim_term.name
                     parts = [p.strip() for p in omim_name.split(';')]
                     full_name = parts[0]
-                    # we could loop through all the name parts, but don't want to as the OMIM acronymn is a little too ambigious
+                    # we could loop through all the name parts, but don't want to as the OMIM acronym is a little too ambitious
                     # if search_text.effective_equals(SearchText(full_name)):
                     #     safe_alias = True  # still mark it as True so we don't have a validation message
                     #     cms.alias_index = match_info.alias_index

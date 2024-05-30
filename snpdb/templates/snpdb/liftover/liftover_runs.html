@@ -5,6 +5,7 @@
 {% load ui_utils %}
 {% load ui_help %}
 {% load ui_menu_bars %}
+{% load humanize %}
 {% block title %}Liftover{% endblock %}
 {% block submenu %}
 {% if 'variants'|is_view_enabled %}
@@ -38,7 +39,7 @@
                     <tr>
                         <th>{{ act }}</th>
                         {% for pc in processing_status_cols %}
-                            <td class="num">{{ data|get_item:pc|default_if_none:0 }}</td>
+                            <td class="num">{{ data|get_item:pc|default_if_none:0|intcomma }}</td>
                         {% endfor %}
                         <td class="num">{{ failure_rate|get_item:act|default_if_none:'-'|floatformat:2 }}</td>
                     </tr>

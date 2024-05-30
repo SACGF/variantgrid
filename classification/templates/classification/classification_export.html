@@ -21,6 +21,11 @@
         baseUriRedirect = '{% url 'classification_export_redirect' %}';
     }
 
+    function scrollToAlleleOrigin() {
+        document.getElementById("allele-origin-toggle").scrollIntoView({ behavior: "smooth", block: "end"});
+        $("#allele-origin-toggle").delay(400).fadeOut().fadeIn();
+    }
+
     function generateUrl() {
         let params = {};
         let inputError = null;
@@ -73,8 +78,8 @@
                 params.mvl_detail = detailLevelChecked.val();
             }
 
-            if (!allele_origin || allele_origin === "A") {
-                inputError = 'MVL download must choose Germline or Somatic';
+            if (!allele_origin || allele_origin !== "G") {
+                inputError = 'MVL download only supports Germline.<br/>Please set <a class="hover-link" onclick="scrollToAlleleOrigin()">Allele Origin</a> to <b>Germline</b> if you wish to export as MVL.';
             }
         } else if (format === 'vcf') {
             params.encoding = $("input[name='encoding']:checked").val();
@@ -113,7 +118,7 @@
         }
         if (format === 'lab_compare'){
             if (selectedLabs.length !== 2 || labSelectionMode !== "include") {
-                inputError = 'You must select to include 2 labs';
+                inputError = 'Lab Compare requires the <b>inclusion</b> of 2 labs.';
             }
         }
 
@@ -152,11 +157,15 @@
             target = '_blank';
         }
         url += paramString;
-        let a = $('#export_url');
+        let a = $('#export-url');
+        let error_box = $('#export-error');
+        let error_text = $('#export-error-text');
         if (inputError) {
-            a.attr('href', null);
-            a.text(inputError);
+            error_text.html(inputError);
+            a.hide();
+            error_box.show();
         } else {
+            error_box.hide();
             a.attr('href', url);
             a.attr('target', target);
             a.text(url);
@@ -165,6 +174,7 @@
             } else {
                 a.removeClass('download-link');
             }
+            a.show();
         }
     }
 
@@ -182,7 +192,7 @@
     });
 </script>
 <style>
-    #export_url {
+    #export-url {
         word-break: break-all;
     }
 </style>
@@ -526,7 +536,8 @@
         </div>
     </div>
     {% labelled label="Generated URL" %}
-        <a class="hover-link" id="export_url" href="{{base_url_redirect}}">{{base_url_redirect}}</a>
+        <a class="hover-link" id="export-url" href="{{base_url_redirect}}">{{base_url_redirect}}</a>
+        <div id="export-error" class="hidden text-danger">{{ "E" | severity_icon }}<span id="export-error-text"></span></div>
     {% endlabelled %}
     {% end_ui_register_tab_embedded %}
     {% ui_register_tab_embedded tab_set="internal_download" label='Export My Data' %}
