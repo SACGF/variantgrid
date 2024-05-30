@@ -125,6 +125,10 @@ class ClinVarCompareRow(ClinVarCompareRowAbstract):
         "risk_factor": "R",
         "drug_response": "D"
     }
+    # not sure what other values are supported
+    CLINSIG_TO_VGSSIG = {
+        "Tier_II_-_Potential": "tier_2"
+    }
 
     @export_column("Allele URL")
     def _allele_url(self) -> str:
