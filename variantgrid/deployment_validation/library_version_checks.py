@@ -1,7 +1,7 @@
 from importlib import metadata
 
 
-def check_library_versions():
+def check_library_versions() -> dict:
     """ Check library versions to make sure bug fixes have been applied """
 
     def _test_biocommons_hgvs():
@@ -25,9 +25,12 @@ def check_library_versions():
                 version_str = metadata.version(name)
                 version = tuple(int(i) for i in version_str.split("."))
                 assert version >= version_required, "Library %s (%s) requires version >= %s" % (name, version, version_required)
-            library_version_valid[name] = True
+            valid = True
         except:
-            library_version_valid[name] = False
-            pass
+            valid = False
+        library_version_valid[name] = {
+            "valid": valid,
+            "fix": "Upgrade the library using the version in requirements.txt",
+        }
 
     return library_version_valid

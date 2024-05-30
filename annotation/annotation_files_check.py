@@ -5,13 +5,24 @@ from django.conf import settings
 from annotation.vep_annotation import VEPConfig
 from snpdb.models import GenomeBuild
 
+_VARIANTGRID_DOWNLOAD_BASE_DIR = "http://variantgrid.com/download/annotation/VEP"
 
-def annotation_data_exists(flat=False):
-    build_data = {}
+
+def _get_fix_instructions(filename) -> str:
+    dirname = os.path.dirname(filename)
+    vg_path = filename.replace(settings.ANNOTATION_VEP_BASE_DIR, _VARIANTGRID_DOWNLOAD_BASE_DIR)
+    fix_instructions = f"cd {dirname};wget {vg_path}"
+    return fix_instructions
+
+
+def annotation_data_exists(flat=False) -> dict:
+    all_build_data = {}
+    # We can sometimes use files twice, only report once
+    unique_filenames = set()
 
     for genome_build in GenomeBuild.builds_with_annotation():
         check_files = {}
-        file_exists = {}
+        file_data = {}
         for key in ["reference_fasta", "cytoband"]:
             check_files[key] = genome_build.settings[key]
 
@@ -27,16 +38,30 @@ def annotation_data_exists(flat=False):
             if rel_path is not None:
                 check_files[key] = vep_config[key]
 
-        for key, filename in check_files.items():
-            file_exists[key] = os.path.exists(filename)
+        for base_key, base_filename in check_files.items():
+            if base_filename in unique_filenames:
+                continue
+            else:
+                unique_filenames.add(base_filename)
 
-        build_data[genome_build.name] = file_exists
+            files = {base_key: base_filename}
+            if ".vcf" in base_filename:
+                files[f"{base_key}_tbi"] = base_filename + ".tbi"
+
+            for key, filename in files.items():
+                file_data[key] = {
+                    "valid": os.path.exists(filename),
+                    "fix": _get_fix_instructions(filename),
+                }
+        all_build_data[genome_build.name] = file_data
 
     if flat:
         flat_data = {}
-        for genome_build_name, file_exists in build_data.items():
-            for key, exists in file_exists.items():
-                flat_data[f"{genome_build_name}/{key}"] = exists
-        build_data = flat_data
+        for genome_build_name, build_data in all_build_data.items():
+            for key, data in build_data.items():
+                flat_data[f"{genome_build_name}/{key}"] = data
+        annotation_data = flat_data
+    else:
+        annotation_data = all_build_data
 
-    return build_data
+    return annotation_data

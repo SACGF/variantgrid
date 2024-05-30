@@ -23,14 +23,16 @@ class Command(BaseCommand):
         }
 
         for check_type, check in checks.items():
-            for k, valid in check.items():
-                if valid:
+            for k, data in check.items():
+                if data.get("valid"):
                     if not quiet:
                         logging.info(f"%s, %s: OK", check_type, k)
                 else:
+                    fix = data.get("fix")
+                    msg = f"{check_type=} {k} INVALID. Fix: {fix}"
                     if die_if_invalid:
-                        raise ValueError(f"{check_type=} {k} invalid")
+                        raise ValueError(msg)
                     else:
-                        logging.info(f"%s, %s: INVALID", check_type, k)
+                        logging.info(msg)
 
 
