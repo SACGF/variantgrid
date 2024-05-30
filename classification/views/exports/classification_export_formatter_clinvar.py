@@ -265,7 +265,7 @@ class ClassificationExportFormatterClinVarCompare(ClassificationExportFormatter)
         cf = ClassificationFilter.from_request(request)
         cf.allele_origin_split = True
         return ClassificationExportFormatterClinVarCompare(
-            classification_filter=ClassificationFilter.from_request(request)
+            classification_filter=cf
         )
 
     def filter_clinvars(self, queryset: QuerySet[ClinVar]) -> QuerySet[ClinVar]:
@@ -446,8 +446,10 @@ class ClassificationExportFormatterClinVarCompareExpert(ClassificationExportForm
 
     @classmethod
     def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterClinVarCompareExpert':
+        cf = ClassificationFilter.from_request(request)
+        cf.allele_origin_split = True
         return ClassificationExportFormatterClinVarCompareExpert(
-            classification_filter=ClassificationFilter.from_request(request)
+            classification_filter=cf,
         )
 
     def content_type(self) -> str:
