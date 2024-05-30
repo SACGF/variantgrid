@@ -1644,7 +1644,7 @@ def view_genome_build(request, genome_build_name):
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     context = {
         "genome_build": genome_build,
-        "standard_contigs": genome_build.contigs.filter(role=SequenceRole.ASSEMBLED_MOLECULE)
+        "standard_contigs": genome_build.standard_contigs,
     }
     return render(request, "snpdb/genomics/view_genome_build.html", context)
 

@@ -51,9 +51,8 @@ def bcftools_liftover(source_vcf: str, source_genome_build: GenomeBuild,
         "--reject", reject_vcf,
     ]
 
-    env = {
-        "BCFTOOLS_PLUGINS": settings.LIFTOVER_BCFTOOLS_PLUGIN_DIR,
-    }
+    env = os.environ.copy()
+    env["BCFTOOLS_PLUGINS"] = settings.LIFTOVER_BCFTOOLS_PLUGIN_DIR
 
     logging.info("Executing BCFTools +liftover")
     liftover_cmd_str = " ".join(cmd)

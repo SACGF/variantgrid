@@ -479,7 +479,7 @@ function applyVariantValues() {
 
             {% if modified_normalised_variants.exists %}
                 <div class='alert alert-warning'>
-                <p>The following VCF variant records were <a target='_blank' href="https://genome.sph.umich.edu/wiki/Vt#Normalization">normalised by VT during import</a> and converted to this variant ({{ variant }}).
+                <p>The following VCF variant records were <a target='_blank' href="https://samtools.github.io/bcftools/bcftools.html#norm">normalised by Bcftools</a>  during import and converted to this variant ({{ variant }}).
                 <ul>
                 {% for mnv in modified_normalised_variants %}
                     <li>{{ mnv }}

@@ -129,6 +129,10 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
         qs = Contig.objects.filter(genomebuildcontig__genome_build=self)
         return qs.order_by("genomebuildcontig__order")
 
+    @cached_property
+    def standard_contigs(self):
+        return self.contigs.filter(role=SequenceRole.ASSEMBLED_MOLECULE)
+
     @property
     def genome_builds(self):
         """ For PreviewModelMixin - search knows it's a genome build """

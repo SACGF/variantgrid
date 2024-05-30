@@ -383,7 +383,6 @@ VCF_DOWNLOAD_ADMIN_ONLY = False
 VCF_IMPORT_CREATE_COHORT_FROM_MULTISAMPLE_VCFS = True
 VCF_IMPORT_NO_DNA_CONTROL_SAMPLE_REGEX = None
 VCF_IMPORT_FILE_SPLIT_ROWS = 50000
-VCF_IMPORT_VT_COMMAND = "vt"  # Needs to be installed and in path
 VCF_IMPORT_SKIP_RECORD_REGEX = {
     "Fusion": "VARTYPE=fusion",
 }
@@ -426,6 +425,7 @@ LIFTOVER_DBSNP_ENABLED = False  # Default=False - doesn't work so well due to db
 
 LIFTOVER_BCFTOOLS_ENABLED = False
 LIFTOVER_BCFTOOLS_PLUGIN_DIR = "/usr/share/bcftools/plugins"
+BCFTOOLS_COMMAND = "bcftools"  # if not absolute, needs to be in path
 
 PANEL_APP_CACHE_DAYS = 7  # Automatically re-check after this time
 GENE_RELATION_PANEL_APP_LIVE_UPDATE = False  # Use GenCC cached result if False, poll panel app if True

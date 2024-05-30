@@ -232,6 +232,8 @@ class Migrator:
         # a problem) just turn off all verbosity
         CommandSubMigration.manage_py(["collectstatic", "-v", "0", "--noinput"]).using(key="c",
                                                                                        task_id="manage*collectstatic"),
+        CommandSubMigration.manage_py(["deployment_check", "--die-if-invalid", "--quiet"]).using(key="k",
+                                                                                       task_id="manage*deployment_check"),
     ]
 
     @property
