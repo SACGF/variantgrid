@@ -1,5 +1,6 @@
 import os
 
+import cyvcf2
 from django.conf import settings
 
 from library.django_utils.django_file_utils import get_import_processing_filename
@@ -52,9 +53,11 @@ class AbstractBulkVCFProcessor:
 
         return None  # No variants, or only reference
 
-    def add_modified_imported_variant(self, variant, variant_hash, miv_hash_list=None, miv_list=None):
+    def add_modified_imported_variant(self, variant: cyvcf2.Variant, variant_hash, miv_hash_list=None, miv_list=None):
         # This used to handle VT tags: OLD_MULTIALLELIC / OLD_VARIANT but now we handle BCFTOOLS only
         if bcftools_old_variant := variant.INFO.get(ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG):
+            svlen = variant.INFO.get("SVLEN")
+
             if miv_hash_list is None:
                 miv_hash_list = self.modified_imported_variant_hashes
             if miv_list is None:
@@ -66,12 +69,12 @@ class AbstractBulkVCFProcessor:
                 old_multiallelic = None
 
             old_position = int(bcftools_old_variant.split("|")[1])
-            if old_position != variant.locus.position:
-                old_variant = old_position
+            if old_position != variant.POS:
+                old_variant = bcftools_old_variant
             else:
                 old_variant = None  # Wasn't normalized
 
-            for ov in ModifiedImportedVariant.bcftools_format_old_variant(bcftools_old_variant, self.genome_build):
+            for ov in ModifiedImportedVariant.bcftools_format_old_variant(bcftools_old_variant, svlen, self.genome_build):
                 # These 2 need to be in sync
                 miv_hash_list.append(variant_hash)
                 miv_list.append((old_multiallelic, old_variant, ov))

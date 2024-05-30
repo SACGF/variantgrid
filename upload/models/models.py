@@ -287,6 +287,7 @@ class UploadStep(models.Model):
     CREATE_UNKNOWN_LOCI_AND_VARIANTS_TASK_NAME = "Create Unknown Loci and Variants"
     PREPROCESS_VCF_NAME = "Preprocess VCF"
     PROCESS_VCF_TASK_NAME = "Process VCF File"
+    NORMALIZE_SUB_STEP = "normalize"
 
     name = models.TextField()
     upload_pipeline = models.ForeignKey(UploadPipeline, on_delete=CASCADE)
@@ -552,7 +553,13 @@ class SimpleVCFImportInfo(VCFImportInfo):
 
 
 class ModifiedImportedVariants(VCFImportInfo):
+    LINKED_SUB_STEP_NAME = UploadStep.NORMALIZE_SUB_STEP
     has_more_details = True
+
+    @staticmethod
+    def get_for_pipeline(upload_pipeline) -> 'ModifiedImportedVariants':
+        upload_step = upload_pipeline.uploadstep_set.get(name=ModifiedImportedVariants.LINKED_SUB_STEP_NAME)
+        return ModifiedImportedVariants.objects.get_or_create(upload_step=upload_step)[0]
 
     @property
     def message(self):
@@ -615,7 +622,7 @@ class ModifiedImportedVariant(models.Model):
         return formatted_old_variants
 
     @staticmethod
-    def bcftools_format_old_variant(old_variant: str, genome_build: GenomeBuild) -> list[str]:
+    def bcftools_format_old_variant(old_variant: str, svlen: Optional[str], genome_build: GenomeBuild) -> list[str]:
         """ We need consistent formatting (case and use of chrom) so we can retrieve it easily.
             May return multiple values """
         formatted_old_variants = []
@@ -632,7 +639,7 @@ class ModifiedImportedVariant(models.Model):
             alt = alt_list[0]
 
         contig = genome_build.chrom_contig_mappings[chrom]
-        variant_coordinate = VariantCoordinate.from_explicit_no_svlen(contig.name, position, ref, alt)
+        variant_coordinate = VariantCoordinate(chrom=contig.name, position=position, ref=ref, alt=alt, svlen=svlen)
         return [ModifiedImportedVariant.get_old_variant_from_variant_coordinate(variant_coordinate)]
 
 

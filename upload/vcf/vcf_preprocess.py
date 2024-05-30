@@ -68,7 +68,6 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     MAX_STDERR_OUTPUT = 5000  # How much stderr output per process to store in DB
 
     VCF_CLEAN_AND_FILTER_SUB_STEP = "vcf_clean_and_filter"
-    NORMALIZE_SUB_STEP = "normalize"
     REMOVE_HEADER_SUB_STEP = "remove_header"
     SPLIT_VCF_SUB_STEP = "split_vcf"
 
@@ -111,13 +110,13 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     pipe_commands[VCF_CLEAN_AND_FILTER_SUB_STEP] = read_variants_cmd
     sub_steps[VCF_CLEAN_AND_FILTER_SUB_STEP] = create_sub_step(upload_step, VCF_CLEAN_AND_FILTER_SUB_STEP, read_variants_cmd)
 
-    pipe_commands[NORMALIZE_SUB_STEP] = [settings.BCFTOOLS_COMMAND, "norm",
+    pipe_commands[UploadStep.NORMALIZE_SUB_STEP] = [settings.BCFTOOLS_COMMAND, "norm",
                                          "--multiallelics=-", "--rm-dup=exact",
                                          "--check-ref=w",
                                          f"--old-rec-tag={ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG}",
                                          f"--fasta-ref={genome_build.reference_fasta}", "-"]
     pipe_commands[REMOVE_HEADER_SUB_STEP] = [settings.BCFTOOLS_COMMAND, "view", "--no-header", "-"]
-    norm_substep_names = [NORMALIZE_SUB_STEP]
+    norm_substep_names = [UploadStep.NORMALIZE_SUB_STEP]
 
     # Split up the VCF
     split_vcf_dir = upload_pipeline.get_pipeline_processing_subdir("split_vcf")
@@ -200,9 +199,8 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     _store_vcf_skip_stats(skipped_records_stats_file, clean_sub_step, "records")
     _store_vcf_skip_stats(skipped_filters_stats_file, clean_sub_step, "FILTER")
 
-    # Create this here so downstream tasks can add modified imported variant messages
-    normalize_sub_step = sub_steps[NORMALIZE_SUB_STEP]
-    import_info, _ = ModifiedImportedVariants.objects.get_or_create(upload_step=normalize_sub_step)
+    # Create this here so downstream tasks (running in parallel) can all link against the same one
+    ModifiedImportedVariants.get_for_pipeline(upload_pipeline)
     vcf_import_annotate_dir = upload_pipeline.get_pipeline_processing_subdir("vcf_import_annotate")
     sort_order = upload_pipeline.get_max_step_sort_order()
     for split_vcf_filename in glob.glob(f"{split_vcf_dir}/*.vcf.gz"):
