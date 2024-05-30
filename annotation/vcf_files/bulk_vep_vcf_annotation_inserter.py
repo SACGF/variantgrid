@@ -105,7 +105,11 @@ class BulkVEPVCFAnnotationInserter:
     ALOFT_COLUMNS = ['aloft_prob_tolerant', 'aloft_prob_recessive', 'aloft_prob_dominant',
                      'aloft_pred', 'aloft_high_confidence', 'aloft_ensembl_transcript']
 
-    def __init__(self, annotation_run: AnnotationRun, infos=None, insert_variants=True, validate_columns=True):
+    def __init__(self,
+                 annotation_run: AnnotationRun,
+                 infos: Optional[dict] = None,
+                 insert_variants: bool = True,
+                 validate_columns: bool = True):
         self.annotation_run = annotation_run
         self.genome_build = self.annotation_run.variant_annotation_version.genome_build
         self.vep_config = VEPConfig(self.genome_build)
@@ -138,7 +142,7 @@ class BulkVEPVCFAnnotationInserter:
         return f"{self.genome_build}/{self.vep_config.columns_version}/{self.annotation_run.get_pipeline_type_display()}"
 
     @staticmethod
-    def _get_vep_columns_from_csq(infos):
+    def _get_vep_columns_from_csq(infos: Optional[dict]):
         """
         VEP packs annotations into a single INFO field, separated by '|', eg:
         CSQ=T|intron_variant&non_coding_transcript_variant|MODIFIER|RP5-857K21.4|ENSG00000230021
@@ -242,7 +246,7 @@ class BulkVEPVCFAnnotationInserter:
         vav = self.annotation_run.variant_annotation_version
         self.prediction_pathogenic_funcs = vav.get_pathogenic_prediction_funcs()
 
-    def _setup_vep_fields_and_db_columns(self, validate_columns, cvf_qs):
+    def _setup_vep_fields_and_db_columns(self, validate_columns: bool, cvf_qs: QuerySet[ColumnVEPField]):
         self._add_vep_field_handlers(cvf_qs)
 
         ignore_columns = set(self.DB_FIXED_COLUMNS +
@@ -257,6 +261,7 @@ class BulkVEPVCFAnnotationInserter:
         ignore_columns.update(vep_fields_not_this_version)
 
         for c in list(ignore_columns):
+            # FIXME, why do we convery ignore_clumns to a list here? it's a set which would work fine
             if c.endswith("_id"):
                 django_column = c.rsplit("_id", 1)[0]
                 ignore_columns.add(django_column)

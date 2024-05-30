@@ -9,7 +9,7 @@ import vcf
 from snpdb.models import Variant, Sequence, GenomeFasta
 
 
-def cyvcf2_header_types(cyvcf2_reader):
+def cyvcf2_header_types(cyvcf2_reader) -> defaultdict:
     header_types = defaultdict(dict)
     for h in cyvcf2_reader.header_iter():
         info = h.info()
