@@ -967,12 +967,7 @@ const VCForm = (function() {
             $('<hr/>').appendTo(jSyncStatus);
             appendLabelHeading("Origin", bucketHtml);
 
-            appendLabelHeadingForKey(SpecialEKeys.ASSERTION_METHOD, true, "Method")
-
-            let label = "Condition";
-            if (alleleOriginBucket === "S") {
-                label = "Cancer";
-            }
+            appendLabelHeadingForKey(SpecialEKeys.ASSERTION_METHOD, true, "Method");
 
             let conditionElement;
             if (this.record.resolved_condition) {
@@ -994,7 +989,7 @@ const VCForm = (function() {
                 }
             }
 
-            appendLabelHeading(label, conditionElement);
+            appendLabelHeading("Condition", conditionElement);
 
 
             appendLabelHeadingForKey(SpecialEKeys.CLINICAL_SIGNIFICANCE, true, 'Class.');
