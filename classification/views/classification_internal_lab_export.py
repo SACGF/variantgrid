@@ -1,47 +1,55 @@
-from datetime import datetime
-from datetime import timedelta, date
-from dataclasses import dataclass, field
-from django.http import StreamingHttpResponse, HttpRequest, HttpResponseBase, JsonResponse
-from library.utils import ExportRow, export_column
-from typing import Iterator
+from django.contrib import messages
+from django.http import JsonResponse
+from django.shortcuts import redirect
+from django.urls import reverse
 
+from classification.enums import ShareLevel
 
-@dataclass
-class InternalLabRow(ExportRow):
+from classification.views.exports import ClassificationExportFormatterCSV
+from classification.views.exports.classification_export_filter import ClassificationFilter
+from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
 
-    @export_column(label="Share Level")
-    def sharelevel_column(self) -> str:
-        return 'self.share_level'
-
-    @export_column(label="Genome Build")
-    def build_column(self) -> str:
-        return 'build'
-
-    @export_column(label="Allele Origin")
-    def allele_origin_column(self) -> str:
-        return 'allele_origin'
-
-    @export_column(label="Genomic Location")
-    def genomic_locations_column(self) -> str:
-        return 'genomic_locations'
-
-
-def stream_internal_lab_rows(share_level, build, allele_origin, genomic_locations) -> Iterator[InternalLabRow]:
-    print('fields data', genomic_locations, share_level, build, allele_origin)
-    report_data = InternalLabRow()
-    yield report_data
+from snpdb.models import GenomeBuild, Lab, AlleleOriginFilterDefault
 
 
 def internal_lab_download(request):
     if request.method == 'POST':
+        user = request.user
         share_level = request.POST.get('share_level')
         build = request.POST.get('genome_build')
-        allele_origin = request.POST.get('allele_origin')
-        genomic_locations = request.POST.get('genomic_location')
-
-        return InternalLabRow.streaming_csv(
-            stream_internal_lab_rows(share_level, build, allele_origin, genomic_locations),
-            filename="Internal_lab_report.csv"
-        )
+        allele_origin = request.POST.get('allele-origin-toggle')
+        allele_origin = AlleleOriginFilterDefault(allele_origin)
+        genomic_locations = request.POST.get('record_filters')
+        genomic_build = GenomeBuild.get_from_fuzzy_string(build)
+        if share_level == 'any':
+            share_level = ShareLevel.ALL_USERS
+        elif share_level == 'public':
+            share_level = ShareLevel.PUBLIC
+        try:
+            user_labs = set(Lab.valid_labs_qs(user, admin_check=True))
+            if not user_labs:
+                messages.error(request, 'You are not associated with any labs.')
+                return redirect(reverse('classification_export') + '?activeTab=internal_download%3Atexport-my-data')
+            filter_data = ClassificationFilter(
+                    user=user,
+                    genome_build=genomic_build,
+                    allele_origin_filter=allele_origin,
+                    min_share_level=share_level,
+                    record_filters=genomic_locations,
+                    file_prefix=f"Internal_lab_report",
+                    include_sources=user_labs,
+                )
+            if filter_data.cms_qs.count() == 0:
+                messages.error(request, 'No records found for the selected filters.')
+                return redirect(reverse('classification_export') + '?activeTab=internal_download%3Atexport-my-data')
+            response = ClassificationExportFormatterCSV(
+                filter_data,
+                FormatDetailsCSV(include_discordances=True, exclude_transient=True)
+            ).serve()
+            return response
+        except Exception as e:
+            print(e)
+            messages.error(request, 'Unable to generate report')
+            return redirect(reverse('classification_export') + '?activeTab=internal_download%3Atexport-my-data')
     else:
-        return JsonResponse({'status': 'error'})
+        return redirect(reverse('classification_export') + '?activeTab=internal_download%3Atexport-my-data')

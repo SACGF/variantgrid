@@ -194,7 +194,7 @@
     <p class="text-info">Please refer to the terms and conditions about proper use of the classifications download.</p>
     <p class="text-info">Once you have configured your download you can save and re-use the generated URL.</p>
     {% ui_register_tabs tab_set="internal_download" %}
-    {% ui_register_tab_embedded tab_set="internal_download" label='Record download' %}
+    {% ui_register_tab_embedded tab_set="internal_download" label='Export Shariant Data' %}
     {% labelled label="For Downloading Via" %}
         <div class="form-check">
             <label class="form-check-label">
@@ -529,7 +529,7 @@
         <a class="hover-link" id="export_url" href="{{base_url_redirect}}">{{base_url_redirect}}</a>
     {% endlabelled %}
     {% end_ui_register_tab_embedded %}
-    {% ui_register_tab_embedded tab_set="internal_download" label='Internal Lab' %}
+    {% ui_register_tab_embedded tab_set="internal_download" label='Export My Data' %}
         {% include 'classification/tags/internal_lab_download.html' %}
     {% end_ui_register_tab_embedded %}
     {% ui_render_tabs tab_set="internal_download" %}

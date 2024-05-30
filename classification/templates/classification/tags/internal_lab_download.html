@@ -7,11 +7,12 @@
 {% load ui_tabs_builder %}
 {% load classification_tags %}
 
-<div>
+<form id="internal-download-form" method="post" action="{% url 'internal_lab_download' %}">
+    {% csrf_token %}
     {% labelled label="Share Levels" %}
         <div class="form-check">
             <label class="form-check-label">
-                <input checked="checked" id="lab_share_level_public" name="lab_share_level" value="public" type="radio" class="form-check-input" />
+                <input checked="checked" id="share_level_public" name="share_level" value="public" type="radio" class="form-check-input" />
                 <img src="{% static 'icons/share_level/logged_in_users.png' %}" class="tiny-icon" />
                 <img src="{% static 'icons/share_level/public.png' %}" class="tiny-icon" />
                 Shared with Application and 3rd Party Databases
@@ -19,7 +20,7 @@
         </div>
         <div class="form-check">
             <label class="form-check-label">
-                <input id="lab_share_level_any" name="lab_share_level" value="any" type="radio" class="form-check-input" />
+                <input id="share_level_any" name="share_level" value="any" type="radio" class="form-check-input" />
                 <img src="{% static 'icons/share_level/lab.png' %}" class="tiny-icon" />
                 <img src="{% static 'icons/share_level/institution.png' %}" class="tiny-icon" />
                 <img src="{% static 'icons/share_level/logged_in_users.png' %}" class="tiny-icon" />
@@ -33,7 +34,7 @@
             {% if genome_build.enabled %}
                 <div class="form-check">
                     <label class="form-check-label">
-                        <input class="form-check-input" {% if genome_build.name == default_genome_build.name %}checked="checked"{% endif %} id="lab_genome_build_{{ genome_build.name }}" type="radio" name="lab_genome_build" value="{{ genome_build.name }}" />
+                        <input class="form-check-input" {% if genome_build.name == default_genome_build.name %}checked="checked"{% endif %} id="genome_build_{{ genome_build.name }}" type="radio" name="genome_build" value="{{ genome_build.name }}" />
                         {{ genome_build.name }}
                     </label>
                 </div>
@@ -44,51 +45,12 @@
         {% allele_origin_toggle show_label=False %}
         <div class="text-muted">Note that records with an allele origin other than germline or somatic will always be included in downloads.</div>
     {% endlabelled %}
-    {% labelled label="Genomic Location"%}
+    {% labelled label="Record Filter/s"%}
         <div class="form-check px-2">
             <label class="form-check-label">
-                <textarea class="form-control" rows="6" cols="80" id="genomic_location" name="genomic_location"></textarea>
+                <textarea class="form-control" rows="6" cols="80" id="record_filters" name="record_filters"></textarea>
             </label>
         </div>
     {% endlabelled %}
-    <button class="btn btn-primary" id="download_internal_lab" type="button" style="float: right">Download</button>
-</div>
-
-<script>
-    $(document).ready(function() {
-        $('#download_internal_lab').click(function() {
-            var formData = {
-                'share_level': $('input[name=lab_share_level]:checked').val(),
-                'genome_build': $('input[name=lab_genome_build]:checked').val(),
-                'genomic_location': $('#genomic_location').val()
-            };
-            let allele_origin = $("input[name='allele-origin-toggle']:checked").val();
-
-            if (allele_origin !== "A") {
-                formData['allele_origin'] = allele_origin;
-            }
-
-            $.ajax({
-                type: 'POST',
-                url: '{% url 'internal_lab_download' %}',
-                data: formData,
-                success: function(response) {
-                    var blob = new Blob([response], {type: 'application/csv'});
-                    var link = document.createElement('a');
-                    link.href = window.URL.createObjectURL(blob);
-                    link.download = 'internal_lab_export.csv';
-                    link.click();
-                    clearForm();
-                },
-                error: function(response) {
-                    alert('An error occurred while downloading the file.');
-                }
-            });
-        });
-        function clearForm() {
-            $('#genomic_location').val('');
-            $("input[name='allele-origin-toggle'][value='A']").prop('checked', true);
-        }
-    });
-</script>
-
+        <button class="btn btn-primary" type="submit" style="float: right">Download</button>
+</form>

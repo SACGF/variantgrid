@@ -1,3 +1,5 @@
+import operator
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -16,10 +18,14 @@ from classification.enums import ShareLevel, ClinicalContextStatus, AlleleOrigin
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
     DiscordanceReport, ClinicalContext, ImportedAlleleInfo, ClinVarExport
+from classification.models.classification_utils import classification_gene_symbol_filter
 from flags.models import FlagsMixin, Flag, FlagComment
+from genes.signals.gene_symbol_search import GENE_SYMBOL_PATTERN
 from library.utils import batch_iterator, local_date_string, http_header_date_now
-from snpdb.models import GenomeBuild, Lab, Organization, Allele, Variant, AlleleOriginFilterDefault
-
+from snpdb.clingen_allele import get_clingen_allele
+from snpdb.models import GenomeBuild, Lab, Organization, Allele, Variant, AlleleOriginFilterDefault, ClinGenAllele, \
+    HGVS_UNCLEANED_PATTERN, VariantCoordinate
+from snpdb.signals.variant_search import get_results_from_variant_coordinate
 
 @dataclass
 class ClassificationIssue:
@@ -211,6 +217,7 @@ class ClassificationFilter:
     user: User
     genome_build: GenomeBuild
     allele_origin_filter: AlleleOriginFilterDefault = AlleleOriginFilterDefault.SHOW_ALL
+    record_filters: Optional[str] = None
     allele_origin_split: bool = False  # if true, subdivide allele data by allele origin bucket
     exclude_sources: Optional[Set[Union[Lab, Organization]]] = None
     include_sources: Optional[Set[Lab]] = None
@@ -314,6 +321,10 @@ class ClassificationFilter:
         if allele_str := request.query_params.get('allele'):
             allele = int(allele_str)
 
+        record_filters: Optional[str] = None
+        if record_filters_str := request.query_params.get('record_filters'):
+            record_filters = record_filters_str
+
         benchmarking = request.query_params.get('benchmark') == 'true'
 
         rows_per_file = None
@@ -343,6 +354,7 @@ class ClassificationFilter:
             transcript_strategy=transcript_strategy,
             since=since,
             allele=allele,
+            record_filters=record_filters,
             benchmarking=benchmarking,
             rows_per_file=rows_per_file,
             row_limit=row_limit,
@@ -491,6 +503,36 @@ class ClassificationFilter:
 
         if allele_id := self.allele:
             cms = cms.filter(classification__allele_info__allele_id=allele_id)
+
+        # Export my data
+        if self.record_filters:
+            internal_lab_filters: List[Q] = []
+            for item in re.split(',|\n|\t', self.record_filters):
+                item = item.strip()
+                if ClinGenAllele.CLINGEN_ALLELE_CODE_PATTERN.match(item):
+                    clingen_allele = get_clingen_allele(item)
+                    internal_lab_filters.append(Q(classification__allele_info__allele__clingen_allele=clingen_allele))
+                elif GENE_SYMBOL_PATTERN.match(item):
+                    if gene_match := classification_gene_symbol_filter(item):
+                        internal_lab_filters.append(classification_gene_symbol_filter(item))
+                elif HGVS_UNCLEANED_PATTERN.match(item):
+                    internal_lab_filters.append(Q(Q(classification__evidence__c_hgvs__value=item)))
+                else:
+                    try:
+                        if vc := VariantCoordinate.from_string(item.strip(), self.genome_build):
+                            variant_coordinate = vc.as_internal_symbolic(self.genome_build)
+                            qs = Variant.objects.all()
+                            allele_data = get_results_from_variant_coordinate(self.genome_build, qs, variant_coordinate)
+                            for i in allele_data:
+                                if allele := i.allele:
+                                    internal_lab_filters.append(Q(classification__allele_info__allele=allele))
+                    except ValueError:
+                        print(f"Failed to parse {item}")
+            if internal_lab_filters:
+                internal_lab_filters_single = reduce(operator.or_, internal_lab_filters)
+                cms = cms.filter(internal_lab_filters_single)
+            else:
+                return ClassificationModification.objects.none()
 
         # PERMISSION CHECK
         cms = get_objects_for_user(self.user, ClassificationModification.get_read_perm(), cms, accept_global_perms=True)
