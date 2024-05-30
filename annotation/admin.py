@@ -4,6 +4,7 @@ from django.contrib import admin, messages
 from django.contrib.admin import TabularInline
 from django.db.models import QuerySet
 from django.utils.safestring import SafeString
+from django.utils.timezone import now
 
 from annotation import models
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
@@ -54,13 +55,31 @@ class ClinVarRecordAdmin(TabularInline):
         return False
 
 
+class ClinVarRecordCollectionCacheFilter(admin.SimpleListFilter):
+    title = 'cache'
+    parameter_name = 'cache'
+    default_value = None
+
+    def lookups(self, request, model_admin):
+        return [("fresh", "Fresh"), ("stale", "Stale")]
+
+    def queryset(self, request, queryset: QuerySet[ClinVarRecordCollection]):
+        if self.value() == "fresh":
+            return queryset.filter(parser_version=ClinVarXmlParserViaVCV.PARSER_VERSION, last_loaded__gte=now() - timedelta(days=CLINVAR_RECORD_CACHE_DAYS))
+        elif self.value() == "stale":
+            return queryset.exclude(parser_version=ClinVarXmlParserViaVCV.PARSER_VERSION,
+                                   last_loaded__gte=now() - timedelta(days=CLINVAR_RECORD_CACHE_DAYS))
+        return queryset
+
+
 @admin.register(ClinVarRecordCollection)
 class ClinVarRecordCollectionAdmin(ModelAdminBasics):
     search_fields = ("clinvar_variation_id", "allele__id")
     inlines = (ClinVarRecordAdmin, )
     list_per_page = 20
 
-    list_display = ("pk", "clinvar_variation_id", "allele_link", "max_stars", "last_loaded")
+    list_display = ("pk", "clinvar_variation_id", "allele_link", "max_stars", "last_loaded", "parser_version")
+    list_filter = (ClinVarRecordCollectionCacheFilter, )
 
     """
     # these took prohibitively long to load
