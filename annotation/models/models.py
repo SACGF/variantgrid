@@ -206,7 +206,7 @@ class ClinVar(models.Model):
 
     @property
     def somatic_stars(self) -> int:
-        return ClinVarReviewStatus(self.clinvar_somatic_review_status).stars()
+        return ClinVarReviewStatus(self.somatic_review_status).stars()
 
     @property
     def is_expert_panel_or_greater(self):
