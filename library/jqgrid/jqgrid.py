@@ -259,13 +259,18 @@ class JqGrid:
                 filters = reduce(operator.and_, q_filters)
         return filters
 
-    def sort_items(self, request, items):
+    def _get_sidx_and_sord(self, request) -> tuple:
         sidx = request.GET.get('sidx')
         sord = request.GET.get('sord')
+        return sidx, sord
+
+    def sort_items(self, request, items):
+        sidx, sord = self._get_sidx_and_sord(request)
         return self._sort_items(items, sidx, sord)
 
     def _sort_items(self, items, sidx, sord):
         """ Moved code into here to make it easier to overwrite sidx in subclasses (as request.GET is immutable) """
+        order_by_list = []
         if sidx is not None:
             order_by = F(sidx)
             # dlawrence - sort nulls first/last via
@@ -275,19 +280,19 @@ class JqGrid:
             else:
                 order_by = order_by.asc(nulls_first=True)
 
-            order_by_list = [order_by]
+            order_by_list.append(order_by)
             if 'sortname' in self.extra_config:
                 second_sidx = self.extra_config.get('sortname')
                 if sidx != second_sidx:
                     second_sort_order = ('-' if self.extra_config.get('sortorder') == 'desc' else '')
                     order_by_list.append(f"{second_sort_order}{second_sidx}")
 
-            # always ultimately sort by PK to ensure reliable results
-            order_by_list.append("-pk")
-            try:
-                items = items.order_by(*order_by_list)
-            except FieldError as fe:
-                print(fe)
+        # always ultimately sort by PK to ensure reliable results
+        order_by_list.append("-pk")
+        try:
+            items = items.order_by(*order_by_list)
+        except FieldError as fe:
+            print(fe)
         return items
 
     def get_paginate_by(self, request):

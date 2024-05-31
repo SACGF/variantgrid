@@ -6,7 +6,7 @@ from django.http.response import JsonResponse, HttpResponse
 from django.urls.base import resolve, reverse
 from django.views.generic.base import View
 
-from library.jqgrid.jqgrid_export import grid_export_request
+from library.jqgrid.jqgrid_export import grid_export_request, grid_export_csv
 from library.utils import nice_class_name
 
 
@@ -28,13 +28,8 @@ class JQGridView(View):
     delete_row = False
     csv_download = False  # via request - can also do via JSON
 
-    def _load_grid(self, request, *args, **kwargs):
-        if self.grid is None:
-            msg = f"{nice_class_name(self)}.grid not set"
-            raise ValueError(msg)
-        else:
-            grid_klass: Type[Any] = self.grid
-
+    @staticmethod
+    def create_grid_from_request(request, grid_klass, **kwargs):
         kwargs["user"] = request.user
         # extra_filters are commonly used to filter by something custom via JS
         extra_filters = request.GET.get("extra_filters")
@@ -42,6 +37,23 @@ class JQGridView(View):
             kwargs["extra_filters"] = json.loads(extra_filters)
 
         return grid_klass(**kwargs)
+
+    @staticmethod
+    def export_grid_as_csv(request, grid_klass, basename, **kwargs):
+
+        # TODO: Need to apply default sorting to grid
+        grid = JQGridView.create_grid_from_request(request, grid_klass=grid_klass,
+                                                   **kwargs)
+        return grid_export_request(request, grid, basename)
+
+    def _load_grid(self, request, *args, **kwargs):
+        if self.grid is None:
+            msg = f"{nice_class_name(self)}.grid not set"
+            raise ValueError(msg)
+        else:
+            grid_klass: Type[Any] = self.grid
+
+        return self.create_grid_from_request(request, grid_klass, **kwargs)
 
     def get(self, request, *args, **kwargs):
         op = kwargs.pop("op")
