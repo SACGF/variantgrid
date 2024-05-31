@@ -33,8 +33,10 @@
                             {% for term in clinvar.clinvar_disease_database_terms %}{% if not forloop.first %}<span class="text-muted">|</span>{% endif %} {% ontology_term term %} {% endfor %}{% endlabelled %}
                     {% endif %}
                     {% if clinvar.somatic_disease_database_terms %}
-                        <div>{% clinvar_stars clinvar.somatic_stars %}{{ clinvar.get_somatic_review_status_display }} <span class="text-muted">|</span> <b>{{ clinvar.somatic_clinical_significance | code_to_english }}</b></div>
-                        {% labelled label="Somatic Summary" %}{% for term in clinvar.somatic_disease_database_terms %}{% if not forloop.first %}<span class="text-muted">|</span>{% endif %} {% ontology_term term %} {% endfor %}{% endlabelled %}
+                        {% labelled label="Somatic Summary" %}
+                            <div>{% clinvar_stars clinvar.somatic_stars %}{{ clinvar.get_somatic_review_status_display }} <span class="text-muted">|</span> <b>{{ clinvar.somatic_clinical_significance | code_to_english }}</b></div>
+                            {% for term in clinvar.somatic_disease_database_terms %}{% if not forloop.first %}<span class="text-muted">|</span>{% endif %} {% ontology_term term %} {% endfor %}
+                        {% endlabelled %}
                     {% endif %}
                     {% if clinvar.oncogenic_disease_database_terms %}
                         <div>{% clinvar_stars clinvar.oncogenic_stars %}{{ clinvar.get_oncogenic_review_status_display }} <span class="text-muted">|</span> <b>{{ clinvar.oncogenic_classification | code_to_english }}</b></div>
