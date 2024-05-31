@@ -48,7 +48,6 @@ from snpdb.models.models_user_settings import UserSettings
 from snpdb.search import search_data
 from snpdb.serializers import VariantAlleleSerializer
 from snpdb.variant_sample_information import VariantSampleInformation
-from sync.models import SyncDestination
 from upload.models import ModifiedImportedVariant
 from upload.upload_stats import get_vcf_variant_upload_stats
 from variantgrid.celery import app

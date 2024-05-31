@@ -1,6 +1,5 @@
 import logging
 import operator
-import os
 import re
 import time
 from collections import Counter
@@ -29,7 +28,7 @@ from library.constants import WEEK_SECS
 from library.django_utils import get_model_fields
 from library.jqgrid.jqgrid_export import grid_export_csv, StashFile
 from library.utils import name_from_filename
-from snpdb.models import Sample, ColumnVCFInfo, VCFInfoTypes, Zygosity, VCF, Cohort
+from snpdb.models import Sample, ColumnVCFInfo, VCFInfoTypes, Zygosity, Cohort
 from snpdb.models.models_variant import Variant
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs
 

@@ -6,9 +6,9 @@ from django.contrib.auth.models import User
 from annotation.tasks.annotation_scheduler_task import annotation_scheduler
 from library.log_utils import log_traceback
 from library.utils import import_class
+from snpdb.bcftools_liftover import bcftools_liftover
 from snpdb.models import AlleleLiftover
 from snpdb.models.models_enums import ProcessingStatus, AlleleConversionTool
-from snpdb.bcftools_liftover import bcftools_liftover
 from upload.models import UploadStep, UploadedVCF, ModifiedImportedVariants
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_vcf_file

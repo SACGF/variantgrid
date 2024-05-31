@@ -12,8 +12,10 @@ Ideally, this could have been done via Django FilteredRelation - but that doesn'
 
 import operator
 from functools import reduce
+
 from django.db.models import QuerySet
 from django.db.models.query_utils import Q
+
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationPipelineType
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
 from snpdb.models import Variant
