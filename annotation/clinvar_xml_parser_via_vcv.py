@@ -32,7 +32,7 @@ class ConditionList:
 
 class ClinVarXmlParserViaVCV(ClinVarXmlParser):
 
-    PARSER_VERSION = 212  # change this whenever the parsing changes, so we know to ignore the old cache
+    PARSER_VERSION = 213  # change this whenever the parsing changes, so we know to ignore the old cache
 
     RE_LEGACY_CS = re.compile("^Converted during submission to (.*?).?$")
 
