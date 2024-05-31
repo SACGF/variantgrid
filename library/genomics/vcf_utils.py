@@ -149,7 +149,7 @@ def write_cleaned_vcf_header(genome_build, source_vcf_filename: str, output_file
     contig_regex = re.compile(r"^##contig=<ID=(.+),length=(\d+)")
 
     header_lines = []
-    with open_handle_gzip(source_vcf_filename) as in_f:
+    with open_handle_gzip(source_vcf_filename, "rt") as in_f:
         for line in in_f:
             if not line.startswith("#"):
                 break  # End of header
