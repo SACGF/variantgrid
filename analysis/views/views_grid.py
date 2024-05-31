@@ -64,10 +64,10 @@ class NodeGridHandler(NodeJSONViewMixin):
         ret = None
         grid_node_id, grid_node_version = node.get_grid_node_id_and_version()
         if grid_node_id != node.pk:
-            url = reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id})
+            node_grid_handler = reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id})
             params = request.GET.dict()
             params.update({"node_id": grid_node_id, "version_id": grid_node_version})
-            url += "?" + urlencode(params)
+            url = f"{node_grid_handler}?" + urlencode(params)
             ret = HttpResponseRedirect(url)
         return ret
 
