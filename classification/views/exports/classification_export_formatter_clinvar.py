@@ -5,7 +5,7 @@ from functools import cached_property
 from itertools import groupby
 from typing import Optional, Callable
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from django.urls import reverse
 
@@ -18,7 +18,7 @@ from classification.views.exports.classification_export_decorator import registe
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
 from library.django_utils import get_url_from_view_path
-from library.utils import ExportRow, export_column, delimited_row, first, ExportDataType
+from library.utils import ExportRow, export_column, delimited_row, first, ExportDataType, ExportTweak
 from snpdb.models import GenomeBuild, VariantAllele
 
 
@@ -197,20 +197,31 @@ class ClinVarCompareRow(ClinVarCompareRowAbstract):
         if resolved_values:
             return ";".join(resolved_values)
 
-    @export_column("$site_name Somatic Clinical Significances")
+    @export_column("$site_name Somatic Clinical Significances", categories={"somatic": True})
     def servers_somatic_clinical_significance(self) -> str:
         (cs_list := list(self.somatic_clinical_significance_set)).sort()
         return ";".join(cs_list)
 
-    @export_column("ClinVar Somatic Clinical Significances")
+    @export_column("ClinVar Somatic Clinical Significances", categories={"somatic": True})
     def clinvar_clinical_significance_raw(self) -> str:
-        return "not-supported-yet"
+        if clinvar := self.clinvar:
+            # TODO, tidy this up once we have known values for somatic clinical significance
+            return clinvar.somatic_clinical_significance
 
-    @export_column("ClinVar Stars")
-    def clinvar_stars(self) -> str:
+    @export_column("ClinVar Germline Stars", categories={"germline": True})
+    def clinvar_germline_stars(self) -> str:
         clinvar: ClinVar
         if clinvar := self.clinvar:
-            return clinvar.stars
+            if germline_stars := clinvar.germline_stars:
+                return germline_stars
+
+    @export_column("ClinVar Somatic Stars", categories={"somatic": True})
+    def clinvar_somatic_oncogenic_stars(self) -> str:
+        clinvar: ClinVar
+        if clinvar := self.clinvar:
+            if max_stars := max(clinvar.somatic_stars, clinvar.oncogenic_stars):
+                # don't want to return 0
+                return max_stars
 
     @export_column("Comparison")
     def diff_value(self) -> ClinVarCompareValue:
@@ -226,12 +237,10 @@ class ClinVarCompareRow(ClinVarCompareRowAbstract):
         if not our_clins:
             return ClinVarCompareValue.UNCLASSIFIED
 
-        has_unknown = any(clin_sig.startswith("?") for clin_sig in clinvar_clins)
+        # has_unknown = any(clin_sig.startswith("?") for clin_sig in clinvar_clins)
 
         # simplify VUS_A/B/C to just VUS
         our_clins = {"VUS" if sc.startswith("VUS") else sc for sc in our_clins}
-
-        lowest_value = ClinVarCompareValue.NOT_CALCULATED
         clingen_buckets = {EvidenceKeyMap.clinical_significance_to_bucket().get(cs, -1) for cs in clinvar_clins}
 
         def compare_single(server_clin: str) -> ClinVarCompareValue:
@@ -254,11 +263,6 @@ class ClinVarCompareRow(ClinVarCompareRowAbstract):
             if clinvar_unknown_clins:
                 return ClinVarCompareValue.UNKNOWN
             return lowest_value
-
-    @export_column("$site_name Resolution Issues")
-    def issues(self) -> str:
-        if issues := self.allele_group.issues:
-            return "\n".join(sorted(set(issue.message for issue in issues)))
 
 
 @register_classification_exporter("clinvar_compare")
@@ -320,14 +324,23 @@ class ClassificationExportFormatterClinVarCompare(ClassificationExportFormatter)
         return "csv"
 
     def header(self) -> list[str]:
-        return [delimited_row(ClinVarCompareRow.csv_header())]
+        return [delimited_row(ClinVarCompareRow.csv_header(export_tweak=self._export_tweak))]
+
+    @cached_property
+    def _export_tweak(self) -> ExportTweak:
+        categories = {}
+        if self.classification_filter.allele_origin_filter == AlleleOriginBucket.SOMATIC:
+            categories["germline"] = None
+        elif self.classification_filter.allele_origin_filter == AlleleOriginBucket.GERMLINE:
+            categories["somatic"] = None
+        return ExportTweak(categories=categories)
 
     def row(self, allele_data: AlleleData) -> list[str]:
         if allele_data.allele_id:
             return [delimited_row(ClinVarCompareRow(
                 allele_data,
                 allele_data["clinvar"]
-            ).to_csv())]
+            ).to_csv(export_tweak=self._export_tweak))]
         else:
             return []
 
@@ -372,17 +385,30 @@ class ClinVarExpertCompareRow(ClinVarCompareRowAbstract):
         if issues := self.allele_group.issues:
             return "\n".join(sorted(set(issue.message for issue in issues)))
 
-    @export_column("$site_name Clinical Significances")
-    def _server_clinical_significance_set_labels(self):
+    @export_column("$site_name Allele Origin")
+    def _allele_origin(self):
+        return self.allele_origins
+
+    @export_column("ClinVar Allele Origins")
+    def _clinvar_allele_origins(self) -> str:
+        return (self.clinvar_expert_record.allele_origin or "no-value") + f" ({AlleleOriginBucket(self.clinvar_expert_record.allele_origin_bucket).label})"
+
+    @export_column("$site_name Classification")
+    def _server_classification(self):
         (cs_list := list(self.clinical_significance_set)).sort()
         return ";".join(cs_list)
 
     @export_column("ClinVar Expert Panel Classification")
-    def clinvar_clinical_significance(self):
+    def _clinvar_classification(self):
         return self.clinvar_expert_record.clinical_significance
 
-    @export_column("ClinVar Expert Panel Somatic Significance")
-    def clinvar_clinical_significance(self):
+    @export_column("$site_name Somatic Clinical Significance", categories={"somatic": True})
+    def _server_somatic_clinical_significance(self):
+        (cs_list := list(self.somatic_clinical_significance_set)).sort()
+        return ";".join(cs_list)
+
+    @export_column("ClinVar Expert Panel Somatic Clinical Significance", categories={"somatic": True})
+    def _clinvar_somatic_clinical_significance(self):
         return self.clinvar_expert_record.somatic_clinical_significance
 
     @export_column("Status")
@@ -429,14 +455,6 @@ class ClinVarExpertCompareRow(ClinVarCompareRowAbstract):
     def clinvar_last_evaluated(self):
         return self.clinvar_expert_record.date_last_evaluated
 
-    @export_column("ClinVar Allele Origins")
-    def _clinvar_allele_origins(self) -> str:
-        return (self.clinvar_expert_record.allele_origin or "no-value") + f" ({AlleleOriginBucket(self.clinvar_expert_record.allele_origin_bucket).label})"
-
-    @export_column("$site_name Allele Origin")
-    def _allele_origin(self):
-        return self.allele_origins
-
     @export_column("Is ClinVar Newer")
     def is_clinvar_newer(self):
         if server_evaluated := self.server_last_evaluated_date:
@@ -462,11 +480,25 @@ class ClassificationExportFormatterClinVarCompareExpert(ClassificationExportForm
     def extension(self) -> str:
         return "csv"
 
+    @cached_property
+    def _export_tweak(self) -> ExportTweak:
+        categories = {}
+        if self.classification_filter.allele_origin_filter == AlleleOriginBucket.SOMATIC:
+            categories["germline"] = None
+        elif self.classification_filter.allele_origin_filter == AlleleOriginBucket.GERMLINE:
+            categories["somatic"] = None
+        return ExportTweak(categories=categories)
+
     def header(self) -> list[str]:
-        return [delimited_row(ClinVarExpertCompareRow.csv_header())]
+        return [delimited_row(ClinVarExpertCompareRow.csv_header(export_tweak=self._export_tweak))]
 
     def filter_clinvars(self, queryset: QuerySet[ClinVar]) -> QuerySet[ClinVar]:
-        return queryset.filter(clinvar_review_status__in=(ClinVarReviewStatus.REVIEWED_BY_EXPERT_PANEL[0], ClinVarReviewStatus.PRACTICE_GUIDELINE[0]))
+        expert_and_practise = (ClinVarReviewStatus.REVIEWED_BY_EXPERT_PANEL[0], ClinVarReviewStatus.PRACTICE_GUIDELINE[0])
+        return queryset.filter(
+            Q(clinvar_review_status__in=expert_and_practise) |
+            Q(somatic_review_status__in=expert_and_practise) |
+            Q(oncogenic_review_status__in=expert_and_practise)
+        )
 
     def row(self, allele_data: AlleleData) -> list[str]:
         rows = []
@@ -492,7 +524,7 @@ class ClassificationExportFormatterClinVarCompareExpert(ClassificationExportForm
                                 cms=list([cm.classification for cm in cms_by_lab]),
                                 clinvar=clinvar_record,
                                 clinvar_expert_record=first(records)
-                            ).to_csv())
+                            ).to_csv(export_tweak=self._export_tweak))
                         ]
                         rows += new_rows
                 else:
