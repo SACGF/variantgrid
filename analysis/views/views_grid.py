@@ -33,6 +33,33 @@ from snpdb.models.models_variant import Variant
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs
 
 
+_NODE_GRID_ALLOWED_PARAMS = {
+    '_filters',
+    '_search',
+    'ccc_id',
+    'ccc_version_id',
+    'extra_filters',
+    'filters',
+    'node_id',
+    'page',
+    'rows',
+    'sidx',
+    'sord',
+    'version_id',
+    'zygosity_samples_hash',
+}
+
+
+def _add_allowed_node_grid_params(url: str, params: dict) -> str:
+    cleaned_params = {}
+    for key, value in params.items():
+        if key in _NODE_GRID_ALLOWED_PARAMS:
+            cleaned_params[key] = value
+        else:
+            logging.warning(f"Node redirect had disallowed GET param: %s", key)
+    return f"{url}?" + urlencode(cleaned_params)
+
+
 @method_decorator([cache_page(WEEK_SECS), vary_on_cookie], name='get')
 class NodeGridHandler(NodeJSONViewMixin):
     def get(self, request, *args, **kwargs):
@@ -42,7 +69,7 @@ class NodeGridHandler(NodeJSONViewMixin):
             which should hopefully hit the cache next time
         """
         LOCK_EXPIRE = 60 * 10  # 10 mins
-        url = f"{request.path}?" + urlencode(request.GET.dict())
+        url = _add_allowed_node_grid_params(request.path, request.GET.dict())
         lock_id = f"{url}_{request.user}"
         if cache.add(lock_id, "true", LOCK_EXPIRE):  # Acquire lock
             try:
@@ -67,7 +94,7 @@ class NodeGridHandler(NodeJSONViewMixin):
             node_grid_handler = reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id})
             params = request.GET.dict()
             params.update({"node_id": grid_node_id, "version_id": grid_node_version})
-            url = f"{node_grid_handler}?" + urlencode(params)
+            url = _add_allowed_node_grid_params(node_grid_handler, params)
             ret = HttpResponseRedirect(url)
         return ret
 
