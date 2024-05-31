@@ -10,7 +10,9 @@ from annotation.models.models import ClinVar, ClinVarVersion
 from annotation.vcf_files.vcf_types import VCFVariant
 from snpdb.models import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
+from upload.models import UploadStep
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
+import cyvcf2
 
 """
 ##fileformat=VCFv4.1
@@ -124,7 +126,9 @@ class BulkClinVarInserter:
 
     MAX_CONFLICTING_RECORDS_MISSING_CLINSIGCONF = 1000
 
-    def __init__(self, clinvar_version, upload_step):
+    def __init__(self,
+                 clinvar_version: ClinVarVersion,
+                 upload_step: UploadStep):
         self.clinvar_version = clinvar_version
         self.variant_by_variant_hash = {}
         self.upload_step = upload_step
@@ -152,7 +156,7 @@ class BulkClinVarInserter:
 
     def bulk_insert(self):
         print("BulkClinVarInserter bulk_insert")
-        clinvar_list = []
+        clinvar_list: list[ClinVar] = []
         self.variant_pk_lookup.batch_check()
         for variant_hash, variant_pk in self.variant_pk_lookup.variant_pk_by_hash.items():
             v = self.variant_by_variant_hash[variant_hash]
@@ -173,7 +177,7 @@ class BulkClinVarInserter:
         self.variant_pk_lookup.clear()
 
         if clinvar_list:
-            def create_clinvar_tuple(cv):
+            def create_clinvar_tuple(cv: ClinVar):
                 values_list = []
                 for f in BulkClinVarInserter.CLINVAR_CSV_FIELDS:
                     values_list.append(getattr(cv, f))
@@ -194,7 +198,7 @@ class BulkClinVarInserter:
             self.batch_id += 1
             self.items_processed += len(clinvar_list)
 
-    def create_clinvar_for_variant_id(self, variant_id: int, v: VCFVariant):
+    def create_clinvar_for_variant_id(self, variant_id: int, v: VCFVariant) -> ClinVar:
         kwargs = {"variant_id": variant_id,
                   "version": self.clinvar_version,
                   "clinvar_variation_id": v.ID}
@@ -263,13 +267,12 @@ def check_can_import_clinvar(user: User):
         raise PermissionDenied(msg)
 
 
-def import_clinvar_vcf(upload_step):
+def import_clinvar_vcf(upload_step: UploadStep):
     """ This can run in parallel """
     logging.debug("import_clinvar_file start")
 
     clinvar_version = ClinVarVersion.objects.get(md5_hash=upload_step.uploaded_file.md5_hash)
 
-    import cyvcf2
     vcf_reader = cyvcf2.VCF(upload_step.input_filename)
     bulk_inserter = BulkClinVarInserter(clinvar_version, upload_step)
 
