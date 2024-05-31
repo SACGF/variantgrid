@@ -183,7 +183,22 @@ class ClinVar(models.Model):
 
     @property
     def clinvar_disease_database_terms(self) -> list[str]:
+        """
+        Deprecated, use germline_disease_database_terms
+        """
+        return self.germline_disease_database_terms
+
+    @cached_property
+    def germline_disease_database_terms(self) -> list[str]:
         return ClinVar._database_terms(self.clinvar_disease_database_name)
+
+    @cached_property
+    def somatic_disease_database_terms(self) -> list[str]:
+        return ClinVar._database_terms(self.somatic_disease_database_name)
+
+    @cached_property
+    def oncogenic_disease_database_terms(self) -> list[str]:
+        return ClinVar._database_terms(self.oncogenic_disease_database_name)
 
     # repeat the above for oncogenic and somatic
 
@@ -200,17 +215,27 @@ class ClinVar(models.Model):
         """
         return self.germline_stars
 
+    @staticmethod
+    def _stars_for(value: Optional[str]) -> int:
+        if not value:
+            return 0
+        return ClinVarReviewStatus(value).stars()
+
     @property
     def germline_stars(self) -> int:
-        return ClinVarReviewStatus(self.clinvar_review_status).stars()
+        return ClinVar._stars_for(self.clinvar_review_status)
 
     @property
     def somatic_stars(self) -> int:
-        return ClinVarReviewStatus(self.somatic_review_status).stars()
+        return ClinVar._stars_for(self.somatic_review_status)
+
+    @property
+    def oncogenic_stars(self) -> int:
+        return ClinVar._stars_for(self.oncogenic_review_status)
 
     @property
     def is_expert_panel_or_greater(self):
-        return self.stars >= CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
+        return max(self.germline_stars, self.somatic_stars, self.oncogenic_stars) >= CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 
     def get_origin_display(self):
         """
@@ -218,6 +243,10 @@ class ClinVar(models.Model):
         it might contain multiple values
         """
         return ClinVar.ALLELE_ORIGIN.get(self.clinvar_origin)
+
+    @property
+    def get_allele_origins_display(self):
+        return ", ".join(self.allele_origins)
 
     @cached_property
     def allele_origins(self) -> list[str]:
