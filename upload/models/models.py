@@ -347,6 +347,7 @@ class UploadStep(models.Model):
         try:
             self.error_message += "\n" + get_traceback()
         except:
+            self.error_message += "\nUnable to load traceback"
             pass
         self.upload_pipeline.error(self.error_message)
 
