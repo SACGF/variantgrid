@@ -466,7 +466,7 @@ class ClassificationExportFormatterClinVarCompareExpert(ClassificationExportForm
         return [delimited_row(ClinVarExpertCompareRow.csv_header())]
 
     def filter_clinvars(self, queryset: QuerySet[ClinVar]) -> QuerySet[ClinVar]:
-        return queryset.filter(clinvar_review_status__in = (ClinVarReviewStatus.REVIEWED_BY_EXPERT_PANEL[0], ClinVarReviewStatus.PRACTICE_GUIDELINE[0]))
+        return queryset.filter(clinvar_review_status__in=(ClinVarReviewStatus.REVIEWED_BY_EXPERT_PANEL[0], ClinVarReviewStatus.PRACTICE_GUIDELINE[0]))
 
     def row(self, allele_data: AlleleData) -> list[str]:
         rows = []

@@ -34,5 +34,3 @@ class Command(BaseCommand):
                         raise ValueError(msg)
                     else:
                         logging.info(msg)
-
-

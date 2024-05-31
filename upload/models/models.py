@@ -642,7 +642,6 @@ class ModifiedImportedVariant(models.Model):
         variant_coordinate = VariantCoordinate(chrom=contig.name, position=position, ref=ref, alt=alt, svlen=svlen)
         return [ModifiedImportedVariant.get_old_variant_from_variant_coordinate(variant_coordinate)]
 
-
     @staticmethod
     def _vt_split_old_variant(old_variant) -> list[str]:
         """ VT decompose writes OLD_VARIANT as comma separated, but if not decomposed (eg someone uploads already

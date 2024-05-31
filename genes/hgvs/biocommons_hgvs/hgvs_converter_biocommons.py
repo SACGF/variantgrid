@@ -92,7 +92,6 @@ class BioCommonsHGVSVariant(HGVSVariant):
         return sv.format(conf)
 
 
-
 class BioCommonsHGVSConverter(HGVSConverter):
     dup_int_pattern = re.compile(r"(.*dup)(\d+)$")
     reference_sequence_pattern = re.compile(r".*: Variant reference \((.*)\) does not agree with reference sequence \((.*)\)")
