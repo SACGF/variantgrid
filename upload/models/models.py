@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import shutil
+import traceback
 from collections import namedtuple
 from functools import cached_property
 from typing import Optional, Union
@@ -345,7 +346,10 @@ class UploadStep(models.Model):
         self.status = status
         self.error_message = str(e)
         try:
-            self.error_message += "\n" + get_traceback()
+            # self.error_message += "\n" + get_traceback()
+            # try just regular traceback as the fancy one above isn't working
+            # and we can't try them both since the fancy one will break and make that the new exception
+            self.error_message += "\n" + str(traceback.format_exc())
         except:
             self.error_message += "\nUnable to load traceback"
             pass
