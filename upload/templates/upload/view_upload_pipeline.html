@@ -1,5 +1,6 @@
 {% extends "uicore/page/base.html" %}
 {% load ui_menu_bars %}
+{% load ui_utils %}
 {% load static %}
 {% load humanize %}
 {% load js_tags %}
@@ -177,87 +178,73 @@
 
 	<div class="container">
         <h3>Upload Pipeline</h3>
-	    <fieldset class="form-fields">
-		    {{ upload_pipeline | as_p }}
-            {% if upload_pipeline.genome_build %}
-                <p><label>genome build</label><span class="field str">{{ upload_pipeline.genome_build }}</span></p>
-            {% endif %}
-        </fieldset>
-
-	{% if upload_pipeline.file_type == 'V' %}
-		{% if uploaded_vcf %}
-			<p>
-                <label>UploadedVCF</label>
-			    <span>{{ uploaded_vcf.pk }}</span>
-			</p>
-            <p>
-                <label>Path</label>
-                <span>{{ uploaded_vcf.uploaded_file.get_filename }}</span>
-            </p>
-            {% if uploaded_vcf.vcf_importer %}
-            <p>
-                <label>Importer Version</label>
-                <span>{{ uploaded_vcf.vcf_importer }}</span>
-            </p>
-            {% endif %}
-            {% with cgc=uploaded_vcf.vcf.cohort.cohort_genotype_collection %}
-                {% if cgc.common_collection %}
-                <p>
-                    <label>gnomAD common filter</label>
-                    <span>Rare: {{ cgc.percent_common|floatformat:2 }}% ({{ cgc.common_collection.common_filter }})</span>
-                </p>
+        <div class="card">
+            <div class="card-header">Upload Pipeline {{ upload_pipeline.pk }}</div>
+            <div class="card-body">
+                {% labelled label="Status" %}{{ upload_pipeline.get_status_display | severity_icon }}{{ upload_pipeline.get_status_display }}{% endlabelled %}
+                {% labelled label="Uploaded File" %}{{ upload_pipeline.uploaded_file }}{% endlabelled %}
+                {% labelled label="File Type" %}{{ upload_pipeline.get_file_type_display }}{% endlabelled %}
+                {% labelled label="Items Processed" value_css="num" %}{{ upload_pipeline.items_processed|intcomma }}{% endlabelled %}
+                {% labelled label="Progress Status" %}
+                    <div class="code">{{ upload_pipeline.progress_status }}</div>
+                {% endlabelled %}
+                {% labelled label="Progress Percentage" %}{{ upload_pipeline.progress_percent|floatformat:2 }}%{% endlabelled %}
+                {% if upload_pipeline.genome_build %}
+                    {% labelled label="Genome Build" %}{{ upload_pipeline.genome_build }}{% endlabelled %}
                 {% endif %}
-            {% endwith %}
-            <p>
-                <label>VCF</label>
-                {% if uploaded_vcf.vcf %}
-                <a href="{% url 'view_vcf' uploaded_vcf.vcf.pk %}">{{ uploaded_vcf.vcf }}</a>
-                {% else %}
-                <span>VCF is still being imported</span>
+                {% if upload_pipeline.file_type == 'V' %}
+		            {% if uploaded_vcf %}
+                        {% labelled label="Uploaded VCF" %}{{ uploaded_vcf.pk }}{% endlabelled %}
+                        {% labelled label="Path" %}{{ uploaded_vcf.uploaded_file.get_filename }}{% endlabelled %}
+                        {% if uploaded_vcf.vcf_importer %}
+                            {% labelled label="Importer Version" %}{{ uploaded_vcf.vcf_importer }}{% endlabelled %}
+                        {% endif %}
+                        {% with cgc=uploaded_vcf.vcf.cohort.cohort_genotype_collection %}
+                            {% if cgc.common_collection %}
+                                {% labelled label="gnomAD Common Filter" %}Rare: {{ cgc.percent_common|floatformat:2 }}% ({{ cgc.common_collection.common_filter }}){% endlabelled %}
+                            {% endif %}
+                        {% endwith %}
+                        {% labelled label="VCF" %}
+                            {% if uploaded_vcf.vcf %} <a href="{% url 'view_vcf' uploaded_vcf.vcf.pk %}">{{ uploaded_vcf.vcf }}</a>{% else %}VCF is still being imported{% endif %}
+                        {% endlabelled %}
+                        {% if uploaded_vcf.backendvcf.sample_sheet.sequencing_run %}
+                            {% labelled label="Sequencing Run" %}
+                                <a href="{% url 'view_sequencing_run' uploaded_vcf.backendvcf.sample_sheet.sequencing_run.pk %}">{{ uploaded_vcf.backendvcf.sample_sheet.sequencing_run }}</a> - Auto uploaded from {{ uploaded_vcf.backendvcf.vcf }}
+                            {% endlabelled %}
+                        {% endif %}
+                    {% else %}
+                        <i class="fa-solid fa-file-circle-xmark"></i> Data for this VCF has been deleted.
+                    {% endif %}
+                {% elif upload_pipeline.file_type == 'G' %}
+                    {% if uploaded_gene_list %}
+                        {% labelled label="Uploaded Gene List" %}{{ uploaded_gene_list.pk }}{% endlabelled %}
+                        {% labelled label="Gene List" %}
+                            {% if uploaded_gene_list.gene_list %}
+                                <a href="{% url 'view_gene_list' uploaded_gene_list.gene_list.pk %}">{{ uploaded_gene_list.gene_list }}</a>
+                            {% else %}
+                                <span>GeneList is still being imported</span>
+                            {% endif %}
+                        {% endlabelled %}
+                    {% else %}
+                        <div>
+                            <i class="fa-solid fa-file-circle-xmark"></i> GeneList for this file has been deleted
+                        </div>
+                    {% endif %}
                 {% endif %}
-            </p>
-            {% if uploaded_vcf.backendvcf.sample_sheet.sequencing_run %}
-            <p>
-                <label>SequencingRun</label>
-                <span><a href="{% url 'view_sequencing_run' uploaded_vcf.backendvcf.sample_sheet.sequencing_run.pk %}">{{ uploaded_vcf.backendvcf.sample_sheet.sequencing_run }}</a> - Auto uploaded from {{ uploaded_vcf.backendvcf.vcf }}</span>
-            </p>
-            {% endif %}
-		{% else %}
-			<p>Data for this VCF has been deleted.</p>
-		{% endif %}
-	{% elif upload_pipeline.file_type == 'G' %}
-		{% if uploaded_gene_list %}
-			<p>
-                <label>UploadedGeneList</label>
-                <span>{{ uploaded_gene_list.pk }}</span>
-			</p>
-			<p>
-                <label>GeneList</label>
-                {% if uploaded_gene_list.gene_list %}
-			        <a href="{% url 'view_gene_list' uploaded_gene_list.gene_list.pk %}">{{ uploaded_gene_list.gene_list }}</a>
-			    {% else %}
-			        <span>GeneList is still being imported</span>
-			    {% endif %}
-			</p>
-		{% else %}
-            <p>GeneList for this file has been deleted.</p>
-		{% endif %}
-	{% endif %}
-
-        <div class="buttons">
-            <form id="retry-upload-form" action={% url 'upload_retry_import' upload_pipeline.pk %} method="post">
-            {% csrf_token %}
-                  <div class="btn-toolbar">
-    		{% if allow_retry_import %}
-                    <button class="btn btn-primary" id='retry-import-button' type='submit'>Retry Import</button>
-    		{% endif %}
+            </div>
+            <div class="card-footer">
+                <form id="retry-upload-form" action={% url 'upload_retry_import' upload_pipeline.pk %} method="post">
+                    {% csrf_token %}
+                    {% if allow_retry_import %}
+                        <button class="btn btn-primary" id='retry-import-button' type='submit'>Retry Import</button>
+                    {% endif %}
                     <button class="btn btn-danger" id='delete-button' type='button'>Delete</button>
                     <div id="delete-container">
                     <!-- error messages set in JSON -->
                     </div>
-                  </div>
-              </form>
-			</div>
+                </form>
+            </div>
+        </div>
 
         {% if step_total_stats %}
             <h3>Steps</h3>
