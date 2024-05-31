@@ -64,4 +64,17 @@ def annotation_data_exists(flat=False) -> dict:
     else:
         annotation_data = all_build_data
 
+
+    # VEP dirs
+    VEP_DIRS = {
+        "vep_cache": settings.ANNOTATION_VEP_CACHE_DIR,
+        "vep_plugins": settings.ANNOTATION_VEP_PLUGINS_DIR,
+    }
+    for k, dir_name in VEP_DIRS.items():
+        valid = os.path.exists(dir_name)
+        annotation_data[k] = {
+            "valid": valid,
+            "fix": "https://github.com/SACGF/variantgrid/wiki/Install-VEP",
+        }
+
     return annotation_data
