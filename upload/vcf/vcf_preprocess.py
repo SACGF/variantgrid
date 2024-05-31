@@ -87,11 +87,12 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
 
     upload_pipeline = upload_step.upload_pipeline
     vcf_name = name_from_filename(vcf_filename, remove_gz=True)
+
     skipped_contigs_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_contigs.tsv")
     skipped_records_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_records.tsv")
     skipped_filters_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_filters.tsv")
 
-    cleaned_vcf_header_filename = _write_cleaned_header(genome_build, upload_pipeline, vcf_name)
+    cleaned_vcf_header_filename = _write_cleaned_header(genome_build, upload_pipeline, vcf_filename)
 
     manage_command = settings.MANAGE_COMMAND
     read_variants_cmd = manage_command + ["vcf_clean_and_filter",
