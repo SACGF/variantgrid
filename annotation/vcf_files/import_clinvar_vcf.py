@@ -3,9 +3,11 @@ import os
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
+from django_messages.admin import User
 
 from annotation.models import ClinVarReviewStatus, Variant
 from annotation.models.models import ClinVar, ClinVarVersion
+from annotation.vcf_files.vcf_types import VCFVariant
 from snpdb.models import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
@@ -98,7 +100,19 @@ class BulkClinVarInserter:
                           'clinvar_clinical_sources',
                           'clinvar_origin',
                           'clinvar_suspect_reason_code',
-                          'drug_response']
+                          'drug_response',
+
+                          'oncogenic_review_status',
+                          'oncogenic_classification',
+                          'oncogenic_conflicting_classification',
+                          'oncogenic_preferred_disease_name',
+                          'oncogenic_disease_database_name',
+
+                          'somatic_review_status',
+                          'somatic_clinical_significance',
+                          'somatic_preferred_disease_name',
+                          'somatic_disease_database_name'
+                          ]
 
     CLINSIG_TO_PATHOGENICITY = {
         "Benign": 1,
@@ -120,10 +134,12 @@ class BulkClinVarInserter:
         self.variant_pk_lookup = VariantPKLookup(clinvar_version.genome_build)
         review_status_vcf_mappings_dict = dict(ClinVarReviewStatus.VCF_MAPPINGS)
         self.field_formatters = {
-            "clinvar_review_status": lambda x: review_status_vcf_mappings_dict[x]
+            "clinvar_review_status": lambda x: review_status_vcf_mappings_dict[x],
+            "somatic_review_status": lambda x: review_status_vcf_mappings_dict[x],
+            "oncogenic_review_status": lambda x: review_status_vcf_mappings_dict[x]
         }
 
-    def process_variant(self, v):
+    def process_variant(self, v: VCFVariant):
         alt = self.variant_single_alt(v)
         variant_coordinate = VariantCoordinate.from_explicit_no_svlen(v.CHROM, v.POS, v.REF, alt)
         variant_hash = self.variant_pk_lookup.add(variant_coordinate)
@@ -178,7 +194,7 @@ class BulkClinVarInserter:
             self.batch_id += 1
             self.items_processed += len(clinvar_list)
 
-    def create_clinvar_for_variant_id(self, variant_id, v):
+    def create_clinvar_for_variant_id(self, variant_id: int, v: VCFVariant):
         kwargs = {"variant_id": variant_id,
                   "version": self.clinvar_version,
                   "clinvar_variation_id": v.ID}
@@ -197,6 +213,7 @@ class BulkClinVarInserter:
 
         # clinical_significance is now a '|' separated string
         if clinical_significance := kwargs.get("clinical_significance"):
+            # FIXME do the same for somatic classification
             drug_response = "drug_response" in clinical_significance
             highest_pathogenicity = 0
             if clinical_significance.startswith("Conflicting_interpretations_of_pathogenicity"):
@@ -240,7 +257,7 @@ class BulkClinVarInserter:
         return Variant.REFERENCE_ALT  # ALT[] is "." ie reference
 
 
-def check_can_import_clinvar(user):
+def check_can_import_clinvar(user: User):
     if not user.is_staff:
         msg = "Only Authorised users can upload a ClinVar VCF"
         raise PermissionDenied(msg)
