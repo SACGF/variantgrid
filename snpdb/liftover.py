@@ -13,7 +13,7 @@ from django.db.models.query_utils import Q
 
 from genes.hgvs import HGVSMatcher
 from library.django_utils.django_file_utils import get_import_processing_dir
-from library.genomics.vcf_utils import write_vcf_from_tuples, get_vcf_header_contig_lines
+from library.genomics.vcf_utils import write_vcf_from_tuples, get_vcf_header_contig_lines, get_contigs_header_lines
 from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
@@ -22,14 +22,6 @@ from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
 from snpdb.models.models_variant import LiftoverRun, Allele, Variant, VariantAllele, AlleleLiftover
 from upload.models import UploadedFile, UploadedLiftover, UploadPipeline, UploadedFileTypes
 from upload.upload_processing import process_upload_pipeline
-
-
-def get_used_contigs_header_lines(genome_build, used_contigs: set) -> list[str]:
-    contigs = []
-    for contig in genome_build.contigs:
-        if contig.name in used_contigs:
-            contigs.append((contig.name, contig.length, genome_build.name))
-    return get_vcf_header_contig_lines(contigs)
 
 
 def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
@@ -74,7 +66,7 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                 if allele_liftover_records:
                     AlleleLiftover.objects.bulk_create(allele_liftover_records, batch_size=2000)
 
-                header_lines = get_used_contigs_header_lines(vcf_genome_build, used_contigs)
+                header_lines = get_contigs_header_lines(vcf_genome_build, contig_allow_list=used_contigs)
                 write_vcf_from_tuples(vcf_filename, av_tuples, tuples_have_id_field=True, header_lines=header_lines)
                 uploaded_file = UploadedFile.objects.create(path=liftover_vcf_filename,
                                                             import_source=import_source,

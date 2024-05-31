@@ -436,8 +436,10 @@ def analysis_template_save(request, pk):
     try:
         atv = analysis_template.new_version()
         return JsonResponse({"version": atv.version})
-    except ValueError as e:
-        return JsonResponse({"error": str(e)})
+    except ValueError:
+        return JsonResponse({
+            "error": f"Could not create new analysis template version for '{analysis_template}'"
+        })
 
 
 @require_POST

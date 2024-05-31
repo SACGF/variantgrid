@@ -1,6 +1,5 @@
 import logging
 import operator
-import os
 import re
 import time
 from collections import Counter
@@ -29,9 +28,36 @@ from library.constants import WEEK_SECS
 from library.django_utils import get_model_fields
 from library.jqgrid.jqgrid_export import grid_export_csv, StashFile
 from library.utils import name_from_filename
-from snpdb.models import Sample, ColumnVCFInfo, VCFInfoTypes, Zygosity, VCF, Cohort
+from snpdb.models import Sample, ColumnVCFInfo, VCFInfoTypes, Zygosity, Cohort
 from snpdb.models.models_variant import Variant
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs
+
+
+_NODE_GRID_ALLOWED_PARAMS = {
+    '_filters',
+    '_search',
+    'ccc_id',
+    'ccc_version_id',
+    'extra_filters',
+    'filters',
+    'node_id',
+    'page',
+    'rows',
+    'sidx',
+    'sord',
+    'version_id',
+    'zygosity_samples_hash',
+}
+
+
+def _add_allowed_node_grid_params(url: str, params: dict) -> str:
+    cleaned_params = {}
+    for key, value in params.items():
+        if key in _NODE_GRID_ALLOWED_PARAMS:
+            cleaned_params[key] = value
+        else:
+            logging.warning(f"Node redirect had disallowed GET param: %s", key)
+    return f"{url}?" + urlencode(cleaned_params)
 
 
 @method_decorator([cache_page(WEEK_SECS), vary_on_cookie], name='get')
@@ -43,7 +69,7 @@ class NodeGridHandler(NodeJSONViewMixin):
             which should hopefully hit the cache next time
         """
         LOCK_EXPIRE = 60 * 10  # 10 mins
-        url = f"{request.path}?" + urlencode(request.GET.dict())
+        url = _add_allowed_node_grid_params(request.path, request.GET.dict())
         lock_id = f"{url}_{request.user}"
         if cache.add(lock_id, "true", LOCK_EXPIRE):  # Acquire lock
             try:
@@ -65,10 +91,10 @@ class NodeGridHandler(NodeJSONViewMixin):
         ret = None
         grid_node_id, grid_node_version = node.get_grid_node_id_and_version()
         if grid_node_id != node.pk:
-            url = reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id})
+            node_grid_handler = reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id})
             params = request.GET.dict()
             params.update({"node_id": grid_node_id, "version_id": grid_node_version})
-            url += "?" + urlencode(params)
+            url = _add_allowed_node_grid_params(node_grid_handler, params)
             ret = HttpResponseRedirect(url)
         return ret
 

@@ -1,7 +1,6 @@
 import time
 from typing import Optional
 
-from django.conf import settings
 from django.core.management import BaseCommand
 
 from annotation.models import VariantAnnotation, VariantTranscriptAnnotation

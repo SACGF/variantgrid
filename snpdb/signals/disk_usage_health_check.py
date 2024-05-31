@@ -2,7 +2,7 @@ from django.dispatch import receiver
 
 from library.health_check import HealthCheckRequest, HealthCheckCapacity, \
     health_check_overall_stats_signal
-from variantgrid.tasks.server_monitoring_tasks import get_disk_usage_objects
+from variantgrid.deployment_validation.disk_usage import get_disk_usage_objects
 
 
 @receiver(signal=health_check_overall_stats_signal)

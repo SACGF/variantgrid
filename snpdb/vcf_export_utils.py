@@ -1,10 +1,8 @@
-from library.genomics.vcf_utils import get_vcf_header_contig_lines
+from library.genomics.vcf_utils import get_vcf_header_contig_lines, get_contigs_header_lines
 
 
-def get_vcf_header_lines(top_lines=None, info_dict=None, formats=None, contigs=None, samples=None):
-    """ info_dict - values = dict with keys of 'type', 'description' (optional 'number' default = 1)
-        contigs - tuples of (contig, length, assembly)
-    """
+def get_vcf_header_lines(top_lines=None, info_dict=None, formats=None, contig_lines=None, samples=None):
+    """ info_dict - values = dict with keys of 'type', 'description' (optional 'number' default = 1) """
 
     if samples is None:
         samples = []
@@ -25,8 +23,8 @@ def get_vcf_header_lines(top_lines=None, info_dict=None, formats=None, contigs=N
     if use_format:
         header_lines.extend(formats)
 
-    if contigs:
-        header_lines.extend(get_vcf_header_contig_lines(contigs))
+    if contig_lines:
+        header_lines.extend(contig_lines)
 
     colnames = ['CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO']
     if use_format:
@@ -40,10 +38,6 @@ def get_vcf_header_lines(top_lines=None, info_dict=None, formats=None, contigs=N
 def get_vcf_header_from_contigs(genome_build, info_dict=None, samples=None):
     """ info_dict which contains ('number', 'type', 'description') """
 
-    contigs = []
-    for contig in genome_build.contigs:
-        contigs.append((contig.name, contig.length, genome_build.name))
-
     formats = ['##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Approximate read depth (reads with MQ=255 or with bad mates are filtered)">',
                '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">',
                '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">',
@@ -51,4 +45,5 @@ def get_vcf_header_from_contigs(genome_build, info_dict=None, samples=None):
                '##FORMAT=<ID=PL,Number=G,Type=Integer,Description="Normalized, Phred-scaled likelihoods for genotypes as defined in the VCF specification">',
                '##FORMAT=<ID=AF,Number=A,Type=Float,Description="Estimated allele frequency in the range (0,1)">']
 
-    return get_vcf_header_lines(info_dict=info_dict, formats=formats, contigs=contigs, samples=samples)
+    contig_lines = get_contigs_header_lines(genome_build)
+    return get_vcf_header_lines(info_dict=info_dict, formats=formats, contig_lines=contig_lines, samples=samples)

@@ -57,7 +57,7 @@ $(document).ready(function() {
     {% if has_modified_imported_variants %}
     <div>
         <h3>Modified Imported Variants</h3>
-        <p>We <a target='_blank' href="https://genome.sph.umich.edu/wiki/Vt#Normalization">Decompose and Normalise variants using VT</a> during import, so variants from different VCF files have a consistent representation.  
+        <p>We decompose multi-allelic variants and normalise indels (using <a href="https://samtools.github.io/bcftools/bcftools.html#norm">BCFtools</a>) during import, so variants from different VCF files have a consistent representation. Normalization is the left-aligned minimal representation of an indel
         
         {% load jqgrid_tags %}
         {% jqgrid 'upload_pipeline_modified_variants_grid' name='Modified Imported Variant' search=False upload_pipeline_id=upload_pipeline.pk %}

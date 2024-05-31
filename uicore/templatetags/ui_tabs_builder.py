@@ -72,6 +72,8 @@ def check_active_tab(tab_set: str, tab_id: str, request: HttpRequest) -> bool:
                     active_tab = parse_qs(query)["activeTab"][0]
         except Exception:
             pass
+    if not active_tab:
+        active_tab = request.session.get("active_tab")
 
     def clean_tab(check_tab_id):
         if match := CLEAN_TAB_RE.match(check_tab_id):

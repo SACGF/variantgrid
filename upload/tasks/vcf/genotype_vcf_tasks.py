@@ -18,7 +18,7 @@ from snpdb.tasks.somalier_tasks import somalier_vcf_id, somalier_all_samples
 from snpdb.variant_zygosity_count import update_all_variant_zygosity_counts_for_vcf, \
     create_variant_zygosity_counts
 from upload.models import VCFPipelineStage, UploadStep, UploadStepTaskType, UploadedVCFPendingAnnotation, \
-    UploadPipeline, SimpleVCFImportInfo, SkipUploadStepException
+    UploadPipeline, SimpleVCFImportInfo, SkipUploadStepException, ModifiedImportedVariants
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_upload_pipeline
 from variantgrid.celery import app
@@ -103,14 +103,13 @@ class ProcessGenotypeVCFDataTask(ImportVCFStepTask):
         (ie via ImportGenotypeVCFTask) - this can run in parallel """
 
     def process_items(self, upload_step):
-        from upload.vcf.vcf_import import import_vcf_file, \
-            get_preprocess_vcf_import_info, genotype_vcf_processor_factory
+        from upload.vcf.vcf_import import import_vcf_file, genotype_vcf_processor_factory
 
         upload_pipeline = upload_step.upload_pipeline
         uploaded_vcf = upload_pipeline.uploadedvcf
 
         vcf = uploaded_vcf.vcf
-        preprocess_vcf_import_info = get_preprocess_vcf_import_info(upload_pipeline)
+        preprocess_vcf_import_info = ModifiedImportedVariants.get_for_pipeline(upload_pipeline)
         bulk_inserter = genotype_vcf_processor_factory(upload_step, vcf.cohort.cohort_genotype_collection,
                                                        uploaded_vcf, preprocess_vcf_import_info)
         return import_vcf_file(upload_step, bulk_inserter)

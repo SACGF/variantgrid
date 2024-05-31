@@ -1,9 +1,10 @@
+from typing import Union
+
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404
 from guardian.shortcuts import get_objects_for_user, get_objects_for_group, get_group_perms
-from typing import Union
 
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission
 

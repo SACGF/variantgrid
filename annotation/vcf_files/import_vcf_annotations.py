@@ -11,8 +11,11 @@ from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnno
 from annotation.vep_annotation import vep_check_annotated_file_version_match
 
 
-def import_vcf_annotations(annotation_run: AnnotationRun, insert_variants=True, vep_version_check=True,
-                           delete_temp_files=settings.IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS):
+def import_vcf_annotations(
+        annotation_run: AnnotationRun,
+        insert_variants: bool = True,
+        vep_version_check: bool = True,
+        delete_temp_files: bool = settings.IMPORT_PROCESSING_DELETE_TEMP_FILES_ON_SUCCESS):
     import cyvcf2
     from library.genomics.vcf_utils import cyvcf2_header_types
 

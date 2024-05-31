@@ -133,6 +133,7 @@ class ClinVar(models.Model):
     clinvar_disease_database_name = models.TextField(null=True, blank=True)
     clinvar_review_status = models.CharField(max_length=1, null=True, choices=ClinVarReviewStatus.choices)
     clinical_significance = models.TextField(null=True, blank=True)
+
     # If clinical_significance = 'Conflicting_interpretations_of_pathogenicity'
     conflicting_clinical_significance = models.TextField(null=True, blank=True)
     highest_pathogenicity = models.IntegerField(default=0)  # Highest of clinical_significance
@@ -141,9 +142,31 @@ class ClinVar(models.Model):
     clinvar_suspect_reason_code = models.IntegerField(default=0)
     drug_response = models.BooleanField(default=False)
 
-    @property
-    def clinvar_disease_database_terms(self) -> list[str]:
-        if db_name_text := self.clinvar_disease_database_name:
+    # ONCREVSTAT
+    oncogenic_review_status = models.CharField(max_length=1, null=True, choices=ClinVarReviewStatus.choices)
+    # ONCINCL
+    oncogenic_classification = models.TextField(null=True, blank=True)
+    # ONCCONF
+    oncogenic_conflicting_classification = models.TextField(null=True, blank=True)
+
+    # ONCDN
+    oncogenic_preferred_disease_name = models.TextField(null=True, blank=True)
+    # ONCDISDB
+    oncogenic_disease_database_name = models.TextField(null=True, blank=True)
+
+    # SCIREVSTAT
+    somatic_review_status = models.CharField(max_length=1, null=True, choices=ClinVarReviewStatus.choices)
+    # SCI
+    somatic_clinical_significance = models.TextField(null=True, blank=True)
+
+    # SCIDN
+    somatic_preferred_disease_name = models.TextField(null=True, blank=True)
+    # SCIDISDB
+    somatic_disease_database_name = models.TextField(null=True, blank=True)
+
+    @staticmethod
+    def _database_terms(clinvar_db_value) -> list[str]:
+        if db_name_text := clinvar_db_value:
             def fix_name(name: str):
                 name = name.strip()
                 if name.startswith("MONDO:MONDO:"):
@@ -159,6 +182,27 @@ class ClinVar(models.Model):
         return []
 
     @property
+    def clinvar_disease_database_terms(self) -> list[str]:
+        """
+        Deprecated, use germline_disease_database_terms
+        """
+        return self.germline_disease_database_terms
+
+    @cached_property
+    def germline_disease_database_terms(self) -> list[str]:
+        return ClinVar._database_terms(self.clinvar_disease_database_name)
+
+    @cached_property
+    def somatic_disease_database_terms(self) -> list[str]:
+        return ClinVar._database_terms(self.somatic_disease_database_name)
+
+    @cached_property
+    def oncogenic_disease_database_terms(self) -> list[str]:
+        return ClinVar._database_terms(self.oncogenic_disease_database_name)
+
+    # repeat the above for oncogenic and somatic
+
+    @property
     def clinvar_clinical_sources_list(self) -> list[str]:
         if clinvar_clinical_sources := self.clinvar_clinical_sources:
             return [name.strip() for name in clinvar_clinical_sources.split("|")]
@@ -166,14 +210,43 @@ class ClinVar(models.Model):
 
     @property
     def stars(self):
-        return ClinVarReviewStatus(self.clinvar_review_status).stars()
+        """
+        deprecated - use .germline_stars
+        """
+        return self.germline_stars
+
+    @staticmethod
+    def _stars_for(value: Optional[str]) -> int:
+        if not value:
+            return 0
+        return ClinVarReviewStatus(value).stars()
+
+    @property
+    def germline_stars(self) -> int:
+        return ClinVar._stars_for(self.clinvar_review_status)
+
+    @property
+    def somatic_stars(self) -> int:
+        return ClinVar._stars_for(self.somatic_review_status)
+
+    @property
+    def oncogenic_stars(self) -> int:
+        return ClinVar._stars_for(self.oncogenic_review_status)
 
     @property
     def is_expert_panel_or_greater(self):
-        return self.stars >= CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
+        return max(self.germline_stars, self.somatic_stars, self.oncogenic_stars) >= CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 
     def get_origin_display(self):
+        """
+        FIXME use allele_origins clinvar_origin is a flag
+        it might contain multiple values
+        """
         return ClinVar.ALLELE_ORIGIN.get(self.clinvar_origin)
+
+    @property
+    def get_allele_origins_display(self):
+        return ", ".join(self.allele_origins)
 
     @cached_property
     def allele_origins(self) -> list[str]:
