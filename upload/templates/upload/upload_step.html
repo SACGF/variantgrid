@@ -1,0 +1,21 @@
+{% load ui_utils %}
+{% load js_tags %}
+{% labelled label="ID" %}{{ upload_step.pk }}{% endlabelled %}
+{% labelled label="Name" %}{{ upload_step.name }}{% endlabelled %}
+{% labelled label="Severity" %}{{ upload_step.status | severity_icon }} {{ upload_step.get_status_display }}{% endlabelled %}
+{% labelled label="Items to Process" %}{{ upload_step.items_to_process }}{% endlabelled %}
+{% labelled label="Items Processed" %}{{ upload_step.items_processed }}{% endlabelled %}
+{% labelled label="Error Message" %}{{ upload_step.error_message }}{% endlabelled %}
+{% labelled label="Input Filename" %}{{ upload_step.input_filename }}{% endlabelled %}
+{% labelled label="Output Filename" %}{{ upload_step.output_filename }}{% endlabelled %}
+{% labelled label="Start Date" %}{{ upload_step.start_date }}{% endlabelled %}
+{% labelled label="End Date" %}{{ upload_step.end_date }}{% endlabelled %}
+{% labelled label="Task Type" %}{{ upload_step.get_tasktype_display }}{% endlabelled %}
+{% labelled label="Pipeline Stage" %}{{ upload_step.get_pipieline_stage_display }}{% endlabelled %}
+{% labelled label="Pipeline Stage Dependency" %}{{ upload_step.get_pipeline_stage_dependency_display }}{% endlabelled %}
+{% labelled label="Script" %}{% code_shell upload_step.script %}{% endlabelled %}
+{% labelled label="Child Script" %}{{ upload_step.child_script }}{% endlabelled %}
+{% labelled label="Import Variant Table" %}{{ upload_step.import_variant_table }}{% endlabelled %}
+{% labelled label="Celery Task" %}{{ upload_step.celery_task }}{% endlabelled %}
+{% labelled label="Tool Version" %}{{ upload_step.tool_version }}{% endlabelled %}
+{% labelled label="Output Text" %}{{ upload_step.output_text }}{% endlabelled %}

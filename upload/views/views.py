@@ -23,6 +23,7 @@ from annotation.views import get_build_contigs
 from eventlog.models import create_event
 from library.enums.log_level import LogLevel
 from library.log_utils import log_traceback
+from library.utils.django_utils import render_ajax_view
 from snpdb.models import VCF
 from upload import forms, upload_processing, upload_stats
 from upload.models import UploadPipeline, UploadedFile, ProcessingStatus, UploadedFileTypes, \
@@ -228,6 +229,14 @@ def view_upload_stats(request):
                "total_times": total_times,
                "time_per_kilo_variant": time_per_kilo_variant}
     return render(request, 'upload/view_upload_stats_detail.html', context)
+
+
+def view_upload_step_detail(request, upload_step_id: int):
+    upload_step = get_object_or_404(UploadStep, pk=upload_step_id)
+    upload_step.upload_pipeline.uploaded_file.check_can_view(request.user)
+    return render_ajax_view(request, 'upload/upload_step.html', {
+        "upload_step": upload_step
+    })
 
 
 def view_upload_pipeline(request, upload_pipeline_id):

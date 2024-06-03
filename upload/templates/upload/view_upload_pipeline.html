@@ -11,6 +11,11 @@
 {% block title %}View upload{% endblock %}
 {% block head %}
     {% if has_upload_steps and step_start_end_lines %}
+        <script>
+            function uploadStepFilter(data) {
+                data.upload_pipeline = {{ upload_pipeline.pk }};
+            }
+        </script>
         <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
         <script>
             var COLORS = [  '#e6194b',
@@ -102,10 +107,10 @@
                             };
                             shapes.push(shape);
 
-                            if (status == 'P') { // processing - still running
+                            if (status === 'P') { // processing - still running
                                 running_markers.x.push(x_end);
                                 running_markers.y.push(y);
-                            } else if (status == 'E') { // error
+                            } else if (status === 'E') { // error
                                 crash_markers.x.push(x_end);
                                 crash_markers.y.push(y);
                             }
@@ -178,7 +183,7 @@
 
 	<div class="container">
         <h3>Upload Pipeline</h3>
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-header">Upload Pipeline {{ upload_pipeline.pk }}</div>
             <div class="card-body">
                 {% labelled label="Status" %}{{ upload_pipeline.get_status_display | severity_icon }}{{ upload_pipeline.get_status_display }}{% endlabelled %}
@@ -205,11 +210,11 @@
                             {% endif %}
                         {% endwith %}
                         {% labelled label="VCF" %}
-                            {% if uploaded_vcf.vcf %} <a href="{% url 'view_vcf' uploaded_vcf.vcf.pk %}">{{ uploaded_vcf.vcf }}</a>{% else %}VCF is still being imported{% endif %}
+                            {% if uploaded_vcf.vcf %} <a class="hover-link" href="{% url 'view_vcf' uploaded_vcf.vcf.pk %}">{{ uploaded_vcf.vcf }}</a>{% else %}VCF is still being imported{% endif %}
                         {% endlabelled %}
                         {% if uploaded_vcf.backendvcf.sample_sheet.sequencing_run %}
                             {% labelled label="Sequencing Run" %}
-                                <a href="{% url 'view_sequencing_run' uploaded_vcf.backendvcf.sample_sheet.sequencing_run.pk %}">{{ uploaded_vcf.backendvcf.sample_sheet.sequencing_run }}</a> - Auto uploaded from {{ uploaded_vcf.backendvcf.vcf }}
+                                <a class="hover-link" href="{% url 'view_sequencing_run' uploaded_vcf.backendvcf.sample_sheet.sequencing_run.pk %}">{{ uploaded_vcf.backendvcf.sample_sheet.sequencing_run }}</a> - Auto uploaded from {{ uploaded_vcf.backendvcf.vcf }}
                             {% endlabelled %}
                         {% endif %}
                     {% else %}
@@ -220,7 +225,7 @@
                         {% labelled label="Uploaded Gene List" %}{{ uploaded_gene_list.pk }}{% endlabelled %}
                         {% labelled label="Gene List" %}
                             {% if uploaded_gene_list.gene_list %}
-                                <a href="{% url 'view_gene_list' uploaded_gene_list.gene_list.pk %}">{{ uploaded_gene_list.gene_list }}</a>
+                                <a class="hover-link" href="{% url 'view_gene_list' uploaded_gene_list.gene_list.pk %}">{{ uploaded_gene_list.gene_list }}</a>
                             {% else %}
                                 <span>GeneList is still being imported</span>
                             {% endif %}
@@ -230,6 +235,9 @@
                             <i class="fa-solid fa-file-circle-xmark"></i> GeneList for this file has been deleted
                         </div>
                     {% endif %}
+                {% endif %}
+                {% if more_warning_or_error_details %}
+                    {% labelled label="Warnings & Errors" %}{{ 'W' | severity_icon }} <a class="hover-link" href="{% url "view_upload_pipeline_warnings_and_errors" upload_pipeline.pk %}">View Warnings & Errors{% endlabelled %}
                 {% endif %}
             </div>
             <div class="card-footer">
@@ -247,38 +255,37 @@
         </div>
 
         {% if step_total_stats %}
-            <h3>Steps</h3>
-            <table class="table">
-            <thead>
-                <tr>
-                    <th class="step">Step Name</th>
-                    <th class="num">Runs</th>
-                    <th class="num">Items Processed</th>
-                    <th class="num">Total Seconds</th>
-                </tr>
-            </thead>
-            {% for step_name, num_runs, items_processed, total_seconds in step_total_stats %}
-                <tr>
-                    <td class="step">{{ step_name }}</td>
-                    <td class="num"> {{ num_runs | intcomma }}</td>
-                    <td class="num"> {{ items_processed | intcomma }}</td>
-                    <td class="num"> {{ total_seconds | floatformat:1 }}</td>
-                </tr>
-            {% endfor %}
-            </table>
+            <a class="toggle-link" href="#upload-steps-times" data-toggle="collapse">Step Runs & Times</a>
+            <div id="upload-steps-times" class="collapse">
+                <table class="table">
+                <thead>
+                    <tr>
+                        <th class="step">Step Name</th>
+                        <th class="num">Runs</th>
+                        <th class="num">Items Processed</th>
+                        <th class="num">Total Seconds</th>
+                    </tr>
+                </thead>
+                {% for step_name, num_runs, items_processed, total_seconds in step_total_stats %}
+                    <tr>
+                        <td class="step">{{ step_name }}</td>
+                        <td class="num"> {{ num_runs | intcomma }}</td>
+                        <td class="num"> {{ items_processed | intcomma }}</td>
+                        <td class="num"> {{ total_seconds | floatformat:1 }}</td>
+                    </tr>
+                {% endfor %}
+                </table>
+            </div>
         {% endif %}
 
-
-		{% if more_warning_or_error_details %}
-		<div id='warnings-or-errors'>
-		<a href="{% url "view_upload_pipeline_warnings_and_errors" upload_pipeline.pk %}">
-    		<img id='vts-errors-icon' style='width: 30px; height: 30px' class='left' src="{% static 'icons/warning.png' %}" />
-    		View Warnings and Errors
-    	</a>
-        </div>
-		{% endif %}
+        {% if has_upload_steps %}
+            <h4>All Upload Steps</h4>
+            <table id="uploadstep-datatable" data-datatable-url="{% url 'upload_step_datatables' %}"  data-datatable-data='uploadStepFilter'></table>
+            <div id='upload-steps-graph'></div>
+        {% endif %}
 	</div>
 
+    {% comment %}
     <div class="container-table">
 	{% if has_upload_steps %}
     <div id='upload-steps-graph'></div>
@@ -288,6 +295,6 @@
 	</div>
 	{% endif %}
     </div>
-
+    {% endcomment %}
 
 {% endblock %}
