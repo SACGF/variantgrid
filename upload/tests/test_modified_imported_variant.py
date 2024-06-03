@@ -18,7 +18,8 @@ class TestModifiedImportedVariant(TestCase):
     def test_bcftools_format_old_variant(self):
         grch37 = GenomeBuild.get_name_or_alias('GRCh37')
         OLD_VARIANT = "NC_000019.9|536068|G|GTCCTCGTCCTTCCGGGACCCGGGGCGCTGGGAGCCTCACG"
-        old_variant_formatted = ModifiedImportedVariant.bcftools_format_old_variant(OLD_VARIANT, grch37)
+        old_variant_formatted = ModifiedImportedVariant.bcftools_format_old_variant(OLD_VARIANT,
+                                                                                    svlen=None, genome_build=grch37)
         ov = old_variant_formatted.pop()
         chrom = ov.split(":", 1)[0]
         old_chrom = OLD_VARIANT.split("|", 1)[0]
@@ -34,12 +35,14 @@ class TestModifiedImportedVariant(TestCase):
     def test_bcftools_format_old_variant_multi(self):
         grch37 = GenomeBuild.get_name_or_alias('GRCh37')
         OLD_VARIANT_MULTI_1 = "19|536068|G|GA,GTCCTCGTCCTTCCGGGACCCGGGGCGCTGGGAGCCTCACG|1"
-        old_variant_formatted = ModifiedImportedVariant.bcftools_format_old_variant(OLD_VARIANT_MULTI_1, grch37)
+        old_variant_formatted = ModifiedImportedVariant.bcftools_format_old_variant(OLD_VARIANT_MULTI_1,
+                                                                                    svlen=None, genome_build=grch37)
         alt = old_variant_formatted[0].split("/")[-1]
         self.assertEqual(alt, "GA")
 
         OLD_VARIANT_MULTI_2 = "19|536068|G|GA,GTCCTCGTCCTTCCGGGACCCGGGGCGCTGGGAGCCTCACG|2"
-        old_variant_formatted = ModifiedImportedVariant.bcftools_format_old_variant(OLD_VARIANT_MULTI_2, grch37)
+        old_variant_formatted = ModifiedImportedVariant.bcftools_format_old_variant(OLD_VARIANT_MULTI_2,
+                                                                                    svlen=None, genome_build=grch37)
         alt = old_variant_formatted[0].split("/")[-1]
         self.assertEqual(alt, "GTCCTCGTCCTTCCGGGACCCGGGGCGCTGGGAGCCTCACG")
 
