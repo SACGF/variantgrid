@@ -25,6 +25,7 @@
                 {% comment %}Showing summary data as well as all records as they're fetchd live from ClinVar{% endcomment %}
                 {% comment %}Do we need to restore more data that was in ClinVar tag before? e.g. drug_response {% endcomment %}
                 <span class="text-muted">|</span> Summary Data as of {% timestamp data.annotation_version.clinvar_version.annotation_date time_ago=True %}
+                {% admin_link clinvar %}
                 <div class="mt-4">
                     {% labelled label="Origin(s)" %}{{ clinvar.get_allele_origins_display }}{% endlabelled %}
                     {% if clinvar.germline_disease_database_terms %}

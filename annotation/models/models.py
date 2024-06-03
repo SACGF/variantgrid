@@ -86,6 +86,9 @@ class ClinVarVersion(SubVersionPartition):
         msg = f"File name '{base_name}' didn't match pattern {CLINVAR_PATTERN}"
         raise ValueError(msg)
 
+    def __str__(self):
+        date_str = self.annotation_date.strftime("%d %B %Y")
+        return f"v{self.pk}. {self.genome_build} ({date_str})"
 
 @receiver(pre_delete, sender=ClinVarVersion)
 def clinvar_version_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument

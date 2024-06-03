@@ -28,7 +28,18 @@ class AnnotationRunAdmin(ModelAdminBasics):
 @admin.register(ClinVar)
 class ClinVarAdmin(ModelAdminBasics):
 
-    list_display = ("pk", "version", "clinvar_variation_id", "variant", "clinvar_review_status")
+    list_display = ("pk", "version_short", "clinvar_variation_id", "variant_link", "clinvar_review_status", "somatic_review_status", "oncogenic_review_status")
+    list_filter = ("version", )
+
+    @admin_list_column("Version", order_field="version")
+    def version_short(self, obj: ClinVar):
+        return obj.version.pk
+
+    @admin_list_column("Variant")
+    def variant_link(self, obj: ClinVar):
+        if variant := obj.variant:
+            href = variant.get_absolute_url()
+            return SafeString(f"<a href=\"{href}\">{variant}</a>")
 
     def has_change_permission(self, request, obj=None):
         return False
