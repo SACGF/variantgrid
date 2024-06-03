@@ -47,6 +47,10 @@ class UploadStepColumns(DatatableConfig[UploadStep]):
 
 
 class UploadStepsGrid(JqGridUserRowConfig):
+    """
+    This is Grid has been replaced with the above DataTable
+    But haven't completely converted over to Grid yet
+    """
     model = UploadStep
     caption = 'Upload Steps'
     fields = ['sort_order', 'id', 'name', 'status', 'items_to_process', 'items_processed', 'error_message', 'input_filename', 'output_filename', 'start_date', 'end_date', 'task_type', 'pipeline_stage', 'pipeline_stage_dependency', 'script', 'output_text', 'tool_version__name', 'tool_version__version', 'import_variant_table', 'celery_task']

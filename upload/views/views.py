@@ -268,7 +268,8 @@ def view_upload_pipeline(request, upload_pipeline_id):
                'has_upload_steps': upload_pipeline.uploadstep_set.exists(),
                "allow_retry_import": allow_retry_import and settings.UPLOAD_ENABLED,
                "more_warning_or_error_details": more_warning_or_error_details,
-               "step_total_stats": upload_stats.get_step_total_stats(upload_pipeline),
+               # this data is redundant if there isn't multiple runs for the same step
+               "step_total_stats": upload_stats.get_step_total_stats(upload_pipeline, only_if_multiple_runs=True),
                "step_order": list(step_order),
                "step_start_end_lines": step_start_end_lines}
 
