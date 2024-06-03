@@ -73,7 +73,7 @@ class GuardianPermissionsMixin:
         klass = cls.get_permission_class()
         if klass != cls:
             # logging.info("%s delegating to %s", cls, klass)
-            queryset = klass.filter_for_user(user, queryset, **kwargs)
+            queryset = klass.filter_for_user(user, queryset=queryset, **kwargs)
         else:
             if queryset is not None:
                 klass = queryset

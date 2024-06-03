@@ -229,16 +229,18 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         raise PermissionDenied(f"You do not have permissions to access cohort id {cohort.pk}")
 
     @classmethod
-    def filter_for_user(cls, user, group_data=True, success_status_only=True):
-        cohort_qs = get_objects_for_user(user, 'snpdb.view_cohort', accept_global_perms=False)
+    def filter_for_user(cls, user, queryset=None, group_data=True, success_status_only=True):
+        if queryset is None:
+            cohort_qs = get_objects_for_user(user, 'snpdb.view_cohort', accept_global_perms=False)
 
-        # Also ones we have access to vcfs
-        vcfs_qs = VCF.filter_for_user(user, group_data=group_data)
-        vcf_cohorts = Cohort.objects.filter(pk__in=vcfs_qs.values_list("cohort__pk", flat=True))
-        cohort_qs |= vcf_cohorts
+            # Also ones we have access to vcfs
+            vcfs_qs = VCF.filter_for_user(user, group_data=group_data)
+            vcf_cohorts = Cohort.objects.filter(pk__in=vcfs_qs.values_list("cohort__pk", flat=True))
+            queryset = cohort_qs | vcf_cohorts
+
         if success_status_only:
-            cohort_qs = cohort_qs.filter(import_status=ImportStatus.SUCCESS)
-        return cohort_qs
+            queryset = queryset.filter(import_status=ImportStatus.SUCCESS)
+        return queryset
 
     @staticmethod
     def get_cohort_containing_all_samples(sample_ids, extra_cohort_filter_kwargs=None,
