@@ -7,6 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
+        ('annotation', '0067_one_off_fix_pandas_nan_to_none'),  # Refers to old fields
         ('genes', '0070_alter_genesymbol_options'),
     ]
 
