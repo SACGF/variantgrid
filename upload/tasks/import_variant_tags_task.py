@@ -10,6 +10,7 @@ from library.django_utils import UserMatcher
 from library.genomics.vcf_utils import write_vcf_from_tuples
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.pandas_utils import df_nan_to_none
+from library.utils import invert_dict
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import GenomeBuild, Variant, ImportSource, Tag, VariantAllele, VariantCoordinate, Allele
@@ -26,12 +27,11 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
     COL_CREATED = "created"
     COL_GENOME_BUILD = "view_genome_build"
     COL_TAG = "tag__id"
+    COL_GENE = "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol"
     COL_VARIANT_ID = "variant__id"
     COL_ANALYSIS_ID = "analysis__id"
     COL_ANALYSIS_NAME = "analysis__name"
     COL_USERNAME = "user__username"
-
-    # 			Gene	ID	ID	Tag	Analysis	ID	Username	Created
 
     NEW_COLUMNS = {
         COL_VARIANT_STRING: "Variant",
@@ -39,23 +39,12 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
         COL_CREATED: "Created",
         COL_GENOME_BUILD: "Genome Build",
         COL_TAG: "Tag",
+        COL_GENE: "Gene",
         COL_VARIANT_ID: "VariantID",
         COL_ANALYSIS_ID: "AnalysisID",
         COL_ANALYSIS_NAME: "Analysis",
         COL_USERNAME: "Username",
     }
-
-    def _convert_new_columns(self, row):
-        """ Convert new columns to old ones """
-        old_row = {}
-        for old_col, new_col in self.NEW_COLUMNS.items():
-            if val := row.get(old_col):
-                old_row[old_col] = val
-            elif val := row.get(new_col):
-               old_row[old_col] = val
-            else:
-                raise ValueError(f"Neither '{old_col}' or '{new_col}' present in row record: {row}")
-        return old_row
 
     def process_items(self, upload_step):
         upload_pipeline = upload_step.upload_pipeline
@@ -65,6 +54,9 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
         df = df_nan_to_none(df)
         NEW_CLASSIFICATION = "New Classification"
         REMOVE_LENGTH = len(NEW_CLASSIFICATION)
+
+        if self.COL_GENOME_BUILD not in df.columns:
+            df = df.rename(columns=invert_dict(self.NEW_COLUMNS))
 
         # view_genome_build should all be the same
         view_genome_builds = set(df["view_genome_build"])
@@ -89,8 +81,6 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
         num_skipped_records = 0
         num_skipped_with_star = 0
         for _, row in df.iterrows():
-            row = self._convert_new_columns(row)
-
             variant_string = row["variant_string"]
             if variant_string.endswith(NEW_CLASSIFICATION):
                 variant_string = variant_string[:-REMOVE_LENGTH].strip()
