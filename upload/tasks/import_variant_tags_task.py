@@ -20,6 +20,42 @@ from variantgrid.celery import app
 
 class VariantTagsCreateVCFTask(ImportVCFStepTask):
     """ Write a VCF with variants in VariantTags so they can go through normal insert pipeline """
+    # These are the original names (JQGrid js export with raw IDs)
+    COL_VARIANT_STRING = "variant_string"
+    COL_NODE = "node__id"
+    COL_CREATED = "created"
+    COL_GENOME_BUILD = "view_genome_build"
+    COL_TAG = "tag__id"
+    COL_VARIANT_ID = "variant__id"
+    COL_ANALYSIS_ID = "analysis__id"
+    COL_ANALYSIS_NAME = "analysis__name"
+    COL_USERNAME = "user__username"
+
+    # 			Gene	ID	ID	Tag	Analysis	ID	Username	Created
+
+    NEW_COLUMNS = {
+        COL_VARIANT_STRING: "Variant",
+        COL_NODE: "NodeID",
+        COL_CREATED: "Created",
+        COL_GENOME_BUILD: "Genome Build",
+        COL_TAG: "Tag",
+        COL_VARIANT_ID: "VariantID",
+        COL_ANALYSIS_ID: "AnalysisID",
+        COL_ANALYSIS_NAME: "Analysis",
+        COL_USERNAME: "Username",
+    }
+
+    def _convert_new_columns(self, row):
+        """ Convert new columns to old ones """
+        old_row = {}
+        for old_col, new_col in self.NEW_COLUMNS.items():
+            if val := row.get(old_col):
+                old_row[old_col] = val
+            elif val := row.get(new_col):
+               old_row[old_col] = val
+            else:
+                raise ValueError(f"Neither '{old_col}' or '{new_col}' present in row record: {row}")
+        return old_row
 
     def process_items(self, upload_step):
         upload_pipeline = upload_step.upload_pipeline
@@ -53,6 +89,8 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
         num_skipped_records = 0
         num_skipped_with_star = 0
         for _, row in df.iterrows():
+            row = self._convert_new_columns(row)
+
             variant_string = row["variant_string"]
             if variant_string.endswith(NEW_CLASSIFICATION):
                 variant_string = variant_string[:-REMOVE_LENGTH].strip()
