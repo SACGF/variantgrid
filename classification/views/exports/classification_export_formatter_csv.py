@@ -44,14 +44,14 @@ class FormatDetailsCSV:
 
     html_handling: CSVCellFormatting = CSVCellFormatting.PURE_TEXT
 
-    include_discordances: bool = True
+    exclude_discordances: bool = True
 
     @staticmethod
     def from_request(request: HttpRequest) -> 'FormatDetailsCSV':
         pretty = request.query_params.get('value_format') == 'labels'
         include_explains = request.query_params.get('include_explains') == 'true'
         exclude_transient = request.query_params.get('exclude_transient') == 'true'
-        include_discordances = request.query_params.get('include_discordances') == 'true'
+        exclude_discordances = request.query_params.get('exclude_discordances') == 'true'
         html_handling = CSVCellFormatting.PURE_TEXT
         if html_handling_str := request.query_params.get('html_handling'):
             html_handling = CSVCellFormatting(html_handling_str.upper())
@@ -60,7 +60,7 @@ class FormatDetailsCSV:
             pretty=pretty,
             include_explains=include_explains,
             exclude_transient=exclude_transient,
-            include_discordances=include_discordances,
+            exclude_discordances=exclude_discordances,
             html_handling=html_handling
         )
 
@@ -275,7 +275,7 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
             categories["transient"] = None
         if not self.grouping_utils.any_pending_changes:
             categories["pending_changes"] = None
-        if self.format_details.include_discordances:
+        if self.format_details.exclude_discordances:
             categories["discordance"] = None
         return ExportTweak(categories=categories)
 

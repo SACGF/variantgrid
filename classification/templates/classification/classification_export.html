@@ -200,11 +200,10 @@
 {% block content %}
 <div class="container" id="export-fields">
     {% page_help page_id='classification/export_help' title='Classification Records Export' %}
-    
-    <p class="text-info">Please refer to the terms and conditions about proper use of the classifications download.</p>
-    <p class="text-info">Once you have configured your download you can save and re-use the generated URL.</p>
     {% ui_register_tabs tab_set="internal_download" %}
     {% ui_register_tab_embedded tab_set="internal_download" label='Export Shariant Data' %}
+    <p class="text-info">Please refer to the terms and conditions about proper use of the classifications download.</p>
+    <p class="text-info">Once you have configured your download you can save and re-use the generated URL.</p>
     {% labelled label="For Downloading Via" %}
         <div class="form-check">
             <label class="form-check-label">

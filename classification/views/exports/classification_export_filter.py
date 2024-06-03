@@ -24,7 +24,7 @@ from genes.signals.gene_symbol_search import GENE_SYMBOL_PATTERN
 from library.utils import batch_iterator, local_date_string, http_header_date_now
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import GenomeBuild, Lab, Organization, Allele, Variant, AlleleOriginFilterDefault, ClinGenAllele, \
-    HGVS_UNCLEANED_PATTERN, VariantCoordinate
+    VariantCoordinate
 from snpdb.signals.variant_search import get_results_from_variant_coordinate
 
 @dataclass
@@ -444,6 +444,14 @@ class ClassificationFilter:
         return share_levels
 
     @cached_property
+    def excluded_record_filters(self) -> List[str]:
+        """
+        Returns a list of record filters that are not valid
+        """
+        invalid_filters = []
+        return invalid_filters
+
+    @cached_property
     def cms_qs(self) -> QuerySet[ClassificationModification]:
         """
         Returns a new QuerySet of all classifications BEFORE
@@ -515,8 +523,8 @@ class ClassificationFilter:
                 elif GENE_SYMBOL_PATTERN.match(item):
                     if gene_match := classification_gene_symbol_filter(item):
                         internal_lab_filters.append(classification_gene_symbol_filter(item))
-                elif HGVS_UNCLEANED_PATTERN.match(item):
-                    internal_lab_filters.append(Q(Q(classification__evidence__c_hgvs__value=item)))
+                    else:
+                        self.excluded_record_filters.append(item)
                 else:
                     try:
                         if vc := VariantCoordinate.from_string(item.strip(), self.genome_build):
@@ -527,7 +535,7 @@ class ClassificationFilter:
                                 if allele := i.allele:
                                     internal_lab_filters.append(Q(classification__allele_info__allele=allele))
                     except ValueError:
-                        print(f"Failed to parse {item}")
+                        self.excluded_record_filters.append(item)
             if internal_lab_filters:
                 internal_lab_filters_single = reduce(operator.or_, internal_lab_filters)
                 cms = cms.filter(internal_lab_filters_single)

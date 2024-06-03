@@ -1,6 +1,4 @@
-{% load ui_menu_bars %}
 {% load ui_utils %}
-{% load ui_help %}
 {% load js_tags %}
 {% load lab_tags %}
 {% load static %}
@@ -20,7 +18,7 @@
         </div>
         <div class="form-check">
             <label class="form-check-label">
-                <input id="share_level_any" name="share_level" value="any" type="radio" class="form-check-input" />
+                <input {% if form_data.share_level == 'any' %} checked="checked" {% endif %} id="share_level_any" name="share_level" value="any" type="radio" class="form-check-input" />
                 <img src="{% static 'icons/share_level/lab.png' %}" class="tiny-icon" />
                 <img src="{% static 'icons/share_level/institution.png' %}" class="tiny-icon" />
                 <img src="{% static 'icons/share_level/logged_in_users.png' %}" class="tiny-icon" />
@@ -30,25 +28,27 @@
         </div>
     {% endlabelled %}
     {% labelled label="Genome Build" %}
-        {% for genome_build in genome_builds %}
-            {% if genome_build.enabled %}
-                <div class="form-check">
-                    <label class="form-check-label">
-                        <input class="form-check-input" {% if genome_build.name == default_genome_build.name %}checked="checked"{% endif %} id="genome_build_{{ genome_build.name }}" type="radio" name="genome_build" value="{{ genome_build.name }}" />
-                        {{ genome_build.name }}
-                    </label>
-                </div>
-            {% endif %}
-        {% endfor %}
+        <div class="form-check">
+            <label class="form-check-label">
+                <input checked="checked" id="genome_build_37" name="genome_build" value="GRCh37" type="radio" class="form-check-input" />
+                GRCh37
+            </label>
+        </div>
+        <div class="form-check">
+            <label class="form-check-label">
+                <input {% if form_data.genome_build == 'GRCh38' %} checked="checked" {% endif %} id="genome_build_38" name="genome_build" value="GRCh38" type="radio" class="form-check-input" />
+                GRCh38
+            </label>
+        </div>
     {% endlabelled %}
     {% labelled label="Allele Origin" %}
-        {% allele_origin_toggle show_label=False %}
+        {% allele_origin_toggle show_label=False prefill=form_data.allele_origin %}
         <div class="text-muted">Note that records with an allele origin other than germline or somatic will always be included in downloads.</div>
     {% endlabelled %}
     {% labelled label="Record Filter/s"%}
         <div class="form-check px-2">
             <label class="form-check-label">
-                <textarea class="form-control" rows="6" cols="80" id="record_filters" name="record_filters"></textarea>
+                <textarea class="form-control" rows="6" cols="80" id="record_filters" name="record_filters">{{ form_data.record_filters }}</textarea>
             </label>
         </div>
     {% endlabelled %}
