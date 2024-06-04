@@ -16,8 +16,7 @@ from snpdb.search import search_receiver, SearchInputInstance, SearchExample, HA
     )
 )
 def scv_search(search_input: SearchInputInstance):
-    search_text = search_input.search_string
-    search_text = search_text.split(' ')[0]
+    search_text = search_input.search_string.upper().split(' ')[0].split('.')[0]
     if len(search_text) < 12:
         search_text = f"SCV{'0' * (12 - len(search_text))}{search_text[3:]}"
     clinvar_export: ClinVarExport = ClinVarExport.objects.filter(scv=search_text).first()
