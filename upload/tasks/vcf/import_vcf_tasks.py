@@ -60,13 +60,13 @@ class ScheduleMultiFileOutputTasksTask(ImportVCFStepTask):
 
         Example is to split a VCF up into multiple sub files, then launch parallel processors """
 
-    def process_items(self, upload_step):
+    def process_items(self, upload_step: UploadStep):
         child_task_class = import_class(upload_step.child_script)
-        multi_steps = upload_step.get_multi_input_files_and_records()
-        if not multi_steps:
-            raise ValueError("No split VCF records. This is caused by pipeline error or empty VCF after cleaning")
-
-        self._schedule_steps(child_task_class, upload_step, multi_steps)
+        if multi_steps := upload_step.get_multi_input_files_and_records():
+            self._schedule_steps(child_task_class, upload_step, multi_steps)
+        else:
+            upload_step.output_text = "Warning: Empty VCF so no split VCF records"
+            upload_step.save()
         return 0
 
 
