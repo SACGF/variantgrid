@@ -9,8 +9,9 @@ from snpdb.search import search_receiver, SearchInputInstance, SearchExample, HA
 @search_receiver(
     search_type=ClinVarExport,
     pattern=HAS_SCV,
+    sub_name="SCV",
     example=SearchExample(
-        note="SCV (Submitted ClinVar Record)",
+        note="Submitted ClinVar Record",
         examples=["SCV000056789"]
     )
 )

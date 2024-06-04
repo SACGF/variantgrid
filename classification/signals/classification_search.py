@@ -19,7 +19,7 @@ from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 @search_receiver(
     search_type=Classification,
     example=SearchExample(
-        note="The lab record ID",
+        note="The lab Record ID",
         examples=["CR_1545" if settings.CLASSIFICATION_ID_OVERRIDE_PREFIX else "vc1545"]
     )
 )
