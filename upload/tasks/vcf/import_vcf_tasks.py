@@ -144,8 +144,7 @@ class LiftoverCreateVCFTask(ImportVCFStepTask):
 class LiftoverProcessFailureVCFTask(ImportVCFStepTask):
 
     def process_items(self, upload_step: UploadStep):
-        preprocess_vcf_import_info = ModifiedImportedVariants.get_for_pipeline(upload_step.upload_pipeline)
-        bulk_inserter = FailedLiftoverVCFProcessor(upload_step, preprocess_vcf_import_info)
+        bulk_inserter = FailedLiftoverVCFProcessor(upload_step, preprocess_vcf_import_info=None)
         return import_vcf_file(upload_step, bulk_inserter)
 
 
