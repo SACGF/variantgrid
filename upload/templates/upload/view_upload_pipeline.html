@@ -237,7 +237,7 @@
                     {% endif %}
                 {% endif %}
                 {% if more_warning_or_error_details %}
-                    {% labelled label="Warnings & Errors" %}{{ 'W' | severity_icon }} <a class="hover-link" href="{% url "view_upload_pipeline_warnings_and_errors" upload_pipeline.pk %}">View Warnings & Errors{% endlabelled %}
+                    {% labelled label="Warnings & Errors" %}{{ 'W' | severity_icon }} <a class="hover-link" href="{% url "view_upload_pipeline_warnings_and_errors" upload_pipeline.pk %}">View Warnings & Errors</a>{% endlabelled %}
                 {% endif %}
             </div>
             <div class="card-footer">
