@@ -17,8 +17,10 @@ reference base anyway to construct it
 """
 import hashlib
 import itertools
+import json
 import logging
 import time
+import uuid
 from typing import Optional
 
 import requests
@@ -26,6 +28,7 @@ from django.conf import settings
 
 from library.constants import MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
+from library.django_utils.django_file_utils import get_import_processing_filename
 from library.utils import iter_fixed_chunks, get_single_element
 from snpdb.models import Allele, ClinGenAllele, GenomeBuild, Variant, VariantAllele, Contig, GenomeFasta, \
     VariantCoordinate
@@ -71,9 +74,14 @@ class ClinGenAlleleTooLargeException(ClinGenAllele.ClinGenAlleleRegistryExceptio
 class ClinGenAlleleRegistryAPI:
     """ Manages API connections to ClinGen Allele Registry
         This has been overridden by mock_clingen_api for unit testing """
-    def __init__(self):
+    def __init__(self, api_failure_output_filename=None):
         self.login = settings.CLINGEN_ALLELE_REGISTRY_LOGIN
         self.password = settings.CLINGEN_ALLELE_REGISTRY_PASSWORD
+        if api_failure_output_filename is None:
+            api_failure_output_filename = get_import_processing_filename(uuid.uuid4(),
+                                                                         "api_failure_output_filename.json",
+                                                                         prefix="clingen_allele_registry")
+        self.api_failure_output_filename = api_failure_output_filename
 
     @staticmethod
     def check_api_response(api_response):
@@ -97,9 +105,24 @@ class ClinGenAlleleRegistryAPI:
         gb_time = str(int(time.time()))
         token = hashlib.sha1((url + identity + gb_time).encode('utf-8')).hexdigest()
         request = url + '&gbLogin=' + self.login + '&gbTime=' + gb_time + '&gbToken=' + token
-        response = requests.put(request, data=data, timeout=MINUTE_SECS)
-        self._check_response(response)
-        return response.json()
+        try:
+            response = requests.put(request, data=data, timeout=MINUTE_SECS)
+            self._check_response(response)
+            return response.json()
+        except Exception as e:
+            if self.api_failure_output_filename:
+                api_failure = {
+                    "request": request,
+                    "data": data,
+                }
+                with open(self.api_failure_output_filename, "w") as f:
+                    json.dump(api_failure, f)
+
+                msg = f"API call failed, debug info written to '{self.api_failure_output_filename}'"
+                raise ClinGenAllele.ClinGenAlleleRegistryException(msg) from e
+            else:
+                raise e
+
 
     @classmethod
     def get_code(cls, code):
