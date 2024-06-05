@@ -120,6 +120,7 @@ class ClinGenAlleleRegistryAPI:
             if self.api_failure_output_filename:
                 api_failure = {
                     "request": request,
+                    "timeout": timeout,
                     "data": data,
                 }
                 with open(self.api_failure_output_filename, "w") as f:
