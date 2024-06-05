@@ -34,14 +34,12 @@ class FormatDetailsMVL:
     """
     Object to track how specific Alissa instance wants to format data.
     Specifically some understand the term "LIKELY_BENIGN" and some "LIKELY BENIGN"
+    :var classification_mapping: VariantGrid -> Alissa of ekey clinical_significance
+    :var conflict_strategy: Alissa only allows a single classification for a variant, so if there's conflicting use this
+    :var is_shell: If true, just used for testing of c.hgvs imports and omits all other data (safe to share around)
     """
 
     def __init__(self):
-        """
-        :var classification_mapping: VariantGrid -> Alissa of ekey clinical_significance
-        :var conflict_strategy: Alissa only allows a single classification for a variant, so if there's conflicting use this
-        :var is_shell: If true, just used for testing of c.hgvs imports and omits all other data (safe to share around)
-        """
         self.classification_mapping = {
             'B': 'BENIGN',
             'LB': 'LIKELY_BENIGN',
@@ -69,7 +67,7 @@ class FormatDetailsMVL:
     def alissa_label_for(self, raw_classification: str) -> str:
         """
         :param raw_classification: The value of the ekey clinical_significance as known by variantgrid
-        :return: the corresponding Alissa value (or Alissa's VUS for any non standard values)
+        :return: the corresponding Alissa value (or Alissa's VUS for any non-standard values)
         """
         return self.classification_mapping.get(raw_classification) or \
             self.classification_mapping.get('VUS')
@@ -123,7 +121,7 @@ class MVLCHGVSData:
 @dataclass
 class MVLClinicalSignificance:
     """
-    This is the equivilent of the evidence key 'clinical_significance'
+    This is the equivalent of the evidence key 'clinical_significance'
     :var alissa: The overall value to be reported to Alissa
     """
     alissa: str
@@ -134,7 +132,7 @@ class MVLClinicalSignificance:
     def from_data(mvl_data: MVLCHGVSData):
         special_classifications = set()
         all_classifications = set()
-        alissa_clasification: str = ""
+        alissa_classification: str = ""
         best_score = None
         strategy = mvl_data.format.conflict_strategy
 
@@ -152,10 +150,10 @@ class MVLClinicalSignificance:
                     (score < best_score and strategy == ConflictStrategy.MOST_BENIGN) or \
                     (score > best_score and strategy == ConflictStrategy.MOST_PATHOGENIC):
                 best_score = score
-                alissa_clasification = mvl_data.format.alissa_label_for(raw_classification)
+                alissa_classification = mvl_data.format.alissa_label_for(raw_classification)
 
         return MVLClinicalSignificance(
-            alissa=alissa_clasification,
+            alissa=alissa_classification,
             special=sorted(special_classifications),
             all=sorted(all_classifications)
         )
@@ -364,7 +362,7 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
                     return "true" if obj else "false"
                 return str(obj).replace("\n", "").replace("\"", "")
 
-            # can't juse simple JSON because we don't want to close this off yet
+            # can't use simple JSON because we don't want to close this off yet
             return ['{"molecularVariants":[']
         elif self.file_format == FormatDetailsMVLFileFormat.HTML:
             return ["<html><body>"]

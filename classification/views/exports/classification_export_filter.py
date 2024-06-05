@@ -73,6 +73,11 @@ class AlleleData:
     source: 'ClassificationFilter'
     allele_id: int
     allele_origin_bucket: Optional[AlleleOriginBucket] = None
+    """
+    Single allele origin, ONLY if we're splitting allele origin by bucket
+    TODO, make this a method and make calling it an exception if we didn't split by allele origin
+    """
+
     all_cms: List[ClassificationIssue] = field(default_factory=list)  # misleading name, should be all_ci or something
 
     def sort(self):
@@ -144,6 +149,13 @@ class AlleleData:
     def cms(self) -> List[ClassificationModification]:
         # The classifications that should be exported (passed validation, not withdrawn)
         return [ci.classification for ci in self.all_cms if not ci.has_issue]
+
+    @property
+    def cms_allele_origins(self) -> set[AlleleOriginBucket]:
+        all_allele_origins: set[AlleleOriginBucket] = set()
+        for cm in self.cms:
+            all_allele_origins.add(AlleleOriginBucket(cm.classification.allele_origin_bucket))
+        return all_allele_origins
 
     @property
     def cms_regardless_of_issues(self) -> List[ClassificationModification]:
@@ -235,6 +247,25 @@ class ClassificationFilter:
     row_limit: Optional[int] = None
     _last_modified: str = None
     clinvar_export: bool = False
+
+    @property
+    def description(self):
+        parts = []
+        if exclude_sources := self.exclude_sources:
+            parts.append(f"Excluding Labs: {', '.join(str(source) for source in exclude_sources)}")
+        if include_sources := self.include_sources:
+            parts.append(f"Including Only Labs: {', '.join(str(source) for source in include_sources)}")
+        if self.allele_origin_filter != AlleleOriginFilterDefault.SHOW_ALL:
+            parts.append(f"Including Only: {self.allele_origin_filter.label}")
+        if since := self.since:
+            parts.append(f"Since {since.strftime('%Y%m%d')}")
+        if self.allele:
+            parts.append(f"Limited to Single Allele")
+        if self.min_share_level == ShareLevel.ALL_USERS:
+            parts.append(f"Shared Data Only")
+        if not parts:
+            return "No Filters"
+        return ", ".join(parts)
 
     def __post_init__(self):
         self._last_modified = http_header_date_now()

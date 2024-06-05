@@ -1,41 +1,33 @@
-import re
-import urllib
 from dataclasses import dataclass
 from enum import Enum
+from functools import cached_property
 
 from django.conf import settings
-from django.contrib.sites.models import Site
 from django.http import HttpRequest
 from django.urls import reverse
+from more_itertools import first
 
 from classification.enums import SpecialEKeys, AlleleOriginBucket
-from classification.models import EvidenceKey, ClassificationModification, EvidenceKeyMap
+from classification.models import EvidenceKeyMap
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
+from classification.views.exports.vcf_export_utils import ExportVCF, export_vcf_info_cell, VCFHeaderType, VCFHeaderNumberSpecial, VCFHeader, VCFExportTweak
 from library.django_utils import get_url_from_view_path
-from library.utils import delimited_row, VCFDialect
-from snpdb.models import GenomeBuildContig
+from snpdb.models import Variant, Allele
 
 
-class FormatDetailsVCFEncodingLevel(str, Enum):
-    BASIC = "basic"
-    FULL = "full"
+class VCFTargetSystem(str, Enum):
+    EMEDGENE = "emedgene"
 
 
 @dataclass(frozen=True)
 class FormatDetailsVCF:
-    encoding_level: FormatDetailsVCFEncodingLevel
-    db_prefix: str = settings.VARIANT_VCF_DB_PREFIX
+    target_system: VCFTargetSystem = VCFTargetSystem.EMEDGENE
 
     @staticmethod
     def from_request(request: HttpRequest) -> 'FormatDetailsVCF':
-        encoding_level = FormatDetailsVCFEncodingLevel.BASIC
-        if request.query_params.get('encoding') == 'full':
-            encoding_level = FormatDetailsVCFEncodingLevel.FULL
-        return FormatDetailsVCF(
-            encoding_level=encoding_level
-        )
+        return FormatDetailsVCF()
 
 
 ALLELE_ORIGIN_BUCKET_TO_LABEL = {
@@ -44,11 +36,114 @@ ALLELE_ORIGIN_BUCKET_TO_LABEL = {
     AlleleOriginBucket.UNKNOWN: "unknown"
 }
 
+
+CLASSIFICATION_VALUE_TO_NUMBER = {
+    "B": 1,
+    "LB": 2,
+    "LP": 4,
+    "LO": 4,
+    "P": 5,
+    "O": 5
+}
+
+
+@dataclass(frozen=True)
+class ClassificationVCF(ExportVCF):
+    allele_data: AlleleData
+
+    def get_variant(self) -> Variant:
+        return self.allele_data.cached_variant
+
+    def get_allele(self) -> Allele:
+        return self.allele_data.cached_allele
+
+    @export_vcf_info_cell(
+        header_id="SVLEN",
+        number=VCFHeaderNumberSpecial.UNBOUND,
+        header_type=VCFHeaderType.Integer,
+        description="Difference in length between REF and ALT alleles",
+        categories={"standard": True})
+    def svlen(self):
+        return self.allele_data.cached_variant.svlen
+
+    @export_vcf_info_cell(
+        header_id="link",
+        number=1,
+        header_type=VCFHeaderType.String,
+        description="$site_name URL",
+        categories={"standard": True, VCFTargetSystem.EMEDGENE.value: True})
+    def link(self):
+        return get_url_from_view_path(reverse("view_allele_compact", kwargs={"allele_id": self.allele_data.cached_allele.id}))
+
+    @export_vcf_info_cell(
+        header_id="significance",
+        number=1,
+        header_type=VCFHeaderType.Integer,
+        description="Classification, 1 = Benign, 2 = Likely Benign, 3 = VUS/Other, 4 = Likely Pathogenic/Oncogenic, 5 = Pathogenic/Oncogenic",
+        categories={VCFTargetSystem.EMEDGENE.value: True})
+    def significance(self):
+        all_values = []
+        for cm in self.allele_data.cms:
+            classification_value = CLASSIFICATION_VALUE_TO_NUMBER.get(cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE), 3)
+            all_values.append(classification_value)
+        if all_values:
+            return max(all_values)
+        else:
+            return 3
+
+    @export_vcf_info_cell(
+        header_id="allele_origin",
+        number=1,
+        header_type=VCFHeaderType.String,
+        description="Allele origin bucket, values will be: somatic, germline, mixed or unknown",
+        categories={"standard": True})
+    def allele_origin(self):
+        allele_origins = self.allele_data.cms_allele_origins
+        if all_origin_counts := len(allele_origins):
+            if all_origin_counts > 1:
+                return "mixed"
+            else:
+                return ALLELE_ORIGIN_BUCKET_TO_LABEL.get(first(allele_origins))
+        else:
+            # not sure how we got 0 allele origins, but just in case
+            return "unknown"
+
+    @export_vcf_info_cell(
+        header_id="category",
+        number=1,
+        header_type=VCFHeaderType.String,
+        description="Free text containing various information such as discordance status, number of labs, full classification",
+        categories={VCFTargetSystem.EMEDGENE.value: True}
+    )
+    def category(self):
+        """
+        Jam everything into this field as it gets displayed with no processing in emedgene
+        """
+        parts = []
+        for cms in self.allele_data.cms:
+            if discordance_status := self.allele_data.source.is_discordant(cms):
+                parts.append("discordance_" + discordance_status.value)
+                break
+        labs = set()
+        cs_values = set()
+        scs_values = set()
+        clin_sig_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+        somatic_clin_sig_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+        for cms in self.allele_data.cms:
+            labs.add(cms.lab)
+            if cs_val := cms.get(SpecialEKeys.CLINICAL_SIGNIFICANCE):
+                cs_values.add(cs_val)
+            if scs_val := cms.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE):
+                scs_values.add(scs_val)
+
+        parts.append(f"labs:{len(labs)}")
+        parts += [clin_sig_e_key.pretty_value(cs_val) for cs_val in clin_sig_e_key.sort_values(cs_values)]
+        parts += [somatic_clin_sig_e_key.pretty_value(cs_val) for cs_val in somatic_clin_sig_e_key.sort_values(scs_values)]
+        return "|".join(parts)
+
+
 @register_classification_exporter("vcf")
 class ClassificationExportFormatterVCF(ClassificationExportFormatter):
-    """
-    Exports data in the format that Agilent's Alissa can import it
-    """
 
     def __init__(self, classification_filter: ClassificationFilter, format_details: FormatDetailsVCF):
         self.format_details = format_details
@@ -58,154 +153,37 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
     @classmethod
     def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterVCF':
         classification_filter = ClassificationFilter.from_request(request)
-        classification_filter.allele_origin_split = True
         return ClassificationExportFormatterVCF(
             classification_filter=classification_filter,
             format_details=FormatDetailsVCF.from_request(request)
         )
 
-    def generate_info_for_key(self, ekey: EvidenceKey):
-        return f'##INFO=<ID={ekey.key},Number=.,Type=String,Description="{ekey.pretty_label}">'
-
-    def generate_value_for_key(self, ekey: EvidenceKey, record: ClassificationModification):
-        return self.vcf_safe(record.get(ekey.key, None))
-
-    def vcf_safe(self, value):
-        if value is None:
-            value = ''
-        elif isinstance(value, list):
-            value = '|'.join(value)
-        else:
-            value = str(value)
-
-        if self.format_details.encoding_level == FormatDetailsVCFEncodingLevel.FULL:
-            return urllib.parse.quote(value)
-        else:
-            value = value.replace('[', '').replace(']', '')  # square brackets used for org name but might cause issues
-            value = value.replace(' ', '_').replace('\t', '_').replace('\n', '_')
-            value = value.replace(';', ':')
-            value = value.replace(',', '.')
-            return value
+    @cached_property
+    def export_tweak(self) -> VCFExportTweak:
+        return VCFExportTweak(
+            # TODO support other formats
+            categories={"emedgene": True}
+        )
 
     def header(self) -> list[str]:
-        genome_build = self.classification_filter.genome_build
-        assembly = genome_build.name
-
-        out = [
-            '##fileformat=VCFv4.1',
-            '##ALT=<ID=NON_REF,Description="Represents any possible alternative allele at this location">',
-            f'##reference={genome_build.name}',
-        ]
-
         genome_build_str = '37'
         if self.genome_build.is_version(38):
             genome_build_str = '38'
-
         contig_field = f'classification__allele_info__grch{genome_build_str}__variant__locus__contig'
-        contigs = self.classification_filter.cms_qs.values_list(contig_field, flat=True).order_by(contig_field).distinct()
+        contig_qs = self.classification_filter.cms_qs.values_list(contig_field, flat=True).order_by(contig_field).distinct()
 
-        for gbc in GenomeBuildContig.objects.filter(genome_build=genome_build, contig__in=contigs).order_by('order').select_related(
-                'contig'):
-            contig = gbc.contig
-            out += [f'##contig=<ID={contig.name},length={contig.length},assembly={assembly}>']
-        # fixme - substitute application name
+        all_vcf_headers = ClassificationVCF.complete_header(
+            genome_build=self.genome_build,
+            contigs=contig_qs,
+            extras=[VCFHeader(settings.SITE_NAME + "_dataFilters", value=self.classification_filter.description)],
+            export_tweak=self.export_tweak
+        )
+        return [str(header) for header in all_vcf_headers]
 
-        out += [
-            '##INFO=<ID=count,Number=1,Type=Integer,Description="Number of records for this variant">',
-            '##INFO=<ID=url,Number=1,Type=String,Description="Shariant URL record">',
-            '##INFO=<ID=lab,Number=.,Type=String,Description="Source lab for the variant classifications">',
-            f'##INFO=<ID=chgvs,Number=.,Type=String,Description="The c.hgvs for the variants in {self.genome_build.name}">',
-            '##INFO=<ID=multiple_clinical_significances,Number=0,Type=Flag,Description="Present if there are multiple clinical significances for the variant">',
-            '##INFO=<ID=discordant,Number=.,Type=Integer,Description="If 1, indicates that the corresponding classification is in discordance">',
-            '##INFO=<ID=condition,Number=.,Type=String,Description="Condition Under Curation">',
-            '##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Difference in length between REF and ALT alleles">',
-            '##INFO=<ID=allele_origin,Number=1,Type=String,Description="Allele origin bucket, values will be: somatic, germline or unknown'
-        ]
-        for e_key in self.report_keys:
-            out += [self.generate_info_for_key(e_key)]
-
-        site = Site.objects.get_current()
-        out += [
-            f'##readme=Generated from {site.name} using VariantGrid technology',
-            f'##readme=For variants with multiple classifications, each info will be listed in corresponding order, e.g. the 2nd variant value is for the same record as the 2nd condition'
-        ]
-
-        # if len(self.error_message_ids):
-        #     out += [f'##readme=Warning at least {len(self.error_message_ids)} records had issues with their variants and could not be included']
-
-        header_cols = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO']
-        out += [delimited_row(header_cols, delimiter='\t', dialect=VCFDialect)]
-        return out
-
-    def row(self, data: AlleleData) -> list[str]:
-        if (vcms := data.cms) and (target_variant := data.cached_variant) and (locus := target_variant.locus) and (contig := locus.contig):
-            cols = []
-
-            # CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO
-            cols.append(contig.name)  # CHROM
-            cols.append(locus.position)  # POS
-            cols.append(self.format_details.db_prefix + str(target_variant.id))  # ID
-            cols.append(locus.ref.seq)  # REF
-            cols.append(target_variant.alt.seq)  # ALT
-            cols.append('.')  # QUAL
-            cols.append('PASS')  # FILTER
-            url = get_url_from_view_path(reverse("view_allele_from_variant", kwargs={"variant_id": target_variant.id}))
-
-            info_dict = {
-                "count": len(vcms),
-                "url": self.vcf_safe(url),
-            }
-            if target_variant.svlen:
-                info_dict['SVLEN'] = target_variant.svlen
-
-            # add lab names, and also calculate if we have conflicting classifications and include that flag if appropriate
-            cs_counts: dict[str, int] = {}
-            lab_names: list[str] = []
-            c_hgvses: list[str] = []
-            discordances: list[str] = []
-            conditions: list[str] = []
-
-            def vcf_tidy(text: str):
-                text = re.sub('[^0-9a-zA-Z]+', ' ', text)
-                text = re.sub(' {2,}', ' ', text)
-                return text
-
-            for record in vcms:
-                lab_name = self.vcf_safe(vcf_tidy(record.classification.lab.organization.name) + '/' + vcf_tidy(record.classification.lab.name))
-
-                lab_names.append(lab_name)
-                cs = record.get(SpecialEKeys.CLINICAL_SIGNIFICANCE, None)
-                if cs:
-                    cs_counts[cs] = cs_counts.get(cs, 0) + 1
-                c_hgvs = record.classification.allele_info[data.source.genome_build].c_hgvs or ''
-
-                c_hgvses.append(c_hgvs)
-                discordances.append('1' if self.classification_filter.is_discordant(record) else '0')
-                conditions.append(self.vcf_safe(record.condition_text))
-
-            info_dict['lab'] = ','.join(lab_names)
-            info_dict["chgvs"] = ','.join(c_hgvses)
-            info_flags = []
-            if len(cs_counts) > 1:
-                info_flags.append("multiple_clinical_significances")
-            info_dict['discordant'] = ','.join(discordances)
-            info_dict['condition'] = ','.join(conditions)
-            info_dict['allele_origin'] = ALLELE_ORIGIN_BUCKET_TO_LABEL.get(data.allele_origin_bucket)
-
-            # loop through all the keys we're choosing to print out
-            for ekey in self.report_keys:
-                parts = []
-                for record in vcms:
-                    parts.append(self.generate_value_for_key(ekey, record))
-                info_dict[ekey.key] = ','.join(parts)
-
-            info_list = [f"{k}={v}" for k, v in info_dict.items()] + info_flags
-            info = ";".join(info_list)
-            cols.append(info)  # INFO
-
-            return [delimited_row(cols, delimiter='\t', dialect=VCFDialect)]
-        else:
-            return []
+    def row(self, allele_data: AlleleData) -> list[str]:
+        if allele_data.cms:
+            if row := ClassificationVCF(allele_data).vcf_row(export_tweak=self.export_tweak):
+                return [row]
 
     def content_type(self) -> str:
         return "text/plain"

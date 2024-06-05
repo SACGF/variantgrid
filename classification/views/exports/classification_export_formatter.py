@@ -66,6 +66,7 @@ class ClassificationExportFormatter(ABC):
             filename_parts.append(str(self.classification_filter.genome_build))
 
         # set by the decorator
+        # noinspection PyUnresolvedReferences
         filename_parts.append(self.format_type)
 
         if part is not None:
