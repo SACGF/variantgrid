@@ -7,7 +7,7 @@ import cyvcf2
 import vcf
 
 from library.utils import open_handle_gzip
-from snpdb.models import Variant, Sequence, GenomeFasta
+from snpdb.models import Variant, Sequence, GenomeFasta, SequenceRole
 
 
 def cyvcf2_header_types(cyvcf2_reader) -> defaultdict:
@@ -145,7 +145,8 @@ def get_contigs_header_lines(genome_build, standard_only=True, contig_allow_list
     return get_vcf_header_contig_lines(contigs)
 
 
-def write_cleaned_vcf_header(genome_build, source_vcf_filename: str, output_filename: str, new_info_lines: list[str] = None):
+def write_cleaned_vcf_header(genome_build, source_vcf_filename: str, output_filename: str,
+                             new_info_lines: list[str] = None, standard_contigs_only=False):
     contig_regex = re.compile(r"^##contig=<ID=(.+),length=(\d+)")
 
     header_lines = []
@@ -157,7 +158,6 @@ def write_cleaned_vcf_header(genome_build, source_vcf_filename: str, output_file
 
     # These are used to validate contigs in header
     genome_fasta = GenomeFasta.get_for_genome_build(genome_build)
-    chrom_to_contig_id = genome_build.get_chrom_contig_id_mappings()
     contig_lengths = dict(genome_build.contigs.values_list("pk", "length"))
     contig_to_fasta_names = genome_fasta.get_contig_id_to_name_mappings()
 
@@ -176,10 +176,14 @@ def write_cleaned_vcf_header(genome_build, source_vcf_filename: str, output_file
             elif m := contig_regex.match(line):
                 # Strip existing contig lines from header - though check they match so we don't get build swaps
                 contig_name, provided_contig_length = m.groups()
-                if contig_id := chrom_to_contig_id.get(contig_name):
-                    if fasta_chrom := contig_to_fasta_names.get(contig_id):
+                if contig := genome_build.chrom_contig_mappings.get(contig_name):
+                    if standard_contigs_only:
+                        if contig.role != SequenceRole.ASSEMBLED_MOLECULE:
+                            continue
+
+                    if fasta_chrom := contig_to_fasta_names.get(contig.pk):
                         provided_contig_length = int(provided_contig_length)
-                        ref_contig_length = contig_lengths[contig_id]
+                        ref_contig_length = contig_lengths[contig.pk]
                         if provided_contig_length != ref_contig_length:
                             msg = f"VCF header contig '{contig_name}' (length={provided_contig_length}) has " + \
                                 f"different length than ref contig {fasta_chrom} (length={ref_contig_length})"

@@ -996,6 +996,8 @@ class AnnotationRun(TimeStampedModel):
 class AbstractVariantAnnotation(models.Model):
     """ Common fields between VariantAnnotation and VariantTranscriptAnnotation
         These fields are PER-TRANSCRIPT """
+    SV_HGVS_TOO_LONG_MESSAGE = "c.HGVS not calculated due to length"
+
     version = models.ForeignKey(VariantAnnotationVersion, on_delete=CASCADE)
     variant = models.ForeignKey(Variant, on_delete=CASCADE)
     annotation_run = models.ForeignKey(AnnotationRun, on_delete=CASCADE)
@@ -1050,6 +1052,10 @@ class AbstractVariantAnnotation(models.Model):
         abstract = True
 
     @property
+    def has_hgvs_c(self) -> bool:
+        return self.hgvs_c and self.hgvs_c != self.SV_HGVS_TOO_LONG_MESSAGE
+
+    @property
     def transcript_accession(self):
         """ Get transcript_id (with version if possible) """
         if self.transcript_version:
@@ -1093,7 +1099,7 @@ class AbstractVariantAnnotation(models.Model):
 
     def get_hgvs_c_with_symbol(self) -> str:
         hgvs_c = self.hgvs_c
-        if hgvs_c and self.symbol:
+        if self.has_hgvs_c and self.symbol:
             from genes.hgvs import HGVSMatcher
             hgvs_matcher = HGVSMatcher(self.version.genome_build)
             hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_c)

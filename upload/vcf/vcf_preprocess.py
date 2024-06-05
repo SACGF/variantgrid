@@ -60,7 +60,8 @@ def _write_cleaned_header(genome_build, upload_pipeline, vcf_filename) -> str:
     HEADERS = [
         f'##INFO=<ID={tag},Number=1,Type=String,Description="Original variant. Format: CHR|POS|REF|ALT|USED_ALT_IDX">',
     ]
-    write_cleaned_vcf_header(genome_build, vcf_filename, cleaned_vcf_header_filename, new_info_lines=HEADERS)
+    write_cleaned_vcf_header(genome_build, vcf_filename, cleaned_vcf_header_filename,
+                             new_info_lines=HEADERS, standard_contigs_only=True)
     return cleaned_vcf_header_filename
 
 
