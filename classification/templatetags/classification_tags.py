@@ -392,7 +392,7 @@ def allele(allele: Allele):
 
 
 @register.inclusion_tag("classification/tags/allele_origin_toggle.html", takes_context=True)
-def allele_origin_toggle(context, style: str = "", show_label: bool = True):
+def allele_origin_toggle(context, style: str = "", show_label: bool = True, prefill=None):
     """
     Embed the allele origin toggle on the page.
     It's expected this will only appear once per page and that there will be a JavaScript implementation of
@@ -402,8 +402,7 @@ def allele_origin_toggle(context, style: str = "", show_label: bool = True):
     """
     user = context.request.user
     User_settings = UserSettings.get_for_user(user)
-
-    value = User_settings.default_allele_origin
+    value = prefill if prefill else User_settings.default_allele_origin
     return {"value": value, "style": style, "show_label": show_label}
 
 
@@ -624,3 +623,4 @@ def user_view_events(user: User, days: int = 1):
             'args': json.dumps(event.args)
         })
     return view_event_data
+

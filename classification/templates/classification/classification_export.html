@@ -5,6 +5,7 @@
 {% load js_tags %}
 {% load lab_tags %}
 {% load static %}
+{% load ui_tabs_builder %}
 {% load classification_tags %}
 {% block title %}Classification Record Export{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
@@ -199,10 +200,10 @@
 {% block content %}
 <div class="container" id="export-fields">
     {% page_help page_id='classification/export_help' title='Classification Records Export' %}
-    
+    {% ui_register_tabs tab_set="internal_download" %}
+    {% ui_register_tab_embedded tab_set="internal_download" label='Export Shariant Data' %}
     <p class="text-info">Please refer to the terms and conditions about proper use of the classifications download.</p>
     <p class="text-info">Once you have configured your download you can save and re-use the generated URL.</p>
-
     {% labelled label="For Downloading Via" %}
         <div class="form-check">
             <label class="form-check-label">
@@ -537,6 +538,12 @@
         <a class="hover-link" id="export-url" href="{{base_url_redirect}}">{{base_url_redirect}}</a>
         <div id="export-error" class="hidden text-danger">{{ "E" | severity_icon }}<span id="export-error-text"></span></div>
     {% endlabelled %}
+    {% end_ui_register_tab_embedded %}
+    {% ui_register_tab_embedded tab_set="internal_download" label='Export My Data' %}
+        {% include 'classification/tags/internal_lab_download.html' %}
+    {% end_ui_register_tab_embedded %}
+    {% ui_render_tabs tab_set="internal_download" %}
+
 </div>
 
 {% endblock %}

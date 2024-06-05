@@ -61,7 +61,7 @@ class TabBuilder:
 CLEAN_TAB_RE = re.compile("(.*)(?:_[0-9]+|-tab)")
 
 
-def check_active_tab(tab_set: str, tab_id: str, request: HttpRequest) -> bool:
+def check_active_tab(tab_set: str, tab_id: str, request: HttpRequest, context = None) -> bool:
     active = False
     active_tab = request.GET.get("activeTab")
     if not active_tab:
@@ -72,8 +72,8 @@ def check_active_tab(tab_set: str, tab_id: str, request: HttpRequest) -> bool:
                     active_tab = parse_qs(query)["activeTab"][0]
         except Exception:
             pass
-    if not active_tab:
-        active_tab = request.session.get("active_tab")
+    if not active_tab and context:
+        active_tab = context.get("active_tab")
 
     def clean_tab(check_tab_id):
         if match := CLEAN_TAB_RE.match(check_tab_id):
@@ -118,7 +118,7 @@ def ui_register_tab(
     if not tab_id:
         tab_id = url + param_id
 
-    if active or check_active_tab(tab_set, tab_id, context.request):
+    if active or check_active_tab(tab_set, tab_id, context.request, context):
         builder.active_tab = tab_number
 
     builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number,
@@ -212,7 +212,7 @@ class LocalTabContent(template.Node):
         if admin_only and not context.request.user.is_superuser:
             return
 
-        if check_active_tab(tab_set, tab_id, context.request):
+        if check_active_tab(tab_set, tab_id, context.request, context):
             builder.active_tab = tab_number
 
         if content.startswith('/'):
