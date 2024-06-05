@@ -98,15 +98,22 @@ class ClinGenAlleleRegistryAPI:
         if response.status_code != 200:
             raise ClinGenAlleleServerException(response.request.method, response.status_code, response.json())
 
-    def _put(self, url, data):
+    def _put(self, url, data, chunk_size=None):
         logging.debug("Calling ClinGen API")
         # copy/pasted from page 5 of https://reg.clinicalgenome.org/doc/AlleleRegistry_1.01.xx_api_v1.pdf
         identity = hashlib.sha1((self.login + self.password).encode('utf-8')).hexdigest()
         gb_time = str(int(time.time()))
         token = hashlib.sha1((url + identity + gb_time).encode('utf-8')).hexdigest()
         request = url + '&gbLogin=' + self.login + '&gbTime=' + gb_time + '&gbToken=' + token
+        default_timeout = 2 * MINUTE_SECS
+        if chunk_size:
+            timeout = MINUTE_SECS * chunk_size / 1000
+            timeout = max(default_timeout, timeout)
+        else:
+            timeout = default_timeout
+
         try:
-            response = requests.put(request, data=data, timeout=MINUTE_SECS)
+            response = requests.put(request, data=data, timeout=timeout)
             self._check_response(response)
             return response.json()
         except Exception as e:
@@ -156,7 +163,7 @@ class ClinGenAlleleRegistryAPI:
 
         for hgvs_chunk in iter_fixed_chunks(hgvs_iter, chunk_size):
             data = "\n".join(hgvs_chunk)
-            yield self._put(url, data)
+            yield self._put(url, data, chunk_size=chunk_size)
 
     def hgvs_put(self, hgvs_iter, file_type="hgvs"):
         return itertools.chain.from_iterable(self._clingen_hgvs_put_iter(hgvs_iter, file_type=file_type))
