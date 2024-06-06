@@ -27,7 +27,7 @@ class ExportCellMethod(Protocol):
     line_number: int
     label: str
     sub_data: Optional[Type['ExportRow']]
-    categories: Optional[dict[str, Any]]
+    categories: Optional[dict[Any, Any]]
     data_type: ExportDataType
     def __call__(self, *args) -> Any: ...
 
@@ -121,7 +121,7 @@ class ExportTweak:
     A method that combine labels and sub labels
     """
 
-    categories: Optional[dict[str, Any]] = None
+    categories: Optional[dict[Any, Any]] = None
     """
     key, value pairs that will determine which columns are included
     """
@@ -174,7 +174,7 @@ class _ColumnZipperRow:
         return self.row
 
 
-def get_decorated_methods(cls, categories: Optional[dict[str, Any]], attribute: str) -> list[Callable]:
+def get_decorated_methods(cls, categories: Optional[dict[Any, Any]], attribute: str) -> list[Callable]:
     if not hasattr(cls, 'export_methods'):
         export_methods = [func for _, func in inspect.getmembers(cls, lambda x: getattr(x, attribute, False))]
         export_methods.sort(key=lambda x: x.line_number)
@@ -188,17 +188,26 @@ def get_decorated_methods(cls, categories: Optional[dict[str, Any]], attribute: 
     if categories:
         def passes_filter(export_method) -> bool:
             nonlocal categories
+            # FIXME, some non-NONE but falsey values could get confused here, e.g. 0 and False
             decorated_values = export_method.categories or {}
             # for every requirement of categories
             for key, value in categories.items():
                 # get the decorated value
+                value_set: set
+                if isinstance(value, (set, tuple, list)):
+                    value_set = set(value)
+                else:
+                    value_set = set([value])
+
                 if decorated_value := decorated_values.get(key):
-                    # handle decorated value being a collection (and matching a single value in that collection)
+                    decorated_set: set
                     if isinstance(decorated_value, (set, tuple, list)):
-                        if value not in decorated_value:
-                            return False
-                    elif decorated_value != value:
-                        return False
+                        decorated_set = set(decorated_value)
+                    else:
+                        decorated_set = set([decorated_value])
+                    return bool(value_set.intersection(decorated_set))
+
+                    # handle decorated value being a collection (and matching a single value in that collection)
                 # if the requirement for the category is None and there's no value at all in the decorator
                 # it passes the test
                 elif value is not None:

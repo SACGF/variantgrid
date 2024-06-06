@@ -82,7 +82,7 @@
                 inputError = 'MVL download only supports Germline.<br/>Please set <a class="hover-link" onclick="scrollToAlleleOrigin()">Allele Origin</a> to <b>Germline</b> if you wish to export as MVL.';
             }
         } else if (format === 'vcf') {
-            params.encoding = $("input[name='encoding']:checked").val();
+            params.target_system = $("input[name='vcf_target_system']:checked").val();
 
         } else if (format === 'csv') {
 
@@ -507,20 +507,17 @@
             {% endlabelled %}
         </div>
         <div class="custom-option" data-format="vcf">
-            {% labelled label="VCF Grouping" %}
-                The VCF will have one row per variant, but details of individual classifications will be included as INFO fields in that row.
-            {% endlabelled %}
-            {% labelled label="VCF Encoding Level" %}
+            {% labelled label="Target System" %}
                 <div class="form-check">
                     <label class="form-check-label">
-                        <input checked="checked" id="encoding_basic" type="radio" name="encoding" value="basic" class="form-check-input" />
-                        Basic (e.g. space -> underscore)
+                        <input id="vcf_target_system_emedgene" type="radio" name="vcf_target_system" value="emedgene" class="form-check-input" />
+                        Illumina Emedgene
                     </label>
                 </div>
                 <div class="form-check">
                     <label class="form-check-label">
-                        <input id="encoding_full" type="radio" name="encoding" value="full" class="form-check-input" />
-                        Full (e.g. space -> %20)
+                        <input checked="checked" id="vcf_target_system_generic" type="radio" name="vcf_target_system" value="generic" class="form-check-input" />
+                        Generic (provides more information, but not formatted for any specific system)
                     </label>
                 </div>
             {% endlabelled %}

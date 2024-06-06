@@ -116,7 +116,7 @@ class VCFHeader:
         :param result: a list or single value
         :return: text to be placed directly into the VCF info cell
         """
-        if result is None:
+        if result is None or result == "" or (isinstance(result, list) and len(result) == 0):
             return None
         if self.header_type == VCFHeaderType.Flag:
             if isinstance(result, bool):
@@ -176,7 +176,7 @@ def export_vcf_info_cell(
         number: VCFHeaderNumber = VCFHeaderNumberSpecial.UNBOUND,
         header_type: VCFHeaderType = VCFHeaderType.String,
         description: Optional[str] = None,
-        categories: dict[str, Any] = None):
+        categories: dict[Any, Any] = None):
     """
     Extend ExportRow and annotate methods with export_column.
     The order of defined methods determines the order that the results will appear in an export file
@@ -254,8 +254,6 @@ class ExportVCF:
         ] +
             extras +
             [method.vcf_header for method in cls.get_export_methods(export_tweak=export_tweak)] +
-            # don't think this is needed (specifying ID as an INFO when it's a column), but claimed EMEDGENE requires it, to confirm
-            [VCFHeader(header_class=VCFHeaderClassStandard.INFO, header_id="ID", number=1, description="id")] +
             # [VCFHeader(header_class="ALT", header_id="NON_REF", description="Represents any possible alternative allele at this location")] + \
             ExportVCF.contig_headers(genome_build, contigs) +
             [("#" + "\t".join(["CHROM", "ID", "POS", "REF", "ALT", "QUAL", "FILTER", "INFO"]))])  # NO SUPPORT FOR FORMAT, etc
