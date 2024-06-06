@@ -55,9 +55,9 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                     liftover.save()
 
                 allele_liftover_records = []
-                used_contigs = set()
+                used_chroms: set[str] = set()
                 for avt in av_tuples:
-                    used_contigs.add(avt[0])
+                    used_chroms.add(avt[0])
                     al = AlleleLiftover(allele_id=avt[2],
                                         liftover=liftover,
                                         status=ProcessingStatus.CREATED)
@@ -66,7 +66,8 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                 if allele_liftover_records:
                     AlleleLiftover.objects.bulk_create(allele_liftover_records, batch_size=2000)
 
-                header_lines = get_contigs_header_lines(vcf_genome_build, contig_allow_list=used_contigs)
+                # BCFTools uses chromosomes not contigs
+                header_lines = get_contigs_header_lines(vcf_genome_build, use_accession=False, contig_allow_list=used_chroms)
                 write_vcf_from_tuples(vcf_filename, av_tuples, tuples_have_id_field=True, header_lines=header_lines)
                 uploaded_file = UploadedFile.objects.create(path=liftover_vcf_filename,
                                                             import_source=import_source,

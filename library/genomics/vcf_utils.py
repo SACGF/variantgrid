@@ -1,3 +1,4 @@
+import logging
 import operator
 import os
 import re
@@ -130,18 +131,26 @@ def get_vcf_header_contig_lines(contigs: list[tuple]) -> list[str]:
     return header_lines
 
 
-def get_contigs_header_lines(genome_build, standard_only=True, contig_allow_list: set = None) -> list[str]:
+def get_contigs_header_lines(genome_build, standard_only=True, use_accession=True, contig_allow_list: set = None) -> list[str]:
+    """ use_accession: If True - write contigs like 'NC_000004.12' if False then '4' """
     if standard_only:
         contig_qs = genome_build.standard_contigs
     else:
         contig_qs = genome_build.contigs
 
+    if contig_allow_list:
+        logging.info("Writing contigs header for contigs: %s", contig_allow_list)
+
     contigs = []
     for contig in contig_qs:
+        if use_accession:
+            contig_name = contig.refseq_accession
+        else:
+            contig_name = contig.name
         if contig_allow_list is not None:
-            if contig.refseq_accession not in contig_allow_list:
+            if contig_name not in contig_allow_list:
                 continue
-        contigs.append((contig.refseq_accession, contig.length, genome_build.name))
+        contigs.append((contig_name, contig.length, genome_build.name))
     return get_vcf_header_contig_lines(contigs)
 
 
