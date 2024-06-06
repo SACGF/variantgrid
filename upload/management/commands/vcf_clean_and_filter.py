@@ -56,7 +56,7 @@ class Command(BaseCommand):
         skipped_records = Counter()
         skipped_filters = Counter()
 
-        ref_standard_bases_pattern = re.compile(r"[GATC]")
+        ref_standard_bases_pattern = re.compile(r"[GATCN]")  # Reference can be N (and FreeBayes often writes these)
         alt_standard_bases_pattern = re.compile(r"[GATC,\.]")  # Can be multi-alts, or "." for reference
 
         skip_patterns = {}

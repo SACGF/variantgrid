@@ -38,37 +38,39 @@ class ManualVariantsPostInsertTask(ImportVCFStepTask):
         mvec = upload_step.uploaded_file.uploadedmanualvariantentrycollection.collection
         logging.info("ManualVariantsPostInsertTask: mvec_id = %s", mvec)
         variant_pk_lookup = VariantPKLookup(mvec.genome_build)
-        variant_coordinate_by_hash = {}
+        hash_by_variant_coordinate = {}
         mvec_id_by_variant_hash = {}
 
         for mve in mvec.manualvariantentry_set.filter(error_message__isnull=True):
             for variant_coordinate in get_manual_variant_coordinates(mve):
                 variant_hash = variant_pk_lookup.add(variant_coordinate)
-                variant_coordinate_by_hash[variant_hash] = variant_coordinate
+                hash_by_variant_coordinate[variant_coordinate] = variant_hash
                 mvec_id_by_variant_hash[variant_hash] = mve.pk
 
-        logging.info("%d variant hashes", len(variant_coordinate_by_hash))
+        logging.info("%d variant hashes", len(hash_by_variant_coordinate))
         created_manual_variants: list[CreatedManualVariant] = []
         variant_pk_lookup.batch_check()
         for variant_hash, variant_pk in variant_pk_lookup.variant_pk_by_hash.items():
-            variant_coordinate = variant_coordinate_by_hash[variant_hash]
             mvec_id = mvec_id_by_variant_hash[variant_hash]
-
-            if variant_pk is None:  # must have been normalised
-                results = list(ModifiedImportedVariant.get_variants_for_unnormalized_variant(variant_coordinate))
-                if not results:
-                    raise ValueError("variant hash '%s' wasn't inserted as un-normalised variant!", variant_hash)
-                else:
-                    for v in results:
-                        cmv = CreatedManualVariant(manual_variant_entry_id=mvec_id,
-                                                   variant=v)
-                        created_manual_variants.append(cmv)
-
-            else:
-                cmv = CreatedManualVariant(manual_variant_entry_id=mvec_id,
-                                           variant_id=variant_pk)
-                created_manual_variants.append(cmv)
+            cmv = CreatedManualVariant(manual_variant_entry_id=mvec_id,
+                                       variant_id=variant_pk)
+            created_manual_variants.append(cmv)
             items_processed += 1
+
+        for variant_coordinate in variant_pk_lookup.unknown_variant_coordinates:
+            results = list(ModifiedImportedVariant.get_variants_for_unnormalized_variant(variant_coordinate))
+            if not results:
+                raise ValueError("Variant '%s' wasn't recorded as modified / normalised variant!", variant_coordinate)
+            else:
+                logging.info("%s: unknown...", variant_coordinate)
+                variant_hash = hash_by_variant_coordinate[variant_coordinate]
+                mvec_id = mvec_id_by_variant_hash[variant_hash]
+
+                for v in results:
+                    cmv = CreatedManualVariant(manual_variant_entry_id=mvec_id,
+                                               variant=v)
+                    created_manual_variants.append(cmv)
+                items_processed += 1
 
         if created_manual_variants:
             CreatedManualVariant.objects.bulk_create(created_manual_variants)
