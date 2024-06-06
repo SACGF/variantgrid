@@ -211,6 +211,7 @@ class ClassificationVCF(ExportVCF):
             parts.append(f"discordance_{discordance_value}")
         labs = set(cms.lab for cms in self.allele_data.cms)
         parts.append(f"labs:{self.lab_count()}")
+        parts.append(f"allele_origin:{self.allele_origin}")
         parts += self.unique_values(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         parts += self.unique_values(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
         return "|".join(parts)
