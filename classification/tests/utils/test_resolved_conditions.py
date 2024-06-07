@@ -1,8 +1,9 @@
-from unittest import TestCase, skip
+from unittest import TestCase, skip, mock
+from unittest.mock import patch
 
 from classification.models import ConditionResolved, MultiCondition
 from classification.tests.utils.data_utils import ConditionMock
-from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
+from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation, OntologyVersion
 
 
 class ResolvedConditionTest(TestCase):
@@ -10,8 +11,10 @@ class ResolvedConditionTest(TestCase):
     def setUp(self):
         ConditionMock.setUp()
 
-    @skip
-    def test_ancestor_relationship(self):
+    @mock.patch("ontology.models.OntologyVersion.get_latest_and_live_ontology_qs")
+    def test_ancestor_relationship(self, mocked_get_latest_and_live):
+        mocked_get_latest_and_live.return_value = OntologyTermRelation.objects.all()
+
         m_disease = OntologyTerm.get_or_stub(ConditionMock.MONDO_DISEASE_OR_DISORDER)
         m_digit = OntologyTerm.get_or_stub(ConditionMock.MONDO_DIGIT_ISSUE)
         m_toe = OntologyTerm.get_or_stub(ConditionMock.MONDO_TOE_ISSUE)
@@ -31,8 +34,10 @@ class ResolvedConditionTest(TestCase):
 
         self.assertEqual(m_big_toe, OntologyTermRelation.as_mondo(o_big_toe))
 
-    @skip
-    def test_resolved_condition(self):
+    @mock.patch("ontology.models.OntologyVersion.get_latest_and_live_ontology_qs")
+    def test_resolved_condition(self, mocked_get_latest_and_live):
+        mocked_get_latest_and_live.return_value = OntologyTermRelation.objects.all()
+
         # m_disease = OntologyTerm.get_or_stub(ConditionMock.MONDO_DISEASE_OR_DISORDER)
         # m_digit = OntologyTerm.get_or_stub(ConditionMock.MONDO_DIGIT_ISSUE)
         m_toe = OntologyTerm.get_or_stub(ConditionMock.MONDO_TOE_ISSUE)

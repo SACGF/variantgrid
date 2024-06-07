@@ -1,8 +1,12 @@
-from ontology.models import OntologyRelation
+from ontology.models import OntologyRelation, OntologyTermRelation
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 
 
 class ConditionMock:
+
+    @staticmethod
+    def get_latest_and_live_ontology_qs():
+        return OntologyTermRelation.objects.all()
 
     MONDO_DISEASE_OR_DISORDER = "MONDO:0000001"
     MONDO_DIGIT_ISSUE = "MONDO:9000022"
