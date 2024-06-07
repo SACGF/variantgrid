@@ -71,6 +71,7 @@ class ClassificationTestCaseViews(TestCase):
             "can_write_latest": True,
             "clinical_context": None,
             "allele_origin_bucket": "U",
+            "condition_text_match": None,
             "data": {
                 "owner": {
                     "value": "joejoe"
