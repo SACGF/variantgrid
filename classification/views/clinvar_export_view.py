@@ -334,6 +334,9 @@ class ClinVarExportSummary(ExportRow):
             classification = modification.classification
             if allele_id := classification.allele_id:
                 return get_url_from_view_path(reverse('view_allele', kwargs={"allele_id": allele_id}))
+        else:
+            allele_id = self.clinvar_export.clinvar_allele.allele_id
+            return get_url_from_view_path(reverse('view_allele', kwargs={"allele_id": allele_id}))
 
     @export_column("Classification URL")
     def _classification_url(self):
@@ -359,6 +362,8 @@ class ClinVarExportSummary(ExportRow):
         if modification := self.classification:
             if allele := modification.classification.allele_object:
                 return str(allele.clingen_allele)
+        elif allele := self.clinvar_export.clinvar_allele.allele:
+            return str(allele.clingen_allele)
 
     @export_column("c.HGVS")
     def _c_hgvs(self):
