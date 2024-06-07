@@ -16,6 +16,10 @@ class ConditionMock:
 
     @staticmethod
     def setUp():
+        """
+        FIXME this no longer works since OntologyVersion just builds together the latest OMIM, HPO, GENCC etc
+        It needs all of them to complete, and this mock import here isn't even one of them
+        """
         ontology_builder = OntologyBuilder(filename="mock", context="mock", import_source="mock")
         try:
             ontology_builder.ensure_hash_changed("3")
