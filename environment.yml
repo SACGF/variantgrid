@@ -35,7 +35,7 @@ dependencies:
   - pypdf2=2.11  # was 2.6
 #  - pysam=0.22.1  # was 0.18
   - python-dateutil=2.8
-  - pyvcf3=1.0
+  - pyvcf3=1.0.3
   - redis=3.5 # was redis==3.5.3
   - reportlab=3.6 # increased patch version from requirements.txt
   - requests=2.31
@@ -90,11 +90,11 @@ dependencies:
       - mozilla_django_oidc==2.0.0
       - easy_thumbnails==2.8.5
       - fontawesomefree==6.4.0
-      - git+https://github.com/davmlaw/django-json-widget#egg=django_json_widget
+      - django_json_widget==2.0.1
       - git+https://github.com/davmlaw/django-jfu#egg=django-jfu
       - git+https://github.com/davmlaw/django-messages/#egg=django-messages
       - git+https://github.com/davmlaw/django-starfield#egg=django_starfield
-      - git+https://github.com/davmlaw/django-js-reverse#egg=django-js-reverse
+      - django-js-reverse==0.10.2
       - git+https://github.com/SACGF/hgvs#egg=pyhgvs
       - git+https://github.com/biocommons/hgvs#egg=hgvs
       - nameparser==1.1.1 # nameparser hasn't been updated in conda since 1.0.5
