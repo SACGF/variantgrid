@@ -8,6 +8,7 @@ from django.db.models import Q
 from django.dispatch import receiver
 
 from annotation.models import VariantAnnotationVersion
+from classification.enums import AlleleOriginBucket
 from classification.models import Classification, ClassificationModification
 from library.preview_request import preview_extra_signal, PreviewKeyValue
 from ontology.models import OntologyTerm
@@ -77,8 +78,14 @@ def _allele_preview_classifications_extra(user: User, obj: Allele, genome_build:
     cms = ClassificationModification.latest_for_user(user=user, allele=obj)
     extras = []
     hgvs_extras = []
-    if count := cms.count():
-        extras += [PreviewKeyValue.count(Classification, count)]
+    if cms.exists():
+        for allele_origin_bucket in AlleleOriginBucket.choices:
+            if filtered_count := cms.filter(classification__allele_origin_bucket=allele_origin_bucket[0]).count():
+                label = allele_origin_bucket[1]
+                if allele_origin_bucket[0] == "U":
+                    label = "Unknown Origin"  # unknown needs more context than somatic or germline
+                extras += [PreviewKeyValue.count(Classification, filtered_count, allele_origin_bucket[1])]
+
         column = ClassificationModification.column_name_for_build(genome_build)
         # provide the c.HGVS for alleles
         if c_hgvs := sorted(

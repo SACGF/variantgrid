@@ -40,10 +40,11 @@ class PreviewKeyValue:
     """
 
     @staticmethod
-    def count(preview_coordinator: 'PreviewModelMixin', amount: int) -> Optional['PreviewKeyValue']:
+    def count(preview_coordinator: 'PreviewModelMixin', amount: int, extra: str) -> Optional['PreviewKeyValue']:
         if preview_coordinator.preview_enabled():
+            parts = " ".join([p for p in [preview_coordinator.preview_category(), extra, "Count"] if p])
             return PreviewKeyValue(
-                key=f"{preview_coordinator.preview_category()} Count",
+                key=parts,
                 value=amount,
                 icon=preview_coordinator.preview_icon()
             )
