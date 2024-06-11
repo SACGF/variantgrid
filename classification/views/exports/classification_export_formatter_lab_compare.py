@@ -48,7 +48,7 @@ class ClassificationLab(ExportRow):
         return self.list_of(SpecialEKeys.C_HGVS)
 
     @export_column("Classification")
-    def c_hgvs(self):
+    def classification_value(self):
         return self.list_of(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
     @export_column("Patient IDs")
