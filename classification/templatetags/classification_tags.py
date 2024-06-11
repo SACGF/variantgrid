@@ -216,6 +216,7 @@ def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE
         "title": title
     }
 
+
 @register.inclusion_tag("classification/tags/clinical_significance_inline.html")
 def clinical_significance_inline(value):
     key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
