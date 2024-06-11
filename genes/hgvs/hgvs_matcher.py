@@ -80,7 +80,7 @@ class HGVSConverterFactory:
 
 class VariantResolvingError(ValueError):
 
-    def __init__(self, message: str, technical_message: str):
+    def __init__(self, message: str, technical_message: Optional[str] = None):
         self.technical_message = technical_message
         super().__init__(message)
 

@@ -13,7 +13,7 @@ from django.urls import reverse
 from annotation.cosmic import CosmicAPI
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from classification.models import Classification, CreateNoClassificationForbidden
-from genes.hgvs import HGVSMatcher, HGVSException
+from genes.hgvs import HGVSMatcher, HGVSException, VariantResolvingError
 from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
 from genes.models import MissingTranscript, MANE, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
@@ -347,6 +347,7 @@ def _search_hgvs_using_gene_symbol(
     # Group results + hgvs by result.identifier
     results_by_variant_identifier: dict[str, list[SearchResult]] = defaultdict(list)
     transcript_accessions_by_variant_identifier: dict[str, list] = defaultdict(list)
+    transcript_accessions_by_exception: dict[str, list] = defaultdict(list)
     hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_string)
     hgvs_variant.gene = None
 
@@ -354,6 +355,9 @@ def _search_hgvs_using_gene_symbol(
     for transcript_version in transcript_versions:
         hgvs_variant.transcript = transcript_version.accession
         transcript_hgvs = hgvs_variant.format()
+        tv_message = str(transcript_version.accession)
+        if mane_status := mane_status_by_transcript.get(transcript_version.accession):
+            tv_message += f" ({mane_status})"
         try:
             for result in _search_hgvs(transcript_hgvs, user, genome_build, variant_qs):
                 if isinstance(result, SearchResult):
@@ -361,16 +365,13 @@ def _search_hgvs_using_gene_symbol(
                     if result.preview.category == "Variant":
                         variant_identifier = result.preview.identifier
                         results_by_variant_identifier[variant_identifier].append(result)
-                        tv_message = str(transcript_version.accession)
-                        if mane_status := mane_status_by_transcript.get(transcript_version.accession):
-                            tv_message += f" ({mane_status})"
                         transcript_accessions_by_variant_identifier[variant_identifier].append(tv_message)
                     else:
                         # result is a ClassifyVariantHgvs or similar, yield it and only care about real variants for the rest
                         yield result
         except Exception as e:
-            # Just swallow all these errors
             logging.warning(e)
+            transcript_accessions_by_exception[str(e)].append(tv_message)
 
     have_results = False
     for variant_identifier, results_for_record in results_by_variant_identifier.items():
@@ -399,6 +400,14 @@ def _search_hgvs_using_gene_symbol(
         yield SearchResult(preview=preview, messages=search_messages)
 
     if not have_results:
+        # If we have a resolution error, throw it here
+        resolution_errors = []
+        for exception_msg, tv_message_list in transcript_accessions_by_exception.items():
+            resolution_errors.append(f"Error resolving transcripts: {', '.join(tv_message_list)}: {exception_msg}")
+
+        if resolution_errors:
+            raise VariantResolvingError("\n".join(resolution_errors))
+
         # In some special cases, add in special messages for no result
         messages_as_strs = [str(message) for message in search_messages]
         if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE and not settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
