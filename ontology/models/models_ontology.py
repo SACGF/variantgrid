@@ -715,16 +715,6 @@ class OntologyVersion(TimeStampedModel):
 
     @staticmethod
     def latest(validate=True) -> Optional['OntologyVersion']:
-        # SCREWED UP MODE
-        oi_qs = list(OntologyImport.objects.all())
-        assign_to = {}
-
-        ov = OntologyVersion()
-        for oimport, import_type in zip(oi_qs, OntologyVersion.ONTOLOGY_IMPORTS.keys()):
-            print(f"Assigning {oimport} to {import_type}")
-            setattr(ov, import_type, oimport)
-        return ov
-
         oi_qs = OntologyImport.objects.all()
         kwargs = {}
         missing_fields = set()
@@ -766,8 +756,6 @@ class OntologyVersion(TimeStampedModel):
     @staticmethod
     @timed_cache(ttl=60, quick_key_access=True)
     def get_latest_and_live_ontology_qs() -> QuerySet[OntologyTermRelation]:
-        return OntologyTermRelation.objects.all()
-
         latest = OntologyVersion.latest()
         # live relationships of panelappau aren't versioned
         # TODO could restrict only if we have live enabled in settings
