@@ -294,6 +294,9 @@ class EvidenceKey(TimeStampedModel):
                 if self.crit_uses_points:
                     if points := CriteriaEvaluation.POINTS.get(entry_key):
                         entry["label"] = f"Met: {points} Point{'s' if points > 1 else ''}"
+                if entry_key == CriteriaEvaluation.PATHOGENIC_UNSPECIFIED and "horak" in self.key:
+                    # TODO hardcoded support for horak saying ONCOGENIC instead of PATHOGENIC, might be a better way to do this
+                    entry["label"] = "Oncogenic Unspecified Strength"
 
                 use_options.append(entry)
             return use_options
