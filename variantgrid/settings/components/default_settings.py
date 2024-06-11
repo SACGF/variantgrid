@@ -565,6 +565,7 @@ SEARCH_HGVS_GENE_SYMBOL_USE_MANE = True
 SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS = False
 SEARCH_USER_ADMIN_ONLY = False
 SEARCH_COSMIC_ENABLED = True
+SEARCH_COSMIC_TRANSCRIPT_MESSAGES = False
 
 SILENCED_SYSTEM_CHECKS = ['models.E006',  # 'captcha.recaptcha_test_key_error'
                           'fields.W907']  # CITextField deprecated. Waiting for Django 4.2.3 see issue #831

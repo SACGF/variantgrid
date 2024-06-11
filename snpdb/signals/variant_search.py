@@ -113,10 +113,16 @@ def variant_cosmic_search(search_input: SearchInputInstance):
                     hgvs_by_variant_identifier[variant_identifier].append(hgvs_string)
 
         for variant_identifier, results_for_record in results_by_variant_identifier.items():
-            search_message = SearchMessage(f"COSMIC {search_input.search_string} resolved to: {', '.join(hgvs_by_variant_identifier[variant_identifier])}",
-                                           severity=LogLevel.INFO)
+            if settings.SEARCH_COSMIC_TRANSCRIPT_MESSAGES:
+                transcript_hgvs = ', '.join(hgvs_by_variant_identifier[variant_identifier])
+                messages = [
+                    SearchMessage(f"COSMIC {search_input.search_string} resolved to: {transcript_hgvs}",
+                                  severity=LogLevel.INFO)
+                ]
+            else:
+                messages = []
             preview = results_for_record[0].preview  # These will all be the same
-            yield SearchResult(preview=preview, messages=[search_message])
+            yield SearchResult(preview=preview, messages=messages)
 
 
 @search_receiver(
