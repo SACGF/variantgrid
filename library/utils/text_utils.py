@@ -20,6 +20,18 @@ def pretty_label(label: str) -> str:
     return tidied
 
 
+def join_with_commas_and_ampersand(items: list[str], final_sep: str = "&") -> str:
+    if len(items) == 0:
+        return ""
+    elif len(items) == 1:
+        return items[0]
+    elif len(items) == 2:
+        return f" {final_sep} ".join(items)
+    else:
+        comma_sep = ", ".join(items[0:-1])
+        return f" {final_sep} ".join([comma_sep, items[-1]])
+
+
 def pretty_collection(collection: Collection[Any], to_string: Optional[Callable] = None) -> str:
     try:
         collection = sorted(collection)
