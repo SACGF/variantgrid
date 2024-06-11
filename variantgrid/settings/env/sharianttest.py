@@ -26,7 +26,7 @@ LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=https%3A%2
 _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded annotation (${ANNOTATION_BASE_DIR} from wiki)
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'test_annotation_scratch')
 
-LIFTOVER_BCFTOOLS_ENABLED = True
+# LIFTOVER_BCFTOOLS_ENABLED = True
 
 SEARCH_HGVS_GENE_SYMBOL = True
 SEARCH_HGVS_GENE_SYMBOL_USE_MANE = True
