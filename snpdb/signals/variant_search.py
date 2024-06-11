@@ -617,7 +617,7 @@ DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
 @search_receiver(
     search_type=Variant,
     pattern=DB_PREFIX_PATTERN,
-    sub_name="ID",
+    sub_name="VCF ID",
     example=SearchExample(
         note="Provide the variant ID as it appears in VCF exports",
         examples=["v42", f"{settings.VARIANT_VCF_DB_PREFIX}4638674"]
@@ -632,9 +632,9 @@ ALLELE_ID_SEARCH_PATTERN = re.compile(r"^a(\d+)$")
 @search_receiver(
     search_type=Allele,
     pattern=ALLELE_ID_SEARCH_PATTERN,
-    sub_name="ID",
+    sub_name="Internal Allele ID",
     example=SearchExample(
-        note="Provide the Allele ID as it appears in URLs",
+        note="Provide the Allele ID as it appears in URLs prefixed with \"a\"",
         examples=["a42", "a256"]
     )
 )

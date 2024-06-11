@@ -20,7 +20,6 @@ def genome_build_search(search_input: SearchInputInstance):
 @search_receiver(
     search_type=Contig,
     pattern=re.compile(r"(chr(\d+|X|Y|M|MT)|NC_\d+.\d)", re.IGNORECASE),
-    sub_name="Contig",
     example=SearchExample(
         note="Contigs or Chromosomes",
         examples=["chrX", "NC_000007.13"]

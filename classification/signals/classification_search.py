@@ -4,12 +4,14 @@ from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from django.dispatch import receiver
 
 from annotation.models import VariantAnnotationVersion
+from classification.enums import AlleleOriginBucket
 from classification.models import Classification, ClassificationModification
 from library.preview_request import preview_extra_signal, PreviewKeyValue
+from library.utils import join_with_commas_and_ampersand
 from ontology.models import OntologyTerm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, Organization, Allele, Variant, GenomeBuild
@@ -19,7 +21,7 @@ from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 @search_receiver(
     search_type=Classification,
     example=SearchExample(
-        note="The lab record ID",
+        note="The lab Record ID",
         examples=["CR_1545" if settings.CLASSIFICATION_ID_OVERRIDE_PREFIX else "vc1545"]
     )
 )
@@ -73,12 +75,34 @@ def classification_search(search_input: SearchInputInstance):
     yield Classification.objects.filter(Q(pk__in=cm_ids) | Q(pk__in=cm_source_ids))
 
 
+def _classification_qs_to_extras(qs: QuerySet[ClassificationModification]) -> list[PreviewKeyValue]:
+    extras = []
+    if qs.exists():
+        includes_origins = []
+        for allele_origin_bucket in AlleleOriginBucket.choices:
+            if filtered_count := qs.filter(classification__allele_origin_bucket=allele_origin_bucket[0]).count():
+                label = allele_origin_bucket[1]
+                if allele_origin_bucket[0] == "U":
+                    label = "Unknown Allele Origin"  # unknown needs more context than somatic or germline
+                includes_origins.append(label)
+                pkv = PreviewKeyValue.count(Classification, filtered_count, override_label=f"{label} Classification Count")
+                pkv.dedicated_row = True
+                extras.append(pkv)
+
+        # override_label = f"Classifications ({join_with_commas_and_ampersand(includes_origins)})"
+        # pkv = PreviewKeyValue.count(Classification, qs.count(), override_label=override_label)
+        # pkv.dedicated_row = True
+        # extras.append(pkv)
+
+    return extras
+
+
 def _allele_preview_classifications_extra(user: User, obj: Allele, genome_build: GenomeBuild) -> list[PreviewKeyValue]:
     cms = ClassificationModification.latest_for_user(user=user, allele=obj)
     extras = []
     hgvs_extras = []
-    if count := cms.count():
-        extras += [PreviewKeyValue.count(Classification, count)]
+    if cms.exists():
+        extras += _classification_qs_to_extras(cms)
         column = ClassificationModification.column_name_for_build(genome_build)
         # provide the c.HGVS for alleles
         if c_hgvs := sorted(
@@ -133,5 +157,4 @@ def variant_preview_classifications_extra(sender, user: User, obj: Variant, **kw
 def ontology_preview_classifications_extra(sender, user: User, obj: OntologyTerm, **kwargs):
     terms = [{"term_id": obj.pk}]
     qs = ClassificationModification.latest_for_user(user=user, published=True, exclude_withdrawn=True, classification__condition_resolution__resolved_terms__contains=terms)
-    if num_classifications := qs.count():
-        return [PreviewKeyValue.count(Classification, num_classifications)]
+    return _classification_qs_to_extras(qs)

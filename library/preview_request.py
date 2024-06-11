@@ -39,11 +39,16 @@ class PreviewKeyValue:
     of this type would hve. Worth highlighting)
     """
 
+    @property
+    def is_count(self):
+        return isinstance(self.value, int)
+
     @staticmethod
-    def count(preview_coordinator: 'PreviewModelMixin', amount: int) -> Optional['PreviewKeyValue']:
+    def count(preview_coordinator: 'PreviewModelMixin', amount: int, override_label: Optional[str] = None) -> Optional['PreviewKeyValue']:
         if preview_coordinator.preview_enabled():
+            parts = override_label if override_label else f"{preview_coordinator.preview_category()} Count"
             return PreviewKeyValue(
-                key=f"{preview_coordinator.preview_category()} Count",
+                key=parts,
                 value=amount,
                 icon=preview_coordinator.preview_icon()
             )

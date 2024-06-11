@@ -23,6 +23,7 @@ from annotation.views import get_build_contigs
 from eventlog.models import create_event
 from library.enums.log_level import LogLevel
 from library.log_utils import log_traceback
+from library.utils.django_utils import render_ajax_view
 from snpdb.models import VCF
 from upload import forms, upload_processing, upload_stats
 from upload.models import UploadPipeline, UploadedFile, ProcessingStatus, UploadedFileTypes, \
@@ -230,6 +231,14 @@ def view_upload_stats(request):
     return render(request, 'upload/view_upload_stats_detail.html', context)
 
 
+def view_upload_step_detail(request, upload_step_id: int):
+    upload_step = get_object_or_404(UploadStep, pk=upload_step_id)
+    upload_step.upload_pipeline.uploaded_file.check_can_view(request.user)
+    return render_ajax_view(request, 'upload/upload_step.html', {
+        "upload_step": upload_step
+    })
+
+
 def view_upload_pipeline(request, upload_pipeline_id):
     upload_pipeline = get_object_or_404(UploadPipeline, pk=upload_pipeline_id)
     uploaded_file = upload_pipeline.uploaded_file
@@ -259,7 +268,8 @@ def view_upload_pipeline(request, upload_pipeline_id):
                'has_upload_steps': upload_pipeline.uploadstep_set.exists(),
                "allow_retry_import": allow_retry_import and settings.UPLOAD_ENABLED,
                "more_warning_or_error_details": more_warning_or_error_details,
-               "step_total_stats": upload_stats.get_step_total_stats(upload_pipeline),
+               # this data is redundant if there isn't multiple runs for the same step
+               "step_total_stats": upload_stats.get_step_total_stats(upload_pipeline, only_if_multiple_runs=True),
                "step_order": list(step_order),
                "step_start_end_lines": step_start_end_lines}
 

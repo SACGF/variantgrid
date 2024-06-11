@@ -1,6 +1,9 @@
 from library.django_utils.jqgrid_view import JQGridView
-from upload.grids import UploadStepsGrid, UploadPipelineModifiedVariantsGrid, UploadPipelineSkippedAnnotationGrid
+from snpdb.views.datatable_view import DatabaseTableView
+from upload.grids import UploadStepsGrid, UploadPipelineModifiedVariantsGrid, UploadPipelineSkippedAnnotationGrid, \
+    UploadStepColumns
 from upload.views import views
+from upload.views.views import view_upload_step_detail
 from variantgrid.perm_path import perm_path
 
 urlpatterns = [
@@ -11,7 +14,10 @@ urlpatterns = [
     perm_path('view_upload_pipeline/warnings_and_errors/<int:upload_pipeline_id>', views.view_upload_pipeline_warnings_and_errors, name='view_upload_pipeline_warnings_and_errors'),
     perm_path('upload_retry_import/<int:upload_pipeline_id>', views.upload_retry_import, name='upload_retry_import'),
     # Grids
+
     perm_path('upload_pipeline/steps/grid/<int:upload_pipeline_id>/<slug:op>/', JQGridView.as_view(grid=UploadStepsGrid), name='upload_step_grid'),
+    perm_path('upload_pipeline/steps/datatables/', DatabaseTableView.as_view(column_class=UploadStepColumns), name='upload_step_datatables'),
+    perm_path('upload_pipeline/step/<int:upload_step_id>', view_upload_step_detail, name='upload_step_detail'),
     perm_path('upload_pipeline/skipped_annotation/grid/<int:upload_pipeline_id>/<slug:op>/',
               JQGridView.as_view(grid=UploadPipelineSkippedAnnotationGrid),
               name='upload_pipeline_skipped_annotation_grid'),

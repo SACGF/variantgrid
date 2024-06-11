@@ -1082,6 +1082,31 @@ class ImportedAlleleInfoValidationInline(admin.TabularInline):
         return False
 
 
+class ImportedAlleleValidationFilter(admin.SimpleListFilter):
+    title = 'Validations'
+    parameter_name = 'validation_x'
+    VALIDATION_TO_PATH = {
+        "Missing 37": "builds__missing_37",
+        "Missing 38": "builds__missing_38",
+        "Transcript ID Change (normal)": "normalize__transcript_id_change",
+        "Transcript ID Change (liftover)": "liftover__transcript_id_change",
+        "Transcript Ver Change (normal)": "normalize__transcript_version_change",
+        "Transcript Ver Change (liftover)": "liftover__transcript_version_change",
+        "Gene Symbol Change (normal)": "normalize__gene_symbol_change",
+        "Gene Symbol Change (liftover)": "liftover__gene_symbol_change",
+        "General Issue (no resolve, unsup transcript)": "general"
+    }
+
+    default_value = None
+
+    def lookups(self, request, model_admin):
+        return list((item[1], item[0]) for item in ImportedAlleleValidationFilter.VALIDATION_TO_PATH.items())
+
+    def queryset(self, request, queryset: QuerySet[ImportedAlleleInfo]):
+        if filter_path := self.value():
+            return queryset.filter(**{f"latest_validation__validation_tags__{filter_path}__isnull": False})
+
+
 @admin.register(ImportedAlleleInfo)
 class ImportedAlleleInfoAdmin(ModelAdminBasics):
     list_display = (
@@ -1097,7 +1122,11 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
         # "created"
     )
     list_filter = (
-        'imported_genome_build_patch_version', 'status', 'latest_validation__confirmed', ValidationFilter, MatchingOnFilter)
+        'imported_genome_build_patch_version', 'status', 'latest_validation__confirmed',
+        ValidationFilter,
+        MatchingOnFilter,
+        ImportedAlleleValidationFilter
+    )
     search_fields = ('id', 'imported_c_hgvs', 'imported_g_hgvs', 'message')
     inlines = (ImportedAlleleInfoValidationInline,)
 

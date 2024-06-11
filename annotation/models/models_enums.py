@@ -165,6 +165,7 @@ class ClinVarReviewStatus(models.TextChoices):
     NO_ASSERTION_CRITERIA_PROVIDED = "C", "No assertion criteria provided"
     NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT = "I", "No interpretation for the single variant"
     NO_CLASSIFICATION_PROVIDED = 'n', "No Classification Provided"
+    NO_CLASSIFICATIONS_FROM_UNFLAGGED_RECORDS = 'f', "No classifications from unflaggedrecords",
     CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS = "F", "Criteria provided - conflicting interpretations"
     CRITERIA_PROVIDED_SINGLE_SUBMITTER = "S", "Criteria provided - single submitter"
     CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS_NO_CONFLICTS = "M", "Criteria provided - multiple submitters w/no conflicts"
@@ -189,6 +190,7 @@ class ClinVarReviewStatus(models.TextChoices):
         'no_interpretation_for_the_single_variant': NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT[0],  # Old value
         'no_classification_for_the_single_variant': NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT[0],  # New one
         'no_classification_provided': NO_CLASSIFICATION_PROVIDED[0],  # New one
+        'no_classifications_from_unflagged_records': NO_CLASSIFICATIONS_FROM_UNFLAGGED_RECORDS[0],  # new for oncogenic
         'criteria_provided,_conflicting_interpretations': CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0],
         'criteria_provided,_conflicting_classifications': CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0],
         'criteria_provided,_single_submitter': CRITERIA_PROVIDED_SINGLE_SUBMITTER[0],

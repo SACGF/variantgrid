@@ -5,10 +5,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from itertools import chain
-from typing import Iterable, Optional, Any, Type, Iterator, Callable
+from typing import Iterable, Optional, Any, Type, Iterator, Callable, Protocol
+
 from dateutil.tz import gettz
 from django.conf import settings
 from django.http import HttpRequest, StreamingHttpResponse
+
 from library.utils.date_utils import local_date_string
 from library.utils.json_utils import JsonObjType
 from library.utils.text_utils import delimited_row
@@ -19,6 +21,15 @@ class ExportDataType(str, Enum):
     datetime = "datetime"
     date = "date"
     any = "any"
+
+
+class ExportCellMethod(Protocol):
+    line_number: int
+    label: str
+    sub_data: Optional[Type['ExportRow']]
+    categories: Optional[dict[Any, Any]]
+    data_type: ExportDataType
+    def __call__(self, *args) -> Any: ...
 
 
 def export_column(
@@ -110,7 +121,7 @@ class ExportTweak:
     A method that combine labels and sub labels
     """
 
-    categories: Optional[dict[str, Any]] = None
+    categories: Optional[dict[Any, Any]] = None
     """
     key, value pairs that will determine which columns are included
     """
@@ -163,47 +174,57 @@ class _ColumnZipperRow:
         return self.row
 
 
+def get_decorated_methods(cls, categories: Optional[dict[Any, Any]], attribute: str) -> list[Callable]:
+    if not hasattr(cls, 'export_methods'):
+        export_methods = [func for _, func in inspect.getmembers(cls, lambda x: getattr(x, attribute, False))]
+        export_methods.sort(key=lambda x: x.line_number)
+        cls.export_methods = export_methods
+
+        if not cls.export_methods:
+            raise ValueError(
+                f"Decorated class {cls} has no methods with {attribute}, did you decorate the methods correctly?")
+
+    export_methods = cls.export_methods
+    if categories:
+        def passes_filter(export_method) -> bool:
+            nonlocal categories
+            # FIXME, some non-NONE but falsey values could get confused here, e.g. 0 and False
+            decorated_values = export_method.categories or {}
+            # for every requirement of categories
+            for key, value in categories.items():
+                # get the decorated value
+                value_set: set
+                if isinstance(value, (set, tuple, list)):
+                    value_set = set(value)
+                else:
+                    value_set = set([value])
+
+                if decorated_value := decorated_values.get(key):
+                    decorated_set: set
+                    if isinstance(decorated_value, (set, tuple, list)):
+                        decorated_set = set(decorated_value)
+                    else:
+                        decorated_set = set([decorated_value])
+                    return bool(value_set.intersection(decorated_set))
+
+                    # handle decorated value being a collection (and matching a single value in that collection)
+                # if the requirement for the category is None and there's no value at all in the decorator
+                # it passes the test
+                elif value is not None:
+                    return False
+
+            return True
+
+        export_methods = [em for em in export_methods if passes_filter(em)]
+
+    return export_methods
+
+
 class ExportRow:
 
-    @staticmethod
-    def get_export_methods(klass, export_tweak: ExportTweak = ExportTweak.DEFAULT):
-        # TODO, provide export_methods in ExportRow but still work out if we need to search or not
-        if not hasattr(klass, 'export_methods'):
-            export_methods = [func for _, func in inspect.getmembers(klass, lambda x: getattr(x, 'is_export', False))]
-            export_methods.sort(key=lambda x: x.line_number)
-            klass.export_methods = export_methods
-
-            if not klass.export_methods:
-                raise ValueError(f"ExportRow class {klass} has no @export_columns, make sure you annotate @export_column(), not @export_column")
-
-        export_methods = klass.export_methods
-        categories = None
-        if export_tweak:
-            categories = export_tweak.categories
-        if categories:
-            def passes_filter(export_method) -> bool:
-                nonlocal categories
-                decorated_values = export_method.categories or {}
-                # for every requirement of categories
-                for key, value in categories.items():
-                    # get the decorated value
-                    if decorated_value := decorated_values.get(key):
-                        # handle decorated value being a collection (and matching a single value in that collection)
-                        if isinstance(decorated_value, (set, tuple, list)):
-                            if value not in decorated_value:
-                                return False
-                        elif decorated_value != value:
-                            return False
-                    # if the requirement for the category is None and there's no value at all in the decorator
-                    # it passes the test
-                    elif value is not None:
-                        return False
-
-                return True
-
-            export_methods = [em for em in export_methods if passes_filter(em)]
-
-        return export_methods
+    @classmethod
+    def get_export_methods(cls, export_tweak: ExportTweak = ExportTweak.DEFAULT) -> list[ExportCellMethod]:
+        return get_decorated_methods(cls, categories=export_tweak.categories, attribute="is_export")
 
     @classmethod
     def _data_generator(cls: Type, data: Iterable[Any]) -> Iterator[Any]:
@@ -276,7 +297,7 @@ class ExportRow:
 
         row = _ColumnZipperRow(sub_data_zip_types=cls.zip_sub_data())
 
-        for method in ExportRow.get_export_methods(cls, export_tweak=export_tweak):
+        for method in cls.get_export_methods(export_tweak=export_tweak):
             label: str
             if export_tweak.force_method_heading:
                 label = method.__name__
@@ -298,7 +319,7 @@ class ExportRow:
 
         row = _ColumnZipperRow(sub_data_zip_types=self.zip_sub_data())
 
-        for method in ExportRow.get_export_methods(self.__class__, export_tweak=export_tweak):
+        for method in self.__class__.get_export_methods(export_tweak=export_tweak):
             result = method(self)
             if sub_data := method.sub_data:
                 sub_data_values: list
@@ -317,7 +338,7 @@ class ExportRow:
         if not export_settings:
             export_settings = ExportSettings.get_for_request()
         row = {}
-        for method in ExportRow.get_export_methods(self.__class__, export_tweak=export_tweak):
+        for method in self.__class__.get_export_methods(export_tweak=export_tweak):
             result = method(self)
             value: Any
             if result is None:
@@ -331,9 +352,7 @@ class ExportRow:
                 value = None
 
             value = export_settings.format_value(export_format=ExportFormat.json, data_type=method.data_type, value=value)
-
-            # row[method.__name__] = value
-            row[method.label or method.__name] = value
+            row[method.label] = value
 
         return row
 

@@ -12,7 +12,7 @@ class Command(BaseCommand):
 
     @staticmethod
     def update_bucket(qs: QuerySet[Classification], allele_origin_bucket: AlleleOriginBucket):
-        for count, chunk in enumerate(iter_fixed_chunks(Classification.objects.iterator(chunk_size=100), chunk_size=100)):
+        for count, chunk in enumerate(iter_fixed_chunks(qs.iterator(chunk_size=100), chunk_size=100)):
             for classification in chunk:
                 classification.allele_origin_bucket = allele_origin_bucket
                 classification.save(update_fields=["allele_origin_bucket"])
@@ -21,7 +21,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         print("About to update all classifications to put them in the correct allele origin clinical context")
 
-        option_key_to_bucket = {}
+        option_key_to_bucket: dict[str, AlleleOriginBucket] = {}
         for allele_origin_option in EvidenceKeyMap.cached_key(SpecialEKeys.ALLELE_ORIGIN).virtual_options:
             allele_origin_option_key = allele_origin_option.get("key")
             option_key_to_bucket[allele_origin_option_key] = AlleleOriginBucket.bucket_for_allele_origin(allele_origin_option_key)

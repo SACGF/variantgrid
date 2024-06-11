@@ -17,8 +17,10 @@ reference base anyway to construct it
 """
 import hashlib
 import itertools
+import json
 import logging
 import time
+import uuid
 from typing import Optional
 
 import requests
@@ -26,6 +28,7 @@ from django.conf import settings
 
 from library.constants import MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
+from library.django_utils.django_file_utils import get_import_processing_filename
 from library.utils import iter_fixed_chunks, get_single_element
 from snpdb.models import Allele, ClinGenAllele, GenomeBuild, Variant, VariantAllele, Contig, GenomeFasta, \
     VariantCoordinate
@@ -71,9 +74,14 @@ class ClinGenAlleleTooLargeException(ClinGenAllele.ClinGenAlleleRegistryExceptio
 class ClinGenAlleleRegistryAPI:
     """ Manages API connections to ClinGen Allele Registry
         This has been overridden by mock_clingen_api for unit testing """
-    def __init__(self):
+    def __init__(self, api_failure_output_filename=None):
         self.login = settings.CLINGEN_ALLELE_REGISTRY_LOGIN
         self.password = settings.CLINGEN_ALLELE_REGISTRY_PASSWORD
+        if api_failure_output_filename is None:
+            api_failure_output_filename = get_import_processing_filename(uuid.uuid4(),
+                                                                         "api_failure_output_filename.json",
+                                                                         prefix="clingen_allele_registry")
+        self.api_failure_output_filename = api_failure_output_filename
 
     @staticmethod
     def check_api_response(api_response):
@@ -90,16 +98,39 @@ class ClinGenAlleleRegistryAPI:
         if response.status_code != 200:
             raise ClinGenAlleleServerException(response.request.method, response.status_code, response.json())
 
-    def _put(self, url, data):
+    def _put(self, url, data, chunk_size=None):
         logging.debug("Calling ClinGen API")
         # copy/pasted from page 5 of https://reg.clinicalgenome.org/doc/AlleleRegistry_1.01.xx_api_v1.pdf
         identity = hashlib.sha1((self.login + self.password).encode('utf-8')).hexdigest()
         gb_time = str(int(time.time()))
         token = hashlib.sha1((url + identity + gb_time).encode('utf-8')).hexdigest()
         request = url + '&gbLogin=' + self.login + '&gbTime=' + gb_time + '&gbToken=' + token
-        response = requests.put(request, data=data, timeout=MINUTE_SECS)
-        self._check_response(response)
-        return response.json()
+        default_timeout = 2 * MINUTE_SECS
+        if chunk_size:
+            timeout = MINUTE_SECS * chunk_size / 1000
+            timeout = max(default_timeout, timeout)
+        else:
+            timeout = default_timeout
+
+        try:
+            response = requests.put(request, data=data, timeout=timeout)
+            self._check_response(response)
+            return response.json()
+        except Exception as e:
+            if self.api_failure_output_filename:
+                api_failure = {
+                    "request": request,
+                    "timeout": timeout,
+                    "data": data,
+                }
+                with open(self.api_failure_output_filename, "w") as f:
+                    json.dump(api_failure, f)
+
+                msg = f"API call failed, debug info written to '{self.api_failure_output_filename}'"
+                raise ClinGenAllele.ClinGenAlleleRegistryException(msg) from e
+            else:
+                raise e
+
 
     @classmethod
     def get_code(cls, code):
@@ -133,7 +164,7 @@ class ClinGenAlleleRegistryAPI:
 
         for hgvs_chunk in iter_fixed_chunks(hgvs_iter, chunk_size):
             data = "\n".join(hgvs_chunk)
-            yield self._put(url, data)
+            yield self._put(url, data, chunk_size=chunk_size)
 
     def hgvs_put(self, hgvs_iter, file_type="hgvs"):
         return itertools.chain.from_iterable(self._clingen_hgvs_put_iter(hgvs_iter, file_type=file_type))

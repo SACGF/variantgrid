@@ -138,13 +138,13 @@ class VariantTagsGrid(JqGridUserRowConfig):
               "variant__id", "node__id", "tag__id", "analysis__name", "analysis__id", "user__username", "created"]
 
     colmodel_overrides = {
-        'id': {'hidden': True},
-        "variant__id": {"hidden": True},
-        "node__id": {"hidden": True},
+        'id': {'hidden': True, "Label": "TagID"},
+        "variant__id": {"hidden": True, "label": "VariantID"},
+        "node__id": {"hidden": True, "label": "NodeID"},
         "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol": {'label': 'Gene', 'formatter': 'geneSymbolNewWindowLink'},
         "tag__id": {'label': "Tag", "formatter": "formatVariantTag"},
         "analysis__name": {'label': 'Analysis', "formatter": "formatAnalysis"},
-        "analysis__id": {'hidden': True},
+        "analysis__id": {'hidden': True, "label": "AnalysisID"},
         "user__username": {'label': "Username"},
         "created": {'label': "Created"},
     }

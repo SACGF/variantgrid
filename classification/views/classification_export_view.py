@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from urllib.parse import unquote_plus
 
 from django.conf import settings
+from django.contrib import messages
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse, HttpResponseBase
 from django.shortcuts import render
@@ -27,6 +28,10 @@ from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 
 ALISSA_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}
+
+
+class InvalidExportParameter(Exception):
+    pass
 
 
 def parse_since(since_str: str) -> datetime:
@@ -197,7 +202,11 @@ class ClassificationApiExportView(APIView):
 
     def get(self, request: HttpRequest, **kwargs) -> HttpResponseBase:
         # will throw a UnsupportedExportType if
-        return serve_export(request)
+        try:
+            return serve_export(request)
+        except InvalidExportParameter as iep:
+            messages.add_message(request, messages.ERROR, str(iep))
+            return export_view(request)
 
 
 @not_minified_response

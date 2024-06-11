@@ -232,6 +232,8 @@ class Migrator:
         # a problem) just turn off all verbosity
         CommandSubMigration.manage_py(["collectstatic", "-v", "0", "--noinput"]).using(key="c",
                                                                                        task_id="manage*collectstatic"),
+        CommandSubMigration.manage_py(["deployment_check", "--die-if-invalid", "--quiet"]).using(key="k",
+                                                                                       task_id="manage*deployment_check"),
     ]
 
     @property
@@ -294,7 +296,7 @@ class Migrator:
             self.refresh_migrations()
         keys = []
         print_purple("-- Welcome to variantgrid upgrader --")
-        print("a: automate standard steps (runs git, migrate, collectstatic_js_reverse, collectstatic, deployed)")
+        print("a: automate standard steps (runs git, migrate, collectstatic_js_reverse, collectstatic, deployment_check, deployed)")
         for migration in self.migrations:
             if migration.key == "1":
                 print("****** SPECIAL STEPS ******")

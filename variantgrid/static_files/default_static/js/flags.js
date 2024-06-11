@@ -884,8 +884,8 @@ let Flags = (function () {
                     `);
                 } else if (this.flag_type === 'classification_significance_change') {
                     return $(`<div>
-                    This classification record has changed its classification compared to a previously published version.
-                    <ol><li>Set the status of this flag to reflect the primary reason behind the change in classification</li>
+                    This classification record has changed its classification or clinical significance compared to a previously published version.
+                    <ol><li>Set the status of this flag to reflect the primary reason behind the change in assertion</li>
                     <div><ul>
                     <li>Discordance Discussion - Data was changed as a result of talking to other labs when this classification was in discordance.
                     <li>Summation of Data - Data was changed as a result of combining information from multiple labs.

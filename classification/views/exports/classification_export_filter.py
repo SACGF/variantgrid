@@ -1,3 +1,5 @@
+import operator
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -16,10 +18,14 @@ from classification.enums import ShareLevel, ClinicalContextStatus, AlleleOrigin
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
     DiscordanceReport, ClinicalContext, ImportedAlleleInfo, ClinVarExport
+from classification.models.classification_utils import classification_gene_symbol_filter
 from flags.models import FlagsMixin, Flag, FlagComment
+from genes.signals.gene_symbol_search import GENE_SYMBOL_PATTERN
 from library.utils import batch_iterator, local_date_string, http_header_date_now
-from snpdb.models import GenomeBuild, Lab, Organization, Allele, Variant, AlleleOriginFilterDefault
-
+from snpdb.clingen_allele import get_clingen_allele
+from snpdb.models import GenomeBuild, Lab, Organization, Allele, Variant, AlleleOriginFilterDefault, ClinGenAllele, \
+    VariantCoordinate
+from snpdb.signals.variant_search import get_results_from_variant_coordinate
 
 @dataclass
 class ClassificationIssue:
@@ -67,6 +73,11 @@ class AlleleData:
     source: 'ClassificationFilter'
     allele_id: int
     allele_origin_bucket: Optional[AlleleOriginBucket] = None
+    """
+    Single allele origin, ONLY if we're splitting allele origin by bucket
+    TODO, make this a method and make calling it an exception if we didn't split by allele origin
+    """
+
     all_cms: List[ClassificationIssue] = field(default_factory=list)  # misleading name, should be all_ci or something
 
     def sort(self):
@@ -140,6 +151,13 @@ class AlleleData:
         return [ci.classification for ci in self.all_cms if not ci.has_issue]
 
     @property
+    def cms_allele_origins(self) -> set[AlleleOriginBucket]:
+        all_allele_origins: set[AlleleOriginBucket] = set()
+        for cm in self.cms:
+            all_allele_origins.add(AlleleOriginBucket(cm.classification.allele_origin_bucket))
+        return all_allele_origins
+
+    @property
     def cms_regardless_of_issues(self) -> List[ClassificationModification]:
         return [ci.classification for ci in self.all_cms]
 
@@ -211,6 +229,7 @@ class ClassificationFilter:
     user: User
     genome_build: GenomeBuild
     allele_origin_filter: AlleleOriginFilterDefault = AlleleOriginFilterDefault.SHOW_ALL
+    record_filters: Optional[str] = None
     allele_origin_split: bool = False  # if true, subdivide allele data by allele origin bucket
     exclude_sources: Optional[Set[Union[Lab, Organization]]] = None
     include_sources: Optional[Set[Lab]] = None
@@ -228,6 +247,25 @@ class ClassificationFilter:
     row_limit: Optional[int] = None
     _last_modified: str = None
     clinvar_export: bool = False
+
+    @property
+    def description(self):
+        parts = []
+        if exclude_sources := self.exclude_sources:
+            parts.append(f"Excluding Labs: {', '.join(str(source) for source in exclude_sources)}")
+        if include_sources := self.include_sources:
+            parts.append(f"Including Only Labs: {', '.join(str(source) for source in include_sources)}")
+        if self.allele_origin_filter != AlleleOriginFilterDefault.SHOW_ALL:
+            parts.append(f"Including Only: {self.allele_origin_filter.label}")
+        if since := self.since:
+            parts.append(f"Since {since.strftime('%Y%m%d')}")
+        if self.allele:
+            parts.append(f"Limited to Single Allele")
+        if self.min_share_level == ShareLevel.ALL_USERS:
+            parts.append(f"Shared Data Only")
+        if not parts:
+            return "No Filters"
+        return ", ".join(parts)
 
     def __post_init__(self):
         self._last_modified = http_header_date_now()
@@ -314,6 +352,10 @@ class ClassificationFilter:
         if allele_str := request.query_params.get('allele'):
             allele = int(allele_str)
 
+        record_filters: Optional[str] = None
+        if record_filters_str := request.query_params.get('record_filters'):
+            record_filters = record_filters_str
+
         benchmarking = request.query_params.get('benchmark') == 'true'
 
         rows_per_file = None
@@ -343,6 +385,7 @@ class ClassificationFilter:
             transcript_strategy=transcript_strategy,
             since=since,
             allele=allele,
+            record_filters=record_filters,
             benchmarking=benchmarking,
             rows_per_file=rows_per_file,
             row_limit=row_limit,
@@ -432,6 +475,14 @@ class ClassificationFilter:
         return share_levels
 
     @cached_property
+    def excluded_record_filters(self) -> List[str]:
+        """
+        Returns a list of record filters that are not valid
+        """
+        invalid_filters = []
+        return invalid_filters
+
+    @cached_property
     def cms_qs(self) -> QuerySet[ClassificationModification]:
         """
         Returns a new QuerySet of all classifications BEFORE
@@ -492,6 +543,36 @@ class ClassificationFilter:
         if allele_id := self.allele:
             cms = cms.filter(classification__allele_info__allele_id=allele_id)
 
+        # Export my data
+        if self.record_filters:
+            internal_lab_filters: List[Q] = []
+            for item in re.split(',|\n|\t', self.record_filters):
+                item = item.strip()
+                if ClinGenAllele.CLINGEN_ALLELE_CODE_PATTERN.match(item):
+                    clingen_allele = get_clingen_allele(item)
+                    internal_lab_filters.append(Q(classification__allele_info__allele__clingen_allele=clingen_allele))
+                elif GENE_SYMBOL_PATTERN.match(item):
+                    if gene_match := classification_gene_symbol_filter(item):
+                        internal_lab_filters.append(classification_gene_symbol_filter(item))
+                    else:
+                        self.excluded_record_filters.append(item)
+                else:
+                    try:
+                        if vc := VariantCoordinate.from_string(item.strip(), self.genome_build):
+                            variant_coordinate = vc.as_internal_symbolic(self.genome_build)
+                            qs = Variant.objects.all()
+                            allele_data = get_results_from_variant_coordinate(self.genome_build, qs, variant_coordinate)
+                            for i in allele_data:
+                                if allele := i.allele:
+                                    internal_lab_filters.append(Q(classification__allele_info__allele=allele))
+                    except ValueError:
+                        self.excluded_record_filters.append(item)
+            if internal_lab_filters:
+                internal_lab_filters_single = reduce(operator.or_, internal_lab_filters)
+                cms = cms.filter(internal_lab_filters_single)
+            else:
+                return ClassificationModification.objects.none()
+
         # PERMISSION CHECK
         cms = get_objects_for_user(self.user, ClassificationModification.get_read_perm(), cms, accept_global_perms=True)
         # can't filter out transcript versions (due to 37!=38) easily here, do that later
@@ -528,7 +609,7 @@ class ClassificationFilter:
             if allele_info := cm.classification.allele_info:
                 allele_id = cm.classification.allele_id
                 # note only care about allele origin bucket if self.allele_origin_split is True
-                allele_origin_bucket = cm.classification.allele_origin_bucket
+                allele_origin_bucket = AlleleOriginBucket(cm.classification.allele_origin_bucket)
 
                 if not allele_data or allele_id != allele_data.allele_id or \
                         (self.allele_origin_split and allele_origin_bucket != allele_data.allele_origin_bucket):
@@ -539,7 +620,7 @@ class ClassificationFilter:
                     allele_data = AlleleData.from_allele_info(
                         source=self,
                         allele_info=allele_info,
-                        allele_origin_bucket=allele_origin_bucket if not self.allele_origin_split else None
+                        allele_origin_bucket=allele_origin_bucket if self.allele_origin_split else None
                     )
                 allele_data.all_cms.append(self._record_issues(allele_id=allele_id, cm=cm))
 

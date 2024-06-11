@@ -33,6 +33,7 @@ urlpatterns = [
     perm_path('view_allele_from_variant/<int:variant_id>', views.view_allele_from_variant,
               name='view_allele_from_variant'),
     perm_path('view_allele/<int:allele_id>', views.view_allele, name='view_allele'),
+    perm_path('a<int:allele_id>', views.view_allele, name='view_allele_compact'),
     perm_path('view_allele/<int:allele_id>/classifications_download', views.export_classifications_allele,
               name='allele_classifications_download'),
     perm_path('allele/<allele_id>/create_variant/<genome_build_name>',
@@ -70,4 +71,9 @@ urlpatterns = [
               JQGridView.as_view(grid=VariantTagsGrid, delete_row=True), name='variant_tags_grid'),
     perm_path('tagged_variants/grid/<genome_build_name>/<slug:op>/',
               JQGridView.as_view(grid=TaggedVariantGrid, delete_row=True), name='tagged_variant_grid'),
+
+    # Grid export
+    perm_path('tags/export/<genome_build_name>/', views.variant_tags_export, name='variant_tags_export'),
+    perm_path('tagged_variants/export/<genome_build_name>/', views.tagged_variant_export, name='tagged_variant_export'),
+
 ]

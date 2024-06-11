@@ -238,7 +238,7 @@
                                                         {% if "c.HGVS" in extra.key %}
                                                             <label class="c-hgvs">{{ extra.key }}</label>{% c_hgvs extra.value %}
                                                         {% else %}
-                                                            {% if extra.key %}<label>{{ extra.key }} </label> {% endif %}
+                                                            {% if extra.key %}<label>{{ extra.key }}{% if extra.is_count %}<span style="margin-left:2px">:</span>{% endif %} </label> {% endif %}
                                                             {{ extra.value|format_value:200 }}
                                                         {% endif %}
                                                         </span>

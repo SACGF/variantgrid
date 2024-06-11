@@ -114,9 +114,10 @@ def get_vcf_variant_upload_stats():
     return df
 
 
-def get_step_total_stats(upload_pipeline):
+def get_step_total_stats(upload_pipeline, only_if_multiple_runs: bool = False):
     """ Returns a list of tuples of (name, count) in start_date order """
 
+    has_multiple_runs = False
     step_order = OrderedSet()
     total_seconds = Counter()
     total_items = Counter()
@@ -129,6 +130,9 @@ def get_step_total_stats(upload_pipeline):
         for name, items_processed, start_date, end_date in ups_values:
             step_order.add(name)
             total_steps[name] += 1
+            if total_steps[name] > 1:
+                has_multiple_runs = True
+
             total_items[name] += items_processed or 0
             if start_date and end_date:
                 total_seconds[name] += (end_date - start_date).total_seconds()
@@ -137,7 +141,8 @@ def get_step_total_stats(upload_pipeline):
     for step_name in step_order:
         step_total_stats_list.append((step_name, total_steps[step_name], total_items[step_name], total_seconds[step_name]))
 
-    return step_total_stats_list
+    if has_multiple_runs or not only_if_multiple_runs:
+        return step_total_stats_list
 
 
 def get_step_order_and_step_start_end_lines(upload_pipeline):

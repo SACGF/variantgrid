@@ -1,6 +1,18 @@
 {% load js_tags %}
 {% load ui_utils %}
 <div class="container">
+
+    <h4>Debug</h4>
+    <form method="POST">
+        {% csrf_token %}
+        <div class="btn-toolbar mt-4">
+            <input type="submit" name="action" value="Test Slack" class="btn btn-outline-secondary" />
+            <input type="submit" name="action" value="Test Rollbar" class="btn btn-outline-secondary" />
+            <input type="submit" value="Test Rollbar JS" class="btn btn-outline-secondary" onclick="return testRollbarJs()" />
+            <input type="submit" name="action" value="Test Message Branding" class="btn btn-outline-secondary" />
+        </div>
+    </form>
+
     <div class="row equal">
         <div class="col-6">
             <div class="card mb-4">
@@ -65,16 +77,15 @@
                 </div>
             </div>
         </div>
-    </div>
 
-    <h4>Debug</h4>
-    <form method="POST">
-        {% csrf_token %}
-        <div class="btn-toolbar mt-4">
-            <input type="submit" name="action" value="Test Slack" class="btn btn-outline-secondary" />
-            <input type="submit" name="action" value="Test Rollbar" class="btn btn-outline-secondary" />
-            <input type="submit" value="Test Rollbar JS" class="btn btn-outline-secondary" onclick="return testRollbarJs()" />
-            <input type="submit" name="action" value="Test Message Branding" class="btn btn-outline-secondary" />
+        <div class="col-6">
+            <div class="card mb-4">
+                <div class="card-header">VEP</div>
+                <div class="card-body">
+                    {% labelled hint="tiny" label="VEP Version" %}{{ settings.ANNOTATION_VEP_VERSION }}{% endlabelled %}
+                    {% labelled hint="tiny" label="VEP Base Directory" %}{{ settings.ANNOTATION_VEP_VERSION_DIR }}{% endlabelled %}
+                </div>
+            </div>
         </div>
-    </form>
+    </div>
 </div>

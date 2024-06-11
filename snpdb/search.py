@@ -27,7 +27,7 @@ HAS_ANYTHING = re.compile(r".")
 HAS_3_ALPHA_MIN = re.compile(r"[a-zA-Z]{3,}")
 HAS_3_ANY = re.compile(r"\S{3,}")
 _SPLIT_GAPS = re.compile(r"[\s,]+")
-HAS_SCV = re.compile(r"SCV\d+")
+HAS_SCV = re.compile(r"SCV\d+", re.IGNORECASE)
 CE_SEARCH = re.compile(r"CE_\d+", re.IGNORECASE)
 CB_SEARCH = re.compile(r"CB_\d+", re.IGNORECASE)
 

@@ -5,6 +5,7 @@
 {% load js_tags %}
 {% load lab_tags %}
 {% load static %}
+{% load ui_tabs_builder %}
 {% load classification_tags %}
 {% block title %}Classification Record Export{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
@@ -18,6 +19,11 @@
     if (baseUriApi.indexOf('localhost') !== -1) {
         baseUriApi = '{% url 'classification_export_api' %}';
         baseUriRedirect = '{% url 'classification_export_redirect' %}';
+    }
+
+    function scrollToAlleleOrigin() {
+        document.getElementById("allele-origin-toggle").scrollIntoView({ behavior: "smooth", block: "end"});
+        $("#allele-origin-toggle").delay(400).fadeOut().fadeIn();
     }
 
     function generateUrl() {
@@ -72,11 +78,11 @@
                 params.mvl_detail = detailLevelChecked.val();
             }
 
-            if (!allele_origin || allele_origin === "A") {
-                inputError = 'MVL download must choose Germline or Somatic';
+            if (!allele_origin || allele_origin !== "G") {
+                inputError = 'MVL download only supports Germline.<br/>Please set <a class="hover-link" onclick="scrollToAlleleOrigin()">Allele Origin</a> to <b>Germline</b> if you wish to export as MVL.';
             }
         } else if (format === 'vcf') {
-            params.encoding = $("input[name='encoding']:checked").val();
+            params.target_system = $("input[name='vcf_target_system']:checked").val();
 
         } else if (format === 'csv') {
 
@@ -112,7 +118,7 @@
         }
         if (format === 'lab_compare'){
             if (selectedLabs.length !== 2 || labSelectionMode !== "include") {
-                inputError = 'You must select to include 2 labs';
+                inputError = 'Lab Compare requires the <b>inclusion</b> of 2 labs.';
             }
         }
 
@@ -151,11 +157,15 @@
             target = '_blank';
         }
         url += paramString;
-        let a = $('#export_url');
+        let a = $('#export-url');
+        let error_box = $('#export-error');
+        let error_text = $('#export-error-text');
         if (inputError) {
-            a.attr('href', null);
-            a.text(inputError);
+            error_text.html(inputError);
+            a.hide();
+            error_box.show();
         } else {
+            error_box.hide();
             a.attr('href', url);
             a.attr('target', target);
             a.text(url);
@@ -164,6 +174,7 @@
             } else {
                 a.removeClass('download-link');
             }
+            a.show();
         }
     }
 
@@ -181,7 +192,7 @@
     });
 </script>
 <style>
-    #export_url {
+    #export-url {
         word-break: break-all;
     }
 </style>
@@ -189,10 +200,10 @@
 {% block content %}
 <div class="container" id="export-fields">
     {% page_help page_id='classification/export_help' title='Classification Records Export' %}
-    
+    {% ui_register_tabs tab_set="internal_download" %}
+    {% ui_register_tab_embedded tab_set="internal_download" label='Export Shariant Data' %}
     <p class="text-info">Please refer to the terms and conditions about proper use of the classifications download.</p>
     <p class="text-info">Once you have configured your download you can save and re-use the generated URL.</p>
-
     {% labelled label="For Downloading Via" %}
         <div class="form-check">
             <label class="form-check-label">
@@ -496,20 +507,17 @@
             {% endlabelled %}
         </div>
         <div class="custom-option" data-format="vcf">
-            {% labelled label="VCF Grouping" %}
-                The VCF will have one row per variant, but details of individual classifications will be included as INFO fields in that row.
-            {% endlabelled %}
-            {% labelled label="VCF Encoding Level" %}
+            {% labelled label="Target System" %}
                 <div class="form-check">
                     <label class="form-check-label">
-                        <input checked="checked" id="encoding_basic" type="radio" name="encoding" value="basic" class="form-check-input" />
-                        Basic (e.g. space -> underscore)
+                        <input id="vcf_target_system_emedgene" type="radio" name="vcf_target_system" value="emedgene" class="form-check-input" />
+                        Illumina Emedgene
                     </label>
                 </div>
                 <div class="form-check">
                     <label class="form-check-label">
-                        <input id="encoding_full" type="radio" name="encoding" value="full" class="form-check-input" />
-                        Full (e.g. space -> %20)
+                        <input checked="checked" id="vcf_target_system_generic" type="radio" name="vcf_target_system" value="generic" class="form-check-input" />
+                        Generic (provides more information, but not formatted for any specific system)
                     </label>
                 </div>
             {% endlabelled %}
@@ -524,8 +532,15 @@
         </div>
     </div>
     {% labelled label="Generated URL" %}
-        <a class="hover-link" id="export_url" href="{{base_url_redirect}}">{{base_url_redirect}}</a>
+        <a class="hover-link" id="export-url" href="{{base_url_redirect}}">{{base_url_redirect}}</a>
+        <div id="export-error" class="hidden text-danger">{{ "E" | severity_icon }}<span id="export-error-text"></span></div>
     {% endlabelled %}
+    {% end_ui_register_tab_embedded %}
+    {% ui_register_tab_embedded tab_set="internal_download" label='Export My Data' %}
+        {% include 'classification/tags/internal_lab_download.html' %}
+    {% end_ui_register_tab_embedded %}
+    {% ui_render_tabs tab_set="internal_download" %}
+
 </div>
 
 {% endblock %}

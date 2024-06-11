@@ -20,17 +20,19 @@ class ConditionList:
     @property
     def result(self) -> Optional[str]:
         if self.disease:
-            return self.disease[0]
+            return "; ".join(self.disease)
         elif self.findings:
-            return self.findings[0]
+            return "; ".join(self.findings)
         elif self.choices:
+            # maybe choices should be uncertain?
             return "; ".join(self.choices)
         else:
             return None
 
+
 class ClinVarXmlParserViaVCV(ClinVarXmlParser):
 
-    PARSER_VERSION = 208  # change this whenever the parsing changes, so we know to ignore the old cache
+    PARSER_VERSION = 213  # change this whenever the parsing changes, so we know to ignore the old cache
 
     RE_LEGACY_CS = re.compile("^Converted during submission to (.*?).?$")
 
@@ -68,6 +70,7 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
     @parser_path(on_start=True)
     def new_record(self, elem):
         self.reset()
+        self.allele_origin_set.clear()
         self.human = False
         self.non_human = False
         self.somatic_clinical_impact = False
@@ -262,10 +265,13 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
             obj.mark_invalid()
         else:
             allele_origins = self.allele_origin_set
-            if ("somatic" in allele_origins) or self.somatic_clinical_impact or self.oncogenicity_classification:
+            if self.somatic_clinical_impact or self.oncogenicity_classification:
                 obj.allele_origin_bucket = AlleleOriginBucket.SOMATIC
             elif "germline" in allele_origins:
                 obj.allele_origin_bucket = AlleleOriginBucket.GERMLINE
+            elif "somatic" in allele_origins:
+                obj.allele_origin_bucket = AlleleOriginBucket.SOMATIC
             else:
                 obj.allele_origin_bucket = AlleleOriginBucket.UNKNOWN
+            self.latest.allele_origin = ", ".join(sorted(self.allele_origin_set))
         self.latest.condition = self.condition_list.result

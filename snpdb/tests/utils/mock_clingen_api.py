@@ -4,7 +4,7 @@ from snpdb.clingen_allele import ClinGenAlleleRegistryAPI, ClinGenAlleleServerEx
 class MockServerErrorClinGenAlleleRegistryAPI(ClinGenAlleleRegistryAPI):
     """ This always throws ClinGenAlleleServerException """
 
-    def _put(self, url, data):
+    def _put(self, url, data, chunk_size=None):
         raise ClinGenAlleleServerException("PUT", 502, {"description": "Bad Gateway"})
 
     @classmethod
@@ -370,7 +370,7 @@ class MockClinGenAlleleRegistryAPI(ClinGenAlleleRegistryAPI):
         "NC_000003.12:g.128480137A>T": CANONICAL_ALLELES["CA10617208"],  # 38
     }
 
-    def _put(self, url, data):
+    def _put(self, url, data, chunk_size=None):
         clingen_records = []
         for line in data.split("\n"):
             if response := self.CACHED_HGVS_RESPONSES.get(line):

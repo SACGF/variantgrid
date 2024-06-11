@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import shutil
+import traceback
 from collections import namedtuple
 from functools import cached_property
 from typing import Optional, Union
@@ -287,6 +288,7 @@ class UploadStep(models.Model):
     CREATE_UNKNOWN_LOCI_AND_VARIANTS_TASK_NAME = "Create Unknown Loci and Variants"
     PREPROCESS_VCF_NAME = "Preprocess VCF"
     PROCESS_VCF_TASK_NAME = "Process VCF File"
+    NORMALIZE_SUB_STEP = "normalize"
 
     name = models.TextField()
     upload_pipeline = models.ForeignKey(UploadPipeline, on_delete=CASCADE)
@@ -344,8 +346,12 @@ class UploadStep(models.Model):
         self.status = status
         self.error_message = str(e)
         try:
-            self.error_message += "\n" + get_traceback()
+            # self.error_message += "\n" + get_traceback()
+            # try just regular traceback as the fancy one above isn't working
+            # and we can't try them both since the fancy one will break and make that the new exception
+            self.error_message += "\n" + str(traceback.format_exc())
         except:
+            self.error_message += "\nUnable to load traceback"
             pass
         self.upload_pipeline.error(self.error_message)
 
@@ -552,7 +558,13 @@ class SimpleVCFImportInfo(VCFImportInfo):
 
 
 class ModifiedImportedVariants(VCFImportInfo):
+    LINKED_SUB_STEP_NAME = UploadStep.NORMALIZE_SUB_STEP
     has_more_details = True
+
+    @staticmethod
+    def get_for_pipeline(upload_pipeline) -> 'ModifiedImportedVariants':
+        upload_step = upload_pipeline.uploadstep_set.get(name=ModifiedImportedVariants.LINKED_SUB_STEP_NAME)
+        return ModifiedImportedVariants.objects.get_or_create(upload_step=upload_step)[0]
 
     @property
     def message(self):
@@ -568,7 +580,10 @@ class ModifiedImportedVariants(VCFImportInfo):
 class ModifiedImportedVariant(models.Model):
     """ Keep track of variants that were modified during import pre-processing by vt,
         so people can find out why a variant they expected didn't turn up.  """
+    BCFTOOLS_OLD_VARIANT_TAG = "BCFTOOLS_OLD_VARIANT"
     VT_OLD_VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+):([^/]+)/([^/]+)$")
+    NORM_TOOL_VT = "vt"
+    NORM_TOOL_BCFTOOLS = "bcftools"
 
     import_info = models.ForeignKey(ModifiedImportedVariants, on_delete=CASCADE, null=True)
     variant = models.ForeignKey(Variant, on_delete=CASCADE)
@@ -577,6 +592,13 @@ class ModifiedImportedVariant(models.Model):
     # OLD_VARIANT from vt: @see https://genome.sph.umich.edu/wiki/Vt#Normalization
     old_variant = models.TextField(null=True)
     old_variant_formatted = models.TextField(null=True)  # consistently format for retrieval
+
+    @property
+    def tool_name(self) -> Optional[str]:
+        name = None
+        if tv := self.import_info.upload_step.tool_version:
+            name = tv.name
+        return name
 
     @property
     def genome_build(self):
@@ -593,11 +615,11 @@ class ModifiedImportedVariant(models.Model):
         raise ValueError(f"{old_variant} didn't match regex {ModifiedImportedVariant.VT_OLD_VARIANT_PATTERN}")
 
     @staticmethod
-    def format_old_variant(old_variant: str, genome_build: GenomeBuild) -> list[str]:
+    def vt_format_old_variant(old_variant: str, genome_build: GenomeBuild) -> list[str]:
         """ We need consistent formatting (case and use of chrom) so we can retrieve it easily.
             May return multiple values """
         formatted_old_variants = []
-        for ov in ModifiedImportedVariant._split_old_variant(old_variant):
+        for ov in ModifiedImportedVariant._vt_split_old_variant(old_variant):
             vc = ModifiedImportedVariant._to_variant_coordinate(ov)
             contig = genome_build.chrom_contig_mappings[vc.chrom]
             variant_coordinate = VariantCoordinate(chrom=contig.name, position=vc.position, ref=vc.ref, alt=vc.alt, svlen=vc.svlen)
@@ -605,7 +627,28 @@ class ModifiedImportedVariant(models.Model):
         return formatted_old_variants
 
     @staticmethod
-    def _split_old_variant(old_variant) -> list[str]:
+    def bcftools_format_old_variant(old_variant: str, svlen: Optional[str], genome_build: GenomeBuild) -> list[str]:
+        """ We need consistent formatting (case and use of chrom) so we can retrieve it easily.
+            May return multiple values """
+        formatted_old_variants = []
+        # old variant can either have 4 or 5 fields (last one is alt index if multi-allelic)
+        cols = old_variant.split("|")
+        chrom, position, ref, alts = cols[:4]
+        alt_list = alts.split(",")
+        if len(cols) > 4:
+            alt_index = int(cols[4]) - 1  # 1-based
+            alt = alt_list[alt_index]
+        else:
+            if len(alt_list) != 1:
+                raise ValueError(f"BCFTOOLS normalized old variant: {old_variant} has multi-alts but no provided alt index")
+            alt = alt_list[0]
+
+        contig = genome_build.chrom_contig_mappings[chrom]
+        variant_coordinate = VariantCoordinate(chrom=contig.name, position=position, ref=ref, alt=alt, svlen=svlen)
+        return [ModifiedImportedVariant.get_old_variant_from_variant_coordinate(variant_coordinate)]
+
+    @staticmethod
+    def _vt_split_old_variant(old_variant) -> list[str]:
         """ VT decompose writes OLD_VARIANT as comma separated, but if not decomposed (eg someone uploads already
             normalized) could be multi-alt that looks like 5:132240059:CT/CTT/T """
         old_variants = []
@@ -624,8 +667,7 @@ class ModifiedImportedVariant(models.Model):
 
     @staticmethod
     def get_old_variant_from_variant_coordinate(vc: VariantCoordinate) -> str:
-        # TODO - this doesn't work w/symbolic alts but neither does VT - will eventually rewrite this to use
-        # BCF tools
+        # This doesn't handle symbolic alts with SVLEN but BCF tools don't record SVLEN in old tag anyway
         return f"{vc.chrom}:{int(vc.position)}:{vc.ref}/{vc.alt}"
 
     @classmethod

@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from typing import Optional
-from unittest import TestCase
+from unittest import TestCase, skip, mock
 
 from classification.models import ConditionResolved
 from classification.models.clinvar_export_prepare import ConsolidatingMerger
 from classification.tests.utils.data_utils import ConditionMock
-from ontology.models import OntologyTerm
+from ontology.models import OntologyTerm, OntologyTermRelation
 
 
 @dataclass
@@ -77,7 +77,10 @@ class TestClinVarExportModels(TestCase):
     def setUp(self):
         ConditionMock.setUp()
 
-    def test_grouping(self):
+    @mock.patch("ontology.models.OntologyVersion.get_latest_and_live_ontology_qs")
+    def test_grouping(self, mocked_get_latest_and_live):
+        mocked_get_latest_and_live.return_value = OntologyTermRelation.objects.all()
+
         # m_disease = OntologyTerm.get_or_stub(ConditionMock.MONDO_DISEASE_OR_DISORDER)
         # m_digit = OntologyTerm.get_or_stub(ConditionMock.MONDO_DIGIT_ISSUE)
         m_toe = OntologyTerm.get_or_stub(ConditionMock.MONDO_TOE_ISSUE)

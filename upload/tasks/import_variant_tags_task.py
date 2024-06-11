@@ -10,6 +10,7 @@ from library.django_utils import UserMatcher
 from library.genomics.vcf_utils import write_vcf_from_tuples
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.pandas_utils import df_nan_to_none
+from library.utils import invert_dict
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import GenomeBuild, Variant, ImportSource, Tag, VariantAllele, VariantCoordinate, Allele
@@ -20,6 +21,30 @@ from variantgrid.celery import app
 
 class VariantTagsCreateVCFTask(ImportVCFStepTask):
     """ Write a VCF with variants in VariantTags so they can go through normal insert pipeline """
+    # These are the original names (JQGrid js export with raw IDs)
+    COL_VARIANT_STRING = "variant_string"
+    COL_NODE = "node__id"
+    COL_CREATED = "created"
+    COL_GENOME_BUILD = "view_genome_build"
+    COL_TAG = "tag__id"
+    COL_GENE = "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol"
+    COL_VARIANT_ID = "variant__id"
+    COL_ANALYSIS_ID = "analysis__id"
+    COL_ANALYSIS_NAME = "analysis__name"
+    COL_USERNAME = "user__username"
+
+    NEW_COLUMNS = {
+        COL_VARIANT_STRING: "Variant",
+        COL_NODE: "NodeID",
+        COL_CREATED: "Created",
+        COL_GENOME_BUILD: "Genome Build",
+        COL_TAG: "Tag",
+        COL_GENE: "Gene",
+        COL_VARIANT_ID: "VariantID",
+        COL_ANALYSIS_ID: "AnalysisID",
+        COL_ANALYSIS_NAME: "Analysis",
+        COL_USERNAME: "Username",
+    }
 
     def process_items(self, upload_step):
         upload_pipeline = upload_step.upload_pipeline
@@ -29,6 +54,9 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
         df = df_nan_to_none(df)
         NEW_CLASSIFICATION = "New Classification"
         REMOVE_LENGTH = len(NEW_CLASSIFICATION)
+
+        if self.COL_GENOME_BUILD not in df.columns:
+            df = df.rename(columns=invert_dict(self.NEW_COLUMNS))
 
         # view_genome_build should all be the same
         view_genome_builds = set(df["view_genome_build"])

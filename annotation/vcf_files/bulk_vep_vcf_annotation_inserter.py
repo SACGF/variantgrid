@@ -1,10 +1,9 @@
 import logging
 import operator
-import re
 import shutil
 from collections import defaultdict
 from functools import cached_property
-from typing import Optional
+from typing import Optional, Iterable, TypeAlias
 
 from django.conf import settings
 from django.db.models import QuerySet
@@ -15,6 +14,7 @@ from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
 from annotation.models.models import ColumnVEPField, VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap, AnnotationRun
 from annotation.models.models_enums import VariantClass, VariantAnnotationPipelineType, VEPCustom
+from annotation.vcf_files.vcf_types import VCFVariant
 from annotation.vep_annotation import VEPConfig
 from genes.hgvs import HGVSMatcher, HGVSException
 from genes.models import TranscriptVersion, GeneVersion
@@ -27,7 +27,6 @@ from library.utils import invert_dict
 from snpdb.models import GenomeBuild, VariantCoordinate
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
-SV_HGVS_TOO_LONG_MESSAGE = "c.HGVS not calculated due to length"
 VEP_SEPARATOR = '&'
 EMPTY_VALUES = {'', '.'}
 DELIMITER = '\t'
@@ -45,6 +44,9 @@ class VEPColumns:
     GENE = "Gene"
     FEATURE = "Feature"
     FEATURE_TYPE = "Feature_type"
+
+
+TranscriptData: TypeAlias = dict
 
 
 class BulkVEPVCFAnnotationInserter:
@@ -105,7 +107,11 @@ class BulkVEPVCFAnnotationInserter:
     ALOFT_COLUMNS = ['aloft_prob_tolerant', 'aloft_prob_recessive', 'aloft_prob_dominant',
                      'aloft_pred', 'aloft_high_confidence', 'aloft_ensembl_transcript']
 
-    def __init__(self, annotation_run: AnnotationRun, infos=None, insert_variants=True, validate_columns=True):
+    def __init__(self,
+                 annotation_run: AnnotationRun,
+                 infos: Optional[dict] = None,
+                 insert_variants: bool = True,
+                 validate_columns: bool = True):
         self.annotation_run = annotation_run
         self.genome_build = self.annotation_run.variant_annotation_version.genome_build
         self.vep_config = VEPConfig(self.genome_build)
@@ -138,7 +144,7 @@ class BulkVEPVCFAnnotationInserter:
         return f"{self.genome_build}/{self.vep_config.columns_version}/{self.annotation_run.get_pipeline_type_display()}"
 
     @staticmethod
-    def _get_vep_columns_from_csq(infos):
+    def _get_vep_columns_from_csq(infos: Optional[dict]):
         """
         VEP packs annotations into a single INFO field, separated by '|', eg:
         CSQ=T|intron_variant&non_coding_transcript_variant|MODIFIER|RP5-857K21.4|ENSG00000230021
@@ -231,8 +237,8 @@ class BulkVEPVCFAnnotationInserter:
                     setting_key = prefix.lower()
                     _ = self.vep_config[setting_key]  # May throw exception if not setup
                     # VEP custom often adds a column of just the prefix which we often don't use
-                    #if cvf.source_field_has_custom_prefix:
-                    #    self.ignored_vep_fields.append(prefix)
+                    # if cvf.source_field_has_custom_prefix:
+                    #     self.ignored_vep_fields.append(prefix)
 
                 self.source_field_to_columns[cvf.vep_info_field].add(cvf.variant_grid_column_id)
                 # logging.info("Handling column %s => %s", cvf.vep_info_field, cvf.variant_grid_column_id)
@@ -242,7 +248,7 @@ class BulkVEPVCFAnnotationInserter:
         vav = self.annotation_run.variant_annotation_version
         self.prediction_pathogenic_funcs = vav.get_pathogenic_prediction_funcs()
 
-    def _setup_vep_fields_and_db_columns(self, validate_columns, cvf_qs):
+    def _setup_vep_fields_and_db_columns(self, validate_columns: bool, cvf_qs: QuerySet[ColumnVEPField]):
         self._add_vep_field_handlers(cvf_qs)
 
         ignore_columns = set(self.DB_FIXED_COLUMNS +
@@ -257,6 +263,7 @@ class BulkVEPVCFAnnotationInserter:
         ignore_columns.update(vep_fields_not_this_version)
 
         for c in list(ignore_columns):
+            # FIXME, why do we convery ignore_clumns to a list here? it's a set which would work fine
             if c.endswith("_id"):
                 django_column = c.rsplit("_id", 1)[0]
                 ignore_columns.add(django_column)
@@ -322,7 +329,7 @@ class BulkVEPVCFAnnotationInserter:
             raise ValueError(f"Unknown VariantAnnotationVersion base_table_name: '{base_table_name}'")
         return self.DB_FIXED_COLUMNS + manual_columns + list(sorted(columns))
 
-    def vep_to_db_dict(self, vep_transcript_data, model_columns):
+    def vep_to_db_dict(self, vep_transcript_data: TranscriptData, model_columns: Iterable[str]) -> dict:
         # logging.debug("vep_to_db_dict:")
         # logging.debug(vep_transcript_data)
 
@@ -389,7 +396,7 @@ class BulkVEPVCFAnnotationInserter:
             best_aloft["aloft_ensembl_transcript"] = "."
         raw_db_data.update(best_aloft)
 
-    def get_gene_id(self, vep_transcript_data):
+    def get_gene_id(self, vep_transcript_data: TranscriptData):
         gene_id = None
         vep_gene = vep_transcript_data[VEPColumns.GENE]
         if vep_gene:
@@ -399,10 +406,9 @@ class BulkVEPVCFAnnotationInserter:
                 logging.warning(f"Could not find gene_id: '{vep_gene}'")
         return gene_id
 
-    def _get_transcript_id_and_version(self, vep_transcript_data) -> tuple[Optional[str], Optional[str]]:
-        transcript_accession = None
-        transcript_id = None
-        transcript_version_id = None
+    def _get_transcript_id_and_version(self, vep_transcript_data: TranscriptData) -> tuple[Optional[str], Optional[str]]:
+        transcript_id: Optional[str] = None
+        transcript_version_id: Optional[str] = None
         vep_feature_type = vep_transcript_data[VEPColumns.FEATURE_TYPE]
         if vep_feature_type == "Transcript":
             if transcript_accession := vep_transcript_data[VEPColumns.FEATURE]:
@@ -418,7 +424,7 @@ class BulkVEPVCFAnnotationInserter:
                     logging.warning(f"Could not find transcript: '{t_id}'")
         return transcript_id, transcript_version_id
 
-    def add_calculated_transcript_columns(self, variant_coordinate: Optional[VariantCoordinate], transcript_data):
+    def add_calculated_transcript_columns(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: TranscriptData):
         """ variant_coordinate - will only be set for symbolics """
 
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STANDARD:
@@ -426,7 +432,7 @@ class BulkVEPVCFAnnotationInserter:
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
             self._add_hgvs_c(variant_coordinate, transcript_data)
 
-    def add_calculated_variant_annotation_columns(self, variant_coordinate, transcript_data):
+    def add_calculated_variant_annotation_columns(self, variant_coordinate: VariantCoordinate, transcript_data: TranscriptData):
         self._add_hemi_count(transcript_data)
         self._add_hgvs_g(variant_coordinate, transcript_data)
         self._add_calculated_num_predictions(transcript_data)
@@ -446,12 +452,12 @@ class BulkVEPVCFAnnotationInserter:
         transcript_data["predictions_num_pathogenic"] = num_pathogenic
         transcript_data["predictions_num_benign"] = num_not_pathogenic
 
-    def _add_hemi_count(self, transcript_data):
+    def _add_hemi_count(self, transcript_data: TranscriptData):
         """ gnomad_non_par=True means not on pseudoautosomal region on chrX, so XY count = hemizygous """
         if transcript_data.get("gnomad_non_par"):
             transcript_data["gnomad_hemi_count"] = transcript_data.get("gnomad_xy_ac")
 
-    def _calculate_gnomad_sv_overlap_percentage(self, variant_coordinate, transcript_data):
+    def _calculate_gnomad_sv_overlap_percentage(self, variant_coordinate: VariantCoordinate, transcript_data: TranscriptData):
         SV_PC_FIELD = "gnomad_sv_overlap_percent"
 
         # These are currently coordinates that look like eg: chr17:42853981-43253980&chr17:43048298-43898190
@@ -467,7 +473,7 @@ class BulkVEPVCFAnnotationInserter:
             transcript_data[SV_PC_FIELD] = VEP_SEPARATOR.join([str(p) for p in gnomad_sv_overlap_percent_list])
 
     @staticmethod
-    def _add_calculated_maxentscan(transcript_data):
+    def _add_calculated_maxentscan(transcript_data: TranscriptData):
         maxentscan_diff = transcript_data.get("maxentscan_diff")
         maxentscan_ref = transcript_data.get("maxentscan_ref")
         if maxentscan_diff and maxentscan_ref:
@@ -477,7 +483,7 @@ class BulkVEPVCFAnnotationInserter:
                 transcript_data["maxentscan_percent_diff_ref"] = 100 * maxentscan_diff / maxentscan_ref
 
     @staticmethod
-    def _merge_cosmic_ids(transcript_data, custom_vcf_cosmic_id):
+    def _merge_cosmic_ids(transcript_data: TranscriptData, custom_vcf_cosmic_id: str):
         """ VEP ships w/COSMIC so we always try and pull it out of the existing variation field
             We also support a custom vcf of COSMIC (for cosmic_count) - this is often more recent """
         cosmic_ids = set(custom_vcf_cosmic_id.split(VEP_SEPARATOR))
@@ -497,7 +503,7 @@ class BulkVEPVCFAnnotationInserter:
 
         # Only calculate very long HGVS for representative transcripts
         if variant_coordinate.max_sequence_length > max_length:
-            transcript_data['hgvs_c'] = SV_HGVS_TOO_LONG_MESSAGE
+            transcript_data['hgvs_c'] = VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
             return
 
         transcript_id = transcript_data.get("transcript_id")
@@ -511,14 +517,14 @@ class BulkVEPVCFAnnotationInserter:
             except (ValueError, HGVSException):
                 pass
 
-    def _add_hgvs_g(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: dict):
+    def _add_hgvs_g(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: TranscriptData):
         # VEP110 has a bug with --hgvsg but we hope to introduce in VEP111+
         if transcript_data.get('hgvs_g'):
             return
 
         max_length = settings.HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT  # VariantAnnotation
         if variant_coordinate.max_sequence_length > max_length:
-            transcript_data['hgvs_g'] = SV_HGVS_TOO_LONG_MESSAGE
+            transcript_data['hgvs_g'] = VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
             return
 
         try:
@@ -526,7 +532,7 @@ class BulkVEPVCFAnnotationInserter:
         except Exception as e:
             logging.error("Error calculating g.HGVS for '%s': %s", variant_coordinate, e)
 
-    def process_entry(self, v):
+    def process_entry(self, v: VCFVariant):
         if len(self.variant_transcript_annotation_list) >= settings.SQL_BATCH_INSERT_SIZE:
             self.bulk_insert()
 

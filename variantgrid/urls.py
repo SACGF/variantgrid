@@ -37,7 +37,6 @@ APPS_WITH_URLS = [
 urlpatterns = [
     path('', views.index),
     path('admin/', admin.site.urls),
-    path('admin', RedirectView.as_view(url='admin/', permanent=False)),
     path('authenticated', views.authenticated, name='authenticated'),
     path('messages/', include('django_messages.urls')),
     path('external_help', views.external_help, name='external_help'),

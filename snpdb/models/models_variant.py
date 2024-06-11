@@ -396,7 +396,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         raise ValueError(f"{variant_string=} did not match against {regex_patterns=}")
 
     @staticmethod
-    def from_explicit_no_svlen(chrom: str, position: int, ref: str, alt: str):
+    def from_explicit_no_svlen(chrom: str, position: int, ref: str, alt: str) -> 'VariantCoordinate':
         """ Initialise w/o providing an end """
 
         if Sequence.allele_is_symbolic(alt):

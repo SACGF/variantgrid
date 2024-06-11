@@ -22,48 +22,49 @@ $(document).ready(function() {
 {% endblock %}
 {% block submenu_page_content %}
 
-    <a href="{% url 'view_upload_pipeline' upload_pipeline.pk %}">Back to upload pipeline.</a>
+    <div class="container">
+        <a class="link-back" href="{% url 'view_upload_pipeline' upload_pipeline.pk %}">Back to upload pipeline.</a>
 
-    {% if skipped_contigs.vcfskippedcontig_set.exists %}
-        <h3>Skipped Contigs</h3>
-        
-        <p>We could not process the following contigs as we don't have the appropriate annotations. We currently support:
+        {% if skipped_contigs.vcfskippedcontig_set.exists %}
+            <h3>Skipped Contigs</h3>
 
-        {% for build_name, data in contigs_import.items %}
-            <P>
-                <b>Build:</b> {{ build_name }} <b>Contigs:</b> {{ data.contigs }}
-            </p> 
-        {% endfor %}
+            <p>We could not process the following contigs as we don't have the appropriate annotations. We currently support:
 
-        <table>
-        <tr><th>Contig <th># skipped
-        {% for skipped_contig in skipped_contigs.vcfskippedcontig_set.all %}
-            <tr><td>{{ skipped_contig.contig }} <td> {{ skipped_contig.num_skipped }}
-        {% endfor %}
-        </table>
-    {% endif %}
+            {% for build_name, data in contigs_import.items %}
+                <P>
+                    <b>Build:</b> {{ build_name }} <b>Contigs:</b> {{ data.contigs }}
+                </p>
+            {% endfor %}
 
-    {% if skipped_annotation %}
-    <div>
-        <h3>Skipped annotation</h3>
-        <p>{{ skipped_annotation.message }}
+            <table>
+            <tr><th>Contig <th># skipped
+            {% for skipped_contig in skipped_contigs.vcfskippedcontig_set.all %}
+                <tr><td>{{ skipped_contig.contig }} <td> {{ skipped_contig.num_skipped }}
+            {% endfor %}
+            </table>
+        {% endif %}
 
-        {% load jqgrid_tags %}
-        {% jqgrid 'upload_pipeline_skipped_annotation_grid' name='Skipped Annotation' search=False upload_pipeline_id=upload_pipeline.pk %}
+        {% if skipped_annotation %}
+        <div>
+            <h3>Skipped annotation</h3>
+            <p>{{ skipped_annotation.message }}
+
+            {% load jqgrid_tags %}
+            {% jqgrid 'upload_pipeline_skipped_annotation_grid' name='Skipped Annotation' search=False upload_pipeline_id=upload_pipeline.pk %}
+        </div>
+        {% endif %}
+
+
+        {% if has_modified_imported_variants %}
+        <div>
+            <h3>Modified Imported Variants</h3>
+            <p>We decompose multi-allelic variants and normalise indels (using <a href="https://samtools.github.io/bcftools/bcftools.html#norm">BCFtools</a>) during import, so variants from different VCF files have a consistent representation. Normalization is the left-aligned minimal representation of an indel
+
+            {% load jqgrid_tags %}
+            {% jqgrid 'upload_pipeline_modified_variants_grid' name='Modified Imported Variant' search=False upload_pipeline_id=upload_pipeline.pk %}
+        </div>
+        {% endif %}
     </div>
-    {% endif %}
-
-
-    {% if has_modified_imported_variants %}
-    <div>
-        <h3>Modified Imported Variants</h3>
-        <p>We <a target='_blank' href="https://genome.sph.umich.edu/wiki/Vt#Normalization">Decompose and Normalise variants using VT</a> during import, so variants from different VCF files have a consistent representation.  
-        
-        {% load jqgrid_tags %}
-        {% jqgrid 'upload_pipeline_modified_variants_grid' name='Modified Imported Variant' search=False upload_pipeline_id=upload_pipeline.pk %}
-    </div>
-    {% endif %}
-
 
 
 {% endblock %}

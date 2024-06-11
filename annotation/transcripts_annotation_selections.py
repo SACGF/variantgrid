@@ -200,6 +200,12 @@ class VariantTranscriptSelections:
         ac_key = self._ac_key(self.annotation_consortium)
         other_ac_key = self._ac_key(self.other_annotation_consortium)
 
+        svlen = variant.svlen or 0
+        if abs(svlen) > settings.HGVS_MAX_SEQUENCE_LENGTH:
+            other_ac = AnnotationConsortium(self.other_annotation_consortium)
+            self.warning_messages.append(f"Not adding {other_ac.label} transcripts due to length")
+            return
+
         gene_symbols = set()
         for ga in self.gene_annotations.values():
             if gene_symbol := ga.get("hgnc_symbol"):

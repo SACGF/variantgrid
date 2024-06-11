@@ -7,7 +7,6 @@ from pydantic import ConfigDict
 
 from annotation.models import ClinVar, AnnotationVersion, VariantAnnotation
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
-from genes.hgvs import HGVSMatcher
 from library.log_utils import report_exc_info
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, Variant, GenomeBuild

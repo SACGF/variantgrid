@@ -86,6 +86,9 @@ class ClinVarVersion(SubVersionPartition):
         msg = f"File name '{base_name}' didn't match pattern {CLINVAR_PATTERN}"
         raise ValueError(msg)
 
+    def __str__(self):
+        date_str = self.annotation_date.strftime("%d %B %Y")
+        return f"v{self.pk}. {self.genome_build} ({date_str})"
 
 @receiver(pre_delete, sender=ClinVarVersion)
 def clinvar_version_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
@@ -111,6 +114,12 @@ class ClinVar(models.Model):
                      512: 'tested-inconclusive',
                      1073741824: 'other'}
 
+    ALLELE_ORIGIN_BUCKETS = {
+        0: AlleleOriginBucket.UNKNOWN,
+        1: AlleleOriginBucket.GERMLINE,
+        2: AlleleOriginBucket.SOMATIC
+    }
+
     SUSPECT_REASON_CODES = {0: 'unspecified',
                             1: 'Paralog',
                             2: 'byEST',
@@ -127,6 +136,7 @@ class ClinVar(models.Model):
     clinvar_disease_database_name = models.TextField(null=True, blank=True)
     clinvar_review_status = models.CharField(max_length=1, null=True, choices=ClinVarReviewStatus.choices)
     clinical_significance = models.TextField(null=True, blank=True)
+
     # If clinical_significance = 'Conflicting_interpretations_of_pathogenicity'
     conflicting_clinical_significance = models.TextField(null=True, blank=True)
     highest_pathogenicity = models.IntegerField(default=0)  # Highest of clinical_significance
@@ -135,9 +145,31 @@ class ClinVar(models.Model):
     clinvar_suspect_reason_code = models.IntegerField(default=0)
     drug_response = models.BooleanField(default=False)
 
-    @property
-    def clinvar_disease_database_terms(self) -> list[str]:
-        if db_name_text := self.clinvar_disease_database_name:
+    # ONCREVSTAT
+    oncogenic_review_status = models.CharField(max_length=1, null=True, choices=ClinVarReviewStatus.choices)
+    # ONCINCL
+    oncogenic_classification = models.TextField(null=True, blank=True)
+    # ONCCONF
+    oncogenic_conflicting_classification = models.TextField(null=True, blank=True)
+
+    # ONCDN
+    oncogenic_preferred_disease_name = models.TextField(null=True, blank=True)
+    # ONCDISDB
+    oncogenic_disease_database_name = models.TextField(null=True, blank=True)
+
+    # SCIREVSTAT
+    somatic_review_status = models.CharField(max_length=1, null=True, choices=ClinVarReviewStatus.choices)
+    # SCI
+    somatic_clinical_significance = models.TextField(null=True, blank=True)
+
+    # SCIDN
+    somatic_preferred_disease_name = models.TextField(null=True, blank=True)
+    # SCIDISDB
+    somatic_disease_database_name = models.TextField(null=True, blank=True)
+
+    @staticmethod
+    def _database_terms(clinvar_db_value) -> list[str]:
+        if db_name_text := clinvar_db_value:
             def fix_name(name: str):
                 name = name.strip()
                 if name.startswith("MONDO:MONDO:"):
@@ -153,6 +185,27 @@ class ClinVar(models.Model):
         return []
 
     @property
+    def clinvar_disease_database_terms(self) -> list[str]:
+        """
+        Deprecated, use germline_disease_database_terms
+        """
+        return self.germline_disease_database_terms
+
+    @cached_property
+    def germline_disease_database_terms(self) -> list[str]:
+        return ClinVar._database_terms(self.clinvar_disease_database_name)
+
+    @cached_property
+    def somatic_disease_database_terms(self) -> list[str]:
+        return ClinVar._database_terms(self.somatic_disease_database_name)
+
+    @cached_property
+    def oncogenic_disease_database_terms(self) -> list[str]:
+        return ClinVar._database_terms(self.oncogenic_disease_database_name)
+
+    # repeat the above for oncogenic and somatic
+
+    @property
     def clinvar_clinical_sources_list(self) -> list[str]:
         if clinvar_clinical_sources := self.clinvar_clinical_sources:
             return [name.strip() for name in clinvar_clinical_sources.split("|")]
@@ -160,14 +213,67 @@ class ClinVar(models.Model):
 
     @property
     def stars(self):
-        return ClinVarReviewStatus(self.clinvar_review_status).stars()
+        """
+        deprecated - use .germline_stars
+        """
+        return self.germline_stars
+
+    @staticmethod
+    def _stars_for(value: Optional[str]) -> int:
+        if not value:
+            return 0
+        return ClinVarReviewStatus(value).stars()
+
+    @property
+    def germline_stars(self) -> int:
+        return ClinVar._stars_for(self.clinvar_review_status)
+
+    @property
+    def somatic_stars(self) -> int:
+        return ClinVar._stars_for(self.somatic_review_status)
+
+    @property
+    def oncogenic_stars(self) -> int:
+        return ClinVar._stars_for(self.oncogenic_review_status)
 
     @property
     def is_expert_panel_or_greater(self):
-        return self.stars >= CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
+        return max(self.germline_stars, self.somatic_stars, self.oncogenic_stars) >= CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
 
     def get_origin_display(self):
+        """
+        FIXME use allele_origins clinvar_origin is a flag
+        it might contain multiple values
+        """
         return ClinVar.ALLELE_ORIGIN.get(self.clinvar_origin)
+
+    @property
+    def get_allele_origins_display(self):
+        return ", ".join(self.allele_origins)
+
+    @cached_property
+    def allele_origins(self) -> list[str]:
+        origins: list[str] = []
+        for flag, label in ClinVar.ALLELE_ORIGIN.items():
+            if flag:
+                if self.clinvar_origin & flag:
+                    origins.append(label)
+        if not origins:
+            origins.append("unknown")
+        return origins
+
+    @property
+    def allele_origin_bucket(self) -> AlleleOriginBucket:
+        is_germline = "germline" in self.allele_origins
+        is_somatic = "somatic" in self.allele_origins
+        if is_germline and is_somatic:
+            return AlleleOriginBucket.UNKNOWN  # technically both, but unknown gets treated like both
+        elif is_germline:
+            return AlleleOriginBucket.GERMLINE
+        elif is_somatic:
+            return AlleleOriginBucket.SOMATIC
+        else:
+            return AlleleOriginBucket.UNKNOWN
 
     def get_suspect_reason_code_display(self):
         return ClinVar.SUSPECT_REASON_CODES.get(self.clinvar_suspect_reason_code)
@@ -209,7 +315,7 @@ class ClinVarRecordCollection(TimeStampedModel):
     def records_with_min_stars(self, min_stars: int) -> list['ClinVarRecord']:
         return list(sorted(self.clinvarrecord_set.filter(stars__gte=min_stars), reverse=True))
 
-    def update_with_records_and_save(self, records: list['ClinVarRecord']):
+    def update_with_records_and_save(self, records: list['ClinVarR ecord']):
         records = list(sorted(records, reverse=True))
         self.clinvarrecord_set.all().delete()
         for record in records:
@@ -890,6 +996,8 @@ class AnnotationRun(TimeStampedModel):
 class AbstractVariantAnnotation(models.Model):
     """ Common fields between VariantAnnotation and VariantTranscriptAnnotation
         These fields are PER-TRANSCRIPT """
+    SV_HGVS_TOO_LONG_MESSAGE = "c.HGVS not calculated due to length"
+
     version = models.ForeignKey(VariantAnnotationVersion, on_delete=CASCADE)
     variant = models.ForeignKey(Variant, on_delete=CASCADE)
     annotation_run = models.ForeignKey(AnnotationRun, on_delete=CASCADE)
@@ -944,6 +1052,10 @@ class AbstractVariantAnnotation(models.Model):
         abstract = True
 
     @property
+    def has_hgvs_c(self) -> bool:
+        return self.hgvs_c and self.hgvs_c != self.SV_HGVS_TOO_LONG_MESSAGE
+
+    @property
     def transcript_accession(self):
         """ Get transcript_id (with version if possible) """
         if self.transcript_version:
@@ -987,7 +1099,7 @@ class AbstractVariantAnnotation(models.Model):
 
     def get_hgvs_c_with_symbol(self) -> str:
         hgvs_c = self.hgvs_c
-        if hgvs_c and self.symbol:
+        if self.has_hgvs_c and self.symbol:
             from genes.hgvs import HGVSMatcher
             hgvs_matcher = HGVSMatcher(self.version.genome_build)
             hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_c)

@@ -10,7 +10,7 @@ ANALYSIS_PREFIX_PATTERN = re.compile(r"^a(\d+)$")
     search_type=Analysis,
     pattern=ANALYSIS_PREFIX_PATTERN,
     example=SearchExample(
-        note="'a' followed by the analysis ID",
+        note="\"a\" followed by the analysis ID",
         examples=["a1105"]
     )
 )

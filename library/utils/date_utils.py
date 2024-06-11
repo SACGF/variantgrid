@@ -17,6 +17,11 @@ def local_date_string() -> str:
     return localtime(timezone.now()).strftime("%Y-%m-%d")
 
 
+def local_date_str_no_dash() -> str:
+    """ Returns e.g. '20220718' """
+    return localtime(timezone.now()).strftime("%Y%m%d")
+
+
 def calculate_age(born: datetime, died: Optional[datetime] = None) -> int:
     """ https://stackoverflow.com/a/9754466/295724 """
     age = None

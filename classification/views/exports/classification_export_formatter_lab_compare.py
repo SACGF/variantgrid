@@ -6,6 +6,7 @@ from django.urls import reverse
 
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap
+from classification.views.classification_export_view import InvalidExportParameter
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
@@ -45,6 +46,10 @@ class ClassificationLab(ExportRow):
     @export_column("c.HGVSs")
     def c_hgvs(self):
         return self.list_of(SpecialEKeys.C_HGVS)
+
+    @export_column("Classification")
+    def classification_value(self):
+        return self.list_of(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
     @export_column("Patient IDs")
     def patient_ids(self):
@@ -132,7 +137,7 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
     def __init__(self, classification_filter: ClassificationFilter):
         super().__init__(classification_filter)
         if not self.classification_filter.include_sources or len(self.classification_filter.include_sources) != 2:
-            raise ValueError("2 labs must be included")
+            raise InvalidExportParameter("Lab Compare requires the <b>inclusion</b> of 2 labs.")
         two_labs = list(sorted(self.classification_filter.include_sources))
         self.lab_a = two_labs[0]
         self.lab_b = two_labs[1]

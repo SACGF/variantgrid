@@ -21,8 +21,9 @@
 
             {{  at_form.as_p }}
 
+            {% if has_write_permission %}
             <button type="submit" name="{{at_form.prefix}}" class="btn btn-primary">save</button>
-
+            {% endif %}
 
         {%  if analysis_template_versions.exists %}
             <h4>Historical versions:</h4>

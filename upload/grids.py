@@ -1,12 +1,56 @@
+from datetime import timedelta
+
+from django.db.models import QuerySet
+from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
 from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
+from snpdb.models import ProcessingStatus
 from snpdb.models.models_variant import Variant
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, DC, CellData
 from upload.models import UploadStep, ModifiedImportedVariant, UploadPipeline
 
 
+class UploadStepColumns(DatatableConfig[UploadStep]):
+
+    def get_initial_queryset(self) -> QuerySet[UploadStep]:
+        upload_pipeline_id = self.get_query_param("upload_pipeline")
+        upload_pipeline = get_object_or_404(UploadPipeline, pk=upload_pipeline_id)
+        upload_pipeline.uploaded_file.check_can_view(self.user)
+        return UploadStep.objects.filter(upload_pipeline_id=upload_pipeline_id)
+
+    @staticmethod
+    def render_status(row: CellData):
+        return ProcessingStatus(row["status"]).label
+
+    @staticmethod
+    def render_duration(row: CellData):
+        if end_date := row["end_date"]:
+            delta = end_date - row["start_date"]
+            return f"{delta.total_seconds():.2f}"
+        else:
+            return ""
+
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.expand_client_renderer = DatatableConfig._row_expand_ajax('upload_step_detail',
+                                                                       expected_height=120)
+        self.rich_columns = [
+            RichColumn(key='sort_order', orderable=True),
+            RichColumn(key='id', orderable=True),
+            RichColumn(key='name', orderable=True),
+            RichColumn(key='status', orderable=True, renderer=UploadStepColumns.render_status),
+            RichColumn(key='items_processed', orderable=True),
+            RichColumn(name='duration', label="Duration Seconds", extra_columns=["start_date", "end_date"], renderer=UploadStepColumns.render_duration, css_class="num")
+        ]
+
+
 class UploadStepsGrid(JqGridUserRowConfig):
+    """
+    This is Grid has been replaced with the above DataTable
+    But haven't completely converted over to Grid yet
+    """
     model = UploadStep
     caption = 'Upload Steps'
     fields = ['sort_order', 'id', 'name', 'status', 'items_to_process', 'items_processed', 'error_message', 'input_filename', 'output_filename', 'start_date', 'end_date', 'task_type', 'pipeline_stage', 'pipeline_stage_dependency', 'script', 'output_text', 'tool_version__name', 'tool_version__version', 'import_variant_table', 'celery_task']

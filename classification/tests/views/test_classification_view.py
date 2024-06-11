@@ -71,6 +71,7 @@ class ClassificationTestCaseViews(TestCase):
             "can_write_latest": True,
             "clinical_context": None,
             "allele_origin_bucket": "U",
+            "condition_text_match": None,
             "data": {
                 "owner": {
                     "value": "joejoe"
@@ -194,6 +195,7 @@ class ClassificationTestCaseViews(TestCase):
             'clinical_context': None,
             'withdrawn': False,
             "allele_origin_bucket": "U",
+            "condition_text_match": None,
             'messages': [
                 {'severity': 'error', 'code': 'missing_significance', 'message': 'Classification requires a value', 'key': 'clinical_significance'},
                 {'severity': 'error', 'code': 'mandatory', 'message': 'Missing mandatory value', 'key': 'condition'},

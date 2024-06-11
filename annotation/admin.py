@@ -4,6 +4,7 @@ from django.contrib import admin, messages
 from django.contrib.admin import TabularInline
 from django.db.models import QuerySet
 from django.utils.safestring import SafeString
+from django.utils.timezone import now
 
 from annotation import models
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
@@ -27,7 +28,18 @@ class AnnotationRunAdmin(ModelAdminBasics):
 @admin.register(ClinVar)
 class ClinVarAdmin(ModelAdminBasics):
 
-    list_display = ("pk", "version", "clinvar_variation_id", "variant", "clinvar_review_status")
+    list_display = ("pk", "version_short", "clinvar_variation_id", "variant_link", "clinvar_review_status", "somatic_review_status", "oncogenic_review_status")
+    list_filter = ("version", )
+
+    @admin_list_column("Version", order_field="version")
+    def version_short(self, obj: ClinVar):
+        return obj.version.pk
+
+    @admin_list_column("Variant")
+    def variant_link(self, obj: ClinVar):
+        if variant := obj.variant:
+            href = variant.get_absolute_url()
+            return SafeString(f"<a href=\"{href}\">{variant}</a>")
 
     def has_change_permission(self, request, obj=None):
         return False
@@ -54,13 +66,31 @@ class ClinVarRecordAdmin(TabularInline):
         return False
 
 
+class ClinVarRecordCollectionCacheFilter(admin.SimpleListFilter):
+    title = 'cache'
+    parameter_name = 'cache'
+    default_value = None
+
+    def lookups(self, request, model_admin):
+        return [("fresh", "Fresh"), ("stale", "Stale")]
+
+    def queryset(self, request, queryset: QuerySet[ClinVarRecordCollection]):
+        if self.value() == "fresh":
+            return queryset.filter(parser_version=ClinVarXmlParserViaVCV.PARSER_VERSION, last_loaded__gte=now() - timedelta(days=CLINVAR_RECORD_CACHE_DAYS))
+        elif self.value() == "stale":
+            return queryset.exclude(parser_version=ClinVarXmlParserViaVCV.PARSER_VERSION,
+                                   last_loaded__gte=now() - timedelta(days=CLINVAR_RECORD_CACHE_DAYS))
+        return queryset
+
+
 @admin.register(ClinVarRecordCollection)
 class ClinVarRecordCollectionAdmin(ModelAdminBasics):
     search_fields = ("clinvar_variation_id", "allele__id")
     inlines = (ClinVarRecordAdmin, )
     list_per_page = 20
 
-    list_display = ("pk", "clinvar_variation_id", "allele_link", "max_stars", "last_loaded")
+    list_display = ("pk", "clinvar_variation_id", "allele_link", "max_stars", "last_loaded", "parser_version")
+    list_filter = (ClinVarRecordCollectionCacheFilter, )
 
     """
     # these took prohibitively long to load

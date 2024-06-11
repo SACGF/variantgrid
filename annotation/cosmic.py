@@ -23,4 +23,3 @@ class CosmicAPI:
         for accession, mutation_cds in self.data[3]:
             hgvs.append(f"{accession}:{mutation_cds}")
         return hgvs
-

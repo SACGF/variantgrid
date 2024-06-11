@@ -55,7 +55,6 @@ class ImportVCFStepTask(Task):
         upload_step = load_upload_step()
         upload_pipeline = upload_step.upload_pipeline
         upload_pipeline_qs = UploadPipeline.objects.filter(id=upload_pipeline.pk)
-        error_message = None
 
         try:
             this_task = self.request.id
@@ -93,15 +92,13 @@ class ImportVCFStepTask(Task):
             upload_step.status = ProcessingStatus.SKIPPED
         except subprocess.CalledProcessError as e:
             error_message = f"Error executing: {e}"
+            self._error(upload_step, error_message)
         except Exception as e:
-            error_message = str(e)
+            self._error(upload_step, e)
             if not upload_pipeline_qs.exists():
                 logging.warning("UploadPipeline was deleted, causing error:")
-                logging.warning(error_message)
+                logging.warning(str(e))
                 return
-
-        if error_message:
-            self._error(upload_step, error_message)
 
         upload_step.end_date = timezone.now()
         upload_step.save()

@@ -24,7 +24,7 @@ from snpdb.models.models_enums import ImportSource, VariantsType, SampleFileType
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
 from upload.models import UploadedVCF, PipelineFailedJobTerminateEarlyException, \
-    BackendVCF, UploadStep, ModifiedImportedVariants, UploadStepTaskType, VCFPipelineStage
+    BackendVCF, UploadStep, UploadStepTaskType, VCFPipelineStage
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
 from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
 from upload.vcf.bulk_no_genotype_vcf_processor import BulkNoGenotypeVCFProcessor
@@ -265,15 +265,6 @@ def import_vcf_file(upload_step, bulk_inserter) -> int:
     bulk_inserter.finish()
     update_uploaded_vcf_max_variant(uploaded_vcf.pk, bulk_inserter.get_max_variant_id())
     return bulk_inserter.rows_processed
-
-
-def get_preprocess_vcf_import_info(upload_pipeline):
-    try:
-        preprocess_vcf_sub_step = upload_pipeline.uploadstep_set.get(name=UploadStep.PREPROCESS_VCF_NAME)
-        # ModifiedImportedVariants object was created in Preprocess upload step
-        return ModifiedImportedVariants.objects.get(upload_step=preprocess_vcf_sub_step)
-    except:
-        return None
 
 
 def update_uploaded_vcf_max_variant(pk, max_inserted_variant_id):

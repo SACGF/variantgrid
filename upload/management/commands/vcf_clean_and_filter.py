@@ -24,6 +24,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--vcf', help='VCF file, default: - (stdin)', default="-")
+        parser.add_argument('--replace-header', help='VCF header file', required=False)
         parser.add_argument('--genome-build', help='GenomeBuild name', required=True)
         parser.add_argument('--remove-info', action='store_true', help='clear INFO field')
         parser.add_argument('--skipped-contigs-stats-file', help='File name')
@@ -35,6 +36,7 @@ class Command(BaseCommand):
         vcf_filename = options["vcf"]
         build_name = options["genome_build"]
         remove_info = options["remove_info"]
+        replace_header = options["replace_header"]
         skipped_contigs_stats_file = options.get("skipped_contigs_stats_file")
         skipped_records_stats_file = options.get("skipped_records_stats_file")
         skipped_filters_stats_file = options.get("skipped_filters_stats_file")
@@ -54,9 +56,8 @@ class Command(BaseCommand):
         skipped_records = Counter()
         skipped_filters = Counter()
 
-        ref_standard_bases_pattern = re.compile(r"[GATC]")
+        ref_standard_bases_pattern = re.compile(r"[GATCN]")  # Reference can be N (and FreeBayes often writes these)
         alt_standard_bases_pattern = re.compile(r"[GATC,\.]")  # Can be multi-alts, or "." for reference
-        contig_regex = re.compile(r"^##contig=<ID=(.+),length=(\d+)")
 
         skip_patterns = {}
         if skip_regex := getattr(settings, "VCF_IMPORT_SKIP_RECORD_REGEX", {}):
@@ -64,27 +65,24 @@ class Command(BaseCommand):
                 skip_patterns[name] = re.compile(regex)
 
         vcf_header_lines = []
+        if replace_header:
+            with open(replace_header, "r") as rh_f:
+                vcf_header_lines = rh_f.readlines()
+
+        first_non_header_line = True
         defined_filters = None
         for line in f:
             if line[0] == '#':
-                if m := contig_regex.match(line):
-                    contig_name, provided_contig_length = m.groups()
-                    if contig_id := chrom_to_contig_id.get(contig_name):
-                        if fasta_chrom := contig_to_fasta_names.get(contig_id):
-                            provided_contig_length = int(provided_contig_length)
-                            ref_contig_length = contig_lengths[contig_id]
-                            if provided_contig_length != ref_contig_length:
-                                msg = f"VCF header contig '{contig_name}' (length={provided_contig_length}) has " + \
-                                    f"different length than ref contig {fasta_chrom} (length={ref_contig_length})"
-                                raise ValueError(msg)
-                            # This contig would be replaced below, so change header
-                            line = f"##contig=<ID={fasta_chrom},length={ref_contig_length}>\n"
-
-                vcf_header_lines.append(line)
-                sys.stdout.write(line)
+                if not replace_header:
+                    vcf_header_lines.append(line)
             else:
-                if defined_filters is None:
+                if first_non_header_line:
+                    # Dump out the header
+                    for header_line in vcf_header_lines:
+                        sys.stdout.write(header_line)
                     defined_filters = self._get_defined_vcf_filters(vcf_header_lines)
+                    first_non_header_line = False
+
                 columns = line.split("\t")
                 chrom = columns[VCFColumns.CHROM]
                 fasta_chrom = None

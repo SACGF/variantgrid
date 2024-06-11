@@ -1,3 +1,4 @@
+import json
 import operator
 import re
 from collections import defaultdict
@@ -12,6 +13,7 @@ from django.db import connection
 from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.timezone import localtime
 from django.views.decorators.http import require_POST
 
@@ -28,9 +30,11 @@ from eventlog.models import create_event
 from genes.hgvs import HGVSMatcher
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
 from library.django_utils import require_superuser, highest_pk, get_field_counts
+from library.django_utils.jqgrid_view import JQGridView
 from library.git import Git
 from library.guardian_utils import admin_bot
 from library.health_check import HealthCheckRequest, health_check_overall_stats_signal
+from library.jqgrid.jqgrid_export import grid_export_csv
 from library.log_utils import log_traceback, report_message, slack_bot_username
 from library.utils import flatten_nested_lists
 from pathtests.models import cases_for_user
@@ -48,12 +52,12 @@ from snpdb.models.models_user_settings import UserSettings
 from snpdb.search import search_data
 from snpdb.serializers import VariantAlleleSerializer
 from snpdb.variant_sample_information import VariantSampleInformation
-from sync.models import SyncDestination
 from upload.models import ModifiedImportedVariant
 from upload.upload_stats import get_vcf_variant_upload_stats
 from variantgrid.celery import app
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
+from variantopedia.grids import VariantTagsGrid, TaggedVariantGrid
 from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries, get_nearby_summaries
 from variantopedia.server_status import get_dashboard_notices
 from variantopedia.tasks.server_status_tasks import notify_server_status_now
@@ -675,3 +679,35 @@ def nearby_variants(request, variant_id, annotation_version_id):
     }
     context.update(get_nearby_qs(variant, annotation_version))
     return render(request, "variantopedia/nearby_variants.html", context)
+
+
+def _get_grid_name(request, name) -> str:
+    name_parts = [
+        name,
+        timezone.now().strftime('%Y-%m-%d'),
+    ]
+    if extra_filters := request.GET.get("extra_filters"):
+        extra_filters = json.loads(extra_filters)
+        if tag_id := extra_filters.get("tag"):
+            name_parts.extend(["tag", tag_id])
+    return "_".join(name_parts)
+
+
+def variant_tags_export(request, genome_build_name):
+    class SortVariantTagsGrid(VariantTagsGrid):
+        def _get_sidx_and_sord(self, request) -> tuple:
+            return "variant_string", "asc"
+
+    basename = _get_grid_name(request, "variant_tags_export")
+    return JQGridView.export_grid_as_csv(request, grid_klass=SortVariantTagsGrid,
+                                         basename=basename, genome_build_name=genome_build_name)
+
+
+def tagged_variant_export(request, genome_build_name):
+    class SortTaggedVariantGrid(TaggedVariantGrid):
+        def _get_sidx_and_sord(self, request) -> tuple:
+            return "locus__position", "asc"
+
+    basename = _get_grid_name(request, "tagged_variant_export")
+    return JQGridView.export_grid_as_csv(request, grid_klass=SortTaggedVariantGrid,
+                                         basename=basename, genome_build_name=genome_build_name)

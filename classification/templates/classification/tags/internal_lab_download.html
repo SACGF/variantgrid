@@ -1,0 +1,58 @@
+{% load ui_utils %}
+{% load js_tags %}
+{% load lab_tags %}
+{% load static %}
+{% load ui_tabs_builder %}
+{% load classification_tags %}
+
+<form id="internal-download-form" method="post" action="{% url 'internal_lab_download' %}">
+    {% csrf_token %}
+    {% labelled label="Share Levels" %}
+        <div class="form-check">
+            <label class="form-check-label">
+                <input checked="checked" id="share_level_public" name="share_level" value="public" type="radio" class="form-check-input" />
+                <img src="{% static 'icons/share_level/logged_in_users.png' %}" class="tiny-icon" />
+                <img src="{% static 'icons/share_level/public.png' %}" class="tiny-icon" />
+                Shared with Application and 3rd Party Databases
+            </label>
+        </div>
+        <div class="form-check">
+            <label class="form-check-label">
+                <input {% if form_data.share_level == 'any' %} checked="checked" {% endif %} id="share_level_any" name="share_level" value="any" type="radio" class="form-check-input" />
+                <img src="{% static 'icons/share_level/lab.png' %}" class="tiny-icon" />
+                <img src="{% static 'icons/share_level/institution.png' %}" class="tiny-icon" />
+                <img src="{% static 'icons/share_level/logged_in_users.png' %}" class="tiny-icon" />
+                <img src="{% static 'icons/share_level/public.png' %}" class="tiny-icon" />
+                Any record I have access to (e.g. records shared at my lab).
+            </label>
+        </div>
+    {% endlabelled %}
+    {% labelled label="Genome Build" %}
+        <div class="form-check">
+            <label class="form-check-label">
+                <input checked="checked" id="genome_build_37" name="genome_build" value="GRCh37" type="radio" class="form-check-input" />
+                GRCh37
+            </label>
+        </div>
+        <div class="form-check">
+            <label class="form-check-label">
+                <input {% if form_data.genome_build == 'GRCh38' %} checked="checked" {% endif %} id="genome_build_38" name="genome_build" value="GRCh38" type="radio" class="form-check-input" />
+                GRCh38
+            </label>
+        </div>
+    {% endlabelled %}
+    {% labelled label="Allele Origin" %}
+        {% allele_origin_toggle show_label=False prefill=form_data.allele_origin %}
+        <div class="text-muted">Note that records with an allele origin other than germline or somatic will always be included in downloads.</div>
+    {% endlabelled %}
+    {% labelled label="Record Filter/s"%}
+        <div class="form-check px-2">
+            <label class="form-check-label">
+                <textarea class="form-control" rows="6" cols="80" id="record_filters" name="record_filters">{{ form_data.record_filters }}</textarea>
+            </label>
+        </div>
+                <p class="text-info mt-2">Accepted filter inputs: gene symbol (e.g. RYR1), ClinGen allele ID (e.g. CA024299) or genomic location (e.g. 19:38455528 C>T)</p>
+        <p class="text-info">Leave blank to download all records.</p>
+    {% endlabelled %}
+        <button class="btn btn-primary" type="submit" style="float: right">Download</button>
+</form>

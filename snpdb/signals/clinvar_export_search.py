@@ -9,8 +9,8 @@ from snpdb.search import search_receiver, SearchInputInstance, SearchExample, Se
 @search_receiver(
     search_type=ClinVarExport,
     pattern=CE_SEARCH,
+    sub_name="Clinvar Export ID",
     example=SearchExample(
-        note="Clinvar Export ID",
         examples=["CE_12"]
     )
 )

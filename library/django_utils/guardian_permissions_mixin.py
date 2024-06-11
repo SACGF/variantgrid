@@ -1,9 +1,11 @@
+import logging
+from typing import Union
+
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404
 from guardian.shortcuts import get_objects_for_user, get_objects_for_group, get_group_perms
-from typing import Union
 
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission
 
@@ -68,14 +70,20 @@ class GuardianPermissionsMixin:
     @classmethod
     def filter_for_user(cls, user, queryset=None, **kwargs):
         # QuerySet evaluates to False if it has no values, so check against None specifically
-        klass = queryset if queryset is not None else cls.get_permission_class()
-
-        if user and user.is_authenticated:
-            queryset = get_objects_for_user(user, cls.get_read_perm(), klass=klass, accept_global_perms=True)
+        klass = cls.get_permission_class()
+        if klass != cls:
+            # logging.info("%s delegating to %s", cls, klass)
+            queryset = klass.filter_for_user(user, queryset=queryset, **kwargs)
         else:
-            # No user - try public (non-logged in users) access
-            group = Group.objects.get(name=settings.PUBLIC_GROUP_NAME)
-            queryset = get_objects_for_group(group, cls.get_read_perm(), klass=klass, accept_global_perms=True)
+            if queryset is not None:
+                klass = queryset
+
+            if user and user.is_authenticated:
+                queryset = get_objects_for_user(user, cls.get_read_perm(), klass=klass, accept_global_perms=True)
+            else:
+                # No user - try public (non-logged in users) access
+                group = Group.objects.get(name=settings.PUBLIC_GROUP_NAME)
+                queryset = get_objects_for_group(group, cls.get_read_perm(), klass=klass, accept_global_perms=True)
 
         return cls._filter_from_permission_object_qs(queryset)
 

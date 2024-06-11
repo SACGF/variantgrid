@@ -261,6 +261,11 @@ def analysis_template_settings(request, pk):
     if atv := analysis_template.active:
         atv_form = _get_form(request, AnalysisTemplateVersionForm, 'atv-pre', instance=atv)
 
+    if not has_write_permission:
+        set_form_read_only(at_form)
+        set_form_read_only(atv_form)
+        messages.add_message(request, messages.WARNING, "You can view but not modify this data.")
+
     if request.method == 'POST':
         if not has_write_permission:
             raise PermissionDenied(f"Don't have permission to modify {analysis_template}")

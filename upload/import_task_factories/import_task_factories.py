@@ -232,13 +232,21 @@ class VariantTagsImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
     def get_data_classes(self):
         return [UploadedVCF]
 
+    @staticmethod
+    def _has_all_columns(columns, required_columns):
+        for c in required_columns:
+            if c not in columns:
+                return False
+        return True
+
     def get_processing_ability(self, user, filename, file_extension):
+        old_tag_columns = ["variant_string", "view_genome_build", "tag__id"]
+        new_tag_columns = ["Variant", "Genome Build", "Tag"]
+
         df = pd.read_csv(filename, nrows=1)  # Just need header
-        REQUIRED_COLUMNS = ["variant_string", "view_genome_build", "tag__id"]
-        for c in REQUIRED_COLUMNS:
-            if c not in df.columns:
-                return 0
-        return 1000
+        if self._has_all_columns(df.columns, old_tag_columns) or self._has_all_columns(df.columns, new_tag_columns):
+            return 1000
+        return 0
 
     def _get_vcf_filename(self, upload_pipeline) -> str:
         return get_import_processing_filename(upload_pipeline.pk, "variant_tag_variants.vcf")
