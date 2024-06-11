@@ -85,10 +85,14 @@ def _classification_qs_to_extras(qs: QuerySet[ClassificationModification]) -> li
                 if allele_origin_bucket[0] == "U":
                     label = "Unknown Allele Origin"  # unknown needs more context than somatic or germline
                 includes_origins.append(label)
+                pkv = PreviewKeyValue.count(Classification, filtered_count, override_label=f"{label} Classification Count")
+                pkv.dedicated_row = True
+                extras.append(pkv)
 
-        override_label = f"Classifications ({join_with_commas_and_ampersand(includes_origins)})"
-        pkv = PreviewKeyValue.count(Classification, qs.count(), override_label=override_label)
-        extras.append(pkv)
+        # override_label = f"Classifications ({join_with_commas_and_ampersand(includes_origins)})"
+        # pkv = PreviewKeyValue.count(Classification, qs.count(), override_label=override_label)
+        # pkv.dedicated_row = True
+        # extras.append(pkv)
 
     return extras
 
