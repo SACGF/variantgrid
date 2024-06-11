@@ -2275,29 +2275,30 @@ const VCForm = (function() {
 })();
 
 VCForm.format_condition = function(condition_json) {
-    let dom = $('<span>');
     if (!condition_json) {
-        return dom;
+        return $('<span>');
     }
     if (!condition_json.resolved_terms) {
-        dom.append(condition_json.display_text);
-        return dom;
+        return $('<span>', {class: 'ontology-term', html: {class:'free-text', text: condition_json.display_text}});
     }
 
+    let dom = $('<span>');
     let first = true;
     for (let term of condition_json.resolved_terms) {
         if (!first) {
             $('<br>').appendTo(dom);
         }
         first = false;
-        $('<span>', {html: [
+        $('<span>', {
+            class: 'ontology-term',
+            html: [
             $('<a>', {
-                text: term.term_id,
-                href:Urls.ontology_term(term.term_id.replace(':','_')),
-                class: 'hover-link'
+                class: 'hover-link',
+                html: $('<span>', {class: 'term-id', text: term.term_id}),
+                href: Urls.ontology_term(term.term_id.replace(':','_'))
             }),
             " ",
-            term.name
+            $('<span>', {text: term.name, class: 'term-name'})
         ]}).appendTo(dom);
     }
     if (condition_json.resolved_terms.length > 1 && condition_json.resolved_join) {

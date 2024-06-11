@@ -1,13 +1,17 @@
+<span class="ontology-term">
 {% if term %}
     {% if show_link %}<a href="{{ term.best_url }}" class="hover-link">{% endif %}
-    {% if is_gene %}<span style="letter-spacing: 1px" class="{% if show_link %}hover-link{% endif %} font-weight-bold">{{ term.name }}</span>&nbsp;
+    {% if is_gene %}
+        <span class="gene-symbol">{{ term.name }}</span>
     {% else %}
-        <span class="text-monospace {% if term.is_obsolete %}text-danger{% endif %}">{{ term.id }}</span>
-        {% if term.is_obsolete %}<span><i class="fas fa-exclamation-triangle text-warning hover-detail mx-1" title="{{ term.warning_text }}"></i></span>{% endif %}
-        {% if spaced %}<br/>{% endif %}
-        {% if not compact %}{% if term.moved_to %}<span class="text-muted" title="MOVED TO {{ term.moved_to }}">Moved</span>{% elif term.name %}{{ term.name }}{% endif %}{% endif %}
+        <span class="term-id">{{ term.id }}</span>
     {% endif %}
-{% if show_link %}</a>{% endif %}
+    {% if show_link %}</a>{% endif %}
+    {% if term.is_obsolete %}<span><i class="fas fa-exclamation-triangle text-warning hover-detail mx-1" title="{{ term.warning_text }}"></i></span>{% endif %}
+    {% if spaced %}<br/>{% endif %}
+    {% if term.moved_to %}<span class="text-muted" title="MOVED TO {{ term.moved_to }}">Moved</span>{% endif %}
+    {% if not is_gene %}<span class="term-name">{{ term.name }}</span>{% endif %}
 {% else %}
-    <span class="text-monospace">{{ text }}</span>
+    <span class="free-text">{{ text }}</span>
 {% endif %}
+</span>

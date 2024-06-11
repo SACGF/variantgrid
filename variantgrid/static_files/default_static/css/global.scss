@@ -3056,3 +3056,21 @@ a .c-hgvs-body {
 		margin-left: 122px;
 	}
 }
+
+.ontology-term {
+	.term-id {
+		// font-family monospace is a bit overpowering on the classification table
+		// font-family: monospace;
+	}
+	// occasionally a gene-symbol can be represented as an ontology-term, normally for showing relationships
+	.gene-symbol {
+		letter-spacing: 1px;
+		font-weight: bold;
+	}
+	.term-name {
+		color: #666;
+	}
+	.free-text {
+		color: #444;  // when the "ontology term" is just free text
+	}
+}
