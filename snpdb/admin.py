@@ -10,8 +10,13 @@ from snpdb.admin_utils import ModelAdminBasics, GuardedModelAdminBasics, admin_l
     admin_action
 from snpdb.liftover import liftover_alleles
 from snpdb.models import Allele, VariantAllele, ClinVarKey, ClinVarKeyExcludePattern, UserSettingsOverride, \
-    LabUserSettingsOverride, OrganizationUserSettingsOverride, UserPageAck, Organization, Lab, GlobalSettings
+    LabUserSettingsOverride, OrganizationUserSettingsOverride, UserPageAck, Organization, Lab, GlobalSettings, Variant
 from snpdb.models.models_genome import GenomeBuild
+
+
+@admin.register(Variant)
+class VariantAdmin(ModelAdminBasics):
+    pass
 
 
 class AlleleClingenFilter(admin.SimpleListFilter):
