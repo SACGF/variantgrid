@@ -24,6 +24,7 @@ class AnnotationConfig(AppConfig):
         from django.conf import settings
         from annotation.models import CachedWebResource
         from annotation.signals.manual_signals import clinvar_citations_post_save_handler
+        from annotation.signals import citation_preview, citation_search, clinvar_annotation_health_check
         # pylint: enable=import-outside-toplevel,unused-import
 
         # Entrez wants both email and API key
