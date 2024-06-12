@@ -1,5 +1,7 @@
 import re
 
+from django.conf import settings
+
 from snpdb.models import GenomeBuild, Contig
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 
@@ -11,7 +13,8 @@ from snpdb.search import search_receiver, SearchInputInstance, SearchExample
     example=SearchExample(
         note="Genome Builds",
         examples=["GRCh37", "GRCh38"]
-    )
+    ),
+    admin_only=settings.SEARCH_CONTIG_GENOME_BUILD_ADMIN_ONLY
 )
 def genome_build_search(search_input: SearchInputInstance):
     yield GenomeBuild.objects.filter(name__iexact=search_input.search_string)
@@ -23,7 +26,8 @@ def genome_build_search(search_input: SearchInputInstance):
     example=SearchExample(
         note="Contigs or Chromosomes",
         examples=["chrX", "NC_000007.13"]
-    )
+    ),
+    admin_only=settings.SEARCH_CONTIG_GENOME_BUILD_ADMIN_ONLY
 )
 def contig_search(search_input: SearchInputInstance):
     q = Contig.get_q(search_input.search_string, case_sensitive=False)

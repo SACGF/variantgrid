@@ -558,6 +558,8 @@ SQL_BATCH_INSERT_SIZE = 50000
 SQL_SCRIPTS_DIR = os.path.join(BASE_DIR, "dbscripts")
 SITE_NAME = "VariantGrid"
 
+# TODO instead of make settings for admin and non-admin enabled searches, have a search value that can be
+# DISABLED, ADMIN_ONLY, ENABLED
 SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN = False  # set True to only find classified variants
 SEARCH_SUMMARY_VARIANT_SHOW_CLINVAR = True
 SEARCH_HGVS_GENE_SYMBOL = True
@@ -566,6 +568,7 @@ SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS = False
 SEARCH_USER_ADMIN_ONLY = False
 SEARCH_COSMIC_ENABLED = True
 SEARCH_COSMIC_TRANSCRIPT_MESSAGES = False
+SEARCH_CONTIG_GENOME_BUILD_ADMIN_ONLY = False
 
 SILENCED_SYSTEM_CHECKS = ['models.E006',  # 'captcha.recaptcha_test_key_error'
                           'fields.W907']  # CITextField deprecated. Waiting for Django 4.2.3 see issue #831
