@@ -33,6 +33,7 @@
                     <tr>
                         <th>Source</th>
                         <th>Variant Coordinate {% if not outputs.all_equal_variant_coordinate %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
+                        <th>Variant Coordinate Explicit {% if not outputs.all_equal_variant_coordinate %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
                         <th>Transcript {% if not outputs.all_equal_transcript_version %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
                         <th>c.HGVS {% if not outputs.all_equal_hgvs %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
                         <th>Message</th>
@@ -48,6 +49,7 @@
                                 {% endif %}
                             </th>
                             <td>{{ output.variant_coordinate|dash_if_empty }}</td>
+                            <td>{{ output.variant_coordinate|stringformat:'r'|dash_if_empty }}</td>
                             <td>{{ output.transcript_version|dash_if_empty }}</td>
                             <td>{% c_hgvs output.hgvs %}</td>
                             <td>
