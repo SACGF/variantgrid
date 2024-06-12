@@ -5,6 +5,7 @@ from django.db.models.signals import post_save
 class OntologyConfig(AppConfig):
     name = 'ontology'
 
+    # noinspection PyUnresolvedReferences
     def ready(self):
         # pylint: disable=import-outside-toplevel,unused-import
         # imported to activate receivers

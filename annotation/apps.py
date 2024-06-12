@@ -16,6 +16,7 @@ def _has_classification_gene_count_type(GeneCountType):
 class AnnotationConfig(AppConfig):
     name = 'annotation'
 
+    # noinspection PyUnresolvedReferences
     def ready(self):
         # pylint: disable=import-outside-toplevel,unused-import
         # imported to activate receivers

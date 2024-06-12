@@ -3,6 +3,7 @@ from django.apps import AppConfig
 class UploadConfig(AppConfig):
     name = 'upload'
 
+    # noinspection PyUnresolvedReferences
     def ready(self):
         # pylint: disable=import-outside-toplevel,unused-import
         from annotation.signals.manual_signals import annotation_run_complete_signal

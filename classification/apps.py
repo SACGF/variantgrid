@@ -5,6 +5,7 @@ from django.apps import AppConfig
 class ClassificationConfig(AppConfig):
     name = 'classification'
 
+    # noinspection PyUnresolvedReferences
     def ready(self):
         # pylint: disable=import-outside-toplevel
         # imported to activate receivers
