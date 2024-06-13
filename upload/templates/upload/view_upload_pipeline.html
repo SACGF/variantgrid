@@ -10,12 +10,12 @@
 {% endblock %}
 {% block title %}View upload{% endblock %}
 {% block head %}
+    <script>
+        function uploadStepFilter(data) {
+            data.upload_pipeline = {{ upload_pipeline.pk }};
+        }
+    </script>
     {% if has_upload_steps and step_start_end_lines %}
-        <script>
-            function uploadStepFilter(data) {
-                data.upload_pipeline = {{ upload_pipeline.pk }};
-            }
-        </script>
         <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
         <script>
             var COLORS = [  '#e6194b',
@@ -139,7 +139,6 @@
                 };
 
                 Plotly.newPlot(selector, data, layout);
-
             }
 
             $(document).ready(function() {

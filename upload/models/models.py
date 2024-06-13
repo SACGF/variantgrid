@@ -16,6 +16,7 @@ from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query import QuerySet
 from django.db.models.signals import pre_delete, post_save
 from django.dispatch.dispatcher import receiver
+from django.urls import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
@@ -126,6 +127,9 @@ class UploadPipeline(models.Model):
 
     def get_file_type_display(self):
         return self.uploaded_file.get_file_type_display()
+
+    def get_absolute_url(self) -> str:
+        return reverse("view_upload_pipeline", kwargs={"upload_pipeline_id": self.pk})
 
     def get_max_step_sort_order(self):
         qs = self.uploadstep_set.exclude(pipeline_stage_dependency=VCFPipelineStage.FINISH)
