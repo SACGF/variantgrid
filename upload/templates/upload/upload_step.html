@@ -2,7 +2,7 @@
 {% load js_tags %}
 {% labelled label="ID" %}{{ upload_step.pk }}{% endlabelled %}
 {% labelled label="Name" %}{{ upload_step.name }}{% endlabelled %}
-{% labelled label="Severity" %}{{ upload_step.status | severity_icon }} {{ upload_step.get_status_display }}{% endlabelled %}
+{% labelled label="Severity" %}{{ upload_step.get_status_display | severity_icon }} {{ upload_step.get_status_display }}{% endlabelled %}
 {% labelled label="Items to Process" %}{{ upload_step.items_to_process }}{% endlabelled %}
 {% labelled label="Items Processed" %}{{ upload_step.items_processed }}{% endlabelled %}
 {% labelled label="Error Message" %}{{ upload_step.error_message }}{% endlabelled %}

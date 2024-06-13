@@ -379,6 +379,16 @@ class ModalTag(template.Node):
         return link + modal + script
 
 
+"""
+    CREATED = 'C', 'Created'
+    PROCESSING = 'P', 'Processing'
+    ERROR = 'E', 'Error'
+    SUCCESS = 'S', 'Success'
+    SKIPPED = 'K', 'Skipped'
+    TERMINATED_EARLY = 'T', 'Terminated Early'
+    TIMED_OUT = 'Z', 'Timed Out'
+"""
+
 @register.filter()
 def severity_icon(severity: str, title: Optional[str] = None) -> str:
     if not severity:
@@ -392,7 +402,17 @@ def severity_icon(severity: str, title: Optional[str] = None) -> str:
 
     def severity_for(severity_part: str) -> Optional[list[str]]:
         # TODO make the below more robust
-        if severity_part.startswith('C'):  # critical
+        if severity_part == "CREATED":
+            return ['fa-solid fa-clock']
+        elif severity_part == "PROCESSING":
+            return ['fa-solid fa-person-running']
+        elif severity_part == "SKIPPED":
+            return ['fa-solid fa-forward text-muted']
+        elif severity_part == "TERMINATED EARLY":
+            return ['fa-solid fa-circle-xmark text-danger']
+        elif severity_part == "TIMED OUT":
+            return ['fa-solid fa-clock text-danger']
+        elif severity_part.startswith('C'):  # critical
             return ['fa-bomb', 'text-danger']
         elif severity_part.startswith('E') or severity_part == 'DANGER':  # error
             return ['fa-exclamation-circle', 'text-danger']
