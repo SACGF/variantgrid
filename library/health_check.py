@@ -10,7 +10,7 @@ from django.utils.timezone import localtime
 
 from library.log_utils import NotificationBuilder
 from library.preview_request import PreviewData
-from library.utils import flatten_nested_lists, model_has_field
+from library.utils import flatten_nested_lists, model_has_field, limit_str
 
 """
 HealthChecks are generated nightly and posted in Slack.
@@ -80,7 +80,7 @@ class HealthCheckRecentActivity(HealthCheckStat):
         if self.sub_type:
             result = f"{result} {self.sub_type}"
         if self.extra:
-            result = f"{result} : {self.extra}"
+            result = f"{result} : {limit_str(self.extra, 2000)}"
         return result
 
     def as_html(self):
