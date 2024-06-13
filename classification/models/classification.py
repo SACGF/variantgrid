@@ -48,7 +48,7 @@ from library.cache import clear_cached_property
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
-from library.preview_request import PreviewData, PreviewModelMixin
+from library.preview_request import PreviewData, PreviewModelMixin, PreviewKeyValue
 from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_text, DebugTimer, \
     invalidate_cached_property, md5sum_str
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
@@ -499,15 +499,33 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @property
     def preview(self) -> PreviewData:
-
-        last_published = self.last_published_version
-        clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE). \
-                       pretty_value(last_published.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)) or 'Unclassified'
-        title = f"{clin_sig}"  # TODO add more data here
-
+        title: Optional[str] = None
+        extras = []
+        if last_published := self.last_published_version:
+            allele_origin_bucket = self.allele_origin_bucket_obj
+            extras.append(
+                PreviewKeyValue(
+                    key="Allele Origin Grouping",
+                    value=allele_origin_bucket.label
+                )
+            )
+            classification_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+            extras.append(PreviewKeyValue(
+                key=classification_key.pretty_label,
+                value=classification_key.pretty_value_from(last_published, empty_value="No Data")
+            ))
+            if allele_origin_bucket != AlleleOriginBucket.GERMLINE:
+                somatic_clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
+                extras.append(PreviewKeyValue(
+                    key=somatic_clin_sig.pretty_label,
+                    value=somatic_clin_sig.pretty_value_from(last_published, empty_value="No Data")
+                ))
+        else:
+            title = "Never been published"
         return self.preview_with(
             identifier=self.friendly_label,
-            title=title
+            title=title,
+            summary_extra=extras
         )
 
     @staticmethod
@@ -686,6 +704,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     def calc_allele_origin_bucket(self) -> AlleleOriginBucket:
         return AlleleOriginBucket.bucket_for_allele_origin(self.get(SpecialEKeys.ALLELE_ORIGIN))
+
+    @property
+    def allele_origin_bucket_obj(self) -> AlleleOriginBucket:
+        return AlleleOriginBucket(self.allele_origin_bucket)
 
     def flag_type_context(self):
         return FlagTypeContext.objects.get(pk='classification')

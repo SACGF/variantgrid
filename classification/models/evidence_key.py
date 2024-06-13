@@ -14,7 +14,7 @@ from django_extensions.db.models import TimeStampedModel
 from classification.enums import CriteriaEvaluation, SubmissionSource, SpecialEKeys
 from classification.enums.classification_enums import EvidenceCategory, \
     EvidenceKeyValueType, ShareLevel
-from classification.models.evidence_mixin import VCBlobDict, VCPatchValue, VCPatch, VCDbRefDict
+from classification.models.evidence_mixin import VCBlobDict, VCPatchValue, VCPatch, VCDbRefDict, EvidenceMixin
 from library.cache import timed_cache
 from library.utils import empty_to_none, strip_json, first
 from snpdb.models import VariantGridColumn
@@ -394,6 +394,12 @@ class EvidenceKey(TimeStampedModel):
             key = key[:1] + '-' + key[2:]
 
         return key[:1].upper() + key[1:].replace('_', ' ')
+
+    def pretty_value_from(self, evidence: EvidenceMixin, empty_value=None):
+        raw_value = evidence.get(self.key)
+        if raw_value is None:
+            return empty_value
+        return self.pretty_value(raw_value)
 
     def pretty_value(self, normal_value_obj: Any, dash_for_none: bool = False) -> Optional[str]:
         """
