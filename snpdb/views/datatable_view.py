@@ -146,22 +146,22 @@ class RichColumn:
         return key
 
     ## the below seems to break special sort keys
-    # def sort_string(self, desc: bool) -> list[OrderBy]:
-    #     def as_order_by(key: str):
-    #         use_desc = desc
-    #         if key.startswith('-'):
-    #             key = key[1:]
-    #             use_desc = not use_desc
-    #         if use_desc:
-    #             return F(key).desc(nulls_last=True)
-    #         else:
-    #             return F(key).asc(nulls_last=True)
-    #     use_keys = self.sort_keys or [self.key]
-    #     return [as_order_by(key) for key in use_keys]
-
-    def sort_string(self, desc: bool) -> list[str]:
+    def sort_string(self, desc: bool) -> list[OrderBy]:
+        def as_order_by(key: str):
+            use_desc = desc
+            if key.startswith('-'):
+                key = key[1:]
+                use_desc = not use_desc
+            if use_desc:
+                return F(key).desc(nulls_last=True)
+            else:
+                return F(key).asc(nulls_last=True)
         use_keys = self.sort_keys or [self.key]
-        return [self.sort_key(key, desc) for key in use_keys]
+        return [as_order_by(key) for key in use_keys]
+
+    # def sort_string(self, desc: bool) -> list[str]:
+    #     use_keys = self.sort_keys or [self.key]
+    #     return [self.sort_key(key, desc) for key in use_keys]
 
     @property
     def value_columns(self) -> list[str]:
@@ -277,16 +277,16 @@ class DatatableConfig(Generic[DC]):
             return json.loads(value)
         return None
 
-    def _get_sort_tiebreaker(self) -> str:
+    def _get_sort_tiebreaker(self) -> OrderBy:
         """ Ensure we always have a 'tie breaker' and thus consistent sort order for paging.
             May need to overwrite if you use a group by/count in queryset thus no PK """
-        return "pk"
+        return F("pk").desc()
 
     def ordering(self, qs: QuerySet) -> QuerySet[DC]:
         """ Get parameters from the request and prepare order by clause """
         #  'order[0][column]': ['0'], 'order[0][dir]': ['asc']
 
-        sort_by_list = []
+        sort_by_list: list[OrderBy] = []
         sorted_set = set()
         for index in range(len(self.enabled_columns)):
             order_key = f'order[{index}][column]'
