@@ -492,6 +492,7 @@ function applyVariantValues() {
         <div class="card" id="clingen-allele">
             <div class="card-header">Variant{% admin_link variant %}</div>
             <div class="card-body">
+                {% if variant_annotation %}{% labelled label="Variant Annotation" admin_only=True %}{{ variant_annotation }} {% admin_link variant_annotation %}{% endlabelled %}{% endif %}
                 {% labelled id="g-hgvs" label="g.HGVS" value_css="variant-coordinate variant_coordinate" %}{% c_hgvs variant_annotation.hgvs_g %}{% endlabelled %}
                 {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
                 {% if variant.svlen %}
