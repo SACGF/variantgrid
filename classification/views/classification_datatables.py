@@ -190,7 +190,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 label='Classification',
                 renderer=self.render_classification,
                 client_renderer='VCTable.classification',
-                sort_keys=['clin_sig_sort'],
+                sort_keys=['clinical_significance', 'clin_sig_sort'],
                 orderable=True
             ),
             RichColumn(
