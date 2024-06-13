@@ -17,7 +17,7 @@ from django_json_widget.widgets import JSONEditorWidget
 from guardian.admin import GuardedModelAdminMixin
 
 from library.log_utils import log_admin_change
-from library.utils import delimited_row, WrappablePartial
+from library.utils import delimited_row, WrappablePartial, limit_str
 
 
 class AllValuesChoicesFieldListFilter(admin.AllValuesFieldListFilter):
@@ -136,9 +136,7 @@ def admin_list_column(
             if result and limit:
                 if not isinstance(result, SafeString):
                     # don't truncate SafeStrings as would include HTML that could easily break
-                    text = str(result)
-                    if len(text) > limit:
-                        result = text[0:limit] + "..."
+                    result = limit_str(str(result), limit)
             return result
 
         if short_description:

@@ -32,6 +32,12 @@ def join_with_commas_and_ampersand(items: list[str], final_sep: str = "&") -> st
         return f" {final_sep} ".join([comma_sep, items[-1]])
 
 
+def limit_str(text: str, limit: int) -> str:
+    if len(text) > limit:
+        text = text[:limit] + "..."
+    return text
+
+
 def pretty_collection(collection: Collection[Any], to_string: Optional[Callable] = None) -> str:
     try:
         collection = sorted(collection)

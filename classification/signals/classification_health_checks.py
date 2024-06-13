@@ -8,6 +8,7 @@ from flags.models.flag_health_check import flag_chanced_since
 from library.health_check import health_check_signal, \
     HealthCheckRequest, HealthCheckTotalAmount, HealthCheckRecentActivity, HealthCheckStat, \
     health_check_overall_stats_signal
+from library.utils import limit_str
 
 """
 Reports information about classifications to the Slack health report
@@ -29,7 +30,7 @@ def allele_info_health_check(sender, health_request: HealthCheckRequest, **kwarg
     if last_failures_count:
         extra = None
         if last_failures_count <= 5:
-            extra = ", ".join(f"{failure.imported_c_hgvs} {failure.imported_genome_build_patch_version}" for failure in last_failures)
+            extra = ", ".join(f"{limit_str(failure.imported_c_hgvs, 80)} {failure.imported_genome_build_patch_version}" for failure in last_failures)
 
         output.append(HealthCheckRecentActivity(
             emoji=":warning:",
