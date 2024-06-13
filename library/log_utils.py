@@ -387,9 +387,8 @@ class AdminNotificationBuilder(NotificationBuilder):
     def send(self):
         from email_manager.models import EmailLog
         super().send()
-        email_recipients = [user.email for user in User.objects.filter(is_superuser=True) if user.email]
-
         if self.is_communication and settings.ADMIN_EMAIL_NOTIFICATION:
+            email_recipients = [user.email for user in User.objects.filter(is_superuser=True) if user.email]
             EmailLog.send_mail(subject=self.message,
                                html=self.as_html(),
                                text=self.as_text(),
