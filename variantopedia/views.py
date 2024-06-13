@@ -34,8 +34,7 @@ from library.django_utils.jqgrid_view import JQGridView
 from library.git import Git
 from library.guardian_utils import admin_bot
 from library.health_check import HealthCheckRequest, health_check_overall_stats_signal
-from library.jqgrid.jqgrid_export import grid_export_csv
-from library.log_utils import log_traceback, report_message, slack_bot_username
+from library.log_utils import log_traceback, report_message, slack_bot_username, AdminNotificationBuilder
 from library.utils import flatten_nested_lists
 from pathtests.models import cases_for_user
 from patients.models import Clinician
@@ -106,6 +105,11 @@ def server_status(request):
     if request.method == "POST":
         action = request.POST.get('action')
         if action == 'Test Slack':
+            nb = AdminNotificationBuilder(message="Slack Check")
+            nb.add_markdown("This is a Slack Test :ladybug:")
+            nb.send()
+            messages.add_message(request, level=messages.INFO, message="Slack should have been sent a test message.")
+        if action == 'Health Check':
             notify_server_status_now()
             messages.add_message(request, level=messages.INFO, message="Slack should have been sent the health check.")
         elif action == 'Test Rollbar':
