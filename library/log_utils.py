@@ -447,7 +447,8 @@ def send_notification(
         try:
             r.raise_for_status()
         except HTTPError:
-            report_exc_info()
+            # give Rollbar the Slack JSON if Slack doesn't want it
+            report_exc_info(extra_data=data)
     else:
         # fallback to Rollbar if Slack isn't configured
         report_event(name=message)
