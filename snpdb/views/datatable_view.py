@@ -145,18 +145,23 @@ class RichColumn:
             key = f'-{key}'
         return key
 
-    def sort_string(self, desc: bool) -> list[OrderBy]:
-        def as_order_by(key: str):
-            use_desc = desc
-            if key.startswith('-'):
-                key = key[1:]
-                use_desc = not use_desc
-            if use_desc:
-                return F(key).desc(nulls_last=True)
-            else:
-                return F(key).asc(nulls_last=True)
+    ## the below seems to break special sort keys
+    # def sort_string(self, desc: bool) -> list[OrderBy]:
+    #     def as_order_by(key: str):
+    #         use_desc = desc
+    #         if key.startswith('-'):
+    #             key = key[1:]
+    #             use_desc = not use_desc
+    #         if use_desc:
+    #             return F(key).desc(nulls_last=True)
+    #         else:
+    #             return F(key).asc(nulls_last=True)
+    #     use_keys = self.sort_keys or [self.key]
+    #     return [as_order_by(key) for key in use_keys]
+
+    def sort_string(self, desc: bool) -> list[str]:
         use_keys = self.sort_keys or [self.key]
-        return [as_order_by(key) for key in use_keys]
+        return [self.sort_key(key, desc) for key in use_keys]
 
     @property
     def value_columns(self) -> list[str]:
