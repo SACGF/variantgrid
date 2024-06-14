@@ -101,7 +101,7 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     logging.info("VCF PREPROCESS env:")
     logging.info("Manage command: %s", manage_command)
     print(f"Parent Python executable: {sys.executable}")
-    p = subprocess.Popen('python -c "import sys; print(f\'Subprocess Python executable: {sys.executable}\')"',
+    p = subprocess.Popen('python3 -c "import sys; print(f\'Subprocess Python executable: {sys.executable}\')"',
                          shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
     print(f"subprocess: {stdout=}, {stderr=}")
