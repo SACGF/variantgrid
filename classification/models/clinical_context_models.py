@@ -156,53 +156,52 @@ class DiscordanceStatus:
             discordance_report: Optional['DiscordanceReport'] = None,
     ) -> 'DiscordanceStatus':
 
-        base_status = DiscordanceStatus._calculate_rows([
-            _DiscordanceCalculationRow(
+        base_status = DiscordanceStatus._calculate_rows(
+            [_DiscordanceCalculationRow(
                 lab=vcm.classification.lab,
                 clinical_significance=vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
                 shared=vcm.share_level_enum.is_discordant_level
-            ) for vcm in modifications
-        ])
-        # in future there will be a different algorithm to detect discordances in somatic
-        if allele_origin_bucket != AlleleOriginBucket.GERMLINE:
-            # if we're not supporting discordances, no need to check flags or anything else
-            if base_status.level not in (DiscordanceLevel.NO_ENTRIES, DiscordanceLevel.SINGLE_SUBMISSION):
-                base_status.level = DiscordanceLevel.MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED
-            return base_status
+            ) for vcm in modifications],
+            allele_origin_bucket=allele_origin_bucket
+        )
 
         if not base_status.is_discordant:
             # no need to check flags for pending changes if we're not discordant when looking at all entries
             # the common case by far
             return base_status
 
-        # we're discordant, check to see if there are pending changes AND if those pending changes would bring us into discordance
-        # if so, just mark "pending_concordance" as true
-        from classification.models import ClassificationFlagTypes, classification_flag_types
-        flag_collections = {mod.classification.flag_collection_id: mod for mod in modifications}
-        if pending_flags := Flag.objects.filter(collection__in=flag_collections.keys(),
-                                                flag_type=classification_flag_types.classification_pending_changes,
-                                                resolution__status=FlagStatus.OPEN):
+        if allele_origin_bucket == AlleleOriginBucket.GERMLINE:
+            # we should only be able to get here if we're GERMLINE anyway, as somatic should never be discordnt
+            # but wanted to highlight the below is
 
-            clin_sig_overrides: dict[int, str] = {}
-            for flag in pending_flags:
-                clin_sig_overrides[flag_collections[flag.collection_id].pk] = flag.data.get(
-                    ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) or None
+            # we're discordant, check to see if there are pending changes AND if those pending changes would bring us into discordance
+            # if so, just mark "pending_concordance" as true
+            from classification.models import ClassificationFlagTypes, classification_flag_types
+            flag_collections = {mod.classification.flag_collection_id: mod for mod in modifications}
+            if pending_flags := Flag.objects.filter(collection__in=flag_collections.keys(),
+                                                    flag_type=classification_flag_types.classification_pending_changes,
+                                                    resolution__status=FlagStatus.OPEN):
 
-            override_status = DiscordanceStatus._calculate_rows([
-                _DiscordanceCalculationRow(
-                    lab=vcm.classification.lab,
-                    clinical_significance=clin_sig_overrides.get(vcm.pk) if vcm.pk in clin_sig_overrides else vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
-                    shared=vcm.share_level_enum.is_discordant_level
-                ) for vcm in modifications
-            ])
-            if not override_status.is_discordant:
-                base_status.pending_concordance = True
+                clin_sig_overrides: dict[int, str] = {}
+                for flag in pending_flags:
+                    clin_sig_overrides[flag_collections[flag.collection_id].pk] = flag.data.get(
+                        ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) or None
+
+                override_status = DiscordanceStatus._calculate_rows([
+                    _DiscordanceCalculationRow(
+                        lab=vcm.classification.lab,
+                        clinical_significance=clin_sig_overrides.get(vcm.pk) if vcm.pk in clin_sig_overrides else vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
+                        shared=vcm.share_level_enum.is_discordant_level
+                    ) for vcm in modifications
+                ])
+                if not override_status.is_discordant:
+                    base_status.pending_concordance = True
 
         base_status.discordance_report = discordance_report
         return base_status
 
     @staticmethod
-    def _calculate_rows(rows: Iterable[_DiscordanceCalculationRow]) -> 'DiscordanceStatus':
+    def _calculate_rows(rows: Iterable[_DiscordanceCalculationRow], allele_origin_bucket: AlleleOriginBucket = AlleleOriginBucket.GERMLINE) -> 'DiscordanceStatus':
         cs_scores: set[int] = set()  # clin sig to score, all VUSs are 3
         cs_vuses: set[int] = set()  # all the different VUS A,B,C values
         cs_values: set[str] = set()   # all the different clinical sig values
@@ -215,25 +214,30 @@ class DiscordanceStatus:
         for row in rows:
             all_labs.add(row.lab)
             clin_sig = row.clinical_significance
-            if clin_sig and row.shared:
-                # if vcm.share_level_enum.is_discordant_level and vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) is not None:
-                if strength := DiscordanceStatus.cs_buckets().get(clin_sig):
-                    counted_classifications += 1
-                    shared_labs.add(row.lab)
-                    cs_scores.add(strength)
-                    cs_values.add(SPECIAL_CS.get(clin_sig, clin_sig))
-                else:
-                    shared_labs.add(row.lab)
-                    ignored_clin_sigs.add(clin_sig)
+            if row.shared:
+                shared_labs.add(row.lab)
+                if allele_origin_bucket == AlleleOriginBucket.GERMLINE:
+                    # if vcm.share_level_enum.is_discordant_level and vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) is not None:
+                    if strength := DiscordanceStatus.cs_buckets().get(clin_sig):
+                        counted_classifications += 1
+                        cs_scores.add(strength)
+                        cs_values.add(SPECIAL_CS.get(clin_sig, clin_sig))
+                    else:
+                        ignored_clin_sigs.add(clin_sig)
 
-                if vus_special := SPECIAL_VUS.get(clin_sig):
-                    cs_vuses.add(vus_special)
+                    if vus_special := SPECIAL_VUS.get(clin_sig):
+                        cs_vuses.add(vus_special)
+                else:
+                    counted_classifications += 1
 
         if counted_classifications == 0:
             level = DiscordanceLevel.NO_ENTRIES
 
         elif counted_classifications == 1:
             level = DiscordanceLevel.SINGLE_SUBMISSION
+
+        elif allele_origin_bucket == AlleleOriginBucket.SOMATIC:
+            level = DiscordanceLevel.MULTIPLE_RECORDS_DISCORDANCE_NOT_SUPPORTED
 
         elif len(cs_scores) > 1:
             level = DiscordanceLevel.DISCORDANT
