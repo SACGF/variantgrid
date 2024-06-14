@@ -1691,6 +1691,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             self.evidence = use_evidence.data
             # classification is stored on the classification record and on the classification modification
             # (not sure if we actually use it for anything on the modification)
+
+            # TODO this is int he wrong spot, it should be on publish
             clinical_significance_choice = self.calc_clinical_significance_choice()
             self.clinical_significance = clinical_significance_choice
             pending_modification.clinical_significance = clinical_significance_choice
@@ -2120,6 +2122,43 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             raise CreateNoClassificationForbidden()
 
 
+@dataclass(frozen=True)
+class SomaticClinicalSignificanceValue:
+    tier_level: str
+    level: Optional[str] = None
+
+
+_SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES = {
+    SomaticClinicalSignificanceValue("tier_1", "A"): 9,
+    SomaticClinicalSignificanceValue("tier_1", "B"): 8,
+    SomaticClinicalSignificanceValue("tier_1"): 7,
+    SomaticClinicalSignificanceValue("tier_1_2"): 6,
+    SomaticClinicalSignificanceValue("tier_2", "C"): 5,
+    SomaticClinicalSignificanceValue("tier_2", "D"): 4,
+    SomaticClinicalSignificanceValue("tier_2"): 3,
+    SomaticClinicalSignificanceValue("tier_3"): 2,
+    SomaticClinicalSignificanceValue("tier_4"): 1
+}
+
+
+def calculate_somatic_clinical_significance_order(evidence: EvidenceMixin) -> Optional[int]:
+    if somatic_clin_sig := evidence.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE):
+        max_level: Optional[str] = None
+        for level_key, level in SpecialEKeys.AMP_LEVELS_TO_LEVEL.items():
+            if evidence.get(level_key):
+                max_level = level
+                break
+        if value := _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES.get(
+                SomaticClinicalSignificanceValue(somatic_clin_sig, max_level)
+        ):
+            return value
+        elif without_max_level := _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES.get(
+                SomaticClinicalSignificanceValue(somatic_clin_sig)
+        ):
+            return without_max_level
+    return None
+
+
 class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models.Model):
     classification = models.ForeignKey(Classification, on_delete=CASCADE)
     user = models.ForeignKey(User, on_delete=PROTECT)  # One who did last change, may not be classification.user
@@ -2184,6 +2223,9 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         self.share_level = value.value
 
     clinical_significance = models.CharField(max_length=1, choices=ClinicalSignificance.CHOICES, null=True, blank=True)
+
+    somatic_clinical_significance_sort = models.IntegerField(db_index=True, null=True, blank=True)
+    """ Used as an optimisation to sort by somatic clinical significance, null implies no relevant values """
 
     is_last_published = models.BooleanField(db_index=True, null=False, blank=True, default=False)
     is_last_edited = models.BooleanField(db_index=True, null=False, blank=True, default=False)
@@ -2356,6 +2398,8 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         self.published = True
         self.published_evidence = vc.evidence
         self.share_level_enum = share_level
+        self.somatic_clinical_significance_sort = calculate_somatic_clinical_significance_order(self)
+
         if previously_published and previously_published.id != self.id:
             # make sure to unmark previous record as the last published
             previously_published.is_last_published = False

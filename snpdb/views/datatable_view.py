@@ -6,7 +6,7 @@ import operator
 from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property, reduce
-from typing import Optional, Any, Callable, Union, TypeVar, Generic, Type
+from typing import Optional, Any, Callable, Union, TypeVar, Generic, Type, List
 
 from django.contrib.auth.models import User
 from django.db import models
@@ -71,6 +71,7 @@ class RichColumn:
                  enabled: bool = True,
                  renderer: Optional[Callable[[CellData], JsonDataType]] = None,
                  default_sort: Optional[SortOrder] = None,
+                 order_sequence: List[SortOrder] = [SortOrder.ASC, SortOrder.DESC],
                  client_renderer: Optional[str] = None,
                  client_renderer_td: Optional[str] = None,
                  visible: bool = True,
@@ -78,6 +79,7 @@ class RichColumn:
                  css_class: str = None,
                  extra_columns: Optional[list[str]] = None):
         """
+        #TODO consolodate, orderable, default_sort, sort_order_sequence
         :param key: A column name to be retrieved and returned and sorted on
         :param name: A name to be shared between both client and server for this value
         :param sort_keys: If provided, use this array to order_by when ordering by this column
@@ -87,6 +89,7 @@ class RichColumn:
         :param enabled: Is this column enabled for this environment/user
         :param renderer: Optional server renderer for the value
         :param default_sort: If this column should be the default sort order, provide ascending or descending here
+        :param order_sequence: How the column should sort when clicked on (can change to be DESC first, can only allow ASC etc)
         :param client_renderer: JavaScript function to render the client
         :param client_renderer_td: JavaScript function that maps to DataTables createdCell https://datatables.net/reference/option/columns.createdCell
         :param visible: If false column would be hidden (useful for sending data we don't want to display)
@@ -119,6 +122,7 @@ class RichColumn:
             raise ValueError("Cannot create a RichColumn without a key, server or client renderer")
 
         self.orderable = orderable
+        self.order_sequence = order_sequence
         self.renderer = renderer
         self.client_renderer = client_renderer
         self.client_renderer_td = client_renderer_td
@@ -459,6 +463,7 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
                 "render": rc.client_renderer,
                 "createdCell": rc.client_renderer_td,
                 "orderable": rc.orderable,
+                "orderSequence": [x.value for x in rc.order_sequence],
                 "className": rc.css_classes,
                 "visible": rc.visible,
             })

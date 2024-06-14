@@ -191,7 +191,8 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 renderer=self.render_classification,
                 client_renderer='VCTable.classification',
                 sort_keys=['clinical_significance', 'clin_sig_sort'],
-                orderable=True
+                orderable=True,
+                order_sequence=[SortOrder.DESC, SortOrder.ASC]
             ),
             RichColumn(
                 key='published_evidence__somatic:clinical_significance__value',
@@ -206,7 +207,8 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                     'published_evidence__amp:level_c__value',
                     'published_evidence__amp:level_d__value'
                 ],
-                sort_keys=['published_evidence__somatic:clinical_significance__value'],
+                sort_keys=['somatic_clinical_significance_sort'],
+                order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 orderable=True
             ),
             RichColumn(
@@ -247,7 +249,8 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 label='Created',
                 orderable=True,
                 client_renderer='TableFormat.timestamp',
-                default_sort=SortOrder.DESC
+                default_sort=SortOrder.DESC,
+                order_sequence=[SortOrder.DESC, SortOrder.ASC]
             ),
             RichColumn(
                 key='classification__flag_collection_id',

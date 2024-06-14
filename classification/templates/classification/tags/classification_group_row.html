@@ -60,7 +60,7 @@
             {% else %}<span class="c-pill cs cs-none no-value">No Data</span>{% endif %}
         {% endif %}
     </td>
-    <td style="width:100px" class="text-center" data-order="{{ group.somatic_clin_sig|default_if_none:'0' }}">
+    <td style="width:100px" class="text-center" data-order="{{ group.somatic_clin_sig_sort }}">
         {% if group.somatic_clin_sig %}
             <span class="c-pill scs scs-{{ group.somatic_clin_sig }}">{{ group.somatic_clin_sig | ekey:"somatic:clinical_significance" }}{% if group.amp_level %} <span class="amp-level">{{ group.amp_level }}</span>{% endif %}</span>
         {% elif group.allele_origin_bucket != "G" %}

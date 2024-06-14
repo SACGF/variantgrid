@@ -133,6 +133,10 @@ let DataTableDefinition = (function() {
                     $('th.toggle-link').removeClass('toggle-link');
                 }
             };
+            if (defn.order) {
+                dtParams.orderSequence = def.orderSequence
+            }
+
             if (defn.downloadCsvButtonEnabled) {
                 dtParams.buttons = [
                     {

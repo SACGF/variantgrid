@@ -251,6 +251,10 @@ class ClassificationGroup:
         return self.most_recent.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
 
     @property
+    def somatic_clin_sig_sort(self):
+        return self.most_recent.somatic_clinical_significance_sort or 0
+
+    @property
     def amp_level(self):
         return self.most_recent.amp_level
 

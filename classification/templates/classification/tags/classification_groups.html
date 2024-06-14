@@ -134,11 +134,11 @@
             columns: [
                 {}, // ID
                 {className: 'dt-hgvs'}, // HGVS
-                {}, // Classification
-                {}, // Clin Sig
+                {orderSequence: ['desc', 'asc']}, // Classification
+                {orderSequence: ['desc', 'asc']}, // Clin Sig
                 {}, // Conditions
                 {}, // ACMG
-                {}, // last record
+                {orderSequence: ['desc', 'asc']}, // last record
                 {visible: false}, // sorting column
                 {visible: false}, // allele origin code
                 {className: 'none'}, // imported as
