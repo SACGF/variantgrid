@@ -134,7 +134,7 @@ let DataTableDefinition = (function() {
                 }
             };
             if (defn.order) {
-                dtParams.orderSequence = def.orderSequence
+                dtParams.orderSequence = defn.orderSequence
             }
 
             if (defn.downloadCsvButtonEnabled) {
