@@ -40,7 +40,7 @@ UPLOAD_ENABLED = True  # This disables uploading files or creating variants (eg 
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media_root')
 MEDIA_URL = '/media/'
 
-PYTHON_COMMAND = "python3"
+PYTHON_COMMAND = sys.executable
 MANAGE_COMMAND = [PYTHON_COMMAND, os.path.join(BASE_DIR, "manage.py")]
 
 # Need 5x as many as largest cohort for CohortNode zygosity query
