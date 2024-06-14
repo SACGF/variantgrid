@@ -256,7 +256,7 @@ class ExportVCF:
             [method.vcf_header for method in cls.get_export_methods(export_tweak=export_tweak)] +
             # [VCFHeader(header_class="ALT", header_id="NON_REF", description="Represents any possible alternative allele at this location")] + \
             ExportVCF.contig_headers(genome_build, contigs) +
-            [("#" + "\t".join(["CHROM", "ID", "POS", "REF", "ALT", "QUAL", "FILTER", "INFO"]))])  # NO SUPPORT FOR FORMAT, etc
+            [("#" + "\t".join(["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"]))])  # NO SUPPORT FOR FORMAT, etc
 
     @staticmethod
     def contig_headers(genome_build: GenomeBuild, contigs: Iterable[Contig]) -> list[VCFHeader]:
@@ -313,4 +313,4 @@ class ExportVCF:
                     info.append(cell)
 
             info_str = ";".join(str(info_cell) for info_cell in info)
-            return "\t".join([chrom, self.get_variant_id(), str(pos), ref, alt, qual, filter_val, info_str])
+            return "\t".join([chrom, str(pos), self.get_variant_id(), ref, alt, qual, filter_val, info_str])
