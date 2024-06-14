@@ -138,9 +138,13 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
         print("single_commands: %s" % " | ".join([' '.join(x) for x in pipe_commands.values()]))
         p = Popen(
             piped_command,
-            shell=True
+            shell=True,
+            stdout=PIPE,
+            stderr=PIPE,
         )
-        _, p_stderr = p.communicate()
+        p_stdout, p_stderr = p.communicate()
+        if p_stdout:
+            logging.info(p_stdout)
         if p_stderr:
             logging.error("%s stderr:", piped_command)
             logging.error(p_stderr)
