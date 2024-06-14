@@ -135,7 +135,7 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     # if POPEN_SHELL=True we're running this all as one command as native shell text
     # this is not recommended, less portable and if commands have errors
     if settings.VCF_IMPORT_PREPROCESS_POPEN_SHELL:
-        print("single_commands: %s" % " | ".join([' '.join(x) for x in pipe_commands.values()]))
+        logging.info("single_commands: %s" % " | ".join([' '.join(x) for x in pipe_commands.values()]))
         p = Popen(
             piped_command,
             shell=True,
@@ -143,10 +143,11 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
             stderr=PIPE,
         )
         p_stdout, p_stderr = p.communicate()
+        logging.info("single command pipe/shell completed - return code: %d", p.returncode)
+
         if p_stdout:
             logging.info(p_stdout)
         if p_stderr:
-            logging.error("%s stderr:", piped_command)
             logging.error(p_stderr)
 
         if p.returncode:
