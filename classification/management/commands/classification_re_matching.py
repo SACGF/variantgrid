@@ -7,7 +7,4 @@ class Command(BaseCommand):
         parser.add_argument('--file', type=str, required=True)
 
     def handle(self, *args, **options):
-        """
-        Take a file of internal classification IDs, and rematch them
-        """
         raise Exception("classification_re_matching has been removed (rematching is now done against allele infos")
