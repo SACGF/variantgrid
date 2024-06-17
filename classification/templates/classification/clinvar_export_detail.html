@@ -25,9 +25,9 @@
     {% endif %}
 {% endlabelled %}
 {% labelled label="Classification" %}{{ classification | ekey:'clinical_significance' }}{% endlabelled %}
-{% labelled label="Interpretation Summary" %}
+{% labelled label="Classification's Interpretation Summary" %}
     {% if interpretation_summary %}
-        <div style="white-space: pre-line">{{ interpretation_summary }}</div>
+        <div style="white-space: pre-line">{{ interpretation_summary }}</div>gi
     {% else %}
         <div class="no-value">None</div>
     {% endif %}

@@ -519,8 +519,10 @@ class ClinVarExportConverter:
     @property
     def json_clinical_significance(self) -> ValidatedJson:
         data = {}
-        if citations := self.citations:
-            data["citation"] = citations
+        # we exclude citations unless we include interpretation summary
+        if self.clinvar_key.include_interpretation_summary:
+            if citations := self.citations:
+                data["citation"] = citations
         data["clinicalSignificanceDescription"] = self.clinvar_value(SpecialEKeys.CLINICAL_SIGNIFICANCE).value(single=True)
 
         comment_parts: list[str] = []
