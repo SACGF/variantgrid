@@ -33,6 +33,7 @@ from snpdb.models import AlleleOriginFilterDefault
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
+from snpdb.templatetags.user_tags import user
 
 ALISSA_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}
 
@@ -114,8 +115,11 @@ def _export_view_context(request: HttpRequest) -> dict:
         format_vcf
     ]
 
+    labs_for_user = set(Lab.valid_labs_qs(request.user, admin_check=True))
+
     return {
         'labs': labs,
+        'labs_for_user': labs_for_user,
         'orgs': orgs,
         'genome_builds': genome_builds,
         'default_genome_build': user_settings.default_genome_build,
