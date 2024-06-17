@@ -76,10 +76,6 @@
                     <div class="card" id="condition-match-attempt">
                         <div class="card-header">Auto Assignment</div>
                         <div class="card-body">
-                            <div class="text-info mb-4">
-                                Top level terms can only be auto-assigned if they come from embedded ID matches.<br/>
-                                Gene level terms can be auto-assigned if:  no warnings/errors, gene association, and all leaf terms.
-                            </div>
                             {% labelled label="Suggested Term(s)" %}{% if suggestion.terms %}
                                 {% for term in suggestion.terms %}
                                     <div>{% ontology_term term show_link=True %}</div>
@@ -89,7 +85,19 @@
                             {% endif %}
                             {% endlabelled %}
                             {% if suggestion.terms %}
-                                {% labelled label="Can auto-assign (without confirmation)" %}{{ is_auto_assignable|boolean }}{% endlabelled %}
+                                {% labelled label="Assignment Level" %}
+                                    {% if gene_symbol %}
+                                        <b>Gene Symbol Level</b> ({{ gene_symbol }})<br/>
+                                        <p class="text-info">Gene level terms can be auto-assigned if: there's no top level term already established, there are no warnings/errors, there is a gene association, and all leaf terms.</p>
+                                        {% if suggestion.ids_found_in_text %}
+                                            <p>{{ 'W' | severity_icon }}This text appears to have IDs in it, and thus would only be appropriate for top level auto-match.</p>
+                                        {% endif %}
+                                    {% else %}
+                                        <b>Top Level</b><br/>
+                                        <p class="text-info">Top level terms can only be auto-assigned if they come from embedded ID matches.</p>
+                                    {% endif %}
+                                {% endlabelled %}
+                                {% labelled label="Can Auto-assign (without confirmation)" %}{{ is_auto_assignable|boolean }}{% endlabelled %}
                                 {% if suggestion.terms|length > 1 %}
                                 {% labelled label="Multi Condition Term" %}{{ suggestion.condition_multi_operation.label }}{% endlabelled %}
                                     {% endif %}
