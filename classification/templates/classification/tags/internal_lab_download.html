@@ -7,6 +7,9 @@
 
 <form id="internal-download-form" method="post" action="{% url 'internal_lab_download' %}">
     {% csrf_token %}
+    {% labelled label="My Lab(s)" %}
+        {% for lab in labs %}<div>{{ lab }}</div>{% endfor %}
+    {% endlabelled %}
     {% labelled label="Share Levels" %}
         <div class="form-check">
             <label class="form-check-label">

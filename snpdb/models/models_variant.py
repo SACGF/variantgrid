@@ -356,7 +356,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             return f"{self.chrom}:{self.position} {self.ref}>{self.alt}"
 
     @staticmethod
-    def from_variant_match(match, genome_build=None):
+    def from_variant_match(match, genome_build: Optional[GenomeBuild] = None):
         chrom = match.group(1)
         if genome_build:
             chrom = format_chrom(chrom, genome_build.reference_fasta_has_chr)
