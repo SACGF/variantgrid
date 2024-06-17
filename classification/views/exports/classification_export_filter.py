@@ -27,6 +27,7 @@ from snpdb.models import GenomeBuild, Lab, Organization, Allele, Variant, Allele
     VariantCoordinate
 from snpdb.signals.variant_search import get_results_from_variant_coordinate
 
+
 @dataclass
 class ClassificationIssue:
     classification: ClassificationModification
@@ -210,6 +211,25 @@ class DiscordanceReportStatus(str, Enum):
     PENDING_CONCORDANCE = 'pending'
 
 
+def classification_export_user_string_to_q(user_input: str, genome_build: GenomeBuild) -> Q:
+    if ClinGenAllele.CLINGEN_ALLELE_CODE_PATTERN.match(user_input):
+        clingen_allele = get_clingen_allele(user_input)
+        return Q(classification__allele_info__allele__clingen_allele=clingen_allele)
+    elif GENE_SYMBOL_PATTERN.match(user_input):
+        if gene_match := classification_gene_symbol_filter(user_input):
+            return gene_match
+    if vc := VariantCoordinate.from_string(user_input, genome_build):
+        variant_coordinate = vc.as_internal_symbolic(genome_build)
+        variants = get_results_from_variant_coordinate(genome_build, Variant.objects.all(), variant_coordinate)
+        all_alleles = set()
+        for v in variants:
+            if allele := v.allele:
+                all_alleles.add(allele)
+        if all_alleles:
+            return Q(classification__allele_info__allele__in=all_alleles)
+    raise ValueError("Can't match to ClinGen Allele, Gene Symbol or Variant Coordinate")
+
+
 @dataclass
 class ClassificationFilter:
     """
@@ -229,7 +249,7 @@ class ClassificationFilter:
     user: User
     genome_build: GenomeBuild
     allele_origin_filter: AlleleOriginFilterDefault = AlleleOriginFilterDefault.SHOW_ALL
-    record_filters: Optional[str] = None
+    extra_filter: Optional[Q] = None
     allele_origin_split: bool = False  # if true, subdivide allele data by allele origin bucket
     exclude_sources: Optional[Set[Union[Lab, Organization]]] = None
     include_sources: Optional[Set[Lab]] = None
@@ -352,9 +372,10 @@ class ClassificationFilter:
         if allele_str := request.query_params.get('allele'):
             allele = int(allele_str)
 
-        record_filters: Optional[str] = None
-        if record_filters_str := request.query_params.get('record_filters'):
-            record_filters = record_filters_str
+        ## Have removed the ability to provide record filters in general from_request
+        # record_filters: Optional[str] = None
+        # if record_filters_str := request.query_params.get('record_filters'):
+        #     record_filters = record_filters_str
 
         benchmarking = request.query_params.get('benchmark') == 'true'
 
@@ -385,7 +406,6 @@ class ClassificationFilter:
             transcript_strategy=transcript_strategy,
             since=since,
             allele=allele,
-            record_filters=record_filters,
             benchmarking=benchmarking,
             rows_per_file=rows_per_file,
             row_limit=row_limit,
@@ -543,35 +563,8 @@ class ClassificationFilter:
         if allele_id := self.allele:
             cms = cms.filter(classification__allele_info__allele_id=allele_id)
 
-        # Export my data
-        if self.record_filters:
-            internal_lab_filters: List[Q] = []
-            for item in re.split(',|\n|\t', self.record_filters):
-                item = item.strip()
-                if ClinGenAllele.CLINGEN_ALLELE_CODE_PATTERN.match(item):
-                    clingen_allele = get_clingen_allele(item)
-                    internal_lab_filters.append(Q(classification__allele_info__allele__clingen_allele=clingen_allele))
-                elif GENE_SYMBOL_PATTERN.match(item):
-                    if gene_match := classification_gene_symbol_filter(item):
-                        internal_lab_filters.append(classification_gene_symbol_filter(item))
-                    else:
-                        self.excluded_record_filters.append(item)
-                else:
-                    try:
-                        if vc := VariantCoordinate.from_string(item.strip(), self.genome_build):
-                            variant_coordinate = vc.as_internal_symbolic(self.genome_build)
-                            qs = Variant.objects.all()
-                            allele_data = get_results_from_variant_coordinate(self.genome_build, qs, variant_coordinate)
-                            for i in allele_data:
-                                if allele := i.allele:
-                                    internal_lab_filters.append(Q(classification__allele_info__allele=allele))
-                    except ValueError:
-                        self.excluded_record_filters.append(item)
-            if internal_lab_filters:
-                internal_lab_filters_single = reduce(operator.or_, internal_lab_filters)
-                cms = cms.filter(internal_lab_filters_single)
-            else:
-                return ClassificationModification.objects.none()
+        if extra_filter := self.extra_filter:
+            cms = cms.filter(extra_filter)
 
         # PERMISSION CHECK
         cms = get_objects_for_user(self.user, ClassificationModification.get_read_perm(), cms, accept_global_perms=True)

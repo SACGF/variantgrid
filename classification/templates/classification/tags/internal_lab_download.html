@@ -51,8 +51,18 @@
                 <textarea class="form-control" rows="6" cols="80" id="record_filters" name="record_filters">{{ form_data.record_filters }}</textarea>
             </label>
         </div>
-                <p class="text-info mt-2">Accepted filter inputs: gene symbol (e.g. RYR1), ClinGen allele ID (e.g. CA024299) or genomic location (e.g. 19:38455528 C>T)</p>
+    {% endlabelled %}
+    {% labelled %}
+        <div class="text-info mt-2">
+            Accepted filter inputs:
+            <ul>
+                <li>Gene Symbol (e.g. RYR1)</li>
+                <li>ClinGen Allele ID (e.g. CA024299)</li>
+                <li>Genomic Location using the Genome Build exporting with (e.g. 19:38455528 C>T)</li>
+            </ul>
+            Records matching any filter will be returned.
+        </div>
         <p class="text-info">Leave blank to download all records.</p>
     {% endlabelled %}
-        <button class="btn btn-primary" type="submit" style="float: right">Download</button>
+    <button class="btn btn-primary" type="submit" style="float: right">Download</button>
 </form>
