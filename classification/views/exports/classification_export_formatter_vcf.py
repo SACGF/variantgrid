@@ -6,8 +6,6 @@ from typing import Optional
 from django.conf import settings
 from django.http import HttpRequest
 from django.urls import reverse
-from more_itertools import first
-
 from classification.enums import SpecialEKeys, AlleleOriginBucket
 from classification.models import EvidenceKeyMap
 from classification.views.exports.classification_export_decorator import register_classification_exporter
@@ -43,7 +41,7 @@ class FormatDetailsVCF:
 ALLELE_ORIGIN_BUCKET_TO_LABEL = {
     AlleleOriginBucket.SOMATIC: "somatic",
     AlleleOriginBucket.GERMLINE: "germline",
-    AlleleOriginBucket.UNKNOWN: "unknown"
+    AlleleOriginBucket.UNKNOWN: "allele_origin_unknown"
 }
 
 
@@ -85,14 +83,14 @@ class ClassificationVCF(ExportVCF):
     def svlen(self):
         return self.allele_data.cached_variant.svlen
 
-    @export_vcf_info_cell(
-        header_id="id",
-        number=1,
-        header_type=VCFHeaderType.String,
-        description="ID in info for Emedgene",
-        categories={"system": VCFTargetSystem.EMEDGENE})
-    def info_id(self):
-        return super().get_variant_id()
+    # @export_vcf_info_cell(
+    #     header_id="id",
+    #     number=1,
+    #     header_type=VCFHeaderType.String,
+    #     description="ID in info for Emedgene",
+    #     categories={"system": VCFTargetSystem.EMEDGENE})
+    # def info_id(self):
+    #     return super().get_variant_id()
 
     @export_vcf_info_cell(
         header_id="link",
@@ -121,17 +119,13 @@ class ClassificationVCF(ExportVCF):
 
     @export_vcf_info_cell(
         header_id="allele_origin",
-        number=1,
+        number=VCFHeaderNumberSpecial.UNBOUND,
         header_type=VCFHeaderType.String,
         description="Allele origin bucket, values will be: somatic, germline, mixed or unknown",
         categories={"system": VCFTargetSystem.GENERIC})
     def allele_origin(self):
-        allele_origins = self.allele_data.cms_allele_origins
-        if all_origin_counts := len(allele_origins):
-            if all_origin_counts > 1:
-                return "mixed"
-            else:
-                return ALLELE_ORIGIN_BUCKET_TO_LABEL.get(first(allele_origins))
+        if allele_origins := self.allele_data.cms_allele_origins:
+            return list(sorted(ALLELE_ORIGIN_BUCKET_TO_LABEL.get(ao) for ao in allele_origins))
         else:
             # not sure how we got 0 allele origins, but just in case
             return "unknown"
@@ -209,9 +203,11 @@ class ClassificationVCF(ExportVCF):
         parts = []
         if discordance_value := self._discordance_value:
             parts.append(f"discordance_{discordance_value}")
-        labs = set(cms.lab for cms in self.allele_data.cms)
         parts.append(f"labs:{self.lab_count()}")
-        parts.append(f"allele_origin:{self.allele_origin()}")
+
+        if allele_origins := self.allele_data.cms_allele_origins:
+            for allele_origin in sorted(ALLELE_ORIGIN_BUCKET_TO_LABEL.get(ao) for ao in allele_origins):
+                parts.append(allele_origin)
         parts += self.unique_values(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         parts += self.unique_values(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
         return "|".join(parts)
@@ -268,7 +264,7 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
         if allele_data.cms:
             if row := ClassificationVCF(
                     allele_data,
-                    include_id=self.target_system != VCFTargetSystem.EMEDGENE,
+                    include_id=True,  # self.target_system != VCFTargetSystem.EMEDGENE,
                     link_extra=self.link_extra
             ).vcf_row(export_tweak=self.export_tweak):
                 return [row]
