@@ -940,6 +940,14 @@ class OntologySnake:
     def start_source(self) -> OntologyImportSource:
         return self.show_steps()[0].relation.from_import.import_source
 
+    @cached_property
+    def get_import_relations(self) -> Optional[OntologyTermRelation]:
+        for step in self.show_steps():
+            if step.relation.from_import.import_source in {OntologyImportSource.PANEL_APP_AU,
+                                                           OntologyImportSource.GENCC,
+                                                           OntologyImportSource.MONDO}:
+                return step.relation
+
     @staticmethod
     def check_if_ancestor(descendant: OntologyTerm, ancestor: OntologyTerm, max_levels=4) -> list['OntologySnake']:
         if ancestor == descendant:

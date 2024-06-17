@@ -50,19 +50,23 @@ def _update_gene_relations(gene_symbol: str):
 
             evidence_dict = defaultdict(lambda: {'evidences': [], 'phenotypes': []})
             possible_statuses = ['Expert Review Green', 'Expert Review Amber', 'Expert Review Red']
+            processed_phenotypes = set()
             for panel_app_result in results:
                 evidence = panel_app_result.get('evidence', '')
                 review_status_key = next((status for status in possible_statuses if status in evidence), None)
 
                 if review_status_key:
                     cleaned_evidence = [e for e in evidence if e != review_status_key]
-                    if cleaned_evidence not in evidence_dict[review_status_key]['evidences']:
-                        evidence_dict[review_status_key]['evidences'].append(cleaned_evidence)
                     for phenotype in panel_app_result.get('phenotypes', []):
-                        evidence_dict[review_status_key]['phenotypes'].append(phenotype)
-
-            print('results:', results)
-            print('evidence_dict:', evidence_dict)
+                        phenotype = phenotype.replace(' ', '')
+                        if phenotype not in processed_phenotypes:
+                            if review_status_key == 'Expert Review Green':
+                                processed_phenotypes.add(phenotype)
+                                evidence_dict[review_status_key]['evidences'].append(cleaned_evidence)
+                                evidence_dict[review_status_key]['phenotypes'].append(phenotype)
+                            elif phenotype not in processed_phenotypes:
+                                evidence_dict[review_status_key]['evidences'].append(cleaned_evidence)
+                                evidence_dict[review_status_key]['phenotypes'].append(phenotype)
 
             ontology_builder.ensure_hash_changed(data_hash=response_hash)
 
