@@ -7,6 +7,7 @@ from django.http import HttpRequest
 from django.template.base import FilterExpression
 from django.utils.text import slugify
 
+from library.utils.django_utils import is_ajax
 from uicore.templatetags.ui_utils import parse_tag, TagUtils
 
 register = template.Library()
@@ -66,10 +67,11 @@ def check_active_tab(tab_set: str, tab_id: str, request: HttpRequest, context = 
     active_tab = request.GET.get("activeTab")
     if not active_tab:
         try:
-            if referer := request.headers.get("Referer"):
-                if "activeTab" in referer:
-                    query = urlparse(referer).query
-                    active_tab = parse_qs(query)["activeTab"][0]
+            if is_ajax(request):
+                if referer := request.headers.get("Referer"):
+                    if "activeTab" in referer:
+                        query = urlparse(referer).query
+                        active_tab = parse_qs(query)["activeTab"][0]
         except Exception:
             pass
     if not active_tab and context:
