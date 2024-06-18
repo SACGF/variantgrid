@@ -496,6 +496,8 @@ function applyVariantValues() {
                 {% labelled id="g-hgvs" label="g.HGVS" value_css="variant-coordinate variant_coordinate" %}{% c_hgvs variant_annotation.hgvs_g %}{% endlabelled %}
                 {% labelled id="variant_coordinate" label="Variant Coordinate" value_css="variant-coordinate variant_coordinate" %}Loading...{% endlabelled %}
                 {% if variant.svlen %}
+                    <!-- You can't see ref base in variant coordinate for symbolics - so explicitly show to help admins debug stuff -->
+                    {% labelled label="Reference" admin_only=True %}{{ variant.locus.ref }}{% endlabelled %}
                     {% labelled label="SVLEN" help="Structural Variant Length - Difference in length between REF and ALT alleles" %}{{ variant.svlen }}{% endlabelled %}
                 {% endif %}
                 {% labelled label="Genome Build" %}{{ genome_build }}{% endlabelled %}
