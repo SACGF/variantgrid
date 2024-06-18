@@ -14,7 +14,7 @@ from library.constants import MINUTE_SECS
 from library.django_utils import get_model_fields, get_field_counts
 from library.utils import invert_dict
 
-HGNC_BASE_URL = "http://rest.genenames.org/fetch/status/"
+HGNC_BASE_URL = "https://rest.genenames.org/fetch/status/"
 
 
 def store_hgnc_from_web(cached_web_resource: CachedWebResource):
@@ -29,7 +29,7 @@ def store_hgnc_from_web(cached_web_resource: CachedWebResource):
         r = requests.get(url, headers=headers, timeout=MINUTE_SECS)
         data = r.json()
         records = data["response"]["docs"]
-        save_hgnc_records(existing_hgnc_ids, records)
+        save_hgnc_records(existing_hgnc_ids, records, status=hgnc_status.value)
 
     # Make sure gene symbols are matched to genes in each release
     for release in GeneAnnotationRelease.objects.all():
@@ -41,8 +41,10 @@ def store_hgnc_from_web(cached_web_resource: CachedWebResource):
     cached_web_resource.save()
 
 
-def save_hgnc_records(existing_hgnc_ids: set, records: list):
-    hgnc_status_lookup = invert_dict(dict(HGNCStatus.choices))
+def save_hgnc_records(existing_hgnc_ids: set, records: list, status: str):
+    """
+    Status is not returned in the results, but we filter by it, so can hardcode the value
+    """
     hgnc_gene_names_new = []
     hgnc_gene_names_update = []
     gene_symbols = []
@@ -63,7 +65,6 @@ def save_hgnc_records(existing_hgnc_ids: set, records: list):
 
         previous_symbols = record.get('prev_symbol', [])
         alias_symbols = record.get('alias_symbol', [])
-        status = hgnc_status_lookup[record['status']]
 
         def _get_list(key):
             return _join_list(record.get(key, []))
