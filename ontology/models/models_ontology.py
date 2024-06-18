@@ -9,7 +9,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Union, Iterable, Any
+from typing import Optional, Union, Iterable, Any, Iterator
 
 from cache_memoize import cache_memoize
 from django.conf import settings
@@ -153,6 +153,31 @@ class OntologyRelation:
     "http://purl.obolibrary.org/obo/RO_0004027": "disease has inflammation site",
     "http://purl.obolibrary.org/obo/RO_0004030": "disease arises from structure"
     """
+
+class PanelAppClassification(models.TextChoices):
+    GREEN = "1", "Expert Review Green"
+    AMBER = "2", "Expert Review Amber"
+    RED = "3", "Expert Review Red"
+
+    @property
+    def is_strong_enough(self) -> bool:
+        return self == PanelAppClassification.GREEN
+
+    @staticmethod
+    def get_by_label_pac(label: str) -> 'PanelAppClassification':
+        for pac in PanelAppClassification:
+            if pac.label == label:
+                return pac
+        raise ValueError(f"No PanelAppClassification for {label}")
+
+    @staticmethod
+    def get_above_min(min_classification: str) -> list[str]:
+        classifications = []
+        for e in reversed(PanelAppClassification):
+            classifications.append(e.label)
+            if e.value == min_classification:
+                break
+        return classifications
 
 
 class GeneDiseaseClassification(models.TextChoices):
@@ -594,10 +619,14 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
         return OntologyRelation.DISPLAY_NAMES.get(self.relation, self.relation)
 
     @property
-    def gencc_quality(self) -> Optional[GeneDiseaseClassification]:
+    def gencc_quality(self) -> GeneDiseaseClassification | PanelAppClassification | None:
         if extra := self.extra:
             if strongest := extra.get('strongest_classification'):
-                return GeneDiseaseClassification.get_by_label(strongest)
+                try:
+                    label = GeneDiseaseClassification.get_by_label(strongest)
+                except ValueError:
+                    label = PanelAppClassification.get_by_label_pac(strongest)
+                return label
         return None
 
     @staticmethod
@@ -911,6 +940,14 @@ class OntologySnake:
     def start_source(self) -> OntologyImportSource:
         return self.show_steps()[0].relation.from_import.import_source
 
+    @cached_property
+    def get_import_relations(self) -> Optional[OntologyTermRelation]:
+        for step in self.show_steps():
+            if step.relation.from_import.import_source in {OntologyImportSource.PANEL_APP_AU,
+                                                           OntologyImportSource.GENCC,
+                                                           OntologyImportSource.MONDO}:
+                return step.relation
+
     @staticmethod
     def check_if_ancestor(descendant: OntologyTerm, ancestor: OntologyTerm, max_levels=4) -> list['OntologySnake']:
         if ancestor == descendant:
@@ -1110,7 +1147,8 @@ class OntologySnake:
 
     @staticmethod
     def has_gene_relationship(term: Union[OntologyTerm, str], gene_symbol: Union[GeneSymbol, str], quality: Optional[GeneDiseaseClassification] = GeneDiseaseClassification.STRONG) -> bool:
-        # TODO, do this with hooks
+        # TODO, have this run off get_all_term_to_gene_relationships
+        # just need to filter through results until we reach one of a high enough quality
         from ontology.panel_app_ontology import update_gene_relations
         update_gene_relations(gene_symbol)
         if isinstance(term, str):
@@ -1139,6 +1177,39 @@ class OntologySnake:
         except ValueError:
             report_exc_info()
             return False
+
+    def get_all_term_to_gene_relationships(term: Union[OntologyTerm, str], gene_symbol: Union[GeneSymbol, str], try_related_terms: bool = True) -> Iterator['OntologySnake']:
+        # iterates all ontology term relationships between the term and the gene symbol (as well as any relationships to the equiv MONDO/OMIM)
+        from ontology.panel_app_ontology import update_gene_relations
+        update_gene_relations(gene_symbol)
+        if isinstance(term, str):
+            term = OntologyTerm.get_or_stub(term)
+            if term.is_stub:
+                return None
+        try:
+            gene_term = OntologyTerm.get_gene_symbol(gene_symbol)
+            # try direct link first
+            otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
+            for relationship in otr_qs.filter(source_term=term, dest_term=gene_term):
+                yield OntologySnake(source_term=term, leaf_term=gene_term, paths=[relationship])
+
+            if not try_related_terms:
+                return None
+
+            # optimisations for OMIM/MONDO
+            if term.ontology_service in {OntologyService.MONDO, OntologyService.OMIM}:
+                if term.ontology_service == OntologyService.MONDO:
+                    if omim := OntologyTermRelation.as_omim(term):
+                        for relation in OntologySnake.get_all_term_to_gene_relationships(omim, gene_symbol, try_related_terms=False):
+                            yield relation
+
+                elif term.ontology_service == OntologyService.OMIM:
+                    if mondo := OntologyTermRelation.as_mondo(term):
+                        for relation in OntologySnake.get_all_term_to_gene_relationships(mondo, gene_symbol, try_related_terms=False):
+                            yield relation
+        except ValueError:
+            report_exc_info()
+            return None
 
     @staticmethod
     def get_children(term: OntologyTerm):
