@@ -176,8 +176,10 @@ def allele_search(search_input: SearchInputInstance):
         clingen_allele = get_clingen_allele(search_string)
         allele = clingen_allele.allele
         for genome_build in search_input.genome_builds:
+            # This ensures we retrieve using correct permissions
+            visible_variants = search_input.get_visible_variants(genome_build)
             if variant := allele.variant_for_build_optional(genome_build):
-                yield variant
+                yield from visible_variants.filter(pk=variant.pk)
                 continue
 
             try:
