@@ -101,7 +101,7 @@ class FailedLiftoverVCFProcessor(BulkMinimalVCFProcessor):
     """ Reads VCF with allele_id as ID column - """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.allele_ids = []
+        self.allele_id_reject_reason = {}
         self.liftover = self.upload_pipeline.uploaded_file.uploadedliftover.liftover
         self.set_max_variant_called = True  # Just need warning to go away
 
@@ -112,9 +112,16 @@ class FailedLiftoverVCFProcessor(BulkMinimalVCFProcessor):
     def process_entry(self, variant):
         # In May 2024 I raised an issue about adding rejection details
         # maybe this has been implemented, and we can store it, https://github.com/freeseek/score/issues/10
-        self.allele_ids.append(variant.ID)
+        self.allele_id_reject_reason[int(variant.ID)] = variant.FILTER
 
     def finish(self):
-        error = {"message": "BCFTools +liftover rejected variant"}
-        qs = AlleleLiftover.objects.filter(liftover=self.liftover, allele__in=self.allele_ids)
-        self.rows_processed = qs.update(status=ProcessingStatus.ERROR, error=error)
+        records = []
+        allele_ids = self.allele_id_reject_reason.keys()
+        for allele_liftover in AlleleLiftover.objects.filter(liftover=self.liftover, allele__in=allele_ids):
+            allele_liftover.status = ProcessingStatus.ERROR
+            reject_reason = self.allele_id_reject_reason[allele_liftover.allele_id]
+            allele_liftover.error = {"message": f"BCFTools +liftover rejected variant: {reject_reason}"}
+            records.append(allele_liftover)
+
+        AlleleLiftover.objects.bulk_update(records, fields=["status", "error"])
+        self.rows_processed = len(records)

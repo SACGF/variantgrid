@@ -1,8 +1,6 @@
 import glob
 import logging
 import os
-import subprocess
-import sys
 from collections import OrderedDict
 from subprocess import Popen, PIPE, CalledProcessError
 
@@ -147,8 +145,11 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
         p_stdout, p_stderr = p.communicate()
         logging.info("single command pipe/shell completed - return code: %d", p.returncode)
 
+        p_stdout = p_stdout.decode()
         if p_stdout:
             logging.info(p_stdout)
+
+        p_stderr = p_stderr.decode()
         if p_stderr:
             logging.error(p_stderr)
 

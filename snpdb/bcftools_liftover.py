@@ -49,6 +49,7 @@ def bcftools_liftover(source_vcf: str, source_genome_build: GenomeBuild,
         "--fasta-ref", dest_fasta_filename,
         "--chain", chain_filename,
         "--reject", reject_vcf,
+        "--write-reject",
     ]
 
     env = os.environ.copy()
