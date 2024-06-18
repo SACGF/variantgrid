@@ -183,8 +183,14 @@
                             This variant is being <a href="{% url 'view_liftover_run' vc.unfinished_liftover.pk %}">lifted</a> over via {{ vc.unfinished_liftover.get_conversion_tool_display }}
                             <br/>(last updated {% timestamp vc.unfinished_liftover.modified time_ago=True %} ago)
                         {% elif vc.last_failed_liftover %}
-                            This variant failed a <a href="{% url 'view_liftover_run' vc.last_failed_liftover.pk %}">liftover attempt</a> over via {{ vc.last_failed_liftover.get_conversion_tool_display }}
-                            <br/>(last updated {% timestamp vc.last_failed_liftover.modified time_ago=True %} ago)
+                            This variant failed a
+                            {% if user.is_superuser %}
+                                <a href="{% url 'view_liftover_run' vc.last_failed_liftover.pk %}">liftover attempt</a>
+                            {% else %}
+                                liftover attempt
+                            {% endif %}
+                            via {{ vc.last_failed_liftover.get_conversion_tool_display }}
+                            <br/>(last updated {% timestamp vc.last_failed_liftover.modified time_ago=True %})
                         {% endif %}
                     </td>
                     {% endfor %}

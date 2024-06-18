@@ -30,7 +30,7 @@
 			<li><a href="{% url 'view_vcf' combo_vcf_file.upload_pipeline.uploadedvcf.vcf.pk %}">View VCF {{ combo_vcf_file.upload_pipeline.uploadedvcf.vcf.pk }}</a>
 			({{ combo_vcf_file.upload_pipeline.uploadedvcf.vcf.get_import_status_display }})
             {% else %}
-			<li><a href="{% url 'view_upload_pipeline' combo_vcf_file.upload_pipeline.pk %}">View Upload Processing</a>
+			<li><a href="{% url 'view_upload_pipeline' combo_vcf_file.upload_pipeline.pk %}" class="hover-link">View Upload Processing</a>
 			({{ combo_vcf_file.upload_pipeline.get_status_display }})
             {% endif %}
 
