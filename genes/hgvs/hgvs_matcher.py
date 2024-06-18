@@ -107,7 +107,7 @@ class HGVSMatcher:
     # captures things in teh form of delG, insG, dupG & delGinsC
     # the del pattern at the start is only for delins, as otherwise the op del is captured
 
-    P_HGVS_REMOVAL = re.compile(r"^(?P<main>.*?) p.*$")
+    P_HGVS_REMOVAL = re.compile(r"^(?P<main>.*?) (p.*|[(]p.*[)])$")
 
     HGVS_METHOD_INTERNAL_LIBRARY = "Internally converted using library"
     # External calls to ClinGen
