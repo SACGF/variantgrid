@@ -2,17 +2,14 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from django.http import HttpRequest
-from django.urls.base import reverse
-
-from classification.enums import SpecialEKeys
-from classification.models import ClassificationModification, Classification
+from classification.models import ClassificationModification
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
-from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column, delimited_row
-from ontology.models import OntologyTerm, OntologyTermRelation, OntologyRelation, OntologyImportSource, \
-    PanelAppClassification, OntologySnake, OntologyService, GeneDiseaseClassification
+from ontology.models import OntologyTerm, OntologyRelation, OntologyImportSource, \
+    PanelAppClassification, OntologySnake, OntologyService, GeneDiseaseClassification, \
+    ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER
 
 
 @dataclass(frozen=True)
@@ -137,21 +134,21 @@ class ClassificationExportFormatterConditionResolution(ClassificationExportForma
 
                                 source = rel.from_import.import_source
                                 if source in OntologyImportSource.PANEL_APP_AU:
-                                    panel_app_strength.add(rel.gencc_quality)
+                                    panel_app_strength.add(rel.relationship_quality)
                                     all_relations.add(rel.source_term)
                                 elif source == OntologyImportSource.MONDO:
                                     mondo_strength.add(rel.relation)
                                     all_relations.add(rel.source_term)
                                 elif source == OntologyImportSource.GENCC:
-                                    gencc_strength.add(rel.gencc_quality)
+                                    gencc_strength.add(rel.relationship_quality)
                                     all_relations.add(rel.source_term)
 
                         if not has_direct_panel_app_relationship:
                             # there may or may not have been any relationships, but there wasn't one from panel app, so now lets look at all conditions for the gene symbol and make a row for each one
-                            if all_relationships_snakes := OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO, min_classification=GeneDiseaseClassification.DISPUTED):
+                            if all_relationships_snakes := OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO, quality_filter=ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER):
                                 all_relationships = all_relationships_snakes.leaf_relations(OntologyRelation.PANEL_APP_AU)
                                 for relation in all_relationships:
-                                    all_relations.add(f'({relation.gencc_quality.label}): {relation.source_term}')
+                                    all_relations.add(f'({relation.relationship_quality.label}): {relation.source_term}')
 
                         if all_relations:
                             row = ClassificationConditionResolutionRow(vcm, condition_term, gene_symbol,

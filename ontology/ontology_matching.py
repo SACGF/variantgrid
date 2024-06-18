@@ -265,7 +265,7 @@ class OntologyMatching:
                 report_message(message=f"Could not resolve {gene_symbol} to HGNC OntologyTerm - can't do gene specific resolutions", level='warning')
                 return
 
-            snakes = OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO, min_classification=GeneDiseaseClassification.STRONG)  # always convert to MONDO for now
+            snakes = OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO)  # always convert to MONDO for now
             for snake in snakes:
                 mondo_term = snake.leaf_term
                 mondo_meta = self.find_or_create(mondo_term.id)

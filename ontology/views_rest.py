@@ -9,7 +9,8 @@ from rest_framework.views import APIView
 from genes.models import GeneListGeneSymbol, create_fake_gene_list
 from genes.serializers import GeneListGeneSymbolSerializer
 from library.constants import WEEK_SECS
-from ontology.models import OntologyTerm, GeneDiseaseClassification, OntologyVersion
+from ontology.models import OntologyTerm, GeneDiseaseClassification, OntologyVersion, \
+    ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER
 from ontology.ontology_matching import OntologyMatching
 from ontology.serializers import OntologyTermRelationSerializer
 
@@ -59,7 +60,6 @@ class GeneDiseaseRelationshipView(APIView):
     def get(self, request, *args, **kwargs):
         data = []
         ontology_version = OntologyVersion.latest()
-        for otr in ontology_version.gene_disease_relations(self.kwargs['gene_symbol'],
-                                                           min_classification=GeneDiseaseClassification.DISPUTED):
+        for otr in ontology_version.gene_disease_relations(self.kwargs['gene_symbol'], quality_filter=ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER):
             data.append(OntologyTermRelationSerializer(otr).data)
         return Response(data)

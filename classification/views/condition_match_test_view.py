@@ -17,7 +17,8 @@ from library.django_utils import require_superuser
 from library.log_utils import report_exc_info
 from library.utils import delimited_row
 from ontology.models import OntologySnake, OntologyVersion, OntologyTermStatus, OntologyImportSource, \
-    OntologyTermRelation, GeneDiseaseClassification, OntologyTerm, OntologyTermDescendant
+    OntologyTermRelation, GeneDiseaseClassification, OntologyTerm, OntologyTermDescendant, \
+    ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER
 from ontology.ontology_matching import OntologyMatching, SearchText, normalize_condition_text
 
 
@@ -212,7 +213,7 @@ def condition_obsoletes_view(request):
 
     obsolete_relations_gencc = OntologyVersion.latest().get_ontology_term_relations() \
         .filter(from_import__import_source=OntologyImportSource.GENCC) \
-        .filter(OntologySnake.gencc_quality_filter(GeneDiseaseClassification.STRONG)) \
+        .filter(ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER.filter_q) \
         .filter(
             Q(source_term__status__ne=OntologyTermStatus.CONDITION) | Q(dest_term__status__ne=OntologyTermStatus.CONDITION)
         ).order_by('dest_term__name')

@@ -154,14 +154,18 @@ class OntologyRelation:
     "http://purl.obolibrary.org/obo/RO_0004030": "disease arises from structure"
     """
 
+
 class PanelAppClassification(models.TextChoices):
-    GREEN = "1", "Expert Review Green"
+    RED = "1", "Expert Review Red"
     AMBER = "2", "Expert Review Amber"
-    RED = "3", "Expert Review Red"
+    GREEN = "3", "Expert Review Green"
 
     @property
     def is_strong_enough(self) -> bool:
         return self == PanelAppClassification.GREEN
+
+    def __lt__(self, other) -> bool:
+        return int(self.value) < int(other.value)
 
     @staticmethod
     def get_by_label_pac(label: str) -> 'PanelAppClassification':
@@ -171,10 +175,10 @@ class PanelAppClassification(models.TextChoices):
         raise ValueError(f"No PanelAppClassification for {label}")
 
     @staticmethod
-    def get_above_min(min_classification: str) -> list[str]:
-        classifications = []
+    def get_above_min(min_classification: str) -> set[str]:
+        classifications = set()
         for e in reversed(PanelAppClassification):
-            classifications.append(e.label)
+            classifications.add(e.label)
             if e.value == min_classification:
                 break
         return classifications
@@ -205,10 +209,10 @@ class GeneDiseaseClassification(models.TextChoices):
         raise ValueError(f"No GeneDiseaseClassification for {label}")
 
     @staticmethod
-    def get_above_min(min_classification: str) -> list[str]:
-        classifications = []
+    def get_above_min(min_classification: str) -> set[str]:
+        classifications = set()
         for e in reversed(GeneDiseaseClassification):
-            classifications.append(e.label)
+            classifications.add(e.label)
             if e.value == min_classification:
                 break
         return classifications
@@ -619,7 +623,7 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
         return OntologyRelation.DISPLAY_NAMES.get(self.relation, self.relation)
 
     @property
-    def gencc_quality(self) -> GeneDiseaseClassification | PanelAppClassification | None:
+    def relationship_quality(self) -> GeneDiseaseClassification | PanelAppClassification | None:
         if extra := self.extra:
             if strongest := extra.get('strongest_classification'):
                 try:
@@ -697,6 +701,29 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
 
 
 OntologyList = Optional[Union[QuerySet, list[OntologyTerm]]]
+
+
+@dataclass
+class OntologyRelationshipQualityFilter:
+
+    min_gencc_strength: GeneDiseaseClassification
+    min_panelapp_strength: PanelAppClassification
+
+    @cached_property
+    def filter_q(self) -> Q:
+        gencc_q = Q(from_import__import_source=OntologyImportSource.GENCC) & Q(extra__strongest_classification__in=GeneDiseaseClassification.get_above_min(self.min_gencc_strength))
+        panel_app_q = Q(from_import__import_source=OntologyImportSource.PANEL_APP_AU) & Q(extra__strongest_classification__in=PanelAppClassification.get_above_min(self.min_panelapp_strength))
+        other_import_source_q = ~Q(from_import__import_source__in={OntologyImportSource.GENCC, OntologyImportSource.PANEL_APP_AU})
+
+        return gencc_q | panel_app_q | other_import_source_q
+
+
+ONTOLOGY_RELATIONSHIP_NO_QUALITY_FILTER = OntologyRelationshipQualityFilter(min_gencc_strength=GeneDiseaseClassification.DISPUTED, min_panelapp_strength=PanelAppClassification.RED)
+ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER = OntologyRelationshipQualityFilter(min_gencc_strength=GeneDiseaseClassification.ANIMAL, min_panelapp_strength=PanelAppClassification.RED)
+ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER = OntologyRelationshipQualityFilter(min_gencc_strength=GeneDiseaseClassification.LIMITED, min_panelapp_strength=PanelAppClassification.AMBER)
+ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER = OntologyRelationshipQualityFilter(min_gencc_strength=GeneDiseaseClassification.STRONG, min_panelapp_strength=PanelAppClassification.GREEN)
+
+
 
 
 class OntologyVersion(TimeStampedModel):
@@ -824,15 +851,15 @@ class OntologyVersion(TimeStampedModel):
         return GeneSymbol.objects.filter(symbol__in=gene_symbol_names)
 
     def terms_for_gene_symbol(self, gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService,
-                              max_depth=1, min_classification: Optional[GeneDiseaseClassification] = None) -> 'OntologySnakes':
+                              max_depth=1, quality_filter: OntologyRelationshipQualityFilter = ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER) -> 'OntologySnakes':
         otr_qs = self.get_ontology_term_relations()
         return OntologySnake.terms_for_gene_symbol(gene_symbol, desired_ontology, max_depth=max_depth,
-                                                   min_classification=min_classification, otr_qs=otr_qs)
+                                                   quality_filter=quality_filter, otr_qs=otr_qs)
 
     def gene_disease_relations(self, gene_symbol: Union[str, GeneSymbol],
-                               min_classification: GeneDiseaseClassification = None) -> list[OntologyTermRelation]:
+                               quality_filter: OntologyRelationshipQualityFilter = ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER) -> list[OntologyTermRelation]:
         snake = self.terms_for_gene_symbol(gene_symbol, OntologyService.MONDO,
-                                           max_depth=0, min_classification=min_classification)
+                                           max_depth=0, quality_filter=quality_filter)
         return snake.leaf_relations(ontology_relation=OntologyRelation.RELATED)
 
     def __str__(self):
@@ -887,7 +914,7 @@ class OntologySnake:
     @property
     def is_strong_enough(self) -> bool:
         for path in self.paths:
-            if gencc_quality := path.gencc_quality:
+            if gencc_quality := path.relationship_quality:
                 if not gencc_quality.is_strong_enough:
                     return False
         return True
@@ -1022,7 +1049,7 @@ class OntologySnake:
     # TODO only allow EXACT between two anythings that aren't Gene Symbols
     @staticmethod
     def snake_from(term: OntologyTerm, to_ontology: OntologyService,
-                   min_classification: Optional[GeneDiseaseClassification] = GeneDiseaseClassification.STRONG,
+                   quality_filter: OntologyRelationshipQualityFilter = ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER,
                    max_depth: int = 1, otr_qs: QuerySet[OntologyTermRelation] = None) -> 'OntologySnakes':
         """
         Returns the smallest snake/paths from source term to the desired OntologyService
@@ -1043,7 +1070,7 @@ class OntologySnake:
             # the list of relationships below is hardly complete for stopping MONDO <-> OMIM, that's done as an extra step
             # but filter out the most common ones here (and IS_A as we don't want to go up/down the hierarchy)
             ~Q(relation__in={OntologyRelation.IS_A, OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM, OntologyRelation.XREF}),
-            OntologySnake.gencc_quality_filter(min_classification),
+            quality_filter.filter_q
         ]
         q_relation = functools.reduce(operator.and_, relation_q_list)
 
@@ -1092,10 +1119,6 @@ class OntologySnake:
 
         return OntologySnakes(valid_snakes)
 
-    @staticmethod
-    def gencc_quality_filter(quality: GeneDiseaseClassification = GeneDiseaseClassification.STRONG) -> Q:
-        gencc_classifications = GeneDiseaseClassification.get_above_min(quality)
-        return ~Q(from_import__import_source='gencc') | Q(extra__strongest_classification__in=gencc_classifications)
 
     @staticmethod
     def mondo_terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol]) -> set[OntologyTerm]:
@@ -1105,7 +1128,7 @@ class OntologySnake:
         terms = set()
 
         otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
-        q_relation = OntologySnake.gencc_quality_filter()
+        q_relation = ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER.filter_q
 
         mondos = otr_qs.filter(
             q_relation,
@@ -1133,7 +1156,8 @@ class OntologySnake:
 
     @staticmethod
     def terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService,
-                              max_depth=1, min_classification: Optional[GeneDiseaseClassification] = None,
+                              max_depth=1,
+                              quality_filter: OntologyRelationshipQualityFilter = ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER,
                               otr_qs: QuerySet[OntologyTermRelation] = None) -> 'OntologySnakes':
         # FIXME, can the min_classification default to STRONG and other code can filter it out?
         """ max_depth: How many steps in snake path to go through """
@@ -1142,11 +1166,11 @@ class OntologySnake:
         update_gene_relations(gene_symbol)
         gene_ontology = OntologyTerm.get_gene_symbol(gene_symbol)
         return OntologySnake.snake_from(term=gene_ontology, to_ontology=desired_ontology,
-                                        max_depth=max_depth, min_classification=min_classification,
+                                        max_depth=max_depth, quality_filter=quality_filter,
                                         otr_qs=otr_qs)
 
     @staticmethod
-    def has_gene_relationship(term: Union[OntologyTerm, str], gene_symbol: Union[GeneSymbol, str], quality: Optional[GeneDiseaseClassification] = GeneDiseaseClassification.STRONG) -> bool:
+    def has_gene_relationship(term: Union[OntologyTerm, str], gene_symbol: Union[GeneSymbol, str], quality_filter: OntologyRelationshipQualityFilter = ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER) -> bool:
         # TODO, have this run off get_all_term_to_gene_relationships
         # just need to filter through results until we reach one of a high enough quality
         from ontology.panel_app_ontology import update_gene_relations
@@ -1158,22 +1182,21 @@ class OntologySnake:
         try:
             gene_term = OntologyTerm.get_gene_symbol(gene_symbol)
             # try direct link first
-            quality_q = OntologySnake.gencc_quality_filter(quality)
-            otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
-            if otr_qs.filter(source_term=term, dest_term=gene_term).filter(quality_q).exists():
+            quality_q = quality_filter.filter_q
+            otr_qs = OntologyVersion.get_latest_and_live_ontology_qs().filter(dest_term=gene_term).filter(quality_q)
+            if otr_qs.filter(source_term=term).exists():
                 return True
-            # optimisations for OMIM/MONDO
-            if term.ontology_service in {OntologyService.MONDO, OntologyService.OMIM}:
-                via_ids: QuerySet = None
-                exclude_mondo_omim = ~Q(relation__in={OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM})
-                if term.ontology_service == OntologyService.MONDO:
-                    via_ids = otr_qs.filter(source_term=term, dest_term__ontology_service=OntologyService.OMIM).filter(quality_q).filter(exclude_mondo_omim).values_list("dest_term_id", flat=True)
-                else:
-                    via_ids = otr_qs.filter(dest_term=term, source_term__ontology_service=OntologyService.MONDO).filter(quality_q).filter(exclude_mondo_omim).values_list("source_term_id", flat=True)
-                return otr_qs.filter(source_term_id__in=via_ids, dest_term=gene_term).exists()
 
-            hgnc_terms = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC).leafs()
-            return gene_term in hgnc_terms
+            if term.ontology_service == OntologyService.OMIM:
+                if mondo_term := OntologyTermRelation.as_mondo(term):
+                    if otr_qs.filter(source_term=mondo_term).exists():
+                        return True
+            elif term.ontology_service == OntologyService.MONDO:
+                if omim_term := OntologyTermRelation.as_omim(term):
+                    if otr_qs.filter(source_term=omim_term).exists():
+                        return True
+
+            return False
         except ValueError:
             report_exc_info()
             return False

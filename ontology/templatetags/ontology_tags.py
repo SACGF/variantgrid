@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Optional, Union, Iterable, Iterator
 from django.template import Library
 from ontology.models import OntologyTerm, OntologyTermRelation, GeneDiseaseClassification, OntologyService, \
-    OntologySnake
+    OntologySnake, PanelAppClassification
 from ontology.ontology_matching import OntologyMatch
 
 register = Library()
@@ -49,8 +49,10 @@ def ontology_relationship_row(relationship: OntologyTermRelation, reference_term
     quality: Optional[str] = None
     if extra := relationship.extra:
         if strongest := extra.get('strongest_classification'):
-            allowed_set = GeneDiseaseClassification.get_above_min(GeneDiseaseClassification.STRONG)
-            if strongest not in allowed_set:
+            allowed_gencc = GeneDiseaseClassification.get_above_min(GeneDiseaseClassification.STRONG)
+            allowed_panelapp = PanelAppClassification.get_above_min(PanelAppClassification.GREEN)
+            high_quality_set = allowed_gencc | allowed_panelapp
+            if strongest not in high_quality_set:
                 low_quality = True
                 quality = strongest
 

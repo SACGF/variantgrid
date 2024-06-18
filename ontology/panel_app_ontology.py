@@ -1,6 +1,7 @@
 import re
+from dataclasses import dataclass
 from datetime import timedelta
-from typing import Union, Any
+from typing import Union, Optional
 from collections import defaultdict
 
 from django.conf import settings
@@ -12,12 +13,12 @@ from library.cache import timed_cache
 from library.log_utils import report_exc_info, report_message
 from library.utils import md5sum_str
 from ontology.models import OntologyTerm, OntologyRelation, OntologyImportSource, OntologyTermRelation, \
-    OntologyTermStatus, OntologyIdNormalized
+    OntologyTermStatus, OntologyIdNormalized, PanelAppClassification
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 
 # increment if you change the logic of parsing ontology terms from PanelApp
 # which will then effectively nullify the cache so the new logic is run
-PANEL_APP_API_PROCESSOR_VERSION = 8
+PANEL_APP_API_PROCESSOR_VERSION = 10
 # with look ahead and behind to make sure we're not in a 7-digit number
 ABANDONED_OMIM_RE = re.compile('(?<![0-9])([0-9]{6})(?![0-9])')
 
@@ -26,6 +27,56 @@ def update_gene_relations(gene_symbol: Union[GeneSymbol, str]):
     if isinstance(gene_symbol, GeneSymbol):
         gene_symbol = gene_symbol.symbol
     return _update_gene_relations(gene_symbol)
+
+
+@dataclass(frozen=True)
+class PanelAppResult:
+
+    ontology_ids: set[str]
+    max_panel_app_strength: Optional[PanelAppClassification]
+    raw_data: dict
+    hash_str: str
+
+    @staticmethod
+    def parse_data(raw_data: dict):
+        phenotypes = raw_data.get('phenotypes', [])
+        evidences = raw_data.get('evidence', [])
+        hash_str = ""
+
+        all_terms = set()
+        for phenotype_row in phenotypes:
+            hash_str += phenotype_row + ";"
+            found_term = False
+            from annotation.regexes import db_ref_regexes, DbRegexes
+            for result in db_ref_regexes.search(phenotype_row):
+                if result.cregx in (DbRegexes.OMIM, DbRegexes.MONDO):
+                    all_terms.add(result.id_fixed)
+            if not found_term:
+                # just look for abandoned 6-digit numbers
+                for omim_id in ABANDONED_OMIM_RE.finditer(phenotype_row):
+                    all_terms.add(f"OMIM:{omim_id.group(1)}")
+
+        max_strength: Optional[PanelAppClassification] = None
+        for evidence in evidences:
+            hash_str += evidence + ";"
+            try:
+                panel_app_strength = PanelAppClassification.get_by_label_pac(evidence)
+                if max_strength is None or max_strength < panel_app_strength:
+                    max_strength = panel_app_strength
+            except ValueError:
+                # not actually a PanelAppStrength
+                pass
+
+        return PanelAppResult(
+            ontology_ids=all_terms,
+            max_panel_app_strength=max_strength,
+            raw_data={
+                # this is just a subset of the full data
+                "phenotypes": phenotypes,
+                "evidence": evidences
+            },
+            hash_str=hash_str
+        )
 
 
 @timed_cache(size_limit=2, ttl=10, quick_key_access=True)
@@ -44,94 +95,61 @@ def _update_gene_relations(gene_symbol: str):
                                            versioned=False)
         try:
             ontology_builder.ensure_old(max_age=timedelta(days=settings.PANEL_APP_CACHE_DAYS))
+            if ontology_builder.versioned:
+                raise ValueError("Can't do PanelAppAU with a versioned OntologyBuilder")
 
-            results = get_panel_app_results_by_gene_symbol_json(server=panel_app, gene_symbol=gene_symbol)
-            response_hash = md5sum_str(str(results))
-
-            evidence_dict = defaultdict(lambda: {'evidences': [], 'phenotypes': []})
-            possible_statuses = ['Expert Review Green', 'Expert Review Amber', 'Expert Review Red']
-            processed_phenotypes = set()
-            for panel_app_result in results:
-                evidence = panel_app_result.get('evidence', '')
-                review_status_key = next((status for status in possible_statuses if status in evidence), None)
-
-                if review_status_key:
-                    cleaned_evidence = [e for e in evidence if e != review_status_key]
-                    for phenotype in panel_app_result.get('phenotypes', []):
-                        phenotype = phenotype.replace(' ', '')
-                        if phenotype not in processed_phenotypes:
-                            if review_status_key == 'Expert Review Green':
-                                processed_phenotypes.add(phenotype)
-                                evidence_dict[review_status_key]['evidences'].append(cleaned_evidence)
-                                evidence_dict[review_status_key]['phenotypes'].append(phenotype)
-                            elif phenotype not in processed_phenotypes:
-                                evidence_dict[review_status_key]['evidences'].append(cleaned_evidence)
-                                evidence_dict[review_status_key]['phenotypes'].append(phenotype)
-
+            results_json = get_panel_app_results_by_gene_symbol_json(server=panel_app, gene_symbol=gene_symbol)
+            response_hash = md5sum_str(str(results_json))
             ontology_builder.ensure_hash_changed(data_hash=response_hash)
 
-            _update_gene_relations_activate(ontology_builder=ontology_builder, hgnc_term=hgnc_term, gene_symbol=gene_symbol, results=evidence_dict)
+            OntologyTermRelation.objects.filter(
+                dest_term_id=hgnc_term.id,
+                relation=OntologyRelation.PANEL_APP_AU
+            ).delete()
+
+            by_ontology_id = defaultdict(list)
+
+            for panel_app_result_json in results_json:
+                parsed_result = PanelAppResult.parse_data(panel_app_result_json)
+                if parsed_result.max_panel_app_strength and parsed_result.ontology_ids:
+                    for ontology_id in parsed_result.ontology_ids:
+                        by_ontology_id[ontology_id].append(parsed_result)
+
+            with transaction.atomic():
+                for ontology_id, parsed_results in by_ontology_id.items():
+                    full_id = OntologyIdNormalized.normalize(ontology_id).full_id
+
+                    term, created = ontology_builder.add_term(
+                        term_id=full_id,
+                        name="Unknown Term",
+                        primary_source=False,
+                        trusted_source=False
+                    )
+                    if created and term.status == OntologyTermStatus.STUB:
+                        report_message("Found ontology term from PanelApp not in DB", level="error",
+                                       extra_data={"target": full_id, "gene_symbol": str(gene_symbol)})
+
+                    max_strength: Optional[PanelAppClassification] = None
+                    all_data = []
+                    unique_raw_data = set()
+                    for parsed_result in parsed_results:
+                        if max_strength is None or max_strength < parsed_result.max_panel_app_strength:
+                            max_strength = parsed_result.max_panel_app_strength
+                        if parsed_result.hash_str not in unique_raw_data:
+                            all_data.append(parsed_result.raw_data)
+                            unique_raw_data.add(parsed_result.hash_str)
+
+                    ontology_builder.add_ontology_relation(
+                        source_term_id=term.id,
+                        dest_term_id=hgnc_term.id,
+                        relation=OntologyRelation.PANEL_APP_AU,
+                        extra={
+                            "strongest_classification": max_strength.label,
+                            "phenotypes_and_evidence": all_data
+                        })
+                ontology_builder.complete(verbose=False)
 
         except OntologyBuilderDataUpToDateException:
             pass
     except ValueError:
         report_exc_info()
-
-
-@transaction.atomic()
-def _update_gene_relations_activate(ontology_builder: OntologyBuilder, hgnc_term: OntologyTerm, gene_symbol: str, results: Any):
-
-    if ontology_builder.versioned:
-        raise ValueError("Can't do PanelAppAU with a versioned OntologyBuilder")
-
-    # remove all old relationships first, most likely will re-create the same data under a new import
-    # but this also ensures old removed relationships don't lie around
-    # we do lose information about the old imports, but
-
-    OntologyTermRelation.objects.filter(
-        dest_term_id=hgnc_term.id,
-        relation=OntologyRelation.PANEL_APP_AU
-    ).delete()
-
-    def add_term_if_valid(full_id: str):
-        nonlocal ontology_builder
-        nonlocal hgnc_term
-
-        # normalize the ID first as PanelApp is not the authority on the ID layout
-        full_id = OntologyIdNormalized.normalize(full_id).full_id
-
-        term, created = ontology_builder.add_term(
-            term_id=full_id,
-            name="Unknown Term",
-            primary_source=False,
-            trusted_source=False
-        )
-        if created and term.status == OntologyTermStatus.STUB:
-            report_message("Found ontology term from PanelApp not in DB", level="error",
-                           extra_data={"target": full_id, "gene_symbol": str(gene_symbol)})
-        ontology_builder.add_ontology_relation(
-            source_term_id=term.id,
-            dest_term_id=hgnc_term.id,
-            relation=OntologyRelation.PANEL_APP_AU,
-            extra={
-                "strongest_classification": strongest_classification,
-                "phenotype_row": phenotype_row,
-                "evidence": evidence
-            })
-
-    for review_status, contents in results.items():
-        if evidence := contents.get('evidences'):
-            strongest_classification = review_status
-            phenotype_row: str
-            for phenotype_row in contents.get('phenotypes', []):
-                from annotation.regexes import db_ref_regexes, DbRegexes
-                found_term = False
-                for result in db_ref_regexes.search(phenotype_row):
-                    if result.cregx in (DbRegexes.OMIM, DbRegexes.MONDO):
-                        add_term_if_valid(result.id_fixed)
-                        found_term = True
-                if not found_term:
-                    # just look for abandoned 6-digit numbers
-                    for omim_id in ABANDONED_OMIM_RE.finditer(phenotype_row):
-                        add_term_if_valid(f"OMIM:{omim_id.group(1)}")
-    ontology_builder.complete(verbose=False)

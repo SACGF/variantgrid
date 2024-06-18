@@ -11,7 +11,7 @@ from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import GeneAnnotationRelease, GnomADGeneConstraint, ReleaseGeneSymbolGene, Gene
 from library.django_utils.django_file_utils import get_import_processing_filename
 from ontology.models import OntologyService, GeneDiseaseClassification, OntologyTermRelation, \
-    OntologyVersion
+    OntologyVersion, ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
 
@@ -237,8 +237,7 @@ class Command(BaseCommand):
 
         diseases_supportive_or_below = []
         diseases_moderate_or_above = []
-        for otr in ontology_version.gene_disease_relations(gene_symbol,
-                                                           min_classification=GeneDiseaseClassification.LIMITED):
+        for otr in ontology_version.gene_disease_relations(gene_symbol, quality_filter=ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER):
             disease = otr.source_term.name
             moi_classifications = otr.get_gene_disease_moi_classifications()
             moi_supportive_or_below = otr.get_moi_summary(moi_classifications, supportive_or_below)
