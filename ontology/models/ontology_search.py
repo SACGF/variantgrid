@@ -55,7 +55,7 @@ def ontology_search_id(search_input: SearchInputInstance):
 
 @search_receiver(
     search_type=OntologyTerm,
-    pattern=re.compile(r"^HGNC\s*:\s*(.*)$"),
+    pattern=re.compile(r"^HGNC\s*:\s*(.*)$", re.IGNORECASE),
     sub_name="Gene Disease Relationships",
     admin_only=True,
     example=SearchExample(

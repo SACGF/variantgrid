@@ -12,7 +12,7 @@ from django.core.management import BaseCommand
 from model_utils.models import now
 
 from annotation.models.models_enums import HPOSynonymScope
-from genes.models import HGNC
+from genes.models import HGNC, HGNCImport
 from library.utils.file_utils import file_md5sum
 from ontology.gencc import load_gencc
 from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource, OntologyImport, \
@@ -528,32 +528,31 @@ def load_omim(filename: str, force: bool):
 
 
 def sync_hgnc():
-    uploads: list[OntologyTerm] = []
 
-    o_import = OntologyImport.objects.create(
+    latest_hgnc_import = HGNCImport.objects.order_by('-pk').first()
+    builder = OntologyBuilder(
+        filename=f"hgnc_import_{latest_hgnc_import.pk}",
+        context="hgnc sync",
         import_source="HGNC Sync",
-        filename="HGNC Aliases",
-        context="hgnc_sync",
-        hash="N/A",
         processor_version=1,
-        processed_date=now,
-        completed=True)
+        versioned=False
+    )
+    builder.ensure_hash_changed(f"{latest_hgnc_import.pk}")
 
     for hgnc in HGNC.objects.all():
-        uploads.append(OntologyTerm(
-            id=f"HGNC:{hgnc.id}",
-            ontology_service=OntologyService.HGNC,
-            name=hgnc.gene_symbol_id,
-            index=hgnc.id,
-            definition=hgnc.approved_name,
-            from_import=o_import
-        ))
+        previous_symbols = []
+        if previous_symbols_str := hgnc.previous_symbols:
+            previous_symbols = previous_symbols_str.split(",")
 
-    old_count = OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC).count()
-    OntologyTerm.objects.bulk_create(uploads, ignore_conflicts=True)
-    updated_count = OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC).count()
-    delta = updated_count - old_count
-    print(f"Inserted {delta} records from HGNCGeneNames into OntologyTerm")
+        builder.add_term(
+            term_id=hgnc.hgnc_id,
+            name=hgnc.gene_symbol_id,
+            definition=hgnc.approved_name,
+            status=OntologyTermStatus.CONDITION,  # TODO might need a better name for Gene Symbol Ontology Terms
+            aliases=previous_symbols  # currently use previous symbols not actual aliases, as prev symbols would be more robust
+        )
+
+    builder.complete()
 
 
 class Command(BaseCommand):
