@@ -1,5 +1,6 @@
 import json
 import pathlib
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -103,16 +104,16 @@ class ClassificationImportMapInsertTask(Task):
 
             args: list[str] = [
                 settings.CLASSIFICATION_OMNI_IMPORTER_PYTHON_COMMAND, "main.py",
-                "--dir", str(working_sub_folder.absolute()),
-                "--publish", publish,
-                "--org", upload_file.lab.organization.group_name,
-                "--lab", upload_file.lab.group_name.split("/")[1],
+                "--dir", shlex.quote(str(working_sub_folder.absolute())),
+                "--publish", shlex.quote(publish),
+                "--org", shlex.quote(upload_file.lab.organization.group_name),
+                "--lab", shlex.quote(upload_file.lab.group_name.split("/")[1]),
                 "--env", f"file"
             ]
             if include_source:
                 args.append("--include_source")
             if file_type_override := upload_file.file_type_override:
-                args += ["--file_type", file_type_override]
+                args += ["--file_type", shlex.quote(file_type_override)]
 
             print(" ".join(args))
 
