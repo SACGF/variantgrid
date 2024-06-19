@@ -384,7 +384,6 @@ def process_record(patient_records, record_id, row):
         assign_patient_to_sample(patient_records.patient_import, user, matched_sample, patient, description, origin=PatientRecordOriginType.UPLOADED_CSV)
 
     validation_message = '\n'.join(validation_messages)
-    print(validation_message)
 
     PatientRecord.objects.create(patient_records=patient_records,
                                  record_id=record_id,
