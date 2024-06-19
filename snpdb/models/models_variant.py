@@ -1009,7 +1009,7 @@ class AlleleLiftover(models.Model):
     def error_tidy(self) -> str | dict:
         # If the JSON is just message=, grab the message
         if error_json := self.error:
-            if message := error_json.get("message") and len(error_json.keys()) == 1:
+            if (message := error_json.get("message")) and len(error_json.keys()) == 1:
                 return message
             return error_json
 
