@@ -12,11 +12,14 @@ def string_deterministic_hash(s: str) -> int:
     return val
 
 
+def _hash_str(method: callable, s: str) -> str:
+    s_bytes = s.encode()
+    return method(s_bytes).hexdigest()
+
+
 def md5sum_str(s: str) -> str:
-    s_bytes = s.encode()
-    return hashlib.md5(s_bytes).hexdigest()
+    return _hash_str(hashlib.md5, s)
 
 
-def sha1_str(s: str) -> str:
-    s_bytes = s.encode()
-    return hashlib.sha1(s_bytes).hexdigest()
+def sha256_str(s: str) -> str:
+    return _hash_str(hashlib.sha256, s)

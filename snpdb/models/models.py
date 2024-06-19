@@ -52,7 +52,7 @@ class CachedGeneratedFile(models.Model):
     filename = models.TextField(null=True)
     exception = models.TextField(null=True)
     generator = models.TextField()
-    params_hash = models.TextField()
+    params_hash = models.TextField()  # sha256 of params used to generate graph
     task_id = models.CharField(max_length=36, null=True)
     task_status = models.TextField(null=True)  # TODO: what's the actual size?
     generate_start = models.DateTimeField(null=True)

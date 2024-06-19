@@ -1,5 +1,5 @@
 from analysis.models import AnalysisNode
-from library.utils import sha1_str
+from library.utils import sha256_str
 from snpdb.graphs.homozygosity_percent_graph import HomozygosityPercentGraph
 
 
@@ -16,7 +16,7 @@ class NodeHomozygosityPercentGraph(HomozygosityPercentGraph):
 
     def get_params_hash(self):
         description = f"{self.node.node_version}{self.cmap}"
-        return sha1_str(description)
+        return sha256_str(description)
 
     def get_queryset(self):
         qs = super().get_queryset()  # uses self.sample_id

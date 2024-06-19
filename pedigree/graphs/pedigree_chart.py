@@ -5,7 +5,7 @@ from tempfile import NamedTemporaryFile
 
 from django.conf import settings
 
-from library.utils import sha1_str
+from library.utils import sha256_str
 from pedigree.models import PedFile
 
 
@@ -19,7 +19,7 @@ class PedigreeChart:
 
     def get_params_hash(self):
         """ This should be unique for every graph produced (from parameters) """
-        return sha1_str(str(self.ped_file_id))
+        return sha256_str(str(self.ped_file_id))
 
     def get_filename(self):
         return self._get_prefix() + self._get_extension()

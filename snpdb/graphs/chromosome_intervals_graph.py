@@ -5,7 +5,7 @@ import numpy as np
 
 from library.genomics import format_chrom
 from library.graphs.chromosomes_graph import plot_chromosomes
-from library.utils import sha1_str
+from library.utils import sha256_str
 from snpdb import models
 from snpdb.graphs.graphcache import CacheableGraph
 
@@ -20,7 +20,7 @@ class ChromosomeIntervalsGraph(CacheableGraph):
         self.genomic_intervals_collection_id = genomic_intervals_collection_id
 
     def get_params_hash(self):
-        return sha1_str(str(self.genomic_intervals_collection_id))
+        return sha256_str(str(self.genomic_intervals_collection_id))
 
     def get_chrom_xmin_xmax(self, genomic_interval_iterator):
         chrom_xmin_xmax = defaultdict(lambda: ([], []))
