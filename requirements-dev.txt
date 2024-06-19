@@ -82,5 +82,5 @@ boto3
 django-storages
 django_threadlocals
 frozendict
-pydantic
+pydantic>=2.4.0
 deepdiff
