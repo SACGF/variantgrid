@@ -41,7 +41,7 @@ dependencies:
   - requests=2.31
   - requests-oauthlib=1.3
   - scipy=1.11  # was scipy==1.8.0
-  - sqlparse=0.4
+  - sqlparse=0.5
   - toposort=1.10  # was toposort==1.7
   - Unidecode=1.3
   - boto3=1.26
