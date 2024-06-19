@@ -57,7 +57,9 @@
         {% endlabelled %}
 
         {% labelled label="ClinGen Canonical Allele ID" %}
-            <a class="hover-link" href="{{ allele_card.allele.clingen_allele.human_url }}">{{ allele.clingen_allele }}</a>
+            {% if allele_card.allele.clingen_allele %}
+                <a class="hover-link" href="{{ allele_card.allele.clingen_allele.human_url }}">{{ allele.clingen_allele }}</a>
+            {% else %}<span class="no-value">-</span>{% endif %}
         {% endlabelled %}
 
         {% if allele_card.imported_allele_infos %}
