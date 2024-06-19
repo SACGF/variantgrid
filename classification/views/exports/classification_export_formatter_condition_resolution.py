@@ -6,6 +6,7 @@ from classification.models import ClassificationModification
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
+from genes.models import GeneSymbol
 from library.utils import ExportRow, export_column, delimited_row
 from ontology.models import OntologyTerm, OntologyRelation, OntologyImportSource, \
     PanelAppClassification, OntologySnake, OntologyService, GeneDiseaseClassification, \
@@ -13,10 +14,17 @@ from ontology.models import OntologyTerm, OntologyRelation, OntologyImportSource
 
 
 @dataclass(frozen=True)
+class GeneSymbolCondition:
+    gene_symbol: GeneSymbol
+    condition: OntologyTerm
+
+
+
+@dataclass(frozen=True)
 class ClassificationConditionResolutionRow(ExportRow):
     classification: ClassificationModification
     condition: OntologyTerm
-    gene_symbol: str
+    gene_symbol: GeneSymbol
     panel_app_strength: Optional[set[PanelAppClassification]]
     gencc_strength: Optional[set[GeneDiseaseClassification]]
     mondo_strength: Optional[set[str]]
@@ -113,7 +121,7 @@ class ClassificationExportFormatterConditionResolution(ClassificationExportForma
 
     def row(self, allele_data: AlleleData) -> list[str]:
         rows: list[str] = []
-        last_row: Optional[ClassificationConditionResolutionRow] = None
+        cache: dict[GeneSymbolCondition, ClassificationConditionResolutionRow] = {}
         for vcm in allele_data.cms:
             if condition_obj := vcm.classification.condition_resolution_obj:
                 if not condition_obj.is_multi_condition and condition_obj.terms and condition_obj.terms[0].ontology_service in {OntologyService.MONDO, OntologyService.OMIM}:
@@ -122,9 +130,11 @@ class ClassificationExportFormatterConditionResolution(ClassificationExportForma
                     for gene_symbol in vcm.classification.allele_info.gene_symbols:
 
                         row: ClassificationConditionResolutionRow
+                        key = GeneSymbolCondition(gene_symbol=gene_symbol, condition=condition_term)
+
                         # can re-use the last row as cache
-                        if last_row and last_row.condition == condition_term and last_row.gene_symbol == gene_symbol:
-                            row = last_row.duplicate_for(vcm)
+                        if cached_row := cache.get(key):
+                            row = cached_row.duplicate_for(vcm)
                         else:
                             # on the off chance there are 2 gene symbols, we can make results for each gene symbol individually
                             all_relationships = []
@@ -152,6 +162,7 @@ class ClassificationExportFormatterConditionResolution(ClassificationExportForma
                             row = ClassificationConditionResolutionRow(vcm, condition_term, gene_symbol,
                                                                        panel_app_strength, gencc_strength,
                                                                        mondo_strength, panel_app_relationship_strs)
+                            cache[key] = row
 
                         rows.append(delimited_row(row.to_csv()))
 
