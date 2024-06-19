@@ -104,7 +104,7 @@
                                                 <td>{{ allele_liftover.liftover.get_conversion_tool_display }}</td>
                                                 <td>{{ allele_liftover.get_status_display }}</td>
                                                 <td><a href="{{ allele_liftover.liftover.get_absolute_url }}" class="hover-link">View LiftoverRun {{ allele_liftover.liftover_id }}</a></a></td>
-                                                <td>{{ allele_liftover.error|dash_if_empty }}</td>
+                                                <td>{{ allele_liftover.error_tidy|dash_if_empty }}</td>
                                             </tr>
                                         {% endfor %}
                                     </tbody>
@@ -190,7 +190,7 @@
                                 liftover attempt
                             {% endif %}
                             via {{ vc.last_failed_liftover.get_conversion_tool_display }}
-                            <br/>(last updated {% timestamp vc.last_failed_liftover.modified time_ago=True %})
+                            <br/><span class="text-muted">last updated {% timestamp vc.last_failed_liftover.modified time_ago=True %}</span>
                         {% endif %}
                     </td>
                     {% endfor %}

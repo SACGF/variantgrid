@@ -1006,6 +1006,13 @@ class AlleleLiftover(models.Model):
     error_message = models.TextField()  # This will be deleted
     error = models.JSONField(null=True)  # Only set on error - uses "message" key in dict
 
+    def error_tidy(self) -> str | dict:
+        # If the JSON is just message=, grab the message
+        if error_json := self.error:
+            if message := error_json.get("message") and len(error_json.keys()) == 1:
+                return message
+            return error_json
+
     class Meta:
         unique_together = ('liftover', 'allele')
 
