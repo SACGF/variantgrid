@@ -103,8 +103,8 @@
                                                 <td>{% timestamp allele_liftover.liftover.created %}</td>
                                                 <td>{{ allele_liftover.liftover.get_conversion_tool_display }}</td>
                                                 <td>{{ allele_liftover.get_status_display }}</td>
-                                                <td><a href="{{ allele_liftover.liftover.get_absolute_url }}">View LiftoverRun {{ allele_liftover.liftover_id }}</a></a></td>
-                                                <td>{{ allele_liftover.error }}</td>
+                                                <td><a href="{{ allele_liftover.liftover.get_absolute_url }}" class="hover-link">View LiftoverRun {{ allele_liftover.liftover_id }}</a></a></td>
+                                                <td>{{ allele_liftover.error|dash_if_empty }}</td>
                                             </tr>
                                         {% endfor %}
                                     </tbody>
@@ -112,14 +112,14 @@
                             {% endif %}
 
                         {% endfor %}
-                        <h5>ClinGen API Response</h5>
+                        <h4>ClinGen API Response</h4>
 
                         {% if clingen_error %}
-                            <h4>Error retrieving ClinGen Allele</h4>
-                            {% labelled hint="tiny" label='Message' %}{{ clingen_error.message }}{% endlabelled %}
-                            {% labelled hint="tiny" label='Type' %}{{ clingen_error.errorType }}{% endlabelled %}
-                            {% labelled hint="tiny" label='Input' %}{{ clingen_error.inputLine }}{% endlabelled %}
-                            {% labelled hint="tiny" label='Description' %}{{ clingen_error.description }}{% endlabelled %}
+                            <h5>Error retrieving ClinGen Allele</h5>
+                            {% labelled label='Message' %}{{ clingen_error.message }}{% endlabelled %}
+                            {% labelled label='Type' %}{{ clingen_error.errorType }}{% endlabelled %}
+                            {% labelled label='Input' %}{{ clingen_error.inputLine }}{% endlabelled %}
+                            {% labelled label='Description' %}{{ clingen_error.description }}{% endlabelled %}
                         {% endif %}
 
                         {% if allele_merge_log_qs.exists %}

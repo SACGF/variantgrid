@@ -70,7 +70,7 @@
             <div class="card-body">
                 {% if status_counts %}
                     {% for status, count in status_counts.items %}
-                        {% labelled label=status %}{{ count }}{% endlabelled %}
+                        {% labelled label=status|add:' Count' %}{{ count }}{% endlabelled %}
                     {% endfor %}
                 {% else %}
                     No linked allele liftovers

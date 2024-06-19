@@ -523,7 +523,7 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
             RichColumn(key="allele", orderable=True,
                        renderer=self.render_allele, client_renderer='TableFormat.linkUrl'),
             RichColumn(key="status", label="Status", renderer=self.render_status, orderable=True),
-            RichColumn(key="error", label="Error", renderer=self.render_json, orderable=True),
+            RichColumn(key="error", label="Error", renderer=self.render_error_json, orderable=True),
         ]
 
     def render_allele(self, row: dict[str, Any]) -> JsonDataType:
@@ -557,8 +557,10 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
 
         return label
 
-    def render_json(self, row: dict[str, Any]) -> JsonDataType:
+    def render_error_json(self, row: dict[str, Any]) -> JsonDataType:
         js = row["error"]
+        if "message" in js and len(js.keys()) == 1:
+            return js.get("message")
         return jsonify_for_js(js, pretty=True)
 
 
