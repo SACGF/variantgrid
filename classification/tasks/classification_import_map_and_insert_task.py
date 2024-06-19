@@ -113,6 +113,9 @@ class ClassificationImportMapInsertTask(Task):
             if include_source:
                 args.append("--include_source")
             if file_type_override := upload_file.file_type_override:
+                if file_type_override not in settings.CLASSIFICATION_OMNI_IMPORTER_PARSERS:
+                    valid_parsers = ",".join(settings.OMNI_IMPORTER_PARSERS)
+                    raise ValueError(f'{file_type_override=} must be one of {valid_parsers}')
                 args += ["--file_type", shlex.quote(file_type_override)]
 
             print(" ".join(args))

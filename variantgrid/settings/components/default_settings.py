@@ -498,6 +498,7 @@ CLASSIFICATION_OMNI_IMPORTER_DATA_DIR = os.path.join(PRIVATE_DATA_ROOT, "lab_cla
 CLASSIFICATION_OMNI_IMPORTER_PUBLISH_LEVEL = "lab"  # change this to logged_in_users for prod environments
 CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE = False  # change this to True for dev environments (too dangerous to set to True by default)
 CLASSIFICATION_OMNI_IMPORTER_PYTHON_COMMAND = PYTHON_COMMAND
+CLASSIFICATION_OMNI_IMPORTER_PARSERS = ["vg_tags", "mvl_patch"]
 
 CLASSIFICATION_SUPPORTED_TRANSCRIPTS = {"NR", "NM", "NC", "ENST", "LRG_", "XR"}
 CLASSIFICATION_MATCH_VARIANTS = True  # exists only so we can turn it off during testing

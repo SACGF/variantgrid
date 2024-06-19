@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Iterable, Any, Optional
 
 import django
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -160,7 +161,6 @@ class FileMeta:
 
 
 class UploadedClassificationsUnmappedView(View):
-
     def get(self, request, **kwargs):
         lab_picker = LabPickerData.from_request(
             request=request,
@@ -218,11 +218,18 @@ class UploadedClassificationsUnmappedView(View):
 
                 status = UploadedClassificationsUnmappedStatus.Pending if lab.upload_automatic else UploadedClassificationsUnmappedStatus.Manual
                 user: User = request.user
+                if file_type_override := request.POST.get('file-type-override', ""):
+                    if not user.is_superuser:
+                        raise PermissionDenied("'file-type-override' can only be set by admin")
+                    if file_type_override not in settings.CLASSIFICATION_OMNI_IMPORTER_PARSERS:
+                        valid_parsers = ",".join(settings.OMNI_IMPORTER_PARSERS)
+                        raise ValueError(f'{file_type_override=} must be one of {valid_parsers}')
+
                 uploaded_file = UploadedClassificationsUnmapped.objects.create(
                     url=sub_file.clean_url,
                     filename=sub_file.filename,
-                    file_type_override=request.POST.get('file-type-override') or "",
-                    user=request.user,
+                    file_type_override=file_type_override,
+                    user=user,
                     lab=lab,
                     status=status,
                     effective_modified=sub_file.modified,
