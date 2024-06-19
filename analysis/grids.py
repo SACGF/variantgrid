@@ -23,7 +23,7 @@ from library.jqgrid.jqgrid_sql import get_overrides
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
 from library.unit_percent import get_allele_frequency_formatter
-from library.utils import md5sum_str, update_dict_of_dict_values, JsonDataType
+from library.utils import update_dict_of_dict_values, JsonDataType, sha256_str
 from ontology.grids import AbstractOntologyGenesGrid
 from ontology.models import OntologyTermRelation, GeneDiseaseClassification, OntologyVersion
 from patients.models_enums import Zygosity
@@ -92,8 +92,7 @@ class VariantGrid(AbstractVariantGrid):
         sample_ids = node.get_sample_ids()
         if sample_ids:
             samples_str = ''.join([str(s) for s in sample_ids])
-            zygosity_samples_hash = md5sum_str(samples_str)
-            post_data['zygosity_samples_hash'] = zygosity_samples_hash
+            post_data['zygosity_samples_hash'] = sha256_str(samples_str)
         self.extra_config['postData'] = post_data
 
     def get_colmodels(self, remove_server_side_only=False):

@@ -498,6 +498,9 @@ class Sequence(models.Model):
         The easiest solution is to md5sum seq and make the constraint on that. Another possible solution is to use
         Gist indexes but that requires installing the btree_gist extension (requires postgres Admin rights).
         Django 3 has ExclusionConstraint, Postgres contrib has BtreeGistExtension to add via migration
+
+        Note: Even after the introduction of symbolic alts, there are still some really long sequences in here (~10kb)
+        due to large substitutions which we don't represent symbolically
     """
     seq = models.TextField()
     seq_md5_hash = models.CharField(max_length=32, unique=True)
