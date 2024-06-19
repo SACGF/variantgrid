@@ -11,7 +11,7 @@ ConfigArgParse==1.5.3
 coreapi==2.3.3
 crispy-bootstrap4==2022.1
 cyvcf2==0.30.28
-Django==4.2.10
+Django==4.2.11
 django-amazon-ses==4.0.1
 django-auditlog==3.0.0
 django_autocomplete_light==3.9.1
