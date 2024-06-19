@@ -37,8 +37,8 @@ def async_graph(graph_class_name, *args):
     generator = cacheablegraph.get_name()
     params_hash = cacheablegraph.get_params_hash()
 
-    (cached_graph, created) = CachedGeneratedFile.objects.get_or_create(generator=generator,
-                                                                        params_hash=params_hash)
+    cached_graph, created = CachedGeneratedFile.objects.get_or_create(generator=generator,
+                                                                      params_hash=params_hash)
     if created or not cached_graph.task_id:
         logging.debug("Launching Celery Job for graph: generator=%s, params_hash=%s", generator, params_hash)
         async_result = generate_graph.delay(graph_class_name, *args)  # @UndefinedVariable
