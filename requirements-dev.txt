@@ -73,7 +73,7 @@ requests_oauthlib
 rollbar
 scipy
 simplejson
-sqlparse
+sqlparse>=0.5.0
 toposort
 Unidecode
 # below are only required for environments directly integrating with s3
