@@ -46,6 +46,13 @@ class ClassificationImportMapInsertTask(Task):
             raise ValueError("Require settings.CLASSIFICATION_OMNI_IMPORTER_APP_DIR to be set to do automated imports")
 
     @staticmethod
+    def validate_file_type_override(file_type_override: str) -> str:
+        if file_type_override not in settings.CLASSIFICATION_OMNI_IMPORTER_PARSERS:
+            valid_parsers = ",".join(settings.OMNI_IMPORTER_PARSERS)
+            raise ValueError(f'{file_type_override=} must be one of {valid_parsers}')
+        return file_type_override
+
+    @staticmethod
     def update_status(upload_file: UploadedClassificationsUnmapped, status: UploadedClassificationsUnmappedStatus):
         upload_file.status = status
         upload_file.save()
@@ -112,10 +119,8 @@ class ClassificationImportMapInsertTask(Task):
             ]
             if include_source:
                 args.append("--include_source")
-            if file_type_override := upload_file.file_type_override:
-                if file_type_override not in settings.CLASSIFICATION_OMNI_IMPORTER_PARSERS:
-                    valid_parsers = ",".join(settings.OMNI_IMPORTER_PARSERS)
-                    raise ValueError(f'{file_type_override=} must be one of {valid_parsers}')
+            if file_type_override_raw := upload_file.file_type_override:
+                file_type_override = self.validate_file_type_override(file_type_override_raw)
                 args += ["--file_type", shlex.quote(file_type_override)]
 
             print(" ".join(args))

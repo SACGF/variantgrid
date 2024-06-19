@@ -218,12 +218,11 @@ class UploadedClassificationsUnmappedView(View):
 
                 status = UploadedClassificationsUnmappedStatus.Pending if lab.upload_automatic else UploadedClassificationsUnmappedStatus.Manual
                 user: User = request.user
-                if file_type_override := request.POST.get('file-type-override', ""):
+                file_type_override = ""
+                if file_type_override_raw := request.POST.get('file-type-override', ""):
                     if not user.is_superuser:
                         raise PermissionDenied("'file-type-override' can only be set by admin")
-                    if file_type_override not in settings.CLASSIFICATION_OMNI_IMPORTER_PARSERS:
-                        valid_parsers = ",".join(settings.OMNI_IMPORTER_PARSERS)
-                        raise ValueError(f'{file_type_override=} must be one of {valid_parsers}')
+                    file_type_override = ClassificationImportMapInsertTask.validate_file_type_override(file_type_override_raw)
 
                 uploaded_file = UploadedClassificationsUnmapped.objects.create(
                     url=sub_file.clean_url,
