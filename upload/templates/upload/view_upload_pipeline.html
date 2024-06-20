@@ -242,12 +242,13 @@
             <div class="card-footer">
                 <form id="retry-upload-form" action={% url 'upload_retry_import' upload_pipeline.pk %} method="post">
                     {% csrf_token %}
-                    {% if allow_retry_import %}
-                        <button class="btn btn-primary" id='retry-import-button' type='submit'>Retry Import</button>
-                    {% endif %}
-                    <button class="btn btn-danger" id='delete-button' type='button'>Delete</button>
-                    <div id="delete-container">
-                    <!-- error messages set in JSON -->
+                    <div class="buttons-bar">
+                        {% if allow_retry_import %}
+                            <button class="btn btn-primary" id='retry-import-button' type='submit'>Retry Import</button>
+                        {% endif %}
+                        <div class="spacer"></div>
+                        <button class="btn btn-danger" id='delete-button' type='button'>Delete</button>
+                        <div id="delete-container"> <!-- error messages set in JSON --> </div>
                     </div>
                 </form>
             </div>

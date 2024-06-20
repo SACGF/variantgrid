@@ -1280,6 +1280,19 @@ form label {
   width: 100%;
 }
 
+.buttons-bar {
+  display: flex;
+  flex-direction: row;
+}
+
+.buttons-bar {
+  min-width: 100px;
+}
+
+.buttons-bar .btn + .btn {
+  margin-left: 40px;
+}
+
 .card-footer .btn {
   min-width: 100px;
 }
