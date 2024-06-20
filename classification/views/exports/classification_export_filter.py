@@ -298,6 +298,8 @@ class ClassificationFilter:
     def last_modified_header(self) -> str:
         return self._last_modified
 
+    IGNORE_PARAMS = {"csrfmiddlewaretoken", }
+
     def record_request_details(self, request):
         if not self.path_info:
             self.path_info = request.path_info
@@ -305,10 +307,12 @@ class ClassificationFilter:
             request_params = {}
             if GET := request.GET:
                 for key, value in GET.items():
-                    request_params[key] = value
+                    if key not in ClassificationFilter.IGNORE_PARAMS:
+                        request_params[key] = value
             if POST := request.POST:
                 for key, value in POST.items():
-                    request_params[key] = value
+                    if key not in ClassificationFilter.IGNORE_PARAMS:
+                        request_params[key] = value
             self.request_params = request_params
 
     @cached_property
