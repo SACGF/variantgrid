@@ -10,8 +10,20 @@ from snpdb.admin_utils import ModelAdminBasics, GuardedModelAdminBasics, admin_l
     admin_action
 from snpdb.liftover import liftover_alleles
 from snpdb.models import Allele, VariantAllele, ClinVarKey, ClinVarKeyExcludePattern, UserSettingsOverride, \
-    LabUserSettingsOverride, OrganizationUserSettingsOverride, UserPageAck, Organization, Lab, GlobalSettings, Variant
+    LabUserSettingsOverride, OrganizationUserSettingsOverride, UserPageAck, Organization, Lab, GlobalSettings, Variant, \
+    AlleleLiftover
 from snpdb.models.models_genome import GenomeBuild
+
+
+@admin.register(AlleleLiftover)
+class AlleleLiftoverAdmin(ModelAdminBasics):
+    list_display = ("pk", "allele", "error_tidy_message", "status")
+    list_filter = ("status", )
+    search_fields = ('pk', 'allele__id')
+
+    @admin_list_column("Error", order_field='error__message')
+    def error_tidy_message(self, obj: AlleleLiftover):
+        return obj.error_tidy()
 
 
 @admin.register(Variant)

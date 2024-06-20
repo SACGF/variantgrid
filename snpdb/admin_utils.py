@@ -120,7 +120,7 @@ def admin_list_column(
         short_description: Optional[str] = None,
         order_field: Optional[str] = None,
         is_boolean: bool = False,
-        limit: int = 30
+        limit: int = 100
         ):
     """
     Decorator, mark a function as acting like an admin list column if class extends ModelAdminBasics
