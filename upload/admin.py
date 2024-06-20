@@ -44,6 +44,7 @@ class UploadStepInline(admin.TabularInline):
     model = UploadStep
     fields = ['id', 'name', 'status']
     show_change_link = True
+    ordering = ('sort_order', )
 
     def has_add_permission(self, request, obj):
         return False
