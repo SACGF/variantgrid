@@ -19,7 +19,9 @@ class Command(BaseCommand):
         for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
             genome_build_matchers[genome_build] = HGVSMatcher(genome_build)
 
-        for allele_info in ImportedAlleleInfo.objects.all():
+        for row_index, allele_info in enumerate(ImportedAlleleInfo.objects.iterator()):
+            if row_index % 1000 == 0:
+                print(f"Processed {row_index} rows")
             try:
                 use_hgvs = allele_info.imported_c_hgvs or allele_info.imported_g_hgvs
                 hgvs_matcher = genome_build_matchers[allele_info.imported_genome_build_patch_version.genome_build]
@@ -31,3 +33,4 @@ class Command(BaseCommand):
             except:
                 if allele_info.variant_coordinate:
                     print(f"Allele Info {allele_info.pk} could not resolve, though it currently has a cached variant coordinate")
+        print(f"Processed {row_index} rows")
