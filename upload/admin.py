@@ -1,10 +1,12 @@
 from django.contrib import admin
 from django.contrib.auth.models import User
+from django.utils.safestring import SafeString
 
 from snpdb.admin_utils import ModelAdminBasics, admin_list_column
 from snpdb.models import ProcessingStatus
 from snpdb.user_settings_manager import UserSettingsManager
-from .models import UploadStep, UploadPipeline, UploadedFile, UploadedVCF, UploadedClassificationImport
+from .models import UploadStep, UploadPipeline, UploadedFile, UploadedVCF, UploadedClassificationImport, \
+    ModifiedImportedVariant
 
 
 class UploadStepStatusFilter(admin.SimpleListFilter):
@@ -58,10 +60,30 @@ class UploadFileAdmin(ModelAdminBasics):
     list_display = ('name', 'file_type', 'path', 'uploaded_file')
 
 
+@admin.register(ModifiedImportedVariant)
+class ModifiedImportedVariant(ModelAdminBasics):
+    list_display = ('id', 'tool', 'allele', 'old_variant', 'old_variant_formatted', 'new_variant')
+
+    @admin_list_column("Tool", order_field='import_info__upload_step__tool_version')
+    def tool(self, obj: ModifiedImportedVariant):
+        return obj.import_info.upload_step.tool_version
+
+    @admin_list_column("Allele", order_field='variant')
+    def allele(self, obj: ModifiedImportedVariant):
+        if variant := obj.variant:
+            if allele := variant.allele:
+                href = allele.get_absolute_url()
+                return SafeString(f"<a href=\"{href}\">{allele}</a>")
+    @admin_list_column("New Variant", order_field='variant')
+    def new_variant(self, obj: ModifiedImportedVariant):
+        return obj.variant
+
+
 @admin.register(UploadPipeline)
 class UploadPipelineAdmin(ModelAdminBasics):
     list_display = ('id', 'uploaded_file_name', 'uploaded_file_date', 'status')
     inlines = (UploadStepInline, )
+    search_fields = ('id', 'uploaded_file__name')
 
     @admin_list_column('File Name', order_field='uploaded_file__name')
     def uploaded_file_name(self, obj: UploadPipeline):
