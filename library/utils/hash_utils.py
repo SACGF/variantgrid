@@ -34,5 +34,6 @@ def file_sha256sum(filename: str) -> str:
     return hasher.hexdigest()
 
 
-def secure_uuid4() -> uuid.UUID:
-    return uuid.UUID(bytes=secrets.token_bytes(16))
+def secure_random_string() -> str:
+    random_bytes = secrets.token_bytes(32)
+    return hashlib.sha256(random_bytes).hexdigest()

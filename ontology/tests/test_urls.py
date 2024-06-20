@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase
-from library.utils import secure_uuid4
+from library.utils import secure_random_string
 from ontology.models import OntologyImport, OntologyService, OntologyTerm
 from ontology.tests.test_data_ontology import create_test_ontology_version
 from snpdb.models import GenomeBuild
@@ -19,10 +19,10 @@ class Test(URLTestCase):
         cls.user = User.objects.get_or_create(username='testuser')[0]
         ontology_import = OntologyImport.objects.get_or_create(import_source="fake", processed_date=timezone.now())[0]
         index = 0
-        cls.hpo = OntologyTerm.objects.get_or_create(id="HPO:0000001", name=secure_uuid4(), from_import=ontology_import,
+        cls.hpo = OntologyTerm.objects.get_or_create(id="HPO:0000001", name=secure_random_string(), from_import=ontology_import,
                                                      index=index, ontology_service=OntologyService.HPO)[0]
         index += 1
-        cls.omim = OntologyTerm.objects.get_or_create(id="OMIM:000001", name=secure_uuid4(), from_import=ontology_import,
+        cls.omim = OntologyTerm.objects.get_or_create(id="OMIM:000001", name=secure_random_string(), from_import=ontology_import,
                                                       index=index, ontology_service=OntologyService.OMIM)[0]
 
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
