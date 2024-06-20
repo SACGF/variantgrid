@@ -1,4 +1,6 @@
 import hashlib
+import secrets
+import uuid
 
 
 def string_deterministic_hash(s: str) -> int:
@@ -30,3 +32,7 @@ def file_sha256sum(filename: str) -> str:
     with open(filename, "rb") as f:
         hasher.update(f.read())
     return hasher.hexdigest()
+
+
+def secure_uuid4() -> uuid.UUID:
+    return uuid.UUID(bytes=secrets.token_bytes(16))
