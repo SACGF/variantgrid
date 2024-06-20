@@ -21,7 +21,7 @@ def md5sum_str(s: str) -> str:
     return _hash_str(hashlib.md5, s)
 
 
-def sha256_str(s: str) -> str:
+def sha256sum_str(s: str) -> str:
     return _hash_str(hashlib.sha256, s)
 
 

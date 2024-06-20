@@ -1,5 +1,5 @@
 from analysis.models import AnalysisNode
-from library.utils import sha256_str
+from library.utils import sha256sum_str
 from snpdb.graphs.chromosome_density_graph import AbstractChromosomeDensityGraph
 
 
@@ -12,7 +12,7 @@ class ChromosomeDensityGraph(AbstractChromosomeDensityGraph):
 
     def get_params_hash(self):
         description = f"{self.node.node_version}.{self.cmap}"
-        return sha256_str(description)
+        return sha256sum_str(description)
 
     def get_queryset(self):
         return self.node.get_queryset()

@@ -12,7 +12,7 @@ from django.db.models import Q, Value, TextField
 from django.db.models.aggregates import Max
 from django.db.models.functions import Concat
 
-from library.utils import md5sum_str
+from library.utils import sha256sum_str
 from snpdb.models import Variant, Locus, Sequence, GenomeBuild, VariantCoordinate
 from upload.vcf import sql_copy_files
 
@@ -35,7 +35,7 @@ class VariantPKLookup:
             self.chrom_contig_id_mappings = None
         self.sequence_pk_by_seq = Sequence.get_pk_by_seq()
         defaults = {
-            "seq_md5_hash": md5sum_str(Variant.REFERENCE_ALT),
+            "seq_sha256_hash": sha256sum_str(Variant.REFERENCE_ALT),
         }
         self.reference_seq_id = Sequence.objects.get_or_create(seq=Variant.REFERENCE_ALT,
                                                                defaults=defaults)[0].pk
@@ -170,7 +170,7 @@ class VariantPKLookup:
             # bulk create not returning pks, so have to retrieve any new ones ourselves
             max_dict = Sequence.objects.all().aggregate(highest_pk=Max("pk"))
             old_highest_pk = max_dict["highest_pk"] or 0
-            sequences = [Sequence(seq=seq, seq_md5_hash=md5sum_str(seq)) for seq in unknown_sequences]
+            sequences = [Sequence(seq=seq, seq_sha256_hash=sha256sum_str(seq)) for seq in unknown_sequences]
             Sequence.objects.bulk_create(sequences, ignore_conflicts=True)
             self.sequence_pk_by_seq.update(Sequence.get_pk_by_seq(Q(pk__gt=old_highest_pk)))
 

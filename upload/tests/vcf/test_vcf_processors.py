@@ -6,7 +6,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from annotation.fake_annotation import get_fake_annotation_version
-from snpdb.models import ImportSource, Sequence, md5sum_str
+from library.utils import sha256sum_str
+from snpdb.models import ImportSource, Sequence
 from upload.models import UploadedFile, UploadPipeline, UploadedVCF, UploadStep, UploadedFileTypes
 from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
 from upload.vcf.bulk_no_genotype_vcf_processor import BulkNoGenotypeVCFProcessor
@@ -22,7 +23,7 @@ class TestVCFProcessors(TestCase):
         super().setUpTestData()
 
         for base in "GATC":
-            Sequence.objects.get_or_create(seq=base, seq_md5_hash=md5sum_str(base))
+            Sequence.objects.get_or_create(seq=base, seq_sha256_hash=sha256sum_str(base))
 
     @classmethod
     def _create_fake_upload_step_and_vcf(cls, vcf_filename, vcf_reader) -> tuple[UploadStep, UploadedVCF]:

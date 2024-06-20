@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from analysis.models import AnalysisNode
-from library.utils import sha256_str
+from library.utils import sha256sum_str
 from snpdb.graphs.graphcache import CacheableGraph
 
 
@@ -16,7 +16,7 @@ class ColumnBoxplotGraph(CacheableGraph):
 
     def get_params_hash(self):
         description = f"{self.node.node_version}{self.variant_column}"
-        return sha256_str(description)
+        return sha256sum_str(description)
 
     def plot(self, ax):
         qs = self.node.get_queryset()

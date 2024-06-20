@@ -26,7 +26,7 @@ from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
-from library.utils import md5sum_str, FormerTuple
+from library.utils import FormerTuple, sha256sum_str
 from snpdb.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
@@ -503,11 +503,11 @@ class Sequence(models.Model):
         due to large substitutions which we don't represent symbolically
     """
     seq = models.TextField()
-    seq_md5_hash = models.CharField(max_length=32, unique=True)
+    seq_sha256_hash = models.TextField(null=True, unique=True)
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
-        if not self.seq_md5_hash:
-            self.seq_md5_hash = md5sum_str(self.seq)
+        if not self.seq_sha256_hash:
+            self.seq_sha256_hash = sha256sum_str(self.seq)
         super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
 
     @staticmethod

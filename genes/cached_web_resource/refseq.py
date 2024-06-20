@@ -13,7 +13,7 @@ from genes.models import Gene, GeneSymbol, GeneSymbolAlias, TranscriptVersionSeq
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import MINUTE_SECS
 from library.django_utils import chunked_queryset
-from library.utils import sha256_str
+from library.utils import sha256sum_str
 
 
 def store_refseq_gene_summary_from_web(cached_web_resource: CachedWebResource):
@@ -125,7 +125,7 @@ def store_refseq_sequence_info_from_web(cached_web_resource: CachedWebResource):
 
     annotation_consortium = AnnotationConsortium.REFSEQ
 
-    sha256_hash = sha256_str(SEQUENCE_INFO_URL)
+    sha256_hash = sha256sum_str(SEQUENCE_INFO_URL)
     if existing_import := TranscriptVersionSequenceInfoFastaFileImport.objects.filter(sha256_hash=sha256_hash).first():
         print(f"Deleting existing TranscriptVersionSequenceInfos for fasta import {sha256_hash}")
         existing_import.delete()

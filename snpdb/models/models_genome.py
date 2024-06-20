@@ -385,7 +385,7 @@ class GenomeFasta(models.Model):
     """ Incoming VCF chroms are mapped to contigs from VCF header then converted to fasta names (for VT) """
     filename = models.TextField(unique=True)
     index_filename = models.TextField()
-    index_md5sum = models.TextField()
+    index_sha256sum = models.TextField()
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
 

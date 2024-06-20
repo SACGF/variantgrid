@@ -2,7 +2,7 @@ import logging
 
 import pandas as pd
 
-from library.utils.file_utils import file_md5sum
+from library.utils import file_sha256sum
 
 
 def load_genome_fasta_index(genome_fasta: 'GenomeFasta', genome_build: 'GenomeBuild'):
@@ -12,7 +12,7 @@ def load_genome_fasta_index(genome_fasta: 'GenomeFasta', genome_build: 'GenomeBu
 
     index_filename = genome_fasta.filename + ".fai"
     genome_fasta.index_filename = index_filename
-    genome_fasta.index_md5sum = file_md5sum(index_filename)
+    genome_fasta.index_sha256sum = file_sha256sum(index_filename)
     genome_fasta.genome_build = genome_build
     genome_fasta.annotation_consortium = genome_build.annotation_consortium
     genome_fasta.save()

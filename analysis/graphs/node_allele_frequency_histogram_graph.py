@@ -3,7 +3,7 @@ from typing import Optional
 from django.db.models import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
-from library.utils import sha256_str
+from library.utils import sha256sum_str
 from snpdb.graphs.allele_frequency_graph import AlleleFrequencyHistogramGraph
 
 
@@ -21,7 +21,7 @@ class NodeAlleleFrequencyHistogramGraph(AlleleFrequencyHistogramGraph):
 
     def get_params_hash(self):
         description = f"{self.node.node_version}"
-        return sha256_str(description)
+        return sha256sum_str(description)
 
     def _get_q(self) -> Optional[Q]:
         return Q(pk__in=self.node.get_queryset())

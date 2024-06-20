@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import GeneListCategory, GeneList, CustomTextGeneList
-from library.utils import sha256_str
+from library.utils import sha256sum_str
 from snpdb.models import ImportStatus
 
 
@@ -14,7 +14,7 @@ def create_custom_text_gene_list(custom_text_gene_list: CustomTextGeneList,
     if gene_matcher is None:
         gene_matcher = GeneSymbolMatcher()
 
-    sha256_hash = sha256_str(custom_text_gene_list.text)
+    sha256_hash = sha256sum_str(custom_text_gene_list.text)
     if custom_text_gene_list.sha256_hash == sha256_hash:
         return  # No meaningful change
 

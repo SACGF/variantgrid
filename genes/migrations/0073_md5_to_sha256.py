@@ -3,7 +3,7 @@ import os
 
 from django.db import migrations
 
-from library.utils import file_sha256sum, sha256_str
+from library.utils import file_sha256sum, sha256sum_str
 
 
 def _md5_to_sha256(apps, schema_editor):
@@ -52,7 +52,7 @@ def _md5_to_sha256(apps, schema_editor):
             ffi.sha256_hash = precalc
         else:
             if ffi.filename.startswith("http"):  # We switched to using url
-                ffi.sha256_hash = sha256_str(ffi.filename)
+                ffi.sha256_hash = sha256sum_str(ffi.filename)
             elif os.path.exists(ffi.filename):
                 ffi.sha256_hash = file_sha256sum(ffi.filename)
             else:
@@ -66,7 +66,7 @@ def _md5_to_sha256(apps, schema_editor):
     ctgl_records = []
     for ctgl in CustomTextGeneList.objects.all():
         # md5_hash -> sha256_hash (from text)
-        ctgl.sha256_hash = sha256_str(ctgl.text)
+        ctgl.sha256_hash = sha256sum_str(ctgl.text)
         ctgl_records.append(ctgl)
     if ctgl_records:
         CustomTextGeneList.objects.bulk_update(ctgl_records, ['sha256_hash'])

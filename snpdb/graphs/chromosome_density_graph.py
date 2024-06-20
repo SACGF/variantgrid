@@ -7,7 +7,7 @@ from matplotlib import cm
 
 from library.genomics import get_genomic_size_description
 from library.graphs.chromosomes_graph import plot_chromosomes
-from library.utils import sha256_str
+from library.utils import sha256sum_str
 from library.utils.database_utils import get_queryset_select_from_where_parts
 from patients.models_enums import Zygosity
 from snpdb.graphs.graphcache import CacheableGraph
@@ -134,7 +134,7 @@ class SampleChromosomeDensityGraph(AbstractChromosomeDensityGraph):
 
     def get_params_hash(self):
         description = f"{self.sample.pk}.{self.cmap}"
-        return sha256_str(description)
+        return sha256sum_str(description)
 
     def get_queryset(self):
         qs = self.sample.get_variant_qs()
