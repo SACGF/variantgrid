@@ -151,6 +151,7 @@ _entire_until_space = re.compile(r'(.*?)(?:[)]|\s|$|[.] )')
 
 
 class DbRefRegexes:
+    MAX_TEXT_SIZE = 100_000
 
     def __init__(self, regexes: list[DbRefRegex]):
         self.regexes = regexes
@@ -230,6 +231,11 @@ class DbRefRegexes:
                 if append_result_if_length(db_regex, match):
                     find_from = match.end(0)
                     while True:
+
+                        search_size = len(text) - find_from
+                        if search_size > self.MAX_TEXT_SIZE:
+                            raise ValueError(f"Maximum search text length ({self.MAX_TEXT_SIZE}) exceeded")
+
                         match = _num_repeat_regex.match(text, find_from)
                         if append_result_if_length(db_regex, match):
                             find_from = match.end(0)
