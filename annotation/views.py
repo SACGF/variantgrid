@@ -132,8 +132,10 @@ def _get_build_annotation_details(build_contigs, genome_build):
             annotation_details["clinvar"] = f"{clinvar_counts} ClinVar records"
 
         clinvar_counts = av.get_clinvar().count()
-        annotation_sub_components = [reference_ok, genes_and_transcripts, gene_annotation_release,
-                                     gene_annotation_counts, clinvar_counts]
+        annotation_sub_components = [reference_ok, genes_and_transcripts, gene_annotation_release, clinvar_counts]
+        if settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED:
+            annotation_sub_components.append(gene_annotation_counts)
+
         if settings.SOMALIER.get("enabled"):
             somalier_cfg = SomalierConfig()
             try:
