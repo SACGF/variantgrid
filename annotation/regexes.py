@@ -231,9 +231,7 @@ class DbRefRegexes:
                 if append_result_if_length(db_regex, match):
                     find_from = match.end(0)
                     while True:
-
-                        search_size = len(text) - find_from
-                        if search_size > self.MAX_TEXT_SIZE:
+                        if len(text) - find_from > self.MAX_TEXT_SIZE:
                             raise ValueError(f"Maximum search text length ({self.MAX_TEXT_SIZE}) exceeded")
 
                         match = _num_repeat_regex.match(text, find_from)
