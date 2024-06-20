@@ -6,7 +6,7 @@ from django.core.management import BaseCommand, CommandError
 from annotation.models import DBNSFPGeneAnnotationVersion, DBNSFPGeneAnnotation
 from genes.models import GeneSymbol
 from library.pandas_utils import df_nan_to_none
-from library.utils.file_utils import file_md5sum
+from library.utils import file_sha256sum
 
 
 class Command(BaseCommand):
@@ -53,9 +53,9 @@ class Command(BaseCommand):
         if not filename.endswith(".gz"):
             raise CommandError("Unknown file type, expecting .gz")
 
-        md5_hash = file_md5sum(filename)
+        sha256_hash = file_sha256sum(filename)
         dbnsfp_version, created = DBNSFPGeneAnnotationVersion.objects.get_or_create(version=version,
-                                                                                    md5_hash=md5_hash)
+                                                                                    sha256_hash=sha256_hash)
         if not created:
             if replace:
                 logging.warning("--replace option used, deleting existing objects")

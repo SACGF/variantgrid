@@ -4,7 +4,7 @@ import os
 from django.conf import settings
 from django.db import migrations
 
-from library.utils import file_md5sum
+from library.utils import file_sha256sum
 from manual.operations.manual_operations import ManualOperation
 
 
@@ -21,9 +21,8 @@ def _structuralvariantoverlap_hash_check(apps):
             # If this file is not found, it should be caught in "deployment_check" and the new one will be downloaded
             if os.path.exists(sv_filename):
                 print(f"Checking hash of '{sv_filename}'")
-                sv_hash = file_md5sum(sv_filename)
-
-                if sv_hash != "ab22ddfbd6b33a0b9faf56cc0e01c8e1":
+                sv_hash = file_sha256sum(sv_filename)
+                if sv_hash != "01e72bcf6fa9efb0346f4baf437fdd82bceaee7b6aad3921da78da4e581df6c5":
                     return True
         except KeyError:
             pass
@@ -34,8 +33,8 @@ def _structuralvariantoverlap_hash_check(apps):
             # If this file is not found, it should be caught in "deployment_check" and the new one will be downloaded
             if os.path.exists(sv_filename):
                 print(f"Checking hash of '{sv_filename}'")
-                sv_hash = file_md5sum(sv_filename)
-                if sv_hash != "ac2ae9a09bee5a7a66ab532d838a2b2e":
+                sv_hash = file_sha256sum(sv_filename)
+                if sv_hash != "a5ffd9a0c8369e2fdaeec1ae23989021d851f1e90dec9cabc0ac26a29f665775":
                     return True
         except KeyError:
             pass

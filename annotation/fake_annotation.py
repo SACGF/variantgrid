@@ -103,10 +103,10 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
                                                                           ontology_version=ontology_version,
                                                                           gnomad_import_date=timezone.now())[0]
     clinvar_version = ClinVarVersion.objects.get_or_create(filename="fake_clinvar.vcf",
-                                                           md5_hash="not_a_real_hash",
+                                                           sha256_hash="not_a_real_hash",
                                                            genome_build=genome_build)[0]
     human_protein_atlas_version = HumanProteinAtlasAnnotationVersion.objects.get_or_create(filename="fake_hpa",
-                                                                                           md5_hash="not_a_real_hash",
+                                                                                           sha256_hash="not_a_real_hash",
                                                                                            hpa_version=0.42)[0]
 
     print(f"Ontology version {ontology_version.pk}")

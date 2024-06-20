@@ -17,8 +17,8 @@ class ImportCreateVersionForClinVarVCFTask(ImportVCFStepTask):
         filename = upload_step.input_filename
         genome_build = vcf_detect_genome_build(filename)
 
-        upload_step.uploaded_file.store_md5_hash()
-        kwargs = {"md5_hash": upload_step.uploaded_file.md5_hash,
+        upload_step.uploaded_file.store_sha256_hash()
+        kwargs = {"sha256_hash": upload_step.uploaded_file.sha256_hash,
                   "genome_build": genome_build}
         clinvar_version, created = ClinVarVersion.objects.get_or_create(**kwargs)
         if created:

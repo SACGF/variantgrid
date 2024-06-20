@@ -26,7 +26,8 @@ from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.enums.log_level import LogLevel
 from library.log_utils import report_message, report_exc_info
-from library.utils.file_utils import file_md5sum, mk_path
+from library.utils import file_sha256sum
+from library.utils.file_utils import mk_path
 from seqauto.models import VCFFile, SampleSheetCombinedVCFFile, get_samples_by_sequencing_sample, VariantCaller
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF, Variant, SoftwareVersion, GenomeBuild, VariantCoordinate
@@ -42,7 +43,7 @@ class UploadedFile(TimeStampedModel):
     path = models.TextField(null=True)
     uploaded_file = models.FileField(storage=PrivateUploadStorage(),
                                      max_length=256, null=True)
-    md5_hash = models.CharField(max_length=32, null=True)
+    sha256_hash = models.TextField(null=True)
     file_type = models.CharField(max_length=1, choices=UploadedFileTypes.choices, null=True)
     import_source = models.CharField(max_length=1, choices=ImportSource.choices)
     name = models.TextField()
@@ -85,8 +86,8 @@ class UploadedFile(TimeStampedModel):
             filename = self.path
         return filename
 
-    def store_md5_hash(self):
-        self.md5_hash = file_md5sum(self.get_filename())
+    def store_sha256_hash(self):
+        self.sha256_hash = file_sha256sum(self.get_filename())
         self.save()
 
     def delete(self, using=None, keep_parents=False):

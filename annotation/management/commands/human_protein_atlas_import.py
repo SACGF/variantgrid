@@ -12,7 +12,7 @@ from annotation.models import HumanProteinAtlasAnnotationVersion, HumanProteinAt
 from genes.models import GeneSymbol, Gene
 from genes.models_enums import AnnotationConsortium
 from library.django_utils.django_file_utils import get_import_processing_filename
-from library.utils.file_utils import file_md5sum
+from library.utils import file_sha256sum
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
 
@@ -46,8 +46,8 @@ class Command(BaseCommand):
             raise CommandError("Only support v21 and later (untested as yet...)")
 
         logging.info("Hashing file...")
-        md5_hash = file_md5sum(filename)
-        hpa_version, created = HumanProteinAtlasAnnotationVersion.objects.get_or_create(md5_hash=md5_hash,
+        sha256_hash = file_sha256sum(filename)
+        hpa_version, created = HumanProteinAtlasAnnotationVersion.objects.get_or_create(sha256_hash=sha256_hash,
                                                                                         hpa_version=hpa_version_number,
                                                                                         defaults={"unit": "nTPM"})
         if created:
@@ -59,7 +59,7 @@ class Command(BaseCommand):
                 hpa_version.delete_related_objects()
                 hpa_version.create_partition()
             else:
-                message = f"HumanProteinAtlasAnnotationVersion with hd5_hash='{md5_hash}' already exists as " \
+                message = f"HumanProteinAtlasAnnotationVersion with sha256_hash='{sha256_hash}' already exists as " \
                           f"pk={hpa_version.pk}. If you really want to import this again, use the --replace option"
                 raise ValueError(message)
 

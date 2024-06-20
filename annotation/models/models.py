@@ -70,7 +70,7 @@ class SubVersionPartition(RelatedModelsPartitionModel):
 class ClinVarVersion(SubVersionPartition):
     RECORDS_BASE_TABLE_NAMES = ["annotation_clinvar"]
     filename = models.TextField()
-    md5_hash = models.CharField(max_length=32)
+    sha256_hash = models.TextField()
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
 
     @staticmethod
@@ -414,10 +414,10 @@ class DBNSFPGeneAnnotationVersion(TimeStampedModel):
     """ @see https://sites.google.com/site/jpopgen/dbNSFP
         This isn't updated every release, so can have same hash across diff versions """
     version = models.TextField(primary_key=True)
-    md5_hash = models.CharField(max_length=32)
+    sha256_hash = models.TextField()
 
     class Meta:
-        unique_together = ('version', 'md5_hash')
+        unique_together = ('version', 'sha256_hash')
 
     def save(self, **kwargs):
         created = not self.pk
@@ -532,7 +532,7 @@ class GeneAnnotation(models.Model):
 class HumanProteinAtlasAnnotationVersion(SubVersionPartition):
     RECORDS_BASE_TABLE_NAMES = ["annotation_humanproteinatlasannotation"]
     filename = models.TextField()
-    md5_hash = models.CharField(max_length=32)
+    sha256_hash = models.TextField()
     hpa_version = models.FloatField()
     unit = models.TextField()  # What unit "value" is in
 
