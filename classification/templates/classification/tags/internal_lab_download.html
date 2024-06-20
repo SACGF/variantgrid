@@ -13,7 +13,7 @@
     {% labelled label="Share Levels" %}
         <div class="form-check">
             <label class="form-check-label">
-                <input checked="checked" id="share_level_public" name="share_level" value="public" type="radio" class="form-check-input" />
+                <input {% if form_data.share_level != 'any' %}checked="checked"{% endif %} id="share_level_logged_in_users" name="share_level" value="logged_in_users" type="radio" class="form-check-input" />
                 <img src="{% static 'icons/share_level/logged_in_users.png' %}" class="tiny-icon" />
                 <img src="{% static 'icons/share_level/public.png' %}" class="tiny-icon" />
                 Shared with Application and 3rd Party Databases

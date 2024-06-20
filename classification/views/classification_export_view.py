@@ -262,7 +262,7 @@ def record_csv(request: HttpRequest, classification_id) -> HttpResponseBase:
 def internal_lab_download(request):
     if request.method == 'POST':
         user = request.user
-        share_level = request.POST.get('share_level')
+        share_level = ShareLevel(request.POST.get('share_level'))
         genome_build = GenomeBuild.get_from_fuzzy_string(request.POST.get('genome_build'))
         allele_origin = AlleleOriginFilterDefault(request.POST.get('allele-origin-toggle'))
         record_filter_str = request.POST.get('record_filters')
@@ -273,11 +273,6 @@ def internal_lab_download(request):
             'record_filters': record_filter_str,
             'active_tab': 'internal_download:texport-my-data'
         }
-        share_level_map = {
-            'any': ShareLevel.ALL_USERS,
-            'public': ShareLevel.PUBLIC
-        }
-        share_level = share_level_map.get(share_level, share_level)
         context = _export_view_context(request)
         context["active_tab"] = "internal_download:texport-my-data"
         context["form_data"] = form_data
