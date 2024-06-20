@@ -143,11 +143,11 @@ class DbRefRegexResult:
         return f'{self.cregx.db}:{self.idx}'
 
 
-_simple_numbers = re.compile('([0-9]{3,})')
-_num_regex = re.compile('[:#\\s]*([0-9]+)')
-_num_repeat_regex = re.compile('\\s*,[:#\\s]*([0-9]+)')
-_word_regex = re.compile('[:# ]*([A-Za-z0-9_-]+)')  # no repeats for words, too risky
-_entire_until_space = re.compile('(.*?)(?:[)]|\\s|$|[.] )')
+_simple_numbers = re.compile(r'([0-9]{3,})')
+_num_regex = re.compile(r'[:#\s]*([0-9]+)')
+_num_repeat_regex = re.compile(r'\s*,[:#\s]*([0-9]+)')
+_word_regex = re.compile(r'[:# ]*([A-Za-z0-9_-]+)')  # no repeats for words, too risky
+_entire_until_space = re.compile(r'(.*?)(?:[)]|\s|$|[.] )')
 
 
 class DbRefRegexes:
