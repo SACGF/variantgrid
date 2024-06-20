@@ -1,6 +1,6 @@
 import vcf
 
-from library.utils import md5sum_str, sha256sum_str
+from library.utils import sha256sum_str
 from snpdb.models import Locus, Variant, Sequence, GenomeBuild, Allele, VariantAllele, AlleleOrigin, \
     AlleleConversionTool, VariantCoordinate
 

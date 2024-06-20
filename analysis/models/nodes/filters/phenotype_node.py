@@ -95,10 +95,10 @@ class PhenotypeNode(AnalysisNode):
 
     @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.pk, s.version))
     def _get_node_q_hash(self) -> str:
-        md5 = hashlib.md5()
+        hasher = hashlib.sha256()
         for ontology_term_id in sorted(self.get_ontology_term_ids()):
-            md5.update(ontology_term_id.encode())
-        return md5.hexdigest()
+            hasher.update(ontology_term_id.encode())
+        return hasher.hexdigest()
 
     @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.pk, s.version))
     def _get_node_q(self) -> Optional[Q]:

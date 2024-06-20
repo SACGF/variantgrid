@@ -32,7 +32,7 @@ from genes.hgvs import get_hgvs_variant_coordinate, get_hgvs_variant, HGVSExcept
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAppPanel
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
 from library.forms import NumberInput
-from library.utils import md5sum_str
+from library.utils import sha256sum_str
 from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
@@ -366,11 +366,11 @@ class GeneListNodeForm(BaseNodeForm):
         node = super().save(commit=False)
         custom_gene_list_text = self.cleaned_data["custom_gene_list_text"]
         if custom_gene_list_text is not None:
-            md5_hash = md5sum_str(custom_gene_list_text)
+            sha256_hash = sha256sum_str(custom_gene_list_text)
             if node.custom_text_gene_list:
                 custom_text_gene_list = node.custom_text_gene_list
-                if custom_text_gene_list.md5_hash != md5_hash:
-                    custom_text_gene_list.md5_hash = 'deleted_will_regen'
+                if custom_text_gene_list.sha256_hash != sha256_hash:
+                    custom_text_gene_list.sha256_hash = 'deleted_will_regen'
                     if custom_text_gene_list.gene_list is not None:
                         custom_text_gene_list.gene_list.delete()
                         custom_text_gene_list.gene_list = None
