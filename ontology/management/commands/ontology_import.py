@@ -9,11 +9,10 @@ from typing import Optional
 import pandas as pd
 import pronto
 from django.core.management import BaseCommand
-from model_utils.models import now
 
 from annotation.models.models_enums import HPOSynonymScope
 from genes.models import HGNC, HGNCImport
-from library.utils.file_utils import file_md5sum
+from library.utils import file_md5sum
 from ontology.gencc import load_gencc
 from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource, OntologyImport, \
     OntologyTermRelation, OntologyVersion, OntologyTermStatus

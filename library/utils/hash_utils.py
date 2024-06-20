@@ -1,6 +1,9 @@
 import hashlib
 import secrets
 import uuid
+from hashlib import md5
+
+import deprecation
 
 
 def string_deterministic_hash(s: str) -> int:
@@ -19,6 +22,7 @@ def _hash_str(method: callable, s: str) -> str:
     return method(s_bytes).hexdigest()
 
 
+@deprecation.deprecated(details="Use sha256sum_str instead")
 def md5sum_str(s: str) -> str:
     return _hash_str(hashlib.md5, s)
 
@@ -37,3 +41,11 @@ def file_sha256sum(filename: str) -> str:
 def secure_random_string() -> str:
     random_bytes = secrets.token_bytes(32)
     return hashlib.sha256(random_bytes).hexdigest()
+
+
+@deprecation.deprecated(details="Use file_sha256sum instead")
+def file_md5sum(filename: str):
+    m = md5()
+    with open(filename, "rb") as f:
+        m.update(f.read())
+    return m.hexdigest()

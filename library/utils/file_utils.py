@@ -2,7 +2,6 @@ import gzip
 import logging
 import os
 import subprocess
-from hashlib import md5
 from pathlib import Path
 from typing import Optional
 
@@ -52,13 +51,6 @@ def file_to_array(filename, comment: Optional[str] = None, max_lines: Optional[i
             continue
         array.append(line.rstrip())
     return array
-
-
-def file_md5sum(filename: str):
-    m = md5()
-    with open(filename, "rb") as f:
-        m.update(f.read())
-    return m.hexdigest()
 
 
 def remove_gz_if_exists(filename: str) -> str:
