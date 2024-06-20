@@ -133,7 +133,7 @@ def admin_list_column(
         def wrapper(*args, **kwargs):
             # empty wrapper, we just want to modify short_description and mark as is_action
             result = method(*args, **kwargs)
-            if result and limit:
+            if result and limit and not isinstance(result, (bool, int, float)):
                 if not isinstance(result, SafeString):
                     # don't truncate SafeStrings as would include HTML that could easily break
                     result = limit_str(str(result), limit)
