@@ -23,3 +23,10 @@ def md5sum_str(s: str) -> str:
 
 def sha256_str(s: str) -> str:
     return _hash_str(hashlib.sha256, s)
+
+
+def file_sha256sum(filename: str) -> str:
+    hasher = hashlib.sha256()
+    with open(filename, "rb") as f:
+        hasher.update(f.read())
+    return hasher.hexdigest()

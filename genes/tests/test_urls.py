@@ -56,12 +56,12 @@ class Test(URLTestCase):
         ctc, _ = CanonicalTranscriptCollection.objects.get_or_create(description="fake canonical transcripts",
                                                                      filename="/tmp/foo.txt",
                                                                      annotation_consortium=ac,
-                                                                     file_md5sum="not_a_real_hash",
+                                                                     file_sha256sum="not_a_real_hash",
                                                                      genome_build=cls.grch37)
 
-        canonical_transcript = CanonicalTranscript.objects.get_or_create(collection=ctc,
-                                                                         gene_symbol=cls.gene_symbol,
-                                                                         transcript=cls.transcript)[0]
+        _canonical_transcript = CanonicalTranscript.objects.get_or_create(collection=ctc,
+                                                                          gene_symbol=cls.gene_symbol,
+                                                                          transcript=cls.transcript)[0]
 
         gcg, created = GeneCoverageCollection.objects.get_or_create(path="/tmp/foo4.txt",
                                                                     data_state=DataState.COMPLETE,

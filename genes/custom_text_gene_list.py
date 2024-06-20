@@ -1,20 +1,21 @@
 from django.contrib.auth.models import User
 
 from genes.gene_matching import GeneSymbolMatcher
-from genes.models import GeneListCategory, GeneList
-from library.utils import md5sum_str
+from genes.models import GeneListCategory, GeneList, CustomTextGeneList
+from library.utils import sha256_str
 from snpdb.models import ImportStatus
 
 
-def create_custom_text_gene_list(custom_text_gene_list, username, gene_list_category_name=None, hidden=False, gene_matcher=None):
+def create_custom_text_gene_list(custom_text_gene_list: CustomTextGeneList,
+                                 username, gene_list_category_name=None, hidden=False, gene_matcher=None):
     """ Creates an associated gene_list for passed CustomTextGeneList object.
         Can pass gene_matcher instance to save reloading each call """
 
     if gene_matcher is None:
         gene_matcher = GeneSymbolMatcher()
 
-    md5_hash = md5sum_str(custom_text_gene_list.text)
-    if custom_text_gene_list.md5_hash == md5_hash:
+    sha256_hash = sha256_str(custom_text_gene_list.text)
+    if custom_text_gene_list.sha256_hash == sha256_hash:
         return  # No meaningful change
 
     user = User.objects.get(username=username)
@@ -36,6 +37,6 @@ def create_custom_text_gene_list(custom_text_gene_list, username, gene_list_cate
         gene_list.import_status = ImportStatus.ERROR
 
     gene_list.save()
-    custom_text_gene_list.md5_hash = md5_hash
+    custom_text_gene_list.sha256_hash = sha256_hash
     custom_text_gene_list.gene_list = gene_list
     custom_text_gene_list.save()

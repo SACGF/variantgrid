@@ -4,8 +4,8 @@ import pandas as pd
 
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import CanonicalTranscriptCollection, CanonicalTranscript, TranscriptVersion
+from library.utils import file_sha256sum
 from library.utils.database_utils import sql_delete_qs
-from library.utils.file_utils import file_md5sum
 from snpdb.models import GenomeBuild
 
 DELETE_IN_PARTS = False
@@ -39,12 +39,11 @@ def delete_old_canonical_transcript_collection_data(filename):
 def create_canonical_transcript_collection(genome_build: GenomeBuild, annotation_consortium, filename, gene_matcher=None):
     delete_old_canonical_transcript_collection_data(filename)
 
-    file_md5hash = file_md5sum(filename)
     collection = CanonicalTranscriptCollection.objects.create(filename=filename,
                                                               description="",
                                                               genome_build=genome_build,
                                                               annotation_consortium=annotation_consortium,
-                                                              file_md5sum=file_md5hash)
+                                                              file_sha256sum=file_sha256sum(filename))
 
     if gene_matcher is None:
         gene_matcher = GeneSymbolMatcher()

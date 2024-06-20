@@ -1268,7 +1268,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
 
 
 class TranscriptVersionSequenceInfoFastaFileImport(TimeStampedModel):
-    md5_hash = models.CharField(max_length=32, unique=True)
+    sha256_hash = models.TextField(unique=True)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     filename = models.TextField()
 
@@ -1903,7 +1903,7 @@ class GeneListGeneSymbol(models.Model):
 
 class CustomTextGeneList(models.Model):
     """' Some human entered text which gets pulled apart to create a gene list """
-    md5_hash = models.CharField(max_length=32)
+    sha256_hash = models.TextField()
     name = models.TextField()
     text = models.TextField()
     gene_list = models.OneToOneField(GeneList, null=True, on_delete=SET_NULL)
@@ -2105,7 +2105,7 @@ class CanonicalTranscriptCollection(TimeStampedModel):
     filename = models.TextField(blank=True)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
-    file_md5sum = models.TextField()
+    file_sha256sum = models.TextField()
 
     @staticmethod
     def get_default():
