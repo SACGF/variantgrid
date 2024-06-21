@@ -13,9 +13,9 @@ from classification.tasks.classification_import_process_variants_task import Cla
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.genomics.vcf_utils import write_vcf_from_tuples
 from library.utils import full_class_name
-from snpdb.models import Variant
+from snpdb.models import Variant, ImportSource
 from snpdb.models.models_variant import VariantCoordinate
-from snpdb.variant_pk_lookup import VariantPKLookup
+from snpdb.variant_pk_lookup import VariantPKLookup, VariantHash
 from upload.models import UploadedFile, UploadPipeline, UploadStep, \
     UploadedClassificationImport
 from upload.models.models_enums import UploadedFileTypes, UploadStepOrigin, \
@@ -35,7 +35,7 @@ def _is_safe_for_vcf(variant_coordinate: VariantCoordinate) -> bool:
     return True
 
 
-def process_classification_import(classification_import: ClassificationImport, import_source):
+def process_classification_import(classification_import: ClassificationImport, import_source: ImportSource):
     """ Classifications are submitted via API with evidence fields (e.g. HGVS) which we need to
         resolve to a single coordinate - ie link to Variant model.
         If the variant is in the database, link to it, otherwise we need to run it through the VCF import
@@ -45,8 +45,8 @@ def process_classification_import(classification_import: ClassificationImport, i
         Batch variant classification submissions are broken up into 1 ClassificationImport per GenomeBuild """
 
     variant_pk_lookup = VariantPKLookup(classification_import.genome_build)
-    variant_tuples_by_hash: dict[Any, VariantCoordinate] = {}
-    allele_info_by_hash: dict[Any, list[ImportedAlleleInfo]] = defaultdict(list)
+    variant_tuples_by_hash: dict[VariantHash, VariantCoordinate] = {}
+    allele_info_by_hash: dict[VariantHash, list[ImportedAlleleInfo]] = defaultdict(list)
 
     # WARNING: previously only matched if the allele_info had no matched_variant
     # (not sure we even have to filter on status of processing, as it shouldn't be part of a classificationImport
@@ -86,7 +86,7 @@ def process_classification_import(classification_import: ClassificationImport, i
 def _classification_upload_pipeline(
         classification_import: ClassificationImport,
         unknown_variant_tuples_list: list[VariantCoordinate],
-        import_source):
+        import_source: ImportSource):
     """ We always run this even with no variants to insert as we need:
         * create Alleles for variants
         * perform liftover to other builds
