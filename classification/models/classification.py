@@ -2132,7 +2132,7 @@ _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES = {
     SomaticClinicalSignificanceValue("tier_1", "A"): 9,
     SomaticClinicalSignificanceValue("tier_1", "B"): 8,
     SomaticClinicalSignificanceValue("tier_1"): 7,
-    SomaticClinicalSignificanceValue("tier_1_2"): 6,
+    SomaticClinicalSignificanceValue("tier_1_or_2"): 6,
     SomaticClinicalSignificanceValue("tier_2", "C"): 5,
     SomaticClinicalSignificanceValue("tier_2", "D"): 4,
     SomaticClinicalSignificanceValue("tier_2"): 3,
