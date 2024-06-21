@@ -13,7 +13,7 @@
     {% labelled label="Share Levels" %}
         <div class="form-check">
             <label class="form-check-label">
-                <input {% if form_data.share_level != 'any' %}checked="checked"{% endif %} id="share_level_logged_in_users" name="share_level" value="logged_in_users" type="radio" class="form-check-input" />
+                <input {% if form_data.share_level.value != 'lab' %}checked="checked"{% endif %} id="share_level_logged_in_users" name="share_level" value="logged_in_users" type="radio" class="form-check-input" />
                 <img src="{% static 'icons/share_level/logged_in_users.png' %}" class="tiny-icon" />
                 <img src="{% static 'icons/share_level/public.png' %}" class="tiny-icon" />
                 Shared with Application and 3rd Party Databases
@@ -21,7 +21,7 @@
         </div>
         <div class="form-check">
             <label class="form-check-label">
-                <input {% if form_data.share_level == 'any' %} checked="checked" {% endif %} id="share_level_any" name="share_level" value="any" type="radio" class="form-check-input" />
+                <input {% if form_data.share_level.value == 'lab' %} checked="checked" {% endif %} id="share_level_any" name="share_level" value="lab" type="radio" class="form-check-input" />
                 <img src="{% static 'icons/share_level/lab.png' %}" class="tiny-icon" />
                 <img src="{% static 'icons/share_level/institution.png' %}" class="tiny-icon" />
                 <img src="{% static 'icons/share_level/logged_in_users.png' %}" class="tiny-icon" />
@@ -33,13 +33,13 @@
     {% labelled label="Genome Build" %}
         <div class="form-check">
             <label class="form-check-label">
-                <input checked="checked" id="genome_build_37" name="genome_build" value="GRCh37" type="radio" class="form-check-input" />
+                <input {% if form_data.genome_build.pk != 'GRCh38' %}checked="checked" {% endif %} id="genome_build_37" name="genome_build" value="GRCh37" type="radio" class="form-check-input" />
                 GRCh37
             </label>
         </div>
         <div class="form-check">
             <label class="form-check-label">
-                <input {% if form_data.genome_build == 'GRCh38' %} checked="checked" {% endif %} id="genome_build_38" name="genome_build" value="GRCh38" type="radio" class="form-check-input" />
+                <input {% if form_data.genome_build.pk == 'GRCh38' %} checked="checked" {% endif %} id="genome_build_38" name="genome_build" value="GRCh38" type="radio" class="form-check-input" />
                 GRCh38
             </label>
         </div>
