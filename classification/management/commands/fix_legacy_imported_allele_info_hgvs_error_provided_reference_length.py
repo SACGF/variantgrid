@@ -46,7 +46,7 @@ class Command(BaseCommand):
             try:
                 matcher.get_variant_coordinate(hgvs_name)
             except (HGVSInvalidVariantError, InvalidHGVSName) as e:
-                print(f"{hgvs_name}: {e}")
+                print(f"REMATCHING {iai.pk} due to: {hgvs_name}: {e}")
                 iai_ids_with_hgvs_errors.add(iai.pk)
             except ValueError:
                 pass  # If things fail for any other reason, we can't help - so no point re-matching
