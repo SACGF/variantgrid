@@ -6,9 +6,9 @@ The original implementation RedisVariantPKLookup used Redis to store a hash, was
 import logging
 import os
 from collections import defaultdict
-from typing import Iterable
+from typing import Iterable, TypeAlias, Tuple, Callable, Collection, Any
 
-from django.db.models import Q, Value, TextField
+from django.db.models import Q, Value, TextField, QuerySet
 from django.db.models.aggregates import Max
 from django.db.models.functions import Concat
 
@@ -16,17 +16,22 @@ from library.utils import sha256sum_str
 from snpdb.models import Variant, Locus, Sequence, GenomeBuild, VariantCoordinate
 from upload.vcf import sql_copy_files
 
+VariantHash: TypeAlias = Tuple[int, int, int, int, int | str]
+LocusHash: TypeAlias = Tuple[int, int, int]
+LociHash: TypeAlias = Any
+AnyHash: TypeAlias = VariantHash | LocusHash | LociHash
+
 
 class VariantPKLookup:
     """ variant hash is something we can compute via SQL from the Variant """
 
     def __init__(self, genome_build: GenomeBuild = None, working_dir=None):
-        self.genome_build = genome_build
-        self._working_dir = working_dir
+        self.genome_build: GenomeBuild = genome_build
+        self._working_dir: str = working_dir
         self._file_batch_id = 0
         self.variant_hashes: list[str] = []  # Variant hash and coordinate lists are kept in sync
         self.variant_coordinates: list[VariantCoordinate] = []
-        self.variant_pk_by_hash = {}
+        self.variant_pk_by_hash: dict[VariantHash, int] = {}
         self.unknown_variant_coordinates: list[VariantCoordinate] = []
 
         if genome_build:
@@ -43,36 +48,36 @@ class VariantPKLookup:
     def _get_locus_hash(self, contig_id, position, ref_id):
         return contig_id, position, ref_id
 
-    def _get_variant_hash(self, contig_id, position, ref_id, alt_id, svlen):
+    def _get_variant_hash(self, contig_id: int, position: int, ref_id: int, alt_id: int, svlen: int) -> VariantHash:
         return contig_id, position, ref_id, alt_id, svlen or ''
 
-    def _get_ids_for_hashes(self, hashes: Iterable, get_queryset):
+    def _get_ids_for_hashes(self, hashes: Iterable[AnyHash], get_queryset: Callable[[int, Collection[int]], QuerySet]) -> list[int]:
         """ hashes tuples 1st 2 elements should be contig_id, position """
         contig_positions = defaultdict(set)
         for contig_id, position, *_ in hashes:
             contig_positions[contig_id].add(position)
 
-        contig_hashes = defaultdict(dict)
+        contig_hashes: dict[int, dict] = defaultdict(dict)
         for contig_id, positions in contig_positions.items():
             qs = get_queryset(contig_id, positions)
             contig_hashes[contig_id] = dict(qs.values_list("hash", "id"))
 
         return [contig_hashes[h[0]].get("_".join([str(s) for s in h[1:]])) for h in hashes]
 
-    def _get_variant_ids(self, variant_hashes: Iterable) -> list[str]:
+    def _get_variant_ids(self, variant_hashes: Iterable[VariantHash]) -> list[int]:
         annotate_kwargs = {
             "hash": Concat("locus__position", Value("_"), "locus__ref_id", Value("_"), "alt_id",
                            Value("_"), "svlen",
                            output_field=TextField())
         }
 
-        def get_queryset(contig_id, positions):
+        def get_queryset(contig_id, positions) -> QuerySet:
             qs = Variant.objects.filter(locus__contig_id=contig_id, locus__position__in=positions)
             return qs.annotate(**annotate_kwargs)
 
         return self._get_ids_for_hashes(variant_hashes, get_queryset)
 
-    def get_variant_ids(self, variant_hashes: Iterable, validate_not_null=True) -> list[str]:
+    def get_variant_ids(self, variant_hashes: Iterable[VariantHash], validate_not_null=True) -> list[int]:
         variant_ids = self._get_variant_ids(variant_hashes)
         if validate_not_null:
             if not all(variant_ids):  # Quick test if ok
@@ -82,7 +87,7 @@ class VariantPKLookup:
                         raise ValueError(f"Variant hash {variant_hash} had no PK in DB!")
         return variant_ids
 
-    def _get_loci_ids(self, loci_hashes: Iterable) -> list[str]:
+    def _get_loci_ids(self, loci_hashes: Iterable) -> list[int]:
         annotate_kwargs = {
             "hash": Concat("position", Value("_"), "ref_id",
                            output_field=TextField())
@@ -94,7 +99,7 @@ class VariantPKLookup:
 
         return self._get_ids_for_hashes(loci_hashes, get_queryset)
 
-    def get_loci_ids(self, loci_hashes: Iterable, validate_not_null=True) -> list[str]:
+    def get_loci_ids(self, loci_hashes: Iterable, validate_not_null=True) -> list[int]:
         loci_ids = self._get_loci_ids(loci_hashes)
         if validate_not_null:
             if not all(loci_ids):  # Quick test if ok
@@ -104,10 +109,10 @@ class VariantPKLookup:
                         raise ValueError(f"Loci hash {loci_hash} had no PK in DB!")
         return loci_ids
 
-    def filter_non_reference(self, variant_hashes, variant_ids) -> list:
+    def filter_non_reference(self, variant_hashes: Iterable[VariantHash], variant_ids: Iterable[int]) -> list[int]:
         return [vh_vi[1] for vh_vi in zip(variant_hashes, variant_ids) if vh_vi[0][3] != self.reference_seq_id]
 
-    def get_variant_coordinate_hash(self, variant_coordinate: VariantCoordinate):
+    def get_variant_coordinate_hash(self, variant_coordinate: VariantCoordinate) -> VariantHash:
         """ For VCF records (needs GenomeBuild supplied) """
 
         variant_coordinate = variant_coordinate.as_internal_symbolic(self.genome_build)
@@ -118,7 +123,7 @@ class VariantPKLookup:
         alt_id = self.sequence_pk_by_seq[variant_coordinate.alt]
         return self._get_variant_hash(contig_id, variant_coordinate.position, ref_id, alt_id, variant_coordinate.svlen)
 
-    def add(self, variant_coordinate: VariantCoordinate):
+    def add(self, variant_coordinate: VariantCoordinate) -> VariantHash:
         variant_coordinate = variant_coordinate.as_internal_symbolic(self.genome_build)
 
         # If sequence isn't known, variant is definitely unknown
