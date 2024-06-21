@@ -329,12 +329,14 @@ class HGVSMatcher:
                             if cga_se.is_unknown_reference():
                                 self._set_clingen_allele_registry_missing_transcript(tv.accession)
                             else:
-                                logging.error(error_message, cga_se)
-                                error_messages.append(f"{error_message} : {cga_se}")
+                                msg = f"{error_message} : {cga_se}"
+                                logging.error(msg)
+                                error_messages.append(msg)
                         except ClinGenAllele.ClinGenAlleleRegistryException as cgare:
                             # API or other recoverable error - try again w/another transcript
-                            logging.error(error_message, cgare)
-                            error_messages.append(f"{error_message} : {cgare}")
+                            msg = f"{error_message} : {cgare}"
+                            logging.error(msg)
+                            error_messages.append(msg)
 
                 if method:
                     if hgvs_string != hgvs_string_for_version:
