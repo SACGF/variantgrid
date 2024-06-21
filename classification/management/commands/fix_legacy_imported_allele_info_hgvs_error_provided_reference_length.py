@@ -48,7 +48,7 @@ class Command(BaseCommand):
             except (HGVSInvalidVariantError, InvalidHGVSName) as e:
                 print(f"{hgvs_name}: {e}")
                 iai_ids_with_hgvs_errors.add(iai.pk)
-            except:
+            except ValueError:
                 pass  # If things fail for any other reason, we can't help - so no point re-matching
 
         rematch_iai_qs = ImportedAlleleInfo.objects.filter(pk__in=iai_ids_with_hgvs_errors)
