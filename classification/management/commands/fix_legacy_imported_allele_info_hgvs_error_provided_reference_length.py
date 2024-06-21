@@ -54,4 +54,4 @@ class Command(BaseCommand):
         rematch_iai_qs = ImportedAlleleInfo.objects.filter(pk__in=iai_ids_with_hgvs_errors)
         print(f"Have {rematch_iai_qs.count()} ImportAlleleIDs to fix")
         user = admin_bot()
-        reattempt_variant_matching(user, rematch_iai_qs)
+        reattempt_variant_matching(user, rematch_iai_qs, clear_existing=True)
