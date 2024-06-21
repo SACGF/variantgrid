@@ -2,11 +2,7 @@
 
 from django.db import migrations
 
-
-def populat_somatic_sort_order(apps, _schema_editor):
-    ClassificationModification = apps.get_model('classification', 'ClassificationModification')
-
-
+# Accidental checked in migration, does nothing
 
 class Migration(migrations.Migration):
 
