@@ -95,8 +95,13 @@ class SeparateUnknownVariantsTask(ImportVCFStepTask):
         bulk_inserter = BulkUnknownVariantInserter(upload_step)
 
         vcf_reader = cyvcf2.VCF(upload_step.input_filename)
-        for v in vcf_reader:
-            bulk_inserter.process_vcf_record(v)
+        for i, v in enumerate(vcf_reader):
+            try:
+                bulk_inserter.process_vcf_record(v)
+            except:
+                logging.warning("SeparateUnknownVariantsTask died processing '%s' line %d record: %s",
+                                upload_step.input_filename, i + 1, v)
+                raise
 
         bulk_inserter.finish()  # Any leftovers
         variant_collection.count = bulk_inserter.rows_processed
