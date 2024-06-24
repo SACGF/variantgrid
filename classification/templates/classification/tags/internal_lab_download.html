@@ -4,8 +4,8 @@
 {% load static %}
 {% load ui_tabs_builder %}
 {% load classification_tags %}
-
-<form id="internal-download-form" method="post" action="{% url 'internal_lab_download' %}">
+{% comment %}clearDjangoMessages is in global.js, remove them as the page wont reload due to file download{% endcomment %}
+<form onsubmit="clearDjangoMessages()" id="internal-download-form" method="post" action="{% url 'internal_lab_download' %}">
     {% csrf_token %}
     {% labelled label="My Lab(s)" %}
         {% for lab in labs_for_user %}<div>{{ lab }}</div>{% endfor %}

@@ -919,6 +919,11 @@ function update_django_messages(messages) {
     $('.main-content').scrollTop(0); // needed when in desktop size
 }
 
+function clearDjangoMessages() {
+    let messagesDom = $("#django-messages");
+    messagesDom.empty();
+}
+
 function createMessage(className, message) {
     let errorMessageUl = $("<ul/>", {class: "messages"});
     let errorMessageLi = $("<li/>", {class: "save-message"});
