@@ -634,18 +634,14 @@ class HGVSMatcher:
         fixed_hgvs_string = f"{prefix}:{allele}"
         return fixed_hgvs_string, fixed_messages
 
-    def get_gene_symbol_or_alias_if_no_transcript(self, hgvs_string: str) -> tuple[Optional[GeneSymbol], Optional[GeneSymbolAlias]]:
+    def get_gene_symbol_if_no_transcript(self, hgvs_string: str) -> Optional[str]:
         """ If HGVS uses gene symbol instead of transcript, return symbol """
         # pyhgvs sets to gene, Biocommons always uses as transcript
         hgvs_variant = self.create_hgvs_variant(hgvs_string)
         if hgvs_variant.transcript and hgvs_variant.gene:
-            return None, None  # only return symbol if transcript is not used
-        symbol = hgvs_variant.transcript or hgvs_variant.gene
-        if gene_symbol := GeneSymbol.objects.filter(pk=symbol).first():
-            alias = None
-        else:
-            alias = GeneSymbolAlias.objects.filter(alias=symbol).first()
-        return gene_symbol, alias
+            return None  # only return symbol if transcript is not used
+        return hgvs_variant.transcript or hgvs_variant.gene
+
 
 def get_hgvs_variant_coordinate(hgvs_string: str, genome_build: GenomeBuild) -> VariantCoordinate:
     """ Convenience method for 1 off HGVS - for batches use HGVSMatcher """

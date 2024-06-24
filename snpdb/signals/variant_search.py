@@ -15,7 +15,7 @@ from annotation.manual_variant_entry import check_can_create_variants, CreateMan
 from classification.models import Classification, CreateNoClassificationForbidden
 from genes.hgvs import HGVSMatcher, HGVSException, VariantResolvingError
 from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
-from genes.models import MissingTranscript, MANE, TranscriptVersion
+from genes.models import MissingTranscript, MANE, TranscriptVersion, GeneSymbol
 from genes.models_enums import AnnotationConsortium
 from library.enums.log_level import LogLevel
 from library.genomics import format_chrom
@@ -498,24 +498,30 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         pass
     except (ValueError, NotImplementedError) as hgvs_error:
         try:
-            gene_symbol, alias = hgvs_matcher.get_gene_symbol_or_alias_if_no_transcript(hgvs_string)
-            if alias:
-                gene_symbol = alias.gene_symbol
-            if gene_symbol:
+            if gene_symbol_str := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
                 has_results = False
-                msg_hgvs_given_symbol = "Searching without transcript is only supported for coordinates resolved against MANE transcripts."
 
                 if settings.SEARCH_HGVS_GENE_SYMBOL:
-                    transcript_versions, mane_status_by_transcript = _get_search_hgvs_gene_symbol_transcripts(gene_symbol, genome_build)
+                    msg_hgvs_given_symbol = "Searching without transcript is only supported for coordinates resolved against MANE transcripts."
+
+                    mane, alias = MANE.get_from_symbol_or_alias(gene_symbol_str)
+                    if alias:
+                        msg_hgvs_given_symbol += f" Matched to MANE gene symbol '{alias.gene_symbol}' via alias " \
+                                                    f" {alias.alias} ({alias.get_source_display()})"
+
+                    if not mane:
+                        raise ValueError(msg_hgvs_given_symbol + f" {gene_symbol_str} (or any aliases) have no MANE transcripts")
+
+                    transcript_versions, mane_status_by_transcript = _get_search_hgvs_gene_symbol_transcripts(mane.symbol, genome_build)
 
                     tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build,
-                                                             gene_version__gene__in=gene_symbol.genes)
+                                                             gene_version__gene__in=mane.symbol.genes)
                     transcripts = [tv.transcript for tv in transcript_versions]
 
                     msg_hgvs_gene_search = msg_hgvs_given_symbol
                     if tv_qs.exclude(transcript__in=transcripts).distinct("transcript_id").exists():
                         # We want to make the messages the same for both genome builds, so they are collected into 1
-                        msg_hgvs_gene_search += f" {gene_symbol} has non-MANE transcripts that may resolve " \
+                        msg_hgvs_gene_search += f" {mane.symbol} has non-MANE transcripts that may resolve " \
                                                 "to different coordinates. You may wish to add a transcript or " \
                                                 "search for the gene symbol to view all results"
 

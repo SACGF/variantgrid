@@ -14,6 +14,7 @@ from urllib.error import URLError, HTTPError
 
 import requests
 from Bio import Entrez, SeqIO
+from cache_memoize import cache_memoize
 from cdot.pyhgvs.pyhgvs_transcript import PyHGVSTranscriptFactory
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -39,7 +40,7 @@ from requests import RequestException
 from genes.gene_coverage import load_gene_coverage_df
 from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAliasSource, MANEStatus
 from library.cache import timed_cache
-from library.constants import HOUR_SECS, WEEK_SECS, MINUTE_SECS
+from library.constants import HOUR_SECS, WEEK_SECS, MINUTE_SECS, DAY_SECS
 from library.django_utils import SortByPKMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
@@ -2607,6 +2608,24 @@ class MANE(models.Model):
     ensembl_transcript_version = models.ForeignKey(TranscriptVersion, related_name="mane_ensembl",
                                                    null=True, on_delete=CASCADE)
     status = models.CharField(max_length=1, choices=MANEStatus.choices)
+
+    @cache_memoize(DAY_SECS)
+    @staticmethod
+    def has_mane_transcripts() -> bool:
+        return MANE.objects.exists()
+
+    @staticmethod
+    def get_from_symbol_or_alias(gene_symbol_str: str) -> tuple[Optional['MANE'], Optional[GeneSymbolAlias]]:
+        if not MANE.has_mane_transcripts():
+            raise ValueError("MANE transcripts are not loaded")
+
+        if mane := MANE.objects.filter(symbol=gene_symbol_str).first():
+            return mane, None
+
+        if alias := GeneSymbolAlias.objects.filter(alias=gene_symbol_str, gene_symbol__mane__isnull=False).first():
+            if mane := MANE.objects.filter(symbol=alias.gene_symbol).first():
+                return mane, alias
+        return None, None
 
     def get_transcript_version(self, annotation_consortium: AnnotationConsortium) -> TranscriptVersion:
         transcript_version = None
