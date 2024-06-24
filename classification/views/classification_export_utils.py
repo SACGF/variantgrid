@@ -10,6 +10,7 @@ from django.db.models.query import QuerySet
 from classification.models.classification import ClassificationModification
 from classification.models.evidence_key import EvidenceKeyMap, EvidenceKey
 from genes.hgvs import CHGVS
+from library.cache import clear_cached_property
 
 
 class KeyValueFormatter:
@@ -100,10 +101,8 @@ class UsedKeyTracker:
         self.calc_dict: dict[str, UsedKey] = {}
         self.pretty = pretty
         self.cell_formatter = cell_formatter
-        self.ordered_keys = None
         self.include_explains = include_explains
         self.ignore_evidence_keys = ignore_evidence_keys
-        self.processed = False
 
     @property
     def keys_ignore_exclude(self) -> Iterable[EvidenceKey]:
@@ -137,9 +136,9 @@ class UsedKeyTracker:
     def check_record(self, vcm: ClassificationModification):
         self.check_evidence(vcm.evidence)
 
+
     def check_evidence(self, evidence: dict[str, Any]):
-        if self.processed:
-            raise ValueError("Can't check evidence after process() has been called")
+        clear_cached_property(self, "ordered_keys")
 
         has_value = False
         has_note = False
@@ -160,19 +159,17 @@ class UsedKeyTracker:
                 used_key.has_note = used_key.has_note or has_note
                 used_key.has_explain = used_key.has_explain or has_explain
 
-    def process(self):
-        if self.processed:
-            return
-        self.processed = True
-        self.ordered_keys = []
+    @cached_property
+    def ordered_keys(self) -> list[UsedKey]:
+        ordered_keys: list[UsedKey] = []
         for ekey in self.ekeys.all_keys:
             used_key = self.calc_dict.get(ekey.key)
             if used_key:
                 used_key.ekey = ekey
-                self.ordered_keys.append(used_key)
+                ordered_keys.append(used_key)
+        return ordered_keys
 
     def header(self) -> list[str]:
-        self.process()
         cols: list[str] = []
         for used_key in self.ordered_keys:
             if used_key.has_value:
@@ -184,7 +181,6 @@ class UsedKeyTracker:
         return cols
 
     def row(self, classification_modification: ClassificationModification, formatter: Callable[[Any], Any]) -> list[Optional[str]]:
-        self.process()
         cols: list[Optional[str]] = []
         evidence = classification_modification.get_visible_evidence(self.user)
         for used_key in self.ordered_keys:

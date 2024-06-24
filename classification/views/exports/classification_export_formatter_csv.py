@@ -44,7 +44,7 @@ class FormatDetailsCSV:
 
     html_handling: CSVCellFormatting = CSVCellFormatting.PURE_TEXT
 
-    exclude_discordances: bool = True
+    exclude_discordances: bool = False
 
     @staticmethod
     def from_request(request: HttpRequest) -> 'FormatDetailsCSV':
@@ -71,6 +71,7 @@ class FormatDetailsCSV:
                 "owner",
                 "source_id",
                 "source_data",
+                "import_warnings"
             }
         else:
             return set()
