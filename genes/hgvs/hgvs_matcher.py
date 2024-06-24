@@ -305,6 +305,7 @@ class HGVSMatcher:
             if not transcript_accession:
                 msg = f"Could not parse \"{hgvs_string}\" c.HGVS requires a transcript or LRG."
                 if hgvs_variant.gene:
+                    # We should only be here if gene based HGVS searching is disabled
                     msg += f"\nGene appears to be \"{hgvs_variant.gene}\""
                 raise ValueError(msg)
 

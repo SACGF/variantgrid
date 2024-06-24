@@ -503,7 +503,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 gene_symbol = alias.gene_symbol
             if gene_symbol:
                 has_results = False
-                msg_hgvs_given_symbol = f'HGVS requires transcript, given symbol "{gene_symbol}"'
+                msg_hgvs_given_symbol = "Searching without transcript is only supported for coordinates resolved against MANE transcripts."
 
                 if settings.SEARCH_HGVS_GENE_SYMBOL:
                     transcript_versions, mane_status_by_transcript = _get_search_hgvs_gene_symbol_transcripts(gene_symbol, genome_build)
@@ -515,9 +515,9 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                     msg_hgvs_gene_search = msg_hgvs_given_symbol
                     if tv_qs.exclude(transcript__in=transcripts).distinct("transcript_id").exists():
                         # We want to make the messages the same for both genome builds, so they are collected into 1
-                        msg_hgvs_gene_search += f"Warning: {gene_symbol} has non-MANE transcripts that may resolve " \
-                                                "to different coordinates. You may wish to search for the gene " \
-                                                "symbol to view all results"
+                        msg_hgvs_gene_search += f" {gene_symbol} has non-MANE transcripts that may resolve " \
+                                                "to different coordinates. You may wish to add a transcript or " \
+                                                "search for the gene symbol to view all results"
 
                     yield SearchMessageOverall(msg_hgvs_gene_search, severity=LogLevel.INFO)
 
