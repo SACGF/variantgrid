@@ -136,7 +136,6 @@ class UsedKeyTracker:
     def check_record(self, vcm: ClassificationModification):
         self.check_evidence(vcm.evidence)
 
-
     def check_evidence(self, evidence: dict[str, Any]):
         clear_cached_property(self, "ordered_keys")
 
@@ -162,7 +161,7 @@ class UsedKeyTracker:
     @cached_property
     def ordered_keys(self) -> list[UsedKey]:
         ordered_keys: list[UsedKey] = []
-        for ekey in self.ekeys.all_keys:
+        for ekey in self.keys_ignore_exclude:
             used_key = self.calc_dict.get(ekey.key)
             if used_key:
                 used_key.ekey = ekey

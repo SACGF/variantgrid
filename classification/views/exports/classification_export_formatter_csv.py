@@ -42,9 +42,10 @@ class FormatDetailsCSV:
     # exclude fields that change between environments, makes it easier to compare changes if the same data is in both environments
     exclude_transient: bool = False
 
-    html_handling: CSVCellFormatting = CSVCellFormatting.PURE_TEXT
-
+    # exclude discordance information or something that could leak data to other labs
     exclude_discordances: bool = False
+
+    html_handling: CSVCellFormatting = CSVCellFormatting.PURE_TEXT
 
     @staticmethod
     def from_request(request: HttpRequest) -> 'FormatDetailsCSV':
