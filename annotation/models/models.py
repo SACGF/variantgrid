@@ -1455,13 +1455,20 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return sv_overlap_list
 
     @staticmethod
-    def get_hgvs_g(variant) -> Optional[str]:
+    def get_hgvs_g(variant: Variant) -> Optional[str]:
+        """ This is very slow - only use on a page with just 1 variant, not in a loop """
         # They should all be the same so any will be ok - but take latest in case we fixed HGVS
         qs = variant.variantannotation_set.filter(hgvs_g__isnull=False).order_by("-version")
         data = qs.values_list("hgvs_g", flat=True)[:1]
         hgvs_g = None
         if data:
             hgvs_g = data[0]
+        if hgvs_g is None:
+            # Reference variants have no annotation - so we'll have to fall back to generating it
+            from genes.hgvs import HGVSMatcher
+            matcher = HGVSMatcher(variant.any_genome_build)
+            hgvs_g = matcher.variant_to_g_hgvs(variant)
+
         return hgvs_g
 
     def __str__(self):

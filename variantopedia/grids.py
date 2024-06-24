@@ -290,7 +290,7 @@ class VariantTagDetailColumns(DatatableConfig[VariantTag]):
         variant = Variant.objects.get(pk=variant_id)
         tag = Tag.objects.get(pk=tag_name)
         # Not going to use anything build specific so don't care about build
-        genome_build = next(iter(variant.genome_builds))
+        genome_build = variant.any_genome_build
         qs = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
         qs = qs.filter(tag=tag)
         return qs

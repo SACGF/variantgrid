@@ -677,6 +677,10 @@ class Variant(PreviewModelMixin, models.Model):
                                                   contig__locus__variant=self)
         return {gbc.genome_build for gbc in gbc_qs}
 
+    @property
+    def any_genome_build(self) -> GenomeBuild:
+        return next(iter(self.genome_builds))
+
     @cached_property
     def coordinate(self) -> VariantCoordinate:
         locus = self.locus

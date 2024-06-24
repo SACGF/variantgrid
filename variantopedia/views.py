@@ -362,7 +362,7 @@ def view_variant(request, variant_id, genome_build_name=None):
                 genome_build = user_settings.default_genome_build
 
     if genome_build is None:
-        genome_build = next(iter(variant.genome_builds))
+        genome_build = variant.any_genome_build
 
     GenomeBuildManager.set_current_genome_build(genome_build)
 
@@ -598,6 +598,11 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
     has_tags = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants).exists()
 
+    if variant_annotation and variant_annotation.hgvs_g:
+        hgvs_g = variant_annotation.hgvs_g
+    else:
+        hgvs_g = VariantAnnotation.get_hgvs_g(variant)  # Calculate for reference variants
+
     context = {
         "annotation_description": annotation_description,
         "annotation_version": annotation_version,
@@ -606,6 +611,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "genes_canonical_transcripts": genes_canonical_transcripts,
         "genome_build": genome_build,
         "has_tags": has_tags,
+        "hgvs_g": hgvs_g,
         "latest_annotation_version": latest_annotation_version,
         "modified_normalised_variants": modified_normalised_variants,
         "num_variant_annotation_versions": num_variant_annotation_versions,

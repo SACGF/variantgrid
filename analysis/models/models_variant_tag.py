@@ -107,7 +107,7 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     @staticmethod
     def get_variant_tag_counts_qs(variant, genome_build=None) -> QuerySet['VariantTag']:
         if genome_build is None:
-            genome_build = next(iter(variant.genome_builds))
+            genome_build = variant.any_genome_build
         qs = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
         return qs.values("tag").annotate(count=Count("id"), last_created=Max("created")).order_by("tag")
 
