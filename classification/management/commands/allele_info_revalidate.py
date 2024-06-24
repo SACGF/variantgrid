@@ -41,8 +41,8 @@ class Command(BaseCommand):
                     allele_info.save()
                 else:
                     pass
-            except:
+            except Exception as ex:
                 if allele_info.variant_coordinate:
-                    allele_info.dirty_message = f"Could not re-resolve to variant coordinate despite currently being resolved"
+                    allele_info.dirty_message = f"Could not re-resolve to variant coordinate despite currently being resolved: {ex}"
                     allele_info.save()
         print(f"Processed {row_index} rows")
