@@ -93,7 +93,7 @@ class BioCommonsHGVSVariant(HGVSVariant):
 
 
 class BioCommonsHGVSConverter(HGVSConverter):
-    dup_int_pattern = re.compile(r"(.*dup)(\d+)$")
+    hgvs_span_trailing_int_length_pattern = re.compile(r"(.*(?:del|dup|inv))(\d+)$")
     reference_sequence_pattern = re.compile(r".*: Variant reference \((.*)\) does not agree with reference sequence \((.*)\)")
 
     def __init__(self, genome_build: GenomeBuild):
@@ -129,19 +129,23 @@ class BioCommonsHGVSConverter(HGVSConverter):
             if re.match(".*ins$", hgvs_string):
                 raise HGVSException("Insertions require inserted sequence")
 
-        # Biocommons HGVS doesn't accept integers on the end of dups - ie NM_001354689.1(RAF1):c.1_2dup3
+        # Biocommons HGVS doesn't accept integers on the end of indels - ie NM_001354689.1(RAF1):c.1_2dup3
         # We want to strip these and raise an error if the span is wrong
-        provided_dup_length = None
-        if m := BioCommonsHGVSConverter.dup_int_pattern.match(hgvs_string):
-            hgvs_string, provided_dup_length = m.groups()
-            provided_dup_length = int(provided_dup_length)
+        provided_span_length = None
+        if m := BioCommonsHGVSConverter.hgvs_span_trailing_int_length_pattern.match(hgvs_string):
+            hgvs_string, provided_span_length = m.groups()
+            provided_span_length = int(provided_span_length)
 
         parser = ParserSingleton.parser()
         sequence_variant = parser.parse_hgvs_variant(hgvs_string)
-        if provided_dup_length is not None:
-            coord_span = sequence_variant.posedit.length_change()
-            if coord_span != provided_dup_length:
-                raise HGVSException(f"dup coordinate span ({coord_span}) not equal to provided ref length {provided_dup_length}")
+        if provided_span_length is not None:
+            if sequence_variant.posedit.edit.type == 'inv':
+                # HGVS is 0 based
+                coord_span = (sequence_variant.posedit.pos.end - sequence_variant.posedit.pos.start) + 1
+            else:
+                coord_span = abs(sequence_variant.posedit.length_change())
+            if coord_span != provided_span_length:
+                raise HGVSException(f"coordinate span ({coord_span}) not equal to provided ref length {provided_span_length}")
         return sequence_variant
 
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
