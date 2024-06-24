@@ -182,6 +182,10 @@ def allele_search(search_input: SearchInputInstance):
                 yield from visible_variants.filter(pk=variant.pk)
                 continue
 
+            # If we are non-admin we don't want to see anything else (eg ClinGen not in our build)
+            if settings.SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN and not search_input.user.is_superuser:
+                continue
+
             try:
                 # if there was no variant for that allele
                 variant_string = clingen_allele.get_variant_string(genome_build)
