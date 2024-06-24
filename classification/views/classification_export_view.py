@@ -288,27 +288,27 @@ def internal_lab_download(request):
             has_errors = False
             for part in re.split('[,\n\t]', record_filter_str):
                 # handle each part here so we can validate that there's 1+ record found for each filter
-                part = part.strip()
-                try:
-                    part_q = classification_export_user_string_to_q(part, genome_build)
-                    filter_data = ClassificationFilter(
-                        user=user,
-                        genome_build=genome_build,
-                        allele_origin_filter=allele_origin,
-                        min_share_level=share_level,
-                        file_prefix=f"Internal_lab_report",
-                        include_sources=user_labs,
-                        extra_filter=part_q
-                    )
-                    if not filter_data.cms_qs.exists():
-                        messages.error(request, f"\"{part}\" - no results found")
-                        has_errors = True
-                    else:
-                        all_qs.append(part_q)
+                if part := part.strip():
+                    try:
+                        part_q = classification_export_user_string_to_q(part, genome_build)
+                        filter_data = ClassificationFilter(
+                            user=user,
+                            genome_build=genome_build,
+                            allele_origin_filter=allele_origin,
+                            min_share_level=share_level,
+                            file_prefix=f"Internal_lab_report",
+                            include_sources=user_labs,
+                            extra_filter=part_q
+                        )
+                        if not filter_data.cms_qs.exists():
+                            messages.error(request, f"\"{part}\" - no results found")
+                            has_errors = True
+                        else:
+                            all_qs.append(part_q)
 
-                except ValueError as ve:
-                    has_errors = True
-                    messages.error(request, f"\"{part}\" - could not be turned into a classification filter")
+                    except ValueError as ve:
+                        has_errors = True
+                        messages.error(request, f"\"{part}\" - could not be turned into a classification filter")
 
             if has_errors:
                 return render(request, 'classification/classification_export.html', context)
