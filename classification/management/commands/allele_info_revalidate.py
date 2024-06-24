@@ -1,7 +1,11 @@
+import itertools
+
 from django.core.management import BaseCommand
 
 from classification.models import ImportedAlleleInfo
+from classification.models.variant_resolver import VariantResolver
 from genes.hgvs import HGVSMatcher
+from library.guardian_utils import admin_bot
 from snpdb.models import GenomeBuild
 
 
@@ -10,6 +14,10 @@ class Command(BaseCommand):
         pass
 
     def handle(self, *args, **options):
+        self.iterate_alleles()
+
+
+    def iterate_alleles(self):
         ###
         # Right now, just validated ImportedAlleleInfo variant-coordinate
         # In future will handle variant resolution too
@@ -29,8 +37,12 @@ class Command(BaseCommand):
                 variant_coordinate = vc_extra.variant_coordinate
 
                 if str(variant_coordinate) != allele_info.variant_coordinate:
-                    print(f"Allele Info {allele_info.pk} resolved to different variant coordinate. Old = {allele_info.variant_coordinate} New = {str(variant_coordinate)}")
+                    allele_info.dirty_message = f"New variant coordinate: {str(variant_coordinate)}"
+                    allele_info.save()
+                else:
+                    pass
             except:
                 if allele_info.variant_coordinate:
-                    print(f"Allele Info {allele_info.pk} could not resolve, though it currently has a cached variant coordinate")
+                    allele_info.dirty_message = f"Could not re-resolve to variant coordinate despite currently being resolved"
+                    allele_info.save()
         print(f"Processed {row_index} rows")

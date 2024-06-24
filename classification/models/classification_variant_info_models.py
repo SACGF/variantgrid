@@ -373,6 +373,9 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     variant_coordinate = TextField(null=True, blank=True)
 
+    dirty_message = TextField(null=True, blank=True)
+    """ Should be populated is we think this is going to resolve to a different variant """
+
     @property
     def variant_coordinate_obj(self) -> Optional[VariantCoordinate]:
         vc: Optional[VariantCoordinate] = None
@@ -728,9 +731,10 @@ class ImportedAlleleInfo(TimeStampedModel):
         if not matched_variant:
             raise ValueError("ImportedAlleleInfo.update_and_save requires a matched_variant, instead call reset_with_status")
 
+        self.dirty_message = None
         if not force_update and self.matched_variant == matched_variant and self.status == ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS:
             # nothing to do, and no force update, just update message if we need to
-            if message and message != self.message:
+            if message and message != self.message or self.dirty_message:
                 self.message = message
                 self.save()
             return
