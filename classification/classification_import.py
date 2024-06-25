@@ -127,6 +127,11 @@ def _add_post_data_insertion_upload_steps(upload_pipeline: UploadPipeline):
         sort_order += 1
 
 
+def variant_matching_dry_run(queryset: QuerySet[ImportedAlleleInfo]):
+    for allele_info in queryset.iterator():
+        allele_info.dirty_check()
+
+
 def reattempt_variant_matching(user: User, queryset: QuerySet[ImportedAlleleInfo], clear_existing: bool = False):
     """ @:returns (valid_record_count, invalid_record_count) """
     from classification.models.variant_resolver import VariantResolver

@@ -12,7 +12,7 @@ from django.utils.safestring import SafeString
 
 from annotation.models.models import AnnotationVersion
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
-from classification.classification_import import reattempt_variant_matching
+from classification.classification_import import reattempt_variant_matching, variant_matching_dry_run
 from classification.enums import WithdrawReason
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
@@ -1159,8 +1159,7 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
 
     @admin_action("Dirty Check")
     def dirty_check(self, request, queryset: QuerySet[ImportedAlleleInfo]):
-        for allele_info in queryset:
-            allele_info.dirty_check()
+        variant_matching_dry_run(queryset)
 
     @admin_action("Re-Match Soft")
     def re_match_soft(self, request, queryset: QuerySet[ImportedAlleleInfo]):
