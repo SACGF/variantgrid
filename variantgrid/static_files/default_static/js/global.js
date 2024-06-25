@@ -954,6 +954,7 @@ function checkLoggedIn(loggedInHandler, loggedOutHandler) {
 
 const JS_DATE_FORMAT_DETAILED = 'YYYY-MM-DD HH:mm:ss ZZ';
 const JS_DATE_FORMAT_SECONDS = 'YYYY-MM-DD HH:mm:ss';
+const JS_DATE_FORMAT_MILLISECONDS = 'YYYY-MM-DD HH:mm:ss.SSS';
 const JS_DATE_FORMAT_SCIENTIFIC = 'YYYY-MM-DD HH:mm';
 const JS_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; //'lll';
 function configureTimestamps() {
@@ -980,7 +981,7 @@ function configureTimestamps() {
 }
 function convertTimestampDom(elem) {
     elem = $(elem);
-    let unix = Number(elem.attr('data-timestamp'));
+    let unix= Number(elem.attr('data-timestamp'));
     let m = moment();
     if (unix) {
         m = moment(unix * 1000);

@@ -382,6 +382,23 @@ TableFormat.timestampSeconds = (data, type, row) => {
     }
 };
 
+TableFormat.timestampMilliseconds = (data, type, row) => {
+    if (data) {
+        let momentValue = moment(Number(data) * 1000)
+        let timestampStr = momentValue.format(JS_DATE_FORMAT_SCIENTIFIC);
+        let seconds = momentValue.format("ss")
+        let milliseconds = momentValue.format("SSS")
+        return $('<span>', {class:'timestamp', 'html': [
+                timestampStr + ":",
+                $('<span>', {class:'seconds', text:seconds}),
+                ".",
+                $('<span>', {class:'milliseconds', text:milliseconds})
+            ]}).prop('outerHTML');
+    } else {
+        return '';
+    }
+};
+
 TableFormat.sizeBytes = (data, type, row) => {
     if (data) {
         let unit = 'bytes';

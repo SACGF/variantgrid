@@ -1275,6 +1275,14 @@ h3.admin {
 .timestamp {
 	font-family: monospace;
 }
+.seconds {
+	font-size: 0.8rem;
+	color: #444;
+}
+.milliseconds {
+	font-size: 0.75rem;
+	color: #555;
+}
 
 div.readonly {
 	color: #8888AA;

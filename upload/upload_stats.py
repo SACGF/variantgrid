@@ -1,4 +1,5 @@
 from collections import Counter, defaultdict
+from typing import TypeAlias, Optional
 
 import numpy as np
 import pandas as pd
@@ -8,7 +9,7 @@ from django.utils import timezone
 from django.utils.datastructures import OrderedSet
 
 from snpdb.models import VCF
-from upload.models import UploadStep
+from upload.models import UploadStep, UploadPipeline
 
 
 def get_upload_stats(uploadstep_qs, max_step_names: int = None):
@@ -73,13 +74,13 @@ def get_upload_stats_from_durations(step_name_durations):
     return total_times, time_per_kilo_variant
 
 
-def get_vcf_variant_upload_stats():
+def get_vcf_variant_upload_stats() -> pd.DataFrame:
     """ df index of vcf_ids, cols = [cumulative_samples, total_variants, percent_known] """
 
-    def get_totals_per_vcf(ups_name):
+    def get_totals_per_vcf(ups_name) -> dict[int, int]:
         qs = VCF.objects.filter(uploadedvcf__upload_pipeline__uploadstep__name=ups_name)
         qs = qs.annotate(total_items_processed=Sum("uploadedvcf__upload_pipeline__uploadstep__items_processed"))
-        totals = {}
+        totals: dict[int, int] = {}
         for vcf_id, total_items_processed in qs.order_by("pk").values_list("pk", "total_items_processed"):
             totals[vcf_id] = total_items_processed
 
@@ -114,7 +115,10 @@ def get_vcf_variant_upload_stats():
     return df
 
 
-def get_step_total_stats(upload_pipeline, only_if_multiple_runs: bool = False):
+UploadStat: TypeAlias = tuple[str, int, int, int]
+
+
+def get_step_total_stats(upload_pipeline: UploadPipeline, only_if_multiple_runs: bool = False) -> Optional[list[UploadStat]]:
     """ Returns a list of tuples of (name, count) in start_date order """
 
     has_multiple_runs = False

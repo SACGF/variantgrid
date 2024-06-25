@@ -255,9 +255,8 @@
         </div>
 
         {% if step_total_stats %}
-            <a class="toggle-link" href="#upload-steps-times" data-toggle="collapse">Step Runs & Times</a>
-            <div id="upload-steps-times" class="collapse">
-                <table class="table">
+            <h4>Accumulative Times</h4>
+            <table class="table">
                 <thead>
                     <tr>
                         <th class="step">Step Name</th>
@@ -274,8 +273,7 @@
                         <td class="num"> {{ total_seconds | floatformat:1 }}</td>
                     </tr>
                 {% endfor %}
-                </table>
-            </div>
+            </table>
         {% endif %}
 
         {% if has_upload_steps %}
