@@ -104,12 +104,6 @@ class BioCommonsHGVSConverter(HGVSConverter):
         else:
             assembly_name = genome_build.name
         self.babelfish = Babelfish(self.hdp, assembly_name)
-        # HACK waiting for babelfish to be patched - see https://github.com/biocommons/hgvs/issues/744
-        # TODO: Remove this once biocommons HGVS is patched
-        accessions = list(self.babelfish.name_to_ac_map.values())
-        self.babelfish.name_to_ac_map.update({ac: ac for ac in accessions})
-        # /End hack
-
         self.am = AssemblyMapper(self.hdp,
                                  assembly_name=genome_build.name,
                                  alt_aln_method='splign',

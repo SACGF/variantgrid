@@ -1,5 +1,8 @@
 from importlib import metadata
 
+from genes.hgvs.hgvs_converter import HGVSConverterType
+from snpdb.models import VariantCoordinate
+
 
 def check_library_versions() -> dict:
     """ Check library versions to make sure bug fixes have been applied """
@@ -7,8 +10,13 @@ def check_library_versions() -> dict:
     def _test_biocommons_hgvs():
         from snpdb.models import GenomeBuild
         from genes.hgvs import HGVSMatcher
-        matcher = HGVSMatcher(GenomeBuild.grch38())
+        matcher = HGVSMatcher(GenomeBuild.grch38(), hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS)
+        # Check it can handle reference variants
         matcher.get_variant_coordinate("NC_000006.12:g.49949407_49949408=")
+
+        # Check it can handle contig names as chrom names
+        vc = VariantCoordinate(chrom="NC_000006.12", position=386486, ref="A", alt="<DUP>", svlen=5000)
+        matcher.variant_coordinate_to_g_hgvs(vc)
 
     minimum_versions = {
         "cdot": (0, 2, 21),
