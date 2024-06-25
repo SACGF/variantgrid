@@ -4,10 +4,6 @@ from django.core.management import BaseCommand
 
 from classification.classification_import import variant_matching_dry_run
 from classification.models import ImportedAlleleInfo
-from classification.models.variant_resolver import VariantResolver
-from genes.hgvs import HGVSMatcher
-from library.guardian_utils import admin_bot
-from snpdb.models import GenomeBuild
 
 
 class Command(BaseCommand):

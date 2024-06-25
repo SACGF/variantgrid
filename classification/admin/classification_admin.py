@@ -1065,7 +1065,7 @@ class ImportedAlleleInfoValidationInline(admin.TabularInline):
 
 class ImportedAlleleInfoDirtyFilter(admin.SimpleListFilter):
     title = "Dirt"
-    parameter_name = "validation"
+    parameter_name = "dirt"
 
     def lookups(self, request, model_admin):
         return [("dirty", "Dirty")]
