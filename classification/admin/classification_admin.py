@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from html import escape
 from typing import Union, Optional
 
 from django.contrib import admin, messages
@@ -1110,8 +1111,9 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
         "grch37_limit",
         "grch38_limit",
         "latest_validation",
+        "variant_coordinate",
         "dirty_message"
-        # "variant_coordinate",
+        #
         # "created"
     )
     list_filter = (
@@ -1140,6 +1142,25 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
         if latest_validation := obj.latest_validation:
             return latest_validation.include
         return False
+
+    # @admin_list_column("Latest Validation", "dirty_message")
+    # def latest_validation_formatted(self, obj: ImportedAlleleInfo):
+    #     if message := obj.latest_validation:
+    #         escaped = escape(str(message))
+    #         escaped.replace("\n", "<br/>")
+    #         return SafeString(escaped)
+    #
+    # @admin_list_column("Dirty Message", "dirty_message")
+    # def dirty_message_formatted(self, obj: ImportedAlleleInfo):
+    #     if message := obj.dirty_message:
+    #         escaped = escape(message)
+    #         escaped.replace("\n", "<br/>")
+    #         return SafeString(escaped)
+
+    @admin_action("Dirty Check")
+    def dirty_check(self, request, queryset: QuerySet[ImportedAlleleInfo]):
+        for allele_info in queryset:
+            allele_info.dirty_check()
 
     @admin_action("Re-Match Soft")
     def re_match_soft(self, request, queryset: QuerySet[ImportedAlleleInfo]):

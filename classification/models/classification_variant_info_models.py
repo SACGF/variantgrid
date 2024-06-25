@@ -333,6 +333,20 @@ _DIFF_TO_VALIDATION_KEY = {
 }
 
 
+@dataclass(frozen=True)
+class CalculatedVariantCoordinate:
+    variant_coordinate: Optional[VariantCoordinate]
+    message: str
+
+    @property
+    def variant_coordinate_str(self) -> Optional[str]:
+        return str(self.variant_coordinate) if self.variant_coordinate else None
+
+    @property
+    def is_valid(self) -> bool:
+        return self.variant_coordinate is not None
+
+
 class ImportedAlleleInfo(TimeStampedModel):
     """
     This class exists to give quick access to GRCh 37 and 38 details to a classification
@@ -627,26 +641,47 @@ class ImportedAlleleInfo(TimeStampedModel):
     def resolved_builds(self) -> list[ResolvedVariantInfo]:
         return list(ResolvedVariantInfo.objects.filter(allele_info=self).select_related('genome_build'))
 
+    def calculate_variant_coordinate(self) -> CalculatedVariantCoordinate:
+        vc: Optional[VariantCoordinate] = None
+        message: str
+        try:
+            use_hgvs = self.imported_c_hgvs or self.imported_g_hgvs
+            hgvs_matcher = HGVSMatcher(self.imported_genome_build_patch_version.genome_build)
+            vc_extra = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(use_hgvs)
+            message = f"HGVS matched by '{vc_extra.method}'"
+            vc = variant_coordinate = str(vc_extra.variant_coordinate)
+        except Exception as ex:
+            message = str(ex)
+        return CalculatedVariantCoordinate(variant_coordinate=vc, message=message)
+
     def update_variant_coordinate(self):
         """ returns if a valid variant_coordinate could be derived """
 
         # TODO, support variant_coordinate being provided
         # Code used to check to see if transcript was supported here
         # but it's better to do that in the validation step
-
-        use_hgvs = self.imported_c_hgvs or self.imported_g_hgvs
-        try:
-            hgvs_matcher = HGVSMatcher(self.imported_genome_build_patch_version.genome_build)
-            vc_extra = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(use_hgvs)
-            self.message = f"HGVS matched by '{vc_extra.method}'"
-            self.variant_coordinate = str(vc_extra.variant_coordinate)
-        except Exception as e:
-            # we rely on ValueError a lot, so best to just review errors in variant matching
-            # if not isinstance(e, (HGVSException, NotImplementedError)):
-            #     # extra not expected errors, report them in case they're coding mistakes rather than bad input
-            #     report_exc_info({"hgvs": use_hgvs, "genome_build": str(self.imported_genome_build_patch_version)})
-            self.message = str(e)
+        cvc = self.calculate_variant_coordinate()
+        self.message = cvc.message
+        self.variant_coordinate = cvc.variant_coordinate_str
+        if not cvc.is_valid:
             self.status = ImportedAlleleInfoStatus.FAILED
+
+    def dirty_check(self):
+        # TODO, if it gets driven here or elsewhere, determining variant coordinate is only part of the puzzle
+        # still need to check if variant resolution is different
+        cvc = self.calculate_variant_coordinate()
+        new_dirty_message: Optional[str]
+        if self.variant_coordinate != cvc.variant_coordinate_str:
+            if cvc.variant_coordinate:
+                new_dirty_message = f"{cvc.message}\n{cvc.variant_coordinate_str}"
+            else:
+                new_dirty_message = cvc.message
+        else:
+            new_dirty_message = None
+
+        if self.dirty_message != new_dirty_message:
+            self.dirty_message = new_dirty_message
+            self.save()
 
     def update_status(self):
         if self.grch37 and self.grch38:
