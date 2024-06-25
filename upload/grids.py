@@ -41,7 +41,8 @@ class UploadStepColumns(DatatableConfig[UploadStep]):
             RichColumn(key='id', orderable=True),
             RichColumn(key='name', orderable=True),
             RichColumn(key='status', orderable=True, renderer=UploadStepColumns.render_status),
-            RichColumn(key='items_processed', orderable=True),
+            RichColumn(key='items_processed', css_class='num', orderable=True),
+            RichColumn(key='start_date', client_renderer='TableFormat.timestampSeconds', orderable=True),
             RichColumn(name='duration', label="Duration Seconds", extra_columns=["start_date", "end_date"], renderer=UploadStepColumns.render_duration, css_class="num")
         ]
 

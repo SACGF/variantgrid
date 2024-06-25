@@ -42,7 +42,7 @@ class UploadStepAdmin(ModelAdminBasics):
 
 class UploadStepInline(admin.TabularInline):
     model = UploadStep
-    fields = ['id', 'name', 'status']
+    fields = ['id', 'name', 'status', 'start_date', 'end_date']
     show_change_link = True
     ordering = ('sort_order', )
 
@@ -75,6 +75,7 @@ class ModifiedImportedVariant(ModelAdminBasics):
             if allele := variant.allele:
                 href = allele.get_absolute_url()
                 return SafeString(f"<a href=\"{href}\">{allele}</a>")
+
     @admin_list_column("New Variant", order_field='variant')
     def new_variant(self, obj: ModifiedImportedVariant):
         return obj.variant

@@ -373,6 +373,15 @@ TableFormat.timestamp = (data, type, row) => {
     }
 };
 
+TableFormat.timestampSeconds = (data, type, row) => {
+    if (data) {
+        let timestampStr = moment(Number(data) * 1000).format(JS_DATE_FORMAT_SECONDS);
+        return $('<span>', {class:'timestamp', 'text': timestampStr}).prop('outerHTML');
+    } else {
+        return '';
+    }
+};
+
 TableFormat.sizeBytes = (data, type, row) => {
     if (data) {
         let unit = 'bytes';

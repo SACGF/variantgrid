@@ -8,10 +8,10 @@
 {% labelled label="Error Message" %}{{ upload_step.error_message }}{% endlabelled %}
 {% labelled label="Input Filename" %}{{ upload_step.input_filename }}{% endlabelled %}
 {% labelled label="Output Filename" %}{{ upload_step.output_filename }}{% endlabelled %}
-{% labelled label="Start Date" %}{{ upload_step.start_date }}{% endlabelled %}
-{% labelled label="End Date" %}{{ upload_step.end_date }}{% endlabelled %}
-{% labelled label="Task Type" %}{{ upload_step.get_tasktype_display }}{% endlabelled %}
-{% labelled label="Pipeline Stage" %}{{ upload_step.get_pipieline_stage_display }}{% endlabelled %}
+{% labelled label="Start Date" %}{% timestamp upload_step.start_date show_seconds=True %}{% endlabelled %}
+{% labelled label="End Date" %}{% timestamp upload_step.end_date show_seconds=True %}{% endlabelled %}
+{% labelled label="Task Type" %}{{ upload_step.get_task_type_display }}{% endlabelled %}
+{% labelled label="Pipeline Stage" %}{{ upload_step.get_pipeline_stage_display }}{% endlabelled %}
 {% labelled label="Pipeline Stage Dependency" %}{{ upload_step.get_pipeline_stage_dependency_display }}{% endlabelled %}
 {% labelled label="Script" %}{% code_shell upload_step.script %}{% endlabelled %}
 {% labelled label="Child Script" %}{{ upload_step.child_script }}{% endlabelled %}

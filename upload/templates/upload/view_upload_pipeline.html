@@ -183,7 +183,7 @@
 	<div class="container">
         <h3>Upload Pipeline</h3>
         <div class="card mb-4">
-            <div class="card-header">Upload Pipeline {{ upload_pipeline.pk }}</div>
+            <div class="card-header">Upload Pipeline {{ upload_pipeline.pk }} {% admin_link upload_pipeline %}</div>
             <div class="card-body">
                 {% labelled label="Status" %}{{ upload_pipeline.get_status_display | severity_icon }}{{ upload_pipeline.get_status_display }}{% endlabelled %}
                 {% labelled label="Uploaded File" %}{{ upload_pipeline.uploaded_file }}{% endlabelled %}
