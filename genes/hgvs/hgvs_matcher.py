@@ -80,7 +80,7 @@ class HGVSConverterFactory:
                 PyHGVSConverter(genome_build, local_resolution=local_resolution, clingen_resolution=clingen_resolution),
             ]
             return ComboCheckerHGVSConverter(genome_build, converters, die_on_error=False)
-        elif hgvs_converter_type == HGVSConverterType.CLINGEN:
+        elif hgvs_converter_type == HGVSConverterType.CLINGEN_ALLELE_REGISTRY:
             class ClinGenHGVSConverter(BioCommonsHGVSConverter):
                 def __init__(self, genome_build, local_resolution=False, clingen_resolution=True):
                     super().__init__(genome_build,

@@ -9,7 +9,7 @@ class HGVSConverterType(Enum):
     PYHGVS = 1
     BIOCOMMONS_HGVS = 2
     COMBO = 3
-    CLINGEN = 4  # This is not a full implementation just enough for HGVS tester tool
+    CLINGEN_ALLELE_REGISTRY = 4  # This is not a full implementation just enough for HGVS tester tool
 
 
 class HgvsMatchRefAllele:
