@@ -110,8 +110,8 @@ class PyHGVSVariant(HGVSVariant):
 
 
 class PyHGVSConverter(HGVSConverter):
-    def __int__(self, genome_build: GenomeBuild):
-        super().__init__(genome_build)
+    def __int__(self, genome_build: GenomeBuild, local_resolution = True, clingen_resolution=True):
+        super().__init__(genome_build, local_resolution=local_resolution, clingen_resolution=clingen_resolution)
 
     @staticmethod
     def _hgvs_name(hgvs_string):
@@ -175,8 +175,11 @@ class PyHGVSConverter(HGVSConverter):
             transcript_accession = ''
         return transcript_accession
 
-    def description(self) -> str:
-        return f"pyhgvs v{metadata.version('pyhgvs')}"
+    def description(self, describe_fallback=True) -> str:
+        desc = f"pyhgvs v{metadata.version('pyhgvs')}"
+        if self.clingen_resolution and describe_fallback:
+            desc += f" (clingen fallback)"
+        return desc
 
     def get_hgvs_match_ref_allele(self, hgvs_name, pyhgvs_transcript=None) -> HgvsMatchRefAllele:
         """Return True if reference allele matches genomic sequence."""

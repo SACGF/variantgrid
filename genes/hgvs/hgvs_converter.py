@@ -9,6 +9,7 @@ class HGVSConverterType(Enum):
     PYHGVS = 1
     BIOCOMMONS_HGVS = 2
     COMBO = 3
+    CLINGEN = 4  # This is not a full implementation just enough for HGVS tester tool
 
 
 class HgvsMatchRefAllele:
@@ -44,8 +45,10 @@ class HGVSConverter(abc.ABC):
     """ This is the base object for PyHGVS and BioCommons HGVS
         implementations """
 
-    def __init__(self, genome_build: GenomeBuild):
+    def __init__(self, genome_build: GenomeBuild, local_resolution=True, clingen_resolution=True):
         self.genome_build = genome_build
+        self.local_resolution = local_resolution
+        self.clingen_resolution = clingen_resolution
 
     @abc.abstractmethod
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
@@ -72,5 +75,5 @@ class HGVSConverter(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def description(self) -> str:
+    def description(self, describe_fallback=True) -> str:
         pass

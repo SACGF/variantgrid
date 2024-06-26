@@ -2,7 +2,7 @@ import logging
 import re
 import sys
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Optional, Union, Tuple
 
 from django.conf import settings
 from django.core.cache import cache
@@ -10,7 +10,7 @@ from django.db.models import Max, Min
 
 from genes.hgvs import HGVSVariant, CHGVS
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
-from genes.hgvs.hgvs_converter import HGVSConverterType, HgvsMatchRefAllele
+from genes.hgvs.hgvs_converter import HGVSConverterType, HgvsMatchRefAllele, HGVSConverter
 from genes.hgvs.hgvs_converter_combo import ComboCheckerHGVSConverter
 from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSConverter
 from genes.models import TranscriptVersion, Transcript, GeneSymbol, LRGRefSeqGene, BadTranscript, \
@@ -57,7 +57,8 @@ class HGVSConverterFactory:
     """
 
     @staticmethod
-    def factory(genome_build: GenomeBuild, hgvs_converter_type: Optional[HGVSConverterType] = None):
+    def factory(genome_build: GenomeBuild, hgvs_converter_type: Optional[HGVSConverterType] = None,
+                local_resolution=True, clingen_resolution=True) -> HGVSConverter:
         if hgvs_converter_type is None:
             # if settings.DEBUG:  # TODO: Disabled
             #     hgvs_converter_type = HGVSConverterType.COMBO
@@ -70,12 +71,29 @@ class HGVSConverterFactory:
         logging.debug("Using HGVSConverter = %s", hgvs_converter_type.name)
 
         if hgvs_converter_type == HGVSConverterType.BIOCOMMONS_HGVS:
-            return BioCommonsHGVSConverter(genome_build)
+            return BioCommonsHGVSConverter(genome_build, local_resolution=local_resolution, clingen_resolution=clingen_resolution)
         elif hgvs_converter_type == HGVSConverterType.PYHGVS:
-            return PyHGVSConverter(genome_build)
+            return PyHGVSConverter(genome_build, local_resolution=local_resolution, clingen_resolution=clingen_resolution)
         elif hgvs_converter_type == HGVSConverterType.COMBO:
-            converters = [BioCommonsHGVSConverter(genome_build), PyHGVSConverter(genome_build)]
+            converters = [
+                BioCommonsHGVSConverter(genome_build, local_resolution=local_resolution, clingen_resolution=clingen_resolution),
+                PyHGVSConverter(genome_build, local_resolution=local_resolution, clingen_resolution=clingen_resolution),
+            ]
             return ComboCheckerHGVSConverter(genome_build, converters, die_on_error=False)
+        elif hgvs_converter_type == HGVSConverterType.CLINGEN:
+            class ClinGenHGVSConverter(BioCommonsHGVSConverter):
+                def __init__(self, genome_build, local_resolution=False, clingen_resolution=True):
+                    super().__init__(genome_build,
+                                     local_resolution=local_resolution, clingen_resolution=clingen_resolution)
+
+                def description(self) -> str:
+                    underlying_lib_description = super().description(describe_fallback=False)
+                    return f"ClinGen Allele Registry (for resolution, on {underlying_lib_description} models)"
+
+            return ClinGenHGVSConverter(genome_build)
+
+        raise ValueError(f"HGVSConverter type {hgvs_converter_type} not supported")
+
 
 
 class VariantResolvingError(ValueError):
@@ -116,10 +134,13 @@ class HGVSMatcher:
     class TranscriptContigMismatchError(ValueError):
         pass
 
-    def __init__(self, genome_build: GenomeBuild, hgvs_converter_type=None):
+    def __init__(self, genome_build: GenomeBuild, hgvs_converter_type=None,
+                 local_resolution=True, clingen_resolution=True):
         self.genome_build = genome_build
         self.attempt_clingen = True  # Stop on any non-recoverable error - keep going if unknown reference
-        self.hgvs_converter = HGVSConverterFactory.factory(genome_build, hgvs_converter_type)
+        self.hgvs_converter = HGVSConverterFactory.factory(genome_build, hgvs_converter_type,
+                                                           local_resolution=local_resolution,
+                                                           clingen_resolution=clingen_resolution)
 
     def _clingen_get_variant_coordinate(self, hgvs_string: str) -> VariantCoordinate:
         cleaned_hgvs = self.hgvs_converter.c_hgvs_remove_gene_symbol(hgvs_string)
@@ -279,9 +300,10 @@ class HGVSMatcher:
             transcript_version = tv_by_version.get(v)
             if not transcript_version:
                 transcript_version = FakeTranscriptVersion(transcript_id=transcript_id, version=v)
-            if transcript_version.hgvs_ok:
+            if transcript_version.hgvs_ok and self.hgvs_converter.local_resolution:
                 tv_and_method.append((transcript_version, HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY))
-            tv_and_method.append((transcript_version, HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY))
+            if self.hgvs_converter.clingen_resolution:
+                tv_and_method.append((transcript_version, HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY))
 
         # TODO: Maybe we should filter transcript versions that have the same length
         sort_key = self._get_sort_key_transcript_version_and_methods(version, prefer_local=prefer_local, closest=closest)
@@ -379,7 +401,7 @@ class HGVSMatcher:
     def _lrg_variant_coordinate_to_hgvs(self, variant_coordinate: VariantCoordinate, lrg_identifier: str = None) -> tuple[HGVSVariant, str]:
         if transcript_version := LRGRefSeqGene.get_transcript_version(self.genome_build, lrg_identifier):
             if transcript_version.hgvs_ok:
-                hgvs_variant, hgvs_method = self._variant_coordinate_to_hgvs_and_method(variant_coordinate, transcript_version.accession)
+                hgvs_variant, hgvs_method = self.variant_coordinate_to_hgvs_and_method(variant_coordinate, transcript_version.accession)
                 if hgvs_variant.transcript != transcript_version.accession:
                     msg = f"Error creating HGVS for {variant_coordinate}, LRG '{lrg_identifier}' asked for HGVS " \
                           f"'{transcript_version.accession}' but got '{hgvs_variant.transcript}'"
@@ -401,8 +423,8 @@ class HGVSMatcher:
         problem_str = ", ".join(problems)
         raise ValueError(f"Could not convert {variant_coordinate} to HGVS using '{lrg_identifier}': {problem_str}")
 
-    def _variant_coordinate_to_hgvs_and_method(self, variant_coordinate: VariantCoordinate,
-                                               transcript_accession: str = None) -> tuple[HGVSVariant, str]:
+    def variant_coordinate_to_hgvs_and_method(self, variant_coordinate: VariantCoordinate,
+                                              transcript_accession: str = None) -> tuple[HGVSVariant, str]:
         """
             returns (hgvs, method) - hgvs is c.HGVS is transcript provided, g.HGVS if not
 
@@ -476,13 +498,16 @@ class HGVSMatcher:
 
         return hgvs_variant, hgvs_method
 
+    def variant_to_hgvs_variant_and_method(self, variant: Variant, transcript_name=None) -> Tuple[HGVSVariant, str]:
+        return self.variant_coordinate_to_hgvs_and_method(variant.coordinate, transcript_name=transcript_name)
+
     def variant_to_hgvs_variant(self, variant: Variant, transcript_name=None) -> HGVSVariant:
         """ returns c.HGVS is transcript provided, g.HGVS if no transcript"""
         return self.variant_coordinate_to_hgvs_variant(variant.coordinate, transcript_name=transcript_name)
 
     def variant_coordinate_to_hgvs_variant(self, variant_coordinate: VariantCoordinate, transcript_name=None) -> HGVSVariant:
         variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
-        return self._variant_coordinate_to_hgvs_and_method(variant_coordinate, transcript_name)[0]
+        return self.variant_coordinate_to_hgvs_and_method(variant_coordinate, transcript_name)[0]
 
     @staticmethod
     def _fast_variant_coordinate_to_g_hgvs(refseq_accession, offset, ref, alt) -> str:

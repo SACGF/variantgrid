@@ -32,6 +32,9 @@
                 <thead>
                     <tr>
                         <th>Source</th>
+                        {% if show_method_column %}
+                            <th>Method</th>
+                        {% endif %}
                         <th>Variant Coordinate {% if not outputs.all_equal_variant_coordinate %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
                         <th>Variant Coordinate Explicit {% if not outputs.all_equal_variant_coordinate %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
                         <th>Transcript {% if not outputs.all_equal_transcript_version %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
@@ -48,6 +51,9 @@
                                     <div>{% imported_allele_info output.imported_allele_info %}</div>
                                 {% endif %}
                             </th>
+                        {% if show_method_column %}
+                            <td>{{ output.method|dash_if_empty }}</td>
+                        {% endif %}
                             <td>{{ output.variant_coordinate|dash_if_empty }}</td>
                             <td>{{ output.variant_coordinate|stringformat:'r'|dash_if_empty }}</td>
                             <td>{{ output.transcript_version|dash_if_empty }}</td>

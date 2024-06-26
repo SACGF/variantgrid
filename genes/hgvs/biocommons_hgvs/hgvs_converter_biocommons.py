@@ -96,8 +96,8 @@ class BioCommonsHGVSConverter(HGVSConverter):
     hgvs_span_trailing_int_length_pattern = re.compile(r"(.*(?:del|dup|inv))(\d+)$")
     reference_sequence_pattern = re.compile(r".*: Variant reference \((.*)\) does not agree with reference sequence \((.*)\)")
 
-    def __init__(self, genome_build: GenomeBuild):
-        super().__init__(genome_build)
+    def __init__(self, genome_build: GenomeBuild, local_resolution=True, clingen_resolution=True):
+        super().__init__(genome_build, local_resolution=local_resolution, clingen_resolution=clingen_resolution)
         self.hdp = DjangoTranscriptDataProvider(genome_build)
         if genome_build.name == 'GRCh37':
             assembly_name = genome_build.get_build_with_patch()  # Need to include patch to get MT in GRCh37
@@ -212,8 +212,11 @@ class BioCommonsHGVSConverter(HGVSConverter):
             alt = alt[i:]
         return ref, alt
 
-    def description(self) -> str:
-        return f"BioCommons hgvs v{metadata.version('hgvs')}"
+    def description(self, describe_fallback=True) -> str:
+        desc = f"BioCommons hgvs v{metadata.version('hgvs')}"
+        if self.clingen_resolution and describe_fallback:
+            desc += f" (clingen fallback)"
+        return desc
 
     @staticmethod
     def _m_to_g(var_m):

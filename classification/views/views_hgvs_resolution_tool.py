@@ -16,6 +16,7 @@ from snpdb.models import GenomeBuild, VariantCoordinate
 class HgvsResolutionForm(forms.Form):
     genome_build = forms.ChoiceField(widget=forms.RadioSelect)
     hgvs = forms.CharField(label="HGVS")
+    display_clingen_separately = forms.BooleanField(required=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -31,6 +32,7 @@ class MatcherOutput:
     transcript_version: Optional[TranscriptParts] = None
     hgvs: Optional[str] = None
     message: Optional[str] = None
+    method: Optional[str] = None
 
     @property
     def explicit_variant_coordinate(self):
@@ -97,9 +99,21 @@ def hgvs_resolution_tool(request: HttpRequest):
                     output.variant_coordinate = v.coordinate
             output.message = iai.message
 
-        for matcher_id in [HGVSConverterType.PYHGVS, HGVSConverterType.BIOCOMMONS_HGVS]:
-            matcher = HGVSMatcher(genome_build, hgvs_converter_type=matcher_id)
+        context["show_method_column"] = not data.get("display_clingen_separately")
 
+        if data.get("display_clingen_separately"):
+            hgvs_matchers = [
+                HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.PYHGVS, clingen_resolution=False),
+                HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS, clingen_resolution=False),
+                HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.CLINGEN),
+            ]
+        else:
+            hgvs_matchers = [
+                HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.PYHGVS),
+                HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS),
+            ]
+
+        for matcher in hgvs_matchers:
             output = MatcherOutput(matcher_name=matcher.hgvs_converter.description(), genome_build=genome_build)
             all_output.append(output)
 
@@ -108,6 +122,7 @@ def hgvs_resolution_tool(request: HttpRequest):
                 if vcd := matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_str):
                     variant_coordinate = vcd.variant_coordinate
                     output.variant_coordinate = variant_coordinate
+                    output.method = vcd.method
 
                 if vcd.transcript_accession:
                     output.transcript_version = TranscriptVersion.transcript_parts(vcd.transcript_accession)
