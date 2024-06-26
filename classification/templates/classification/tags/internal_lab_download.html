@@ -15,8 +15,7 @@
             <label class="form-check-label">
                 <input {% if form_data.share_level.value != 'lab' %}checked="checked"{% endif %} id="share_level_logged_in_users" name="share_level" value="logged_in_users" type="radio" class="form-check-input" />
                 <img src="{% static 'icons/share_level/logged_in_users.png' %}" class="tiny-icon" />
-                <img src="{% static 'icons/share_level/public.png' %}" class="tiny-icon" />
-                Shared with Application and 3rd Party Databases
+                Published records, shared with all users
             </label>
         </div>
         <div class="form-check">
@@ -25,8 +24,7 @@
                 <img src="{% static 'icons/share_level/lab.png' %}" class="tiny-icon" />
                 <img src="{% static 'icons/share_level/institution.png' %}" class="tiny-icon" />
                 <img src="{% static 'icons/share_level/logged_in_users.png' %}" class="tiny-icon" />
-                <img src="{% static 'icons/share_level/public.png' %}" class="tiny-icon" />
-                Any record I have access to (e.g. records shared at my lab).
+                Any record I have access to (includes unshared records only visible to members of your lab)
             </label>
         </div>
     {% endlabelled %}
@@ -43,10 +41,11 @@
                 GRCh38
             </label>
         </div>
+        <div class="text-muted">This will also determine which genome build is used to resolve genomic locations in the filter</div>
     {% endlabelled %}
     {% labelled label="Allele Origin" %}
         {% allele_origin_toggle show_label=False prefill=form_data.allele_origin %}
-        <div class="text-muted">Note that records with an allele origin other than germline or somatic will always be included in downloads.</div>
+        <div class="text-muted">Note that records with an allele origin other than germline or somatic will always be included.</div>
     {% endlabelled %}
     {% labelled label="Record Filter/s"%}
         <div class="form-check px-2">
@@ -61,7 +60,7 @@
             <ul>
                 <li>Gene Symbol (e.g. RYR1)</li>
                 <li>ClinGen Allele ID (e.g. CA024299)</li>
-                <li>Genomic Location using selected Genome Build (e.g. 19:38455528 C>T)</li>
+                <li>Genomic Location (e.g. 19:38455528 C>T) using selected genome build</li>
             </ul>
             Records matching any filter will be returned.
         </div>

@@ -14,6 +14,9 @@ from django.http import HttpRequest
 from guardian.shortcuts import get_objects_for_user
 from threadlocals.threadlocals import get_current_request
 
+from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version, \
+    get_variant_queryset_for_latest_annotation_version
+from annotation.models import AnnotationVersion
 from classification.enums import ShareLevel, ClinicalContextStatus, AlleleOriginBucket
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
@@ -219,15 +222,22 @@ def classification_export_user_string_to_q(user_input: str, genome_build: Genome
         if gene_match := classification_gene_symbol_filter(user_input):
             return gene_match
     if vc := VariantCoordinate.from_string(user_input, genome_build):
+        variant_qs = get_variant_queryset_for_latest_annotation_version(genome_build)
+        variant_qs = variant_qs.filter(Variant.get_contigs_q(genome_build))  # restrict to build
+
         variant_coordinate = vc.as_internal_symbolic(genome_build)
-        variants = get_results_from_variant_coordinate(genome_build, Variant.objects.all(), variant_coordinate)
-        all_alleles = set()
+        variants = get_results_from_variant_coordinate(genome_build, variant_qs, variant_coordinate)
+        all_alleles: set[Allele] = set()
         for v in variants:
             if allele := v.allele:
                 all_alleles.add(allele)
         if all_alleles:
             return Q(classification__allele_info__allele__in=all_alleles)
-    raise ValueError("Can't match to ClinGen Allele, Gene Symbol or Variant Coordinate")
+        else:
+            return Q(pk=None)
+            # no variants match this search, return a Q that will result in no records being returned, so we can complain
+            # that there are no matches for this user string
+    raise ValueError(f"Can't match \"{user_input}\" to ClinGen Allele, Gene Symbol or Variant Coordinate")
 
 
 @dataclass

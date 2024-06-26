@@ -28,6 +28,7 @@ from classification.views.exports.classification_export_formatter_csv import For
 from classification.views.exports.classification_export_formatter_redcap import export_redcap_definition
 from classification.views.exports.classification_export_view import serve_export
 from library.django_utils import get_url_from_view_path
+from library.log_utils import report_exc_info
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import AlleleOriginFilterDefault
 from snpdb.models.models import Lab, Organization
@@ -307,6 +308,7 @@ def internal_lab_download(request):
                             all_qs.append(part_q)
 
                     except ValueError as ve:
+                        report_exc_info()
                         has_errors = True
                         messages.error(request, f"\"{part}\" - could not be turned into a classification filter")
 

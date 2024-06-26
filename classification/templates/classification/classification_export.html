@@ -243,8 +243,7 @@
             <label class="form-check-label">
                 <input checked="checked" id="share_level_public" name="share_level" value="public" type="radio" class="form-check-input" />
                 <img src="{% static 'icons/share_level/logged_in_users.png' %}" class="tiny-icon" />
-                <img src="{% static 'icons/share_level/public.png' %}" class="tiny-icon" />
-                Shared with Application and 3rd Party Databases
+                Published records, shared with all users
             </label>
         </div>
         <div class="form-check">
@@ -253,8 +252,7 @@
                 <img src="{% static 'icons/share_level/lab.png' %}" class="tiny-icon" />
                 <img src="{% static 'icons/share_level/institution.png' %}" class="tiny-icon" />
                 <img src="{% static 'icons/share_level/logged_in_users.png' %}" class="tiny-icon" />
-                <img src="{% static 'icons/share_level/public.png' %}" class="tiny-icon" />
-                Any record I have access to (e.g. records shared at my lab).
+                Any record I have access to (includes unshared records only visible to members of your lab)
             </label>
         </div>
     {% endlabelled %}
