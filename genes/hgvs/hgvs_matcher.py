@@ -13,8 +13,8 @@ from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSC
 from genes.hgvs.hgvs_converter import HGVSConverterType, HgvsMatchRefAllele, HGVSConverter
 from genes.hgvs.hgvs_converter_combo import ComboCheckerHGVSConverter
 from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSConverter
-from genes.models import TranscriptVersion, Transcript, GeneSymbol, LRGRefSeqGene, BadTranscript, \
-    NoTranscript, TranscriptParts, GeneSymbolAlias
+from genes.models import TranscriptVersion, Transcript, LRGRefSeqGene, BadTranscript, \
+    NoTranscript, TranscriptParts
 from genes.transcripts_utils import transcript_is_lrg, looks_like_transcript, looks_like_hgvs_prefix
 from library.constants import WEEK_SECS
 from library.log_utils import report_exc_info
