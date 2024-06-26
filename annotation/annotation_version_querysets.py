@@ -12,30 +12,34 @@ Ideally, this could have been done via Django FilteredRelation - but that doesn'
 
 import operator
 from functools import reduce
+from typing import TypeVar, Optional
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Model
 from django.db.models.query_utils import Q
 
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationPipelineType
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
-from snpdb.models import Variant
+from snpdb.models import Variant, GenomeBuild
 
 
-def get_variant_queryset_for_latest_annotation_version(genome_build) -> QuerySet:
+def get_variant_queryset_for_latest_annotation_version(genome_build: GenomeBuild) -> QuerySet[Variant]:
     annotation_version = AnnotationVersion.latest(genome_build)
     return get_variant_queryset_for_annotation_version(annotation_version)
 
 
-def get_variant_queryset_for_annotation_version(annotation_version) -> QuerySet:
+def get_variant_queryset_for_annotation_version(annotation_version: AnnotationVersion) -> QuerySet[Variant]:
     return get_queryset_for_annotation_version(Variant, annotation_version)
 
 
-def get_queryset_for_latest_annotation_version(klass, genome_build) -> QuerySet:
+QUERY_SET_K = TypeVar("QUERY_SET_K", bound=Model)
+
+
+def get_queryset_for_latest_annotation_version(klass: type[QUERY_SET_K], genome_build: GenomeBuild) -> QuerySet[QUERY_SET_K]:
     annotation_version = AnnotationVersion.latest(genome_build)
     return get_queryset_for_annotation_version(klass, annotation_version=annotation_version)
 
 
-def get_queryset_for_annotation_version(klass, annotation_version) -> QuerySet:
+def get_queryset_for_annotation_version(klass: type[QUERY_SET_K], annotation_version: AnnotationVersion) -> QuerySet[QUERY_SET_K]:
     """ Returns a klass QuerySet for which joins to the correct VariantAnnotation partition """
 
     assert annotation_version, "Must provide 'annotation_version'"
@@ -44,9 +48,11 @@ def get_queryset_for_annotation_version(klass, annotation_version) -> QuerySet:
     return qs
 
 
-def get_variants_qs_for_annotation(annotation_version, pipeline_type=None,
-                                   min_variant_id=None, max_variant_id=None,
-                                   annotated=False):
+def get_variants_qs_for_annotation(
+        annotation_version: AnnotationVersion,
+        pipeline_type: Optional[VariantAnnotationPipelineType] = None,
+        min_variant_id: Optional[int] = None, max_variant_id: Optional[int] = None,
+        annotated: bool = False):
     # Explicitly join to version partition so other version annotations don't count
     qs = get_variant_queryset_for_annotation_version(annotation_version)
     q_filters = VariantAnnotation.VARIANT_ANNOTATION_Q + \
