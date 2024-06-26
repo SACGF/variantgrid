@@ -164,6 +164,9 @@ class ClassificationExportInternalCompare(ClassificationExportFormatter):
         ]
 
     def row(self, allele_data: AlleleData) -> list[str]:
+        if not allele_data.allele:
+            return []
+
         lab_a_cs: list[ClassificationModification] = []
         lab_b_cs: list[ClassificationModification] = []
         for cm in allele_data.cms_regardless_of_issues:
