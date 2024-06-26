@@ -308,7 +308,7 @@ def internal_lab_download(request):
                             all_qs.append(part_q)
 
                     except ValueError as ve:
-                        report_exc_info()
+                        report_exc_info(extra_data={"target": part, "exception_message": str(ve)})
                         has_errors = True
                         messages.error(request, f"\"{part}\" - could not be turned into a classification filter")
 
