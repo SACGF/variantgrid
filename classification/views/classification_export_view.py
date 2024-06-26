@@ -118,7 +118,7 @@ def _export_view_context(request: HttpRequest) -> dict:
         format_vcf
     ]
 
-    labs_for_user = set(Lab.valid_labs_qs(request.user, admin_check=True))
+    labs_for_user = list(sorted(Lab.valid_labs_qs(request.user, admin_check=True)))
 
     return {
         'labs': labs,
