@@ -51,6 +51,18 @@ class VariantCoordinateAndDetails(FormerTuple):
         return self.variant_coordinate, self.transcript_accession, self.kind, self.method, self.matches_reference
 
 
+class ClinGenHGVSConverter(BioCommonsHGVSConverter):
+    def __init__(self, genome_build, local_resolution=False, clingen_resolution=True):
+        super().__init__(genome_build,
+                         local_resolution=local_resolution, clingen_resolution=clingen_resolution)
+
+    def get_hgvs_converter_type(self) -> HGVSConverterType:
+        return HGVSConverterType.CLINGEN_ALLELE_REGISTRY
+
+    def get_version(self) -> str:
+        return f"From (cached) API, uses {super().get_hgvs_converter_type().name} models)"
+
+
 class HGVSConverterFactory:
     """
     For choice of PyHGVS vs BioCommons @see https://github.com/SACGF/variantgrid/issues/839
@@ -81,15 +93,6 @@ class HGVSConverterFactory:
             ]
             return ComboCheckerHGVSConverter(genome_build, converters, die_on_error=False)
         elif hgvs_converter_type == HGVSConverterType.CLINGEN_ALLELE_REGISTRY:
-            class ClinGenHGVSConverter(BioCommonsHGVSConverter):
-                def __init__(self, genome_build, local_resolution=False, clingen_resolution=True):
-                    super().__init__(genome_build,
-                                     local_resolution=local_resolution, clingen_resolution=clingen_resolution)
-
-                def description(self) -> str:
-                    underlying_lib_description = super().description(describe_fallback=False)
-                    return f"ClinGen Allele Registry (for resolution, on {underlying_lib_description} models)"
-
             return ClinGenHGVSConverter(genome_build)
 
         raise ValueError(f"HGVSConverter type {hgvs_converter_type} not supported")

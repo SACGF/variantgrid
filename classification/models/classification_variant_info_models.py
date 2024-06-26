@@ -5,18 +5,20 @@ from typing import Optional, Any, TypedDict, Literal
 import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.db import models
 from django.db.models import TextField, ForeignKey, CASCADE, SET_NULL, OneToOneField, TextChoices, \
-    CharField, JSONField, BooleanField
+    CharField, JSONField, BooleanField, PROTECT
 from django.urls import reverse
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
-from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff
+from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff, HGVSConverterType
 from genes.models import TranscriptVersion, GeneSymbol, Transcript
 from library.cache import timed_cache
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.log_utils import report_exc_info
 from library.utils import pretty_label, IconWithTooltip, md5sum_str
+from library.utils.django_utils import get_cached_project_git_hash
 from snpdb.models import GenomeBuild, Variant, Allele, GenomeBuildPatchVersion, VariantCoordinate
 
 """
@@ -45,6 +47,23 @@ allele_info_changed_signal = django.dispatch.Signal()  # args: "allele_info": Im
 A signal to fire when an AlleleInfo changes what it resolves to.
 post_save seemed like it might be a little too easy to trigger.
 """
+
+
+class HGVSConverterVersion(TimeStampedModel):
+    hgvs_converter_type = models.TextField()  # HGVSConverterType
+    version = models.TextField()
+    method = models.TextField()  # Records eg fall back to ClinGen
+    code_git_hash = models.TextField()
+
+    def __str__(self) -> str:
+        return f"{self.hgvs_converter_type} {self.version} {self.method} {self.code_git_hash}"
+
+    @staticmethod
+    def get(hgvs_converter_type: HGVSConverterType, version: str, method: str):
+        return HGVSConverterVersion.objects.get_or_create(hgvs_converter_type=hgvs_converter_type.name,
+                                                          version=version,
+                                                          method=method,
+                                                          code_git_hash=get_cached_project_git_hash())[0]
 
 
 class ResolvedVariantInfo(TimeStampedModel):
@@ -77,6 +96,9 @@ class ResolvedVariantInfo(TimeStampedModel):
 
     c_hgvs_compat = TextField(null=True, blank=True)
     """ c.HGVS with all bases explicit in the case of dels & dups """
+
+    c_hgvs_converter_version = ForeignKey(HGVSConverterVersion, null=True, blank=True, on_delete=PROTECT)
+    """ Tool used to generate c_hgvs  """
 
     gene_symbol = ForeignKey(GeneSymbol, null=True, on_delete=SET_NULL)
     """ The GeneSymbol of the c.HGVS """
@@ -126,13 +148,17 @@ class ResolvedVariantInfo(TimeStampedModel):
         imported_transcript = self.allele_info.get_transcript
 
         hgvs_matcher = HGVSMatcher(genome_build=genome_build)
+        hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
+        version = hgvs_matcher.hgvs_converter.get_version()
+
         try:
-            hgvs_variant = hgvs_matcher.variant_to_hgvs_variant(variant, imported_transcript)
+            hgvs_variant, method = hgvs_matcher.variant_to_hgvs_variant_and_method(variant, imported_transcript)
             c_hgvs = hgvs_variant.format()
             c_hgvs_obj = CHGVS(c_hgvs)
             self.c_hgvs = c_hgvs
             self.c_hgvs_compat = hgvs_variant.format(use_compat=True,
                                                      max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH)
+            self.c_hgvs_converter_version = HGVSConverterVersion.get(hgvs_converter_type, version=version, method=method)
             self.transcript_version = c_hgvs_obj.transcript_version_model(genome_build=genome_build)
             self.gene_symbol = GeneSymbol.objects.filter(symbol=c_hgvs_obj.gene_symbol).first()
         except Exception as exception:

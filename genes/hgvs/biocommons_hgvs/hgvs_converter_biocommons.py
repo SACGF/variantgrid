@@ -1,6 +1,7 @@
 import os.path
 import re
 from importlib import metadata
+from typing import Tuple
 
 from bioutils.sequences import reverse_complement
 from django.conf import settings
@@ -16,7 +17,7 @@ from hgvs.variantmapper import VariantMapper
 
 from genes.hgvs import HGVSVariant, HGVSException
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
-from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele
+from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele, HGVSConverterType
 from genes.models import TranscriptVersion
 from genes.transcripts_utils import looks_like_transcript, get_refseq_type
 from snpdb.models import GenomeBuild, VariantCoordinate, Contig
@@ -212,11 +213,11 @@ class BioCommonsHGVSConverter(HGVSConverter):
             alt = alt[i:]
         return ref, alt
 
-    def description(self, describe_fallback=True) -> str:
-        desc = f"BioCommons hgvs v{metadata.version('hgvs')}"
-        if self.clingen_resolution and describe_fallback:
-            desc += f" (clingen fallback)"
-        return desc
+    def get_hgvs_converter_type(self) -> HGVSConverterType:
+        return HGVSConverterType.BIOCOMMONS_HGVS
+
+    def get_version(self) -> str:
+        return metadata.version('hgvs')
 
     @staticmethod
     def _m_to_g(var_m):

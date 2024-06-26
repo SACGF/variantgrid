@@ -1,5 +1,6 @@
 import abc
 from enum import Enum
+from typing import Tuple
 
 from genes.hgvs import HGVSVariant
 from snpdb.models import GenomeBuild, VariantCoordinate
@@ -75,5 +76,17 @@ class HGVSConverter(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def description(self, describe_fallback=True) -> str:
+    def get_hgvs_converter_type(self) -> HGVSConverterType:
         pass
+
+    @abc.abstractmethod
+    def get_version(self) -> str:
+        pass
+
+    def description(self, describe_fallback=True) -> str:
+        hgvs_converter_type = self.get_hgvs_converter_type()
+        version = self.get_version()
+        desc = f"{hgvs_converter_type.name} {version}"
+        if describe_fallback and self.clingen_resolution:
+            desc += "(clingen fallback)"
+        return desc

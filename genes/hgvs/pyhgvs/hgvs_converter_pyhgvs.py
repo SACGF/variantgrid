@@ -1,6 +1,6 @@
 import sys
 from importlib import metadata
-from typing import Optional
+from typing import Optional, Tuple
 
 import pyhgvs
 from django.conf import settings
@@ -8,7 +8,7 @@ from pyhgvs import get_genomic_sequence, HGVSName
 from pyhgvs.utils import make_transcript
 
 from genes.hgvs import HGVSVariant, HGVSException
-from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele
+from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele, HGVSConverterType
 from genes.transcripts_utils import transcript_is_lrg
 from snpdb.models import GenomeBuild, VariantCoordinate
 
@@ -175,11 +175,11 @@ class PyHGVSConverter(HGVSConverter):
             transcript_accession = ''
         return transcript_accession
 
-    def description(self, describe_fallback=True) -> str:
-        desc = f"pyhgvs v{metadata.version('pyhgvs')}"
-        if self.clingen_resolution and describe_fallback:
-            desc += f" (clingen fallback)"
-        return desc
+    def get_hgvs_converter_type(self) -> HGVSConverterType:
+        return HGVSConverterType.PYHGVS
+
+    def get_version(self) -> str:
+        return metadata.version('pyhgvs')
 
     def get_hgvs_match_ref_allele(self, hgvs_name, pyhgvs_transcript=None) -> HgvsMatchRefAllele:
         """Return True if reference allele matches genomic sequence."""

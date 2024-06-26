@@ -1,10 +1,15 @@
 from typing import Optional, TypeVar
 
+from cache_memoize import cache_memoize
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Model
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.template.loader import render_to_string
+
+from library.constants import MINUTE_SECS
+from library.git import Git
 
 
 def is_ajax(request: HttpRequest):
@@ -40,3 +45,8 @@ def get_model_content_type_dict(model):
         'app_label': content_type.app_label,
         'model': content_type.model
     }
+
+
+@cache_memoize(30)
+def get_cached_project_git_hash() -> str:
+    return Git(settings.BASE_DIR).hash
