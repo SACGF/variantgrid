@@ -230,19 +230,35 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
                 break
 
     multi_diff = MultiDiff(use_regex)
+    # 'parts' and 'resolved_variant_info' are kept in sync
     parts = []
+    c_hgvs_resolved_variant_info = []
+
     if allele_info.imported_c_hgvs:
         parts += [MultiDiffInput(f"Imported ({allele_info.imported_genome_build_patch_version})", allele_info.imported_c_hgvs)]
+        c_hgvs_resolved_variant_info.append(None)
+
     if allele_info.imported_genome_build_patch_version.genome_build == GenomeBuild.grch37():
-        parts += [
-            MultiDiffInput("Normalised (GRCh37)", allele_info.grch37.c_hgvs if allele_info.grch37 else None, is_reference=True),
-            MultiDiffInput("Liftover (GRCh38)", allele_info.grch38.c_hgvs if allele_info.grch38 else None)
+        resolved_variant_info_is_reference = [
+            (allele_info.grch37, True),
+            (allele_info.grch38, False),
         ]
     else:
-        parts += [
-            MultiDiffInput("Normalised (GRCh38)", allele_info.grch38.c_hgvs if allele_info.grch38 else None, is_reference=True),
-            MultiDiffInput("Liftover (GRCh37)", allele_info.grch37.c_hgvs if allele_info.grch37 else None)
+        resolved_variant_info_is_reference = [
+            (allele_info.grch38, True),
+            (allele_info.grch37, False),
         ]
+
+    for rvi, is_reference in resolved_variant_info_is_reference:
+        if is_reference:
+            origin = "Normalized"
+        else:
+            origin = "Liftover"
+        label = f"{origin} ({rvi.genome_build})"
+
+        parts.append(MultiDiffInput(label, rvi.c_hgvs if rvi else None,
+                                    is_reference=is_reference))
+        c_hgvs_resolved_variant_info.append((label + " c.HGVS by", rvi.c_hgvs_converter_version))
 
     diff_output = multi_diff.diffs(parts)
     if not allele_info.imported_c_hgvs:
@@ -265,6 +281,7 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
         "allele_info": allele_info,
         "g_hgvs_label": f"Imported g.HGVS ({allele_info.imported_genome_build_patch_version})",
         "c_hgvses": diff_output,
+        "c_hgvs_resolved_variant_info": c_hgvs_resolved_variant_info,
         "normalized_diff": chgvs_diff_description(normalized_diff) if normalized_diff else None,
         "liftover_diff": chgvs_diff_description(liftover_diff) if liftover_diff else None,
         "variant_coordinate_label": f"Normalised Variant Coordinate ({allele_info.imported_genome_build_patch_version})",

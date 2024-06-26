@@ -55,8 +55,17 @@ class HGVSConverterVersion(TimeStampedModel):
     method = models.TextField()  # Records eg fall back to ClinGen
     code_git_hash = models.TextField()
 
+    @property
+    def converted_using_library(self) -> bool:
+        return self.method.startswith("Internally converted using library")
+
     def __str__(self) -> str:
-        return f"{self.hgvs_converter_type} {self.version} {self.method} {self.code_git_hash}"
+        desc = f"{self.hgvs_converter_type} version='{self.version}'"
+        if not self.converted_using_library:
+            desc += f" (method={self.method})"
+        if self.code_git_hash != "not-a-real-git-hash":
+            desc += f" git@{self.code_git_hash}"
+        return desc
 
     @staticmethod
     def get(hgvs_converter_type: HGVSConverterType, version: str, method: str):

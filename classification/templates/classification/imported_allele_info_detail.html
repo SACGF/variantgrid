@@ -21,10 +21,13 @@
         {% labelled label="Normalised Diffs" label_css="text-muted" value_css="text-muted" %}<i class="fa-solid fa-arrows-up-down"></i> {{ normalized_diff|separator:', ' }}{% endlabelled %}
     {% endif %}
     {% labelled label=c_hgvses.1.identifier value_css="text-monospace" %}{{ c_hgvses.1.html }}{% endlabelled %}
+    {% labelled admin_only=True label=c_hgvs_resolved_variant_info.1.0 value_css="text-monospace" %}{{ c_hgvs_resolved_variant_info.1.1 }}{% endlabelled %}
+
     {% if liftover_diff %}
         {% labelled label="Liftover Diffs" label_css="text-muted" value_css="text-muted" %}<i class="fa-solid fa-arrows-up-down"></i> {{ liftover_diff|separator:', ' }}{% endlabelled %}
     {% endif %}
     {% labelled label=c_hgvses.2.identifier value_css="text-monospace" %}{{ c_hgvses.2.html }}{% endlabelled %}
+    {% labelled admin_only=True label=c_hgvs_resolved_variant_info.2.0 value_css="text-monospace" %}{{ c_hgvs_resolved_variant_info.2.1 }}{% endlabelled %}
     {% labelled label=variant_coordinate_label value_css="text-monospace" %}{{ allele_info.variant_coordinate }}{% endlabelled %}
 
     <hr style="border-top:1px dashed lightgrey"/>
