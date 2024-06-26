@@ -499,7 +499,7 @@ class HGVSMatcher:
         return hgvs_variant, hgvs_method
 
     def variant_to_hgvs_variant_and_method(self, variant: Variant, transcript_name=None) -> Tuple[HGVSVariant, str]:
-        return self.variant_coordinate_to_hgvs_and_method(variant.coordinate, transcript_name=transcript_name)
+        return self.variant_coordinate_to_hgvs_and_method(variant.coordinate, transcript_name)
 
     def variant_to_hgvs_variant(self, variant: Variant, transcript_name=None) -> HGVSVariant:
         """ returns c.HGVS is transcript provided, g.HGVS if no transcript"""
