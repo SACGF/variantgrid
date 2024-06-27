@@ -371,6 +371,7 @@ _DIFF_TO_VALIDATION_KEY = {
 @dataclass(frozen=True)
 class CalculatedVariantCoordinate:
     variant_coordinate: Optional[VariantCoordinate]
+    genome_build: GenomeBuild
     message: str
 
     @property
@@ -681,14 +682,15 @@ class ImportedAlleleInfo(TimeStampedModel):
         vc: Optional[VariantCoordinate] = None
         message: str
         try:
+            genome_build = self.imported_genome_build_patch_version.genome_build
             use_hgvs = self.imported_c_hgvs or self.imported_g_hgvs
-            hgvs_matcher = HGVSMatcher(self.imported_genome_build_patch_version.genome_build)
+            hgvs_matcher = HGVSMatcher(genome_build)
             vc_extra = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(use_hgvs)
             message = f"HGVS matched by \"{vc_extra.method}\""
             vc = vc_extra.variant_coordinate
         except Exception as ex:
             message = str(ex)
-        return CalculatedVariantCoordinate(variant_coordinate=vc, message=message)
+        return CalculatedVariantCoordinate(variant_coordinate=vc, genome_build=genome_build, message=message)
 
     def update_variant_coordinate(self):
         """ returns if a valid variant_coordinate could be derived """
@@ -714,6 +716,15 @@ class ImportedAlleleInfo(TimeStampedModel):
                 new_dirty_message = cvc.message
         else:
             new_dirty_message = None
+
+            # Our string rep of indels doesn't show the reference base - so do a comparison of the object
+            if variant := self.allele.variant_for_build(cvc.genome_build):
+                existing_vc = variant.coordinate
+                if existing_vc != cvc.variant_coordinate:
+                    if existing_vc.ref != cvc.variant_coordinate.ref:
+                        new_dirty_message = f"{cvc.message}\nRef was: {existing_vc.ref} -> {cvc.variant_coordinate.ref}"
+                    else:
+                        new_dirty_message = f"{cvc.message}\nExisting={repr(existing_vc)} != {repr(cvc.variant_coordinate)}"
 
         if self.dirty_message != new_dirty_message:
             self.dirty_message = new_dirty_message
