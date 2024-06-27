@@ -254,7 +254,10 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
             origin = "Normalized"
         else:
             origin = "Liftover"
-        label = f"{origin} ({rvi.genome_build})"
+        if rvi:
+            label = f"{origin} ({rvi.genome_build})"
+        else:
+            label = origin
 
         parts.append(MultiDiffInput(label, rvi.c_hgvs if rvi else None,
                                     is_reference=is_reference))
