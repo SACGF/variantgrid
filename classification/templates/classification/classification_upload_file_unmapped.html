@@ -49,16 +49,20 @@
                             <p class="text-info">Once the file is uploaded it will be manually reviewed and processed over the next few days.</p>
                         {% endif %}
                         {% if lab_picker.selected_lab.upload_instructions %}<p class="text-info">{{ upload_instructions }}</p>{% endif %}
-                        {% if user.is_superuser %}
-                            {% labelled label="Destination" value_css="admin-only" %}{{ lab_picker.selected_lab.upload_location }}{% endlabelled %}
-                        {% endif %}
+                        {% labelled admin_only=True label="Destination" %}{{ lab_picker.selected_lab.upload_location }}{% endlabelled %}
+                        {% labelled admin_only=True label="On Behalf Of" %}
+                            <input name="on-behalf-of" placeholder="Enter email address or username of the owner of this file - otherwise it will be associated to you" class="form-control"/>
+                        {% endlabelled %}
                         {% labelled label="Upload File" %}
                             <input type="file" name="file">
                         {% endlabelled %}
                         {% labelled label="File Type Override" hint="Only need to provide this if not using the default import method" admin_only=True %}
-                            <input type="text" name="file-type-override" class="form-field">
+                            <input type="text" name="file-type-override" class="form-control">
                         {% endlabelled %}
                         {% if user.is_superuser and server_files %}
+                            {% labelled label="" %}
+
+                            {% endlabelled %}
                             <hr/>
                             <div class="text-center">OR</div>
                             <label class="admin-only">These files are at the upload location but may not have been imported yet</label>

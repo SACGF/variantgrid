@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 from django.http import HttpResponseRedirect, HttpRequest, StreamingHttpResponse
 from django.shortcuts import render
 from django.urls import reverse
@@ -219,6 +219,23 @@ class UploadedClassificationsUnmappedView(View):
                 status = UploadedClassificationsUnmappedStatus.Pending if lab.upload_automatic else UploadedClassificationsUnmappedStatus.Manual
                 user: User = request.user
                 file_type_override = ""
+
+                on_behalf_of_user: User = user
+                if user.is_superuser:
+                    invalid_user_override = False
+                    if on_behalf_of_str := request.POST.get('on-behalf-of'):
+                        if on_behalf_of_user_override := User.objects.filter(Q(username=on_behalf_of_str) | Q(email=on_behalf_of_str)).first():
+                            on_behalf_of_user = on_behalf_of_user_override
+                            if not Lab.valid_labs_qs(on_behalf_of_user).contains(lab):
+                                invalid_user_override = True
+                                messages.add_message(request, messages.ERROR, f"{on_behalf_of_user} does not belong to lab {lab}")
+                        else:
+                            invalid_user_override = True
+                            messages.add_message(request, messages.ERROR, f"Could not find a user for {on_behalf_of_str}")
+
+                    if invalid_user_override:
+                        return HttpResponseRedirect(reverse("classification_upload_unmapped_lab", kwargs={"lab_id": lab.pk}))
+
                 if file_type_override_raw := request.POST.get('file-type-override', ""):
                     if not user.is_superuser:
                         raise PermissionDenied("'file-type-override' can only be set by admin")
@@ -228,7 +245,7 @@ class UploadedClassificationsUnmappedView(View):
                     url=sub_file.clean_url,
                     filename=sub_file.filename,
                     file_type_override=file_type_override,
-                    user=user,
+                    user=on_behalf_of_user,
                     lab=lab,
                     status=status,
                     effective_modified=sub_file.modified,
@@ -248,7 +265,7 @@ class UploadedClassificationsUnmappedView(View):
                         message="File Uploaded"
                     ).add_header(":file_folder: File Uploaded"). \
                         add_field("For Lab", lab.name). \
-                        add_field("By User", user.username). \
+                        add_field("By User", on_behalf_of_user.username). \
                         add_field("Path", sub_file.clean_url). \
                         add_markdown(f"*URL:* <{admin_url}>")
 
