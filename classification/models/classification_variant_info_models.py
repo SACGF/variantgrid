@@ -685,7 +685,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             hgvs_matcher = HGVSMatcher(self.imported_genome_build_patch_version.genome_build)
             vc_extra = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(use_hgvs)
             message = f"HGVS matched by \"{vc_extra.method}\""
-            vc = variant_coordinate = str(vc_extra.variant_coordinate)
+            vc = vc_extra.variant_coordinate
         except Exception as ex:
             message = str(ex)
         return CalculatedVariantCoordinate(variant_coordinate=vc, message=message)
