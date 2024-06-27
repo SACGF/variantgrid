@@ -139,11 +139,33 @@ class ClassificationModificationAdmin(admin.TabularInline):
         return False
 
 
+class ClassificationImportRunCountFilter(admin.SimpleListFilter):
+    title = "Run Type"
+    parameter_name = "upload_type"
+    default_value = None
+
+    def lookups(self, request, model_admin):
+        return [
+            ("import", "Proper Import"),
+            ("test", "Import Test Tool"),
+            ("rematch", "Allele Re-Match"),
+        ]
+
+    def queryset(self, request, queryset: QuerySet[ClassificationImportRun]):
+        if self.value() == "test":
+            return queryset.filter(identifier__endswith="#classification_import_tool")
+        elif self.value() == "rematch":
+            return queryset.filter(identifier="admin-variant-rematch")
+        elif self.value() == "import":
+            return queryset.exclude(identifier__endswith="#classification_import_tool").exclude(identifier="admin-variant-rematch")
+
+
 @admin.register(ClassificationImportRun)
 class ClassificationImportRunAdmin(ModelAdminBasics):
     # change_list_template = 'classification/admin/change_list.html'
+    search_fields = ('identifier', 'from_file__filename',)
     list_display = ['id', 'identifier', 'row_count', 'status', 'from_file', 'created_detailed', 'modified_detailed']
-    list_filter = ('status',)
+    list_filter = ('status', ClassificationImportRunCountFilter)
 
     @admin_model_action(url_slug="create_dummy/", short_description="Create Dummy Import", icon="fa-solid fa-plus")
     def create_dummy(self, request):
