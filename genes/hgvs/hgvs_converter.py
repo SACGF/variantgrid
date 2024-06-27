@@ -88,5 +88,5 @@ class HGVSConverter(abc.ABC):
         version = self.get_version()
         desc = f"{hgvs_converter_type.name} {version}"
         if describe_fallback and self.clingen_resolution:
-            desc += "(clingen fallback)"
+            desc += " (ClinGen fallback)"
         return desc

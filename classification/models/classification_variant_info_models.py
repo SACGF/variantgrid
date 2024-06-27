@@ -60,7 +60,7 @@ class HGVSConverterVersion(TimeStampedModel):
         return self.method.startswith("Internally converted using library")
 
     def __str__(self) -> str:
-        desc = f"{self.hgvs_converter_type} version='{self.version}'"
+        desc = f"{self.hgvs_converter_type} version=\"{self.version}\""
         if not self.converted_using_library:
             desc += f" (method={self.method})"
         if self.code_git_hash != "not-a-real-git-hash":
@@ -684,7 +684,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             use_hgvs = self.imported_c_hgvs or self.imported_g_hgvs
             hgvs_matcher = HGVSMatcher(self.imported_genome_build_patch_version.genome_build)
             vc_extra = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(use_hgvs)
-            message = f"HGVS matched by '{vc_extra.method}'"
+            message = f"HGVS matched by \"{vc_extra.method}\""
             vc = variant_coordinate = str(vc_extra.variant_coordinate)
         except Exception as ex:
             message = str(ex)

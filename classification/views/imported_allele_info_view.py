@@ -261,7 +261,7 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
 
         parts.append(MultiDiffInput(label, rvi.c_hgvs if rvi else None,
                                     is_reference=is_reference))
-        c_hgvs_resolved_variant_info.append((label + " c.HGVS by", rvi.c_hgvs_converter_version if rvi else "<not converted>"))
+        c_hgvs_resolved_variant_info.append((label + " c.HGVS by", rvi.c_hgvs_converter_version if rvi else ""))
 
     diff_output = multi_diff.diffs(parts)
     if not allele_info.imported_c_hgvs:
