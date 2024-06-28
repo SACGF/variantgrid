@@ -279,7 +279,22 @@
                     }
                     if (relationship.relation === "panelappau") {
                         let extra = relationship.extra || {};
-                        let tooltip = `Phenotype: ${extra.phenotype_row}<br/>Evidence: ${extra.evidence ? extra.evidence.join(',') : ''}`;
+                        let phenoEvidences = extra.phenotypes_and_evidence || [];
+                        let allEvidencesSet = new Set();
+                        for (let pe of phenoEvidences) {
+                            let evidences = pe.evidence || [];
+                            if (evidences.indexOf("Expert Review Green") !== -1) {
+                                for (let evidence of (pe.evidence || [])) {
+                                    if (!evidence.startsWith("Expert Review")) {
+                                        allEvidencesSet.add(evidence)
+                                    }
+                                }
+                            }
+                        }
+                        let allEvidences = Array.from(allEvidencesSet);
+                        allEvidences.sort()
+
+                        let tooltip = `Expert Review Green Sources: ${allEvidences.join(', ')}`;
                         if (relationship.via) {
                             tooltip += `<br/>Via related term: ${relationship.via}`;
                         }
