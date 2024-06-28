@@ -23,6 +23,8 @@ class ConditionTextStatusFilter(admin.SimpleListFilter):
 
 
 class ConditionTextMatchAdmin(admin.TabularInline):
+    readonly_fields = ('modified',)
+    fields = ('last_edited_by', 'parent', 'gene_symbol', 'mode_of_inheritance', 'classification', 'condition_xrefs', 'modified')
     model = ConditionTextMatch
 
     def has_add_permission(self, request, obj=None):
