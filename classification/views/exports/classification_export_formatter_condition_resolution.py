@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from django.http import HttpRequest
+
+from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
@@ -60,6 +62,14 @@ class ClassificationConditionResolutionRow(ExportRow):
     @export_column('c.HGVS')
     def c_hgvs(self):
         return self.vc.c_parts.full_c_hgvs
+
+    @export_column("Classification")
+    def classification_value(self):
+        return self.classification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+
+    @export_column("Somatic Clinical Significance")
+    def somatic_clinical_significance_value(self):
+        return self.classification.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
 
     @export_column('Allele Origin')
     def allele_origin(self):
