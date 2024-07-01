@@ -680,6 +680,7 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     def calculate_variant_coordinate(self) -> CalculatedVariantCoordinate:
         vc: Optional[VariantCoordinate] = None
+        genome_build: Optional[GenomeBuild] = None
         message: str
         try:
             genome_build = self.imported_genome_build_patch_version.genome_build
