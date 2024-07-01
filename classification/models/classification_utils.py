@@ -11,7 +11,7 @@ from django.db.models import Q
 
 from classification.models.evidence_mixin import VCPatch, VCStore
 from flags.models import FlagCollection
-from genes.models import GeneSymbol, Gene, Transcript
+from genes.models import GeneSymbol, Transcript
 from library.log_utils import NotificationBuilder
 from library.utils import VarsDict
 from snpdb.models import Allele, Lab
@@ -227,17 +227,6 @@ class ClassificationJsonParams:
         self.hardcode_extra_data = hardcode_extra_data
         self.fix_data_types = fix_data_types
         self.remove_acmg_namespace = remove_acmg_namespace
-
-    def report(self) -> None:
-        """
-        FIXME, so many references to non-existent variables, has this method been copy and pasted here by mistake?
-        Record all information about the VariantMatching evidence on the VariantMatching flag of the Classification
-        """
-        if self.matching_flag:
-            if not self.messages:
-                self.messages.append('No variant related values to match on')
-            message = '\n\n'.join(self.messages)
-            self.matching_flag.flag_action(comment=message)
 
 
 class PatchMeta:
