@@ -76,7 +76,7 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
         variant_tags_import = VariantTagsImport.objects.create(user=uploaded_file.user, genome_build=genome_build)
         UploadedVariantTags.objects.create(uploaded_file=uploaded_file, variant_tags_import=variant_tags_import)
 
-        variant_tuples = []
+        variant_coordinates = []
         imported_tags = []
         num_skipped_records = 0
         num_skipped_with_star = 0
@@ -93,7 +93,7 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
                     num_skipped_with_star += 1
                 logging.warning("Could not convert '%s'", variant_string)
                 continue
-            variant_tuples.append(variant_coordinate)
+            variant_coordinates.append(variant_coordinate)
             node_id = None
             if "node__id" in row:
                 node_id = row["node__id"]
@@ -124,7 +124,7 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
                 message_string += f" ({num_skipped_with_star} containing '*') "
             SimpleVCFImportInfo.objects.create(upload_step=upload_step, message_string=message_string)
 
-        write_vcf_from_tuples(upload_step.output_filename, variant_tuples)
+        write_vcf_from_tuples(upload_step.output_filename, variant_coordinates)
         return items_processed
 
 

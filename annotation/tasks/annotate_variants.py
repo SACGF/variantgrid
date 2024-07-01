@@ -202,7 +202,7 @@ def _unannotated_variants_to_vcf(genome_build: GenomeBuild, vcf_filename,
 def write_qs_to_vcf(vcf_filename, genome_build, qs, info_dict=VARIANT_GRID_INFO_DICT):
     qs = qs.order_by("locus__contig__genomebuildcontig__order", "locus__position")
     sorted_values = qs.values("id", "locus__contig__name", "locus__position",
-                              "locus__ref__seq", "alt__seq", "svlen")
+                              "locus__ref__seq", "alt__seq", "end", "svlen")
 
     with open(vcf_filename, 'wb') as f:
         return write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict=info_dict)

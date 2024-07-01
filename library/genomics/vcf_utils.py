@@ -50,6 +50,7 @@ def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=Fal
     vcf_tuples = sorted(vcf_tuples, key=operator.itemgetter(0, 1, 3, 4))
 
     info = [
+        '##INFO=<ID=END,Number=.,Type=Integer,Description="Stop position of the interval">',
         '##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Difference in length between REF and ALT alleles">',
         '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">',
     ]

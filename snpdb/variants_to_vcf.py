@@ -20,6 +20,10 @@ VARIANT_GRID_INFO_DICT = {
         VARIANT_PATH: 'id',
         'key_data_func': key_data_func},
     # INFO fields for Symbolic alts
+    "END": {
+        'type': 'Integer',
+        'description': 'Stop position of the interval',
+    },
     "SVLEN": {
         'type': 'Integer',
         'description': 'Difference in length between REF and ALT alleles',
@@ -62,10 +66,12 @@ def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict):
         pos = data["locus__position"]
         ref = data["locus__ref__seq"]
         alt = data["alt__seq"]
+        end = data["end"]
         svlen = data["svlen"]
         info = {}
 
         if vcf_allele_is_symbolic(alt):
+            info["END"] = end
             info["SVLEN"] = svlen
             info["SVTYPE"] = alt[1:-1]  # Strip off brackets
 

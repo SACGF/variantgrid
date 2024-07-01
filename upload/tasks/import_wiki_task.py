@@ -98,14 +98,14 @@ class VariantWikiCreateVCFTask(ImportVCFStepTask):
 
         wiki_collection, records = _process_imported_wiki(uploaded_file)
         matcher = HGVSMatcher(wiki_collection.genome_build)
-        variant_tuples = []
+        variant_coordinates = []
         for iw in records:
             g_hgvs = iw.match_column_value
-            if vt := matcher.get_variant_coordinate(g_hgvs):
-                variant_tuples.append(vt)
+            if variant_coordinate := matcher.get_variant_coordinate(g_hgvs):
+                variant_coordinates.append(variant_coordinate)
 
-        if variant_tuples:
-            write_vcf_from_tuples(upload_step.output_filename, variant_tuples)
+        if variant_coordinates:
+            write_vcf_from_tuples(upload_step.output_filename, variant_coordinates)
 
         return len(records)
 

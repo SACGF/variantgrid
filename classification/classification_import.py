@@ -85,16 +85,16 @@ def process_classification_import(classification_import: ClassificationImport, i
 
 def _classification_upload_pipeline(
         classification_import: ClassificationImport,
-        unknown_variant_tuples_list: list[VariantCoordinate],
+        unknown_variant_coordinates: list[VariantCoordinate],
         import_source: ImportSource):
     """ We always run this even with no variants to insert as we need:
         * create Alleles for variants
         * perform liftover to other builds
         * set c_hgvs cache """
-    if unknown_variant_tuples_list:
+    if unknown_variant_coordinates:
         working_dir = get_import_processing_dir(classification_import.pk, "classification_import")
         vcf_filename = os.path.join(working_dir, "classification_import.vcf")
-        write_vcf_from_tuples(vcf_filename, unknown_variant_tuples_list)
+        write_vcf_from_tuples(vcf_filename, unknown_variant_coordinates)
     else:
         vcf_filename = None
 
