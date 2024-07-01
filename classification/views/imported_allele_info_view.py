@@ -8,7 +8,8 @@ from django.http import HttpRequest
 from django.shortcuts import render, get_object_or_404
 from requests import Response
 
-from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus, Classification
+from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus, Classification, \
+    ClassificationModification
 from classification.models.classification_variant_info_models import ImportedAlleleInfoValidation
 from genes.hgvs import CHGVS, CHGVSDiff, chgvs_diff_description
 from library.django_utils import get_url_from_view_path
@@ -277,8 +278,7 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
         if (c37c := c37.c_hgvs_obj) and (c38c := c38.c_hgvs_obj):
             liftover_diff = c37c.diff(c38c)
 
-    classifications = Classification.filter_for_user(user=request.user, queryset=allele_info.classification_set.filter(withdrawn=False))
-    classifications = sorted(classifications, key=lambda x: (x.lab, x.pk))
+    classifications = ClassificationModification.latest_for_user(user=request.user, published=True).filter(classification__in=allele_info.classification_set.all())
 
     return render_ajax_view(request, "classification/imported_allele_info_detail.html", {
         "allele_info": allele_info,
