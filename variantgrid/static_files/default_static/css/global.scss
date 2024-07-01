@@ -3095,3 +3095,11 @@ a .c-hgvs-body {
 		color: #444;  // when the "ontology term" is just free text
 	}
 }
+
+.screenshot-mode {
+	// time.ago changes non-stop, so black them out for screenshots so we don't get meaningless changes
+	time.ago {
+		color: black;
+		background: black;
+	}
+}

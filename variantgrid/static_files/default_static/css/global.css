@@ -2672,4 +2672,9 @@ a .c-hgvs-body .c-hgvs-nomen {
   color: #444;
 }
 
+.screenshot-mode time.ago {
+  color: black;
+  background: black;
+}
+
 /*# sourceMappingURL=global.css.map */
