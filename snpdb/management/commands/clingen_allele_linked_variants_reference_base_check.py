@@ -2,7 +2,7 @@ from datetime import date
 
 from django.core.management import BaseCommand
 
-from snpdb.models import Variant, Allele, ClinGenAllele
+from snpdb.models import Variant, Allele, ClinGenAllele, Contig
 
 
 class Command(BaseCommand):
@@ -26,5 +26,5 @@ class Command(BaseCommand):
                     if existing_vc != clingen_vc:
                         print(f"{allele} has variant {repr(existing_vc)} not matching expected for build: {repr(clingen_vc)}")
 
-                except ClinGenAllele.ClinGenBuildNotInResponseError:
+                except (ClinGenAllele.ClinGenBuildNotInResponseError, Contig.ContigNotInBuildError):
                     pass
