@@ -78,7 +78,7 @@ class DiscordanceLabSummary(ClassificationLabSummary):
         for triage in discordance_report.discordancereporttriage_set.select_related('lab').all():
             triage_by_lab[triage.lab] = triage
 
-        # apply triages to the first (non withdrawn row) for each lab
+        # apply triages to the first (non-withdrawn row) for each lab
         # in case a lab has both withdrawn and non-withdrawn records
         with_triages = []
         for dl in dlses:

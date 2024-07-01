@@ -108,7 +108,7 @@ class ExcludeRecord:
 
     def apply(self):
         """
-        Updates the exclude from ClinVar flag to the new status
+        Updates the "Exclude from ClinVar" Flag to the new status
         Unless existing_flag_manual in which case don't touch it
         """
         if self.existing_flag_manual or self.is_currently_ignored == self.has_ignore_matches:

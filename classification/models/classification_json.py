@@ -267,7 +267,7 @@ def populate_classification_json(classification: Classification, params: Classif
 
     if data and params.fix_data_types:
         # currently just fixes data types to multiselect array
-        # should fix more data types and move the logic out of as_json so it can be done for other datatypes
+        # should fix more data types and move the logic out of as_json, so it can be done for other datatypes
         e_keys = EvidenceKeyMap.instance()
         for key, blob in data.items():
             if e_keys.get(key).value_type == EvidenceKeyValueType.MULTISELECT:

@@ -234,7 +234,7 @@ class ClassificationGroup:
     def gene_symbols(self) -> list[GeneSymbol]:
         gene_symbols: set[GeneSymbol] = set()
         for allele_info in self.allele_infos:
-            gene_symbols.update(allele_info.gene_symbols )
+            gene_symbols.update(allele_info.gene_symbols)
         return gene_symbols
 
     @staticmethod

@@ -22,7 +22,6 @@ from classification.models import Classification, ClassificationModification, cl
 from classification.models.condition_text_search import condition_text_search
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol, GeneSymbolAlias
-from library.cache import timed_cache
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info, report_message

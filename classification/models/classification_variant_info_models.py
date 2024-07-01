@@ -52,7 +52,7 @@ post_save seemed like it might be a little too easy to trigger.
 class HGVSConverterVersion(TimeStampedModel):
     hgvs_converter_type = models.TextField()  # HGVSConverterType
     version = models.TextField()
-    method = models.TextField()  # Records eg fall back to ClinGen
+    method = models.TextField()  # Records e.g. fall back to ClinGen
     code_git_hash = models.TextField()
 
     @property

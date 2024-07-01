@@ -212,7 +212,7 @@ def validate_variant_fields(sender, patch_meta: PatchMeta, key_map: EvidenceKeyM
                 # except:
                 #     vm.add_message(evidence_key, code=ValidationCode.MATCHING_ERROR, severity='error', message='Error attempting to parse variant coordinate')
 
-    # check for this because if there were parsing errors we wont have any variant_values
+    # check for this because if there were parsing errors we won't have any variant_values
     if len(variant_map) > 1:
         # generate message like:
         # c HGVS resolves to 4:53454A>T but g HGVS resolves to 4:4:53454A>C
