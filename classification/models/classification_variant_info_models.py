@@ -439,7 +439,6 @@ class ImportedAlleleInfo(TimeStampedModel):
     variants of other builds) """
 
     allele = ForeignKey(Allele, null=True, blank=True, on_delete=SET_NULL)
-    allele = ForeignKey(Allele, null=True, blank=True, on_delete=SET_NULL)
     """ set this once it's matched, but record can exist prior to variant matching """
 
     grch37 = OneToOneField(ResolvedVariantInfo, on_delete=SET_NULL, null=True, blank=True, related_name='+')
