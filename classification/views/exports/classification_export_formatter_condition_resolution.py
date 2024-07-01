@@ -21,16 +21,15 @@ class GeneSymbolCondition:
     condition: OntologyTerm
 
 
-
 @dataclass(frozen=True)
 class ClassificationConditionResolutionRow(ExportRow):
     classification: ClassificationModification
     condition: OntologyTerm
     gene_symbol: GeneSymbol
-    panel_app_strength: Optional[set[PanelAppClassification]]
-    gencc_strength: Optional[set[GeneDiseaseClassification]]
-    mondo_strength: Optional[set[str]]
-    all_relations: Optional[set[OntologyTerm]] = None
+    panel_app_strength: Optional[set[PanelAppClassification]] = None
+    gencc_strength: Optional[set[GeneDiseaseClassification]] = None
+    mondo_strength: Optional[set[str]] = None
+    all_relations: Optional[list[OntologyRelation]] = None
 
     def duplicate_for(self, new_classification: ClassificationModification):
         return ClassificationConditionResolutionRow(
@@ -102,10 +101,21 @@ class ClassificationConditionResolutionRow(ExportRow):
         if self.mondo_strength:
             return ', '.join(self.mondo_strength)
 
-    @export_column('All Panel App Relationships For Gene Symbol')
-    def matching_relations(self):
-        if self.all_relations:
-            return ', '.join(str(relation) for relation in self.all_relations)
+    @export_column('All PanelApp Relationships For Gene Symbol')
+    def panelapp_all(self):
+        if filtered_relationships := [otr for otr in self.all_relations if otr.from_import.import_source == OntologyImportSource.PANEL_APP_AU]:
+            relationship_strs = [
+                (rel.relationship_quality.label if rel.relationship_quality else "Green?") + f" {rel.source_term}" for rel
+                in filtered_relationships]
+            return ', '.join(str(relation) for relation in relationship_strs)
+
+    @export_column('All GenCC Relationships For Gene Symbol')
+    def gencc_all(self):
+        if filtered_relationships := [otr for otr in self.all_relations if otr.from_import.import_source == OntologyImportSource.GENCC]:
+            relationship_strs = [
+                (rel.relationship_quality.label if rel.relationship_quality else "Unknown?") + f" {rel.source_term}" for rel
+                in filtered_relationships]
+            return ', '.join(str(relation) for relation in relationship_strs)
 
 
 @register_classification_exporter("condition_resolution")
@@ -132,48 +142,51 @@ class ClassificationExportFormatterConditionResolution(ClassificationExportForma
     def row(self, allele_data: AlleleData) -> list[str]:
         rows: list[str] = []
         cache: dict[GeneSymbolCondition, ClassificationConditionResolutionRow] = {}
-        for vcm in allele_data.cms:
-            if condition_obj := vcm.classification.condition_resolution_obj:
-                if not condition_obj.is_multi_condition and condition_obj.terms and condition_obj.terms[0].ontology_service in {OntologyService.MONDO, OntologyService.OMIM}:
-                    # only work for single conditions in MONDO or OMIM
-                    condition_term = condition_obj.terms[0]
-                    for gene_symbol in vcm.classification.allele_info.gene_symbols:
+        for vcm in allele_data.cms_regardless_of_issues:
+            if (allele_info := vcm.classification.allele_info) and (gene_symbols := allele_info.gene_symbols):
+                if condition_obj := vcm.classification.condition_resolution_obj:
+                    if not condition_obj.is_multi_condition and condition_obj.terms and condition_obj.terms[0].ontology_service in {OntologyService.MONDO, OntologyService.OMIM}:
+                        # only work for single conditions in MONDO or OMIM
+                        condition_term = condition_obj.terms[0]
+                        for gene_symbol in gene_symbols:
 
-                        row: ClassificationConditionResolutionRow
-                        key = GeneSymbolCondition(gene_symbol=gene_symbol, condition=condition_term)
+                            row: ClassificationConditionResolutionRow
+                            key = GeneSymbolCondition(gene_symbol=gene_symbol, condition=condition_term)
 
-                        # can re-use the last row as cache
-                        if cached_row := cache.get(key):
-                            row = cached_row.duplicate_for(vcm)
-                        else:
-                            # on the off chance there are 2 gene symbols, we can make results for each gene symbol individually
-                            all_relationships = []
-                            for snake in OntologySnake.get_all_term_to_gene_relationships(condition_term, gene_symbol):
-                                if snake_relations := snake.get_import_relations:
-                                    all_relationships.append(snake_relations)
+                            # can re-use the last row as cache
+                            if cached_row := cache.get(key):
+                                row = cached_row.duplicate_for(vcm)
+                            else:
+                                # on the off chance there are 2 gene symbols, we can make results for each gene symbol individually
+                                all_relationships = []
+                                for snake in OntologySnake.get_all_term_to_gene_relationships(condition_term, gene_symbol):
+                                    if snake_relations := snake.get_import_relations:
+                                        all_relationships.append(snake_relations)
 
-                            # we now have a list of potential PanelApp, MONDO, GenCC relationships all of different strengths to the exact condition term
-                            panel_app_strength, gencc_strength, mondo_strength = set(), set(), set()
-                            for rel in all_relationships:
-                                source = rel.from_import.import_source
-                                if source in OntologyImportSource.PANEL_APP_AU:
-                                    panel_app_strength.add(rel.relationship_quality)
-                                elif source == OntologyImportSource.MONDO:
-                                    mondo_strength.add(rel.relation)
-                                elif source == OntologyImportSource.GENCC:
-                                    gencc_strength.add(rel.relationship_quality)
+                                # we now have a list of potential PanelApp, MONDO, GenCC relationships all of different strengths to the exact condition term
+                                panel_app_strength, gencc_strength, mondo_strength = set(), set(), set()
+                                for rel in all_relationships:
+                                    source = rel.from_import.import_source
+                                    if source in OntologyImportSource.PANEL_APP_AU:
+                                        panel_app_strength.add(rel.relationship_quality)
+                                    elif source == OntologyImportSource.MONDO:
+                                        mondo_strength.add(rel.relation)
+                                    elif source == OntologyImportSource.GENCC:
+                                        gencc_strength.add(rel.relationship_quality)
 
-                            # filter to only be panel app
-                            all_gene_symbol_relationships = OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO, quality_filter=ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER)
-                            panel_app_snakes = [os for os in all_gene_symbol_relationships if os.get_import_relations.from_import.import_source == OntologyImportSource.PANEL_APP_AU]
-                            panel_app_relationships = [os.get_import_relations for os in panel_app_snakes]
-                            panel_app_relationship_strs = [(rel.relationship_quality.label if rel.relationship_quality else "Green?") + f" {rel.source_term}" for rel in panel_app_relationships]
+                                # grab all values, don't convert to MONDO
+                                direct_relationships = OntologySnake.direct_relationships_for_gene_symbol(gene_symbol)
+                                row = ClassificationConditionResolutionRow(
+                                    classification=vcm,
+                                    condition=condition_term,
+                                    gene_symbol=gene_symbol,
+                                    panel_app_strength=panel_app_strength,
+                                    gencc_strength=gencc_strength,
+                                    mondo_strength=mondo_strength,
+                                    all_relations=direct_relationships
+                                )
+                                cache[key] = row
 
-                            row = ClassificationConditionResolutionRow(vcm, condition_term, gene_symbol,
-                                                                       panel_app_strength, gencc_strength,
-                                                                       mondo_strength, panel_app_relationship_strs)
-                            cache[key] = row
-
-                        rows.append(delimited_row(row.to_csv()))
+                            rows.append(delimited_row(row.to_csv()))
 
         return rows

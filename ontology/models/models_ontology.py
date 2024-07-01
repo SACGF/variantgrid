@@ -1119,6 +1119,22 @@ class OntologySnake:
 
         return OntologySnakes(valid_snakes)
 
+    @staticmethod
+    def direct_relationships_for_gene_symbol(
+            gene_symbol: Union[str, GeneSymbol],
+            quality_filter: OntologyRelationshipQualityFilter = ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER
+        ) -> list[OntologyTermRelation]:
+        gene_ontology = OntologyTerm.get_gene_symbol(gene_symbol)
+        from ontology.panel_app_ontology import update_gene_relations
+        update_gene_relations(gene_symbol)
+        otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
+        q_relation = quality_filter.filter_q
+        return list(otr_qs.filter(
+            q_relation,
+            dest_term=gene_ontology,
+            source_term__ontology_service__in={OntologyService.MONDO, OntologyService.OMIM}
+        ))
+
 
     @staticmethod
     def mondo_terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol]) -> set[OntologyTerm]:
