@@ -708,18 +708,16 @@ class ImportedAlleleInfo(TimeStampedModel):
         # TODO, if it gets driven here or elsewhere, determining variant coordinate is only part of the puzzle
         # still need to check if variant resolution is different
         cvc = self.calculate_variant_coordinate()
-        new_dirty_message: Optional[str]
+        new_dirty_message: Optional[str] = None
         if self.variant_coordinate != cvc.variant_coordinate_str:
             if cvc.variant_coordinate:
                 new_dirty_message = f"{cvc.message}\n{cvc.variant_coordinate_str}"
             else:
                 new_dirty_message = cvc.message
         else:
-            new_dirty_message = None
-
             # Our string rep of indels doesn't show the reference base - so do a comparison of the object
-            if variant := self.allele.variant_for_build(cvc.genome_build):
-                existing_vc = variant.coordinate
+            if self.matched_variant:
+                existing_vc = self.matched_variant.coordinate
                 if existing_vc != cvc.variant_coordinate:
                     if existing_vc.ref != cvc.variant_coordinate.ref:
                         new_dirty_message = f"{cvc.message}\nRef was: {existing_vc.ref} -> {cvc.variant_coordinate.ref}"
