@@ -8,7 +8,7 @@ from genes.gene_matching import GeneSymbolMatcher
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneSymbolWiki
 from library.django_utils import UserMatcher
-from library.genomics.vcf_utils import write_vcf_from_tuples
+from library.genomics.vcf_utils import write_vcf_from_variant_coordinates
 from library.pandas_utils import df_nan_to_none
 from snpdb.models import ImportedWikiCollection, GenomeBuild, ImportedWiki, VariantWiki, Variant
 from upload.models import UploadedWikiCollection, UploadStep
@@ -105,7 +105,7 @@ class VariantWikiCreateVCFTask(ImportVCFStepTask):
                 variant_coordinates.append(variant_coordinate)
 
         if variant_coordinates:
-            write_vcf_from_tuples(upload_step.output_filename, variant_coordinates)
+            write_vcf_from_variant_coordinates(upload_step.output_filename, variant_coordinates)
 
         return len(records)
 
@@ -122,8 +122,8 @@ class VariantWikiInsertTask(ImportVCFStepTask):
         user_matcher = UserMatcher(uploaded_file.user)
         matched_records = []
         for iw in wiki_collection.importedwiki_set.all():
-            if variant_tuple := hgvs_matcher.get_variant_coordinate(iw.match_column_value):
-                variant = Variant.get_from_variant_coordinate(variant_tuple, wiki_collection.genome_build)
+            if variant_coordinate := hgvs_matcher.get_variant_coordinate(iw.match_column_value):
+                variant = Variant.get_from_variant_coordinate(variant_coordinate, wiki_collection.genome_build)
                 v_wiki, created = VariantWiki.objects.get_or_create(variant=variant)
                 _create_or_modify_wiki(user_matcher, iw, v_wiki, created)
                 matched_records.append(iw)

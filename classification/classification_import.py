@@ -11,7 +11,7 @@ from classification.models.classification import ClassificationImport
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.tasks.classification_import_process_variants_task import ClassificationImportProcessVariantsTask
 from library.django_utils.django_file_utils import get_import_processing_dir
-from library.genomics.vcf_utils import write_vcf_from_tuples
+from library.genomics.vcf_utils import write_vcf_from_variant_coordinates
 from library.utils import full_class_name
 from snpdb.models import Variant, ImportSource
 from snpdb.models.models_variant import VariantCoordinate
@@ -45,7 +45,7 @@ def process_classification_import(classification_import: ClassificationImport, i
         Batch variant classification submissions are broken up into 1 ClassificationImport per GenomeBuild """
 
     variant_pk_lookup = VariantPKLookup(classification_import.genome_build)
-    variant_tuples_by_hash: dict[VariantHash, VariantCoordinate] = {}
+    variant_coordinates_by_hash: dict[VariantHash, VariantCoordinate] = {}
     allele_info_by_hash: dict[VariantHash, list[ImportedAlleleInfo]] = defaultdict(list)
 
     # WARNING: previously only matched if the allele_info had no matched_variant
@@ -58,7 +58,7 @@ def process_classification_import(classification_import: ClassificationImport, i
             if variant_coordinate := allele_info.variant_coordinate_obj:
                 variant_hash = variant_pk_lookup.add(variant_coordinate)
                 if variant_hash:
-                    variant_tuples_by_hash[variant_hash] = variant_coordinate
+                    variant_coordinates_by_hash[variant_hash] = variant_coordinate
                     allele_info_by_hash[variant_hash].append(allele_info)
             else:
                 allele_info.set_matching_failed(message='Could not derive variant coordinates')
@@ -73,12 +73,12 @@ def process_classification_import(classification_import: ClassificationImport, i
             if variant_pk:
                 allele_info.set_variant_and_save(matched_variant=Variant.objects.get(pk=variant_pk))
             else:
-                variant_tuple = variant_tuples_by_hash[variant_hash]
-                if not _is_safe_for_vcf(variant_tuple):
-                    ref_length = len(variant_tuple.ref) if variant_tuple.ref else 0
+                variant_coordinate = variant_coordinates_by_hash[variant_hash]
+                if not _is_safe_for_vcf(variant_coordinate):
+                    ref_length = len(variant_coordinate.ref) if variant_coordinate.ref else 0
                     allele_info.set_matching_failed(message=f'Could not process via VCF, ref length = {ref_length}')
                 else:
-                    unknown_variant_coordinates.append(variant_tuple)
+                    unknown_variant_coordinates.append(variant_coordinate)
 
     _classification_upload_pipeline(classification_import, unknown_variant_coordinates, import_source)
 
@@ -94,7 +94,7 @@ def _classification_upload_pipeline(
     if unknown_variant_coordinates:
         working_dir = get_import_processing_dir(classification_import.pk, "classification_import")
         vcf_filename = os.path.join(working_dir, "classification_import.vcf")
-        write_vcf_from_tuples(vcf_filename, unknown_variant_coordinates)
+        write_vcf_from_variant_coordinates(vcf_filename, unknown_variant_coordinates)
     else:
         vcf_filename = None
 

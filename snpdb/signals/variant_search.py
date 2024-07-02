@@ -15,7 +15,7 @@ from annotation.manual_variant_entry import check_can_create_variants, CreateMan
 from classification.models import Classification, CreateNoClassificationForbidden
 from genes.hgvs import HGVSMatcher, HGVSException, VariantResolvingError
 from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
-from genes.models import MissingTranscript, MANE, TranscriptVersion, GeneSymbol
+from genes.models import MissingTranscript, MANE, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from library.enums.log_level import LogLevel
 from library.genomics import format_chrom
@@ -324,14 +324,14 @@ def search_variant_db_snp(search_input: SearchInputInstance):
 
 
 def _yield_results_from_hgvs(search_input, genome_build, matcher, hgvs_string) -> Iterable[SearchResult]:
-    variant_tuple = matcher.get_variant_coordinate(hgvs_string)
+    variant_coordinate = matcher.get_variant_coordinate(hgvs_string)
     results = get_results_from_variant_coordinate(genome_build, search_input.get_visible_variants(genome_build),
-                                                  variant_tuple)
+                                                  variant_coordinate)
     if results.exists():
         for r in results:
             yield r
     else:
-        variant_string = Variant.format_tuple(*variant_tuple)
+        variant_string = Variant.format_tuple(*variant_coordinate)
         if create_manual := VariantExtra.create_manual_variant(
                 for_user=search_input.user,
                 variant_string=variant_string,
@@ -469,7 +469,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
 
     # can add on search_message to objects to (stop auto-jump and show message)
     original_hgvs_string = hgvs_string
-    variant_tuple = None
+    variant_coordinate = None
     used_transcript_accession: Optional[str] = None
     kind = None
     clean_hgvs_string, _ = hgvs_matcher.clean_hgvs(hgvs_string)
@@ -482,10 +482,10 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
     reference_message: list[SearchMessage] = []
 
     try:
-        variant_tuple, used_transcript_accession, kind, method, matches_reference = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string)
-        logging.info("get_variant_tuple_used_transcript_kind_method_and_matches_reference - variant_tuple=%s", variant_tuple)
+        variant_coordinate, used_transcript_accession, kind, method, matches_reference = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string)
+        logging.info("get_variant_coordinate_used_transcript_kind_method_and_matches_reference - variant_coordinate=%s", variant_coordinate)
         if not matches_reference:
-            ref_base = variant_tuple[2]
+            ref_base = variant_coordinate[2]
 
             # reporting on the "provided" reference is slightly promblematic as it's not always provided directly, it could be indirectly
 
@@ -541,7 +541,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                             # result.messages.append(SearchMessage(str(alias)))
                             yield result
                 else:
-                    yield SearchMessageOverall(msg_hgvs_given_symbol)
+                    yield SearchMessageOverall("HGVS search requires a transcript")
 
                 if has_results:
                     return
@@ -552,7 +552,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
             # might just not be a HGVS name at all
             pass
 
-        if variant_tuple is None:
+        if variant_coordinate is None:
             if classify:
                 search_message = SearchMessage(f"Error reading HGVS \"{hgvs_error}\"")
                 if classify_no_variant := VariantExtra.classify_no_variant_hgvs(for_user=user, genome_build=genome_build, hgvs_string=original_hgvs_string):
@@ -605,11 +605,11 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 pass  # Doesn't exist - OK just can't check
 
     # TODO: alter initial_score based on warning messages of alt not matching?
-    # also - _lrg_get_variant_tuple should add matches_reference to search warnings list
+    # also - _lrg_get_variant_coordinate should add matches_reference to search warnings list
 
-    if variant_tuple:
+    if variant_coordinate:
         try:
-            results = get_results_from_variant_coordinate(genome_build, variant_qs, variant_tuple)
+            results = get_results_from_variant_coordinate(genome_build, variant_qs, variant_coordinate)
             variant = results.get()
             if classify:
                 yield VariantExtra.classify_variant(
@@ -622,8 +622,8 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                                    ignore_genome_build_mismatch=is_genomic)
 
         except Variant.DoesNotExist:
-            variant_string = Variant.format_tuple(*variant_tuple)
-            variant_string_abbreviated = Variant.format_tuple(*variant_tuple, abbreviate=True)
+            variant_string = Variant.format_tuple(*variant_coordinate)
+            variant_string_abbreviated = Variant.format_tuple(*variant_coordinate, abbreviate=True)
             search_messages.append(SearchMessage(f'"{hgvs_string}" resolved to genomic coordinates "{variant_string_abbreviated}"', LogLevel.INFO, genome_build=genome_build))
             # if we're saying what we're resolving to, no need to complain about reference_message
 
@@ -632,9 +632,9 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 yield SearchResult(cmv, messages=search_messages + reference_message)
 
             # search for alt alts
-            alts = get_results_from_variant_coordinate(genome_build, variant_qs, variant_tuple, any_alt=True)
+            alts = get_results_from_variant_coordinate(genome_build, variant_qs, variant_coordinate, any_alt=True)
             for alt in alts:
-                alt_messages = search_messages + [SearchMessage(f'No results for alt "{variant_tuple.alt}", but found this using alt "{alt.alt}"', severity=LogLevel.ERROR, substituted=True)]
+                alt_messages = search_messages + [SearchMessage(f'No results for alt "{variant_coordinate.alt}", but found this using alt "{alt.alt}"', severity=LogLevel.ERROR, substituted=True)]
                 yield SearchResult(alt.preview, messages=alt_messages)
 
 

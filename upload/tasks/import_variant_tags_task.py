@@ -7,7 +7,7 @@ from django.utils.timezone import make_aware
 
 from analysis.models import VariantTagsImport, ImportedVariantTag, VariantTag, TagLocation
 from library.django_utils import UserMatcher
-from library.genomics.vcf_utils import write_vcf_from_tuples
+from library.genomics.vcf_utils import write_vcf_from_variant_coordinates
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.pandas_utils import df_nan_to_none
 from library.utils import invert_dict
@@ -124,7 +124,7 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
                 message_string += f" ({num_skipped_with_star} containing '*') "
             SimpleVCFImportInfo.objects.create(upload_step=upload_step, message_string=message_string)
 
-        write_vcf_from_tuples(upload_step.output_filename, variant_coordinates)
+        write_vcf_from_variant_coordinates(upload_step.output_filename, variant_coordinates)
         return items_processed
 
 

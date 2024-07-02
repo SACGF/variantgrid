@@ -513,8 +513,8 @@ def link_allele_to_existing_variants(allele: Allele, allele_linking_tool,
         try:
             try:
                 if clingen_allele := allele.clingen_allele:
-                    variant_tuple = clingen_allele.get_variant_coordinate(genome_build)
-                    variant = Variant.get_from_variant_coordinate(variant_tuple, genome_build)
+                    variant_coordinate = clingen_allele.get_variant_coordinate(genome_build)
+                    variant = Variant.get_from_variant_coordinate(variant_coordinate, genome_build)
                 else:
                     # no clingen allele, see if it's known
                     # TODO should an error be thrown if it's not?
