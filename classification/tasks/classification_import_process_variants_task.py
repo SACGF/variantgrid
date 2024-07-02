@@ -60,10 +60,9 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
         # # Create a list of variant tuples for classifications that have no variant set
         # no_variant_qs = classification_import.classification_set.filter(variant__isnull=True)
         # for classification in no_variant_qs:
-        #     variant_tuple = classification.get_variant_coordinates_from_evidence()
-        #     if variant_tuple:
-        #         variant_hash = variant_pk_lookup.add(*variant_tuple)
-        #         variant_coordinates_by_hash[variant_hash] = variant_tuple
+        #     if variant_coordinate := classification.get_variant_coordinates_from_evidence():
+        #         variant_hash = variant_pk_lookup.add(*variant_coordinate)
+        #         variant_coordinates_by_hash[variant_hash] = variant_coordinate
         #         classifications_by_hash[variant_hash] = classification
         #     else:
         #         # note this shouldn't happen at this step - to get here get_variant_coordinates_from_evidence

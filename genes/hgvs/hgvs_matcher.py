@@ -182,7 +182,7 @@ class HGVSMatcher:
                 return hgvs_variant, transcript_version
         return None, None
 
-    def _lrg_get_variant_tuple_used_transcript_method_and_matches_reference(self, hgvs_variant: HGVSVariant) -> tuple[VariantCoordinate, str, str, Union[bool, HgvsMatchRefAllele]]:
+    def _lrg_get_variant_coordinate_used_transcript_method_and_matches_reference(self, hgvs_variant: HGVSVariant) -> tuple[VariantCoordinate, str, str, Union[bool, HgvsMatchRefAllele]]:
         lrg_transcript_accession = hgvs_variant.transcript
         new_hgvs_variant, transcript_version = self._get_renamed_lrg_transcript_hgvs_variant_and_transcript_version(self.genome_build, hgvs_variant)
         if new_hgvs_variant:
@@ -325,7 +325,7 @@ class HGVSMatcher:
         combined_error_message = None
 
         if transcript_is_lrg(transcript_accession):
-            variant_coordinate, used_transcript_accession, method, matches_reference = self._lrg_get_variant_tuple_used_transcript_method_and_matches_reference(hgvs_variant)
+            variant_coordinate, used_transcript_accession, method, matches_reference = self._lrg_get_variant_coordinate_used_transcript_method_and_matches_reference(hgvs_variant)
         elif hgvs_variant.kind in ('c', 'n'):
             if not transcript_accession:
                 msg = f"Could not parse \"{hgvs_string}\" c.HGVS requires a transcript or LRG."

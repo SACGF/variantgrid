@@ -1,7 +1,7 @@
 import logging
 import re
 from functools import cached_property
-from typing import Optional, Iterable, Union, Any
+from typing import Optional, Iterable, Union, Any, Tuple
 
 import django
 import pydantic
@@ -39,6 +39,9 @@ VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+))\s*:\s*(\d+)[,\s]*([GA
 VARIANT_SYMBOLIC_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+))\s*:\s*(\d+)\s*-\s*(\d+)\s*<(DEL|DUP|INS|INV|CNV)>$", re.IGNORECASE)
 # matches anything hgvs-like before any fixes
 HGVS_UNCLEANED_PATTERN = re.compile(r"(^(N[MC]_|ENST)\d+.*:|[cnmg]\.|[^:]:[cnmg]).*\d+", re.IGNORECASE)
+
+
+LIFTOVER_TOOL_AND_COORDINATE = tuple[Optional[AlleleConversionTool], Optional['VariantCoordinate']]
 
 
 class Allele(FlagsMixin, PreviewModelMixin, models.Model):
@@ -127,8 +130,22 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
             raise ValueError(f'Could not find a variant in allele {self.id} for build {genome_build}')
         return v
 
-    def get_liftover_tuple(self, genome_build: GenomeBuild,
-                           hgvs_matcher=None) -> tuple[AlleleConversionTool, Union[int, 'VariantCoordinate']]:
+    def liftover_using_existing_variant(self, dest_genome_build: GenomeBuild) -> Tuple[AlleleConversionTool, 'Variant']:
+        """ For Mito you can use existing contig """
+        conversion_tool = None
+        variant = None
+
+        # Check if the other build shares existing contig
+        genome_build_contigs = set(c.pk for c in dest_genome_build.chrom_contig_mappings.values())
+        for variant_allele in self.variantallele_set.all():
+            if variant_allele.variant.locus.contig_id in genome_build_contigs:
+                conversion_tool = AlleleConversionTool.SAME_CONTIG
+                # Return variant_id so we can create it directly
+                variant = variant_allele.variant
+        return conversion_tool, variant
+
+    def liftover_using_dest_variant_coordinate(self, dest_genome_build: GenomeBuild,
+                                               hgvs_matcher=None) -> LIFTOVER_TOOL_AND_COORDINATE:
         """ This returns tuples FOR a genome build (if something can look them up)
 
             Used by to write VCF coordinates during liftover. Can be slow (API call)
@@ -141,19 +158,11 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
         from snpdb.models.models_dbsnp import DbSNP
         from genes.hgvs import get_hgvs_variant_coordinate
 
-        # Check if the other build shares existing contig
-        genome_build_contigs = set(c.pk for c in genome_build.chrom_contig_mappings.values())
-        for variant_allele in self.variantallele_set.all():
-            if variant_allele.variant.locus.contig_id in genome_build_contigs:
-                conversion_tool = AlleleConversionTool.SAME_CONTIG
-                # Return variant_id so we can create it directly
-                return conversion_tool, variant_allele.variant_id
-
         conversion_tool = None
         g_hgvs = None
         if self.clingen_allele:
             try:
-                g_hgvs = self.clingen_allele.get_g_hgvs(genome_build)
+                g_hgvs = self.clingen_allele.get_g_hgvs(dest_genome_build)
                 conversion_tool = AlleleConversionTool.CLINGEN_ALLELE_REGISTRY
             except ValueError:  # Various contig errors all subclass from this
                 pass
@@ -163,7 +172,7 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
                 if va is None:
                     raise ValueError("Allele contains no VariantAlleles at all! Cannot liftover")
                 if dbsnp := DbSNP.get_for_variant(va.variant, VariantAnnotationVersion.latest(va.genome_build)):
-                    g_hgvs = dbsnp.get_g_hgvs(genome_build, alt=va.variant.alt)
+                    g_hgvs = dbsnp.get_g_hgvs(dest_genome_build, alt=va.variant.alt)
                     conversion_tool = AlleleConversionTool.DBSNP
 
         variant_coordinate = None
@@ -171,12 +180,12 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
             if hgvs_matcher:
                 variant_coordinate = hgvs_matcher.get_variant_coordinate(g_hgvs)
             else:
-                variant_coordinate = get_hgvs_variant_coordinate(g_hgvs, genome_build)
+                variant_coordinate = get_hgvs_variant_coordinate(g_hgvs, dest_genome_build)
 
         return conversion_tool, variant_coordinate
 
-    def get_liftover_tuple_from_other_build(self, source_genome_build: GenomeBuild,
-                                            dest_genome_build: GenomeBuild) -> Optional[tuple[AlleleConversionTool, tuple]]:
+    def liftover_using_source_variant_coordinate(self, source_genome_build: GenomeBuild,
+                                                 dest_genome_build: GenomeBuild) -> LIFTOVER_TOOL_AND_COORDINATE:
         """ This gets tuples from another build to run through a tool """
 
         # Try tools that write other builds, then run conversion
@@ -185,6 +194,7 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
         ]
 
         conversion_tool = None
+        variant_coordinate = None
         for enabled, potential_conversion_tool in options:
             if enabled:
                 if self.alleleliftover_set.filter(liftover__genome_build=dest_genome_build,
@@ -197,32 +207,32 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
         if conversion_tool:
             # Return VCF tuples in inserted genome build
             try:
-                chrom, position, ref, alt, svlen = self.variant_for_build(source_genome_build).as_tuple()
+                variant = self.variant_for_build(source_genome_build)
+                variant_coordinate = variant.coordinate
                 # BCFTools fails with "Unable to fetch sequence" if any variant is outside contig size
-                if errors := Variant.validate(source_genome_build, chrom, position):
+                if errors := Variant.validate(source_genome_build, variant_coordinate.chrom, variant_coordinate.position):
                     raise ValueError("\n".join(errors))
             except ValueError as e:  # No variant for source build (merged allele?)
                 logging.warning("Skipped %s: %s", self, e)
-                return None
+                return None, None
 
-            if alt == Variant.REFERENCE_ALT:
-                alt = "."  # NCBI works with '.' but not repeating ref (ie ref = alt)
-            # contig_accession = inserted_genome_build.convert_chrom_to_contig_accession(chrom)
-            return conversion_tool, (chrom, position, self.pk, ref, alt, svlen)
-
-        return None
+        return conversion_tool, variant_coordinate
 
     def can_attempt_liftover(self, genome_build) -> bool:
         try:
-            # See if we can have data already to liftover
-            conversion_tool, _ = self.get_liftover_tuple(genome_build)
+            conversion_tool, _ = self.liftover_using_existing_variant(genome_build)
+            if conversion_tool is not None:
+                return True
+
+            conversion_tool, _ = self.liftover_using_dest_variant_coordinate(genome_build)[0]
             if conversion_tool is not None:
                 return True
         except:
             pass
 
         for va in self.variantallele_set.exclude(genome_build=genome_build):
-            if self.get_liftover_tuple_from_other_build(va.genome_build, genome_build):
+            conversion_tool, _ self.liftover_using_source_variant_coordinate(va.genome_build, genome_build)
+            if conversion_tool is not None:
                 return True
 
         return False

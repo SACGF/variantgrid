@@ -3,12 +3,13 @@ import operator
 import os
 import re
 from collections import defaultdict
+from typing import Optional, Iterable
 
 import cyvcf2
 import vcf
 
 from library.utils import open_handle_gzip
-from snpdb.models import Variant, Sequence, GenomeFasta, SequenceRole
+from snpdb.models import Variant, Sequence, GenomeFasta, SequenceRole, VariantCoordinate
 
 
 def cyvcf2_header_types(cyvcf2_reader) -> defaultdict:
@@ -36,18 +37,19 @@ def cyvcf2_get_contig_lengths_dict(cyvcf2_reader):
         return {}
 
 
-def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=False, header_lines: list[str] = None):
-    """ variant_tuples can have either 4 or 5 fields (tuples_have_id_field) """
+def write_vcf_from_variant_coordinates(vcf_filename, variant_coordinates: Iterable[VariantCoordinate],
+                                       vcf_ids: Optional[Iterable[str]] = None, header_lines: list[str] = None):
+    """ If vcf_ids is supplied it must be in sync (record for record) with variant_coordinates """
 
     if header_lines is None:
         header_lines = []
 
-    if tuples_have_id_field:
-        vcf_tuples = variant_tuples
-    else:
-        vcf_tuples = ((chrom, position, ".", ref, alt, svlen) for (chrom, position, ref, alt, svlen) in variant_tuples)
+    if vcf_ids is None:
+        vcf_ids = ("." for _ in variant_coordinates)
 
-    vcf_tuples = sorted(vcf_tuples, key=operator.itemgetter(0, 1, 3, 4))
+    # Put them together and then sort
+    vc_and_ids = ((vc, vcf_id) for vc, vcf_id in zip(variant_coordinates, vcf_ids))
+    vc_and_ids = sorted(vc_and_ids, key=operator.itemgetter(0))
 
     info = [
         '##INFO=<ID=END,Number=.,Type=Integer,Description="Stop position of the interval">',
@@ -56,19 +58,23 @@ def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=Fal
     ]
     columns = "\t".join(["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"])
     header = "\n".join(["##fileformat=VCFv4.1", "##source=VariantGrid"] + info + header_lines + ["#" + columns])
-    empty_qual_filter_info = ('.', '.', '.')
     with open(vcf_filename, "wt", encoding="utf-8") as f:
         f.write(header + "\n")
-        for vcf_record in vcf_tuples:
-            (chrom, position, id_col, ref, alt, svlen) = vcf_record
+        for variant_coordinate, vcf_id in vc_and_ids:
+            (chrom, position, ref, alt, svlen) = variant_coordinate
             if Sequence.allele_is_symbolic(alt):
                 svtype = alt[1:-1]  # Strip off brackets
-                qual_filter_info = (".", ".", f"SVLEN={svlen};SVTYPE={svtype}")
+                info_dict = {
+                    "SVLEN": svlen,
+                    "SVTYPE": svtype,
+                    "END": variant_coordinate.end,
+                }
+                record_info = ";".join([f"{k}={v}" for k,v in info_dict.items()])
             else:
-                qual_filter_info = empty_qual_filter_info
+                record_info = "."
                 if alt == Variant.REFERENCE_ALT:
                     alt = "."
-            line = "\t".join((chrom, str(position), str(id_col), ref, alt) + qual_filter_info)
+            line = "\t".join((chrom, str(position), vcf_id, ref, alt, ".", ".", record_info))
             f.write(line + "\n")
 
 

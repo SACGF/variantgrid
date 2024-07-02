@@ -7,7 +7,7 @@ from annotation.models import ManualVariantEntryType
 from annotation.models.models import ManualVariantEntryCollection, ManualVariantEntry
 from annotation.tasks.process_manual_variants_task import ManualVariantsPostInsertTask, get_manual_variant_coordinates
 from library.django_utils.django_file_utils import get_import_processing_dir
-from library.genomics.vcf_utils import write_vcf_from_tuples
+from library.genomics.vcf_utils import write_vcf_from_variant_coordinates
 from library.utils import full_class_name
 from snpdb.models.models_enums import ImportSource
 from snpdb.models.models_genome import GenomeBuild
@@ -35,7 +35,7 @@ def create_manual_variants(user, genome_build: GenomeBuild, variants_text: str):
     check_can_create_variants(user)
     mvec = ManualVariantEntryCollection.objects.create(user=user,
                                                        genome_build=genome_build)
-    variants_list = []
+    variant_coordinates = []
     for i, line in enumerate(variants_text.split('\n')):
         line = line.strip()
         entry_type = ManualVariantEntry.get_entry_type(line)
@@ -50,12 +50,12 @@ def create_manual_variants(user, genome_build: GenomeBuild, variants_text: str):
 
         if entry_type != ManualVariantEntryType.UNKNOWN:
             try:
-                variants_list.extend(get_manual_variant_coordinates(mve))
+                variant_coordinates.extend(get_manual_variant_coordinates(mve))
             except Exception as ve:
                 mve.error_message = f"Error parsing {entry_type}: '{ve}'"
                 mve.save()
 
-    if not variants_list:
+    if not variant_coordinates:
         # Pipeline would have just hung forever
         raise ValueError("No valid variants to create!")
 
@@ -63,7 +63,7 @@ def create_manual_variants(user, genome_build: GenomeBuild, variants_text: str):
     # and run through upload pipeline
     working_dir = get_import_processing_dir(mvec.pk, "manual_variants")
     vcf_filename = os.path.join(working_dir, "manual_variant_entry.vcf")
-    write_vcf_from_tuples(vcf_filename, variants_list)
+    write_vcf_from_variant_coordinates(vcf_filename, variant_coordinates)
     uploaded_file = UploadedFile.objects.create(path=vcf_filename,
                                                 import_source=ImportSource.WEB,
                                                 name='Manual Variant Entry',
