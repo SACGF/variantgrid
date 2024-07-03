@@ -72,7 +72,7 @@ python_dateutil
 # Have trouble with Celery workers shutting down with newer versions of Redis
 redis==3.5.3
 reportlab
-requests>=2.32.0
+requests>=2.33.3
 requests_oauthlib
 rollbar
 scipy
