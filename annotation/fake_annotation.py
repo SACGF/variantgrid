@@ -55,9 +55,15 @@ def get_fake_annotation_settings_dict(columns_version: int) -> dict:
 
 
 def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium, columns_version: int):
+    # We need to use a later assembly of GRCh37 as the 1st one didn't have MT in it
+    if genome_build.name == "GRCh37":
+        assembly = "GRCh37.p13"
+    else:
+        assembly = genome_build.name
+
     fake_version = {"id": None,
                     "genome_build": genome_build,
-                    "assembly": str(genome_build),
+                    "assembly": assembly,
                     "annotation_consortium": annotation_consortium,
                     "columns_version": columns_version}
     for f in VariantAnnotationVersion._meta.fields:  # @UndefinedVariable

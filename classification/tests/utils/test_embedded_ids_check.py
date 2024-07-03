@@ -1,4 +1,4 @@
-from unittest import TestCase
+from django.test import TestCase
 
 from classification.models import embedded_ids_check
 from classification.tests.utils.data_utils import ConditionMock

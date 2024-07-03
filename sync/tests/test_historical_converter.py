@@ -5,8 +5,8 @@ The key changes happened in:
 
 classification.migrations.0042_vep_ekeys.modifying_existing_keys
 """
-import unittest
 from collections import namedtuple
+from django.test import TestCase
 from unittest import skip
 
 from django.contrib.auth.models import User
@@ -16,7 +16,7 @@ from classification.models.evidence_key import EvidenceKey, EvidenceCategory, Ev
 from sync.shariant.historical_ekey_converter import HistoricalEKeyConverter
 
 
-class Test(unittest.TestCase):
+class Test(TestCase):
     LATEST_DATA_VALUE_KEYS = {
         "cadd": {"value": "1.5"},
         "1000_genomes_af": {"value": "0.42123"},

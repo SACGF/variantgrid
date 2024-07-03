@@ -1,4 +1,4 @@
-from unittest import TestCase
+from django.test import TestCase
 
 from classification.models import ClinVarExportRequest
 from classification.models.clinvar_export_models import ClinVarExportBatch

@@ -1,4 +1,4 @@
-from unittest import TestCase
+from django.test import TestCase
 
 from library.utils import JsonDiffs
 from uicore.json.validated_json import JsonMessages, ValidatedJson

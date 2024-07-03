@@ -69,4 +69,13 @@ class TestVCFUtils(TestCase):
                     self.assertLess(previous_out_vc, out_vc)
                 previous_out_vc = out_vc
 
+    def test_write_vcf_has_end(self):
+        variant_coordinates = [
+            VariantCoordinate(chrom='1', position=123456, ref='A', alt='<DEL>', svlen=5000),
+        ]
 
+        with tempfile.NamedTemporaryFile(delete=True) as temp_file:
+            write_vcf_from_variant_coordinates(temp_file.name, variant_coordinates)
+            out = vcf_to_variant_coordinates_and_records(temp_file.name)
+            for in_vc, (out_vc, out_record) in zip(variant_coordinates, out):
+                self.assertEqual(out_record.INFO["END"], in_vc.end)

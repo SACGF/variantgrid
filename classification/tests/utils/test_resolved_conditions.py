@@ -1,5 +1,6 @@
-from unittest import TestCase, skip, mock
-from unittest.mock import patch
+from django.test import TestCase
+
+from unittest import mock
 
 from classification.models import ConditionResolved, MultiCondition
 from classification.tests.utils.data_utils import ConditionMock

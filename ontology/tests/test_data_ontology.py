@@ -28,8 +28,12 @@ def create_test_ontology_version() -> OntologyVersion:
     now = timezone.now()
     for field, (import_source, filenames) in OntologyVersion.ONTOLOGY_IMPORTS.items():
         filename = filenames[0]
-        oi, _ = OntologyImport.objects.get_or_create(import_source=import_source, filename=filename,
-                                                     defaults={"processed_date": now})
-        kwargs[field] = oi
-    ontology_version, _ = OntologyVersion.objects.get_or_create(**kwargs)
+        oi = OntologyImport.objects.filter(import_source=import_source, filename=filename).first()
+        if not oi:
+            oi, _ = OntologyImport.objects.get_or_create(import_source=import_source, filename=filename,
+                                                         defaults={"processed_date": now})
+            kwargs[field] = oi
+    ontology_version = OntologyVersion.objects.filter(**kwargs).first()
+    if ontology_version is None:
+        ontology_version, _ = OntologyVersion.objects.get_or_create(**kwargs)
     return ontology_version
