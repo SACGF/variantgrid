@@ -125,7 +125,7 @@ class ClassificationVCF(ExportVCF):
     def allele_origin_germline(self):
         if AlleleOriginBucket.GERMLINE in self.allele_data.cms_allele_origins:
             return True
-    
+
     @export_vcf_info_cell(
         header_id="somatic",
         header_type=VCFHeaderType.Flag,
