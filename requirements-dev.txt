@@ -1,8 +1,10 @@
 stream-zip
 more-itertools
 beautifulsoup4
-bgzip
-biopython>=1.81
+# 0.5.0 minimum workaround for Mac M1 build compatibility issue
+bgzip>=0.5.0
+# 1.8.4 minimum workaround for Mac M1 build compatibility issue
+biopython>=1.84
 cdot
 celery
 ConfigArgParse
@@ -46,7 +48,8 @@ git+https://github.com/SACGF/hgvs#egg=pyhgvs
 git+https://github.com/davmlaw/hgvs@variantgrid#egg=hgvs
 git+https://github.com/davmlaw/PyVCF3@f7ba4b4adb8a79ac13e99470d013af6a8fe1363b#egg=pyvcf3
 gunicorn
-HTSeq
+# 2.0.8 minimum workaround for Mac M1 build compatibility issue
+HTSeq>=2.0.8
 ijson
 ipython
 kombu

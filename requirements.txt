@@ -3,8 +3,8 @@ setuptools_rust==1.9.0
 stream-zip==0.0.47
 more-itertools==8.12.0
 beautifulsoup4==4.10.0
-bgzip==0.4.0
-biopython==1.81
+bgzip==0.5.0
+biopython==1.84
 cdot==0.2.21
 celery==5.3.6
 ConfigArgParse==1.5.3
@@ -48,7 +48,7 @@ git+https://github.com/davmlaw/django-starfield#egg=django_starfield
 git+https://github.com/SACGF/hgvs#egg=pyhgvs
 git+https://github.com/biocommons/hgvs#egg=hgvs
 gunicorn
-HTSeq==2.0.5
+HTSeq==2.0.8
 ijson==3.1.4
 ipython==8.15
 kombu==5.3.7
