@@ -9,7 +9,7 @@ from snpdb.models import ClinVarKey
 class TestClinVarExportSync(TestCase):
 
     def test_submitted(self):
-        clinvar_key = ClinVarKey.objects.create(
+        clinvar_key, _ = ClinVarKey.objects.get_or_create(
             id="clinvar_test_key"
         )
         batch = ClinVarExportBatch.objects.create(
