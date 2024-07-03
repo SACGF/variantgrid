@@ -8,6 +8,7 @@ from annotation.manual_variant_entry import check_can_create_variants, CreateMan
 from annotation.models import VariantAnnotation
 from annotation.templatetags.clinvar_tags import ClinVarDetails
 from classification.models import Classification, ImportedAlleleInfo
+from snpdb.liftover import allele_can_attempt_liftover
 from snpdb.models import Allele, GenomeBuild, VariantAllele, \
     Variant, AlleleOrigin, AlleleMergeLog, LiftoverRun, AlleleLiftover
 from snpdb.variant_links import variant_link_info
@@ -31,7 +32,7 @@ class VariantCard:
             if unfinished_liftover is None:
                 try:
                     check_can_create_variants(user)
-                    can_create_variant = allele.can_attempt_liftover(genome_build)
+                    can_create_variant = allele_can_attempt_liftover(allele, genome_build)
                 except CreateManualVariantForbidden:
                     pass
 
