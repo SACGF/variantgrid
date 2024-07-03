@@ -118,17 +118,31 @@ class ClassificationVCF(ExportVCF):
             return 3
 
     @export_vcf_info_cell(
-        header_id="allele_origin",
-        number=VCFHeaderNumberSpecial.UNBOUND,
-        header_type=VCFHeaderType.String,
-        description="Allele origin bucket, values will be: somatic, germline, mixed or unknown",
+        header_id="germline",
+        header_type=VCFHeaderType.Flag,
+        description="Allele origin bucket, values will be 1 or more of: somatic, germline, allele_origin_unknown",
         categories={"system": VCFTargetSystem.GENERIC})
-    def allele_origin(self):
-        if allele_origins := self.allele_data.cms_allele_origins:
-            return list(sorted(ALLELE_ORIGIN_BUCKET_TO_LABEL.get(ao) for ao in allele_origins))
-        else:
-            # not sure how we got 0 allele origins, but just in case
-            return "unknown"
+    def allele_origin_germline(self):
+        if AlleleOriginBucket.GERMLINE in self.allele_data.cms_allele_origins:
+            return True
+    
+    @export_vcf_info_cell(
+        header_id="somatic",
+        header_type=VCFHeaderType.Flag,
+        description="Allele origin bucket, values will be 1 or more of: somatic, germline, allele_origin_unknown",
+        categories={"system": VCFTargetSystem.GENERIC})
+    def allele_origin_somatic(self):
+        if AlleleOriginBucket.SOMATIC in self.allele_data.cms_allele_origins:
+            return True
+
+    @export_vcf_info_cell(
+        header_id="allele_origin_unknown",
+        header_type=VCFHeaderType.Flag,
+        description="Allele origin bucket, values will be  1 or more of: somatic, germline, allele_origin_unknown",
+        categories={"system": VCFTargetSystem.GENERIC})
+    def allele_origin_unknown(self):
+        if AlleleOriginBucket.UNKNOWN in self.allele_data.cms_allele_origins:
+            return True
 
     def unique_values(self, evidence_key: str, raw: bool = False):
         e_key = EvidenceKeyMap.cached_key(evidence_key)
