@@ -9,13 +9,14 @@ from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 class VariantTestCase(TestCase):
 
-    def setUp(self):
-        self.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
-        self.variant = slowly_create_test_variant("3", 128198980, 'A', 'T', self.grch37)
-        self.ref_variant = slowly_create_test_variant("3", 128198980, 'A', 'A', self.grch37)
+    @classmethod
+    def setUpTestData(cls):
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.variant = slowly_create_test_variant("3", 128198980, 'A', 'T', cls.grch37)
+        cls.ref_variant = slowly_create_test_variant("3", 128198980, 'A', 'A', cls.grch37)
 
         # Need this for HGVSMatcher in VariantCoordinate - that may be removed in future
-        get_fake_annotation_version(self.grch37)
+        get_fake_annotation_version(cls.grch37)
 
     def test_variant_string(self):
         variant_string = "3:128198980 A>T"
