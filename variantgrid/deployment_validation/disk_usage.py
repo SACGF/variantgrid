@@ -1,6 +1,8 @@
 from dataclasses import dataclass
-from django.conf import settings
 from typing import Optional
+
+from django.conf import settings
+
 from library.utils.file_utils import get_disk_usage
 
 

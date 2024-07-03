@@ -1,9 +1,10 @@
+from typing import Union
+
 from django.contrib.auth.models import User, Group
 from django.db import models
 from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
-from typing import Union
 
 from genes.models import GeneList, GeneSymbol
 from library.enums import ModificationOperation

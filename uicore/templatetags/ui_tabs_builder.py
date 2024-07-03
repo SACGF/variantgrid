@@ -2,6 +2,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Optional
 from urllib.parse import urlparse, parse_qs
+
 from django import template
 from django.http import HttpRequest
 from django.template.base import FilterExpression

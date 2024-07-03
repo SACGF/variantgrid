@@ -1,8 +1,8 @@
 import re
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Union, Optional
-from collections import defaultdict
 
 from django.conf import settings
 from django.db import transaction

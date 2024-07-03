@@ -2,7 +2,9 @@ import itertools
 import uuid
 from dataclasses import dataclass
 from typing import Optional, Union, Iterable, Iterator
+
 from django.template import Library
+
 from ontology.models import OntologyTerm, OntologyTermRelation, GeneDiseaseClassification, OntologyService, \
     OntologySnake, PanelAppClassification
 from ontology.ontology_matching import OntologyMatch

@@ -14,7 +14,6 @@ from library.constants import MINUTE_SECS
 from library.log_utils import report_message
 from library.utils import JsonObjType
 
-
 """
 This code is responsible for sending our data to ClinVar API (after everything else has run to work out what
 data we want to send)

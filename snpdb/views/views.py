@@ -73,10 +73,10 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
     VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, SampleStats, \
     SampleStatsPassingFilter, TagColorsCollection, Contig, LiftoverRun, Allele, AlleleLiftover
-from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, SequenceRole, AlleleConversionTool
+from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, AlleleConversionTool
 from snpdb.sample_file_path import get_example_replacements
-from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.tasks.liftover_tasks import liftover_alleles
+from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.utils import LabNotificationBuilder, get_tag_styles_and_colors
 from upload.models import UploadedVCF
 from upload.uploaded_file_type import retry_upload_pipeline

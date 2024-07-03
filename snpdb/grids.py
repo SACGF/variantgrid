@@ -3,7 +3,7 @@ from functools import reduce
 from typing import Optional, Any
 
 from django.conf import settings
-from django.db.models import F, QuerySet, OuterRef, Subquery
+from django.db.models import F, QuerySet
 from django.db.models.aggregates import Count, Max
 from django.db.models.query_utils import Q
 from django.shortcuts import get_object_or_404

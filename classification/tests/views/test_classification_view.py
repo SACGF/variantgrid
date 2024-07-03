@@ -1,10 +1,13 @@
+import json
+
 from deepdiff import DeepDiff
 from django.test import TestCase, RequestFactory, override_settings
+
 from classification.enums import EvidenceKeyValueType, SubmissionSource
 from classification.models import Classification, EvidenceKey
 from classification.tests.models.test_utils import ClassificationTestUtils
 from classification.views.classification_view import ClassificationView
-import json
+
 
 class ClassificationTestCaseViews(TestCase):
 

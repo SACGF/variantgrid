@@ -1,7 +1,6 @@
 import os.path
 import re
 from importlib import metadata
-from typing import Tuple
 
 from bioutils.sequences import reverse_complement
 from django.conf import settings

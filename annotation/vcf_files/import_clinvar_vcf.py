@@ -1,6 +1,7 @@
 import logging
 import os
 
+import cyvcf2
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django_messages.admin import User
@@ -12,7 +13,6 @@ from snpdb.models import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import UploadStep
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
-import cyvcf2
 
 """
 ##fileformat=VCFv4.1

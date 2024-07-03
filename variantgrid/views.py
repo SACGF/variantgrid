@@ -1,7 +1,5 @@
 import sys
 
-from django_recaptcha.fields import ReCaptchaField
-from django_recaptcha.widgets import ReCaptchaV3
 from django import forms
 from django.conf import settings
 from django.contrib import messages
@@ -13,6 +11,8 @@ from django.template.loader import get_template, render_to_string
 from django.urls.base import resolve, reverse
 from django.urls.exceptions import Resolver404
 from django.views.generic import FormView
+from django_recaptcha.fields import ReCaptchaField
+from django_recaptcha.widgets import ReCaptchaV3
 from global_login_required import login_not_required
 
 from library.django_utils import require_superuser

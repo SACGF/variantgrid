@@ -24,7 +24,6 @@ from snpdb.models.models_variant import LiftoverRun, Allele, Variant, VariantAll
 from upload.models import UploadedFile, UploadedLiftover, UploadPipeline, UploadedFileTypes
 from upload.upload_processing import process_upload_pipeline
 
-
 LIFTOVER_TOOL_AND_COORDINATE = tuple[Optional[AlleleConversionTool], Optional['VariantCoordinate']]
 
 

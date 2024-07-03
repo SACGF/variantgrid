@@ -2,8 +2,10 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import timedelta, date
 from typing import Iterator
+
 from django.contrib.auth.models import User
 from django.db.models import Q
+
 from eventlog.models import ViewEvent
 from library.django_utils import require_superuser
 from library.utils import ExportRow, export_column

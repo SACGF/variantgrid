@@ -32,7 +32,6 @@ from snpdb.models import Sample, ColumnVCFInfo, VCFInfoTypes, Zygosity, Cohort
 from snpdb.models.models_variant import Variant
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs
 
-
 _NODE_GRID_ALLOWED_PARAMS = {
     '_filters',
     '_search',

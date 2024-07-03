@@ -1,5 +1,3 @@
-import operator
-import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -14,9 +12,7 @@ from django.http import HttpRequest
 from guardian.shortcuts import get_objects_for_user
 from threadlocals.threadlocals import get_current_request
 
-from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version, \
-    get_variant_queryset_for_latest_annotation_version
-from annotation.models import AnnotationVersion
+from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
 from classification.enums import ShareLevel, ClinicalContextStatus, AlleleOriginBucket
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \

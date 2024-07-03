@@ -1,6 +1,7 @@
 import re
 from dataclasses import dataclass
 from typing import Optional
+
 from django.http import HttpRequest
 from django.urls import reverse
 

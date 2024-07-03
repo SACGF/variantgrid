@@ -1,6 +1,5 @@
 import abc
 from enum import Enum
-from typing import Tuple
 
 from genes.hgvs import HGVSVariant
 from snpdb.models import GenomeBuild, VariantCoordinate

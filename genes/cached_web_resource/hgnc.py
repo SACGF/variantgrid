@@ -12,7 +12,6 @@ from genes.models import HGNCImport, GeneAnnotationRelease, GeneSymbol, HGNC, Ge
 from genes.models_enums import HGNCStatus, GeneSymbolAliasSource
 from library.constants import MINUTE_SECS
 from library.django_utils import get_model_fields, get_field_counts
-from library.utils import invert_dict
 
 HGNC_BASE_URL = "https://rest.genenames.org/fetch/status/"
 

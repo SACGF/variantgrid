@@ -1,6 +1,6 @@
 import sys
 from importlib import metadata
-from typing import Optional, Tuple
+from typing import Optional
 
 import pyhgvs
 from django.conf import settings

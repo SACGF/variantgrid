@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from genes.models import GeneListGeneSymbol, create_fake_gene_list
 from genes.serializers import GeneListGeneSymbolSerializer
 from library.constants import WEEK_SECS
-from ontology.models import OntologyTerm, GeneDiseaseClassification, OntologyVersion, \
+from ontology.models import OntologyTerm, OntologyVersion, \
     ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER
 from ontology.ontology_matching import OntologyMatching
 from ontology.serializers import OntologyTermRelationSerializer

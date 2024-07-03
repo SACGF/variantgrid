@@ -1,5 +1,3 @@
-from datetime import timedelta
-
 from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
@@ -8,7 +6,7 @@ from annotation.annotation_version_querysets import get_queryset_for_latest_anno
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.models import ProcessingStatus
 from snpdb.models.models_variant import Variant
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, DC, CellData
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData
 from upload.models import UploadStep, ModifiedImportedVariant, UploadPipeline
 
 

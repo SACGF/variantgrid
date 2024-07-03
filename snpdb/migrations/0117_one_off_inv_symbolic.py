@@ -8,7 +8,7 @@ from bioutils.sequences import reverse_complement
 from django.db import migrations
 from django.db.models import Q
 
-from library.utils import md5sum_str, sha256sum_str
+from library.utils import sha256sum_str
 
 
 def _one_off_inv_symbolic(apps, _schema_editor):

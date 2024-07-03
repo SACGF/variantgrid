@@ -6,7 +6,6 @@ from django.db import migrations
 
 from manual.operations.manual_operations import ManualOperation
 
-
 LIFTOVER_37_TO_38 = settings.ANNOTATION["GRCh37"]["liftover"]["GRCh38"]
 LIFTOVER_38_TO_37 = settings.ANNOTATION["GRCh38"]["liftover"]["GRCh37"]
 

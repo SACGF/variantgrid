@@ -11,8 +11,7 @@ from classification.views.exports.classification_export_formatter import Classif
 from genes.models import GeneSymbol
 from library.utils import ExportRow, export_column, delimited_row
 from ontology.models import OntologyTerm, OntologyRelation, OntologyImportSource, \
-    PanelAppClassification, OntologySnake, OntologyService, GeneDiseaseClassification, \
-    ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER
+    PanelAppClassification, OntologySnake, OntologyService, GeneDiseaseClassification
 
 
 @dataclass(frozen=True)

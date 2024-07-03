@@ -1,6 +1,8 @@
 from typing import Optional, Union
+
 from django import template
 from django.db.models import QuerySet
+
 from library.utils import pretty_label
 
 register = template.Library()

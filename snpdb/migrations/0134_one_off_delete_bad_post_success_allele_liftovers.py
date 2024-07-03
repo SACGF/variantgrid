@@ -3,6 +3,7 @@ import logging
 
 from django.db import migrations
 
+
 def _one_off_delete_bad_post_success_allele_liftovers(apps, _schema_editor):
     """
         This is to clean up historical liftovers made from one_off_legacy_populate_allele_liftover

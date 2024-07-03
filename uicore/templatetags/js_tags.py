@@ -7,6 +7,7 @@ from datetime import date
 from decimal import Decimal
 from html import escape
 from typing import Union, Any, Optional
+
 from django import template
 from django.db.models import TextChoices
 from django.utils.safestring import mark_safe, SafeString

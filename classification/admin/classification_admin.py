@@ -1,11 +1,10 @@
 import json
 from datetime import timedelta
-from html import escape
 from typing import Union, Optional
 
 from django.contrib import admin, messages
 from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter, DateFieldListFilter
-from django.db.models import QuerySet, Q
+from django.db.models import QuerySet
 from django.forms import Widget
 from django.utils import timezone
 from django.utils.safestring import SafeString

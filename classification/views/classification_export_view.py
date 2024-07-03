@@ -34,7 +34,6 @@ from snpdb.models import AlleleOriginFilterDefault
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
-from snpdb.templatetags.user_tags import user
 
 ALISSA_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}
 

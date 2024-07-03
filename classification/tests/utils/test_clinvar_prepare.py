@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from django.test import TestCase
 from typing import Optional
 from unittest import mock
+
+from django.test import TestCase
 
 from classification.models import ConditionResolved
 from classification.models.clinvar_export_prepare import ConsolidatingMerger

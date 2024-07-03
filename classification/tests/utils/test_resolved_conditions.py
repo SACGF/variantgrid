@@ -1,10 +1,10 @@
-from django.test import TestCase
-
 from unittest import mock
+
+from django.test import TestCase
 
 from classification.models import ConditionResolved, MultiCondition
 from classification.tests.utils.data_utils import ConditionMock
-from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation, OntologyVersion
+from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 
 
 class ResolvedConditionTest(TestCase):

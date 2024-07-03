@@ -3,10 +3,11 @@ import urllib
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Optional, Iterable, TypeAlias, Protocol
+
 from django.conf import settings
+
 from library.utils import ExportTweak, local_date_str_no_dash, get_decorated_methods
 from snpdb.models import Variant, GenomeBuild, GenomeBuildContig, Contig, Allele
-
 
 """
 This works much like ExportRow @export_column but for VCFs

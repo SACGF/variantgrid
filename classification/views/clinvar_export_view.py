@@ -4,7 +4,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Dict, Any, Optional, Iterable, List, Set
+from typing import Dict, Any, Optional, List, Set
 
 from django.contrib import messages
 from django.db.models import QuerySet, When, Value, Case, IntegerField, Count, Q, TextField
@@ -18,7 +18,7 @@ from django.views.decorators.http import require_POST
 
 from classification.enums import SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
-    EvidenceKeyMap, ClinVarExportStatus, ClinVarExportSubmission, ConditionResolved
+    EvidenceKeyMap, ClinVarExportStatus, ClinVarExportSubmission
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.utils.clinvar_matcher import ClinVarLegacyRow, ClinVarLegacyMatches, ClinVarLegacyExportMatchType
 from classification.views.classification_dashboard_view import ClassificationDashboard

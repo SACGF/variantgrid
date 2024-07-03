@@ -5,7 +5,7 @@ from django.views.generic import TemplateView
 from annotation.models import patients_qs_for_ontology_term
 from library.utils import LimitedCollection
 from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService, OntologySnake, OntologyRelation, \
-    GeneDiseaseClassification, ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER
+    ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER
 from ontology.panel_app_ontology import update_gene_relations
 
 

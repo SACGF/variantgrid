@@ -1,6 +1,7 @@
 import unittest
 
 from django.contrib.auth.models import User
+
 from eventlog.models import create_event
 from library.django_utils.unittest_utils import URLTestCase
 

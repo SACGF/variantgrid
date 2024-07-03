@@ -3,9 +3,10 @@ from collections import defaultdict
 
 from django.core.management.base import BaseCommand
 from django.db.models import Min, F, Count
+
 from library.guardian_utils import admin_bot
 from snpdb.models import GenomeBuild, Allele, ClinGenAllele, Contig, VariantAllele, \
-    AlleleLiftover, LiftoverRun, AlleleConversionTool, ProcessingStatus, AlleleSource
+    AlleleLiftover, LiftoverRun, AlleleConversionTool, ProcessingStatus
 
 
 class Command(BaseCommand):

@@ -6,10 +6,10 @@ The key changes happened in:
 classification.migrations.0042_vep_ekeys.modifying_existing_keys
 """
 from collections import namedtuple
-from django.test import TestCase
 from unittest import skip
 
 from django.contrib.auth.models import User
+from django.test import TestCase
 
 from annotation.models.models_enums import VariantClass
 from classification.models.evidence_key import EvidenceKey, EvidenceCategory, EvidenceKeyValueType

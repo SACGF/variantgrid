@@ -1,7 +1,9 @@
 import re
 from functools import cached_property
 from typing import Dict, Any, Mapping, Optional, Union, List, TypedDict
+
 from django.conf import settings
+
 from annotation.models import CitationFetchRequest
 from annotation.models.models_citations import CitationFetchResponse
 from classification.criteria_strengths import CriteriaStrength, CriteriaStrengths

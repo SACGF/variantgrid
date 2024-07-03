@@ -1,6 +1,5 @@
 import hashlib
 import secrets
-import uuid
 from hashlib import md5
 
 import deprecation

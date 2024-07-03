@@ -13,7 +13,6 @@ from library.utils import pretty_collection
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, ClinVarKey, Lab
 
-
 """
 This code creates or updates ClinVarExports with the latest data.
 It finds the best candidate classification for each lab / allele / condition combo,

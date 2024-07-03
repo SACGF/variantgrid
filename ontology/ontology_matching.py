@@ -2,12 +2,14 @@ import re
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Any, Iterable, TypedDict
+
 from django.urls import reverse
+
 from annotation.regexes import db_ref_regexes
 from classification.models.condition_text_search import condition_text_search
 from library.log_utils import report_message, report_exc_info
 from library.utils import empty_to_none
-from ontology.models import OntologyTerm, OntologyService, OntologySnake, GeneDiseaseClassification
+from ontology.models import OntologyTerm, OntologyService, OntologySnake
 
 
 class OntologySnakeJson(TypedDict):

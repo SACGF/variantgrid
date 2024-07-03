@@ -1,6 +1,6 @@
-from annotation.fake_annotation import get_fake_annotation_version
 from django.test import TestCase
 
+from annotation.fake_annotation import get_fake_annotation_version
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.liftover import _liftover_using_existing_contig, _liftover_using_dest_variant_coordinate, \
     _liftover_using_source_variant_coordinate
