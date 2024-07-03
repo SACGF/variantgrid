@@ -131,7 +131,6 @@ class ClinGenAlleleRegistryAPI:
             else:
                 raise e
 
-
     @classmethod
     def get_code(cls, code):
         url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + f"/allele/{code}"

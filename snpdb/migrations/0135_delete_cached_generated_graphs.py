@@ -26,7 +26,6 @@ class Migration(migrations.Migration):
     """ We're changing the hash on these to use sha256 sum so old ones will no longer be retrieved,
         so may as well delete them """
 
-
     dependencies = [
         ("snpdb", "0134_one_off_delete_bad_post_success_allele_liftovers"),
     ]

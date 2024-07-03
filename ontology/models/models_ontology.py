@@ -724,8 +724,6 @@ ONTOLOGY_RELATIONSHIP_MEDIUM_QUALITY_FILTER = OntologyRelationshipQualityFilter(
 ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER = OntologyRelationshipQualityFilter(min_gencc_strength=GeneDiseaseClassification.STRONG, min_panelapp_strength=PanelAppClassification.GREEN)
 
 
-
-
 class OntologyVersion(TimeStampedModel):
     """ This is used by annotation.AnnotationVersion to keep track of different OntologyImports,
         so we can load historical versions of OntologyTermRelation """
@@ -1134,7 +1132,6 @@ class OntologySnake:
             dest_term=gene_ontology,
             source_term__ontology_service__in={OntologyService.MONDO, OntologyService.OMIM}
         ))
-
 
     @staticmethod
     def mondo_terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol]) -> set[OntologyTerm]:

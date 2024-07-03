@@ -98,7 +98,6 @@ class HGVSConverterFactory:
         raise ValueError(f"HGVSConverter type {hgvs_converter_type} not supported")
 
 
-
 class VariantResolvingError(ValueError):
 
     def __init__(self, message: str, technical_message: Optional[str] = None):

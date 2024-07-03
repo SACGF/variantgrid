@@ -110,7 +110,7 @@ class PyHGVSVariant(HGVSVariant):
 
 
 class PyHGVSConverter(HGVSConverter):
-    def __int__(self, genome_build: GenomeBuild, local_resolution = True, clingen_resolution=True):
+    def __int__(self, genome_build: GenomeBuild, local_resolution=True, clingen_resolution=True):
         super().__init__(genome_build, local_resolution=local_resolution, clingen_resolution=clingen_resolution)
 
     @staticmethod

@@ -63,7 +63,7 @@ class TabBuilder:
 CLEAN_TAB_RE = re.compile("(.*)(?:_[0-9]+|-tab)")
 
 
-def check_active_tab(tab_set: str, tab_id: str, request: HttpRequest, context = None) -> bool:
+def check_active_tab(tab_set: str, tab_id: str, request: HttpRequest, context=None) -> bool:
     active = False
     active_tab = request.GET.get("activeTab")
     if not active_tab:
