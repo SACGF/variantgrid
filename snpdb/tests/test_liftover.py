@@ -10,7 +10,6 @@ from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
 class TestLiftover(TestCase):
-    """ Test for library.utils - Django unit tests are run in apps so this needs to be here """
 
     @classmethod
     def setUpTestData(cls):
