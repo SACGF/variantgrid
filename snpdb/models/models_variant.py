@@ -242,6 +242,9 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             return self.position + abs(self.svlen) + 1
         return self.position + len(self.ref)
 
+    def __lt__(self, other):
+        return self.as_tuple < other.as_tuple
+
     def __str__(self):
         return self.format()
 

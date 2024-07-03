@@ -15,7 +15,7 @@ from library.django_utils.unittest_utils import URLTestCase, prevent_request_war
 from ontology.models import OntologyService, OntologyImport, OntologyTerm
 from snpdb.models import ImportStatus, DataState
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.tests.test_data import create_fake_trio
+from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 
 
 class Test(URLTestCase):

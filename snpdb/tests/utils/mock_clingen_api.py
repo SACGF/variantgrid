@@ -354,7 +354,64 @@ class MockClinGenAlleleRegistryAPI(ClinGenAlleleRegistryAPI):
                                                      "referenceAllele": "G"}],
                                     "proteinEffect": {"hgvs": "ENSP00000487081.1:p.Glu500Lys",
                                                       "hgvsWellDefined": "ENSP00000487081.1:p.Glu500Lys"},
-                                    "referenceSequence": "http://reg.genome.network/refseq/RS407216"}]}
+                                    "referenceSequence": "http://reg.genome.network/refseq/RS407216"}]},
+        "CA337095804": {
+            "@context": "http://reg.genome.network/schema/allele.jsonld",
+            "@id": "http://reg.genome.network/allele/CA337095804",
+            "communityStandardTitle": [
+                "NC_012920.1:m.263A>G"
+            ],
+            "externalRecords": {
+                "ClinVarAlleles": [
+                    {
+                        "@id": "http://www.ncbi.nlm.nih.gov/clinvar/?term=434777[alleleid]",
+                        "alleleId": 434777,
+                        "preferredName": "NC_012920.1(MT-CYB):m.263A>G"
+                    }
+                ],
+                "ClinVarVariations": [
+                    {
+                        "@id": "http://www.ncbi.nlm.nih.gov/clinvar/variation/441147",
+                        "RCV": [
+                            "RCV000509228"
+                        ],
+                        "variationId": 441147
+                    }
+                ],
+                "MyVariantInfo_hg38": [
+                    {
+                        "@id": "http://myvariant.info/v1/variant/chrMT:g.263A>G?assembly=hg38",
+                        "id": "chrMT:g.263A>G"
+                    }
+                ],
+                "dbSNP": [
+                    {
+                        "@id": "http://www.ncbi.nlm.nih.gov/snp/2853515",
+                        "rs": 2853515
+                    }
+                ]
+            },
+            "genomicAlleles": [
+                {
+                    "chromosome": "MT",
+                    "coordinates": [
+                        {
+                            "allele": "G",
+                            "end": 263,
+                            "referenceAllele": "A",
+                            "start": 262
+                        }
+                    ],
+                    "hgvs": [
+                        "NC_012920.1:m.263A>G",
+                        "J01415.2:m.263A>G"
+                    ],
+                    "referenceGenome": "GRCh38",
+                    "referenceSequence": "http://reg.genome.network/refseq/RS000433"
+                }
+            ],
+            "type": "nucleotide"
+        }
     }
 
     CACHED_HGVS_RESPONSES = {

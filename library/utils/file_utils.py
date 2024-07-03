@@ -6,14 +6,14 @@ from pathlib import Path
 from typing import Optional
 
 
-def file_or_filename(f, mode='r'):
+def open_file_or_filename(f, mode='r', **kwargs):
     """ If f is a string (filename), opens (handling gzip)
         otherwise does nothing if already a file object """
     if isinstance(f, str):
         if 'w' in mode:  # Create path if writing
             mk_path_for_file(f)
 
-        return open_handle_gzip(f, mode)
+        return open_handle_gzip(f, mode, **kwargs)
     if all(hasattr(f, method) for method in ["read", "readlines"]):
         return f  # Already a File object
     raise ValueError(f"'{f}' ({type(f)}) not a file or string")
@@ -42,7 +42,7 @@ def name_from_filename(filename: str, remove_gz=False) -> str:
 
 def file_to_array(filename, comment: Optional[str] = None, max_lines: Optional[int] = None):
     array = []
-    f_or_f = file_or_filename(filename)
+    f_or_f = open_file_or_filename(filename)
     for i, line in enumerate(f_or_f):
         if max_lines is not None and i > max_lines:
             break
@@ -118,7 +118,7 @@ def add_permissions_to_file(filename: str, add_stat: int):
         raise e
 
 
-def open_handle_gzip(filename: str, mode=None):
+def open_handle_gzip(filename: str, mode=None, **kwargs):
     if filename.endswith(".gz"):
         open_func = gzip.open
     else:
@@ -127,7 +127,7 @@ def open_handle_gzip(filename: str, mode=None):
     args = ()
     if mode:
         args = (mode,)
-    return open_func(filename, *args)
+    return open_func(filename, *args, **kwargs)
 
 
 def get_disk_usage(human_readable=False):
