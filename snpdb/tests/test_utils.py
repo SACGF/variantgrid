@@ -5,7 +5,7 @@ from library.utils import format_significant_digits
 
 
 class TestUtils(TestCase):
-
+    """ Test for library.utils - Django unit tests are run in apps so this needs to be here """
     def test_sig_digits(self):
         self.assertEqual("0", format_significant_digits(0))
         self.assertEqual("1", format_significant_digits(1))
