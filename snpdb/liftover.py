@@ -42,7 +42,7 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                                                   genome_build=genome_build)
 
             if conversion_tool == AlleleConversionTool.SAME_CONTIG:
-                _liftover_using_same_contig(liftover, av_tuples)
+                _run_liftover_using_same_contig(liftover, av_tuples)
 
     for genome_build, liftover_tuples in build_liftover_variant_coordinates.items():
         for conversion_tool, allele_and_variant_coordinates in liftover_tuples.items():
@@ -135,7 +135,7 @@ def _get_build_liftover_dicts(alleles: Iterable[Allele], inserted_genome_build: 
             conversion_tool = None
             variant_coordinate = None
             try:
-                conversion_tool, variant = _liftover_using_existing_variant(allele, genome_build)
+                conversion_tool, variant = _liftover_using_existing_contig(allele, genome_build)
                 if conversion_tool:
                     build_liftover_existing_allele_and_variants[genome_build][conversion_tool].append((allele, variant))
                 else:
@@ -165,7 +165,7 @@ def liftover_alleles(allele_qs, user: User = None):
         create_liftover_pipelines(user, allele_qs, ImportSource.WEB, inserted_genome_build=genome_build)
 
 
-def _liftover_using_same_contig(liftover, av_tuples: list[tuple[Allele, Variant]]):
+def _run_liftover_using_same_contig(liftover, av_tuples: list[tuple[Allele, Variant]]):
     """ Special case of e.g. Mitochondria that has the same contig across multiple builds
         we just need to create a VariantAllele object - will already have annotation for both builds """
 
@@ -191,14 +191,15 @@ def _liftover_using_same_contig(liftover, av_tuples: list[tuple[Allele, Variant]
         AlleleLiftover.objects.bulk_create(allele_liftovers, batch_size=2000)
 
 
-def _liftover_using_existing_variant(allele, dest_genome_build: GenomeBuild) -> tuple[AlleleConversionTool, 'Variant']:
-    """ For Mito you can use existing contig """
+def _liftover_using_existing_contig(allele, dest_genome_build: GenomeBuild) -> tuple[AlleleConversionTool, 'Variant']:
+    """ For Mito, 37 and 38 contigs are the same so we can re-use a variant """
     conversion_tool = None
     variant = None
 
-    # Check if the other build shares existing contig
+    # Check if the other build shares existing contig and the variant already exists
     genome_build_contigs = set(c.pk for c in dest_genome_build.chrom_contig_mappings.values())
-    for variant_allele in allele.variantallele_set.all():
+    # We shouldn't be here if a variant for build is already linked to allele - don't return these
+    for variant_allele in allele.variantallele_set.exclude(genome_build=dest_genome_build):
         if variant_allele.variant.locus.contig_id in genome_build_contigs:
             conversion_tool = AlleleConversionTool.SAME_CONTIG
             # Return variant_id so we can create it directly

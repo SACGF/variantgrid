@@ -3,12 +3,12 @@ import operator
 import os
 import re
 from collections import defaultdict
-from typing import Optional, Iterable
+from typing import Optional, Iterable, IO, Union
 
 import cyvcf2
 import vcf
 
-from library.utils import open_handle_gzip
+from library.utils import open_handle_gzip, open_file_or_filename
 from snpdb.models import Variant, Sequence, GenomeFasta, SequenceRole, VariantCoordinate
 
 
@@ -37,7 +37,7 @@ def cyvcf2_get_contig_lengths_dict(cyvcf2_reader):
         return {}
 
 
-def write_vcf_from_variant_coordinates(vcf_filename, variant_coordinates: Iterable[VariantCoordinate],
+def write_vcf_from_variant_coordinates(file_or_filename: Union[str, IO], variant_coordinates: Iterable[VariantCoordinate],
                                        vcf_ids: Optional[Iterable[str]] = None, header_lines: list[str] = None):
     """ If vcf_ids is supplied it must be in sync (record for record) with variant_coordinates """
 
@@ -58,7 +58,7 @@ def write_vcf_from_variant_coordinates(vcf_filename, variant_coordinates: Iterab
     ]
     columns = "\t".join(["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"])
     header = "\n".join(["##fileformat=VCFv4.1", "##source=VariantGrid"] + info + header_lines + ["#" + columns])
-    with open(vcf_filename, "wt", encoding="utf-8") as f:
+    with open_file_or_filename(file_or_filename, mode="wt", encoding="utf-8") as f:
         f.write(header + "\n")
         for variant_coordinate, vcf_id in vc_and_ids:
             (chrom, position, ref, alt, svlen) = variant_coordinate
@@ -76,6 +76,19 @@ def write_vcf_from_variant_coordinates(vcf_filename, variant_coordinates: Iterab
                     alt = "."
             line = "\t".join((chrom, str(position), vcf_id, ref, alt, ".", ".", record_info))
             f.write(line + "\n")
+
+
+def vcf_to_variant_coordinates_and_records(filename: str) -> Iterable[tuple[VariantCoordinate, cyvcf2.Variant]]:
+    reader = cyvcf2.Reader(filename)  # Can only handle filenames
+    for v in reader:
+        for alt in v.ALT:
+            variant_coordinate = VariantCoordinate(chrom=v.CHROM, position=v.POS, ref=v.REF, alt=alt)
+            yield variant_coordinate, v
+
+
+def vcf_to_variant_coordinates(filename: str) -> Iterable[VariantCoordinate]:
+    for vc, _ in vcf_to_variant_coordinates_and_records(filename):
+        yield vc
 
 
 def get_variant_caller_and_version_from_vcf(filename) -> tuple[str, str]:

@@ -34,7 +34,7 @@ class BedFileReader:
     def __init__(self, filename, **kwargs):
         """ @param want_chr: set to True/False to FORCE add/removal of "chr" (default = leave as is) """
         self.expected_genome = kwargs.get("expected_genome")
-        self.source = file_utils.file_or_filename(filename, "rt")
+        self.source = file_utils.open_file_or_filename(filename, "rt")
         self.delimiter = kwargs.get("delimiter", '\t')
         self.want_chr = kwargs.get("want_chr")
         self.bed_type = BED_FILE

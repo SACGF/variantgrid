@@ -12,7 +12,7 @@ from snpdb.models.models_columns import CustomColumnsCollection
 from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection, GenomicIntervalsCategory
-from snpdb.tests.test_data import create_fake_trio
+from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 
 
 class Test(URLTestCase):

@@ -4,7 +4,7 @@ from django.test import TestCase
 from annotation.fake_annotation import get_fake_annotation_version
 from snpdb.models import GenomeBuild, CohortGenotypeCollection
 from snpdb.tasks.cohort_genotype_tasks import cohort_genotype_task, create_cohort_genotype_collection
-from snpdb.tests.test_data import create_fake_trio
+from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 
 
 class CohortGenotypeTestCase(TestCase):

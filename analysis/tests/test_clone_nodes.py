@@ -12,7 +12,7 @@ from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from pedigree.models import PedigreeInheritance
 from snpdb.models import GenomeBuild, ImportStatus, Variant, GenomicInterval, Tag
-from snpdb.tests.test_data import create_fake_trio, create_fake_pedigree
+from snpdb.tests.utils.fake_cohort_data import create_fake_trio, create_fake_pedigree
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
