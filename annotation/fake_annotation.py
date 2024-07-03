@@ -89,6 +89,9 @@ def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium, colum
 
 
 def get_fake_annotation_version(genome_build: GenomeBuild):
+    if not settings.UNIT_TEST:
+        raise ValueError("Called get_fake_annotation_version while not in a test!")
+
     gene_annotation_import = GeneAnnotationImport.objects.get_or_create(genome_build=genome_build,
                                                                         annotation_consortium=AnnotationConsortium.ENSEMBL,
                                                                         url="fake")[0]
