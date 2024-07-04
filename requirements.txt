@@ -47,6 +47,7 @@ git+https://github.com/davmlaw/django-messages/#egg=django-messages
 git+https://github.com/davmlaw/django-starfield#egg=django_starfield
 git+https://github.com/SACGF/hgvs#egg=pyhgvs
 git+https://github.com/biocommons/hgvs#egg=hgvs
+git+https://github.com/dridk/PyVCF3#egg=pyvcf3
 gunicorn
 HTSeq==2.0.5
 ijson==3.1.4
@@ -67,7 +68,6 @@ psycopg2==2.9.3
 pypdf==4.0.2
 pysam==0.22.1
 python_dateutil==2.8.2
-pyvcf3==1.0.3
 redis==3.5.3
 reportlab==3.6.13
 requests==2.32.0
