@@ -183,7 +183,7 @@
                             <a class="hover-link" href="{% url 'view_variant' vc.variant.pk %}">{% c_hgvs vc.g_hgvs %}</a>
                         {% elif vc.unfinished_liftover %}
                             This variant is being <a href="{% url 'view_liftover_run' vc.unfinished_liftover.pk %}">lifted</a> over via {{ vc.unfinished_liftover.get_conversion_tool_display }}
-                            <br/>(last updated {% timestamp vc.unfinished_liftover.modified time_ago=True %} ago)
+                            <br/>(last updated {% timestamp vc.unfinished_liftover.modified time_ago=True %})
                         {% elif vc.last_failed_liftover %}
                             This variant failed a
                             {% if user.is_superuser %}
