@@ -74,7 +74,7 @@ def write_vcf_from_variant_coordinates(file_or_filename: Union[str, IO], variant
                 record_info = "."
                 if alt == Variant.REFERENCE_ALT:
                     alt = "."
-            line = "\t".join((chrom, str(position), vcf_id, ref, alt, ".", ".", record_info))
+            line = "\t".join((chrom, str(position), str(vcf_id), ref, alt, ".", ".", record_info))
             f.write(line + "\n")
 
 
