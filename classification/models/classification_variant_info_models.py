@@ -373,6 +373,7 @@ class CalculatedVariantCoordinate:
     variant_coordinate: Optional[VariantCoordinate]
     genome_build: GenomeBuild
     message: str
+    hgvs_converter_version: Optional[HGVSConverterVersion]
 
     @property
     def variant_coordinate_str(self) -> Optional[str]:
@@ -405,6 +406,9 @@ class ImportedAlleleInfo(TimeStampedModel):
     """
 
     imported_g_hgvs = TextField(null=True, blank=True)
+
+    hgvs_converter_version = ForeignKey(HGVSConverterVersion, null=True, blank=True, on_delete=PROTECT)
+    """ Tool used to resolve hgvs  """
 
     imported_transcript = TextField(null=True, blank=True)
     """
@@ -680,17 +684,23 @@ class ImportedAlleleInfo(TimeStampedModel):
     def calculate_variant_coordinate(self) -> CalculatedVariantCoordinate:
         vc: Optional[VariantCoordinate] = None
         genome_build: Optional[GenomeBuild] = None
-        message: str
+        message: str = ""
+        hgvs_converter_version: Optional[HGVSConverterVersion] = None
         try:
             genome_build = self.imported_genome_build_patch_version.genome_build
             use_hgvs = self.imported_c_hgvs or self.imported_g_hgvs
             hgvs_matcher = HGVSMatcher(genome_build)
+            hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
+            version = hgvs_matcher.hgvs_converter.get_version()
+
             vc_extra = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(use_hgvs)
-            message = f"HGVS matched by \"{vc_extra.method}\""
+            hgvs_converter_version = HGVSConverterVersion.get(hgvs_converter_type,
+                                                              version=version, method=vc_extra.method)
             vc = vc_extra.variant_coordinate
         except Exception as ex:
             message = str(ex)
-        return CalculatedVariantCoordinate(variant_coordinate=vc, genome_build=genome_build, message=message)
+        return CalculatedVariantCoordinate(variant_coordinate=vc, genome_build=genome_build,
+                                           message=message, hgvs_converter_version=hgvs_converter_version)
 
     def update_variant_coordinate(self):
         """ returns if a valid variant_coordinate could be derived """
@@ -700,6 +710,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         # but it's better to do that in the validation step
         cvc = self.calculate_variant_coordinate()
         self.message = cvc.message
+        self.hgvs_converter_version = cvc.hgvs_converter_version
         self.variant_coordinate = cvc.variant_coordinate_str
         if not cvc.is_valid:
             self.status = ImportedAlleleInfoStatus.FAILED
@@ -779,6 +790,7 @@ class ImportedAlleleInfo(TimeStampedModel):
     def hard_reset_matching_info(self):
         self.status = ImportedAlleleInfoStatus.PROCESSING
         self.matched_variant = None
+        self.hgvs_converter_version = None
         self.allele = None
         for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
             self._update_variant(genome_build=genome_build, variant=None)

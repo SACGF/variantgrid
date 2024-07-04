@@ -219,7 +219,8 @@ class HGVSMatcher:
         cache.set(key, True, timeout=WEEK_SECS)
 
     def get_variant_coordinate(self, hgvs_string: str) -> VariantCoordinate:
-        return self.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string).variant_coordinate
+        vcd = self.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string)
+        return vcd.variant_coordinate
 
     @staticmethod
     def _get_sort_key_transcript_version_and_methods(version, prefer_local=True, closest=False):
@@ -341,7 +342,7 @@ class HGVSMatcher:
                 # Ensure that ref is always present so we can give warning about provided reference
                 hgvs_string_for_version = hgvs_variant.format(max_ref_length=sys.maxsize)
                 if method == self.HGVS_METHOD_INTERNAL_LIBRARY:
-                    method = self.hgvs_converter.description()
+                    # method = self.hgvs_converter.description(describe_fallback=False)
                     variant_coordinate, matches_reference = self.hgvs_converter.hgvs_to_variant_coordinate_and_reference_match(hgvs_string_for_version, tv)
                 elif method == self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY:
                     if self._clingen_allele_registry_ok(tv.accession):
