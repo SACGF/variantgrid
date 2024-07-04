@@ -31,7 +31,7 @@ class ClassificationRef:
         self.user = user
         self.rid = rid
         self.lab = lab
-        self.lab_record_id = lab_record_id
+        self.lab_record_id = str(lab_record_id)  # Some JSON has this as an int
         self.version = version
         self.cached_version = None
         self.cached_record = None
