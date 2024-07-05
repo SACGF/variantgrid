@@ -144,19 +144,26 @@ class ClinGenAllele(TimeStampedModel):
                     from genes.models import NoTranscript
 
                     try:
-                        tvsi = TranscriptVersionSequenceInfo.get(transcript_accession)
-                        if hgvs_variant.mutation_type == "dup":
-                            ref_end = coord["end"]
-                            ref_start = ref_end - len(coord["allele"])
+                        if tvsi := TranscriptVersionSequenceInfo.get(transcript_accession):
+                            if hgvs_variant.mutation_type == "dup":
+                                ref_end = coord["end"]
+                                ref_start = ref_end - len(coord["allele"])
+                            else:
+                                ref_start = coord["start"]
+                                ref_end = coord["end"]
+                            hgvs_variant.ref_allele = tvsi.sequence[ref_start:ref_end]
                         else:
-                            ref_start = coord["start"]
-                            ref_end = coord["end"]
-                        hgvs_variant.ref_allele = tvsi.sequence[ref_start:ref_end]
+                            msg = f"Could not retrieve reference allele for '{transcript_accession}'"
+                            if settings.CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE:
+                                raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError(msg)
+                            else:
+                                logging.warning(msg)
                     except NoTranscript as e_no_transcript:
                         if settings.CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE:
                             raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError() from e_no_transcript
                         else:
                             logging.warning(e_no_transcript)
+
         return hgvs_variant
 
     def _get_raw_hgvs_and_data(self, transcript_accession, match_version=True) -> tuple[Optional[str],

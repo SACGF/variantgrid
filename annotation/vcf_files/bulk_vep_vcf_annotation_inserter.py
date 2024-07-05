@@ -514,8 +514,9 @@ class BulkVEPVCFAnnotationInserter:
                 hgvs_c = self.hgvs_matcher.variant_coordinate_to_hgvs_variant(variant_coordinate, transcript_accession)
                 transcript_data['hgvs_c'] = hgvs_c
                 # TODO: Protein?? hgvs_p
-            except (ValueError, HGVSException):
-                pass
+            except Exception as e:
+                logging.error("Error calculating c.HGVS for '%s'/'%s': %s",
+                              variant_coordinate, transcript_accession, e)
 
     def _add_hgvs_g(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: TranscriptData):
         # VEP110 has a bug with --hgvsg but we hope to introduce in VEP111+
