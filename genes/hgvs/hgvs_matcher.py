@@ -49,7 +49,7 @@ class VariantCoordinateAndDetails(FormerTuple):
 
     @property
     def as_tuple(self) -> tuple:
-        return self.variant_coordinate, self.transcript_accession, self.kind, self.method, self.matches_reference
+        return self.variant_coordinate, self.transcript_accession, self.kind, self.used_converter_type, self.method, self.matches_reference
 
 
 class ClinGenHGVSConverter(BioCommonsHGVSConverter):
