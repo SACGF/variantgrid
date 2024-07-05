@@ -512,11 +512,13 @@ class BulkVEPVCFAnnotationInserter:
             transcript_accession = TranscriptVersion.get_accession(transcript_id, version)
             try:
                 hgvs_c = self.hgvs_matcher.variant_coordinate_to_hgvs_variant(variant_coordinate, transcript_accession)
-                transcript_data['hgvs_c'] = hgvs_c
                 # TODO: Protein?? hgvs_p
             except Exception as e:
                 logging.error("Error calculating c.HGVS for '%s'/'%s': %s",
                               variant_coordinate, transcript_accession, e)
+                hgvs_c = VariantAnnotation.SV_HGVS_ERROR_MESSAGE
+
+            transcript_data['hgvs_c'] = hgvs_c
 
     def _add_hgvs_g(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: TranscriptData):
         # VEP110 has a bug with --hgvsg but we hope to introduce in VEP111+
@@ -525,13 +527,15 @@ class BulkVEPVCFAnnotationInserter:
 
         max_length = settings.HGVS_MAX_SEQUENCE_LENGTH_REPRESENTATIVE_TRANSCRIPT  # VariantAnnotation
         if variant_coordinate.max_sequence_length > max_length:
-            transcript_data['hgvs_g'] = VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
-            return
+            hgvs_g = VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
+        else:
+            try:
+                hgvs_g = self.hgvs_matcher.variant_coordinate_to_g_hgvs(variant_coordinate)
+            except Exception as e:
+                logging.error("Error calculating g.HGVS for '%s': %s", variant_coordinate, e)
+                hgvs_g = VariantAnnotation.SV_HGVS_ERROR_MESSAGE
 
-        try:
-            transcript_data['hgvs_g'] = self.hgvs_matcher.variant_coordinate_to_g_hgvs(variant_coordinate)
-        except Exception as e:
-            logging.error("Error calculating g.HGVS for '%s': %s", variant_coordinate, e)
+        transcript_data['hgvs_g'] = hgvs_g
 
     def process_entry(self, v: VCFVariant):
         if len(self.variant_transcript_annotation_list) >= settings.SQL_BATCH_INSERT_SIZE:
