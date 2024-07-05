@@ -1,8 +1,10 @@
 stream-zip
 more-itertools
 beautifulsoup4
-bgzip
-biopython>=1.81
+# 0.5.0 minimum workaround for Mac M1 build compatibility issue
+bgzip>=0.5.0
+# 1.8.4 minimum workaround for Mac M1 build compatibility issue
+biopython>=1.84
 cdot
 celery
 ConfigArgParse
@@ -45,7 +47,8 @@ git+https://github.com/SACGF/hgvs#egg=pyhgvs
 git+https://github.com/biocommons/hgvs#egg=hgvs
 git+https://github.com/dridk/PyVCF3#egg=pyvcf3
 gunicorn
-HTSeq
+# 2.0.8 minimum workaround for Mac M1 build compatibility issue
+HTSeq>=2.0.8
 ijson
 ipython
 kombu
@@ -68,7 +71,7 @@ python_dateutil
 # Have trouble with Celery workers shutting down with newer versions of Redis
 redis==3.5.3
 reportlab
-requests>=2.32.0
+requests>=2.33.3
 requests_oauthlib
 rollbar
 scipy
