@@ -770,7 +770,11 @@ class VariantAllele(TimeStampedModel):
         return False
 
     def __str__(self):
-        return f"{self.allele} - {self.variant_id}({self.genome_build}/{self.allele_linking_tool})"
+        s = f"{self.allele} - {self.variant_id}({self.genome_build}"
+        if linking_tool := self.get_allele_linking_tool_display():
+            s += f"/{linking_tool=}"
+        return s
+
 
 class VariantCollection(RelatedModelsPartitionModel):
     """ A set of variants - usually used as a cached result """

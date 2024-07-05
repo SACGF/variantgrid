@@ -52,26 +52,29 @@ post_save seemed like it might be a little too easy to trigger.
 class HGVSConverterVersion(TimeStampedModel):
     hgvs_converter_type = models.TextField()  # HGVSConverterType
     version = models.TextField()
-    method = models.TextField()  # Records e.g. fall back to ClinGen
+    used_converter_type = models.TextField(blank=True, null=True)  # HGVSConverterType
     code_git_hash = models.TextField()
+
+    class Meta:
+        unique_together = ("hgvs_converter_type", "version", "used_converter_type", "code_git_hash")
 
     @property
     def converted_using_library(self) -> bool:
-        return self.method.startswith("Internally converted using library")
+        return self.hgvs_converter_type == self.used_converter_type
 
     def __str__(self) -> str:
         desc = f"{self.hgvs_converter_type} version=\"{self.version}\""
-        if not self.converted_using_library:
-            desc += f" (method={self.method})"
+        if self.used_converter_type and not self.converted_using_library:
+            desc += f" (used_converter_type={self.used_converter_type})"
         if self.code_git_hash != "not-a-real-git-hash":
             desc += f" git@{self.code_git_hash}"
         return desc
 
     @staticmethod
-    def get(hgvs_converter_type: HGVSConverterType, version: str, method: str):
+    def get(hgvs_converter_type: HGVSConverterType, version: str, used_converter_type: HGVSConverterType):
         return HGVSConverterVersion.objects.get_or_create(hgvs_converter_type=hgvs_converter_type.name,
                                                           version=version,
-                                                          method=method,
+                                                          used_converter_type=used_converter_type.name,
                                                           code_git_hash=get_cached_project_git_hash())[0]
 
 
@@ -161,13 +164,14 @@ class ResolvedVariantInfo(TimeStampedModel):
         version = hgvs_matcher.hgvs_converter.get_version()
 
         try:
-            hgvs_variant, method = hgvs_matcher.variant_to_hgvs_variant_and_method(variant, imported_transcript)
+            hgvs_variant, used_converter_type, method = hgvs_matcher.variant_to_hgvs_variant_used_converter_type_and_method(variant, imported_transcript)
             c_hgvs = hgvs_variant.format()
             c_hgvs_obj = CHGVS(c_hgvs)
             self.c_hgvs = c_hgvs
             self.c_hgvs_compat = hgvs_variant.format(use_compat=True,
                                                      max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH)
-            self.c_hgvs_converter_version = HGVSConverterVersion.get(hgvs_converter_type, version=version, method=method)
+            self.c_hgvs_converter_version = HGVSConverterVersion.get(hgvs_converter_type, version=version,
+                                                                     used_converter_type=used_converter_type)
             self.transcript_version = c_hgvs_obj.transcript_version_model(genome_build=genome_build)
             self.gene_symbol = GeneSymbol.objects.filter(symbol=c_hgvs_obj.gene_symbol).first()
         except Exception as exception:
@@ -373,6 +377,7 @@ class CalculatedVariantCoordinate:
     variant_coordinate: Optional[VariantCoordinate]
     genome_build: GenomeBuild
     message: str
+    hgvs_converter_version: Optional[HGVSConverterVersion]
 
     @property
     def variant_coordinate_str(self) -> Optional[str]:
@@ -405,6 +410,9 @@ class ImportedAlleleInfo(TimeStampedModel):
     """
 
     imported_g_hgvs = TextField(null=True, blank=True)
+
+    hgvs_converter_version = ForeignKey(HGVSConverterVersion, null=True, blank=True, on_delete=PROTECT)
+    """ Tool used to resolve hgvs  """
 
     imported_transcript = TextField(null=True, blank=True)
     """
@@ -680,17 +688,23 @@ class ImportedAlleleInfo(TimeStampedModel):
     def calculate_variant_coordinate(self) -> CalculatedVariantCoordinate:
         vc: Optional[VariantCoordinate] = None
         genome_build: Optional[GenomeBuild] = None
-        message: str
+        hgvs_converter_version: Optional[HGVSConverterVersion] = None
         try:
             genome_build = self.imported_genome_build_patch_version.genome_build
             use_hgvs = self.imported_c_hgvs or self.imported_g_hgvs
             hgvs_matcher = HGVSMatcher(genome_build)
+            hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
+            version = hgvs_matcher.hgvs_converter.get_version()
+
             vc_extra = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(use_hgvs)
             message = f"HGVS matched by \"{vc_extra.method}\""
+            hgvs_converter_version = HGVSConverterVersion.get(hgvs_converter_type, version=version,
+                                                              used_converter_type=vc_extra.used_converter_type)
             vc = vc_extra.variant_coordinate
         except Exception as ex:
             message = str(ex)
-        return CalculatedVariantCoordinate(variant_coordinate=vc, genome_build=genome_build, message=message)
+        return CalculatedVariantCoordinate(variant_coordinate=vc, genome_build=genome_build,
+                                           message=message, hgvs_converter_version=hgvs_converter_version)
 
     def update_variant_coordinate(self):
         """ returns if a valid variant_coordinate could be derived """
@@ -700,6 +714,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         # but it's better to do that in the validation step
         cvc = self.calculate_variant_coordinate()
         self.message = cvc.message
+        self.hgvs_converter_version = cvc.hgvs_converter_version
         self.variant_coordinate = cvc.variant_coordinate_str
         if not cvc.is_valid:
             self.status = ImportedAlleleInfoStatus.FAILED
@@ -779,6 +794,7 @@ class ImportedAlleleInfo(TimeStampedModel):
     def hard_reset_matching_info(self):
         self.status = ImportedAlleleInfoStatus.PROCESSING
         self.matched_variant = None
+        self.hgvs_converter_version = None
         self.allele = None
         for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
             self._update_variant(genome_build=genome_build, variant=None)

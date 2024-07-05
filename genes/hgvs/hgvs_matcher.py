@@ -43,7 +43,8 @@ class VariantCoordinateAndDetails(FormerTuple):
     variant_coordinate: VariantCoordinate
     transcript_accession: str
     kind: str
-    method: str
+    used_converter_type: HGVSConverterType
+    method: str  # human readable contains a trail of what was tried
     matches_reference: Union[bool, HgvsMatchRefAllele]
 
     @property
@@ -181,20 +182,22 @@ class HGVSMatcher:
                 return hgvs_variant, transcript_version
         return None, None
 
-    def _lrg_get_variant_coordinate_used_transcript_method_and_matches_reference(self, hgvs_variant: HGVSVariant) -> tuple[VariantCoordinate, str, str, Union[bool, HgvsMatchRefAllele]]:
+    def _lrg_get_variant_coordinate_used_transcript_method_and_matches_reference(self, hgvs_variant: HGVSVariant) -> tuple[VariantCoordinate, str, HGVSConverterType, str, Union[bool, HgvsMatchRefAllele]]:
         lrg_transcript_accession = hgvs_variant.transcript
         new_hgvs_variant, transcript_version = self._get_renamed_lrg_transcript_hgvs_variant_and_transcript_version(self.genome_build, hgvs_variant)
         if new_hgvs_variant:
             new_hgvs_string = new_hgvs_variant.format()
             method = f"{self.hgvs_converter.description()} as '{new_hgvs_string}' (from LRG_RefSeqGene)"
             variant_coordinate, matches_reference = self.hgvs_converter.hgvs_to_variant_coordinate_and_reference_match(new_hgvs_string, transcript_version)
-            return variant_coordinate, lrg_transcript_accession, method, matches_reference
+            internal_converter_type = self.hgvs_converter.get_hgvs_converter_type()
+            return variant_coordinate, lrg_transcript_accession, internal_converter_type, method, matches_reference
 
         hgvs_string = hgvs_variant.format()
         try:
             # ClinGen fails if reference base is different so matches_reference is always True
             matches_reference = True
-            return self._clingen_get_variant_coordinate(hgvs_string), lrg_transcript_accession, self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY, matches_reference
+            method = HGVSConverterType.CLINGEN_ALLELE_REGISTRY.name
+            return self._clingen_get_variant_coordinate(hgvs_string), lrg_transcript_accession, HGVSConverterType.CLINGEN_ALLELE_REGISTRY, method, matches_reference
         except ClinGenAllele.ClinGenAlleleRegistryException as cga_re:
             raise ValueError(f"Could not retrieve {hgvs_string} from ClinGen Allele Registry") from cga_re
 
@@ -219,7 +222,8 @@ class HGVSMatcher:
         cache.set(key, True, timeout=WEEK_SECS)
 
     def get_variant_coordinate(self, hgvs_string: str) -> VariantCoordinate:
-        return self.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string).variant_coordinate
+        vcd = self.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string)
+        return vcd.variant_coordinate
 
     @staticmethod
     def _get_sort_key_transcript_version_and_methods(version, prefer_local=True, closest=False):
@@ -257,7 +261,7 @@ class HGVSMatcher:
     def create_hgvs_variant(self, hgvs_string) -> HGVSVariant:
         return self.hgvs_converter.create_hgvs_variant(hgvs_string)
 
-    def filter_best_transcripts_and_method_by_accession(self, transcript_accession, prefer_local=True, closest=False) -> list[tuple[TranscriptVersion, str]]:
+    def filter_best_transcripts_and_converter_type_by_accession(self, transcript_accession, prefer_local=True, closest=False) -> list[tuple[TranscriptVersion, HGVSConverterType]]:
         """ Get the best transcripts you'd want to match a HGVS against - assuming you will try multiple in order """
 
         transcript_id: str
@@ -297,25 +301,28 @@ class HGVSMatcher:
 
         min_version = min(min_versions)
         max_version = max(max_versions)
-        tv_and_method = []
+
+        local_converter_type = self.hgvs_converter.get_hgvs_converter_type()
+        tv_and_converter_type = []
         for v in range(min_version, max_version+1):
             transcript_version = tv_by_version.get(v)
             if not transcript_version:
                 transcript_version = FakeTranscriptVersion(transcript_id=transcript_id, version=v)
             if transcript_version.hgvs_ok and self.hgvs_converter.local_resolution:
-                tv_and_method.append((transcript_version, HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY))
+                tv_and_converter_type.append((transcript_version, local_converter_type))
             if self.hgvs_converter.clingen_resolution:
-                tv_and_method.append((transcript_version, HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY))
+                tv_and_converter_type.append((transcript_version, HGVSConverterType.CLINGEN_ALLELE_REGISTRY))
 
         # TODO: Maybe we should filter transcript versions that have the same length
         sort_key = self._get_sort_key_transcript_version_and_methods(version, prefer_local=prefer_local, closest=closest)
-        return sorted(tv_and_method, key=sort_key)
+        return sorted(tv_and_converter_type, key=sort_key)
 
     def get_variant_coordinate_used_transcript_kind_method_and_matches_reference(self, hgvs_string: str) -> VariantCoordinateAndDetails:
         """ Returns variant_coordinate and method for HGVS resolution = """
 
         transcript_accession = self.hgvs_converter.get_transcript_accession(hgvs_string)
         used_transcript_accession = None
+        used_converter_type = None
         method = None
         matches_reference = None
         hgvs_variant = self.create_hgvs_variant(hgvs_string)
@@ -324,7 +331,8 @@ class HGVSMatcher:
         combined_error_message = None
 
         if transcript_is_lrg(transcript_accession):
-            variant_coordinate, used_transcript_accession, method, matches_reference = self._lrg_get_variant_coordinate_used_transcript_method_and_matches_reference(hgvs_variant)
+            variant_coordinate, used_transcript_accession, hgvs_converter_type, method, matches_reference = self._lrg_get_variant_coordinate_used_transcript_method_and_matches_reference(hgvs_variant)
+            used_converter_type = hgvs_converter_type
         elif hgvs_variant.kind in ('c', 'n'):
             if not transcript_accession:
                 msg = f"Could not parse \"{hgvs_string}\" c.HGVS requires a transcript or LRG."
@@ -335,15 +343,16 @@ class HGVSMatcher:
 
             variant_coordinate = None
             hgvs_methods = []
-            for tv, method in self.filter_best_transcripts_and_method_by_accession(transcript_accession):
+            for tv, potential_converter_type in self.filter_best_transcripts_and_converter_type_by_accession(transcript_accession):
                 used_transcript_accession = tv.accession
                 hgvs_variant.transcript = tv.accession
                 # Ensure that ref is always present so we can give warning about provided reference
                 hgvs_string_for_version = hgvs_variant.format(max_ref_length=sys.maxsize)
-                if method == self.HGVS_METHOD_INTERNAL_LIBRARY:
-                    method = self.hgvs_converter.description()
+                if potential_converter_type.is_internal_type():
+                    method = self.hgvs_converter.description(describe_fallback=False)
                     variant_coordinate, matches_reference = self.hgvs_converter.hgvs_to_variant_coordinate_and_reference_match(hgvs_string_for_version, tv)
-                elif method == self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY:
+                elif potential_converter_type == HGVSConverterType.CLINGEN_ALLELE_REGISTRY:
+                    method = HGVSConverterType.CLINGEN_ALLELE_REGISTRY.name
                     if self._clingen_allele_registry_ok(tv.accession):
                         error_message = f"Could not convert \"{hgvs_string}\" using ClinGenAllele Registry"
                         try:
@@ -369,6 +378,7 @@ class HGVSMatcher:
                     hgvs_methods.append(method)
 
                 if variant_coordinate:
+                    used_converter_type = potential_converter_type
                     break
 
             if variant_coordinate is None:
@@ -382,13 +392,14 @@ class HGVSMatcher:
                     raise ValueError(f"\"{transcript_accession}\": No transcripts found")
         else:
             # g. HGVS
-            method = self.hgvs_converter.description()
+            method = self.hgvs_converter.description(describe_fallback=False)
             variant_coordinate, matches_reference = self.hgvs_converter.hgvs_to_variant_coordinate_and_reference_match(hgvs_string, None)
 
         return VariantCoordinateAndDetails(
             variant_coordinate=variant_coordinate.as_internal_symbolic(self.genome_build),
             transcript_accession=used_transcript_accession,
             kind=kind,
+            used_converter_type=used_converter_type,
             method=method,
             matches_reference=matches_reference
         )
@@ -400,10 +411,10 @@ class HGVSMatcher:
         accession = self.hgvs_converter.get_transcript_accession(hgvs_string)
         return TranscriptVersion.get_transcript_id_and_version(accession)
 
-    def _lrg_variant_coordinate_to_hgvs(self, variant_coordinate: VariantCoordinate, lrg_identifier: str = None) -> tuple[HGVSVariant, str]:
+    def _lrg_variant_coordinate_to_hgvs(self, variant_coordinate: VariantCoordinate, lrg_identifier: str = None) -> tuple[HGVSVariant, HGVSConverterType, str]:
         if transcript_version := LRGRefSeqGene.get_transcript_version(self.genome_build, lrg_identifier):
             if transcript_version.hgvs_ok:
-                hgvs_variant, hgvs_method = self.variant_coordinate_to_hgvs_and_method(variant_coordinate, transcript_version.accession)
+                hgvs_variant, hgvs_converter_type, hgvs_method = self.variant_coordinate_to_hgvs_used_converter_type_and_method(variant_coordinate, transcript_version.accession)
                 if hgvs_variant.transcript != transcript_version.accession:
                     msg = f"Error creating HGVS for {variant_coordinate}, LRG '{lrg_identifier}' asked for HGVS " \
                           f"'{transcript_version.accession}' but got '{hgvs_variant.transcript}'"
@@ -411,22 +422,22 @@ class HGVSMatcher:
                 # Replace with our LRG
                 hgvs_variant.transcript = lrg_identifier
                 hgvs_variant.gene = str(transcript_version.gene_symbol)
-                return hgvs_variant, hgvs_method
+                return hgvs_variant, hgvs_converter_type, hgvs_method
 
         problems = ["No transcript via LRGRefSeqGene"]
 
         # Use ClinGen - will raise exception if it can't get it
         if ca := get_clingen_allele_for_variant_coordinate(self.genome_build, variant_coordinate, self):
             if hgvs_variant := ca.get_c_hgvs_variant(self.hgvs_converter, lrg_identifier):
-                return hgvs_variant, self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
+                return hgvs_variant, HGVSConverterType.CLINGEN_ALLELE_REGISTRY, self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
             else:
                 problems.append(f"{ca} didn't contain HGVS for '{lrg_identifier}'")
 
         problem_str = ", ".join(problems)
         raise ValueError(f"Could not convert {variant_coordinate} to HGVS using '{lrg_identifier}': {problem_str}")
 
-    def variant_coordinate_to_hgvs_and_method(self, variant_coordinate: VariantCoordinate,
-                                              transcript_accession: str = None) -> tuple[HGVSVariant, str]:
+    def variant_coordinate_to_hgvs_used_converter_type_and_method(self, variant_coordinate: VariantCoordinate,
+                                                                  transcript_accession: str = None) -> tuple[HGVSVariant, HGVSConverterType, str]:
         """
             returns (hgvs, method) - hgvs is c.HGVS is transcript provided, g.HGVS if not
 
@@ -435,16 +446,17 @@ class HGVSMatcher:
         """
 
         hgvs_variant = None
+        hgvs_converter_type = None
         hgvs_method = None
         if transcript_accession:
             if transcript_is_lrg(transcript_accession):
                 return self._lrg_variant_coordinate_to_hgvs(variant_coordinate, transcript_accession)
 
             hgvs_methods = {}
-            for transcript_version, method in self.filter_best_transcripts_and_method_by_accession(transcript_accession):
-                hgvs_method = f"{method}: {transcript_version}"
+            for transcript_version, potential_converter_type in self.filter_best_transcripts_and_converter_type_by_accession(transcript_accession):
+                hgvs_method = f"{potential_converter_type}: {transcript_version}"
                 hgvs_methods[hgvs_method] = None
-                if method == self.HGVS_METHOD_INTERNAL_LIBRARY:
+                if potential_converter_type.is_internal_type():
                     # Sanity Check - make sure contig is the same
                     vc_contig = self.genome_build.chrom_contig_mappings[variant_coordinate.chrom]
                     if vc_contig != transcript_version.contig:
@@ -453,9 +465,9 @@ class HGVSMatcher:
                         raise self.TranscriptContigMismatchError(contig_msg)
 
                     hgvs_variant = self.hgvs_converter.variant_coordinate_to_c_hgvs(variant_coordinate, transcript_version)
-                elif method == self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY:
+                elif potential_converter_type == HGVSConverterType.CLINGEN_ALLELE_REGISTRY:
                     if self._clingen_allele_registry_ok(transcript_version.accession):
-                        error_message = f"Could not convert '{variant_coordinate}' ({transcript_version}) using {method}: %s"
+                        error_message = f"Could not convert '{variant_coordinate}' ({transcript_version}) using {potential_converter_type}: %s"
                         # TODO: We could also use VEP then add reference bases on our HGVSs
                         try:
                             if ca := get_clingen_allele_for_variant_coordinate(self.genome_build, variant_coordinate, self):
@@ -464,7 +476,7 @@ class HGVSMatcher:
                                     # regardless of whether we use PyHGVS or ClinGen to resolve
                                     if gene_symbol := transcript_version.gene_symbol:
                                         hgvs_variant.gene = str(gene_symbol)
-                                    hgvs_method = method
+                                    hgvs_method = potential_converter_type
                         except ClinGenAlleleServerException as cga_se:
                             # If it's unknown reference we can just retry with another version, other errors are fatal
                             if cga_se.is_unknown_reference():
@@ -478,6 +490,7 @@ class HGVSMatcher:
                             hgvs_methods[hgvs_method] = str(cgare)
 
                 if hgvs_variant:
+                    hgvs_converter_type = potential_converter_type
                     break
 
             if hgvs_methods:
@@ -496,12 +509,13 @@ class HGVSMatcher:
             # No transcript = convert to Genomic HGVS
             # We need to return a HGVSVariant - self.variant_coordinate_to_g_hgvs may go down fast path returns a str
             hgvs_variant = self.hgvs_converter.variant_coordinate_to_g_hgvs(variant_coordinate)
-            hgvs_method = self.hgvs_converter.description()
+            hgvs_converter_type = self.hgvs_converter.get_hgvs_converter_type()
+            hgvs_method = self.hgvs_converter.description(describe_fallback=False)
 
-        return hgvs_variant, hgvs_method
+        return hgvs_variant, hgvs_converter_type, hgvs_method
 
-    def variant_to_hgvs_variant_and_method(self, variant: Variant, transcript_name=None) -> Tuple[HGVSVariant, str]:
-        return self.variant_coordinate_to_hgvs_and_method(variant.coordinate, transcript_name)
+    def variant_to_hgvs_variant_used_converter_type_and_method(self, variant: Variant, transcript_name=None) -> Tuple[HGVSVariant, HGVSConverterType, str]:
+        return self.variant_coordinate_to_hgvs_used_converter_type_and_method(variant.coordinate, transcript_name)
 
     def variant_to_hgvs_variant(self, variant: Variant, transcript_name=None) -> HGVSVariant:
         """ returns c.HGVS is transcript provided, g.HGVS if no transcript"""
@@ -509,7 +523,7 @@ class HGVSMatcher:
 
     def variant_coordinate_to_hgvs_variant(self, variant_coordinate: VariantCoordinate, transcript_name=None) -> HGVSVariant:
         variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
-        return self.variant_coordinate_to_hgvs_and_method(variant_coordinate, transcript_name)[0]
+        return self.variant_coordinate_to_hgvs_used_converter_type_and_method(variant_coordinate, transcript_name)[0]
 
     @staticmethod
     def _fast_variant_coordinate_to_g_hgvs(refseq_accession, offset, ref, alt) -> str:

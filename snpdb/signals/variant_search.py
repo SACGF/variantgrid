@@ -482,7 +482,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
     reference_message: list[SearchMessage] = []
 
     try:
-        variant_coordinate, used_transcript_accession, kind, method, matches_reference = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string)
+        variant_coordinate, used_transcript_accession, kind, _used_converter_type, method, matches_reference = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string)
         logging.info("get_variant_coordinate_used_transcript_kind_method_and_matches_reference - variant_coordinate=%s", variant_coordinate)
         if not matches_reference:
             ref_base = variant_coordinate[2]
