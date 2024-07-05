@@ -511,7 +511,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                     mane, alias = MANE.get_from_symbol_or_alias(gene_symbol_str)
                     if alias:
                         msg_hgvs_given_symbol += f" Matched to MANE gene symbol '{alias.gene_symbol}' via alias " \
-                                                    f" {alias.alias} ({alias.get_source_display()})"
+                                                    f" {alias.alias} ({alias.get_source_display()})."
 
                     if not mane:
                         raise ValueError(msg_hgvs_given_symbol + f" {gene_symbol_str} (or any aliases) have no MANE transcripts")
