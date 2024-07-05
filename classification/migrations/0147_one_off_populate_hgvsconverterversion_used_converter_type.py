@@ -34,7 +34,7 @@ def _one_off_populate_hgvsconverterversion_used_converter_type(apps, schema_edit
         }
         ResolvedVariantInfo.objects.filter(**kwargs).update(c_hgvs_converter_version=hcvs)
 
-    if num := HGVSConverterVersion.objects.exclude(pk__in=newest_ids).delete():
+    if num := HGVSConverterVersion.objects.exclude(pk__in=newest_ids).delete()[0]:
         print(f"Deleted {num} dupe HGVSConverterVersion objects")
 
     # Now we need to assign all AlleleInfo to hgvs_converter_version
