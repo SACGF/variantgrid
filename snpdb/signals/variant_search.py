@@ -501,28 +501,31 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         # contig triggered from g.HGVS from another genome build - can't do anything just return no results
         pass
     except (ValueError, NotImplementedError) as hgvs_error:
-        try:
-            if gene_symbol_str := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
-                has_results = False
+        if gene_symbol_str := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
+            has_results = False
 
-                if settings.SEARCH_HGVS_GENE_SYMBOL:
-                    msg_hgvs_given_symbol = "Searching without transcript is only supported for coordinates resolved against MANE transcripts."
+            if settings.SEARCH_HGVS_GENE_SYMBOL:
+                msg_hgvs_given_symbol = "Searching without transcript is only supported for coordinates resolved against MANE transcripts."
 
-                    mane, alias = MANE.get_from_symbol_or_alias(gene_symbol_str)
-                    if alias:
-                        msg_hgvs_given_symbol += f" Matched to MANE gene symbol '{alias.gene_symbol}' via alias " \
-                                                    f" {alias.alias} ({alias.get_source_display()})."
+                mane_and_aliases = MANE.get_mane_and_aliases_list_from_symbol(gene_symbol_str)
+                if not mane_and_aliases:
+                    raise ValueError(
+                        msg_hgvs_given_symbol + f" {gene_symbol_str} (or any aliases) have no MANE transcripts")
 
-                    if not mane:
-                        raise ValueError(msg_hgvs_given_symbol + f" {gene_symbol_str} (or any aliases) have no MANE transcripts")
+                transcript_versions = set()
+                mane_status_by_transcript = {}
+                for mane, alias in mane_and_aliases:
+                    msg_hgvs_gene_search = msg_hgvs_given_symbol + f" Matched to MANE gene symbol '{alias.gene_symbol}' " + \
+                        f"via alias {alias.alias} ({alias.get_source_display()})."
 
-                    transcript_versions, mane_status_by_transcript = _get_search_hgvs_gene_symbol_transcripts(mane.symbol, genome_build)
+                    gene_tvs, gene_mane_status = _get_search_hgvs_gene_symbol_transcripts(mane.symbol, genome_build)
+                    transcript_versions.update(gene_tvs)
+                    mane_status_by_transcript.update(gene_mane_status)
 
                     tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build,
                                                              gene_version__gene__in=mane.symbol.genes)
                     transcripts = [tv.transcript for tv in transcript_versions]
 
-                    msg_hgvs_gene_search = msg_hgvs_given_symbol
                     if tv_qs.exclude(transcript__in=transcripts).distinct("transcript_id").exists():
                         # We want to make the messages the same for both genome builds, so they are collected into 1
                         msg_hgvs_gene_search += f" {mane.symbol} has non-MANE transcripts that may resolve " \
@@ -531,6 +534,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
 
                     yield SearchMessageOverall(msg_hgvs_gene_search, severity=LogLevel.INFO)
 
+                try:
                     for result in _search_hgvs_using_gene_symbol(transcript_versions, mane_status_by_transcript,
                                                                  hgvs_matcher, search_messages,
                                                                  hgvs_string, user, genome_build, variant_qs):
@@ -540,17 +544,17 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                             # FIXME - not sure what a SearchMessage of the alias is meant to accomplish by itself?
                             # result.messages.append(SearchMessage(str(alias)))
                             yield result
-                else:
-                    yield SearchMessageOverall("HGVS search requires a transcript")
+                except HGVSException as e:
+                    logging.error(e)
+                    # might just not be a HGVS name at all
+                    pass
+            else:
+                yield SearchMessageOverall("HGVS search requires a transcript")
 
-                if has_results:
-                    return
-                else:  # Valid - just no results
-                    hgvs_error = None
-
-        except HGVSException:
-            # might just not be a HGVS name at all
-            pass
+            if has_results:
+                return
+            else:  # Valid - just no results
+                hgvs_error = None
 
         if variant_coordinate is None:
             if classify:

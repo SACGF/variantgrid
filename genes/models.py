@@ -2615,17 +2615,20 @@ class MANE(models.Model):
         return MANE.objects.exists()
 
     @staticmethod
-    def get_from_symbol_or_alias(gene_symbol_str: str) -> tuple[Optional['MANE'], Optional[GeneSymbolAlias]]:
+    def get_mane_and_aliases_list_from_symbol(gene_symbol_str: str) -> list[tuple['MANE', Optional[GeneSymbolAlias]]]:
         if not MANE.has_mane_transcripts():
             raise ValueError("MANE transcripts are not loaded")
 
-        if mane := MANE.objects.filter(symbol=gene_symbol_str).first():
-            return mane, None
+        mane_and_aliases = []
 
-        if alias := GeneSymbolAlias.objects.filter(alias=gene_symbol_str, gene_symbol__mane__isnull=False).first():
+        for mane in MANE.objects.filter(symbol=gene_symbol_str):
+            mane_and_aliases.append((mane, None))
+
+        for alias in GeneSymbolAlias.objects.filter(alias=gene_symbol_str, gene_symbol__mane__isnull=False):
             if mane := MANE.objects.filter(symbol=alias.gene_symbol).first():
-                return mane, alias
-        return None, None
+                mane_and_aliases.append((mane, alias))
+
+        return mane_and_aliases
 
     def get_transcript_version(self, annotation_consortium: AnnotationConsortium) -> TranscriptVersion:
         transcript_version = None
