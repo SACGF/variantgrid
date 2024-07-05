@@ -996,7 +996,7 @@ class AnnotationRun(TimeStampedModel):
 class AbstractVariantAnnotation(models.Model):
     """ Common fields between VariantAnnotation and VariantTranscriptAnnotation
         These fields are PER-TRANSCRIPT """
-    SV_HGVS_TOO_LONG_MESSAGE = "c.HGVS not calculated due to length"
+    SV_HGVS_TOO_LONG_MESSAGE = "HGVS not calculated due to length"
 
     version = models.ForeignKey(VariantAnnotationVersion, on_delete=CASCADE)
     variant = models.ForeignKey(Variant, on_delete=CASCADE)
