@@ -33,6 +33,7 @@
                     <tr>
                         <th>Source</th>
                         {% if show_method_column %}
+                            <th>Used Converter Type</th>
                             <th>Method</th>
                         {% endif %}
                         <th>Variant Coordinate {% if not outputs.all_equal_variant_coordinate %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
@@ -52,6 +53,7 @@
                                 {% endif %}
                             </th>
                         {% if show_method_column %}
+                            <td>{{ output.used_converter_type|dash_if_empty }}</td>
                             <td>{{ output.method|dash_if_empty }}</td>
                         {% endif %}
                             <td>{{ output.variant_coordinate|dash_if_empty }}</td>

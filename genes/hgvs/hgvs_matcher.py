@@ -187,7 +187,7 @@ class HGVSMatcher:
         new_hgvs_variant, transcript_version = self._get_renamed_lrg_transcript_hgvs_variant_and_transcript_version(self.genome_build, hgvs_variant)
         if new_hgvs_variant:
             new_hgvs_string = new_hgvs_variant.format()
-            method = f"{self.hgvs_converter.description()} as '{new_hgvs_string}' (from LRG_RefSeqGene)"
+            method = f"{self.hgvs_converter.description(describe_fallback=False)} as '{new_hgvs_string}' (from LRG_RefSeqGene)"
             variant_coordinate, matches_reference = self.hgvs_converter.hgvs_to_variant_coordinate_and_reference_match(new_hgvs_string, transcript_version)
             internal_converter_type = self.hgvs_converter.get_hgvs_converter_type()
             return variant_coordinate, lrg_transcript_accession, internal_converter_type, method, matches_reference

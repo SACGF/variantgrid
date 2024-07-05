@@ -32,6 +32,7 @@ class MatcherOutput:
     transcript_version: Optional[TranscriptParts] = None
     hgvs: Optional[str] = None
     message: Optional[str] = None
+    used_converter_type: Optional[HGVSConverterType] = None
     method: Optional[str] = None
 
     @property
@@ -122,6 +123,7 @@ def hgvs_resolution_tool(request: HttpRequest):
                 if vcd := matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_str):
                     variant_coordinate = vcd.variant_coordinate
                     output.variant_coordinate = variant_coordinate
+                    output.used_converter_type = vcd.used_converter_type.name
                     output.method = vcd.method
 
                 if vcd.transcript_accession:
