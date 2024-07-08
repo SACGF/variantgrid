@@ -38,6 +38,7 @@ class ClassificationConditionResolutionRow(ExportRow):
             condition=self.condition,
             condition_matched_gene_symbol=self.condition_matched_gene_symbol,
             gene_symbol=self.gene_symbol,
+            gene_symbol_entry=self.gene_symbol_entry,
             panel_app_strength=self.panel_app_strength,
             gencc_strength=self.gencc_strength,
             mondo_strength=self.mondo_strength,
