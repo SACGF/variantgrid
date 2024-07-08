@@ -236,14 +236,22 @@ def get_vep_version(genome_build: GenomeBuild, annotation_consortium):
 
 
 def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: dict) -> dict:
-    def vep_int_version(vep_string_version):
+    def _vep_int_version(vep_string_version):
         m = re.match(r"v(\d+)", vep_string_version)
         return int(m.group(1))
 
+    # We strip off the hash ie '110.73b02d8' -> '110' so that we can re-use annotation
+    # if VEP do a minor bugfix change to their releases etc
+    def _major_version(version_str) -> str:
+        return version_str.split(".")[0]
+
+
     FIELD_CONVERSION = {
-        "vep": vep_int_version,
+        "vep": _vep_int_version,
         "cosmic": int,
         "dbsnp": int,
+        "ensembl": _major_version,
+        "ensembl_io": _major_version,
     }
 
     FIELD_LOOKUP = {
