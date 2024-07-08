@@ -515,8 +515,10 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 transcript_versions = set()
                 mane_status_by_transcript = {}
                 for mane, alias in mane_and_aliases:
-                    msg_hgvs_gene_search = msg_hgvs_given_symbol + f" Matched to MANE gene symbol '{alias.gene_symbol}' " + \
-                        f"via alias {alias.alias} ({alias.get_source_display()})."
+                    msg_hgvs_gene_search = msg_hgvs_given_symbol
+                    if alias:
+                        msg_hgvs_gene_search += f" Matched to MANE gene symbol '{alias.gene_symbol}' " + \
+                            f"via alias {alias.alias} ({alias.get_source_display()})."
 
                     gene_tvs, gene_mane_status = _get_search_hgvs_gene_symbol_transcripts(mane.symbol, genome_build)
                     transcript_versions.update(gene_tvs)
