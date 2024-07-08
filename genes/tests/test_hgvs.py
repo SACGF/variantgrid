@@ -247,3 +247,23 @@ class TestHGVS(TestCase):
             #print(f"{type(vcd.matches_reference)=}")
             self.assertEqual(vcd.variant_coordinate, expected_vc)
             self.assertEqual(vcd.matches_reference, expected_matches_ref)
+
+    def test_pyhgvs_gene_symbol_hgvs(self):
+        self._test_gene_symbol_hgvs(HGVSConverterType.PYHGVS)
+
+    def test_biocommons_gene_symbol_hgvs(self):
+        self._test_gene_symbol_hgvs(HGVSConverterType.BIOCOMMONS_HGVS)
+
+    def _test_gene_symbol_hgvs(self, hgvs_converter_type: HGVSConverterType):
+        # HGVS: (has_transcript, has_gene_symbol)
+        HGVS_DATA = {
+            'NM_001145661.2:c.1113dup': (True, False),
+            'NM_001145661.2(GATA2):c.1113dup': (True, True),
+            'GATA2:c.1113dup': (False, True),
+        }
+
+        matcher = HGVSMatcher(GenomeBuild.grch37(), hgvs_converter_type=hgvs_converter_type)
+        for hgvs_string, (expected_has_transcript, expected_has_gene) in HGVS_DATA.items():
+            gene_symbol = matcher.get_gene_symbol_if_no_transcript(hgvs_string)
+            msg = f"get_gene_symbol_if_no_transcript {hgvs_string}"
+            self.assertEqual(not expected_has_transcript and expected_has_gene, bool(gene_symbol), msg)

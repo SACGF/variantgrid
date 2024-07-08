@@ -677,11 +677,8 @@ class HGVSMatcher:
 
     def get_gene_symbol_if_no_transcript(self, hgvs_string: str) -> Optional[str]:
         """ If HGVS uses gene symbol instead of transcript, return symbol """
-        # pyhgvs sets to gene, Biocommons always uses as transcript
         hgvs_variant = self.create_hgvs_variant(hgvs_string)
-        if hgvs_variant.transcript and hgvs_variant.gene:
-            return None  # only return symbol if transcript is not used
-        return hgvs_variant.transcript or hgvs_variant.gene
+        return hgvs_variant.get_gene_symbol_if_no_transcript()
 
 
 def get_hgvs_variant_coordinate(hgvs_string: str, genome_build: GenomeBuild) -> VariantCoordinate:

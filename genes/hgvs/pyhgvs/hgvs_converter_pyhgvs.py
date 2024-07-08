@@ -105,6 +105,16 @@ class PyHGVSVariant(HGVSVariant):
                 count += len(part)
         return count
 
+    def get_gene_symbol_if_no_transcript(self) -> Optional[str]:
+        # PyHGVS HGVSName works like:
+        # NM_001145661.2:c.1113dup          transcript=NM_001145661.2, gene=''
+        # NM_001145661.2(GATA2):c.1113dup   transcript=NM_001145661.2, gene=GATA2
+        # GATA2:c.1113dup                   transcript='',             gene=GATA2
+        gene_symbol = None
+        if not self._get_transcript():
+            gene_symbol = self.gene
+        return gene_symbol
+
     def __str__(self):
         return self.format()
 

@@ -481,6 +481,10 @@ class HGVSVariant(abc.ABC):
     def format(self, use_compat=False, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH):
         pass
 
+    @abc.abstractmethod
+    def get_gene_symbol_if_no_transcript(self) -> Optional[str]:
+        pass
+
     def __repr__(self):
         return self.format()
 

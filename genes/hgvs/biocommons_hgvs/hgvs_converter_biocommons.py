@@ -1,6 +1,7 @@
 import os.path
 import re
 from importlib import metadata
+from typing import Optional
 
 from bioutils.sequences import reverse_complement
 from django.conf import settings
@@ -90,6 +91,20 @@ class BioCommonsHGVSVariant(HGVSVariant):
 
         conf = {"max_ref_length": max_ref_length}
         return sv.format(conf)
+
+    def get_gene_symbol_if_no_transcript(self) -> Optional[str]:
+        # Biocommons SequenceVariant works like:
+        # NM_001145661.2:c.1113dup          transcript=NM_001145661.2, gene=None
+        # NM_001145661.2(GATA2):c.1113dup   transcript=NM_001145661.2, gene=GATA2
+        # GATA2:c.1113dup                   transcript=GATA2
+        gene_symbol = None
+        gene = self._get_gene()
+        transcript = self._get_transcript()
+        if not (gene and transcript):
+            # Will always be transcript
+            if not looks_like_transcript(transcript):
+                gene_symbol = transcript
+        return gene_symbol
 
 
 class BioCommonsHGVSConverter(HGVSConverter):
