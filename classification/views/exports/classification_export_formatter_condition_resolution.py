@@ -89,7 +89,7 @@ class ClassificationConditionResolutionRow(ExportRow):
         return self.condition
 
     @export_column("Gene Symbol Entry")
-    def gene_symbol_entry(self):
+    def gene_symbol_entry_formatted(self):
         return f"{self.gene_symbol_entry[0] + 1} of {self.gene_symbol_entry[1]}"
 
     @export_column('Gene Symbol for Relationship DBs')
