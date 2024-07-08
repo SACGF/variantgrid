@@ -4,7 +4,7 @@ from typing import List, Optional
 from django.http import HttpRequest
 
 from classification.enums import SpecialEKeys
-from classification.models import ClassificationModification
+from classification.models import ClassificationModification, ConditionTextMatch
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
@@ -24,7 +24,9 @@ class GeneSymbolCondition:
 class ClassificationConditionResolutionRow(ExportRow):
     classification: ClassificationModification
     condition: OntologyTerm
-    gene_symbol: GeneSymbol
+    condition_matched_gene_symbol: GeneSymbol = None
+    gene_symbol: GeneSymbol = None
+    gene_symbol_entry: tuple[int, int] = None
     panel_app_strength: Optional[set[PanelAppClassification]] = None
     gencc_strength: Optional[set[GeneDiseaseClassification]] = None
     mondo_strength: Optional[set[str]] = None
@@ -34,6 +36,7 @@ class ClassificationConditionResolutionRow(ExportRow):
         return ClassificationConditionResolutionRow(
             classification=new_classification,
             condition=self.condition,
+            condition_matched_gene_symbol=self.condition_matched_gene_symbol,
             gene_symbol=self.gene_symbol,
             panel_app_strength=self.panel_app_strength,
             gencc_strength=self.gencc_strength,
@@ -73,15 +76,23 @@ class ClassificationConditionResolutionRow(ExportRow):
     def allele_origin(self):
         return self.vc.allele_origin_bucket
 
-    @export_column('Provided Condition')
-    def condition(self):
-        return self.condition
-
     @export_column('Date Curated')
     def date_curated(self):
         return self.cm.curated_date.date()
 
-    @export_column('Gene Symbol')
+    @export_column('Gene Symbol for Condition Matching')
+    def gene_symbol_matching(self):
+        return self.condition_matched_gene_symbol
+
+    @export_column('Auto/User Matched Condition')
+    def condition(self):
+        return self.condition
+
+    @export_column("Gene Symbol Entry")
+    def gene_symbol_entry(self):
+        return f"{self.gene_symbol_entry[0] + 1} of {self.gene_symbol_entry[1]}"
+
+    @export_column('Gene Symbol for Relationship DBs')
     def gene_symbol(self):
         return self.gene_symbol
 
@@ -142,12 +153,29 @@ class ClassificationExportFormatterConditionResolution(ClassificationExportForma
         rows: list[str] = []
         cache: dict[GeneSymbolCondition, ClassificationConditionResolutionRow] = {}
         for vcm in allele_data.cms_regardless_of_issues:
-            if (allele_info := vcm.classification.allele_info) and (gene_symbols := allele_info.gene_symbols):
+            ctm: ConditionTextMatch
+            if ctm := ConditionTextMatch.objects.filter(classification=vcm.classification).first():
+                condition_matched_gene_symbol: Optional[GeneSymbol] = ctm.gene_symbol
+                while condition_matched_gene_symbol is None:
+                    ctm = ctm.parent
+                    if not ctm:
+                        break
+                    condition_matched_gene_symbol = ctm.gene_symbol
+
+                gene_symbol_list = []  # use a list instead of a set so we always have the gene_symbol used for matching as the first entry
+                if condition_matched_gene_symbol:
+                    gene_symbol_list.append(condition_matched_gene_symbol)
+                if (allele_info := vcm.classification.allele_info) and (resolved_gene_symbols := allele_info.gene_symbols):
+                    for gene_symbol in resolved_gene_symbols:
+                        if gene_symbol not in gene_symbol_list:
+                            gene_symbol_list.append(gene_symbol)
+
                 if condition_obj := vcm.classification.condition_resolution_obj:
                     if not condition_obj.is_multi_condition and condition_obj.terms and condition_obj.terms[0].ontology_service in {OntologyService.MONDO, OntologyService.OMIM}:
                         # only work for single conditions in MONDO or OMIM
                         condition_term = condition_obj.terms[0]
-                        for gene_symbol in gene_symbols:
+                        gene_symbols_length = len(gene_symbol_list)
+                        for index, gene_symbol in enumerate(gene_symbol_list):
 
                             row: ClassificationConditionResolutionRow
                             key = GeneSymbolCondition(gene_symbol=gene_symbol, condition=condition_term)
@@ -178,6 +206,8 @@ class ClassificationExportFormatterConditionResolution(ClassificationExportForma
                                 row = ClassificationConditionResolutionRow(
                                     classification=vcm,
                                     condition=condition_term,
+                                    condition_matched_gene_symbol=condition_matched_gene_symbol,
+                                    gene_symbol_entry=(index, gene_symbols_length),
                                     gene_symbol=gene_symbol,
                                     panel_app_strength=panel_app_strength,
                                     gencc_strength=gencc_strength,
