@@ -27,8 +27,16 @@ ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.join(BASE_DIR, "scripts", "perlb
 _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "fasta")
 
 ANNOTATION[BUILD_GRCH37].update({
+    "columns_version": 1,
     "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.25_GRCh37.p13_genomic.fna.gz"),
 })
+
+ANNOTATION[BUILD_GRCH37]["vep_config"].update({
+    "cosmic": "annotation_data/GRCh37/CosmicCodingMuts_v95_20211101_grch37.normal.vcf.gz",
+    "dbnsfp": "annotation_data/GRCh37/dbNSFP4.0a.grch37.stripped.gz",
+    "mastermind": "annotation_data/GRCh37/mastermind_cited_variants_reference-2022.04.02-grch37.vcf.gz",
+})
+
 
 GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID = 1  # MedEx
 

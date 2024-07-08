@@ -117,22 +117,12 @@ _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded an
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'annotation_scratch')
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
 
-ANNOTATION[BUILD_GRCH37]["enabled"] = True
-ANNOTATION[BUILD_GRCH37]["annotation_consortium"] = "RefSeq"
-ANNOTATION[BUILD_GRCH37]["columns_version"] = 3
-ANNOTATION[BUILD_GRCH37]["vep_config"].update({
-    "cosmic": "annotation_data/GRCh37/Cosmic_GenomeScreensMutant_v99_GRCh37.vcf.gz",
-    "dbnsfp": "annotation_data/GRCh37/dbNSFP4.5a.grch37.stripped.gz",
-    "mastermind": "annotation_data/GRCh37/mastermind_cited_variants_reference-2023.10.02-grch37.vcf.gz",
+ANNOTATION[BUILD_GRCH37].update({
+    "annotation_consortium": "RefSeq",
 })
-
-ANNOTATION[BUILD_GRCH38]["enabled"] = True
-ANNOTATION[BUILD_GRCH38]["annotation_consortium"] = "RefSeq"
-ANNOTATION[BUILD_GRCH38]["columns_version"] = 3
-ANNOTATION[BUILD_GRCH38]["vep_config"].update({
-    "cosmic": "annotation_data/GRCh38/Cosmic_GenomeScreensMutant_v99_GRCh38.vcf.gz",
-    "dbnsfp": "annotation_data/GRCh38/dbNSFP4.5a.grch38.stripped.gz",
-    "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2023.10.02-grch38.vcf.gz",
+ANNOTATION[BUILD_GRCH38].update({
+    "enabled": True,
+    "annotation_consortium": "RefSeq",
 })
 
 LOGIN_REDIRECT_URL = '/classification/dashboard'
