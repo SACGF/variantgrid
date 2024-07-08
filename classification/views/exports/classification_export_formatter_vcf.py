@@ -22,12 +22,14 @@ from snpdb.models import Variant, Allele
 class VCFTargetSystem(str, Enum):
     EMEDGENE = "emedgene"
     GENERIC = "generic"
+    VARSEQ = "varseq"
+
     CORE = "core"  # should be used for everyone
 
 
 @dataclass(frozen=True)
 class FormatDetailsVCF:
-    target_system: VCFTargetSystem = VCFTargetSystem.EMEDGENE
+    target_system: VCFTargetSystem = VCFTargetSystem.GENERIC
 
     @staticmethod
     def from_request(request: HttpRequest) -> 'FormatDetailsVCF':
@@ -104,6 +106,15 @@ class ClassificationVCF(ExportVCF):
         return get_url_from_view_path(reverse("view_allele_compact", kwargs={"allele_id": self.allele_data.cached_allele.id})) + self.link_extra
 
     @export_vcf_info_cell(
+        header_id="labs",
+        header_type=VCFHeaderType.String,
+        description="Allele origin bucket, values will be 1 or more of: somatic, germline, allele_origin_unknown",
+        categories={"system": {VCFTargetSystem.GENERIC, VCFTargetSystem.VARSEQ}})
+    def lab_names(self):
+        all_labs = sorted({cm.classification.lab for cm in self.allele_data.cms})
+        return [f"{lab.organization.shortest_name}__{lab.name}" for lab in all_labs]
+
+    @export_vcf_info_cell(
         header_id="significance",
         number=1,
         header_type=VCFHeaderType.Integer,
@@ -163,11 +174,21 @@ class ClassificationVCF(ExportVCF):
         header_id="classification",
         number=VCFHeaderNumberSpecial.UNBOUND,
         header_type=VCFHeaderType.String,
-        description="All unique classification values for this allele, B, LP, VUS, VUS_A, VUS_B, VUS_C, LP, P, LO O, D, R, B=Benign, P=Pathogenic, O=Oncogenic, D=Drug Response, R=Risk Factor",
+        description="All unique classification values for this allele, B, LB, VUS, VUS_A, VUS_B, VUS_C, LP, P, LO O, D, R, B=Benign, P=Pathogenic, O=Oncogenic, D=Drug Response, R=Risk Factor",
         categories={"system": VCFTargetSystem.GENERIC}
     )
     def classification_values(self):
         return self.unique_values(SpecialEKeys.CLINICAL_SIGNIFICANCE, raw=True)
+
+    @export_vcf_info_cell(
+        header_id="classification",
+        number=VCFHeaderNumberSpecial.UNBOUND,
+        header_type=VCFHeaderType.String,
+        description="All unique classification values for this allele, Benign, Likely Benign, VUS, VUS A, VUS B, VUS C, Likely Pathogenic, Pathogenic, Likely Oncogenic, Oncogenic, Drug Response, Risk Factor",
+        categories={"system": VCFTargetSystem.VARSEQ}
+    )
+    def classification_labels(self):
+        return self.unique_values(SpecialEKeys.CLINICAL_SIGNIFICANCE, raw=False)
 
     @export_vcf_info_cell(
         header_id="somatic_clinical_significance",
@@ -176,8 +197,18 @@ class ClassificationVCF(ExportVCF):
         description="All unique somatic clinical significance values for this allele, values include tier_1, tier_2, tier_1_or_2, tier_3, tier_4",
         categories={"system": VCFTargetSystem.GENERIC}
     )
-    def somatic_clinical_significance(self):
+    def somatic_clinical_significance_values(self):
         return self.unique_values(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE, raw=True)
+
+    @export_vcf_info_cell(
+        header_id="somatic_clinical_significance",
+        number=VCFHeaderNumberSpecial.UNBOUND,
+        header_type=VCFHeaderType.String,
+        description="All unique somatic clinical significance values for this allele, values include Tier I, Tier II, Tier I / II, Tier III, Tier IV",
+        categories={"system": VCFTargetSystem.VARSEQ}
+    )
+    def somatic_clinical_significance_labels(self):
+        return self.unique_values(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE, raw=False)
 
     @property
     def _discordance_value(self) -> Optional[str]:
