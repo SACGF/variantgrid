@@ -1,4 +1,5 @@
 from django.core.management import BaseCommand
+
 from classification.models import ClassificationModification, calculate_somatic_clinical_significance_order
 
 

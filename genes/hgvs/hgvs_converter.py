@@ -1,11 +1,8 @@
 import abc
 from enum import Enum
 
-from cache_memoize import cache_memoize
-
 from genes.hgvs import HGVSVariant
-from library.constants import HOUR_SECS
-from snpdb.models import GenomeBuild, VariantCoordinate, AssemblyMoleculeType
+from snpdb.models import GenomeBuild, VariantCoordinate
 
 
 class HGVSConverterType(Enum):

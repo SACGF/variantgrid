@@ -4,7 +4,6 @@ from django.conf import settings
 
 from classification.models import ImportedAlleleInfo
 from classification.models.classification import ClassificationImport
-from library.log_utils import report_exc_info
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import GenomeBuild, ImportSource, Variant, VariantCoordinate, Allele

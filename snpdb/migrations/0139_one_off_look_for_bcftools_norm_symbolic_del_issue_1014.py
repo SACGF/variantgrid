@@ -3,6 +3,7 @@ import logging
 
 from django.db import migrations
 
+
 def _one_off_look_for_bcftools_norm_symbolic_del_issue_1014(apps, schema_editor):
     Variant = apps.get_model("snpdb", "Variant")
 

@@ -11,7 +11,6 @@ from annotation.models import VariantAnnotationVersion
 from classification.enums import AlleleOriginBucket
 from classification.models import Classification, ClassificationModification
 from library.preview_request import preview_extra_signal, PreviewKeyValue
-from library.utils import join_with_commas_and_ampersand
 from ontology.models import OntologyTerm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, Organization, Allele, Variant, GenomeBuild

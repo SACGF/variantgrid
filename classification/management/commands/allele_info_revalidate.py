@@ -1,5 +1,3 @@
-import itertools
-
 from django.core.management import BaseCommand
 
 from classification.classification_import import variant_matching_dry_run

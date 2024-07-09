@@ -14,7 +14,6 @@ from genes.hgvs import HGVSMatcher
 from genes.models import NoTranscript
 from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 
-
 __AT_LEAST_ONE_SET = {SpecialEKeys.CLINICAL_SIGNIFICANCE, SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}
 __CHECK_IF_CHANGED = __AT_LEAST_ONE_SET | {SpecialEKeys.ALLELE_ORIGIN} | set(SpecialEKeys.AMP_LEVELS_TO_LEVEL.keys())
 __NOT_FOR_GERMLINE = {SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE} | set(SpecialEKeys.AMP_LEVELS_TO_LEVEL.keys())

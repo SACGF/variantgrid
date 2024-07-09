@@ -1,5 +1,6 @@
 from django.core.management import BaseCommand
 from django.db.models import Count
+
 from classification.models import ClinVarExport, ClinVarAllele
 from ontology.models import AncestorCalculator, OntologySnake
 

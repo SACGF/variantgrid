@@ -3,7 +3,6 @@ import uuid
 from datetime import timedelta
 from html import escape
 from typing import Union, Optional, Iterable, Any, Collection
-from django.utils.timezone import localtime
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -11,9 +10,10 @@ from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.template import Library
 from django.utils.safestring import mark_safe
+from django.utils.timezone import localtime
 
 from classification.criteria_strengths import CriteriaStrength, AcmgPointScore
-from classification.enums import SpecialEKeys, AlleleOriginBucket
+from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo, \
     EvidenceMixin

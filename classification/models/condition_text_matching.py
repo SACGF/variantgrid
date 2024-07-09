@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from functools import cached_property, reduce
 from operator import attrgetter
 from typing import Optional, Iterable
+
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, transaction

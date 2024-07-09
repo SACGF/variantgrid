@@ -1,13 +1,12 @@
+import csv
 from typing import Optional
 
 from django.core.management import BaseCommand
+
 from annotation.models import AnnotationVersion
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
-from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
 from classification.models import Classification, EvidenceKey
-from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild, Variant
-import csv
 
 
 class Command(BaseCommand):

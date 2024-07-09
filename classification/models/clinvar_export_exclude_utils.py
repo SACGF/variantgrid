@@ -14,7 +14,6 @@ from library.guardian_utils import admin_bot
 from library.utils import DebugTimer
 from snpdb.models import ClinVarKey, ClinVarKeyExcludePattern
 
-
 """
 This file has the data responsible for applying the ClinVarExclude patterns to automatically stop
 records with certain values being exported to ClinVar.

@@ -16,7 +16,7 @@ from annotation.models.models import ColumnVEPField, VariantAnnotation, \
 from annotation.models.models_enums import VariantClass, VariantAnnotationPipelineType, VEPCustom
 from annotation.vcf_files.vcf_types import VCFVariant
 from annotation.vep_annotation import VEPConfig
-from genes.hgvs import HGVSMatcher, HGVSException
+from genes.hgvs import HGVSMatcher
 from genes.models import TranscriptVersion, GeneVersion
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import get_model_fields
