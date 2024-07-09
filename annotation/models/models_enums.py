@@ -169,6 +169,7 @@ class ClinVarReviewStatus(models.TextChoices):
     CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS = "F", "Criteria provided - conflicting interpretations"
     CRITERIA_PROVIDED_SINGLE_SUBMITTER = "S", "Criteria provided - single submitter"
     CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS_NO_CONFLICTS = "M", "Criteria provided - multiple submitters w/no conflicts"
+    CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS = "m", "Criteria provided - multiple submitters"  # somatic only
     REVIEWED_BY_EXPERT_PANEL = "E", "Reviewed by expert panel"
     PRACTICE_GUIDELINE = "P", "Practice guideline"
 
@@ -180,6 +181,7 @@ class ClinVarReviewStatus(models.TextChoices):
         CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0]: 1,
         CRITERIA_PROVIDED_SINGLE_SUBMITTER[0]: 1,
         CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS_NO_CONFLICTS[0]: 2,
+        CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS[0]: 2,
         REVIEWED_BY_EXPERT_PANEL[0]: 3,
         PRACTICE_GUIDELINE[0]: 4,
     })
@@ -194,6 +196,7 @@ class ClinVarReviewStatus(models.TextChoices):
         'criteria_provided,_conflicting_interpretations': CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0],
         'criteria_provided,_conflicting_classifications': CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0],
         'criteria_provided,_single_submitter': CRITERIA_PROVIDED_SINGLE_SUBMITTER[0],
+        'criteria_provided,_multiple_submitters': CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS[0],  # new for somatic
         'criteria_provided,_multiple_submitters,_no_conflicts': CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS_NO_CONFLICTS[0],
         'reviewed_by_expert_panel': REVIEWED_BY_EXPERT_PANEL[0],
         'practice_guideline': PRACTICE_GUIDELINE[0],
