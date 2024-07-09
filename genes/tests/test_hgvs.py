@@ -267,3 +267,19 @@ class TestHGVS(TestCase):
             gene_symbol = matcher.get_gene_symbol_if_no_transcript(hgvs_string)
             msg = f"get_gene_symbol_if_no_transcript {hgvs_string}"
             self.assertEqual(not expected_has_transcript and expected_has_gene, bool(gene_symbol), msg)
+
+    def test_biocommons_mitochondria_hgvs(self):
+        return self._test_mitochondria_hgvs(HGVSConverterType.BIOCOMMONS_HGVS)
+
+    def test_pyhgvs_mitochondria_hgvs(self):
+        return self._test_mitochondria_hgvs(HGVSConverterType.PYHGVS)
+
+    def _test_mitochondria_hgvs(self, hgvs_converter_type: HGVSConverterType):
+        matcher = HGVSMatcher(GenomeBuild.grch37(), hgvs_converter_type=hgvs_converter_type)
+        vc = VariantCoordinate(chrom='MT', position=263, ref='A', alt='G')
+        fast_hgvs_string = matcher.variant_coordinate_to_g_hgvs(vc)  # is a SNV so will go down fast path
+        self.assertTrue("m." in fast_hgvs_string, "fast HGVS conversion")
+
+        lib_hgvs_string = matcher.hgvs_converter.variant_coordinate_to_g_hgvs(vc)
+        self.assertTrue("m." in str(lib_hgvs_string), "HGVS library conversion")
+

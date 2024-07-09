@@ -50,8 +50,8 @@ class ComboCheckerHGVSConverter(HGVSConverter):
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
         return self._call_converters("create_hgvs_variant", hgvs_string)
 
-    def variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
-        return self._call_converters("variant_coordinate_to_g_hgvs", vc)
+    def _variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
+        return self._call_converters("_variant_coordinate_to_g_hgvs", vc)
 
     def variant_coordinate_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
         return self._call_converters("variant_coordinate_to_c_hgvs", vc, transcript_version)

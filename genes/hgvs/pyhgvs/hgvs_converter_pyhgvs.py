@@ -19,6 +19,9 @@ class PyHGVSVariant(HGVSVariant):
             raise ValueError("Double extra!")
         self._hgvs_name = hgvs_name
 
+    def _get_contig_accession(self) -> str:
+        return self._hgvs_name.chrom
+
     def _get_gene(self) -> str:
         return self._hgvs_name.gene
 
@@ -134,7 +137,7 @@ class PyHGVSConverter(HGVSConverter):
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
         return PyHGVSVariant(self._hgvs_name(hgvs_string))
 
-    def variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
+    def _variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
         chrom, position, ref, alt, _svlen = vc.as_external_explicit(self.genome_build)
         hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, position, ref, alt,
                                                 self.genome_build.genome_fasta.fasta,

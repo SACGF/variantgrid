@@ -526,14 +526,18 @@ class HGVSMatcher:
         variant_coordinate = variant_coordinate.as_external_explicit(self.genome_build)
         return self.variant_coordinate_to_hgvs_used_converter_type_and_method(variant_coordinate, transcript_name)[0]
 
-    @staticmethod
-    def _fast_variant_coordinate_to_g_hgvs(refseq_accession, offset, ref, alt) -> str:
+    def _fast_variant_coordinate_to_g_hgvs(self, refseq_accession, offset, ref, alt) -> str:
         """ This only works for SNPs (ie not indels etc) """
         if ref == alt:
             hgvs_allele = f"{ref}="
         else:
             hgvs_allele = f"{ref}>{alt}"
-        return f"{refseq_accession}:g.{offset}{hgvs_allele}"
+
+        if refseq_accession == self.genome_build.mitochondria_accession:
+            kind = 'm'
+        else:
+            kind = 'g'
+        return f"{refseq_accession}:{kind}.{offset}{hgvs_allele}"
 
     def variant_to_g_hgvs(self, variant: Variant) -> str:
         return self.variant_coordinate_to_g_hgvs(variant.coordinate)

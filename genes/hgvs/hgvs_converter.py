@@ -1,8 +1,11 @@
 import abc
 from enum import Enum
 
+from cache_memoize import cache_memoize
+
 from genes.hgvs import HGVSVariant
-from snpdb.models import GenomeBuild, VariantCoordinate
+from library.constants import HOUR_SECS
+from snpdb.models import GenomeBuild, VariantCoordinate, AssemblyMoleculeType
 
 
 class HGVSConverterType(Enum):
@@ -57,8 +60,14 @@ class HGVSConverter(abc.ABC):
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
         pass
 
-    @abc.abstractmethod
     def variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
+        hgvs_variant = self._variant_coordinate_to_g_hgvs(vc)
+        if hgvs_variant.contig_accession == self.genome_build.mitochondria_accession:
+            hgvs_variant.kind = 'm'
+        return hgvs_variant
+
+    @abc.abstractmethod
+    def _variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
         pass
 
     @abc.abstractmethod

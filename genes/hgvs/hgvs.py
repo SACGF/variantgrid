@@ -398,6 +398,17 @@ class HGVSVariant(abc.ABC):
         to allow library independent code """
 
     @property
+    def contig_accession(self) -> str:
+        _genomic_kinds = ('g', 'm')
+        if self.kind not in _genomic_kinds:
+            raise ValueError(f"'{self}' can only request contig for genomic kinds '{','.join(_genomic_kinds)}'")
+        return self._get_contig_accession()
+
+    @abc.abstractmethod
+    def _get_contig_accession(self) -> str:
+        pass
+
+    @property
     def gene(self) -> str:
         return self._get_gene()
 

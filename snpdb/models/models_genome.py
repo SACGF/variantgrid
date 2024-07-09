@@ -133,6 +133,13 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
     def standard_contigs(self):
         return self.contigs.filter(role=SequenceRole.ASSEMBLED_MOLECULE)
 
+    @cached_property
+    def mitochondria_accession(self) -> Optional[str]:
+        mito_ac = None
+        if mito := self.contigs.filter(molecule_type=AssemblyMoleculeType.MITOCHONDRION).first():
+            mito_ac = mito.refseq_accession
+        return mito_ac
+
     @property
     def genome_builds(self):
         """ For PreviewModelMixin - search knows it's a genome build """

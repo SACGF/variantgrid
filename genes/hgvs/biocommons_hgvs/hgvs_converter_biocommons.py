@@ -41,6 +41,9 @@ class BioCommonsHGVSVariant(HGVSVariant):
     def __init__(self, sequence_variant: SequenceVariant):
         self._sequence_variant = sequence_variant
 
+    def _get_contig_accession(self) -> str:
+        return self._sequence_variant.ac
+
     def _get_gene(self) -> str:
         return self._sequence_variant.gene
 
@@ -169,7 +172,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
         chrom, position, ref, alt, _svlen = vc.as_external_explicit(self.genome_build)
         return self.babelfish.vcf_to_g_hgvs(chrom, position, ref, alt)
 
-    def variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
+    def _variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
         var_g = self._variant_coordinate_to_sequence_variant(vc)
         return BioCommonsHGVSVariant(var_g)
 
