@@ -7,8 +7,8 @@
         <h4>Imported Allele Info ({{ allele_info.pk }})</h4>
     {% endif %}
 
-    {% labelled admin_only=True label="Created" row_css="debug-footnote" %}{% timestamp allele_info.created %}{% endlabelled %}
-    {% labelled admin_only=True label="Modified" row_css="debug-footnote" %}{% timestamp allele_info.modified %}{% endlabelled %}
+    {% labelled admin_only=True label="Created" row_css="debug-footnote" %}{% timestamp allele_info.created show_seconds=True %}{% endlabelled %}
+    {% labelled admin_only=True label="Modified" row_css="debug-footnote" %}{% timestamp allele_info.modified show_seconds=True %}{% endlabelled %}
 
     {% comment %}
     {% for diff_text in c_hgvses %}
