@@ -16,6 +16,7 @@ from classification.views.exports.vcf_export_utils import ExportVCF, export_vcf_
     VCFHeaderNumberSpecial, VCFHeader, VCFExportTweak
 from library.django_utils import get_url_from_view_path
 from library.utils import local_date_str_no_dash
+from ontology.models import OntologyTerm
 from snpdb.models import Variant, Allele
 
 
@@ -118,7 +119,7 @@ class ClassificationVCF(ExportVCF):
         header_id="significance",
         number=1,
         header_type=VCFHeaderType.Integer,
-        description="Classification, 1 = Benign, 2 = Likely Benign, 3 = VUS/Other, 4 = Likely Pathogenic/Oncogenic, 5 = Pathogenic/Oncogenic",
+        description="Most Pathogenic Classification, 1 = Benign, 2 = Likely Benign, 3 = VUS/Other, 4 = Likely Pathogenic/Oncogenic, 5 = Pathogenic/Oncogenic",
         categories={"system": VCFTargetSystem.EMEDGENE})
     def significance(self):
         all_values = []
@@ -169,6 +170,22 @@ class ClassificationVCF(ExportVCF):
             return sorted_values
         else:
             return [e_key.pretty_value(val) for val in sorted_values]
+
+    @export_vcf_info_cell(
+        header_id="condition_terms",
+        number=VCFHeaderNumberSpecial.UNBOUND,
+        header_type=VCFHeaderType.String,
+        description="All unique conditions this variant is being curated against, only provides values that could be matched to exact ontology terms",
+        categories={"system": {VCFTargetSystem.GENERIC, VCFTargetSystem.VARSEQ}}
+    )
+    def condition_terms(self):
+        all_terms: set[OntologyTerm] = set()
+        for cm in self.allele_data.cms:
+            if cr := cm.classification.condition_resolution_obj:
+                all_terms.update(cr.terms)
+        if all_terms:
+            sorted_terms = sorted(all_terms)
+            return [f"{t.id} {t.name}" for t in sorted_terms]
 
     @export_vcf_info_cell(
         header_id="classification",
