@@ -2115,6 +2115,11 @@ ul.compact {
 // DEBUG TEXT
 ////////////////////////
 
+.debug-footnote {
+	opacity: 0.7;
+	font-size: 0.8rem;
+}
+
 .code {
 	font-family: monospace;
 	color: #444;
@@ -2395,7 +2400,7 @@ li.help-item {
 
 .quoted {
 	font-weight: 500;
-
+	color: #446644;
 	&::before,
 	&::after {
 		content: "\"";

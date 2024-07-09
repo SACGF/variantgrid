@@ -672,6 +672,10 @@ def enrich(text: str):
     :param text: The text to be enriched
     :return: HTML
     """
+    if text is None:
+        text = ""
+    elif not isinstance(text, str):
+        text = str(text)
     parts = []
     is_quotes = False
     for part in QUOTES_RE.split(text):

@@ -1831,6 +1831,11 @@ ul.compact li:before {
   animation: fadeInScale ease-out 0.5s;
 }
 
+.debug-footnote {
+  opacity: 0.7;
+  font-size: 0.8rem;
+}
+
 .code {
   font-family: monospace;
   color: #444;
@@ -2078,6 +2083,7 @@ li.help-item :last-child {
 
 .quoted {
   font-weight: 500;
+  color: #446644;
 }
 .quoted::before, .quoted::after {
   content: "\"";

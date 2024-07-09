@@ -7,8 +7,8 @@
         <h4>Imported Allele Info ({{ allele_info.pk }})</h4>
     {% endif %}
 
-    {% labelled admin_only=True label="Created" value_css="text-monospace" %}{{ allele_info.created }}{% endlabelled %}
-    {% labelled admin_only=True label="Modified" value_css="text-monospace" %}{{ allele_info.modified }}{% endlabelled %}
+    {% labelled admin_only=True label="Created" row_css="debug-footnote" %}{% timestamp allele_info.created %}{% endlabelled %}
+    {% labelled admin_only=True label="Modified" row_css="debug-footnote" %}{% timestamp allele_info.modified %}{% endlabelled %}
 
     {% comment %}
     {% for diff_text in c_hgvses %}
@@ -20,18 +20,18 @@
     {% else %}
         {% labelled label=c_hgvses.0.identifier value_css="text-monospace" %}{{ c_hgvses.0.html }}{% endlabelled %}
     {% endif %}
-    {% labelled admin_only=True label="HGVS matched by" value_css="text-monospace" %}{{ allele_info.hgvs_converter_version }}{% endlabelled %}
-    {% if normalized_diff %}
+    {% labelled admin_only=True label="HGVS matched by" value_css="text-monospace" row_css="debug-footnote" %}{{ allele_info.hgvs_converter_version | enrich }}{% endlabelled %}
+    {% if normalized_diff %}x
         {% labelled label="Normalised Diffs" label_css="text-muted" value_css="text-muted" %}<i class="fa-solid fa-arrows-up-down"></i> {{ normalized_diff|separator:', ' }}{% endlabelled %}
     {% endif %}
     {% labelled label=c_hgvses.1.identifier value_css="text-monospace" %}{{ c_hgvses.1.html }}{% endlabelled %}
-    {% labelled admin_only=True label=c_hgvs_resolved_variant_info.1.0 value_css="text-monospace" %}{{ c_hgvs_resolved_variant_info.1.1 }}{% endlabelled %}
+    {% labelled admin_only=True label=c_hgvs_resolved_variant_info.1.0 value_css="text-monospace" row_css="debug-footnote" %}{{ c_hgvs_resolved_variant_info.1.1 | enrich}}{% endlabelled %}
 
     {% if liftover_diff %}
         {% labelled label="Liftover Diffs" label_css="text-muted" value_css="text-muted" %}<i class="fa-solid fa-arrows-up-down"></i> {{ liftover_diff|separator:', ' }}{% endlabelled %}
     {% endif %}
     {% labelled label=c_hgvses.2.identifier value_css="text-monospace" %}{{ c_hgvses.2.html }}{% endlabelled %}
-    {% labelled admin_only=True label=c_hgvs_resolved_variant_info.2.0 value_css="text-monospace" %}{{ c_hgvs_resolved_variant_info.2.1 }}{% endlabelled %}
+    {% labelled admin_only=True label=c_hgvs_resolved_variant_info.2.0 value_css="text-monospace" row_css="debug-footnote" %}{{ c_hgvs_resolved_variant_info.2.1 | enrich }}{% endlabelled %}
     {% labelled label=variant_coordinate_label value_css="text-monospace" %}{{ allele_info.variant_coordinate }}{% endlabelled %}
 
     <hr style="border-top:1px dashed lightgrey"/>
