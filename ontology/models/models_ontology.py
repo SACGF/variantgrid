@@ -1214,6 +1214,7 @@ class OntologySnake:
             report_exc_info()
             return False
 
+    @staticmethod
     def get_all_term_to_gene_relationships(term: Union[OntologyTerm, str], gene_symbol: Union[GeneSymbol, str], try_related_terms: bool = True) -> Iterator['OntologySnake']:
         # iterates all ontology term relationships between the term and the gene symbol (as well as any relationships to the equiv MONDO/OMIM)
         from ontology.panel_app_ontology import update_gene_relations
