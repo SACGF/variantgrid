@@ -123,9 +123,6 @@ class PyHGVSVariant(HGVSVariant):
 
 
 class PyHGVSConverter(HGVSConverter):
-    def __int__(self, genome_build: GenomeBuild, local_resolution=True, clingen_resolution=True):
-        super().__init__(genome_build, local_resolution=local_resolution, clingen_resolution=clingen_resolution)
-
     @staticmethod
     def _hgvs_name(hgvs_string):
         """ Catches PyHGVS specific exceptions and converts to HGVSException """
