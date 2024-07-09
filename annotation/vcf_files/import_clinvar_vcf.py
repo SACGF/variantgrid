@@ -70,10 +70,9 @@ class BulkClinVarInserter:
         'CLNVI': 'clinvar_clinical_sources',
         'ORIGIN': 'clinvar_origin',
         'SSR': 'clinvar_suspect_reason_code',
-
         # new oncogenic fields
         'ONCREVSTAT': 'oncogenic_review_status',
-        'ONCINCL': 'oncogenic_classification',
+        'ONC': 'oncogenic_classification',
         'ONCCONF': 'oncogenic_conflicting_classification',
         'ONCDN': 'oncogenic_preferred_disease_name',
         'ONCDISDB': 'oncogenic_disease_database_name',
