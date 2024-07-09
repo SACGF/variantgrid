@@ -1,7 +1,6 @@
 import os
 from collections import defaultdict
 from time import sleep
-from typing import Any
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet

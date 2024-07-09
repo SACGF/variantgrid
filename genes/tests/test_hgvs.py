@@ -282,4 +282,3 @@ class TestHGVS(TestCase):
 
         lib_hgvs_string = matcher.hgvs_converter.variant_coordinate_to_g_hgvs(vc)
         self.assertTrue("m." in str(lib_hgvs_string), "HGVS library conversion")
-

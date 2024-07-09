@@ -42,7 +42,6 @@ def _one_off_populate_hgvsconverterversion_used_converter_type(apps, schema_edit
         ImportedAlleleInfo.objects.all().update(hgvs_converter_version=legacy)
 
 
-
 class Migration(migrations.Migration):
 
     dependencies = [
