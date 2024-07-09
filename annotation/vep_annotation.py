@@ -252,6 +252,7 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
         "dbsnp": int,
         "ensembl": _major_version,
         "ensembl_io": _major_version,
+        "ensembl_variation": _major_version,
     }
 
     FIELD_LOOKUP = {
