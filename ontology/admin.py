@@ -31,7 +31,7 @@ class OntologyImportAdmin(ModelAdminBasics):
 
 
 @admin.register(OntologyTermRelation)
-class OntologyImportAdmin(ModelAdminBasics):
+class OntologyTermRelationAdmin(ModelAdminBasics):
     search_fields = ('relation', 'from_import__import_source', 'from_import__context')
     list_filter = ('from_import__import_source',)
 
