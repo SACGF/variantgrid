@@ -48,5 +48,7 @@ def plural(items: Union[list, QuerySet, int], singular: str = "", plural: str = 
 
 
 @register.filter()
-def code_to_english(text: str):
+def code_to_english(text: Optional[str]):
+    if text is None:
+        return ""
     return pretty_label(text)
