@@ -21,7 +21,7 @@
         {% labelled label=c_hgvses.0.identifier value_css="text-monospace" %}{{ c_hgvses.0.html }}{% endlabelled %}
     {% endif %}
     {% labelled admin_only=True label="HGVS matched by" value_css="text-monospace" row_css="debug-footnote" %}{{ allele_info.hgvs_converter_version | enrich }}{% endlabelled %}
-    {% if normalized_diff %}x
+    {% if normalized_diff %}
         {% labelled label="Normalised Diffs" label_css="text-muted" value_css="text-muted" %}<i class="fa-solid fa-arrows-up-down"></i> {{ normalized_diff|separator:', ' }}{% endlabelled %}
     {% endif %}
     {% labelled label=c_hgvses.1.identifier value_css="text-monospace" %}{{ c_hgvses.1.html }}{% endlabelled %}
