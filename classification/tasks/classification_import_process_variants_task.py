@@ -69,39 +69,37 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
         #         # has to have previously returned a proper value
         #         classification.set_variant_failed_matching(message="Could not derive variant coordinates")
 
-        # Look up variant tuples - if not exists was normalised during import - lookup ModifiedImportedVariant
+        # Look up variant tuples - normalized ones will be in unknown_variant_coordinates and need to
+        # lookup via ModifiedImportedVariant
         variant_pk_lookup.batch_check()
+
+        allele_info_variant_and_message: dict[ImportedAlleleInfo, tuple[Optional[Variant], Optional[str]]] = {}
         for variant_hash, variant_pk in variant_pk_lookup.variant_pk_by_hash.items():
-            #classification = classifications_by_hash[variant_hash]
             allele_info = allele_info_by_hash[variant_hash]
-            variant_coordinate = variant_coordinates_by_hash[variant_hash]
+            variant = Variant.objects.get(pk=variant_pk)
+            allele_info_variant_and_message[allele_info] = (variant, None)
+
+        for variant_coordinate in variant_pk_lookup.unknown_variant_coordinates:
+            variant_hash = variant_pk_lookup.get_variant_coordinate_hash(variant_coordinate)
+            allele_info = allele_info_by_hash[variant_hash]
             try:
-                validation_message: Optional[str] = None
-                if variant_pk is None:
-                    # Not inserted - was normalised during import
-                    try:
-                        miv = ModifiedImportedVariant.get_upload_pipeline_unnormalized_variant(upload_step.upload_pipeline, variant_coordinate)
-                        variant_pk = miv.variant.pk
-                        validation_message = f"{miv.old_variant} was normalized to {miv.variant}"
-                    except ModifiedImportedVariant.DoesNotExist:
-                        variant_str = " ".join(map(str, variant_coordinate))
-                        validation_message = f"Variant '{variant_str}' for Allele Info {allele_info.pk} not inserted!"
-
+                miv = ModifiedImportedVariant.get_upload_pipeline_unnormalized_variant(upload_step.upload_pipeline,
+                                                                                       variant_coordinate)
+                variant = miv.variant
+                validation_message = f"{miv.old_variant} was normalized to {miv.variant}"
+            except ModifiedImportedVariant.DoesNotExist:
+                variant_str = " ".join(map(str, variant_coordinate))
                 variant = None
-                if variant_pk:
-                    variant = Variant.objects.get(pk=variant_pk)
+                validation_message = f"Variant '{variant_str}' for Allele Info {allele_info.pk} not inserted!"
 
-                # go via the set method so signals can be called
-                if variant:
-                    allele_info.set_variant_and_save(matched_variant=variant, message=validation_message, force_update=False)
-                    # classification.set_variant(variant, validation_message)
-                else:
-                    allele_info.set_matching_failed(validation_message)
-                    # classification.set_variant_failed_matching(validation_message)
-            except Exception as e:
-                report_exc_info()
-                allele_info.set_matching_failed(str(e))
-                # classification.set_variant_failed_matching(f'Unexpected error during matching {str(e)}')
+            allele_info_variant_and_message[allele_info] = (variant, validation_message)
+
+        for allele_info, (variant, message) in allele_info_variant_and_message.items():
+            # go via the set method so signals can be called
+            if variant:
+                allele_info.set_variant_and_save(matched_variant=variant, message=message, force_update=False)
+            else:
+                allele_info.set_matching_failed(message)
 
 
 def liftover_classification_import(
