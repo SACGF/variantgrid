@@ -7,6 +7,13 @@ from snpdb.models import VariantCoordinate, GenomeBuild
 
 
 class ComboCheckerHGVSConverter(HGVSConverter):
+    def get_hgvs_converter_type(self) -> 'HGVSConverterType':
+        from genes.hgvs.hgvs_converter import HGVSConverterType
+        return HGVSConverterType.COMBO
+
+    def get_version(self) -> str:
+        return "1.0"
+
     def __init__(self, genome_build: GenomeBuild, converters, die_on_error=True):
         super().__init__(genome_build)
         self._converters = converters
