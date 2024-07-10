@@ -512,13 +512,13 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                     raise ValueError(
                         msg_hgvs_given_symbol + f" {gene_symbol_str} (or any aliases) have no MANE transcripts")
 
+                gene_aliases_to_mane_symbols = set()
+                genes_with_non_mane_transcripts = set()
                 transcript_versions = set()
                 mane_status_by_transcript = {}
                 for mane, alias in mane_and_aliases:
-                    msg_hgvs_gene_search = msg_hgvs_given_symbol
                     if alias:
-                        msg_hgvs_gene_search += f" Matched to MANE gene symbol '{alias.gene_symbol}' " + \
-                            f"via alias {alias.alias} ({alias.get_source_display()})."
+                        gene_aliases_to_mane_symbols.add(f"{alias.gene_symbol} ({alias.get_source_display()})")
 
                     gene_tvs, gene_mane_status = _get_search_hgvs_gene_symbol_transcripts(mane.symbol, genome_build)
                     transcript_versions.update(gene_tvs)
@@ -530,11 +530,29 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
 
                     if tv_qs.exclude(transcript__in=transcripts).distinct("transcript_id").exists():
                         # We want to make the messages the same for both genome builds, so they are collected into 1
-                        msg_hgvs_gene_search += f" {mane.symbol} has non-MANE transcripts that may resolve " \
-                                                "to different coordinates. You may wish to add a transcript or " \
-                                                "search for the gene symbol to view all results"
+                        genes_with_non_mane_transcripts.add(str(mane.symbol))
 
-                    yield SearchMessageOverall(msg_hgvs_gene_search, severity=LogLevel.INFO)
+                # Combine messages into 1
+                msg_hgvs_gene_search = msg_hgvs_given_symbol
+                if gene_aliases_to_mane_symbols:
+                    if len(gene_aliases_to_mane_symbols) == 1:
+                        alias_word = "alias"
+                    else:
+                        alias_word = "aliases"
+                    msg_hgvs_gene_search += f" Matched to MANE symbols via {alias_word}: {', '.join(gene_aliases_to_mane_symbols)}. "
+                if genes_with_non_mane_transcripts:
+                    if len(genes_with_non_mane_transcripts) == 1:
+                        gene_word = "Gene symbol"
+                        has_word = "has"
+                    else:
+                        gene_word = "Gene symbols"
+                        has_word = "have"
+
+                    msg_hgvs_gene_search += f"{gene_word} {', '.join(genes_with_non_mane_transcripts)} {has_word} "
+                    msg_hgvs_gene_search += "non-MANE transcripts that may resolve to different coordinates. " + \
+                        "You may wish to add a transcript or search for the gene symbol to view all results"
+
+                yield SearchMessageOverall(msg_hgvs_gene_search, severity=LogLevel.INFO)
 
                 try:
                     for result in _search_hgvs_using_gene_symbol(transcript_versions, mane_status_by_transcript,
