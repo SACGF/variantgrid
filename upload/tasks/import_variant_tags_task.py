@@ -76,7 +76,7 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
         variant_tags_import = VariantTagsImport.objects.create(user=uploaded_file.user, genome_build=genome_build)
         UploadedVariantTags.objects.create(uploaded_file=uploaded_file, variant_tags_import=variant_tags_import)
 
-        variant_coordinates = []
+        variant_coordinates = set()
         imported_tags = []
         num_skipped_records = 0
         num_skipped_with_star = 0
@@ -93,7 +93,7 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
                     num_skipped_with_star += 1
                 logging.warning("Could not convert '%s'", variant_string)
                 continue
-            variant_coordinates.append(variant_coordinate)
+            variant_coordinates.add(variant_coordinate)
             node_id = None
             if "node__id" in row:
                 node_id = row["node__id"]
@@ -158,8 +158,13 @@ class VariantTagsInsertTask(ImportVCFStepTask):
                     variant = Variant.get_from_variant_coordinate(variant_coordinate, genome_build)
                 except Variant.DoesNotExist:
                     # Must have been normalized
-                    variant = ModifiedImportedVariant.get_variant_for_unnormalized_variant(upload_step.upload_pipeline,
-                                                                                           variant_coordinate)
+                    try:
+                        variant = ModifiedImportedVariant.get_variant_for_unnormalized_variant(upload_step.upload_pipeline,
+                                                                                               variant_coordinate)
+                    except ModifiedImportedVariant.DoesNotExist as mvi:
+                        msg = f"Could not find tag variant '{ivt.variant_string}' as Variant or ModifiedImportedVariant"
+                        raise ValueError(msg) from mvi
+
             ivt_variants[ivt] = variant
 
             last_variant = variant

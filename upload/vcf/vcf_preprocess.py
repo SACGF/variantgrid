@@ -112,11 +112,16 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     pipe_commands[VCF_CLEAN_AND_FILTER_SUB_STEP] = read_variants_cmd
     sub_steps[VCF_CLEAN_AND_FILTER_SUB_STEP] = create_sub_step(upload_step, VCF_CLEAN_AND_FILTER_SUB_STEP, read_variants_cmd)
 
-    pipe_commands[UploadStep.NORMALIZE_SUB_STEP] = [settings.BCFTOOLS_COMMAND, "norm",
-                                         "--multiallelics=-", "--rm-dup=exact",
-                                         "--check-ref=w",
-                                         f"--old-rec-tag={ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG}",
-                                         f"--fasta-ref={genome_build.reference_fasta}", "-"]
+    pipe_commands[UploadStep.NORMALIZE_SUB_STEP] = [
+        settings.BCFTOOLS_COMMAND, "norm",
+        "--multiallelics=-",
+        # We don't remove duplicates due to:
+        # * https://github.com/samtools/bcftools/issues/2225 - rmdup removes --old-rec-tag so lose normalize info
+        # "--rm-dup=exact",
+        "--check-ref=w",
+        f"--old-rec-tag={ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG}",
+        f"--fasta-ref={genome_build.reference_fasta}", "-",
+    ]
     pipe_commands[REMOVE_HEADER_SUB_STEP] = [settings.BCFTOOLS_COMMAND, "view", "--no-header", "-"]
     norm_substep_names = [UploadStep.NORMALIZE_SUB_STEP]
 
