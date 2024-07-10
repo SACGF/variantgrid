@@ -286,7 +286,7 @@ def internal_lab_download(request):
         if record_filter_str:
             all_qs: list[Q] = []
             has_errors = False
-            for part in re.split('[,\n\t]', record_filter_str):
+            for part in re.split('[;,\n\t]', record_filter_str):
                 # handle each part here so we can validate that there's 1+ record found for each filter
                 if part := part.strip():
                     try:
