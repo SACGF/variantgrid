@@ -19,6 +19,7 @@ from classification.models import ClassificationModification, Classification, cl
     DiscordanceReport, ClinicalContext, ImportedAlleleInfo, ClinVarExport
 from classification.models.classification_utils import classification_gene_symbol_filter
 from flags.models import FlagsMixin, Flag, FlagComment
+from genes.models import GeneSymbolAlias
 from genes.signals.gene_symbol_search import GENE_SYMBOL_PATTERN
 from library.utils import batch_iterator, local_date_string, http_header_date_now
 from snpdb.clingen_allele import get_clingen_allele
@@ -215,7 +216,10 @@ def classification_export_user_string_to_q(user_input: str, genome_build: Genome
         clingen_allele = get_clingen_allele(user_input)
         return Q(classification__allele_info__allele__clingen_allele=clingen_allele)
     elif GENE_SYMBOL_PATTERN.match(user_input):
-        if gene_match := classification_gene_symbol_filter(user_input):
+        gene_symbol = user_input
+        if gene_symbol_alias := GeneSymbolAlias.objects.filter(alias=user_input).first():
+            gene_symbol = gene_symbol_alias.gene_symbol
+        if gene_match := classification_gene_symbol_filter(gene_symbol):
             return gene_match
     if vc := VariantCoordinate.from_string(user_input, genome_build):
         variant_qs = get_variant_queryset_for_latest_annotation_version(genome_build)
