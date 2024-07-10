@@ -62,7 +62,7 @@ class UploadFileAdmin(ModelAdminBasics):
 
 
 @admin.register(ModifiedImportedVariant)
-class ModifiedImportedVariant(ModelAdminBasics):
+class ModifiedImportedVariantAdmin(ModelAdminBasics):
     list_display = ('id', 'tool', 'allele', 'old_variant', 'old_variant_formatted', 'new_variant')
 
     @admin_list_column("Tool", order_field='import_info__upload_step__tool_version')
