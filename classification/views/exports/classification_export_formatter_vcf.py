@@ -248,7 +248,7 @@ class ClassificationVCF(ExportVCF):
         number=VCFHeaderNumberSpecial.UNBOUND,
         header_type=VCFHeaderType.String,
         description="If present, describes the discordance status of allele, if absent, the allele is not in discordance",
-        categories={"system": VCFTargetSystem.GENERIC}
+        categories={"system": {VCFTargetSystem.GENERIC, VCFTargetSystem.VARSEQ}}
     )
     def discordance_status(self):
         return self._discordance_value
