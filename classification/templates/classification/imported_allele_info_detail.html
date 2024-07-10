@@ -33,6 +33,7 @@
     {% labelled label=c_hgvses.2.identifier value_css="text-monospace" %}{{ c_hgvses.2.html }}{% endlabelled %}
     {% labelled admin_only=True label=c_hgvs_resolved_variant_info.2.0 value_css="text-monospace" row_css="debug-footnote" %}{{ c_hgvs_resolved_variant_info.2.1 | enrich }}{% endlabelled %}
     {% labelled label=variant_coordinate_label value_css="text-monospace" %}{{ allele_info.variant_coordinate }}{% endlabelled %}
+    {% labelled label=variant_coordinate_normalized_label value_css="text-monospace" %}{{ allele_info.variant_coordinate_normalized }}{% endlabelled %}
 
     <hr style="border-top:1px dashed lightgrey"/>
     {% if allele_info.status != "M" %}

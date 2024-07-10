@@ -287,7 +287,8 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
         "c_hgvs_resolved_variant_info": c_hgvs_resolved_variant_info,
         "normalized_diff": chgvs_diff_description(normalized_diff) if normalized_diff else None,
         "liftover_diff": chgvs_diff_description(liftover_diff) if liftover_diff else None,
-        "variant_coordinate_label": f"Normalised Variant Coordinate ({allele_info.imported_genome_build_patch_version})",
+        "variant_coordinate_label": f"Variant Coordinate (from HGVS resolution) ({allele_info.imported_genome_build_patch_version})",
+        "variant_coordinate_normalized_label": f"Variant Coordinate Normalized ({allele_info.imported_genome_build_patch_version})",
         "validation_tags": allele_info.latest_validation.validation_tags_list if allele_info.latest_validation else None,
         "on_allele_page": request.GET.get("on_allele_page") == "true",
         "classifications": classifications

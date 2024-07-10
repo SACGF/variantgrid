@@ -429,7 +429,8 @@ class ImportedAlleleInfo(TimeStampedModel):
         if patch_version := self.imported_genome_build_patch_version:
             return patch_version.genome_build
 
-    variant_coordinate = TextField(null=True, blank=True)
+    variant_coordinate = TextField(null=True, blank=True)  # One initially made by HGVS
+    variant_coordinate_normalized = TextField(null=True, blank=True)  # Run through VCF normalization
 
     dirty_message = TextField(null=True, blank=True)
     """ Should be populated is we think this is going to resolve to a different variant """
@@ -836,6 +837,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             return
 
         self.matched_variant = matched_variant
+        self.variant_coordinate_normalized = str(matched_variant.coordinate)
         matched_allele = matched_variant.allele
         if self.allele != matched_allele:
             self.allele = matched_allele
