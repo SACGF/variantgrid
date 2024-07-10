@@ -12,7 +12,7 @@ from genes.models import GeneSymbol
 from library.utils import ExportRow, export_column, delimited_row
 from ontology.models import OntologyTerm, OntologyRelation, OntologyImportSource, \
     PanelAppClassification, OntologySnake, OntologyService, GeneDiseaseClassification, \
-    ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER
+    ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER, ONTOLOGY_RELATIONSHIP_NO_QUALITY_FILTER
 
 
 @dataclass(frozen=True)
@@ -204,7 +204,7 @@ class ClassificationExportFormatterConditionResolution(ClassificationExportForma
                                         gencc_strength.add(rel.relationship_quality)
 
                                 # grab all values, don't convert to MONDO
-                                direct_relationships = OntologySnake.direct_relationships_for_gene_symbol(gene_symbol, quality_filter=ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER)
+                                direct_relationships = OntologySnake.direct_relationships_for_gene_symbol(gene_symbol, quality_filter=ONTOLOGY_RELATIONSHIP_NO_QUALITY_FILTER)
                                 row = ClassificationConditionResolutionRow(
                                     classification=vcm,
                                     condition=condition_term,
