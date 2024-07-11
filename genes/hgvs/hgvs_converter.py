@@ -1,7 +1,8 @@
 import abc
+import re
 from enum import Enum
 
-from genes.hgvs import HGVSVariant
+from genes.hgvs import HGVSVariant, HGVSException
 from snpdb.models import GenomeBuild, VariantCoordinate
 
 
@@ -52,6 +53,18 @@ class HGVSConverter(abc.ABC):
         self.genome_build = genome_build
         self.local_resolution = local_resolution
         self.clingen_resolution = clingen_resolution
+
+    @staticmethod
+    def _hgvs_string_validation(hgvs_string: str):
+        """ raise exceptions on any errors """
+
+        if "ins" in hgvs_string:
+            if re.match(".*ins\d+$", hgvs_string):
+                raise HGVSException("Insertions require inserted sequence, not an integer length")
+            if re.match(".*ins$", hgvs_string):
+                raise HGVSException("Insertions require inserted sequence")
+
+
 
     @abc.abstractmethod
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:

@@ -282,3 +282,21 @@ class TestHGVS(TestCase):
 
         lib_hgvs_string = matcher.hgvs_converter.variant_coordinate_to_g_hgvs(vc)
         self.assertTrue("m." in str(lib_hgvs_string), "HGVS library conversion")
+
+    def test_biocommons_invalid_trailing_int(self):
+        return self._test_invalid_trailing_int(HGVSConverterType.BIOCOMMONS_HGVS)
+
+    def test_pyhgvs_invalid_trailing_int(self):
+        return self._test_invalid_trailing_int(HGVSConverterType.PYHGVS)
+
+    def _test_invalid_trailing_int(self, hgvs_converter_type: HGVSConverterType):
+        _bad_examples = [
+            "NM_000441.2(SLC26A4):c.1246_2341ins23",
+            "NM_003194.4(TBP):c.223_281delins50",
+        ]
+
+        matcher = HGVSMatcher(GenomeBuild.grch37(), hgvs_converter_type=hgvs_converter_type)
+        for hgvs_string in _bad_examples:
+            def get_vc():
+                return matcher.get_variant_coordinate(hgvs_string)
+            self.assertRaises(HGVSException, get_vc)

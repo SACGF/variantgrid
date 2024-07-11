@@ -126,6 +126,8 @@ class PyHGVSConverter(HGVSConverter):
     @staticmethod
     def _hgvs_name(hgvs_string):
         """ Catches PyHGVS specific exceptions and converts to HGVSException """
+
+        HGVSConverter._hgvs_string_validation(hgvs_string)
         try:
             return HGVSName(hgvs_string)
         except pyhgvs.InvalidHGVSName as e:
