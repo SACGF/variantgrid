@@ -122,5 +122,5 @@ def clinvar(
     return {
         "data": data,
         "expert_panel_only": expert_panel_only,
-        "min_stars": CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE if expert_panel_only else 1
+        "min_stars": CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE if expert_panel_only else 0
     }
