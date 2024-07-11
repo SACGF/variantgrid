@@ -99,6 +99,8 @@ class ClinGenAlleleRegistryAPI:
             raise ClinGenAlleleServerException(response.request.method, response.status_code, response.json())
 
     def _put(self, url, data, chunk_size=None):
+        if chunk_size > settings.CLINGEN_ALLELE_REGISTRY_MAX_RECORDS:
+            raise ValueError(f"ClinGen accepts a max of {settings.CLINGEN_ALLELE_REGISTRY_MAX_RECORDS} records")
         logging.debug("Calling ClinGen API")
         # copy/pasted from page 5 of https://reg.clinicalgenome.org/doc/AlleleRegistry_1.01.xx_api_v1.pdf
         identity = hashlib.sha1((self.login + self.password).encode('utf-8')).hexdigest()
@@ -107,7 +109,7 @@ class ClinGenAlleleRegistryAPI:
         request = url + '&gbLogin=' + self.login + '&gbTime=' + gb_time + '&gbToken=' + token
         default_timeout = 2 * MINUTE_SECS
         if chunk_size:
-            timeout = MINUTE_SECS * chunk_size / 1000
+            timeout = 2 * MINUTE_SECS * chunk_size / 1000
             timeout = max(default_timeout, timeout)
         else:
             timeout = default_timeout
@@ -159,7 +161,7 @@ class ClinGenAlleleRegistryAPI:
             file_type = {hgvs, id, MyVariantInfo_hg19.id, MyVariantInfo_hg38.id, ExAC.id, gnomAD.id}
          """
         url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + f"/alleles?file={file_type}"
-        chunk_size = settings.CLINGEN_ALLELE_REGISTRY_MAX_RECORDS
+        chunk_size = settings.CLINGEN_ALLELE_REGISTRY_BATCH_SIZE
 
         for hgvs_chunk in iter_fixed_chunks(hgvs_iter, chunk_size):
             data = "\n".join(hgvs_chunk)

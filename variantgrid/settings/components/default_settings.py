@@ -369,6 +369,7 @@ PREFER_ALLELE_LINKS = False
 
 # ClinGen Allele Registry paper - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6519371/
 CLINGEN_ALLELE_REGISTRY_DOMAIN = "http://reg.genome.network"
+CLINGEN_ALLELE_REGISTRY_BATCH_SIZE = 1000
 CLINGEN_ALLELE_REGISTRY_MAX_RECORDS = 2000
 # From paper: The maximal nucleotide (transcript or genomic) allele size is 10,000 bp
 CLINGEN_ALLELE_REGISTRY_MAX_ALLELE_SIZE = 10_000
