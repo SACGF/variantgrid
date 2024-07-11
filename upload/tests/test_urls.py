@@ -43,7 +43,6 @@ class Test(URLTestCase):
 
         # (url_name, url_kwargs, object to check appears in grid pk column or (grid column, object)
         cls.PRIVATE_GRID_LIST_URLS = [
-            ("upload_step_grid", upload_pipeline_kwargs, upload_step),
             ("upload_pipeline_modified_variants_grid", upload_pipeline_kwargs, None),
         ]
 

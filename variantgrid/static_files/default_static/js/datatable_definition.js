@@ -129,6 +129,7 @@ let DataTableDefinition = (function() {
                 },
                 bFilter: defn.searchBoxEnabled,
                 bAutoWidth: false,
+                scrollX: defn.scrollX,
                 initComplete:  function( settings, json ) {
                     $('th.toggle-link').removeClass('toggle-link');
                 }

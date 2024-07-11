@@ -275,24 +275,14 @@
                 {% endfor %}
             </table>
         {% endif %}
-
-        {% if has_upload_steps %}
-            <h4>All Upload Steps</h4>
-            <table id="uploadstep-datatable" data-datatable-url="{% url 'upload_step_datatables' %}"  data-datatable-data='uploadStepFilter'></table>
-            <div id='upload-steps-graph'></div>
-        {% endif %}
 	</div>
 
-    {% comment %}
-    <div class="container-table">
 	{% if has_upload_steps %}
-    <div id='upload-steps-graph'></div>
-	<div id="upload-steps-container">
-	{% load jqgrid_tags %}
-	{% jqgrid 'upload_step_grid' name='upload_step' search=True upload_pipeline_id=upload_pipeline.pk %}
-	</div>
-	{% endif %}
+    <div class="container-table">
+        <h4>All Upload Steps</h4>
+        <table id="uploadstep-datatable" data-datatable-url="{% url 'upload_step_datatables' %}"  data-datatable-data='uploadStepFilter'></table>
+        <div id='upload-steps-graph'></div>
     </div>
-    {% endcomment %}
+	{% endif %}
 
 {% endblock %}

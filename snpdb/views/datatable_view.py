@@ -196,6 +196,7 @@ class DatatableConfig(Generic[DC]):
     download_csv_button_enabled = False
     rich_columns: list[RichColumn]  # columns for display
     expand_client_renderer: Optional[str] = None  # if provided, will expand rows and render content with this JavaScript method
+    scroll_x = False
 
     def value_columns(self) -> list[str]:
         column_names = list(itertools.chain(*[rc.value_columns for rc in self.rich_columns if rc.enabled]))
@@ -451,6 +452,7 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
             "searchBoxEnabled": config.search_box_enabled,
             "downloadCsvButtonEnabled": config.download_csv_button_enabled,
             "expandClientRenderer": config.expand_client_renderer,
+            "scrollX": config.scroll_x,
         }
         if config.default_sort_order_column:
             data["order"] = [[config.column_index(config.default_sort_order_column), "asc" if config.default_sort_order_column.default_sort != SortOrder.DESC else "desc"]]

@@ -24,14 +24,17 @@ class UploadStepColumns(DatatableConfig[UploadStep]):
 
     @staticmethod
     def render_duration(row: CellData):
-        if end_date := row["end_date"]:
-            delta = end_date - row["start_date"]
+        start_date = row["start_date"]
+        end_date = row["end_date"]
+        if start_date and end_date:
+            delta = end_date - start_date
             return f"{delta.total_seconds():.2f}"
         else:
             return ""
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
+        self.scroll_x = True
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('upload_step_detail',
                                                                        expected_height=120)
         self.rich_columns = [
@@ -40,31 +43,14 @@ class UploadStepColumns(DatatableConfig[UploadStep]):
             RichColumn(key='name', orderable=True),
             RichColumn(key='status', orderable=True, renderer=UploadStepColumns.render_status),
             RichColumn(key='items_processed', css_class='num', orderable=True),
+            RichColumn(key='error_message', orderable=True),
+            RichColumn(key='input_filename', orderable=True),
+            RichColumn(key='output_filename', orderable=True),
             RichColumn(key='start_date', client_renderer='TableFormat.timestampMilliseconds', orderable=True),
             RichColumn(key='end_date', client_renderer='TableFormat.timestampMilliseconds', orderable=True),
-            RichColumn(name='duration', label="Duration Seconds", extra_columns=["start_date", "end_date"], renderer=UploadStepColumns.render_duration, css_class="num")
+            RichColumn(name='duration', label="Duration Seconds", extra_columns=["start_date", "end_date"],
+                       renderer=UploadStepColumns.render_duration, css_class="num")
         ]
-
-
-class UploadStepsGrid(JqGridUserRowConfig):
-    """
-    This is Grid has been replaced with the above DataTable
-    But haven't completely converted over to Grid yet
-    """
-    model = UploadStep
-    caption = 'Upload Steps'
-    fields = ['sort_order', 'id', 'name', 'status', 'items_to_process', 'items_processed', 'error_message', 'input_filename', 'output_filename', 'start_date', 'end_date', 'task_type', 'pipeline_stage', 'pipeline_stage_dependency', 'script', 'output_text', 'tool_version__name', 'tool_version__version', 'import_variant_table', 'celery_task']
-    colmodel_overrides = {'name': {'width': 300},
-                          'tool__name': {'label': 'Tool'},
-                          'tool__version': {'label': 'Tool Version'}}
-
-    def __init__(self, user, upload_pipeline_id):
-        super().__init__(user)
-        upload_pipeline = get_object_or_404(UploadPipeline, pk=upload_pipeline_id)
-        upload_pipeline.uploaded_file.check_can_view(user)
-        self.queryset = self.get_queryset(None).filter(upload_pipeline=upload_pipeline)  # .exclude(status=ProcessingStatus.SKIPPED)
-        self.extra_config.update({'sortname': 'sort_order',
-                                  'sortorder': 'desc'})
 
 
 class UploadPipelineSkippedAnnotationGrid(JqGridUserRowConfig):
