@@ -48,11 +48,14 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
         # TODO, should we filter on matched_variant__isnull=True, or on status, or not filter at all so we can rematch
         no_variant_qs = classification_import.importedalleleinfo_set.all()  # .filter(matched_variant__isnull=True)
         for allele_info in no_variant_qs:
-            if variant_coordinate := allele_info.variant_coordinate_obj:
-                variant_hash = variant_pk_lookup.add(variant_coordinate)
-                variant_coordinates_by_hash[variant_hash] = variant_coordinate
-                allele_info_by_hash[variant_hash] = allele_info
-            else:
+            try:
+                if variant_coordinate := allele_info.variant_coordinate_obj:
+                    variant_hash = variant_pk_lookup.add(variant_coordinate)
+                    variant_coordinates_by_hash[variant_hash] = variant_coordinate
+                    allele_info_by_hash[variant_hash] = allele_info
+                else:
+                    pass
+            except:
                 pass
                 # if there's no variant_coordinate, record already knows it's in error, shouldn't have been linked
 
