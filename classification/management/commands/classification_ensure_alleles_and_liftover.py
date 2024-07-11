@@ -27,7 +27,7 @@ class Command(BaseCommand):
 
             # Note: This deliberately only gets classifications where the submitting variant was against this genome build
             # ie we don't use Classification.get_variant_q_from_classification_qs() to get liftovers
-            contigs_q = Variant.get_contigs_q(self.genome_build)
+            contigs_q = Variant.get_contigs_q(genome_build)
             variants_qs = Variant.objects.filter(contigs_q, importedalleleinfo__isnull=False)
             if variants_qs.exists():
                 print(f"{genome_build} has variants - creating Allele/ClinGen + liftover")
