@@ -42,7 +42,7 @@ SOMATIC_CLIN_SIG_VALUE = {
 
 
 CLINVAR_REVIEW_STATUS_TO_STARS = {
-    "no assertion criteria provided": 1,
+    "no assertion criteria provided": 0,
     "criteria provided, single submitter": 1,
     #"xx": 2, # not sure individual record can get 2
     "reviewed by expert panel": 3,
