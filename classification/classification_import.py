@@ -61,8 +61,8 @@ def process_classification_import(classification_import: ClassificationImport, i
                     allele_info_by_hash[variant_hash].append(allele_info)
             else:
                 allele_info.set_matching_failed(message='Could not derive variant coordinates')
-        except ValueError as ve:
-            allele_info.set_matching_failed(message=str(ve))
+        except Exception as e:
+            allele_info.set_matching_failed(message=str(e))
 
     variant_pk_lookup.batch_check()
     unknown_variant_coordinates = variant_pk_lookup.unknown_variant_coordinates
