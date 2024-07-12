@@ -1,5 +1,6 @@
 from typing import Any
 
+from genes.hgvs import HGVSException
 from snpdb.models import Variant, GenomeBuild
 
 
@@ -15,8 +16,12 @@ def variant_link_info(variant: Variant, genome_build: GenomeBuild) -> dict[str, 
     link_data['genome_build'] = genome_build.name
 
     if cta := variant.get_canonical_transcript_annotation(genome_build):
-        link_data['canonical_c_hgvs'] = cta.get_hgvs_c_with_symbol()
         link_data['gene_symbol'] = cta.symbol
+        try:
+            link_data['canonical_c_hgvs'] = cta.get_hgvs_c_with_symbol()
+        except HGVSException:
+            pass
+
 
     # If we can include these in link_data we'll get more links
     #
