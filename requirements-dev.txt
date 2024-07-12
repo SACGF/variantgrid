@@ -50,6 +50,7 @@ ijson
 ipython
 kombu
 levenshtein
+lxml
 Markdown
 matplotlib
 more_itertools
