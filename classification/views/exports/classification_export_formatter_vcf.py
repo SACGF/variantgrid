@@ -109,7 +109,7 @@ class ClassificationVCF(ExportVCF):
     @export_vcf_info_cell(
         header_id="labs",
         header_type=VCFHeaderType.String,
-        description="Allele origin bucket, values will be 1 or more of: somatic, germline, unknown",
+        description="All labs that have classified this allele",
         categories={"system": {VCFTargetSystem.GENERIC, VCFTargetSystem.VARSEQ}})
     def lab_names(self):
         all_labs = sorted({cm.classification.lab for cm in self.allele_data.cms})
@@ -141,7 +141,7 @@ class ClassificationVCF(ExportVCF):
         header_id="allele_origin",
         number=VCFHeaderNumberSpecial.UNBOUND,
         header_type=VCFHeaderType.String,
-        description="Allele origin bucket, values will be 1 or more of: somatic, germline, allele_origin_unknown",
+        description="Allele origin bucket, values will be 1 or more of: somatic, germline, unknown",
         categories={"system": {VCFTargetSystem.GENERIC, VCFTargetSystem.VARSEQ}}
     )
     def allele_origin_buckets(self):
