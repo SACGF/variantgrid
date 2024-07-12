@@ -18,6 +18,7 @@ from django.dispatch import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
+from pydantic import field_validator
 
 from flags.models import FlagCollection, flag_collection_extra_info_signal, FlagInfos
 from flags.models.models import FlagsMixin, FlagTypeContext
@@ -227,6 +228,12 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
     ref: str
     alt: str
     svlen: Optional[int] = None
+
+    @field_validator('svlen')
+    def validate_svlen(cls, value):
+        if value is not None and settings.VARIANT_SYMBOLIC_ALT_ENABLED is False:
+            raise ValueError('Symbolic variants disabled via settings.')
+        return value
 
     @property
     def as_tuple(self) -> tuple:
