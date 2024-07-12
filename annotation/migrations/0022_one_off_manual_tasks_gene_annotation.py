@@ -10,8 +10,9 @@ def _check_has_existing_samples(apps):
     return Sample.objects.all().exists()
 
 
-def _check_has_gene_annotation(_apps):
-    return settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED
+def _check_has_gene_annotation(apps):
+    GeneAnnotationVersion = apps.get_model("annotation", "GeneAnnotationVersion")
+    return settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED and GeneAnnotationVersion.objects.exists()
 
 
 class Migration(migrations.Migration):
