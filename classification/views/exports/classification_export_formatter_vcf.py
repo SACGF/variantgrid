@@ -131,32 +131,21 @@ class ClassificationVCF(ExportVCF):
         else:
             return 3
 
-    @export_vcf_info_cell(
-        header_id="germline",
-        header_type=VCFHeaderType.Flag,
-        description="Allele origin bucket, values will be 1 or more of: somatic, germline, allele_origin_unknown",
-        categories={"system": VCFTargetSystem.GENERIC})
-    def allele_origin_germline(self):
-        if AlleleOriginBucket.GERMLINE in self.allele_data.cms_allele_origins:
-            return True
+    BUCKET_NAMES = {
+        AlleleOriginBucket.SOMATIC: "somatic",
+        AlleleOriginBucket.GERMLINE: "germline",
+        AlleleOriginBucket.UNKNOWN: "unknown"
+    }
 
     @export_vcf_info_cell(
-        header_id="somatic",
-        header_type=VCFHeaderType.Flag,
+        header_id="allele_origin",
+        number=VCFHeaderNumberSpecial.UNBOUND,
+        header_type=VCFHeaderType.String,
         description="Allele origin bucket, values will be 1 or more of: somatic, germline, allele_origin_unknown",
-        categories={"system": VCFTargetSystem.GENERIC})
-    def allele_origin_somatic(self):
-        if AlleleOriginBucket.SOMATIC in self.allele_data.cms_allele_origins:
-            return True
-
-    @export_vcf_info_cell(
-        header_id="allele_origin_unknown",
-        header_type=VCFHeaderType.Flag,
-        description="Allele origin bucket, values will be  1 or more of: somatic, germline, allele_origin_unknown",
-        categories={"system": VCFTargetSystem.GENERIC})
-    def allele_origin_unknown(self):
-        if AlleleOriginBucket.UNKNOWN in self.allele_data.cms_allele_origins:
-            return True
+        categories={"system": {VCFTargetSystem.GENERIC, VCFTargetSystem.VARSEQ}}
+    )
+    def allele_origin_buckets(self):
+        return [ClassificationVCF.BUCKET_NAMES.get(bucket) for bucket in sorted(self.allele_data.cms_allele_origins)]
 
     def unique_values(self, evidence_key: str, raw: bool = False):
         e_key = EvidenceKeyMap.cached_key(evidence_key)
@@ -191,7 +180,7 @@ class ClassificationVCF(ExportVCF):
         header_id="classification",
         number=VCFHeaderNumberSpecial.UNBOUND,
         header_type=VCFHeaderType.String,
-        description="All unique classification values for this allele, B, LB, VUS, VUS_A, VUS_B, VUS_C, LP, P, LO O, D, R, B=Benign, P=Pathogenic, O=Oncogenic, D=Drug Response, R=Risk Factor",
+        description="All unique classification values for this allele, B, LB, VUS, VUS_A, VUS_B, VUS_C, LP, P, LO, O, D, R, B=Benign, P=Pathogenic, O=Oncogenic, D=Drug Response, R=Risk Factor",
         categories={"system": VCFTargetSystem.GENERIC}
     )
     def classification_values(self):
@@ -247,7 +236,7 @@ class ClassificationVCF(ExportVCF):
         header_id="discordance_status",
         number=VCFHeaderNumberSpecial.UNBOUND,
         header_type=VCFHeaderType.String,
-        description="If present, describes the discordance status of allele, if absent, the allele is not in discordance",
+        description="If present, describes the discordance status of allele ongoing (yet to be resolved), continued (parties could not resolve), pending (parties have agreed to change classifications, waiting on data updates), if absent, the allele is not in discordance",
         categories={"system": {VCFTargetSystem.GENERIC, VCFTargetSystem.VARSEQ}}
     )
     def discordance_status(self):
