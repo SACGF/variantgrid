@@ -124,8 +124,11 @@ class Command(BaseCommand):
                 if alt_standard_bases_pattern.sub("", alt):
                     skip_reason = None
                     if alt.startswith("<") and alt.endswith(">"):
-                        if alt not in settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES:
-                            skip_reason = f"ALT = {alt}"
+                        if settings.VARIANT_SYMBOLIC_ALT_ENABLED:
+                            if alt not in settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES:
+                                skip_reason = f"ALT = {alt}"
+                        else:
+                            skip_reason = "Symbolic variants disabled via settings."
                     else:
                         skip_reason = "non-standard bases in ALT sequence"
                     if skip_reason:
