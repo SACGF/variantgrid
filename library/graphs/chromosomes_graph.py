@@ -3,7 +3,6 @@ Based on example code from Ryan Dale - https://www.biostars.org/p/9922/#9969
 """
 
 import pandas as pd
-from matplotlib.collections import BrokenBarHCollection
 
 from library.genomics import format_chrom
 from library.utils import sorted_nicely
@@ -70,7 +69,7 @@ def plot_chromosomes(ax, cytoband_filename, has_chr=False, **kwargs):
 
     for xranges, yrange, colors, contig_name in sorted_ideograms(cytoband_filename, **kwargs):
         contig_name = format_chrom(contig_name, has_chr)
-        coll = BrokenBarHCollection(xranges, yrange, facecolors=colors)
+        coll = ax.broken_barh(xranges, yrange, facecolors=colors)
         coll.set_alpha(chrom_alpha)
         ax.add_collection(coll)
         center = yrange[0] + yrange[1] / 2.
