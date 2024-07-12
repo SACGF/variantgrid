@@ -1,7 +1,7 @@
 stream-zip
 more-itertools
 beautifulsoup4
-bgzip
+bgzip>=0.5.0
 biopython>=1.81
 cdot
 celery
