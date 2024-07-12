@@ -10,12 +10,12 @@ def _one_off_fix_pandas_nan_to_none(apps, _schema_editor):
     GeneAnnotation = apps.get_model("annotation", "GeneAnnotation")
     GnomADGeneConstraint = apps.get_model("genes", "GnomADGeneConstraint")
 
-    GeneAnnotation.objects.filter(gnomad_oe_lof=np.NaN).update(gnomad_oe_lof=None)
+    GeneAnnotation.objects.filter(gnomad_oe_lof=np.nan).update(gnomad_oe_lof=None)
 
     g_qs = GnomADGeneConstraint.objects.all()
-    g_qs.filter(oe_lof=np.NaN).update(oe_lof=None)
-    g_qs.filter(oe_lof_lower=np.NaN).update(oe_lof_lower=None)
-    g_qs.filter(oe_lof_upper=np.NaN).update(oe_lof_upper=None)
+    g_qs.filter(oe_lof=np.nan).update(oe_lof=None)
+    g_qs.filter(oe_lof_lower=np.nan).update(oe_lof_lower=None)
+    g_qs.filter(oe_lof_upper=np.nan).update(oe_lof_upper=None)
 
 
 class Migration(migrations.Migration):

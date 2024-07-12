@@ -14,20 +14,20 @@ from snpdb.models import CustomColumnsCollection, GenomeBuild
 
 class Command(BaseCommand):
     """ Occasionally we run into a JSON serialization issue because some data was inserted without
-        converting np.NaN to None - this looks for it: """
+        converting np.nan to None - this looks for it: """
     def handle(self, *args, **options):
         genome_build = GenomeBuild.grch38()
         annotation_version = AnnotationVersion.latest(genome_build)
         node, float_paths = self._get_float_paths(annotation_version)
         q_list = []
         for fp in float_paths:
-            q_list.append(Q(**{fp: np.NaN}))
+            q_list.append(Q(**{fp: np.nan}))
         q = reduce(operator.or_, q_list)
         qs = node._get_model_queryset()
         if values := qs.filter(q).values(*float_paths).first():
             print(f"Example variant: {values['id']}")
             for k, v in values:
-                if v == np.NaN:
+                if v == np.nan:
                     print(f"{k}={v}")
         else:
             print(f"No NaN found in {len(float_paths)} float paths")

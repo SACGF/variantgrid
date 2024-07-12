@@ -9,12 +9,12 @@ def _one_off_rvis_gnomad_gene_constraint_np_to_none(apps, _schema_editor):
     RVIS = apps.get_model("genes", "RVIS")
     GnomADGeneConstraint = apps.get_model("genes", "GnomADGeneConstraint")
 
-    RVIS.objects.filter(oe_ratio_percentile=np.NaN).update(oe_ratio_percentile=None)
+    RVIS.objects.filter(oe_ratio_percentile=np.nan).update(oe_ratio_percentile=None)
 
     g_qs = GnomADGeneConstraint.objects.all()
-    g_qs.filter(oe_lof=np.NaN).update(oe_lof=None)
-    g_qs.filter(oe_lof_lower=np.NaN).update(oe_lof_lower=None)
-    g_qs.filter(oe_lof_upper=np.NaN).update(oe_lof_upper=None)
+    g_qs.filter(oe_lof=np.nan).update(oe_lof=None)
+    g_qs.filter(oe_lof_lower=np.nan).update(oe_lof_lower=None)
+    g_qs.filter(oe_lof_upper=np.nan).update(oe_lof_upper=None)
 
 
 class Migration(migrations.Migration):

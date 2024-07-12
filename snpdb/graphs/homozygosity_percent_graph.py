@@ -109,7 +109,7 @@ class HomozygosityPercentGraph(CacheableGraph):
                 if total >= MIN_VARIANTS_PER_BIN:
                     perc = 100.0 * hom / total
                 else:
-                    perc = np.NaN
+                    perc = np.nan
 
                 homozygosity_percent[i] = perc
 

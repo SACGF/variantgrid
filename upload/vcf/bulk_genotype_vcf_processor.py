@@ -354,7 +354,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         else:
             read_depth_str = ""
             alt_allele_depth_str = ""
-            self.locus_allele_depths.append(np.NaN)
+            self.locus_allele_depths.append(np.nan)
 
         if self.vcf.allele_frequency_field:
             allele_frequency_str = self.get_format_array_str(variant, self.vcf.allele_frequency_field, as_type=float)

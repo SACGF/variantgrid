@@ -102,7 +102,7 @@ def get_vcf_variant_upload_stats() -> pd.DataFrame:
             "new_genotypes": new_genotypes}  # This has 1 genotype per variant - needs to be multiplied by samples
 
     df = pd.DataFrame(data=data)
-    df = df.replace(np.NaN, 0)
+    df = df.replace(np.nan, 0)
 
     df["total_genotypes"] = df["old_genotypes"] + df["new_genotypes"] * df["num_samples"]
     df["unknown"] = df["unknown"] / 2  # We create ref and alt for unknowns

@@ -38,7 +38,7 @@ def load_exec_summary(klass, exec_summary_filename):
     type_converters = {f.name: f.get_internal_type() for f in klass._meta.fields}
 
     df = pd.read_csv(exec_summary_filename, sep='\t', index_col='Name')
-    values = df["Value"].replace("NotAvail", np.NaN)
+    values = df["Value"].replace("NotAvail", np.nan)
     sample_name = values["Sample"]
 
     exec_data = {}
