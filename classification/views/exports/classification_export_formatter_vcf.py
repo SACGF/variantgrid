@@ -43,7 +43,7 @@ class FormatDetailsVCF:
         return FormatDetailsVCF(target_system=target_system)
 
 
-ALLELE_ORIGIN_BUCKET_TO_LABEL = {
+EMEDGENE_ALLELE_ORIGIN_BUCKET_TO_LABEL = {
     AlleleOriginBucket.SOMATIC: "somatic",
     AlleleOriginBucket.GERMLINE: "germline",
     AlleleOriginBucket.UNKNOWN: "allele_origin_unknown"
@@ -109,7 +109,7 @@ class ClassificationVCF(ExportVCF):
     @export_vcf_info_cell(
         header_id="labs",
         header_type=VCFHeaderType.String,
-        description="Allele origin bucket, values will be 1 or more of: somatic, germline, allele_origin_unknown",
+        description="Allele origin bucket, values will be 1 or more of: somatic, germline, unknown",
         categories={"system": {VCFTargetSystem.GENERIC, VCFTargetSystem.VARSEQ}})
     def lab_names(self):
         all_labs = sorted({cm.classification.lab for cm in self.allele_data.cms})
@@ -164,17 +164,21 @@ class ClassificationVCF(ExportVCF):
         header_id="condition_terms",
         number=VCFHeaderNumberSpecial.UNBOUND,
         header_type=VCFHeaderType.String,
-        description="All unique conditions this variant is being curated against, only provides values that could be matched to exact ontology terms",
+        description="All unique conditions this variant is being curated against, provides standard terms where possible, otherwise plain text",
         categories={"system": {VCFTargetSystem.GENERIC, VCFTargetSystem.VARSEQ}}
     )
     def condition_terms(self):
         all_terms: set[OntologyTerm] = set()
+        all_plain_text: set[str] = set()
         for cm in self.allele_data.cms:
             if cr := cm.classification.condition_resolution_obj:
-                all_terms.update(cr.terms)
-        if all_terms:
-            sorted_terms = sorted(all_terms)
-            return [f"{t.id} {t.name}" for t in sorted_terms]
+                if terms := cr.terms:
+                    all_terms.update(terms)
+                elif plain := cr.plain_text:
+                    all_plain_text.add(plain)
+            elif condition := cm.get(SpecialEKeys.CONDITION):
+                all_plain_text.add(condition)
+        return [f"{t.id} {t.name}" for t in sorted(all_terms)] + list(sorted(all_plain_text))
 
     @export_vcf_info_cell(
         header_id="classification",
@@ -236,7 +240,7 @@ class ClassificationVCF(ExportVCF):
         header_id="discordance_status",
         number=VCFHeaderNumberSpecial.UNBOUND,
         header_type=VCFHeaderType.String,
-        description="If present, describes the discordance status of allele ongoing (yet to be resolved), continued (parties could not resolve), pending (parties have agreed to change classifications, waiting on data updates), if absent, the allele is not in discordance",
+        description="If present, describes the discordance status of allele. Possible values are: ongoing (yet to be resolved), continued (parties could not resolve), pending (parties have agreed to change classifications, waiting on data updates), if absent, the allele is not in discordance",
         categories={"system": {VCFTargetSystem.GENERIC, VCFTargetSystem.VARSEQ}}
     )
     def discordance_status(self):
@@ -259,7 +263,7 @@ class ClassificationVCF(ExportVCF):
         parts.append(f"labs:{self.lab_count()}")
 
         if allele_origins := self.allele_data.cms_allele_origins:
-            for allele_origin in sorted(ALLELE_ORIGIN_BUCKET_TO_LABEL.get(ao) for ao in allele_origins):
+            for allele_origin in sorted(EMEDGENE_ALLELE_ORIGIN_BUCKET_TO_LABEL.get(ao) for ao in allele_origins):
                 parts.append(allele_origin)
         parts += self.unique_values(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         parts += self.unique_values(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
