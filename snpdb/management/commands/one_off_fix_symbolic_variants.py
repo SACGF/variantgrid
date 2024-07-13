@@ -19,12 +19,14 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         long_sequences = Sequence.objects.all().annotate(seq_length=Length("seq")).filter(seq_length__gte=1000)
         long_variants = Variant.objects.filter(Q(locus__ref__in=long_sequences) | Q(alt__in=long_sequences))
+        print(f"Long variant count = {long_variants.count()}")
 
         base_lookup = {s: Sequence.objects.get(seq=s) for s in ["G", "A", "T", "C", "<DEL>", "<DUP>"]}
         not_symbolic = []
         dry_run = options["dry_run"]
 
         for genome_build in GenomeBuild.builds_with_annotation():
+            print(f"Genome build {genome_build}")
             self._find_bad_symbolic_via_clinvar(dry_run, genome_build, "<DEL>")  # DELISN stored as DEL
             self._find_bad_symbolic_via_clinvar(dry_run, genome_build, "<DUP>")  # INS stored as DUP
             num_deleted = 0
@@ -107,6 +109,8 @@ class Command(BaseCommand):
             ClinVar.objects.filter(version__genome_build=genome_build, variant__alt__seq=alt_seq).values_list(
                 "clinvar_variation_id", flat=True))
 
+        print(f"{genome_build} Found clinvar {alt_seq} count = {clinvar_variation_del.count()}")
+
         clinvar_variation_original = {}
 
         for cv in ClinVar.objects.filter(version__genome_build=genome_build,
@@ -114,11 +118,15 @@ class Command(BaseCommand):
                 variant__alt__seq=alt_seq):
             clinvar_variation_original[cv.clinvar_variation_id] = cv.variant
 
+        print(f"{genome_build} clinvar_variation_original_count = {len(clinvar_variation_original)}")
+
         clinvar_variation_bad = {}
         for cv in ClinVar.objects.filter(version__genome_build=genome_build,
                                          clinvar_variation_id__in=clinvar_variation_original,
                                          variant__alt__seq=alt_seq):
             clinvar_variation_bad[cv.clinvar_variation_id] = cv.variant
+
+        print(f"{genome_build} clinvar_variation_bad = {len(clinvar_variation_bad)}")
 
         for clinvar_variation_id, bad_variant in clinvar_variation_bad.items():
             original_variant = clinvar_variation_original[clinvar_variation_id]
