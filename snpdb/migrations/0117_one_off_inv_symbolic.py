@@ -8,7 +8,7 @@ from bioutils.sequences import reverse_complement
 from django.db import migrations
 from django.db.models import Q
 
-from library.utils import sha256sum_str
+from library.utils import sha256sum_str, md5sum_str
 
 
 def _one_off_inv_symbolic(apps, _schema_editor):
@@ -41,7 +41,7 @@ def _one_off_inv_symbolic(apps, _schema_editor):
         base_lookup = {s: Sequence.objects.get(seq=s) for s in "GATC"}
         symbolic_alt = "<INV>"
         inv, _ = Sequence.objects.get_or_create(seq=symbolic_alt,
-                                                seq_sha256_hash=sha256sum_str(symbolic_alt),
+                                                seq_md5_hash=md5sum_str(symbolic_alt),
                                                 length=len(symbolic_alt))  # This is wrong, but will remove this eventually
 
         # There are so few of these, that we can just do them 1 by 1
@@ -62,7 +62,7 @@ def _one_off_inv_symbolic(apps, _schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('snpdb', '0137_md5_to_sha256'),
+        ('snpdb', '0116_one_off_set_existing_symbolic_del_dup_svlen'),
     ]
 
     operations = [
