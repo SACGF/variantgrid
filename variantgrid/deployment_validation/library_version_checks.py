@@ -2,6 +2,7 @@ from importlib import metadata
 
 from genes.hgvs.hgvs_converter import HGVSConverterType
 from snpdb.models import VariantCoordinate
+from variantgrid import settings
 
 
 def check_library_versions() -> dict:
@@ -15,8 +16,10 @@ def check_library_versions() -> dict:
         matcher.get_variant_coordinate("NC_000006.12:g.49949407_49949408=")
 
         # Check it can handle contig names as chrom names
-        vc = VariantCoordinate(chrom="NC_000006.12", position=386486, ref="A", alt="<DUP>", svlen=5000)
-        matcher.variant_coordinate_to_g_hgvs(vc)
+        if settings.VARIANT_SYMBOLIC_ALT_ENABLED:
+            # only do this test if symbolic variants are supported
+            vc = VariantCoordinate(chrom="NC_000006.12", position=386486, ref="A", alt="<DUP>", svlen=5000)
+            matcher.variant_coordinate_to_g_hgvs(vc)
 
     minimum_versions = {
         "cdot": (0, 2, 21),
