@@ -34,11 +34,11 @@ def check_library_versions() -> dict:
                 version = tuple(int(i) for i in version_str.split("."))
                 assert version >= version_required, "Library %s (%s) requires version >= %s" % (name, version, version_required)
             valid = True
-        except:
+        except Exception as ex:
             valid = False
         library_version_valid[name] = {
             "valid": valid,
-            "fix": "Upgrade the library using the version in requirements.txt",
+            "fix": f"Upgrade the library using the version in requirements.txt - error {ex}",
         }
 
     return library_version_valid
