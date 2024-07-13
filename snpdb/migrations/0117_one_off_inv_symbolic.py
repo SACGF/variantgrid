@@ -62,7 +62,7 @@ def _one_off_inv_symbolic(apps, _schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('snpdb', '0116_one_off_set_existing_symbolic_del_dup_svlen'),
+        ('snpdb', '0137_md5_to_sha256'),
     ]
 
     operations = [
