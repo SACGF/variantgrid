@@ -15,6 +15,7 @@ from annotation.models import Citation, CitationFetchRequest, ClinVarRecordColle
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, get_admin_url
 
 admin.site.register(models.AnnotationVersion)
+admin.site.register(models.CachedWebResource)
 admin.site.register(models.GeneAnnotationVersion)
 admin.site.register(models.VariantAnnotationVersion)
 
