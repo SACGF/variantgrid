@@ -1558,6 +1558,12 @@ CREATE TABLE "%(table_name)s" (
     LIKE %(base_table_name)s including indexes,
     CHECK (%(records_fk_field)s = %(pk)s)
 ) INHERITS (%(base_table_name)s);
+
+-- If a column in the parent table is an identity column, that property is not inherited
+-- @see https://www.postgresql.org/docs/current/sql-createtable.html
+
+ALTER TABLE "%(table_name)s" 
+ALTER COLUMN id SET DEFAULT nextval('%(base_table_name)s_id_seq');
 """
 
     table_name = f"{base_table_name}_collection_{pk}"
