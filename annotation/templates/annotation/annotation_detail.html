@@ -249,10 +249,13 @@ wget ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_i
                 {% comment %}
                     I asked dbNSFP guy to host just the genes gz on their site, so check maybe it's up and we can remove our own hosting of it
                 {% endcomment %}
-                Download <a href="http://variantgrid.com/static/annotation_download/dbNSFP4.3_gene.complete.gz">dbNSFP4.3_gene.complete.gz</a> (43Mb) - hosted on variantgrid.com
+                Download <a href="http://variantgrid.com/download/dbNSFP4.5_gene.complete.gz">dbNSFP4.5_gene.complete.gz</a> (43Mb) - hosted on variantgrid.com
                 This is just the gene data extracted from the <a href="https://sites.google.com/site/jpopgen/dbNSFP">dbNSFP</a> release.
 
-                <code>{{ python_command }} manage.py import_dbnsfp_gene_annotation --dbnsfp-version=4.3 dbNSFP4.3_gene.complete.gz</code>
+                <code>
+                    wget http://variantgrid.com/download/dbNSFP4.5_gene.complete.gz
+                    {{ python_command }} manage.py import_dbnsfp_gene_annotation --dbnsfp-version=4.5 dbNSFP4.5_gene.complete.gz
+                </code>
              {% endinstall-instructions %}
         {% endlabelled %}
 
