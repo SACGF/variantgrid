@@ -10,7 +10,7 @@ from annotation.fake_annotation import get_fake_vep_version
 from annotation.models.models import ColumnVEPField
 from annotation.models.models_enums import VEPPlugin, VEPCustom, VariantAnnotationPipelineType
 from genes.models_enums import AnnotationConsortium
-from library.utils import get_single_element, execute_cmd
+from library.utils import execute_cmd
 from library.utils.file_utils import get_extension_without_gzip, mk_path_for_file, open_handle_gzip
 from snpdb.models.models_genome import GenomeBuild
 
@@ -43,47 +43,65 @@ def _get_dbnsfp_plugin_command(genome_build: GenomeBuild, vc: VEPConfig):
     return f"dbNSFP,{dbnsfp_data_path},{joined_columns}"
 
 
-def _get_custom_params_list(fields, prefix, data_path) -> list:
+def _get_custom_params_list(cvf_list: list[ColumnVEPField], prefix, data_path) -> list:
+    """ All our deployments are VEP >= 110 so we can use key/value pairs """
+    int_vep_version = int(settings.ANNOTATION_VEP_VERSION)
+    if int_vep_version < 110:
+        raise ValueError(f"{int_vep_version=} - we require min of v110")
+
     extension = get_extension_without_gzip(data_path)
+    fields = [cvf.source_field for cvf in cvf_list if cvf.source_field]  # Strip empty/falsey
+    params = {
+        "file": data_path,
+        "type": "overlap",
+    }
 
-    fields = [f for f in fields if f]  # Strip empty/falsey
+    if extension == 'vcf':
+        field_delimiter = "%"
 
-    if prefix in ["gnomAD_SV", "gnomAD_SV_name"]:
-        delimiter = "%"
-        overlap_cutoff = str(int(100 * settings.ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION))
+        params["short_name"] = prefix
+        params["fields"] = field_delimiter.join(fields)
+        params["format"] = 'vcf'
 
-        params = {
-            "file": data_path,
-            "short_name": prefix,
-            "format": 'vcf',
-            "type": "overlap",
-            "overlap_cutoff": overlap_cutoff,
-            "same_type": "1",
-        }
-        # gnomad_sv_name doesn't have any fields
-        if prefix == "gnomAD_SV":
-            params["fields"] = delimiter.join(fields)
-            params["coords"] = "1"
+        if prefix in ["gnomAD_SV", "gnomAD_SV_name"]:
+            del params["fields"]  # Leave fields blank so that it uses ID
+            params["type"] = "overlap"
+            overlap_cutoff = str(int(100 * settings.ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION))
+            params["overlap_cutoff"] = overlap_cutoff
+            params["same_type"] = "1"
 
-        command = ",".join([f"{k}={v}" for k, v in params.items()])
-    elif extension == 'vcf':
-        delimiter = ","
-        joined_columns = delimiter.join(fields)
-        command = f"{data_path},{prefix},vcf,exact,0,{joined_columns}"
+            # gnomad_sv_name doesn't have any fields
+            if prefix == "gnomAD_SV":
+                params["fields"] = field_delimiter.join(fields)
+                params["coords"] = "1"
+        else:
+            params["type"] = "exact"
+
     else:
-        try:
-            field = get_single_element(fields)
-        except Exception as e:
-            msg = f"Expected exactly 1 ColumnVEPField source field for VEP custom: {prefix}, {fields=}"
-            raise ValueError(msg) from e
+        if len(cvf_list) != 1:
+            raise ValueError(f"Expected exactly 1 ColumnVEPField source field for VEP custom: {prefix}, {cvf_list=}")
+
+        cvf = cvf_list[0]
+        if int_vep_version >= 110:
+            # This is a new v110 feature
+            if cvf.summary_stats:
+                params["summary_stats"] = cvf.summary_stats
+
+        # For beds etc use this as only name
+        params["short_name"] = cvf.source_field
 
         if extension == 'bed':
-            command = f"{data_path},{field},bed,overlap"
+            fmt = "bed"
         elif extension == 'bw':
-            command = f"{data_path},{field},bigwig,overlap"
+            fmt = "bigwig"
         else:
             msg = "Don't know how to handle custom data: {data_path}"
             raise ValueError(msg)
+
+        params["format"] = fmt
+
+    command = ",".join([f"{k}={v}" for k, v in params.items()])
+    logging.info(command)
     return ["--custom", command]
 
 
@@ -178,10 +196,10 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     for vep_custom, prefix in dict(VEPCustom.choices).items():
         try:
             q = ColumnVEPField.get_q(genome_build, vc.columns_version, pipeline_type)
-            if fields := ColumnVEPField.get_source_fields(genome_build, q, vep_custom=vep_custom):
+            if cvf_list := list(ColumnVEPField.get(genome_build, q, vep_custom=vep_custom)):
                 prefix_lc = prefix.lower()
                 if cfg := vc[prefix_lc]:  # annotation settings are lower case
-                    cmd.extend(_get_custom_params_list(fields, prefix, cfg))
+                    cmd.extend(_get_custom_params_list(cvf_list, prefix, cfg))
                 else:
                     logging.info("Skipping due to settings.ANNOTATION[%s][vep_config][%s] = None",
                                  genome_build.name, prefix_lc)

@@ -14,6 +14,7 @@ from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction, connection
+from django.db.models import QuerySet
 from django.db.models.deletion import PROTECT, CASCADE, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
@@ -592,6 +593,7 @@ class ColumnVEPField(models.Model):
     # We can use these min/max versions to turn on/off columns over time
     min_vep_columns_version = models.IntegerField(null=True)
     max_vep_columns_version = models.IntegerField(null=True)
+    summary_stats = models.TextField(blank=True, null=True)  # Only used VEP 111 and on...
 
     def __str__(self) -> str:
         return self.column
@@ -652,6 +654,12 @@ class ColumnVEPField(models.Model):
     def filter_for_build(genome_build: GenomeBuild):
         """ genome_build = NULL (no build) or matches provided build """
         return ColumnVEPField.objects.filter(ColumnVEPField.get_genome_build_q(genome_build))
+
+    @staticmethod
+    def get(genome_build: GenomeBuild, *columnvepfield_args, **columnvepfield_kwargs) -> QuerySet['ColumnVEPField']:
+        qs = ColumnVEPField.filter_for_build(genome_build)
+        qs = qs.filter(*columnvepfield_args, **columnvepfield_kwargs)
+        return qs.distinct("source_field").order_by("source_field")
 
     @staticmethod
     def get_source_fields(genome_build: GenomeBuild, *columnvepfield_args, **columnvepfield_kwargs):
