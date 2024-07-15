@@ -37,3 +37,18 @@ if _use_refseq:
         "annotation_consortium": "RefSeq",
     })
 
+
+# The following will auto-assign people to an "Unknown" lab - if you keep careful control of who joins you server
+# and what lab they belong to, you probably want to remove this
+
+USER_CREATE_ORG_LABS = {
+    "unknown": "unknown",
+}
+
+USER_CREATE_ORG_MESSAGE = {
+    "unknown": "Users must belong to a lab and organisation to perform classifications, and share data with others. "
+               "Because we don't know who you are yet, we've assigned you to 'Unknown'. If you want "
+               "to properly set things up, please contact david.lawrence@"
+               "sa.gov.au (using your institutional email). Thanks!",
+}
+
