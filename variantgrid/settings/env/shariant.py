@@ -18,10 +18,3 @@ OIDC_RP_CLIENT_ID = 'shariant'
 OIDC_REQUIRED_GROUP = '/variantgrid/shariant_production'
 LOGIN_URL = '/oidc_login/'
 LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=https%3A%2F%2Fshariant.org.au'
-
-
-# Prod hasn't been updated yet, default now is 110
-ANNOTATION_VEP_VERSION = "108"
-ANNOTATION_VEP_VERSION_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", ANNOTATION_VEP_VERSION)
-ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "ensembl-vep")
-ANNOTATION_VEP_PLUGINS_DIR = os.path.join(ANNOTATION_VEP_VERSION_DIR, "plugins")
