@@ -19,7 +19,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         long_sequences = Sequence.objects.all().annotate(seq_length=Length("seq")).filter(seq_length__gte=1000)
         long_variants = Variant.objects.filter(Q(locus__ref__in=long_sequences) | Q(alt__in=long_sequences))
-        print(f"Long variant count = {long_variants.count()}")
+        print(f"Long variant count = {len(long_variants)}")
 
         base_lookup = {s: Sequence.objects.get(seq=s) for s in ["G", "A", "T", "C", "<DEL>", "<DUP>"]}
         not_symbolic = []
@@ -109,7 +109,7 @@ class Command(BaseCommand):
             ClinVar.objects.filter(version__genome_build=genome_build, variant__alt__seq=alt_seq).values_list(
                 "clinvar_variation_id", flat=True))
 
-        print(f"{genome_build} Found clinvar {alt_seq} count = {clinvar_variation_del.count()}")
+        print(f"{genome_build} Found clinvar {alt_seq} count = {len(clinvar_variation_del)}")
 
         clinvar_variation_original = {}
 
