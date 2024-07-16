@@ -4,6 +4,7 @@
 """
 import logging
 
+import ijson
 import requests
 
 from annotation.models import CachedWebResource
@@ -26,13 +27,13 @@ def store_hgnc_from_web(cached_web_resource: CachedWebResource):
         url = HGNC_BASE_URL + hgnc_status.label
         logging.info("Fetching HGNC of status: %s", hgnc_status.label)
         r = requests.get(url, headers=headers, timeout=MINUTE_SECS)
-        data = r.json()
-        records = data["response"]["docs"]
+        records = ijson.items(r.content, "response.docs.item")
         save_hgnc_records(existing_hgnc_ids, records, status=hgnc_status.value)
 
     # Make sure gene symbols are matched to genes in each release
     for release in GeneAnnotationRelease.objects.all():
         gm = ReleaseGeneMatcher(release)
+        logging.info(f"Checking GeneAnnotationRelease: {release}")
         gm.match_unmatched_in_hgnc_and_gene_lists()
 
     status_counts = get_field_counts(HGNC.objects.all(), "status")
