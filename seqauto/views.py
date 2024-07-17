@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from collections import defaultdict
 
@@ -23,24 +24,21 @@ from library.utils import full_class_name
 from seqauto import forms
 from seqauto.forms import SequencingRunForm, AllEnrichmentKitForm, AutocompleteSequencingRunForm
 from seqauto.graphs.index_metrics_qc_graph import IndexMetricsQCGraph
-from seqauto.graphs.qc_column_boxplot_graph import QCColumnBoxPlotGraph
-from seqauto.graphs.qc_column_line_graph import QCColumnLineGraph
 from seqauto.graphs.qc_exec_summary_graph import QCExecSummaryGraph
 from seqauto.graphs.sequencing_run_qc_graph import SequencingRunQCGraph
 from seqauto.illumina.run_parameters import get_run_parameters
 from seqauto.models import BamFile, SequencingRun, FastQC, Flagstats, UnalignedReads, QCType, VCFFile, QC, \
     Experiment, SequencingSample, SampleSheetCombinedVCFFile, QCExecSummary, IlluminaFlowcellQC, SeqAutoRun, \
     Library, Sequencer, Assay, Aligner, VariantCaller, VariantCallingPipeline, SoftwarePipelineNode, \
-    GoldReference, GoldGeneCoverageCollection, EnrichmentKit, QCGeneCoverage
-from seqauto.models.models_enums import QCGraphEnrichmentKitSeparationChoices, QCGraphType, \
-    QCCompareType, SequencingFileType
+    GoldReference, GoldGeneCoverageCollection, EnrichmentKit, QCGeneCoverage, QCColumn
+from seqauto.models.models_enums import QCCompareType, SequencingFileType
 from seqauto.qc.sequencing_run_utils import get_sequencing_run_data, get_qc_exec_summary_data, \
     get_sequencing_run_columns, SEQUENCING_RUN_QC_COLUMNS
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from seqauto.sequencing_files.create_resource_models import assign_old_sample_sheet_data_to_current_sample_sheet
 from seqauto.tasks.scan_run_jobs import scan_run_jobs
 from snpdb.graphs import graphcache
-from snpdb.models import Sample, UserSettings
+from snpdb.models import Sample, UserSettings, DataState
 
 
 def sequencing_data(request):
@@ -469,35 +467,11 @@ def qc_graphs(request):
     form = forms.QCColumnForm()
     qc_type_totals = dict(QCType.objects.all().values_list("name", "total_field"))
 
-    context = {'form': form,
-               'qc_type_totals': qc_type_totals,
-               'show_enrichment_kit': QCGraphEnrichmentKitSeparationChoices.SHOW_ENRICHMENT_KIT}
+    context = {
+        'form': form,
+        'qc_type_totals': qc_type_totals,
+    }
     return render(request, 'seqauto/qc_graphs.html', context)
-
-
-def qc_column_historical_graph(request, qc_column_id, graph_type, enrichment_kit_separation, enrichment_kit_id, use_percent):
-    graph_classes = {QCGraphType.LINE_GRAPH: QCColumnLineGraph,
-                     QCGraphType.BOX_PLOT: QCColumnBoxPlotGraph}
-
-    graph_class = graph_classes.get(graph_type)
-    if not graph_class:
-        valid_classes = ','.join(graph_classes.keys())
-        msg = f"QCColumn Graph type '{graph_type}' Unknown (should be '{valid_classes}')"
-        raise ValueError(msg)
-    graph_class_name = full_class_name(graph_class)
-
-    enrichment_kit_separation_dict = dict(QCGraphEnrichmentKitSeparationChoices.choices)
-    if enrichment_kit_separation not in enrichment_kit_separation_dict:
-        valid_separation = ','.join(enrichment_kit_separation_dict.keys())
-        msg = f"QCColumn enrichment_kit_separation '{enrichment_kit_separation}' Unknown (should be '{valid_separation}')"
-        raise ValueError(msg)
-
-    if not QCGraphEnrichmentKitSeparationChoices(enrichment_kit_separation).show_enrichment_kit():
-        enrichment_kit_id = None
-
-    use_percent = json.loads(use_percent)  # Boolean
-    cached_graph = graphcache.async_graph(graph_class_name, qc_column_id, enrichment_kit_separation, enrichment_kit_id, use_percent)
-    return HttpResponseRedirect(reverse("cached_generated_file_check", kwargs={"cgf_id": cached_graph.id}))
 
 
 def sequencing_run_qc_graph(request, sequencing_run_id, qc_compare_type):
@@ -527,6 +501,65 @@ def sequencing_run_qc_json_graph(request, sequencing_run_id, qc_compare_type):
         "gold_column": gold_column
     }
     return render(request, 'seqauto/json_graphs/qc_json_graph.html', context)
+
+
+def qc_column_graph(request, qc_column_id, use_percent):
+    qc_column = get_object_or_404(QCColumn, pk=qc_column_id)
+    logging.info(f"USing %s", qc_column)
+    use_percent = json.loads(use_percent)  # Boolean
+
+    data_state = qc_column.qc_type.qc_object_path + "__data_state"
+
+    SEQUENCING_SAMPLE_PATH = 'bam_file__unaligned_reads__sequencing_sample'
+    ENRICHMENT_KIT_PATH = SEQUENCING_SAMPLE_PATH + '__enrichment_kit'
+
+    def get_field(f):
+        return qc_column.qc_type.qc_object_path + "__" + f
+
+    path = get_field(qc_column.field)
+    qs = QC.objects.filter(**{data_state: DataState.COMPLETE})
+    qs = qs.filter(**{path + "__isnull": False})
+    qs = qs.order_by(ENRICHMENT_KIT_PATH)  # want dict eventually sorted by kit
+
+    total_field = None
+    args = [ENRICHMENT_KIT_PATH + "__name", ENRICHMENT_KIT_PATH + "__version", path]
+    if use_percent:
+        total_field = qc_column.qc_type.total_field
+        if total_field is None:
+            msg = f"Asked for percentage for {qc_column} ({qc_column.qc_type}) with no total field!"
+            raise ValueError(msg)
+        total_path = get_field(total_field)
+        args.append(total_path)
+
+    kit_values = defaultdict(list)
+    for values in qs.values_list(*args):
+        enrichment_kit_name = values[0]
+        enrichment_kit_version = values[1]
+        name = EnrichmentKit.get_full_name(enrichment_kit_name, enrichment_kit_version)
+        if use_percent:
+            (val, total) = values[2:]
+            if total:
+                val = 100.0 * val / total
+            elif val:
+                msg = f"Val was '{val}' with total field {total_field} of {total}"
+                raise ValueError(msg)
+        else:
+            val = values[2]
+
+        # TODO: Right here we want to handle percent (2 values) and normal (1 value)
+        # Being put into a scalar
+
+        kit_values[name].append(val)
+
+    graph_title = str(qc_column)
+    if use_percent:
+        graph_title += " %"
+
+    context = {
+        "box_data": dict(kit_values),
+        "graph_title": graph_title,
+    }
+    return render(request, 'seqauto/json_graphs/qc_column_graph.html', context)
 
 
 def index_metrics_qc_graph(request, illumina_qc_id):

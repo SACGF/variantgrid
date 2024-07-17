@@ -5,8 +5,7 @@ from library.django_utils.autocomplete_utils import ModelSelect2
 from library.forms import ROFormMixin
 from seqauto import models
 from seqauto.models import QCType, QCColumn, EnrichmentKit, SequencingRun
-from seqauto.models.models_enums import QCCompareType, QCGraphTypes2, \
-    QCGraphEnrichmentKitSeparationChoices, QCGraphType
+from seqauto.models.models_enums import QCCompareType, QCGraphTypes2
 from snpdb.forms import BaseDeclareForm
 
 
@@ -60,9 +59,6 @@ class QCColumnForm(BaseDeclareForm):
                                        widget=ModelSelect2(url='qc_column_autocomplete',
                                                            forward=['qc_type'],
                                                            attrs={'data-placeholder': 'Column...'}))
-    enrichment_kit_separation = forms.ChoiceField(choices=QCGraphEnrichmentKitSeparationChoices.choices)
-    enrichment_kit = forms.ModelChoiceField(queryset=EnrichmentKit.objects.all())
-    qc_graph_type = forms.ChoiceField(choices=QCGraphType.choices, label='QC graph type')
 
 
 class EnrichmentKitForm(forms.Form):

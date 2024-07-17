@@ -4,22 +4,6 @@ from django.db import models
 from library.utils import Constant
 
 
-class QCGraphEnrichmentKitSeparationChoices(models.TextChoices):
-    ALL_ENRICHMENT_KITS = 'A', 'All Enrichment Kits'
-    SEPARATED_ENRICHMENT_KITS = 'S', 'Separated Enrichment Kit'
-    SELECTED_ENRICHMENT_KIT = 'O', 'User selected Enrichment Kit'
-
-    SHOW_ENRICHMENT_KIT = Constant({SELECTED_ENRICHMENT_KIT[0]: True})
-
-    def show_enrichment_kit(self):
-        return QCGraphEnrichmentKitSeparationChoices.SHOW_ENRICHMENT_KIT.get(self.value)
-
-
-class QCGraphType(models.TextChoices):
-    LINE_GRAPH = 'L', 'Line Graph'
-    BOX_PLOT = 'B', 'Box Plot'
-
-
 class QCGraphTypes2(models.TextChoices):
     BOX_PLOT = 'B', 'Box Plot'
     BAR_CHART = 'A', 'Bar Chart'

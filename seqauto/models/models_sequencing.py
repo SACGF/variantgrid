@@ -109,11 +109,15 @@ class EnrichmentKit(models.Model):
     def get_absolute_url(self):
         return reverse('view_enrichment_kit', kwargs={"pk": self.pk})
 
-    def __str__(self):
-        name = self.name
-        if self.version > 1:
-            name += f" (version {self.version})"
+    @staticmethod
+    def get_full_name(name: str, version: int):
+        name = name
+        if version > 1:
+            name += f" (version {version})"
         return name
+
+    def __str__(self):
+        return self.get_full_name(self.name, self.version)
 
 
 class Library(models.Model):
