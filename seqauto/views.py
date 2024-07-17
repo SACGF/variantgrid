@@ -466,14 +466,14 @@ def qc_data(request):
     return render(request, 'seqauto/qc_data.html')
 
 
-def sequencing_historical_graphs(request):
+def qc_graphs(request):
     form = forms.QCColumnForm()
     qc_type_totals = dict(QCType.objects.all().values_list("name", "total_field"))
 
     context = {'form': form,
                'qc_type_totals': qc_type_totals,
                'show_enrichment_kit': QCGraphEnrichmentKitSeparationChoices.SHOW_ENRICHMENT_KIT}
-    return render(request, 'seqauto/sequencing_historical_graphs.html', context)
+    return render(request, 'seqauto/qc_graphs.html')
 
 
 def qc_column_historical_graph(request, qc_column_id, graph_type, enrichment_kit_separation, enrichment_kit_id, use_percent):
