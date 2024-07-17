@@ -3,8 +3,7 @@ from typing import Optional
 
 from django.core.management import BaseCommand
 
-from annotation.models import VariantAnnotation, VariantTranscriptAnnotation
-from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import SV_HGVS_TOO_LONG_MESSAGE
+from annotation.models import VariantAnnotation, VariantTranscriptAnnotation, AbstractVariantAnnotation
 from genes.hgvs import HGVSMatcher, HGVSException
 from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 
@@ -71,7 +70,7 @@ class Command(BaseCommand):
                     # Need to use in _update_annotation calculations
                     variant_coordinate = variant_coordinate.as_external_explicit(genome_build)
                 else:
-                    hgvs_c = SV_HGVS_TOO_LONG_MESSAGE
+                    hgvs_c = AbstractVariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
 
                 self._update_annotation(v, variant_coordinate, matcher, va_list, VariantAnnotation, hgvs_c)
                 self._update_annotation(v, variant_coordinate, matcher, vta_list, VariantTranscriptAnnotation, hgvs_c)
