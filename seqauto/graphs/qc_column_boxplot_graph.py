@@ -29,6 +29,10 @@ class QCColumnBoxPlotGraph(CacheableGraph):
         logging.info("EnrichmentKit: %s", self.enrichment_kit)
         logging.info("Percent: %s", self.percent)
 
+    def __str__(self):
+        info = [self.qc_column, self.enrichment_kit_separation, self.enrichment_kit, self.percent]
+        return ", ".join((str(i) for i in info if i is not None))
+
     def get_params_hash(self):
         """ This uses get_values_list rather than just hashing params as the underlying DB may have changed """
         sha1 = hashlib.sha1()
@@ -36,7 +40,9 @@ class QCColumnBoxPlotGraph(CacheableGraph):
             for value in values:
                 sha1.update(str(value).encode())
 
-        return sha1.hexdigest()
+        params_hash = sha1.hexdigest()
+        print(f"{self}: {params_hash=}")
+        return params_hash
 
     def get_values_list(self):
         data_state = self.qc_column.qc_type.qc_object_path + "__data_state"
@@ -70,6 +76,7 @@ class QCColumnBoxPlotGraph(CacheableGraph):
 
         path = get_field(self.qc_column.field)
         qs = qs.filter(**{path + "__isnull": False})
+        qs = qs.order_by(self.qc_column.qc_type.qc_object_path)  # Need consistent order for hash
 
         args = [SEQUENCING_RUN, path]
         if self.percent:
