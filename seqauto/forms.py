@@ -1,11 +1,11 @@
-from dal import autocomplete, forward
+from dal import forward
 from django import forms
 
+from library.django_utils.autocomplete_utils import ModelSelect2
 from library.forms import ROFormMixin
 from seqauto import models
 from seqauto.models import QCType, QCColumn, EnrichmentKit, SequencingRun
-from seqauto.models.models_enums import QCCompareType, QCGraphTypes2, \
-    QCGraphEnrichmentKitSeparationChoices, QCGraphType
+from seqauto.models.models_enums import QCCompareType, QCGraphTypes2
 from snpdb.forms import BaseDeclareForm
 
 
@@ -56,30 +56,27 @@ class QCColumnForm(BaseDeclareForm):
     qc_type = forms.ModelChoiceField(queryset=QCType.objects.all(), label='QC type')
     qc_column = forms.ModelChoiceField(queryset=QCColumn.objects.all(),
                                        label='QC column',
-                                       widget=autocomplete.ModelSelect2(url='qc_column_autocomplete',
-                                                                        forward=['qc_type'],
-                                                                        attrs={'data-placeholder': 'Column...'}))
-    enrichment_kit_separation = forms.ChoiceField(choices=QCGraphEnrichmentKitSeparationChoices.choices)
-    enrichment_kit = forms.ModelChoiceField(queryset=EnrichmentKit.objects.all())
-    qc_graph_type = forms.ChoiceField(choices=QCGraphType.choices, label='QC graph type')
+                                       widget=ModelSelect2(url='qc_column_autocomplete',
+                                                           forward=['qc_type'],
+                                                           attrs={'data-placeholder': 'Column...'}))
 
 
 class EnrichmentKitForm(forms.Form):
     """ Only returns non-obsolete kits """
     enrichment_kit = forms.ModelChoiceField(queryset=EnrichmentKit.objects.all(),
-                                            widget=autocomplete.ModelSelect2(url='enrichment_kit_autocomplete',
-                                                                             attrs={'data-placeholder': 'Enrichment Kit...'}))
+                                            widget=ModelSelect2(url='enrichment_kit_autocomplete',
+                                                                attrs={'data-placeholder': 'Enrichment Kit...'}))
 
 
 class AllEnrichmentKitForm(forms.Form):
     """ Also returns obsolete kits """
     enrichment_kit = forms.ModelChoiceField(queryset=EnrichmentKit.objects.all(),
-                                            widget=autocomplete.ModelSelect2(url='enrichment_kit_autocomplete',
-                                                                             forward=(forward.Const(True, 'show_obsolete'),),
-                                                                             attrs={'data-placeholder': 'Enrichment Kit...'}))
+                                            widget=ModelSelect2(url='enrichment_kit_autocomplete',
+                                                                forward=(forward.Const(True, 'show_obsolete'),),
+                                                                attrs={'data-placeholder': 'Enrichment Kit...'}))
 
 
 class AutocompleteSequencingRunForm(forms.Form):
     sequencing_run = forms.ModelChoiceField(queryset=SequencingRun.objects.all(),
-                                            widget=autocomplete.ModelSelect2(url='sequencing_run_autocomplete',
-                                                                             attrs={'data-placeholder': 'SequencingRun...'}))
+                                            widget=ModelSelect2(url='sequencing_run_autocomplete',
+                                                                attrs={'data-placeholder': 'SequencingRun...'}))

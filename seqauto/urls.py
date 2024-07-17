@@ -34,9 +34,9 @@ urlpatterns = [
     perm_path('sequencing_stats/data', views.sequencing_stats_data, name='sequencing_stats_data'),
     perm_path('qc_data', views.qc_data, name='qc_data'),
     perm_path('qc_graphs', views.qc_graphs, name='qc_graphs'),
-    perm_path('graphs/qc_column_historical_graph/<int:qc_column_id>/<graph_type>/<enrichment_kit_separation>/<enrichment_kit_id>/<use_percent>', views.qc_column_historical_graph, name='qc_column_historical_graph'),
     perm_path('graphs/sequencing_run_qc_graph/<sequencing_run_id>/<qc_compare_type>', views.sequencing_run_qc_graph, name='sequencing_run_qc_graph'),
     perm_path('graphs/sequencing_run_qc_json_graph/<sequencing_run_id>/<qc_compare_type>', views.sequencing_run_qc_json_graph, name='sequencing_run_qc_json_graph'),
+    perm_path('graphs/qc_column_graph/<int:qc_column_id>/<use_percent>', views.qc_column_graph, name='qc_column_graph'),
 
     perm_path('graphs/index_metrics_qc_graph/<illumina_qc_id>', views.index_metrics_qc_graph, name='index_metrics_qc_graph'),
     perm_path('graphs/qc_exec_summary_graph/<qc_exec_summary_id>/<qc_compare_type>', views.qc_exec_summary_graph, name='qc_exec_summary_graph'),

@@ -7,8 +7,8 @@
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <script>
     $(document).ready(function() {
-        var total_times = {{ total_times | safe  }};
-        var time_per_kilo_variant = {{ time_per_kilo_variant | safe  }};
+        let total_times = {{ total_times | safe  }};
+        let time_per_kilo_variant = {{ time_per_kilo_variant | safe  }};
 
         plotPieDict('total-time-graph', "Total Time", total_times, 800, 600);
         plotBoxDict('time-per-variant-graph', "Time per 1000 variants", time_per_kilo_variant);

@@ -1,0 +1,17 @@
+{% load static %}
+{% load js_tags %}
+<div id='total-time-graph'></div>
+<div id='time-per-variant-graph'></div>
+<script>
+    $(document).ready(function() {
+        const graphTitle = "{{ graph_title }}";
+        const boxData = {{ box_data|jsonify  }};
+        plotBoxDict('qc-column-graph', graphTitle, boxData);
+    });
+
+</script>
+{% comment %}
+<!-- required on the including page -->
+<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+{% endcomment %}
