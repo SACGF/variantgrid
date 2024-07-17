@@ -472,7 +472,7 @@ def qc_graphs(request):
     context = {'form': form,
                'qc_type_totals': qc_type_totals,
                'show_enrichment_kit': QCGraphEnrichmentKitSeparationChoices.SHOW_ENRICHMENT_KIT}
-    return render(request, 'seqauto/qc_graphs.html')
+    return render(request, 'seqauto/qc_graphs.html', context)
 
 
 def qc_column_historical_graph(request, qc_column_id, graph_type, enrichment_kit_separation, enrichment_kit_id, use_percent):
