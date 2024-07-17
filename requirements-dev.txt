@@ -1,14 +1,15 @@
 beautifulsoup4
 bgzip
 Bio
-celery
+celery==4.4.7
 ConfigArgParse
 coreapi
 cyvcf2>=0.30.14
-Django
+Django<4
 django_admin_json_editor
 django_autocomplete_light
 django-avatar
+django_cache_memoize
 django-compressor
 django-dag
 django_debug_toolbar
@@ -28,7 +29,8 @@ django_starfield
 django_termsandconditions
 easy_thumbnails
 git+https://github.com/azavea/django-amazon-ses@a9dd749575cfaa6e1fc7c289b535cba9798b8018#egg=django-amazon-ses
-git+https://github.com/davmlaw/django-datetime-utc#egg=django-datetime-utc
+# git+https://github.com/davmlaw/django-datetime-utc#egg=django-datetime-utc
+django-datetime-utc
 git+https://github.com/davmlaw/django-jfu#egg=django-jfu
 git+https://github.com/davmlaw/django-messages/#egg=django-messages
 git+https://github.com/SACGF/hgvs#egg=pyhgvs
@@ -38,12 +40,12 @@ kombu
 lazy
 lxml
 Markdown
-matplotlib
+matplotlib==3.3.0
 mozilla_django_oidc
 nameparser
 networkx
 nltk
-numpy
+numpy==1.21.0
 oauthlib
 pandas
 pronto
@@ -53,7 +55,7 @@ pysam
 python_dateutil
 python_Levenshtein
 pytz
-PyVCF
+git+https://github.com/dridk/PyVCF3#egg=pyvcf3
 redis
 reportlab
 requests

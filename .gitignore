@@ -12,4 +12,5 @@ dump.rdb
 watcherTasks.xml
 /sapath
 env/
+env_sapath/
 variantgrid/settings/env_developers/
