@@ -260,9 +260,14 @@ let VCLinks = (function() {
                 let parts = this.variant_coordinate_parts;
                 let genome_build = this.data[SpecialEKeys.GENOME_BUILD];
                 let safeUrl = parts[1] + '-' + parts[2] + '-' + (parts[3] || '').replace('>', '-');
-                let dataset = genome_build.indexOf('38') != -1 ? 'gnomad_r3' : 'gnomad_r2_1';
+                let linkText = "gnomAD v2.1";
+                let dataset = 'gnomad_r2_1';
+                if (genome_build.indexOf('38') !== -1) {
+                    dataset = 'gnomad_r4';
+                    linkText = 'gnomAD v4';
+                }
                 return new VCLink({
-                    text:'gnomAD',
+                    text: linkText,
                     href:`https://gnomad.broadinstitute.org/variant/${safeUrl}?dataset=${dataset}`,
                     build: this.buildName()
             });
