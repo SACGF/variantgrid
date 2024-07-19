@@ -54,6 +54,7 @@ def _get_custom_params_list(cvf_list: list[ColumnVEPField], prefix, data_path) -
     params = {
         "file": data_path,
         "type": "overlap",
+        "num_records": "all",  # Display all (defaults to 50 then "...")
     }
 
     if extension == 'vcf':
@@ -86,6 +87,8 @@ def _get_custom_params_list(cvf_list: list[ColumnVEPField], prefix, data_path) -
             # This is a new v110 feature
             if cvf.summary_stats:
                 params["summary_stats"] = cvf.summary_stats
+                # TODO: Turn this back on once we have per-VEP version code
+                # params["num_records"] = 0
 
         # For beds etc use this as only name
         params["short_name"] = cvf.source_field
