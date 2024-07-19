@@ -55,7 +55,6 @@ CELERY_SEQAUTO_WORKER_NAMES = ['seqauto_single_worker']
 CELERY_TASK_ROUTES = {
     # Analysis
     'analysis.tasks.karyomapping_tasks.create_genome_karyomapping_for_trio': ANALYSIS_WORKERS,
-    "analysis.tasks.node_update_tasks.dummy_task": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.update_node_task": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.node_cache_task": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.wait_for_cache_task": ANALYSIS_WORKERS,
@@ -79,11 +78,8 @@ CELERY_TASK_ROUTES = {
     # 2. So that these jobs (which don't require DB access) fill up their own queue so run in parallel with db_workers
     'classification.tasks.classification_import_map_and_insert_task.ClassificationImportMapInsertTask': WEB_WORKERS,
     'snpdb.tasks.graph_generation_task.generate_graph': WEB_WORKERS,
-    'upload.tasks.vcf.import_vcf_task.ImportVCFExtractUnknownVariantsAndSplitFileTask': WEB_WORKERS,
-    'upload.tasks.vcf.genotype_vcf_tasks.ImportCreateProjectForGenotypeVCFTask': WEB_WORKERS,
     'upload.tasks.vcf.genotype_vcf_tasks.ProcessGenotypeVCFDataTask': WEB_WORKERS,
     'upload.tasks.import_bedfile_task.ImportBedFileTask': WEB_WORKERS,
-    'upload.tasks.import_gene_list_task.ImportGeneCoverageTask': WEB_WORKERS,
     'upload.tasks.import_gene_list_task.ImportGeneListTask': WEB_WORKERS,
     'upload.tasks.import_patient_records_task.ImportPatientRecords': WEB_WORKERS,
     'upload.tasks.import_ped_task.ImportPedTask': WEB_WORKERS,
@@ -92,17 +88,11 @@ CELERY_TASK_ROUTES = {
     'upload.tasks.vcf.unknown_variants_task.InsertUnknownVariantsTask': VARIANT_ID_SINGLE_WORKER,
     'upload.tasks.vcf.genotype_vcf_tasks.UpdateVariantZygosityCountsTask': VARIANT_ID_SINGLE_WORKER,
     'upload.tasks.vcf.genotype_vcf_tasks.reload_vcf_task': VARIANT_ID_SINGLE_WORKER,
-    'snpdb.tasks.validation_task.validate_variant_data': VARIANT_ID_SINGLE_WORKER,
 
     # Scheduling single worker
     'analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks': SCHEDULING_SINGLE_WORKER,
-    'upload.tasks.annotation_scheduler_task.annotation_scheduler': SCHEDULING_SINGLE_WORKER,
     'upload.tasks.vcf.import_vcf_step_task.schedule_pipeline_stage_steps': SCHEDULING_SINGLE_WORKER,
     'snpdb.tasks.soft_delete_tasks.remove_soft_deleted_vcfs_task': SCHEDULING_SINGLE_WORKER,
-
-    # SeqAuto
-    'seqauto.tasks.scan_run_jobs.scan_run_jobs': SEQAUTO_SINGLE_WORKERS,
-    'sapath.tasks.import_helix_task.sapath_helix_load_if_changed': SEQAUTO_SINGLE_WORKERS,
 }
 
 CELERY_IMPORTS = (
@@ -125,11 +115,9 @@ CELERY_IMPORTS = (
     'snpdb.tasks.graph_generation_task',
     'snpdb.tasks.soft_delete_tasks',
     'snpdb.tasks.vcf_bed_file_task',
-    'snpdb.tasks.validation_task',
     'snpdb.tasks.vcf_zygosity_count_tasks',
     'sync.tasks.sync_tasks',
     'upload.tasks.import_bedfile_task',
-    'upload.tasks.import_gene_coverage_task',
     'upload.tasks.import_gene_list_task',
     'upload.tasks.import_patient_records_task',
     'upload.tasks.import_ped_task',

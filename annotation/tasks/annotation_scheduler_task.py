@@ -12,7 +12,7 @@ from library.log_utils import log_traceback
 from snpdb.models import GenomeBuild, ImportStatus, Sample, VCF
 
 
-@celery.shared_task
+@celery.shared_task(queue='scheduling_single_worker')
 def annotation_scheduler(active=True):
     """ This is run on scheduling_single_worker queue to avoid race conditions """
     LOCK_EXPIRE = 60 * 5  # 5 minutes

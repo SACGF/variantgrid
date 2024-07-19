@@ -17,7 +17,6 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTOCOL', 'https')
 
 SYNC_DETAILS = get_shariant_sync_secrets()
 
-ALLELE_VALIDATION = True
 AVATAR_PROVIDERS = (
     'library.django_utils.avatar.SpaceThemedAvatarProvider'
 )

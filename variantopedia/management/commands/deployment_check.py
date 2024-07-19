@@ -3,6 +3,7 @@ import logging
 from django.core.management.base import BaseCommand
 
 from annotation.annotation_files_check import annotation_data_exists
+from variantgrid.deployment_validation.celery_checks import check_celery_tasks
 from variantgrid.deployment_validation.library_version_checks import check_library_versions
 from variantgrid.deployment_validation.tool_version_checks import check_tool_versions
 
@@ -20,6 +21,7 @@ class Command(BaseCommand):
             "Annotation data exists": annotation_data_exists(flat=True),
             "Library versions": check_library_versions(),
             "Tool versions": check_tool_versions(),
+            "Celery Tasks": check_celery_tasks(),
         }
 
         for check_type, check in checks.items():
