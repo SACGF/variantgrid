@@ -306,7 +306,7 @@ class ClinVarExportConverter:
     CITATION_SOURCE_TO_CLINVAR = {
         CitationSource.PUBMED: "PubMed",
         CitationSource.PUBMED_CENTRAL: "pmc",
-        CitationSource.NCBI_BOOKSHELF: "Bookshelf"  # FIXME, don't know if this is what NCBI wants, waiting on email
+        CitationSource.NCBI_BOOKSHELF: "BookShelf"
     }
 
     @property
