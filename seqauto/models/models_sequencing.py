@@ -111,7 +111,6 @@ class EnrichmentKit(models.Model):
 
     @staticmethod
     def get_full_name(name: str, version: int):
-        name = name
         if version and version > 1:
             name += f" (version {version})"
         return name
