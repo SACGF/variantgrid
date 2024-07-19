@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Mapping, TypedDict, Optional
@@ -280,6 +281,8 @@ class ClinVarExportConverter:
         # classification_flag_types.classification_not_public - this has special handling to include a comment
     }
 
+    BOOKSHELF_ID_RE = re.compile(".*(NBK[0-9]+)")
+
     def __init__(self, clinvar_export_record: ClinVarExport):
         """
         :param clinvar_export_record: the record to use as a basis to convert to ClinVar json (with validation)
@@ -322,10 +325,14 @@ class ClinVarExportConverter:
         citation_list = []
         for citation in CitationFetchRequest.fetch_all_now(request_ids).all_citations:
             if clinvar_db := ClinVarExportConverter.CITATION_SOURCE_TO_CLINVAR.get(citation.source):
-                # NEED to test for NBCI
+                citation_id = citation.id
+                if citation.source == CitationSource.NCBI_BOOKSHELF:
+                    if m := ClinVarExportConverter.BOOKSHELF_ID_RE.match():
+                        citation_id = m.group(1)
+
                 citation_json = {
                     "db": clinvar_db,
-                    "id": citation.id
+                    "id": citation_id
                 }
                 messages = JSON_MESSAGES_EMPTY
 
