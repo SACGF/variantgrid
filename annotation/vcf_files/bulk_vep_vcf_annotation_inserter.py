@@ -128,7 +128,9 @@ class BulkVEPVCFAnnotationInserter:
         self.aloft_columns = False
         logging.info("CSQ: %s", self.vep_columns)
 
-        cvf_qs = ColumnVEPField.filter(self.genome_build, self.vep_config.columns_version,
+        cvf_qs = ColumnVEPField.filter(self.genome_build,
+                                       self.vep_config.vep_version,
+                                       self.vep_config.columns_version,
                                        self.annotation_run.pipeline_type)
 
         self._setup_vep_fields_and_db_columns(validate_columns, cvf_qs)

@@ -591,8 +591,10 @@ class ColumnVEPField(models.Model):
     vep_custom = models.CharField(max_length=1, choices=VEPCustom.choices, null=True)
     source_field_has_custom_prefix = models.BooleanField(default=False)
     # We can use these min/max versions to turn on/off columns over time
-    min_vep_columns_version = models.IntegerField(null=True)
-    max_vep_columns_version = models.IntegerField(null=True)
+    min_columns_version = models.IntegerField(null=True)
+    max_columns_version = models.IntegerField(null=True)
+    min_vep_version = models.IntegerField(null=True)
+    max_vep_version = models.IntegerField(null=True)
     summary_stats = models.TextField(blank=True, null=True)  # Only used VEP 111 and on...
 
     def __str__(self) -> str:
@@ -616,16 +618,22 @@ class ColumnVEPField(models.Model):
     @cached_property
     def columns_version_description(self) -> str:
         limits = []
-        if self.min_vep_columns_version:
-            limits.append(f"column version >= {self.min_vep_columns_version}")
-        if self.max_vep_columns_version:
-            limits.append(f"column version <= {self.max_vep_columns_version}")
+        if self.min_columns_version:
+            limits.append(f"column version >= {self.min_columns_version}")
+        if self.max_columns_version:
+            limits.append(f"column version <= {self.max_columns_version}")
         return " and ".join(limits)
 
     @staticmethod
     def get_columns_version_q(columns_version: int) -> Q:
-        q_min = Q(min_vep_columns_version__isnull=True) | Q(min_vep_columns_version__lte=columns_version)
-        q_max = Q(max_vep_columns_version__isnull=True) | Q(max_vep_columns_version__gte=columns_version)
+        q_min = Q(min_columns_version__isnull=True) | Q(min_columns_version__lte=columns_version)
+        q_max = Q(max_columns_version__isnull=True) | Q(max_columns_version__gte=columns_version)
+        return q_min & q_max
+
+    @staticmethod
+    def get_vep_version_q(vep_version: int) -> Q:
+        q_min = Q(min_vep_version__isnull=True) | Q(min_vep_version__lte=vep_version)
+        q_max = Q(max_vep_version__isnull=True) | Q(max_vep_version__gte=vep_version)
         return q_min & q_max
 
     @staticmethod
@@ -637,17 +645,18 @@ class ColumnVEPField(models.Model):
         return Q(genome_build=genome_build) | Q(genome_build__isnull=True)
 
     @staticmethod
-    def get_q(genome_build: GenomeBuild, columns_version, pipeline_type) -> Q:
+    def get_q(genome_build: GenomeBuild, vep_version, columns_version, pipeline_type) -> Q:
         filters = [
             ColumnVEPField.get_genome_build_q(genome_build),
             ColumnVEPField.get_columns_version_q(columns_version),
+            ColumnVEPField.get_vep_version_q(vep_version),
             ColumnVEPField.get_pipeline_type_q(pipeline_type),
         ]
         return reduce(operator.and_, filters)
 
     @staticmethod
-    def filter(genome_build: GenomeBuild, columns_version, pipeline_type):
-        q = ColumnVEPField.get_q(genome_build, columns_version, pipeline_type)
+    def filter(genome_build: GenomeBuild, vep_version: int, columns_version: int, pipeline_type):
+        q = ColumnVEPField.get_q(genome_build, vep_version, columns_version, pipeline_type)
         return ColumnVEPField.objects.filter(q)
 
     @staticmethod

@@ -3,19 +3,6 @@
 from django.db import migrations
 
 
-def _one_off_populate_column_vep_field_summary_stats(apps, schema_editor):
-    ColumnVEPField = apps.get_model('annotation', 'ColumnVEPField')
-    bigwigs = [
-        'phastcons_100_way_vertebrate',
-        'phylop_100_way_vertebrate',
-        'phastcons_46_way_mammalian',
-        'phylop_46_way_mammalian',
-        'phastcons_30_way_mammalian',
-        'phylop_30_way_mammalian'
-    ]
-    ColumnVEPField.objects.filter(column__in=bigwigs).update(summary_stats="max")
-
-
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -23,5 +10,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(_one_off_populate_column_vep_field_summary_stats)
+        # This is deliberately empty - and undone in 0115
     ]

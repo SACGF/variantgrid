@@ -37,7 +37,7 @@ class VariantGridColumn(models.Model):
 
     @cached_property
     def columns_version_description(self) -> str:
-        q = Q(min_vep_columns_version__isnull=False) | Q(max_vep_columns_version__isnull=False)
+        q = Q(min_columns_version__isnull=False) | Q(max_columns_version__isnull=False)
         if cvf := self.columnvepfield_set.filter(q).first():
             return cvf.columns_version_description
         return ""

@@ -25,6 +25,7 @@ class VEPConfig:
         self.annotation_consortium = genome_build.annotation_consortium
         self.genome_build = genome_build
         self.vep_data = genome_build.settings["vep_config"]
+        self.vep_version = int(settings.ANNOTATION_VEP_VERSION)
         self.columns_version = genome_build.settings["columns_version"]
 
     def __getitem__(self, key):
@@ -83,15 +84,12 @@ def _get_custom_params_list(cvf_list: list[ColumnVEPField], prefix, data_path) -
             raise ValueError(f"Expected exactly 1 ColumnVEPField source field for VEP custom: {prefix}, {cvf_list=}")
 
         cvf = cvf_list[0]
-        if int_vep_version >= 110:
-            # This is a new v110 feature
-            if cvf.summary_stats:
-                params["summary_stats"] = cvf.summary_stats
-                # TODO: Turn this back on once we have per-VEP version code
-                # params["num_records"] = 0
-
-        # For beds etc use this as only name
-        params["short_name"] = cvf.source_field
+        if cvf.summary_stats:
+            params["short_name"] = prefix
+            params["summary_stats"] = cvf.summary_stats
+            params["num_records"] = 0
+        else:
+            params["short_name"] = cvf.source_field
 
         if extension == 'bed':
             fmt = "bed"
@@ -198,7 +196,7 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     # Custom
     for vep_custom, prefix in dict(VEPCustom.choices).items():
         try:
-            q = ColumnVEPField.get_q(genome_build, vc.columns_version, pipeline_type)
+            q = ColumnVEPField.get_q(genome_build, vc.vep_version, vc.columns_version, pipeline_type)
             if cvf_list := list(ColumnVEPField.get(genome_build, q, vep_custom=vep_custom)):
                 prefix_lc = prefix.lower()
                 if cfg := vc[prefix_lc]:  # annotation settings are lower case
