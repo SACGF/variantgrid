@@ -19,8 +19,9 @@ def check_annotation_status() -> dict:
     else:
         arl_data = {
             "valid": True,  # Just a warning
-            "warning": arl_message + " (this is a just a warning but will become an error in the future)"
         }
+        if has_dupes:
+            arl_data["warning"] = arl_message + " (this is a just a warning but will become an error in the future)"
     annotation_status = {
         "AnnotationRangeLock duplicates": arl_data,
     }
