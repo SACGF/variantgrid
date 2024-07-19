@@ -31,7 +31,8 @@ def is_simplified_single_end_convention(fastq):
 def is_new_sheet(sheet):
     with open(sheet) as f:
         first_line = f.readline().strip()
-        return first_line.startswith('[Header]')
+        return '[Header]' in first_line  # Need to Handle Byte Order Mark at beginning of file
+
 
 def csv_file_from_new_samplesheet(sheet):
     mem_file = StringIO()
@@ -41,7 +42,7 @@ def csv_file_from_new_samplesheet(sheet):
             if found_data:
                 mem_file.write(line)
             else:
-                if line.strip().startswith('[Data]'):
+                if '[Data]' in line:
                     found_data = True
 
     mem_file.seek(0)
