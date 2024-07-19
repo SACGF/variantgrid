@@ -327,7 +327,7 @@ class ClinVarExportConverter:
             if clinvar_db := ClinVarExportConverter.CITATION_SOURCE_TO_CLINVAR.get(citation.source):
                 citation_id = citation.id
                 if citation.source == CitationSource.NCBI_BOOKSHELF:
-                    if m := ClinVarExportConverter.BOOKSHELF_ID_RE.match():
+                    if m := ClinVarExportConverter.BOOKSHELF_ID_RE.match(citation_id):
                         citation_id = m.group(1)
 
                 citation_json = {
