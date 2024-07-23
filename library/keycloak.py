@@ -32,7 +32,7 @@ class KeycloakNewUser:
 
 class Keycloak:
 
-    def __init__(self, connector: ServerAuth = None):
+    def __init__(self, connector: Optional[ServerAuth] = None):
         if not connector:
             connector = ServerAuth.keycloak_connector()
         self.connector = connector

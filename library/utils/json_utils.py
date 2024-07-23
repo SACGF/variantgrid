@@ -108,9 +108,11 @@ class JsonPathKey(JsonPathPart):
     def __str__(self):
         return f"[{json.dumps(self.key)}]"
 
+
 @dataclass(frozen=True)
 class JsonPathId(JsonPathPart):
     key: str
+
     # not a real path, indicates that we're treating a list as
     # a dictionary with "id" as the key
     @property

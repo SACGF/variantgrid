@@ -296,7 +296,7 @@ class ClinVarRecordCollection(TimeStampedModel):
     """
     Stores data about when we've retrieved individual ClinVar records for a clinvar variation id.
     Importantly, when we did it, and what was the minimum number of stars on a record that we kept.
-    Let's us know if we can re-use the cached ClinVarRecords or if we should retrieve them fresh from ClinVar.
+    Lets us know if we can re-use the cached ClinVarRecords or if we should retrieve them fresh from ClinVar.
     """
 
     class Meta:
@@ -654,7 +654,7 @@ class ColumnVEPField(models.Model):
         return ColumnVEPField.objects.filter(ColumnVEPField.get_genome_build_q(genome_build))
 
     @staticmethod
-    def get_source_fields(genome_build: GenomeBuild, *columnvepfield_args, **columnvepfield_kwargs):
+    def get_source_fields(genome_build: GenomeBuild, *columnvepfield_args, **columnvepfield_kwargs) -> list[str]:
         qs = ColumnVEPField.filter_for_build(genome_build)
         qs = qs.filter(*columnvepfield_args, **columnvepfield_kwargs).distinct("source_field")
         return list(qs.values_list("source_field", flat=True).order_by("source_field"))

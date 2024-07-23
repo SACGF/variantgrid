@@ -197,14 +197,14 @@ def get_decorated_methods(cls, categories: Optional[dict[Any, Any]], attribute: 
                 if isinstance(value, (set, tuple, list)):
                     value_set = set(value)
                 else:
-                    value_set = set([value])
+                    value_set = {value}
 
                 if decorated_value := decorated_values.get(key):
                     decorated_set: set
                     if isinstance(decorated_value, (set, tuple, list)):
                         decorated_set = set(decorated_value)
                     else:
-                        decorated_set = set([decorated_value])
+                        decorated_set = {decorated_value}
                     return bool(value_set.intersection(decorated_set))
 
                     # handle decorated value being a collection (and matching a single value in that collection)

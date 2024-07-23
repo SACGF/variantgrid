@@ -11,12 +11,12 @@ class Git:
     def __init__(self, directory=None):
         self.directory = directory
 
-    def git_cmd(self, params):
+    def git_cmd(self, params) -> str:
         output = subprocess.check_output(["git"] + params, cwd=self.directory)
         return output.decode().strip()
 
     @cached_property
-    def hash(self):
+    def hash(self) -> str:
         return self.git_cmd(["rev-parse", "HEAD"])
 
     @cached_property
@@ -25,7 +25,7 @@ class Git:
         return parse(date_string)
 
     @cached_property
-    def branch(self):
+    def branch(self) -> str:
         return self.git_cmd(["rev-parse", "--abbrev-ref", "HEAD"])
 
     @cached_property

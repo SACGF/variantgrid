@@ -3,11 +3,12 @@ import os
 import re
 import uuid
 from shlex import shlex
+from typing import Iterable
 
 from django.conf import settings
 
 from annotation.fake_annotation import get_fake_vep_version
-from annotation.models.models import ColumnVEPField
+from annotation.models.models import ColumnVEPField, VariantAnnotationVersion
 from annotation.models.models_enums import VEPPlugin, VEPCustom, VariantAnnotationPipelineType
 from genes.models_enums import AnnotationConsortium
 from library.utils import get_single_element, execute_cmd
@@ -43,7 +44,7 @@ def _get_dbnsfp_plugin_command(genome_build: GenomeBuild, vc: VEPConfig):
     return f"dbNSFP,{dbnsfp_data_path},{joined_columns}"
 
 
-def _get_custom_params_list(fields, prefix, data_path) -> list:
+def _get_custom_params_list(fields: Iterable[str], prefix: str, data_path) -> list:
     extension = get_extension_without_gzip(data_path)
 
     fields = [f for f in fields if f]  # Strip empty/falsey
@@ -87,7 +88,7 @@ def _get_custom_params_list(fields, prefix, data_path) -> list:
     return ["--custom", command]
 
 
-def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium,
+def get_vep_command(vcf_filename: str, output_filename: str, genome_build: GenomeBuild, annotation_consortium,
                     pipeline_type: VariantAnnotationPipelineType):
     vc = VEPConfig(genome_build)
     vep_cmd = os.path.join(settings.ANNOTATION_VEP_CODE_DIR, "vep")
@@ -200,7 +201,7 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     return cmd
 
 
-def run_vep(vcf_filename, output_filename, genome_build: GenomeBuild, annotation_consortium,
+def run_vep(vcf_filename: str, output_filename: str, genome_build: GenomeBuild, annotation_consortium: AnnotationConsortium,
             pipeline_type: VariantAnnotationPipelineType):
     """ executes VEP command. Returns (command_line, code, stdout, stderr) """
 
@@ -208,7 +209,7 @@ def run_vep(vcf_filename, output_filename, genome_build: GenomeBuild, annotation
     return execute_cmd(cmd, shell=True)
 
 
-def get_vep_version(genome_build: GenomeBuild, annotation_consortium):
+def get_vep_version(genome_build: GenomeBuild, annotation_consortium: AnnotationConsortium):
     """ returns dictionary of VEP and database versions """
 
     vcf_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, "fake.vcf")
@@ -327,7 +328,7 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
     return kwargs
 
 
-def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild):
+def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild) -> dict:
     vep_config = VEPConfig(genome_build)
     if settings.ANNOTATION_VEP_FAKE_VERSION:
         return get_fake_vep_version(genome_build, vep_config.annotation_consortium, vep_config.columns_version)
@@ -337,7 +338,7 @@ def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild):
     return kwargs
 
 
-def get_vep_version_from_vcf(output_filename):
+def get_vep_version_from_vcf(output_filename: str | os.PathLike) -> dict:
     VEP_VERSIONS_LINE_START = "##VEP="
 
     num_lines_read = 0
@@ -353,7 +354,8 @@ def get_vep_version_from_vcf(output_filename):
     raise ValueError(f"{output_filename}: Could not find line in header starting with '{VEP_VERSIONS_LINE_START}' "
                      + f"(read {num_lines_read} lines).")
 
-def vep_parse_version_line(line):
+
+def vep_parse_version_line(line: str) -> dict:
     try:
         line = line[2:].strip()  # Remove hashes
         value_sep = "="
@@ -370,7 +372,7 @@ def vep_parse_version_line(line):
         raise
 
 
-def _vep_check_version_match(variant_annotation_version, vep_version_kwargs: dict, vep_version_desc: str):
+def _vep_check_version_match(variant_annotation_version: VariantAnnotationVersion, vep_version_kwargs: dict, vep_version_desc: str):
     for k, v in vep_version_kwargs.items():
         version_value = getattr(variant_annotation_version, k)
         if version_value != v:
@@ -379,7 +381,7 @@ def _vep_check_version_match(variant_annotation_version, vep_version_kwargs: dic
             raise VEPVersionMismatchError(msg)
 
 
-def vep_check_annotated_file_version_match(variant_annotation_version, filename):
+def vep_check_annotated_file_version_match(variant_annotation_version: VariantAnnotationVersion, filename: str | os.PathLike):
     """ Load VEP VCF, check VEP= line and make sure that values match expected VariantAnnotationVersion """
     vep_config = VEPConfig(variant_annotation_version.genome_build)
     vep_dict = get_vep_version_from_vcf(filename)
@@ -388,7 +390,7 @@ def vep_check_annotated_file_version_match(variant_annotation_version, filename)
                             f"VEP annotated VCF: '{filename}'")
 
 
-def vep_check_command_line_version_match(variant_annotation_version):
+def vep_check_command_line_version_match(variant_annotation_version: VariantAnnotationVersion):
     """ Check vs what will get executed on command line """
     vep_config = VEPConfig(variant_annotation_version.genome_build)
     vep_version = get_vep_version(variant_annotation_version.genome_build, vep_config.annotation_consortium)

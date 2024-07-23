@@ -4,7 +4,7 @@ from collections import Counter
 _end = '_end_'
 
 
-def make_trie(*words):
+def make_trie(*words) -> dict:
     root = {}
     for word in words:
         current_dict = root
@@ -14,7 +14,7 @@ def make_trie(*words):
     return root
 
 
-def get_multi_entries(trie, prefix=''):
+def get_multi_entries(trie, prefix='') -> Counter:
     counter = Counter()
     trie_keys = list(trie.keys())
 
@@ -32,7 +32,7 @@ def get_multi_entries(trie, prefix=''):
     return counter
 
 
-def get_common_prefix_dirs(files):
+def get_common_prefix_dirs(files) -> list[str]:
     trie = make_trie(*tuple(files))
     most_common = get_multi_entries(trie).most_common(3)
     return [k for k, _ in most_common]
