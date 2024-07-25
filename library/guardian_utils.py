@@ -26,11 +26,11 @@ def public_group():
 
 
 @lru_cache()
-def _cached_admin_bot():
+def _cached_admin_bot() -> User:
     return User.objects.get(username='admin_bot')
 
 
-def admin_bot():
+def admin_bot() -> User:
     """
     lru_cache is great for performance, but it can break unit tests by caching a User object across sessions (when the DB has been rolled back).
     Specifically this object is often referenced by things that want to save the user to the DB.
@@ -41,7 +41,7 @@ def admin_bot():
         return _cached_admin_bot()
 
 
-def bot_group():
+def bot_group() -> Group:
     g, _ = Group.objects.get_or_create(name='variantgrid/bot')
     return g
 
@@ -140,12 +140,12 @@ def clear_permissions(obj, permissions):
             remove_perm(permission, group, obj)
 
 
-def check_can_write(obj, user):
+def check_can_write(obj, user: User):
     if not obj.can_write(user):
         raise PermissionDenied(f"You do not have WRITE permission for {obj.pk}")
 
 
-def check_can_delete(user, pk, owner):
+def check_can_delete(user: User, pk, owner):
     can_delete = user and (user.is_superuser or user == owner)
     if not can_delete:
         raise PermissionDenied(f"You are not allowed to delete {pk}")

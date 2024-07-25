@@ -31,7 +31,7 @@ def render_ajax_view(
         return render(request, "snpdb/embedded_ajax.html", {"embedded_content": text, "menubar": menubar})
 
 
-ModelT = TypeVar("T", bound=Model)
+ModelT = TypeVar("ModelT", bound=Model)
 
 
 def refresh_for_update(obj: ModelT) -> ModelT:

@@ -8,7 +8,7 @@ import deprecation
 def string_deterministic_hash(s: str) -> int:
     """
     When you want the same string to always hash to the same value (where security
-    isnt a concern). Hashlib seemed overkill for this purpose.
+    isn't a concern). Hashlib seemed overkill for this purpose.
     """
     val = 0
     for c in s:
