@@ -88,3 +88,5 @@ pyspellchecker==0.6.3
 frozendict==2.3.4
 pydantic==2.4.0
 deepdiff==6.5.0
+# required for omni importer
+openpyxl==3.1.2
