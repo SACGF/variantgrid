@@ -393,8 +393,8 @@ VCF_IMPORT_COMMON_FILTERS = {
         "clinical_significance_max": "3",
     },
     "GRCh38": {
-        "gnomad_af_filename": "annotation_data/GRCh38/gnomad_GRCh38_af_greater_than_5.contigs.vcf.bgz",
-        "gnomad_version": "3.1",
+        "gnomad_af_filename": "annotation_data/GRCh38/gnomad4.0_GRCh38_af_greater_than_5.stripped.vcf.gz",
+        "gnomad_version": "4.0",
         "gnomad_af_min": 0.05,
         "clinical_significance_max": "3",
     }
