@@ -195,7 +195,7 @@ ANNOTATION_VEP_FORK = 1
 # If it gets below min, it does a slower query to get range lock.
 # The variant table is usually ~55% alt variants but may be different due to data or if you've deleted records
 ANNOTATION_VEP_BATCH_MIN = 5000  # Dont' set too low due to overhead of running pipeline etc
-ANNOTATION_VEP_BATCH_MAX = 100000  # Set to None to do all in 1 job (probably want to set FORK higher)
+ANNOTATION_VEP_BATCH_MAX = 50_000  # Set to None to do all in 1 job (probably want to set FORK higher)
 ANNOTATION_VEP_ARGS = []  # ["--buffer_size", "1000"] # default = 5000
 ANNOTATION_VEP_VERSION = "110"
 ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "VEP")
