@@ -14,7 +14,8 @@ import operator
 from functools import reduce
 from typing import TypeVar, Optional
 
-from django.db.models import QuerySet, Model
+from django.conf import settings
+from django.db.models import QuerySet, Model, F
 from django.db.models.query_utils import Q
 
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationPipelineType
@@ -61,12 +62,16 @@ def get_variants_qs_for_annotation(
     if not annotated:
         q_filters.append(Q(variantannotation__isnull=True))
 
-    q_symbolic = Q(locus__ref__seq__contains='<') | Q(alt__seq__contains='<')
     if pipeline_type:
+        # We also need to handle very long ref/alts that are not symbolic
+        qs = qs.annotate(variant_length=F("end") - F("locus__position"))
+        q_symbolic = Q(locus__ref__seq__contains='<') | Q(alt__seq__contains='<')
+        q_long = Q(variant_length__gt=settings.VARIANT_SYMBOLIC_ALT_SIZE)
+        q_sv = q_symbolic | q_long
         if pipeline_type == VariantAnnotationPipelineType.STANDARD:
-            q_filters.append(~q_symbolic)
+            q_filters.append(~q_sv)
         elif pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
-            q_filters.append(q_symbolic)
+            q_filters.append(q_sv)
         else:
             raise ValueError(f"Unrecognised {pipeline_type=}")
 
