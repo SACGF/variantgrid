@@ -406,9 +406,13 @@ def slack_bot_username():
         return f"{site_name} ({env_name})"
 
 
+# message limit is actually 4000, but this gives us a lot of leway
+SLACK_CHARACTER_LIMIT = 3500
+
+
 def send_notification(
         message: str,
-        blocks: Optional[list] = None,
+        blocks: Optional[list[NotificationBuilder.Block]] = None,
         slack_webhook_url: Optional[str] = None):
     """
     Sends a message to your notification service, currently Slack centric.
@@ -435,8 +439,20 @@ def send_notification(
             "text": message,
             "icon_emoji": emoji
         }
-        if blocks:
-            data["blocks"] = blocks
+        character_count = 0
+        data_blocks = []
+        for block in blocks:
+            this_block = json.dumps(block)
+            character_count += len(this_block)
+            if character_count >= SLACK_CHARACTER_LIMIT:
+                data_blocks.append(
+                    NotificationBuilder.MarkdownBlock("Message is too big for slack, check EventLog for the full message").as_slack()
+                )
+                break
+            data_blocks.append(block)
+
+        if data_blocks:
+            data["blocks"] = data_blocks
 
         r = requests.post(
             headers={"Content-Type": "application/json"},
