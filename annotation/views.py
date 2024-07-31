@@ -17,7 +17,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
 from htmlmin.decorators import not_minified_response
 
-from annotation.annotation_versions import diff_vs_current_vep
+from annotation.annotation_versions import vav_diff_vs_kwargs
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
 from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
@@ -29,7 +29,7 @@ from annotation.models.models_enums import AnnotationStatus, VariantAnnotationPi
 from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
 from annotation.tasks.annotation_scheduler_task import annotation_scheduler
-from annotation.vep_annotation import get_vep_command
+from annotation.vep_annotation import get_vep_command, get_vep_variant_annotation_version_kwargs
 from genes.models import GeneListCategory, GeneAnnotationImport, GeneVersion, TranscriptVersion, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import WEEK_SECS
@@ -102,12 +102,10 @@ def annotation_build_detail(request, genome_build_name):
         if av.variant_annotation_version is None:
             out_of_sync_with_current_vep = "Not created"
         else:
-            if diff := diff_vs_current_vep(av.variant_annotation_version):
-                diff_items = []
-                for field, (db_val, vep_val) in diff.items():
-                    diff_items.append(f"{field} - {db_val=} != {vep_val=}")
-                diff_str = ", ".join(diff_items)
-                out_of_sync_with_current_vep = f"Latest is out of sync with current VEP: {diff_str}"
+            vav = av.variant_annotation_version
+            vep_vav_kwargs = get_vep_variant_annotation_version_kwargs(vav.genome_build)
+            if diff := vav_diff_vs_kwargs(vav, vep_vav_kwargs):
+                out_of_sync_with_current_vep = f"Latest is out of sync with current VEP: {diff}"
             else:
                 sync_with_current_vep = "In sync with current VEP"
 

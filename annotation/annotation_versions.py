@@ -29,14 +29,17 @@ def get_or_create_variant_annotation_version_from_current_vep(genome_build: Geno
     return variant_annotation_version, created
 
 
-def diff_vs_current_vep(vav: VariantAnnotationVersion) -> dict[str, tuple]:
-    kwargs = get_vep_variant_annotation_version_kwargs(vav.genome_build)
+def vav_diff_vs_kwargs(vav: VariantAnnotationVersion, vep_vav_kwargs) -> str:
     diff = {}
-    for k, v in kwargs.items():
+    for k, v in vep_vav_kwargs.items():
         existing_v = getattr(vav, k)
         if existing_v != v:
             diff[k] = (existing_v, v)
-    return diff
+
+    diff_items = []
+    for field, (db_val, vep_val) in diff.items():
+        diff_items.append(f"{field} - {db_val=} != {vep_val=}")
+    return ", ".join(diff_items)
 
 def _get_unannotated_count_min_max(annotation_version, search_min: int,
                                    annotation_batch_min=None, annotation_batch_max=None):
