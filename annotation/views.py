@@ -42,6 +42,7 @@ from variantgrid.celery import app
 
 
 def get_build_contigs():
+    # TODO: We know what build we have when we call this - so could only retrieve for that
     build_contigs = {}
     for genome_build in GenomeBuild.objects.all():
         contigs_list = list(genome_build.contigs.values_list("name", flat=True))
@@ -76,7 +77,11 @@ def _get_gene_and_transcript_stats(genome_build: GenomeBuild, annotation_consort
     return genes_and_transcripts
 
 
-def _get_build_annotation_details(build_contigs, genome_build):
+@not_minified_response
+def annotation_build_detail(request, genome_build_name):
+    genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+    build_contigs = get_build_contigs()
+
     annotation_details = {
         "contigs": build_contigs.get(genome_build.name),
         "annotation_consortium": genome_build.settings["annotation_consortium"],
@@ -140,7 +145,8 @@ def _get_build_annotation_details(build_contigs, genome_build):
             annotation_details["clinvar"] = f"{clinvar_counts} ClinVar records"
 
         clinvar_counts = av.get_clinvar().count()
-        annotation_sub_components = [reference_ok, genes_and_transcripts, gene_annotation_release, clinvar_counts]
+        annotation_sub_components = [sync_with_current_vep, reference_ok,
+                                     genes_and_transcripts, gene_annotation_release, clinvar_counts]
         if settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED:
             annotation_sub_components.append(gene_annotation_counts)
 
@@ -155,11 +161,20 @@ def _get_build_annotation_details(build_contigs, genome_build):
             annotation_sub_components.append(somalier)
 
         annotation_details["ok"] = all(annotation_sub_components)
-    return annotation_details
+
+    context = {
+        "build_name": genome_build.name,
+        "details": annotation_details,
+        "cdot_version": cdot.__version__,
+    }
+    return render(request, "annotation/annotation_build_detail.html", context)
 
 
 def annotation(request):
-    return render(request, "annotation/annotation.html", {})
+    context = {
+        "genome_build_list": GenomeBuild.builds_with_annotation(),
+    }
+    return render(request, "annotation/annotation.html", context)
 
 
 @not_minified_response
@@ -167,16 +182,6 @@ def annotation_detail(request):
     # Set Variables to None for uninstalled components, the template will show installation instructions
     ensembl_biomart_transcript_genes = None
     diagnostic_gene_list = None
-
-    build_contigs = get_build_contigs()
-    genome_build_annotations = {}
-
-    builds_ok = []
-    for genome_build in GenomeBuild.builds_with_annotation():
-        annotation_details = _get_build_annotation_details(build_contigs, genome_build)
-        genome_build_annotations[genome_build.name] = annotation_details
-
-        builds_ok.append(annotation_details.get("ok", False))
 
     gene_symbol_alias_counts = get_field_counts(GeneSymbolAlias.objects.all(), "source")
     if gene_symbol_alias_counts:
@@ -228,8 +233,7 @@ def annotation_detail(request):
         somalier = _verify_somalier_config()
 
     # These are empty/None if not set.
-    annotations_ok = [all(builds_ok),
-                      all_ontologies_accounted_for,
+    annotations_ok = [all_ontologies_accounted_for,
                       hpa_counts > 0]
     if somalier_enabled:
         annotations_ok.append(somalier)
@@ -243,7 +247,6 @@ def annotation_detail(request):
     context = {
         "annotations_all_imported": annotations_all_imported,
         "all_ontologies_accounted_for": all_ontologies_accounted_for,
-        "genome_build_annotations": genome_build_annotations,
         "ensembl_biomart_transcript_genes": ensembl_biomart_transcript_genes,
         "ontology_services": ontology_services,
         "ontology_counts": ontology_counts,
@@ -257,7 +260,6 @@ def annotation_detail(request):
         "num_annotation_columns": VariantGridColumn.objects.count(),
         "cached_web_resources": cached_web_resources,
         "somalier": somalier,
-        "cdot_version": cdot.__version__,
     }
     return render(request, "annotation/annotation_detail.html", context)
 

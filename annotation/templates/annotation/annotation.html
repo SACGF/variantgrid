@@ -19,8 +19,39 @@
         {% load ui_help %}
         {% page_help page_id='annotation/annotation_help' title='Annotations' %}
 
+        <div id="installation-instructions" class='card hidden'>
+            <div class="card-header"><h5>Installation Instructions</h5></div>
+                <div class="card-body">
+                <p>
+                See instructions at <a href="https://github.com/sacgf/variantgrid/wiki/Annotation%20Setup">Annotation Setup (VariantGrid Wiki)</a>
+
+                <p>Command line examples should be executed in the variantgrid dir <code>(${VG_INSTALL_DIR})</code> running as the <code>(${VARIANTGRID_USER})</code>
+
+                <p>The variables should be set as per <a href="https://github.com/sacgf/variantgrid/wiki/Annotation%20Setup">wiki link (same as above)</a>:
+
+                <ul>
+                 <li><code>${ANNOTATION_BASEDIR}</code> where you downloaded reference annotation
+                </ul>
+
+                <p>
+                <b>Follow the instruction steps below in order</b> (as some have dependencies)
+                </p>
+
+                <p>
+                Details instructions contain the way to download the latest copy of the annotations, or you can just use the out of date data from <code>${VARIANTGRID_SETUP_DATA}</code> dir (which came from downloading annotations)
+                </p>
+            </div>
+        </div>
+
+
+        {% for genome_build in genome_build_list %}
+            <div data-toggle="ajax" href="{% url 'annotation_build_detail' genome_build.name %}">
+                <div class="loading-message">Loading {{ genome_build }} annotation...</div>
+            </div>
+        {% endfor %}
+
         <div data-toggle="ajax" href="{% url 'annotation_detail' %}">
-            <div class="loading-message">Loading Annotations, this may take a while.</div>
+            <div class="loading-message">Loading non-build annotations...</div>
         </div>
     </div>
 {% endblock content %}

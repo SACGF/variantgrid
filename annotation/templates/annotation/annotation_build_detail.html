@@ -1,0 +1,203 @@
+{% load static %}
+{% load js_tags %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load humanize %}
+{% load tz %}
+{% load settings_tags %}
+
+{% settings_value 'PYTHON_COMMAND' as python_command %}
+
+    <div id="build-{{ build_name }}-details" class="card mt-4">
+        <div class="card-header">{{ build_name }}</div>
+        <div class="card-body">
+            {% labelled label="Latest" %}<a class="hover-link" href="{% url 'annotation_versions' %}">{{ details.latest }}</a>{% endlabelled %}
+            {% labelled label="Sync with current VEP" %}
+                {% if details.sync_with_current_vep %}
+                    {{ details.sync_with_current_vep }}
+                {% endif %}
+                {% if details.out_of_sync_with_current_vep %}
+                    <code>
+                    {{ details.out_of_sync_with_current_vep }}
+                    </code>
+                {% endif %}
+                {% install-instructions "Sync with current VEP" installed=details.sync_with_current_vep %}
+                    <code>{{ python_command }} manage.py create_new_variant_annotation_version --genome_build={{ build_name }}</code>
+                {% endinstall-instructions %}
+            {% endlabelled %}
+            {% labelled label="Genome Fasta" %}
+                {% if details.reference_fasta %}
+                    {{ details.reference_fasta }}
+                {% else %}
+                    <div class="not-installed">Not found</div>
+                {% endif %}
+                {% install-instructions "Reference Fasta" installed=details.reference_fasta %}
+                    <div class="mono">{{ details.reference_fasta_error }}</div>
+                    You need to download the annotations, or change <code>settings.GENOME_BUILD_REFERENCE_FASTA</code>
+                {% endinstall-instructions %}
+            {% endlabelled %}
+            {% labelled label="Contigs" %}
+                <div class="{{ build_name }}">
+                    <b>Contigs:</b> {{ details.contigs.num_contigs }} <a href="#{{ build_name }}-contigs" data-toggle="collapse" class="toggle-link">Toggle</a>
+                    <div id="{{ build_name }}-contigs" class='contig-details collapse'>{{ details.contigs.contigs }}</div>
+                </div>
+            {% endlabelled %}
+            {% labelled label="Gene/Transcript Information" %}
+                {% if details.genes_and_transcripts %}
+                    <div>
+                        <b>Lastest cdot</b> {{ details.genes_and_transcripts.latest_cdot }}
+                    </div>
+                    <div>
+                        <b>Annotation:</b> {{ details.annotation_consortium }}
+                        <b>Genes:</b> {{ details.genes_and_transcripts.genes | intcomma }}
+                        <b>Transcripts:</b> {{ details.genes_and_transcripts.transcripts | intcomma }}
+                        <a href="#{{ build_name }}-import-sources" data-toggle="collapse" class="toggle-link">Toggle import sources</a>
+                    </div>
+                    <div id="{{ build_name }}-import-sources" class='gene-transcript-instructions collapse'>
+                        <b>Import Sources</b>
+                        {% for import_source, import_stats in details.genes_and_transcripts.import_sources.items %}
+                            <div>
+                            {{ import_source }}: <b>{{ import_stats.transcripts }}</b> transcripts ({{ import_stats.created|localtime }})
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                {% for cons_name, other_consortia_data in details.other_consortia.items %}
+                    <div>
+                        <b>Annotation:</b> {{ cons_name }}
+                        <b>Genes:</b> {{ other_consortia_data.genes | intcomma }}
+                        <b>Transcripts:</b> {{ other_consortia_data.transcripts | intcomma }}
+                        <a href="#{{ build_name }}-other-import-sources" data-toggle="collapse" class="toggle-link">Toggle import sources</a>
+                    </div>
+                    <div id="{{ build_name }}-other-import-sources" class='gene-transcript-instructions collapse'>
+                        <b>Import Sources</b>
+                        {% for file_name, import_stats in other_consortia_data.import_sources.items %}
+                            <div>
+                            {{ file_name }}: <b>{{ import_stats.transcripts }}</b> transcripts ({{ import_stats.created|localtime }})
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+
+                {% install-instructions build_name installed=details.genes_and_transcripts.transcripts %}
+                    <p>
+                    You can install both Ensembl and RefSeq transcripts (for HGVS) but you NEED the ones used by your variant annotation pipeline which is: '<b>{{ details.annotation_consortium }}</b>'
+                    </p>
+
+                    <p>
+                    Download data from <a href="https://github.com/SACGF/cdot/wiki/Download-JSON.gz-files">cdot</a>. See <a href="https://github.com/SACGF/variantgrid/wiki/Gene-and-Transcript-version-data">Gene and Transcript version data</a> for details and how to generate this from scratch
+                    </p>
+
+<code>
+export gene_annotation_dir=${VARIANTGRID_SETUP_DATA}/gene_annotation
+mkdir -p ${gene_annotation_dir}
+cd ${gene_annotation_dir}
+</code>
+                    {% if build_name == 'GRCh37' %}
+                    <h5>Ensembl GRCh37</h5>
+
+<code>
+wget https://cdot.cc/download/{{ cdot_version }}/cdot-{{ cdot_version }}.ensembl.grch37.json.gz
+{{ python_command }} manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh37 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.ensembl.grch37.json.gz
+</code>
+                    {% elif build_name == 'GRCh38' %}
+                    <h5>Ensembl GRCh38</h5>
+<code>
+wget https://cdot.cc/download/{{ cdot_version }}/cdot-{{ cdot_version }}.ensembl.grch38.json.gz
+{{ python_command }} manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh38 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.ensembl.grch38.json.gz
+</code>
+                    {% endif %}
+
+                    {% if build_name == 'GRCh37' %}
+                    <h5>RefSeq GRCh37</h5>
+<code>
+wget https://cdot.cc/download/{{ cdot_version }}/cdot-{{ cdot_version }}.refseq.grch37.json.gz
+{{ python_command }} manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh37 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.refseq.grch37.json.gz
+</code>
+                    {% elif build_name == 'GRCh38' %}
+                    <h5>RefSeq GRCh38</h5>
+<code>
+wget https://cdot.cc/download/{{ cdot_version }}/cdot-{{ cdot_version }}.refseq.grch38.json.gz
+{{ python_command }} manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh38 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.refseq.grch38.json.gz
+</code>
+                    {% endif %}
+                {% endinstall-instructions %}
+            {% endlabelled %}
+
+            {% labelled label="Gene Annotation Release" %}
+                {% if details.gene_annotation_release %}
+                <span title="{{ details.gene_annotation_release.gene_annotation_import }}">{{ details.gene_annotation_release.name }}</span>
+                {% else %}
+                    <div class="no-value">Not Installed</div>
+                {% endif %}
+                {% install-instructions "Gene Annotation Release" installed=details.gene_annotation_release %}
+                    You need a Gene Annotation Release that matches the exact symbol/gene/transcript versions used by VEP.
+                    <a href="https://github.com/SACGF/variantgrid/wiki/Gene-and-Transcript-Version-Data#gene-annotation-release---install">See Wiki for details</a>
+
+                    {% with vav=details.latest.variant_annotation_version %}
+                        {% if vav.cdot_gene_release_filename %}
+<code>
+wget http://cdot.cc/download/{{ vav.get_annotation_consortium_display }}/{{ build_name }}/{{ vav.cdot_gene_release_filename }}
+{{ python_command }} manage.py import_gene_annotation --annotation-consortium={{ vav.get_annotation_consortium_display }} --genome-build={{ build_name }} --json-file {{ vav.cdot_gene_release_filename }} --release={{ vav.suggested_gene_annotation_release_name }}
+</code>
+                            If it doesn't auto-link, go to <a href="{% url 'admin:annotation_variantannotationversion_change' vav.pk %}">Admin</a> then set the gene annotation release.
+                        {% endif %}
+                    {% endwith %}
+
+                {% endinstall-instructions %}
+            {% endlabelled %}
+
+            {% settings_value 'ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED' as ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED %}
+            {% if ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED %}
+                {% labelled label="Gene Annotation" %}
+                   {% if details.gene_level_annotation %}
+                        {{ details.gene_level_annotation }}
+                   {% else %}
+                        <div class="no-value">Not Installed</div>
+                   {% endif %}
+                    {% install-instructions "Gene Annotation" installed=details.gene_level_annotation %}
+                        <code>{{ python_command }} manage.py gene_annotation --gene-annotation-release={{ details.latest.variant_annotation_version.gene_annotation_release_id|default_if_none:'(Gene Annotation Release ID)' }}</code>
+                    {% endinstall-instructions %}
+                {% endlabelled %}
+            {% endif %}
+
+            {% labelled label="ClinVar" %}
+                {% if details.clinvar %}
+                    {{ details.clinvar }}
+                {% else %}
+                    <div class="no-value">Not installed</div>
+                {% endif %}
+                {% install-instructions "Clinvar" installed=details.clinvar %}
+                    Download VCF (with date in file name) from <a href="https://www.ncbi.nlm.nih.gov/clinvar/">NCBI ClinVar</a> site, then run:
+
+                    <code>{{ python_command }} manage.py clinvar_import ${VARIANTGRID_SETUP_DATA}/clinvar_20180401.vcf.gz</code>
+               {% endinstall-instructions %}
+
+            {% endlabelled %}
+            {% if somalier_enabled %}
+                {% labelled label="Somalier" %}
+                    {% if details.somalier %}
+                        {{ details.somalier }}
+                    {% else %}
+                       Not installed
+                    {% endif %}
+                    {% install-instructions "Somalier" installed=details.somalier %}
+                        Upload the Somalier sites VCF for {{ build_name }}.
+                    {% endinstall-instructions %}
+                {% endlabelled %}
+            {% endif %}
+        </div>
+    </div>
+
+    <div>
+    Details.ok = {{ details.ok }}
+    </div>
+
+    {% if not details.ok %}
+        <script>
+            $(document).ready(function() {
+                $("#installation-instructions").show();
+            });
+        </script>
+    {% endif %}
