@@ -292,6 +292,13 @@ img.thumbnail {
 			$("#file-types-description").hide()
 		});
 		setTimeout(update_uploads, UPDATE_TIME);
+        
+        let userAgent = navigator.userAgent.toLowerCase();
+        let isFirefox = userAgent.indexOf('firefox') > -1;
+        let isLinux = userAgent.indexOf('linux') > -1;
+        if (isFirefox && isLinux) {
+            $("#linux-firefox-warning").show();
+        }    
 	});
 </script>
 {% endblock %}
@@ -302,6 +309,10 @@ img.thumbnail {
 	{% page_help page_id='data/upload_help' title='Upload' %}
 
     {%  if upload_enabled %}
+    <div id="linux-firefox-warning" class="hidden warning">
+        FireFox on Linux: If you can't upload files - uninstall FireFox in Snap and reinstall using deb
+    </div>
+
 	<div id="instructions-headline">
 		Drag and drop VCF, bed, GeneList, .PED (pedigree files) etc files to upload.
 	</div>
