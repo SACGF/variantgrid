@@ -647,8 +647,20 @@ class Variant(PreviewModelMixin, models.Model):
         return True
 
     @property
+    def _clingen_allele_size(self) -> int:
+        if self.is_symbolic:
+            allele_size = abs(self.svlen)
+            # Bug in ClinGenAlleleRegistry - dup seems to calculate max size wrong leading to a
+            # max size of 5k, @see https://github.com/BRL-BCM/Allele-Registry/issues/6
+            if self.alt.seq == VCFSymbolicAllele.DUP:
+                allele_size *= 2
+        else:
+            allele_size = len(self.locus.ref) + len(self.alt)
+        return allele_size
+
+    @property
     def can_have_clingen_allele(self) -> bool:
-        return self.length <= settings.CLINGEN_ALLELE_REGISTRY_MAX_ALLELE_SIZE and self.can_make_g_hgvs
+        return self._clingen_allele_size <= settings.CLINGEN_ALLELE_REGISTRY_MAX_ALLELE_SIZE and self.can_make_g_hgvs
 
     @property
     def can_have_annotation(self) -> bool:
