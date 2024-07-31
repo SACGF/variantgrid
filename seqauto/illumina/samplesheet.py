@@ -11,7 +11,7 @@ from io import StringIO
 import pandas as pd
 
 ILLUMINA = 'ILLUMINA'
-ILLEGAL_CHARACTERS = "?()[]/\=+<>:;\"',*^|&. "  # From Illumina docs
+ILLEGAL_CHARACTERS = r"?()[]/\=+<>:;\"',*^|&. "  # From Illumina docs
 NO_SPACES_COLUMNS = ['sample_id', 'sample_name']
 
 

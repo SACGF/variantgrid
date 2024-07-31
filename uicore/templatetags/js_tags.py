@@ -56,7 +56,7 @@ def query_unquote(query_string):
 @register.filter
 def jsstring(text):
     if text:
-        text = text.replace('\\', '\\\\').replace('`', '\`').replace('</script>', '<\\/script>')
+        text = text.replace('\\', '\\\\').replace('`', '\\`').replace('</script>', '<\\/script>')
         return mark_safe(text)
     return ''
 

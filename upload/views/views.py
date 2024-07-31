@@ -201,7 +201,7 @@ def upload(request):
 
     file_dicts_list = get_file_dicts_list(upload_settings)
     extensions = get_import_tasks_by_extension().keys()
-    accept_file_types = f"/(\.|\/)({'|'.join(extensions)})$/i"
+    accept_file_types = fr"/(\.|\/)({'|'.join(extensions)})$/i"
     context = {'existing_files': file_dicts_list,
                'form': form,
                "upload_enabled": settings.UPLOAD_ENABLED,

@@ -59,7 +59,7 @@ class HGVSConverter(abc.ABC):
         """ raise exceptions on any errors """
 
         if "ins" in hgvs_string:
-            if re.match(".*ins\d+$", hgvs_string):
+            if re.match(r".*ins\d+$", hgvs_string):
                 raise HGVSException("Insertions require inserted sequence, not an integer length")
             if re.match(".*ins$", hgvs_string):
                 raise HGVSException("Insertions require inserted sequence")

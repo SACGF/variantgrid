@@ -714,7 +714,7 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                 result_text = text
                 for prefix in ontology_prefixes:
                     # fetch text between the matched term and the next ontology ID
-                    pattern = f"{matched_term.id.lower()}(.*?)({prefix}:\d+)"
+                    pattern = fr"{matched_term.id.lower()}(.*?)({prefix}:\d+)"
                     match = re.search(pattern, text)
                     if match:
                         found = True
