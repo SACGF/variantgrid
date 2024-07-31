@@ -39,6 +39,19 @@
         <div class="card-header">{{ build_name }}</div>
         <div class="card-body">
             {% labelled label="Latest" %}<a class="hover-link" href="{% url 'annotation_versions' %}">{{ details.latest }}</a>{% endlabelled %}
+            {% labelled label="Sync with current VEP" %}
+                {% if details.sync_with_current_vep %}
+                    {{ details.sync_with_current_vep }}
+                {% endif %}
+                {% if details.out_of_sync_with_current_vep %}
+                    <code>
+                    {{ details.out_of_sync_with_current_vep }}
+                    </code>
+                {% endif %}
+                {% install-instructions "Sync with current VEP" installed=details.sync_with_current_vep %}
+                    <code>{{ python_command }} manage.py create_new_variant_annotation_version --genome_build={{ build_name }}</code>
+                {% endinstall-instructions %}
+            {% endlabelled %}
             {% labelled label="Genome Fasta" %}
                 {% if details.reference_fasta %}
                     {{ details.reference_fasta }}
@@ -113,13 +126,13 @@ cd ${gene_annotation_dir}
 
 <code>
 wget https://cdot.cc/download/{{ cdot_version }}/cdot-{{ cdot_version }}.ensembl.grch37.json.gz
-python3 manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh37 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.ensembl.grch37.json.gz
+{{ python_command }} manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh37 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.ensembl.grch37.json.gz
 </code>
                     {% elif build_name == 'GRCh38' %}
                     <h5>Ensembl GRCh38</h5>
 <code>
 wget https://cdot.cc/download/{{ cdot_version }}/cdot-{{ cdot_version }}.ensembl.grch38.json.gz
-python3 manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh38 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.ensembl.grch38.json.gz
+{{ python_command }} manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh38 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.ensembl.grch38.json.gz
 </code>
                     {% endif %}
 
@@ -127,13 +140,13 @@ python3 manage.py import_gene_annotation --annotation-consortium=Ensembl --genom
                     <h5>RefSeq GRCh37</h5>
 <code>
 wget https://cdot.cc/download/{{ cdot_version }}/cdot-{{ cdot_version }}.refseq.grch37.json.gz
-python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh37 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.refseq.grch37.json.gz
+{{ python_command }} manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh37 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.refseq.grch37.json.gz
 </code>
                     {% elif build_name == 'GRCh38' %}
                     <h5>RefSeq GRCh38</h5>
 <code>
 wget https://cdot.cc/download/{{ cdot_version }}/cdot-{{ cdot_version }}.refseq.grch38.json.gz
-python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh38 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.refseq.grch38.json.gz
+{{ python_command }} manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh38 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.refseq.grch38.json.gz
 </code>
                     {% endif %}
                 {% endinstall-instructions %}
@@ -153,7 +166,7 @@ python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome
                         {% if vav.cdot_gene_release_filename %}
 <code>
 wget http://cdot.cc/download/{{ vav.get_annotation_consortium_display }}/{{ build_name }}/{{ vav.cdot_gene_release_filename }}
-python3 manage.py import_gene_annotation --annotation-consortium={{ vav.get_annotation_consortium_display }} --genome-build={{ build_name }} --json-file {{ vav.cdot_gene_release_filename }} --release={{ vav.suggested_gene_annotation_release_name }}
+{{ python_command }} manage.py import_gene_annotation --annotation-consortium={{ vav.get_annotation_consortium_display }} --genome-build={{ build_name }} --json-file {{ vav.cdot_gene_release_filename }} --release={{ vav.suggested_gene_annotation_release_name }}
 </code>
                             If it doesn't auto-link, go to <a href="{% url 'admin:annotation_variantannotationversion_change' vav.pk %}">Admin</a> then set the gene annotation release.
                         {% endif %}

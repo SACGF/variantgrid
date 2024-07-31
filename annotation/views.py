@@ -17,7 +17,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
 from htmlmin.decorators import not_minified_response
 
-from annotation.annotation_versions import get_variant_annotation_version
+from annotation.annotation_versions import diff_vs_current_vep
 from annotation.clinvar_fetch_request import ClinVarFetchRequest
 from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
@@ -89,17 +89,25 @@ def _get_build_annotation_details(build_contigs, genome_build):
     except Exception as e:
         annotation_details["reference_fasta_error"] = str(e)
 
-    av = AnnotationVersion.latest(genome_build, active=False, validate=False)
-    if av is None:
-        # Maybe doesn't exist - attempt to create
-        try:
-            get_variant_annotation_version(genome_build)
-        except:
-            pass
-        av = AnnotationVersion.latest(genome_build, active=False, validate=False)
-
-    if av:
+    if av := AnnotationVersion.latest(genome_build, active=False, validate=False):
         annotation_details["latest"] = av
+
+        sync_with_current_vep = False
+        out_of_sync_with_current_vep = None
+        if av.variant_annotation_version is None:
+            out_of_sync_with_current_vep = "Not created"
+        else:
+            if diff := diff_vs_current_vep(av.variant_annotation_version):
+                diff_items = []
+                for field, (db_val, vep_val) in diff.items():
+                    diff_items.append(f"{field} - {db_val=} != {vep_val=}")
+                diff_str = ", ".join(diff_items)
+                out_of_sync_with_current_vep = f"Latest is out of sync with current VEP: {diff_str}"
+            else:
+                sync_with_current_vep = "In sync with current VEP"
+
+        annotation_details["sync_with_current_vep"] = sync_with_current_vep
+        annotation_details["out_of_sync_with_current_vep"] = out_of_sync_with_current_vep
         genes_and_transcripts = None
         try:
             genes_and_transcripts = _get_gene_and_transcript_stats(genome_build, genome_build.annotation_consortium)
@@ -281,13 +289,7 @@ def load_cached_web_resource(request, pk):
 
 def annotation_versions(request):
     anno_versions = {}
-    # Create VariantAnnotationVersion for build if not exists
     for genome_build in GenomeBuild.builds_with_annotation():
-        try:
-            get_variant_annotation_version(genome_build)
-        except:
-            log_traceback()
-
         try:
             latest = AnnotationVersion.latest(genome_build, validate=False)
         except AnnotationVersion.DoesNotExist:

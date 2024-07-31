@@ -12,12 +12,11 @@ from library.django_utils import highest_pk
 from snpdb.models.models_genome import GenomeBuild
 
 
-def get_variant_annotation_version(genome_build: GenomeBuild):
+def get_or_create_variant_annotation_version_from_current_vep(genome_build: GenomeBuild) -> tuple[VariantAnnotationVersion, bool]:
     kwargs = get_vep_variant_annotation_version_kwargs(genome_build)
     # When creating, don't set as active as it won't have all the annotation done - that will be done manually
     variant_annotation_version, created = VariantAnnotationVersion.objects.get_or_create(**kwargs,
                                                                                          defaults={"active": False})
-
     now = timezone.now()
     if created:
         logging.info("New Variant Annotation version created!")
@@ -27,8 +26,17 @@ def get_variant_annotation_version(genome_build: GenomeBuild):
         variant_annotation_version.last_checked_date = now
 
     variant_annotation_version.save()
-    return variant_annotation_version
+    return variant_annotation_version, created
 
+
+def diff_vs_current_vep(vav: VariantAnnotationVersion) -> dict[str, tuple]:
+    kwargs = get_vep_variant_annotation_version_kwargs(vav.genome_build)
+    diff = {}
+    for k, v in kwargs.items():
+        existing_v = getattr(vav, k)
+        if existing_v != v:
+            diff[k] = (existing_v, v)
+    return diff
 
 def _get_unannotated_count_min_max(annotation_version, search_min: int,
                                    annotation_batch_min=None, annotation_batch_max=None):

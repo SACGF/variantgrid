@@ -4,7 +4,7 @@ from django.conf import settings
 from django.test import TestCase
 from django.test.utils import override_settings
 
-from annotation.annotation_versions import get_variant_annotation_version, \
+from annotation.annotation_versions import get_or_create_variant_annotation_version_from_current_vep, \
     get_annotation_range_lock_and_unannotated_count
 from annotation.fake_annotation import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotation
@@ -52,7 +52,8 @@ class TestAnnotationVCF(TestCase):
 
     def test_version_mismatch(self):
         genome_build = GenomeBuild.get_name_or_alias('GRCh37')
-        vav = get_variant_annotation_version(genome_build)  # Will be fake due to ANNOTATION_VEP_FAKE_VERSION
+        # Will be fake due to ANNOTATION_VEP_FAKE_VERSION
+        vav, _ = get_or_create_variant_annotation_version_from_current_vep(genome_build)
         annotation_range_lock, _ = get_annotation_range_lock_and_unannotated_count(vav)
         annotation_range_lock.save()
         annotation_run = AnnotationRun.objects.create(annotation_range_lock=annotation_range_lock,
