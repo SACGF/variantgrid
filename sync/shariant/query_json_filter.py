@@ -44,11 +44,11 @@ class QueryJsonFilter:
         # special hardcoded segment, should migrate
         if key == 'somatic':
             if value is False:
-                # old code also allowed value to be isnull
-                return ~self.q('allele_origin', ['somatic'], 'in') | self.q('allele_origin', True, 'isnull')
+                # no longer allow nulls if we have a somatic filter
+                return self.q('allele_origin', ['germline', 'likely_germline', 'unknown', 'tested_inconclusive', 'other'],
+                              'in')
             else:
-                # so ugly that this is the only way I know to make a Q that wont restrict record counts
-                raise ~Q(pk=None)
+                return self.q('allele_origin', ['somatic', 'likely_somatic', 'unknown', 'tested_inconclusive', 'other'], 'in')
         else:
             if key == 'not':
                 return ~self.convert_to_q(value)
