@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 from django.db.models import Count
 from django.db.models.query import QuerySet
 
+from classification.enums import CriteriaEvaluation
 from classification.models.classification import ClassificationModification
 from classification.models.evidence_key import EvidenceKeyMap, EvidenceKey
 from genes.hgvs import CHGVS
@@ -47,7 +48,7 @@ class KeyValueFormatter:
 class UsedKey:
 
     def __init__(self):
-        self.ekey = None
+        self.ekey: Optional[EvidenceKey] = None
         self.has_value = False
         self.has_note = False
         self.has_explain = False
@@ -189,6 +190,14 @@ class UsedKeyTracker:
                     cols.append(None)
                 else:
                     value = value_obj.get('value')
+
+                    # prettyValue for a horak code will say Met: 2 Points
+                    # we just want to say 2
+                    if used_key.ekey.crit_uses_points:
+                        points = CriteriaEvaluation.POINTS.get(value)
+                        if points is not None:
+                            value = str(points)
+
                     cols.append(self.key_value_formatter.value_for(used_key.ekey, value, pretty=self.pretty, cell_formatter=self.cell_formatter))
             if used_key.has_note:
                 if not value_obj:

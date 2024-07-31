@@ -168,7 +168,7 @@ class ClassificationMeta(ExportRow):
         return (self.vc.condition_resolution_dict or {}).get('display_text')
 
     @export_column()
-    def acmg_criteria(self):
+    def criteria(self):
         return self.cm.criteria_strength_summary(self.e_keys)
 
     @export_column()

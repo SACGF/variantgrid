@@ -15,7 +15,7 @@ def inject_tier_1_2(apps, schema_editor):
             "key": "tier_1_or_2",
             "tier": "1",
             "index": 5,
-            "label": "Tier I or II",
+            "label": "Tier I / II",
             "aliases": ["1 or 2"]
         }
     )
