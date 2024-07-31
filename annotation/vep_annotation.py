@@ -159,6 +159,9 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     if settings.ANNOTATION_VEP_FORK and settings.ANNOTATION_VEP_FORK > 1:
         cmd.extend(["--fork", str(settings.ANNOTATION_VEP_FORK)])
 
+    if settings.ANNOTATION_VEP_BUFFER_SIZE:
+        cmd.extend(["--buffer_size", str(settings.ANNOTATION_VEP_BUFFER_SIZE)])
+
     if settings.ANNOTATION_VEP_ARGS:
         cmd.extend(settings.ANNOTATION_VEP_ARGS)
 

@@ -188,15 +188,16 @@ ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = None  # os.path.join(BASE_DIR, "scripts"
 # I've had VEP hang on me when running --fork so by default we run in small batches
 # This causes a small amount of overhead obtaining an AnnotationRangeLock
 # If you get ERROR: Forked process(es) died: read-through of cross-process communication detected
-# You may want to set buffer_size in ANNOTATION_VEP_ARGS below
+# You may want to reduce ANNOTATION_VEP_BUFFER_SIZE below
 # @see https://github.com/Ensembl/ensembl-vep/issues/150
 ANNOTATION_VEP_FORK = 1
+ANNOTATION_VEP_BUFFER_SIZE = 2000  # Default VEP is 5k but this has crashed out a 16G machine...
 # get_unannotated_count_min_max does quick queries to try and get VEP batch sizes within a range
 # If it gets below min, it does a slower query to get range lock.
 # The variant table is usually ~55% alt variants but may be different due to data or if you've deleted records
 ANNOTATION_VEP_BATCH_MIN = 5000  # Dont' set too low due to overhead of running pipeline etc
 ANNOTATION_VEP_BATCH_MAX = 50_000  # Set to None to do all in 1 job (probably want to set FORK higher)
-ANNOTATION_VEP_ARGS = []  # ["--buffer_size", "1000"] # default = 5000
+ANNOTATION_VEP_ARGS = []
 ANNOTATION_VEP_VERSION = "110"
 ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "VEP")
 ANNOTATION_VEP_VERSION_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_code", ANNOTATION_VEP_VERSION)
