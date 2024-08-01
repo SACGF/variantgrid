@@ -17,6 +17,16 @@ def run_sql(sql, params=None) -> tuple[Any, int]:
         return value, rowcount
 
 
+def get_postgresql_version() -> str:
+    # Few ways to get this, but we'll go with the simpler one:
+    # SHOW server_version - '14.12 (Ubuntu 14.12-0ubuntu0.22.04.1)'
+    # select version() - 'PostgreSQL 14.12 (Ubuntu 14.12-0ubuntu0.22.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0, 64-bit'
+    with connection.cursor() as cursor:
+        cursor.execute('SHOW server_version')
+        version = cursor.fetchone()[0]
+    return version
+
+
 def queryset_to_sql(queryset: QuerySet, pretty=False) -> str:
     """ str(queryset.query) doesn't quote variables properly....
 

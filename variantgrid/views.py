@@ -1,4 +1,5 @@
 import sys
+from importlib import metadata
 
 from django import forms
 from django.conf import settings
@@ -20,6 +21,7 @@ from library.email import Email
 from library.git import Git
 from library.keycloak import Keycloak, KeycloakError, KeycloakNewUser
 from library.log_utils import report_exc_info, AdminNotificationBuilder
+from library.utils.database_utils import get_postgresql_version
 from manual.models import Deployment
 from snpdb.forms import KeycloakUserForm
 from snpdb.models import UserSettings
@@ -128,11 +130,19 @@ def version(request):
             if user.email and UserSettings.get_for_user(user).email_weekly_updates:
                 weekly_update_users.append(user)
 
+    libraries = ["django", "celery", "cdot"]
+    versions_dict = {
+        "python": sys.version,
+        "postgresql": get_postgresql_version(),
+    }
+    for library in libraries:
+        versions_dict[library] = metadata.version(library)
+
     context = {
         "git": git,
         "deployment_history": deployments,
         "weekly_update_users": weekly_update_users,
-        "python_version": sys.version
+        "versions": versions_dict,
     }
     return render(request, 'version.html', context)
 

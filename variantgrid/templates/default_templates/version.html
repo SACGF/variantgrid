@@ -18,10 +18,21 @@
                     {% else %}{{ git.branch }}
                     {% endif %}
                 {% endlabelled %}
-                {% labelled label="Python Version" admin_only="true" %}{{ python_version }}{% endlabelled %}
                 {% labelled label="Manual Migrations" admin_only="true" %}<a href="{% url 'manual_migrations' %}">Review Manual Migrations</a>{% endlabelled %}
             </form>
         </div>
+
+        {% if user.is_superuser %}
+            <h3>Library Versions</h3>
+
+            <div id="library-version-details" class="mt-4">
+                <form>
+                    {% for k, v in versions.items %}
+                        {% labelled label=k admin_only="true" %}{{ v }}{% endlabelled %}
+                    {% endfor %}
+                </form>
+            </div>
+        {% endif %}
 
         {% if deployment_history %}
             <div id="version-deployment-history">
