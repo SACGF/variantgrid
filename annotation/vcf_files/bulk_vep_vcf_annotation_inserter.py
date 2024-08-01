@@ -807,6 +807,11 @@ def format_canonical(value) -> bool:
 
 
 class SVOverlapProcessor:
+    """
+        We use --custom (twice) rather than StructuralVariantOverlap
+        due to some issues: https://github.com/Ensembl/VEP_plugins/issues/710
+        This requires a bit of post-processing
+    """
     def __init__(self, cvf_qs: QuerySet[ColumnVEPField]):
         cvf_qs = cvf_qs.filter(vep_custom__in=[VEPCustom.GNOMAD_SV, VEPCustom.GNOMAD_SV_NAME])
         self.sv_fields = set(cvf_qs.values_list("variant_grid_column_id", flat=True))
