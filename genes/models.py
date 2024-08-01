@@ -171,7 +171,7 @@ class UniProt(models.Model):
 
 
 class GeneSymbol(models.Model, PreviewModelMixin):
-    symbol = CITextField(primary_key=True)
+    symbol = TextField(primary_key=True, db_collation='case_insensitive')
 
     objects = ObjectManagerCachingRequest()
 
@@ -277,7 +277,7 @@ class GeneSymbolAlias(TimeStampedModel):
          * Source: https://genome.ucsc.edu/cgi-bin/hgTables?command=start export kgAlias table
          * Code: N/A - obsolete
     """
-    alias = CITextField()
+    alias = TextField(db_collation='case_insensitive')
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
     source = models.CharField(max_length=1, choices=GeneSymbolAliasSource.choices)
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
