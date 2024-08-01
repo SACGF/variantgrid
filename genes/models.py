@@ -19,7 +19,6 @@ from cdot.pyhgvs.pyhgvs_transcript import PyHGVSTranscriptFactory
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.contrib.postgres.aggregates import StringAgg
-from django.contrib.postgres.fields import CITextField
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ObjectDoesNotExist, MultipleObjectsReturned
 from django.db import models, IntegrityError, transaction

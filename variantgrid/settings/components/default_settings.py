@@ -569,8 +569,9 @@ SEARCH_COSMIC_ENABLED = True
 SEARCH_COSMIC_TRANSCRIPT_MESSAGES = False
 SEARCH_CONTIG_GENOME_BUILD_ADMIN_ONLY = False
 
-SILENCED_SYSTEM_CHECKS = ['models.E006',  # 'captcha.recaptcha_test_key_error'
-                          'fields.W907']  # CITextField deprecated. Waiting for Django 4.2.3 see issue #831
+SILENCED_SYSTEM_CHECKS = [
+    'models.E006',  # 'captcha.recaptcha_test_key_error'
+]
 SITE_ID = 2
 SITE_MESSAGE = None  # displayed at the top of all logged-in pages
 
