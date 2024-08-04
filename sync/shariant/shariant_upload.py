@@ -112,7 +112,7 @@ class ClassificationUploader:
             data.pop(dont_share, None)
 
         # inject AMP if HORAK is used and vice versa (since VG3 only has a single value for assertion method)
-        if data.get("assertion_method", {}).get("value") == "horak" || data.get("assertion_method", {}).get("value") == "amp":
+        if data.get("assertion_method", {}).get("value") == "horak" or data.get("assertion_method", {}).get("value") == "amp":
             data["assertion_method"] = {"value": ["horak", "amp"]}
 
         # no need to screw around with owner
