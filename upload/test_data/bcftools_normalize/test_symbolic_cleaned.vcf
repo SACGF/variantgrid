@@ -1,0 +1,12 @@
+##fileformat=VCFv4.1
+##source=VariantGrid
+##INFO=<ID=END,Number=.,Type=Integer,Description="Stop position of the interval">
+##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Difference in length between REF and ALT alleles">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+##contig=<ID=NC_000001.11,length=248956422,assembly=GRCh38>
+##contig=<ID=NC_000005.10,length=181538259,assembly=GRCh38>
+##contig=<ID=NC_000017.11,length=83257441,assembly=GRCh38>
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+NC_000001.11	1787353	.	C	<DEL>	11971.8	PASS	SVLEN=-38100;END=1825454
+NC_000005.10	112840436	.	G	<DEL>	11971.8	PASS	SVLEN=-2113;END=112842550
+NC_000017.11	43090940	.	T	<DEL>	11971.8	PASS	SVLEN=-6347;END=43097288
