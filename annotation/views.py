@@ -148,9 +148,11 @@ def annotation_build_detail(request, genome_build_name):
         if settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED:
             annotation_sub_components.append(gene_annotation_counts)
 
+        expected_somalier_sites_name = None
         if settings.SOMALIER.get("enabled"):
             somalier_cfg = SomalierConfig()
             try:
+                expected_somalier_sites_name = somalier_cfg.get_sites_vcf_name(genome_build)
                 vcf = somalier_cfg.get_sites_vcf(genome_build)
                 annotation_details["somalier"] = f"Sites VCF: {vcf.name}"
                 somalier = True
@@ -164,6 +166,7 @@ def annotation_build_detail(request, genome_build_name):
         "build_name": genome_build.name,
         "details": annotation_details,
         "cdot_version": cdot.__version__,
+        "expected_somalier_sites_name": expected_somalier_sites_name,
     }
     return render(request, "annotation/annotation_build_detail.html", context)
 

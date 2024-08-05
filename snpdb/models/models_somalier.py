@@ -272,8 +272,11 @@ class SomalierConfig:
         sites = self.settings["annotation"]["sites"][genome_build.name]
         return self._annotation_dir(sites)
 
+    def get_sites_vcf_name(self, genome_build: 'GenomeBuild') -> str:
+        return os.path.basename(self.get_sites(genome_build))
+
     def get_sites_vcf(self, genome_build: 'GenomeBuild'):
-        sites_name = os.path.basename(self.get_sites(genome_build))
+        sites_name = self.get_sites_vcf_name(genome_build)
         sites_vcf_kwargs = {"name": sites_name, "genome_build": genome_build}
         try:
             return VCF.objects.get(**sites_vcf_kwargs)
