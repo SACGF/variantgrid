@@ -229,7 +229,7 @@ _VALIDATION_TO_SEVERITY: [str, ALLELE_INFO_VALIDATION_SEVERITY] = {
     'gene_symbol_change': "W",
     'c_nomen_change': "E",
     'missing_37': "W",
-    'missing_38': "E",
+    'missing_38': "W",
     'cant_resolve_to_variant_coordinate': "E",
     'hgvs_issue': "E"  # deprecated as too generic
 }
