@@ -4,7 +4,7 @@ import numpy as np
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import OuterRef, Subquery, F
-from django.db.models.functions import Length
+from django.db.models.functions import Length, Abs
 
 from annotation.models import AnnotationRangeLock
 from library.utils import mk_path
@@ -28,10 +28,15 @@ class Command(BaseCommand):
     @staticmethod
     def update_variants_in_range_fix_end(variant_qs):
         # These are all non-symbolic, so can just use ref length
-        variant_qs = variant_qs.exclude(alt__seq__startswith="<")
-        calc_end = F("locus__position") + Length("locus__ref__seq")
-        variant_subquery = Variant.objects.filter(pk=OuterRef("pk")).annotate(calc_end=calc_end).values("calc_end")[:1]
-        variant_qs.update(end=Subquery(variant_subquery))
+        non_symbolic_variant_qs = variant_qs.filter(svlen__isnull=True)
+        calc_end = F("locus__position") + Length("locus__ref__seq") - 1
+        non_symbolic_variant_subquery = Variant.objects.filter(pk=OuterRef("pk")).annotate(calc_end=calc_end).values("calc_end")[:1]
+        non_symbolic_variant_qs.update(end=Subquery(non_symbolic_variant_subquery))
+
+        symbolic_variant_qs = variant_qs.filter(svlen__isnull=False)
+        calc_end = F("locus__position") + Abs("svlen")
+        symbolic_variant_subquery = Variant.objects.filter(pk=OuterRef("pk")).annotate(calc_end=calc_end).values("calc_end")[:1]
+        symbolic_variant_qs.update(end=Subquery(symbolic_variant_subquery))
 
     def handle(self, *args, **options):
         # We want to do this in small batches - so use the variant annotation range locks which are all approx the same
@@ -43,7 +48,7 @@ class Command(BaseCommand):
         # This can take a few days, so we'll write the variant as we go, so we can resume without any troubles
         migrations_dir = os.path.join(settings.PRIVATE_DATA_ROOT, "migrations")
         mk_path(migrations_dir)
-        progress_file = os.path.join(migrations_dir, "one_off_fix_variant_end_progress.txt")
+        progress_file = os.path.join(migrations_dir, "one_off_fix_variant_end_progress_v2.txt")
 
         highest_av = AnnotationRangeLock.objects.order_by("-max_variant").first()
         arl_qs = AnnotationRangeLock.objects.filter(version=highest_av.version)

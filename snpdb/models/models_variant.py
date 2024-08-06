@@ -252,11 +252,9 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
                 * <DEL>, <DUP>, <INV>, and <CNV> symbolic structural variant alleles:, POS + SVLEN
         """
         if self.is_symbolic():
-            # Insertions add w/o replacing, so their end is the start (ie 1 past start using half-open)
-            if self.alt == VCFSymbolicAllele.DUP:
-                return self.position + 1
-            return self.position + abs(self.svlen) + 1
-        return self.position + len(self.ref)
+            # We don't support <INV> so don't need to worry about it
+            return self.position + abs(self.svlen)
+        return self.position + len(self.ref) - 1
 
     def __lt__(self, other):
         return self.as_tuple < other.as_tuple
