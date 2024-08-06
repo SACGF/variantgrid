@@ -30,7 +30,7 @@ def _get_note(apps):
 class Migration(migrations.Migration):
     dependencies = [
         ("classification", "0152_allele_origin_confirmed_ekey"),
-        ("snpdb", "0118_reminder_one_off_fix_variant_end"),
+        ("snpdb", "0141_one_off_fix_variant_end2"),
     ]
 
     operations = [
