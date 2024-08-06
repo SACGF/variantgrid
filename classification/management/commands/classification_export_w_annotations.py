@@ -63,7 +63,7 @@ class Command(BaseCommand):
                 count += 1
                 if count % 100 == 0:
                     print(f"Processed {count}")
-                variant_annotation_cells = [None] * 7
+                variant_annotation_cells = [None] * 4
                 gnomad_cells = [None] * 4
                 transcript_annotations_cells = [None] * len(transcript_annotation_keys)
                 substituted_transcript_version = None
