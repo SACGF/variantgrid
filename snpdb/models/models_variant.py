@@ -241,7 +241,16 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
 
     @property
     def end(self) -> int:
-        """ This corresponds to Variant.end - ie for overlaps """
+        """
+            THIS IMPLEMENTATION IS WRONG. Correct is below:
+
+            This corresponds to VCF INFO["END"] which is defined in spec as:
+
+            END position of the longest variant described in this record. The END of each allele is defined as:
+                * Non-symbolic alleles: POS + length of REF allele − 1.
+                * <INS> symbolic structural variant alleles: POS + length of REF allele − 1.
+                * <DEL>, <DUP>, <INV>, and <CNV> symbolic structural variant alleles:, POS + SVLEN
+        """
         if self.is_symbolic():
             # Insertions add w/o replacing, so their end is the start (ie 1 past start using half-open)
             if self.alt == VCFSymbolicAllele.DUP:
