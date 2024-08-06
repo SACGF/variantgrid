@@ -56,7 +56,11 @@ class ManualOperation(Operation):
             ManualMigrationTask.objects.filter(pk=self.task_id).delete()
         else:
             task, _ = ManualMigrationTask.objects.get_or_create(pk=self.task_id)
-            ManualMigrationRequsted.objects.create(task=task, note=self.note)
+            if callable(self.note):
+                note = self.note(apps)
+            else:
+                note = self.note
+            ManualMigrationRequsted.objects.create(task=task, note=note)
 
     @staticmethod
     def operation_manage(args: list[str], note: Optional[str] = None, test: Callable = None):
