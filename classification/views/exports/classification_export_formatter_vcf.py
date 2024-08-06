@@ -8,7 +8,7 @@ from django.http import HttpRequest
 from django.urls import reverse
 
 from classification.enums import SpecialEKeys, AlleleOriginBucket
-from classification.models import EvidenceKeyMap
+from classification.models import EvidenceKeyMap, ClassificationModification
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
@@ -24,6 +24,7 @@ class VCFTargetSystem(str, Enum):
     EMEDGENE = "emedgene"
     GENERIC = "generic"
     VARSEQ = "varseq"
+    CLASSIFICATION_DUMP = "classification_dump"
 
     CORE = "core"  # should be used for everyone
 
@@ -58,6 +59,27 @@ CLASSIFICATION_VALUE_TO_NUMBER = {
     "P": 5,
     "O": 5
 }
+
+
+@dataclass(frozen=True)
+class ClassificationSimpleVCF(ExportVCF):
+    classification_modification: ClassificationModification
+    allele_data: AlleleData
+
+    def get_variant_id(self) -> str:
+        return self.classification_modification.classification.cr_lab_id
+
+    def get_variant(self) -> Variant:
+        return self.allele_data.cached_variant
+
+    @export_vcf_info_cell(
+        header_id="allele_id",
+        header_type=VCFHeaderType.String,
+        description="Allele ID",
+        categories={"system": VCFTargetSystem.CORE}
+    )
+    def allele_id(self):
+        return self.allele_data.allele_id
 
 
 @dataclass(frozen=True)
@@ -301,12 +323,20 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
         contig_field = f'classification__allele_info__grch{genome_build_str}__variant__locus__contig'
         contig_qs = self.classification_filter.cms_qs.values_list(contig_field, flat=True).order_by(contig_field).distinct()
 
-        all_vcf_headers = ClassificationVCF.complete_header(
-            genome_build=self.genome_build,
-            contigs=contig_qs,
-            extras=[VCFHeader(settings.SITE_NAME + "_dataFilters", value=self.classification_filter.description)],
-            export_tweak=self.export_tweak
-        )
+        if self.target_system == VCFTargetSystem.CLASSIFICATION_DUMP:
+            all_vcf_headers = ClassificationSimpleVCF.complete_header(
+                genome_build=self.genome_build,
+                contigs=contig_qs,
+                extras=[VCFHeader(settings.SITE_NAME + "_dataFilters", value=self.classification_filter.description)],
+                export_tweak=self.export_tweak
+            )
+        else:
+            all_vcf_headers = ClassificationVCF.complete_header(
+                genome_build=self.genome_build,
+                contigs=contig_qs,
+                extras=[VCFHeader(settings.SITE_NAME + "_dataFilters", value=self.classification_filter.description)],
+                export_tweak=self.export_tweak
+            )
         return [str(header) for header in all_vcf_headers]
 
     @property
@@ -319,12 +349,24 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
 
     def row(self, allele_data: AlleleData) -> list[str]:
         if allele_data.cms:
-            if row := ClassificationVCF(
-                    allele_data,
-                    include_id=True,  # self.target_system != VCFTargetSystem.EMEDGENE,
-                    link_extra=self.link_extra
-            ).vcf_row(export_tweak=self.export_tweak):
-                return [row]
+            if self.target_system == VCFTargetSystem.CLASSIFICATION_DUMP:
+                rows = []
+                if variant := allele_data.cached_variant:
+                    for cm in allele_data.cms:
+                        simple_row = ClassificationSimpleVCF(
+                            classification_modification=cm,
+                            allele_data=allele_data
+                        ).vcf_row(export_tweak=self.export_tweak)
+                        rows.append(simple_row)
+                return rows
+
+            else:
+                if row := ClassificationVCF(
+                        allele_data,
+                        include_id=True,  # self.target_system != VCFTargetSystem.EMEDGENE,
+                        link_extra=self.link_extra
+                ).vcf_row(export_tweak=self.export_tweak):
+                    return [row]
 
     def content_type(self) -> str:
         return "text/plain"
