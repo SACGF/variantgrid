@@ -817,17 +817,18 @@ class SVOverlapProcessor:
         self.sv_fields = set(cvf_qs.values_list("variant_grid_column_id", flat=True))
 
     @staticmethod
-    def _get_required_substring(variant_class: str):
-        required_substring = ''  # Empty string is in anything
+    def _get_required_substrings(variant_class: str) -> list[str]:
+        required_substrings = []  # Empty means all will go through
         if settings.ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE:
             # gnomad_sv_overlap_name looks like: 'gnomAD-SV_v2.1_INV_17_731&gnomAD-SV_v2.1_DEL_17_160435'
             EXPECTED_NAME = {
-                'deletion': "DEL",
-                'duplication': 'DUP',
-                'inversion': 'INV',
+                'deletion': ["DEL"],
+                'duplication': ['DUP'],
+                'inversion': ['INV'],
+                'indel': ["DEL", "INS"]
             }
-            required_substring = EXPECTED_NAME[variant_class]
-        return required_substring
+            required_substrings = EXPECTED_NAME.get(variant_class, [])
+        return required_substrings
 
     def process(self, raw_db_data: dict):
         # This one should always there if any overlaps
@@ -837,8 +838,16 @@ class SVOverlapProcessor:
         # The StructuralVariantOverlap fields are joined via '&'
         # Get it into a nice structure then process it
         sv_records = VariantAnnotation.vep_multi_fields_to_list_of_dicts(raw_db_data, self.sv_fields)
-        required_substring = self._get_required_substring(raw_db_data["variant_class"])
-        filtered_sv_records = [r for r in sv_records if required_substring in r['gnomad_sv_overlap_name']]
+        if required_substrings := self._get_required_substrings(raw_db_data["variant_class"]):
+            filtered_sv_records = []
+            for r in sv_records:
+                for substring in required_substrings:
+                    if substring in r['gnomad_sv_overlap_name']:
+                        filtered_sv_records.append(r)
+                        break
+        else:
+            # No filtering required - all go through
+            filtered_sv_records = sv_records
 
         if filtered_sv_records:
             chosen_record = self._pick_record(filtered_sv_records)
