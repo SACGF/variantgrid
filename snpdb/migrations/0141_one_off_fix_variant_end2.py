@@ -18,5 +18,4 @@ class Migration(migrations.Migration):
     operations = [
         ManualOperation(task_id=ManualOperation.task_id_manage(["one_off_fix_variant_end"]),
                         test=_existing_deploy_has_variants),
-
     ]
