@@ -206,7 +206,7 @@ class ImportedAlleleInfoStatus(TextChoices):
     MATCHED_IMPORTED_BUILD = "I", "Matched Imported Variant"
     """ We have a variant for the imported build, but not yet lifted it over """
 
-    MATCHED_ALL_BUILDS = "M", "Matched All Builds"
+    MATCHED_ALL_BUILDS = "M", "Complete"
     """ There's a 37 and 38 variant linked (or at least there was an attempted liftover) """
 
     FAILED = "F", "Failed"
