@@ -101,7 +101,7 @@ class TranscriptAutocompleteView(AutocompleteView):
 
 @method_decorator(cache_page(WEEK_SECS), name='dispatch')
 class GeneSymbolAutocompleteView(AutocompleteView):
-    fields = ['symbol']
+    fields = ['symbol_deterministic']
 
     def sort_queryset(self, qs):
         return qs.order_by(Length("symbol").asc(), 'symbol')
@@ -109,11 +109,12 @@ class GeneSymbolAutocompleteView(AutocompleteView):
     def get_user_queryset(self, _user):
         """ Doesn't actually use user for genes """
         annotation_consortium = self.forwarded.get('annotation_consortium', None)
-        qs = GeneSymbol.objects.all()
+        qs = GeneSymbol.get_deterministic_queryset()
         if annotation_consortium:
             qs = qs.filter(geneversion__gene__annotation_consortium=annotation_consortium)
         if self.q:
-            qs = qs.filter(symbol__istartswith=self.q)
+            # Make it start with the query not just contain it
+            qs = qs.filter(symbol_deterministic__startswith=self.q)
         return qs.distinct()
 
 

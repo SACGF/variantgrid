@@ -24,7 +24,7 @@ from django.core.exceptions import PermissionDenied, ObjectDoesNotExist, Multipl
 from django.db import models, IntegrityError, transaction
 from django.db.models import QuerySet, TextField
 from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
-from django.db.models.functions import Upper
+from django.db.models.functions import Upper, Collate
 from django.db.models.query_utils import Q
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
@@ -168,14 +168,23 @@ class UniProt(models.Model):
     def __str__(self):
         return self.accession
 
-
 class GeneSymbol(models.Model, PreviewModelMixin):
+    """
+        If you need to perform a 'like' query on this field, you need to:
+
+    """
     symbol = TextField(primary_key=True, db_collation='case_insensitive')
 
     objects = ObjectManagerCachingRequest()
 
     class Meta:
         base_manager_name = 'objects'
+
+    @classmethod
+    def get_deterministic_queryset(cls) -> QuerySet['GeneSymbol']:
+        """ Adds 'symbol_deterministic' you can do like queries on """
+        qs = cls.objects.all()
+        return qs.annotate(symbol_deterministic=Collate("symbol", "und-x-icu"))
 
     @staticmethod
     def cast(symbol: Union[str, 'GeneSymbol']) -> Optional['GeneSymbol']:
@@ -227,7 +236,7 @@ class GeneSymbol(models.Model, PreviewModelMixin):
 
     def has_different_genes(self, other: 'GeneSymbol') -> bool:
         """
-        Tries to work out if genes are equivilant, not that sometimes refseq or ensembl assign gene ids to both the
+        Tries to work out if genes are equivilent, not that sometimes RefSeq or ensembl assign gene ids to both the
         symbol and the alias, but the other consortium only assigns to one. In that case we'd still like to treat them
         as the "same"
         """
