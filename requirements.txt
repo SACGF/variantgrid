@@ -39,7 +39,7 @@ django_recaptcha==4.0.0
 django-registration-redux==2.9
 django_termsandconditions==2.0.12
 django-reversion-compare==0.15.0
-djangorestframework==3.14.0
+djangorestframework==3.15.2
 easy_thumbnails==2.8.1
 fontawesomefree==6.4.0
 git+https://github.com/davmlaw/django-jfu#egg=django-jfu
