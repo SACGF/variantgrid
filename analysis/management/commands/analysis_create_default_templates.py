@@ -30,7 +30,6 @@ class Command(BaseCommand):
                 print(f"Created: {filename}")
 
             analysis.template_type = AnalysisTemplateType.TEMPLATE
-            analysis.visible = False
             analysis.save()
             add_public_group_read_permission(analysis)
 
