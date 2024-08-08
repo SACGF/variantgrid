@@ -13,9 +13,4 @@ apt-get install -y sassc
 # Stuff required to install on shariant server, might just be moving dependencies
 apt-get install -y pkg-config
 
-echo "Install python libraries"
-# For some reason straight out install of requirements.txt has issues, do some first
-python3 -m pip install --upgrade pip
-python3 -m pip install numpy HTSeq Cython
-#python3 -m pip install -r requirements-dev.txt
-python3 -m pip install -r variantgrid/requirements.txt
+# Installing Python now done elsewhere so you can do in virtual env
