@@ -38,8 +38,10 @@ out_file=dbNSFP${version}_grch38.stripped
 
 mkdir -p ${TMP_DIR}
 
+zcat dbNSFP${version}_variant.chr1.gz | head -n1 | cut -f ${CUT_COLUMNS} > ${out_file}
+
 # Sort chromosomes individually as that's much more efficient
-cat header.txt | cut -f ${CUT_COLUMNS} > ${OUT_FILE}
+
 for chrom in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y; do
     zgrep -h -v ^#chr dbNSFP${version}_variant.chr${chrom}.gz | cut -f ${CUT_COLUMNS} | sort -T ${TMP_DIR} -k${SEQ_COL},${SEQ_COL} -k${POS_COL},${POS_COL}n - >> ${out_file}
 done
