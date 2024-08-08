@@ -1298,7 +1298,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
 
     @property
     def has_conservation(self) -> bool:
-        return self.is_standard_annotation
+        """ Thanks to summary stats we can now do this in VEP112 """
+        return self.is_standard_annotation or self.version.vep >= 112
 
     @property
     def has_splicing(self) -> bool:
