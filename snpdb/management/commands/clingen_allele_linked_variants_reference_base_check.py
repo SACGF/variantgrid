@@ -36,7 +36,8 @@ class Command(BaseCommand):
                     if existing_vc != clingen_vc:
                         logging.info(f"{allele} has variant {repr(existing_vc)} not matching expected for build {va.genome_build}: {repr(clingen_vc)}")
                         if not dry_run:
-                            liftover_res = AlleleLiftover.objects.filter(allele=allele, genome_build=va.genome_build).delete()
+                            liftover_res = AlleleLiftover.objects.filter(variant_allele=allele,
+                                                                         liftover__genome_build=va.genome_build).delete()
                             logging.info(f"Removing liftover record: %s", liftover_res)
                             va_res = va.delete()
                             logging.info(f"Unlinking variant: %s", va_res)
