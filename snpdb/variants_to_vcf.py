@@ -55,14 +55,19 @@ def write_qs_to_vcf_file_sort_alphabetically(qs, f, info_dict=None):
     return _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict=info_dict)
 
 
-def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict):
+def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict, use_accession=False):
+    if use_accession:
+        chrom_key = "locus__contig__refseq_accession"
+    else:
+        chrom_key = "locus__contig__name"
+
     for line in header_lines:
         line_bytes = (line + '\n').encode()
         f.write(line_bytes)
 
     i = 0
     for data in sorted_values:
-        chrom = data["locus__contig__name"]
+        chrom = data[chrom_key]
         pos = data["locus__position"]
         ref = data["locus__ref__seq"]
         alt = data["alt__seq"]
@@ -94,9 +99,9 @@ def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict):
     return i
 
 
-def write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict):
-    header_lines = get_vcf_header_from_contigs(genome_build, info_dict=info_dict)
-    return _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict=info_dict)
+def write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict, use_accession=False):
+    header_lines = get_vcf_header_from_contigs(genome_build, info_dict=info_dict, use_accession=use_accession)
+    return _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict=info_dict, use_accession=use_accession)
 
 
 def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample_name_func=None) -> dict[Sample, Counter]:
