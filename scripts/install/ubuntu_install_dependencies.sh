@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Tested on Ubuntu 20, 22, 24
+
 set -e # Fail on error
 
 echo "Installing packages via apt-get"
