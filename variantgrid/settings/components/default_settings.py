@@ -550,6 +550,8 @@ PEDIGREE_MADELINE2_COMMAND = None  # Install https://madeline.med.umich.edu/made
 REQUESTS_DISABLE_IPV6 = True  # we've found a performance penalty w/IPv6
 
 INITIAL_USER_DATA_PREFIX_KWARGS = {}  # Create UserDataPrefix object to setup IGV for new users
+ISSUE_TRACKER_URL = "https://github.com/SACGF/variantgrid/issues"
+ISSUE_TRACKER_TEXT = "GitHub issue tracker"
 
 USER_SETTINGS_SHOW_GROUPS = True
 

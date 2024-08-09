@@ -1,6 +1,7 @@
 {% extends menu_data_base %}
 {% load static %}
 {% load js_tags %}
+{% load settings_tags %}
 {% block head %}
     <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
@@ -108,7 +109,9 @@
     {% endif %}
 
         <P>
-        Please report bugs on <a class="hover-link external-link" href="https://github.com/SACGF/variantgrid/issues">github issue tracker</a>.
+        {% settings_value 'ISSUE_TRACKER_URL' as ISSUE_TRACKER_URL %}
+        {% settings_value 'ISSUE_TRACKER_TEXT' as ISSUE_TRACKER_TEXT %}
+        Please report bugs on <a class="hover-link external-link" href="{{ ISSUE_TRACKER_URL }}">{{ ISSUE_TRACKER_TEXT }}</a>.
 
         <div>
             {{ dashboard_notices.notice_header }}
