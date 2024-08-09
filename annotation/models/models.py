@@ -871,7 +871,10 @@ class AnnotationRangeLock(models.Model):
     def __str__(self):
         min_v = self.min_variant_id
         max_v = self.max_variant_id
-        return f"AnnotationRangeLock: (v. {self.version}) {min_v} - {max_v}"
+        s = f"AnnotationRangeLock: (v. {self.version}) {min_v} - {max_v}"
+        if self.count is not None:
+            s += f" (count={self.count})"
+        return s
 
     @staticmethod
     def release_variant(variant: Variant):
