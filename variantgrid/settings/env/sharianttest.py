@@ -26,8 +26,6 @@ LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=https%3A%2
 _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded annotation (${ANNOTATION_BASE_DIR} from wiki)
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'test_annotation_scratch')
 
-# LIFTOVER_BCFTOOLS_ENABLED = True
-
 SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
 SHARIANT_TEST_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_test_static")
 STATICFILES_DIRS = (SHARIANT_TEST_STATIC_FILES_DIR, SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
@@ -35,3 +33,4 @@ SHARIANT_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/shariant_t
 TEMPLATES[0]["DIRS"].insert(0, SHARIANT_TEMPLATES_DIR)
 
 VARIANT_SYMBOLIC_ALT_ENABLED = True
+HGVS_DEFAULT_METHOD = "biocommons_hgvs"

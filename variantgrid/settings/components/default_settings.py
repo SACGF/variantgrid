@@ -421,7 +421,7 @@ LIFTOVER_CLASSIFICATIONS = True
 LIFTOVER_TO_CHROMOSOMES_ONLY = True  # False = Liftover to alt/patches
 LIFTOVER_DBSNP_ENABLED = False  # Default=False - doesn't work so well due to dbSNP IDs being for loci
 
-LIFTOVER_BCFTOOLS_ENABLED = False
+LIFTOVER_BCFTOOLS_ENABLED = True
 LIFTOVER_BCFTOOLS_PLUGIN_DIR = "/usr/share/bcftools/plugins"
 BCFTOOLS_COMMAND = "bcftools"  # if not absolute, needs to be in path
 
