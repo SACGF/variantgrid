@@ -172,7 +172,7 @@ class PreviewModelMixin:
 PreviewCoordinator = Union[Type[PreviewModelMixin], PreviewProxyModel]
 
 
-@dataclass
+@dataclass(eq=True)
 class PreviewData:
     category: str
     identifier: str
@@ -185,6 +185,7 @@ class PreviewData:
     annotation_consortia: Optional[set['AnnotationConsortium']] = None
     obj: Optional[Any] = None
     is_operation: bool = False  # indicates that the preview data is the preview of an operation to create the data
+    # If you add any fields, be sure to modify __hash__ below...
 
     @staticmethod
     def for_object(
@@ -298,6 +299,28 @@ class PreviewData:
             "external_url": self.external_url
         }
 
+    def __hash__(self):
+        genome_builds = []
+        if self.genome_builds:
+            genome_builds = tuple(sorted(self.genome_builds))
+        annotation_consortia = []
+        if self.annotation_consortia:
+            annotation_consortia = tuple(sorted(self.annotation_consortia))
+
+        fields = (
+            self.category,
+            self.identifier,
+            self.title,
+            self.icon,
+            self.summary_extra,
+            self.internal_url,
+            self.external_url,
+            genome_builds,
+            annotation_consortia,
+            self.obj,
+            self.is_operation,
+        )
+        return hash((f for f in fields if f is not None))
 
 class PreviewRequest:
     """

@@ -331,6 +331,14 @@ class SearchResult:
     def __lt__(self, other):
         return self._sort_order < other._sort_order
 
+    def __hash__(self):
+        return hash(self.preview)
+
+    def __eq__(self, other):
+        if not isinstance(other, SearchResult):
+            return NotImplemented
+        return self.preview == other.preview
+
     @property
     def effective_match_strength(self) -> SearchResultMatchStrength:
         return self.match_strength or SearchResultMatchStrength.STRONG_MATCH
@@ -766,11 +774,12 @@ class SearchResponsesCombined:
                 return id_matches[0]
             return None
 
-        correct_genome_build_results = [result for result in self.results if not result.genome_build_mismatch]
+        # Put in set to merge identical results (based off Preview) from diff genome builds
+        correct_genome_build_results = {result for result in self.results if not result.genome_build_mismatch}
 
         # alternatively if we only have 1 match, return it
         if len(correct_genome_build_results) == 1:
-            first_result = correct_genome_build_results[0]
+            first_result = next(iter(correct_genome_build_results))
             if first_result.is_perfectly_valid and first_result.match_strength >= SearchResultMatchStrength.STRONG_MATCH:
                 return first_result
 

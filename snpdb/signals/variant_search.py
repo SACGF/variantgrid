@@ -641,7 +641,8 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                     genome_build=genome_build
                 ), search_messages + reference_message
             else:
-                is_genomic = kind == 'g'  # doesn't matter what the preferred genome build is (explicit contig version)
+                # doesn't matter what the preferred genome build is (explicit contig version)
+                is_genomic = kind in ('g', 'm')
                 yield SearchResult(preview=variant.preview, messages=search_messages + reference_message,
                                    ignore_genome_build_mismatch=is_genomic)
 
