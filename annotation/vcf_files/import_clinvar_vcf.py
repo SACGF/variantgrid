@@ -62,14 +62,14 @@ from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 class BulkClinVarInserter:
     CLINVAR_INFO_MAPPINGS = {
         'ALLELEID': 'clinvar_allele_id',
-        'CLNDN': 'clinvar_preferred_disease_name',
-        'CLNDISDB': 'clinvar_disease_database_name',
-        'CLNREVSTAT': 'clinvar_review_status',
+        'CLNDN': 'preferred_disease_name',
+        'CLNDISDB': 'disease_database_name',
+        'CLNREVSTAT': 'review_status',
         'CLNSIG': 'clinical_significance',
         'CLNSIGCONF': 'conflicting_clinical_significance',
-        'CLNVI': 'clinvar_clinical_sources',
-        'ORIGIN': 'clinvar_origin',
-        'SSR': 'clinvar_suspect_reason_code',
+        'CLNVI': 'clinical_sources',
+        'ORIGIN': 'origin',
+        'SSR': 'suspect_reason_code',
         # new oncogenic fields
         'ONCREVSTAT': 'oncogenic_review_status',
         'ONC': 'oncogenic_classification',
@@ -92,15 +92,15 @@ class BulkClinVarInserter:
                           'variant_id',
                           'clinvar_variation_id',
                           'clinvar_allele_id',
-                          'clinvar_preferred_disease_name',
-                          'clinvar_disease_database_name',
-                          'clinvar_review_status',
+                          'preferred_disease_name',
+                          'disease_database_name',
+                          'review_status',
                           'clinical_significance',
                           'conflicting_clinical_significance',
                           'highest_pathogenicity',
-                          'clinvar_clinical_sources',
-                          'clinvar_origin',
-                          'clinvar_suspect_reason_code',
+                          'clinical_sources',
+                          'origin',
+                          'suspect_reason_code',
                           'drug_response',
 
                           'oncogenic_review_status',
@@ -137,7 +137,7 @@ class BulkClinVarInserter:
         self.variant_pk_lookup = VariantPKLookup(clinvar_version.genome_build)
         review_status_vcf_mappings_dict = dict(ClinVarReviewStatus.VCF_MAPPINGS)
         self.field_formatters = {
-            "clinvar_review_status": lambda x: review_status_vcf_mappings_dict[x],
+            "review_status": lambda x: review_status_vcf_mappings_dict[x],
             "somatic_review_status": lambda x: review_status_vcf_mappings_dict[x],
             "oncogenic_review_status": lambda x: review_status_vcf_mappings_dict[x]
         }

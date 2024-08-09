@@ -495,7 +495,7 @@ class ClassificationExportFormatterClinVarCompareExpert(ClassificationExportForm
     def filter_clinvars(self, queryset: QuerySet[ClinVar]) -> QuerySet[ClinVar]:
         expert_and_practise = (ClinVarReviewStatus.REVIEWED_BY_EXPERT_PANEL[0], ClinVarReviewStatus.PRACTICE_GUIDELINE[0])
         return queryset.filter(
-            Q(clinvar_review_status__in=expert_and_practise) |
+            Q(review_status__in=expert_and_practise) |
             Q(somatic_review_status__in=expert_and_practise) |
             Q(oncogenic_review_status__in=expert_and_practise)
         )

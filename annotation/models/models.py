@@ -133,17 +133,17 @@ class ClinVar(models.Model):
     variant = models.ForeignKey(Variant, on_delete=PROTECT)
     clinvar_variation_id = models.IntegerField()
     clinvar_allele_id = models.IntegerField()
-    clinvar_preferred_disease_name = models.TextField(null=True, blank=True)
-    clinvar_disease_database_name = models.TextField(null=True, blank=True)
-    clinvar_review_status = models.CharField(max_length=1, null=True, choices=ClinVarReviewStatus.choices)
+    preferred_disease_name = models.TextField(null=True, blank=True)
+    disease_database_name = models.TextField(null=True, blank=True)
+    review_status = models.CharField(max_length=1, null=True, choices=ClinVarReviewStatus.choices)
     clinical_significance = models.TextField(null=True, blank=True)
 
     # If clinical_significance = 'Conflicting_interpretations_of_pathogenicity'
     conflicting_clinical_significance = models.TextField(null=True, blank=True)
     highest_pathogenicity = models.IntegerField(default=0)  # Highest of clinical_significance
-    clinvar_clinical_sources = models.TextField(null=True, blank=True)
-    clinvar_origin = models.IntegerField(default=0)
-    clinvar_suspect_reason_code = models.IntegerField(default=0)
+    clinical_sources = models.TextField(null=True, blank=True)
+    origin = models.IntegerField(default=0)
+    suspect_reason_code = models.IntegerField(default=0)
     drug_response = models.BooleanField(default=False)
 
     # ONCREVSTAT
@@ -194,7 +194,7 @@ class ClinVar(models.Model):
 
     @cached_property
     def germline_disease_database_terms(self) -> list[str]:
-        return ClinVar._database_terms(self.clinvar_disease_database_name)
+        return ClinVar._database_terms(self.disease_database_name)
 
     @cached_property
     def somatic_disease_database_terms(self) -> list[str]:
@@ -207,9 +207,9 @@ class ClinVar(models.Model):
     # repeat the above for oncogenic and somatic
 
     @property
-    def clinvar_clinical_sources_list(self) -> list[str]:
-        if clinvar_clinical_sources := self.clinvar_clinical_sources:
-            return [name.strip() for name in clinvar_clinical_sources.split("|")]
+    def clinical_sources_list(self) -> list[str]:
+        if clinical_sources := self.clinical_sources:
+            return [name.strip() for name in clinical_sources.split("|")]
         return []
 
     @property
@@ -227,7 +227,7 @@ class ClinVar(models.Model):
 
     @property
     def germline_stars(self) -> int:
-        return ClinVar._stars_for(self.clinvar_review_status)
+        return ClinVar._stars_for(self.review_status)
 
     @property
     def somatic_stars(self) -> int:
@@ -246,7 +246,7 @@ class ClinVar(models.Model):
         FIXME use allele_origins clinvar_origin is a flag
         it might contain multiple values
         """
-        return ClinVar.ALLELE_ORIGIN.get(self.clinvar_origin)
+        return ClinVar.ALLELE_ORIGIN.get(self.origin)
 
     @property
     def get_allele_origins_display(self):
@@ -257,7 +257,7 @@ class ClinVar(models.Model):
         origins: list[str] = []
         for flag, label in ClinVar.ALLELE_ORIGIN.items():
             if flag:
-                if self.clinvar_origin & flag:
+                if self.origin & flag:
                     origins.append(label)
         if not origins:
             origins.append("unknown")
@@ -277,7 +277,7 @@ class ClinVar(models.Model):
             return AlleleOriginBucket.UNKNOWN
 
     def get_suspect_reason_code_display(self):
-        return ClinVar.SUSPECT_REASON_CODES.get(self.clinvar_suspect_reason_code)
+        return ClinVar.SUSPECT_REASON_CODES.get(self.suspect_reason_code)
 
     def get_loaded_citations(self) -> CitationFetchResponse:
         cvc_qs = ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,

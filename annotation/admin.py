@@ -36,7 +36,7 @@ class AnnotationRunAdmin(ModelAdminBasics):
 @admin.register(ClinVar)
 class ClinVarAdmin(ModelAdminBasics):
 
-    list_display = ("pk", "version_short", "clinvar_variation_id", "variant_link", "clinvar_review_status", "somatic_review_status", "oncogenic_review_status")
+    list_display = ("pk", "version_short", "clinvar_variation_id", "variant_link", "review_status", "somatic_review_status", "oncogenic_review_status")
     list_filter = ("version", )
 
     @admin_list_column("Version", order_field="version")

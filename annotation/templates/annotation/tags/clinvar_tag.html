@@ -45,7 +45,7 @@
                             {% for term in clinvar.oncogenic_disease_database_terms %}{% if not forloop.first %}<span class="text-muted">|</span>{% endif %} {% ontology_term term %} {% endfor %}
                         {% endlabelled %}
                     {% endif %}
-                    {% labelled label="Clinical Sources" %}{% for source in clinvar.clinvar_clinical_sources_list %}{% if not forloop.first %}<span class="text-muted">|</span>{% endif %} {{ source | code_to_english }} {% endfor %}{% endlabelled %}
+                    {% labelled label="Clinical Sources" %}{% for source in clinvar.clinical_sources_list %}{% if not forloop.first %}<span class="text-muted">|</span>{% endif %} {{ source | code_to_english }} {% endfor %}{% endlabelled %}
                 </div>
                 <div class="mt-2">
                     <div data-toggle="ajax-collapse" href="{% url 'view_clinvar_records_detail' clinvar.clinvar_variation_id min_stars %}" title="Individual ClinVar Records"></div>

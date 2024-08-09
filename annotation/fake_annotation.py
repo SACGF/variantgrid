@@ -144,9 +144,9 @@ def create_fake_clinvar_data(clinvar_version: ClinVarVersion):
     defaults = {
         "clinvar_variation_id": clinvar_variation_id,
         "clinvar_allele_id": clinvar_allele_id,
-        "clinvar_preferred_disease_name": "smelly feet",
-        "clinvar_disease_database_name": "blah",
-        "clinvar_review_status": ClinVarReviewStatus.CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS_NO_CONFLICTS,
+        "preferred_disease_name": "smelly feet",
+        "disease_database_name": "blah",
+        "review_status": ClinVarReviewStatus.CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS_NO_CONFLICTS,
         "clinical_significance": "Pathogenic",
         "highest_pathogenicity": 5
     }

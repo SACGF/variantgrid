@@ -23,7 +23,7 @@ class BuiltInFilterNode(AnalysisNode):
 
     def get_clinvar_stars_q(self):
         review_statuses = ClinVarReviewStatus.statuses_gte_stars(self.clinvar_stars_min)
-        return Q(clinvar__clinvar_review_status__in=review_statuses)
+        return Q(clinvar__review_status__in=review_statuses)
 
     def _get_node_q(self) -> Optional[Q]:
         q = get_extra_filters_q(self.analysis.user, self.analysis.genome_build, self.built_in_filter)
