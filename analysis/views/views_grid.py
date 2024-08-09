@@ -68,7 +68,8 @@ class NodeGridHandler(NodeJSONViewMixin):
             which should hopefully hit the cache next time
         """
         LOCK_EXPIRE = 60 * 10  # 10 mins
-        url = reverse("node_grid_handler", kwargs={"analysis_id": self.analysis_id})
+        node = self._get_node(request)
+        url = reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id})
         url = _add_allowed_node_grid_params(url, request.GET.dict())
         lock_id = f"{url}_{request.user}"
         if cache.add(lock_id, "true", LOCK_EXPIRE):  # Acquire lock
