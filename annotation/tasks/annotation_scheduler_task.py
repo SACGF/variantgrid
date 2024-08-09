@@ -100,10 +100,10 @@ def subdivide_annotation_range_lock(arl: AnnotationRangeLock, minimum_size=1000)
     logging.info("Subdividing %s", arl)
 
     # Delete all existing annotation runs
-    res = arl.annotationrun_set.delete()
+    res = arl.annotationrun_set.all().delete()
     logging.info("Deleted attached annotation runs: %s", res)
 
-    half_size = size / 1000
+    half_size = size / 2
     halfway_point = int(arl.min_variant_id) + half_size
     first_at_or_above_halfway = Variant.objects.filter(pk__gte=halfway_point).order_by("pk").first()
     first_below_halfway = Variant.objects.filter(pk__gte=arl.min_variant_id, pk__lt=halfway_point).order_by("pk").last()
