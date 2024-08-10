@@ -8,4 +8,4 @@ ALTER USER snpdb CREATEDB;
 -- Install extension install on snpdb database
 \connect snpdb;
 CREATE EXTENSION IF NOT EXISTS citext;
-GRANT ALL ON SCHEMA public TO snpdb;  # Needed for Postgres 15+
+GRANT ALL ON SCHEMA public TO snpdb;  -- Needed for Postgres 15+
