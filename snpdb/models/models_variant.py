@@ -323,15 +323,19 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
     def is_symbolic(self):
         return Sequence.allele_is_symbolic(self.alt)
 
+    def calculated_reference(self, genome_build) -> str:
+        contig_sequence = genome_build.genome_fasta.fasta[self.chrom]
+        # reference sequence is 0-based
+        ref_sequence = contig_sequence[self.position - 1:self.end]
+        return ref_sequence.upper()
+
     def as_external_explicit(self, genome_build) -> 'VariantCoordinate':
         """ explicit ref/alt """
         if self.is_symbolic():
             if self.svlen is None:
                 raise ValueError(f"{self} has 'svlen' = None")
 
-            contig_sequence = genome_build.genome_fasta.fasta[self.chrom]
-            # reference sequence is 0-based
-            ref_sequence = contig_sequence[self.position-1:self.position + abs(self.svlen)].upper()
+            ref_sequence = self.calculated_reference(genome_build)
             if self.alt == VCFSymbolicAllele.DEL:
                 ref = ref_sequence
                 alt = ref_sequence[0]

@@ -157,11 +157,21 @@ def search_variant_locus_with_ref(search_input: SearchInputInstance):
     for genome_build in search_input.genome_builds:
         chrom, position, ref = search_input.match.groups()
         chrom = format_chrom(chrom, genome_build.reference_fasta_has_chr)
-        yield search_input.get_visible_variants(genome_build).filter(
+        variants_qs = search_input.get_visible_variants(genome_build)
+        position_qs = variants_qs.filter(
             locus__contig__name=chrom,
             locus__position=position,
-            locus__ref__seq=ref
         )
+        ref_qs = position_qs.filter(locus__ref__seq=ref)
+        if ref_qs.exists():
+            yield from ref_qs
+        else:
+            for v in position_qs:
+                ref_messages = [
+                    SearchMessage(f'No results for ref "{ref}", but found this using ref "{v.locus.ref}"',
+                                  severity=LogLevel.WARNING, substituted=True)
+                ]
+                yield SearchResult(v.preview, messages=ref_messages)
 
 
 @search_receiver(
@@ -177,26 +187,44 @@ def allele_search(search_input: SearchInputInstance):
         allele = clingen_allele.allele
         for genome_build in search_input.genome_builds:
             # This ensures we retrieve using correct permissions
-            visible_variants = search_input.get_visible_variants(genome_build)
+            visible_variants_qs = search_input.get_visible_variants(genome_build)
             if variant := allele.variant_for_build_optional(genome_build):
-                yield from visible_variants.filter(pk=variant.pk)
+                yield from visible_variants_qs.filter(pk=variant.pk)
                 continue
+            # if here then No variant found
 
             # If we are non-admin we don't want to see anything else (eg ClinGen not in our build)
             if settings.SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN and not search_input.user.is_superuser:
                 continue
 
             try:
-                # if there was no variant for that allele
-                variant_string = clingen_allele.get_variant_string(genome_build)
-                if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build, variant_string=variant_string):
-                    variant_string_abbreviated = clingen_allele.get_variant_string(genome_build, abbreviate=True)
-                    yield create_manual, SearchMessage(f'"{clingen_allele}" resolved to "{variant_string_abbreviated}"', severity=LogLevel.INFO)
+                variant_coordinate = clingen_allele.get_variant_coordinate(genome_build)
+                yield from _yield_no_results_for_variant_coordinate(search_input.user, genome_build, visible_variants_qs,
+                                                                    variant_coordinate, [])
             except ValueError as e:
                 yield SearchMessageOverall(str(e), severity=LogLevel.ERROR, genome_builds=[genome_build])
 
 
-def get_results_from_variant_coordinate(genome_build: GenomeBuild, qs: QuerySet, variant_coordinate: VariantCoordinate, any_alt: bool = False) -> QuerySet[Variant]:
+def _yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, variant_qs,
+                                             variant_coordinate: VariantCoordinate,
+                                             search_messages: list[SearchMessage]) -> Iterable[SearchResult]:
+    # manual variants
+    variant_string = variant_coordinate.format()
+    if cmv := VariantExtra.create_manual_variant(for_user=user, genome_build=genome_build,
+                                                 variant_string=variant_string):
+        yield SearchResult(cmv, messages=search_messages)
+
+    # search for alt alts
+    alts = get_results_from_variant_coordinate(genome_build, variant_qs, variant_coordinate, any_alt=True)
+    for alt in alts:
+        alt_messages = search_messages + [
+            SearchMessage(f'No results for alt "{variant_coordinate.alt}", but found this using alt "{alt.alt}"',
+                          severity=LogLevel.ERROR, substituted=True)]
+        yield SearchResult(alt.preview, messages=alt_messages)
+
+
+def get_results_from_variant_coordinate(genome_build: GenomeBuild, qs: QuerySet, variant_coordinate: VariantCoordinate,
+                                        any_alt: bool = False) -> QuerySet[Variant]:
     """
     :param genome_build: genome build (used for format variant_coordinate.chromosome for variant search
     :param qs: A query set that we'll be searching inside of (except for when returning ModifiedImportVariants)
@@ -211,7 +239,7 @@ def get_results_from_variant_coordinate(genome_build: GenomeBuild, qs: QuerySet,
     if not any_alt:
         results = results.filter(alt__seq=variant_coordinate.alt, svlen=variant_coordinate.svlen)
 
-    if not results:
+    if not results.exists():
         if not any_alt:
             return ModifiedImportedVariant.get_variants_for_unnormalized_variant(variant_coordinate)
         else:
@@ -224,23 +252,29 @@ def get_results_from_variant_coordinate(genome_build: GenomeBuild, qs: QuerySet,
 def yield_search_variant_match(search_input: SearchInputInstance, get_variant_coordinate: Callable):
     for genome_build in search_input.genome_builds:
         variant_coordinate = get_variant_coordinate(search_input.match, genome_build)
-        variant_coordinate = variant_coordinate.as_internal_symbolic(genome_build)
-        results = get_results_from_variant_coordinate(genome_build, search_input.get_visible_variants(genome_build),
-                                                      variant_coordinate)
-        has_results = False
-        if results.exists():
-            has_results = True
-            yield results
-
         if errors := Variant.validate(genome_build, variant_coordinate.chrom, variant_coordinate.position):
             yield SearchMessageOverall(", ".join(errors), genome_builds=[genome_build])
+            continue
+
+        search_messages = []
+        calculated_ref = variant_coordinate.calculated_reference(genome_build)
+        logging.info(f"calc ref: %s, provided ref: %s", calculated_ref, variant_coordinate.ref)
+        if calculated_ref != variant_coordinate.ref:
+            provided_ref = variant_coordinate.ref
+            sm = SearchMessage(f'Using genomic reference "{calculated_ref}" from our build, in place of provided reference "{provided_ref}"',
+                               LogLevel.WARNING, substituted=True)
+            search_messages.append(sm)
+            variant_coordinate.ref = calculated_ref
+
+        variant_coordinate = variant_coordinate.as_internal_symbolic(genome_build)
+        visible_variants_qs = search_input.get_visible_variants(genome_build)
+        results = get_results_from_variant_coordinate(genome_build, visible_variants_qs, variant_coordinate)
+        if results.exists():
+            for v in results:
+                yield SearchResult(v.preview, messages=search_messages)
         else:
-            if not has_results:
-                variant_string = variant_coordinate.format()
-                if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build,
-                                                                       variant_string=variant_string):
-                    search_message = f"The variant {variant_string} does not exist in our database"
-                    yield create_manual, search_message
+            yield from _yield_no_results_for_variant_coordinate(search_input.user, genome_build, visible_variants_qs,
+                                                                variant_coordinate, search_messages)
 
 
 VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)", re.IGNORECASE)
@@ -479,7 +513,6 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         hgvs_string = clean_hgvs_string
 
     search_messages: list[SearchMessage] = []  # [SearchMessage(m) for m in hgvs_search_messages]
-    reference_message: list[SearchMessage] = []
 
     try:
         variant_coordinate, used_transcript_accession, kind, _used_converter_type, method, matches_reference = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string)
@@ -490,7 +523,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
             # reporting on the "provided" reference is slightly promblematic as it's not always provided directly, it could be indirectly
 
             if isinstance(matches_reference, HgvsMatchRefAllele) and matches_reference.provided_ref:
-                reference_message.append(SearchMessage(f'Using genomic reference "{matches_reference.calculated_ref}" from our build, in place of provided reference "{matches_reference.provided_ref}"', LogLevel.ERROR, substituted=True))
+                search_messages.append(SearchMessage(f'Using genomic reference "{matches_reference.calculated_ref}" from our build, in place of provided reference "{matches_reference.provided_ref}"', LogLevel.ERROR, substituted=True))
             else:
                 # if no reference was provided, do we even need to provide a message?
                 # e.g. this is providing a ref for when we have a delins, e.g. delinsGT => delCCinsGT
@@ -639,28 +672,23 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 yield VariantExtra.classify_variant(
                     variant=variant,
                     genome_build=genome_build
-                ), search_messages + reference_message
+                ), search_messages
             else:
                 # doesn't matter what the preferred genome build is (explicit contig version)
                 is_genomic = kind in ('g', 'm')
-                yield SearchResult(preview=variant.preview, messages=search_messages + reference_message,
+                yield SearchResult(preview=variant.preview, messages=search_messages,
                                    ignore_genome_build_mismatch=is_genomic)
 
         except Variant.DoesNotExist:
-            variant_string = Variant.format_tuple(*variant_coordinate)
             variant_string_abbreviated = Variant.format_tuple(*variant_coordinate, abbreviate=True)
-            search_messages.append(SearchMessage(f'"{hgvs_string}" resolved to genomic coordinates "{variant_string_abbreviated}"', LogLevel.INFO, genome_build=genome_build))
+            search_messages.append(
+                SearchMessage(f'"{hgvs_string}" resolved to genomic coordinates "{variant_string_abbreviated}"',
+                              LogLevel.INFO,
+                              genome_build=genome_build))
             # if we're saying what we're resolving to, no need to complain about reference_message
 
-            # manual variants
-            if cmv := VariantExtra.create_manual_variant(for_user=user, genome_build=genome_build, variant_string=variant_string):
-                yield SearchResult(cmv, messages=search_messages + reference_message)
-
-            # search for alt alts
-            alts = get_results_from_variant_coordinate(genome_build, variant_qs, variant_coordinate, any_alt=True)
-            for alt in alts:
-                alt_messages = search_messages + [SearchMessage(f'No results for alt "{variant_coordinate.alt}", but found this using alt "{alt.alt}"', severity=LogLevel.ERROR, substituted=True)]
-                yield SearchResult(alt.preview, messages=alt_messages)
+            yield from _yield_no_results_for_variant_coordinate(user, genome_build, variant_qs,
+                                                                variant_coordinate, search_messages)
 
 
 DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
