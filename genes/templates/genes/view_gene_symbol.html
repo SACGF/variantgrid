@@ -289,6 +289,15 @@
 
                     </div>
                 </div>
+            {% else %}
+                <!-- Show minimal annotation (HGNC only) -->
+                <div class="card mt-4">
+                    <div class="card-header">Summary</div>
+                    <div class="card-body">
+                        {% labelled label="Approved Name" help=annotation_description.hgnc_name %}{{ hgnc.approved_name }}{% endlabelled %}
+                        {% labelled label="HGNC ID" help=annotation_description.hgnc_id %}<a href="{{ hgnc.url }}">HGNC:{{ hgnc.pk }}</a> ({{ hgnc.get_status_display }}){% endlabelled %}
+                    </div>
+                </div>
             {% endif %}
 
             {% if dbnsfp_gene_annotation %}
