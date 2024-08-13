@@ -145,7 +145,7 @@ class HGVSMatcher:
                                                            local_resolution=local_resolution,
                                                            clingen_resolution=clingen_resolution)
 
-    def _clingen_get_variant_coordinate(self, hgvs_string: str) -> VariantCoordinate:
+    def _clingen_get_variant_coordinate_and_matches_reference(self, hgvs_string: str, match_ref_allele=None) -> tuple[VariantCoordinate, bool]:
         cleaned_hgvs = self.hgvs_converter.c_hgvs_remove_gene_symbol(hgvs_string)
 
         try:
@@ -158,7 +158,9 @@ class HGVSMatcher:
                     start=variant_coord.start,
                     ref=variant_coord.ref,
                     alt=variant_coord.ref)  # ref == alt
-            return variant_coord
+            if match_ref_allele is None:
+                match_ref_allele = True
+            return variant_coord, match_ref_allele
         except ClinGenAlleleAPIException:
             self.attempt_clingen = False
             raise
@@ -168,6 +170,23 @@ class HGVSMatcher:
                 transcript_accession = self.hgvs_converter.get_transcript_accession(hgvs_string)
                 self._set_clingen_allele_registry_missing_transcript(transcript_accession)
             else:
+                if settings.CLINGEN_ALLELE_REGISTRY_REATTEMPT_WITH_ACTUAL_REF and match_ref_allele is None:
+                    # Don't do if already swapped (stop infinite recursion)
+                    rjson = cga_se.response_json
+                    if rjson["errorType"] == 'IncorrectReferenceAllele':
+                        actual_allele = rjson['actualAllele']
+                        given_allele = rjson['givenAllele']
+                        transcript_reference_sequence = rjson["referenceSequence"]
+                        hgvs_variant = self.create_hgvs_variant(cleaned_hgvs)
+                        if hgvs_variant.ref_allele == given_allele:
+                            hgvs_variant.ref_allele = actual_allele
+                            hgvs_swapped_ref = hgvs_variant.format()
+                            match_ref_allele = HgvsMatchRefAllele(provided_ref=given_allele,
+                                                                  calculated_ref=actual_allele,
+                                                                  ref_type=f"transcript {transcript_reference_sequence}",
+                                                                  ref_source="ClinGen Allele Registry")
+                            return self._clingen_get_variant_coordinate_and_matches_reference(hgvs_swapped_ref, match_ref_allele=match_ref_allele)
+
                 self.attempt_clingen = False
             raise
 
@@ -194,10 +213,9 @@ class HGVSMatcher:
 
         hgvs_string = hgvs_variant.format()
         try:
-            # ClinGen fails if reference base is different so matches_reference is always True
-            matches_reference = True
             method = HGVSConverterType.CLINGEN_ALLELE_REGISTRY.name
-            return self._clingen_get_variant_coordinate(hgvs_string), lrg_transcript_accession, HGVSConverterType.CLINGEN_ALLELE_REGISTRY, method, matches_reference
+            variant_coordinate, matches_reference = self._clingen_get_variant_coordinate_and_matches_reference(hgvs_string)
+            return variant_coordinate, lrg_transcript_accession, HGVSConverterType.CLINGEN_ALLELE_REGISTRY, method, matches_reference
         except ClinGenAllele.ClinGenAlleleRegistryException as cga_re:
             raise ValueError(f"Could not retrieve {hgvs_string} from ClinGen Allele Registry") from cga_re
 
@@ -356,8 +374,7 @@ class HGVSMatcher:
                     if self._clingen_allele_registry_ok(tv.accession):
                         error_message = f"Could not convert \"{hgvs_string}\" using ClinGenAllele Registry"
                         try:
-                            matches_reference = True  # ClnGen fails if different
-                            variant_coordinate = self._clingen_get_variant_coordinate(hgvs_string_for_version)
+                            variant_coordinate, matches_reference = self._clingen_get_variant_coordinate_and_matches_reference(hgvs_string_for_version)
                         except ClinGenAlleleServerException as cga_se:
                             # If it's unknown reference we can just retry with another version, other errors are fatal
                             if cga_se.is_unknown_reference():

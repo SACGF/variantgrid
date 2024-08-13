@@ -17,9 +17,16 @@ class HGVSConverterType(Enum):
 
 
 class HgvsMatchRefAllele:
-    def __init__(self, provided_ref: str, calculated_ref: str):
+    def __init__(self, provided_ref: str, calculated_ref: str, ref_type=None, ref_source=None):
         self.provided_ref = provided_ref
         self.calculated_ref = calculated_ref
+
+        if ref_type is None:
+            ref_type = "genomic"
+        self.ref_type = ref_type
+        if ref_source is None:
+            ref_source = "our build"
+        self.ref_source = ref_source
 
     def __bool__(self):
         if self.provided_ref:
@@ -40,6 +47,8 @@ class HgvsMatchRefAllele:
             return True
         return self.provided_ref == other.provided_ref and self.calculated_ref == other.calculated_ref
 
+    def get_message(self) -> str:
+        return f'Using {self.ref_type} reference "{self.calculated_ref}" from {self.ref_source}, in place of provided reference "{self.provided_ref}"'
 
 # We need a common Exception
 # Common HGVS Extra??
