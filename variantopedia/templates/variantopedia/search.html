@@ -159,7 +159,7 @@
 
                 {% comment %}Overall Messages{% endcomment %}
                 {% if search_results.results or search_results.messages_overall %}
-                    <ul class="list-group search-results">
+                    <a class="list-group search-results">
                         {% comment %}TOP LEVEL SEARCH INFO/WARNINGS/ERRORS{% endcomment %}
                         {% for message in search_results.messages_overall %}
                             <div class="list-group-item list-group-item-{{ message.severity|severity_bs }}">
@@ -187,8 +187,8 @@
                         {% for search_result in search_results.results %}
                             {% with preview=search_result.preview %}
                                 {% comment %}The below anchor is used to jump to results of a certain kind{% endcomment %}
-                                <a {% ifchanged preview.category %}id="results-{{ preview.category|id_safe }}"{% endifchanged %}
-                                        class="list-group-item list-group-item-action list-group-item-okay result-{{ preview.category|id_safe }}" href="{{ preview.internal_url }}"
+                                <{{ preview.html_element }} {% ifchanged preview.category %}id="results-{{ preview.category|id_safe }}"{% endifchanged %}
+                                        class="list-group-item list-group-item-action list-group-item-{{ search_result.error_severity|severity_bs }} result-{{ preview.category|id_safe }}" href="{{ preview.internal_url }}"
                                         {% comment %}used to lower opacity of mismatched search results, but got confusing when they weren't duplicates of the correct search{% endcomment %}
                                         {% comment %}style="{% if search_result.genome_build_mismatch %}opacity:0.5{% endif %}"{% endcomment %}
                                         >
@@ -230,6 +230,7 @@
                                                     {% endfor %}
                                                 </div>
                                             {% endif %}
+                                            {% if not preview.is_error %}
                                             <label class="search-identifier">{{ preview.identifier }}</label>&nbsp;{% if preview.title %}<span class="search-title">{{ preview.title }}</span>{% endif %}
                                             {% if preview.summary_all %}<div class="d-block text-small text-secondary extra-summary">
                                                 {% for extra in preview.summary_all %}
@@ -245,10 +246,11 @@
                                                     {% endif %}
                                                 {% endfor %}
                                             </div>{% endif %}
+                                            {% endif %}
                                         </div>
                                         {% endspaceless %}
                                     </div>
-                                </a>
+                                </{{ preview.html_element }}>
                             {% endwith %}
                         {% endfor %}
                     </ul>

@@ -284,6 +284,8 @@ class SearchResultGenomeBuildMessages:
 class SearchResult:
     """
     Represents a single record found in a search
+
+    If you use preview = None, it's an error (using messages)
     """
 
     preview: PreviewData
@@ -327,6 +329,18 @@ class SearchResult:
     @property
     def _sort_order(self):
         return self.genome_build_mismatch, self.original_order
+
+    @property
+    def error_severity(self) -> Optional[LogLevel]:
+        # I originally looked through messages to get max severity but many
+        # messages on ok results have been set to ERROR
+        # severity_list = [m.severity for m in self.messages]
+        # if severity_list:
+        #    ms = max(severity_list, key=log_level_to_int)
+        ms = None
+        if self.preview.is_error:
+            ms = LogLevel.ERROR
+        return ms
 
     def __lt__(self, other):
         return self._sort_order < other._sort_order

@@ -185,6 +185,7 @@ class PreviewData:
     annotation_consortia: Optional[set['AnnotationConsortium']] = None
     obj: Optional[Any] = None
     is_operation: bool = False  # indicates that the preview data is the preview of an operation to create the data
+    is_error: bool = False
     # If you add any fields, be sure to modify __hash__ below...
 
     @staticmethod
@@ -199,7 +200,8 @@ class PreviewData:
             external_url: Optional[str] = None,
             genome_builds: Optional[set['GenomeBuild']] = None,
             annotation_consortia: Optional[set['AnnotationConsortium']] = None,
-            is_operation: bool = False):
+            is_operation: bool = False,
+            is_error: bool = False):
 
         if category is None:
             if hasattr(obj, "_meta"):
@@ -257,7 +259,8 @@ class PreviewData:
             external_url=external_url,
             genome_builds=genome_builds,
             annotation_consortia=annotation_consortia,
-            is_operation=is_operation
+            is_operation=is_operation,
+            is_error=is_error,
         )
 
     @cached_property
@@ -277,6 +280,12 @@ class PreviewData:
                     else:
                         external_extra.extend(response)
         return external_extra
+
+    @property
+    def html_element(self) -> str:
+        if self.is_error:
+            return "span"
+        return "a"
 
     @property
     def summary(self):

@@ -497,6 +497,7 @@ _LOG_LEVEL_SEVERITY = {
 }
 
 _LOG_LEVEL_TO_BOOTSTRAP = {
+    None: 'ok',
     LogLevel.DEBUG: 'info',
     LogLevel.INFO: 'info',
     LogLevel.WARNING: 'warning',

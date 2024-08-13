@@ -491,7 +491,21 @@ def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
         return [INVALID_INPUT]
     for_all_genome_builds = []
     for genome_build in search_input.genome_builds:
-        for_all_genome_builds.append(_search_hgvs(hgvs_string=search_input.search_string, user=search_input.user, genome_build=genome_build, visible_variants=search_input.get_visible_variants(genome_build), classify=search_input.classify))
+        try:
+            results =_search_hgvs(hgvs_string=search_input.search_string, user=search_input.user,
+                                  genome_build=genome_build,
+                                  visible_variants=search_input.get_visible_variants(genome_build),
+                                  classify=search_input.classify)
+            results = list(results)  # read iterator to trigger exceptions
+        except Exception as e:
+            if search_input.user.is_superuser:
+                message = str(e)
+            else:
+                message = "Cannot resolve HGVS"
+            preview = PreviewData.for_object(obj=None, category='', internal_url='',
+                                             is_error=True, genome_builds={genome_build})
+            results = [SearchResult(preview=preview, messages=[SearchMessage(severity=LogLevel.ERROR, message=message)])]
+        for_all_genome_builds.append(results)
     return itertools.chain(*for_all_genome_builds)
 
 
