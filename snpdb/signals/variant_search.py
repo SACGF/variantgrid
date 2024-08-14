@@ -503,10 +503,8 @@ def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
                                   classify=search_input.classify)
             results = list(results)  # read iterator to trigger exceptions
         except Exception as e:
-            if search_input.user.is_superuser:
-                message = str(e)
-            else:
-                message = "Cannot resolve HGVS"
+            # We want to return errors with the HGVS but not show implementation details...
+            message = str(e)
             results = [SearchResult.error_result(message, genome_build)]
         for_all_genome_builds.append(results)
     return itertools.chain(*for_all_genome_builds)
