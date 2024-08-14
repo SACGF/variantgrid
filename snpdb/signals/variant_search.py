@@ -13,7 +13,8 @@ from django.urls import reverse
 from annotation.cosmic import CosmicAPI
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from classification.models import Classification, CreateNoClassificationForbidden
-from genes.hgvs import HGVSMatcher, HGVSException, VariantResolvingError
+from genes.hgvs import HGVSMatcher, HGVSException, VariantResolvingError, HGVSImplementationException, \
+    HGVSNomenclatureException
 from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
 from genes.models import MissingTranscript, MANE, TranscriptVersion
 from genes.models_enums import AnnotationConsortium
@@ -410,13 +411,7 @@ def _search_hgvs_using_gene_symbol(
                         # result is a ClassifyVariantHgvs or similar, yield it and only care about real variants for the rest
                         yield result
         except Exception as e:
-            if settings.SEARCH_HGVS_GENE_SYMBOL_REPORT_FAILURES:
-                # TODO: Should we do the "simplify for non-admin users" here?
-                message = f"Could not resolve HGVS for transcript {transcript_version.accession}: {e}"
-                yield SearchResult.error_result(message, genome_build)
-            else:
-                # Add, and only report if no results found
-                transcript_accessions_by_exception[str(e)].append(tv_message)
+            transcript_accessions_by_exception[str(e)].append(tv_message)
 
     have_results = False
     for variant_identifier, results_for_record in results_by_variant_identifier.items():
@@ -444,15 +439,19 @@ def _search_hgvs_using_gene_symbol(
             preview.annotation_consortia = unique_annotation_consortia
         yield SearchResult(preview=preview, messages=search_messages)
 
-    if not have_results:
-        # If we have a resolution error, throw it here
+
+    if transcript_accessions_by_exception:
         resolution_errors = []
         for exception_msg, tv_message_list in transcript_accessions_by_exception.items():
             resolution_errors.append(f"Error resolving transcripts: {', '.join(tv_message_list)}: {exception_msg}")
 
-        if resolution_errors:
-            raise VariantResolvingError("\n".join(resolution_errors))
+        resolution_msg = "\n".join(resolution_errors)
+        if settings.SEARCH_HGVS_GENE_SYMBOL_REPORT_FAILURES:
+            yield SearchResult.error_result(resolution_msg, genome_build)
+        elif not have_results:
+            raise VariantResolvingError(resolution_msg)
 
+    if not have_results:
         # In some special cases, add in special messages for no result
         messages_as_strs = [str(message) for message in search_messages]
         if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE and not settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
@@ -496,17 +495,28 @@ def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
         return [INVALID_INPUT]
     for_all_genome_builds = []
     for genome_build in search_input.genome_builds:
+        results = []
+        error_message = None
         try:
             results =_search_hgvs(hgvs_string=search_input.search_string, user=search_input.user,
                                   genome_build=genome_build,
                                   visible_variants=search_input.get_visible_variants(genome_build),
                                   classify=search_input.classify)
             results = list(results)  # read iterator to trigger exceptions
-        except Exception as e:
+        except HGVSNomenclatureException as e:
             # We want to return errors with the HGVS but not show implementation details...
-            message = str(e)
-            results = [SearchResult.error_result(message, genome_build)]
-        for_all_genome_builds.append(results)
+            error_message = str(e)
+        except (Exception, HGVSImplementationException) as e:
+            if search_input.user.is_superuser:
+                error_message = str(e)
+            else:
+                error_message = "Error resolving HGVS"
+
+        if error_message:
+            results = [SearchResult.error_result(error_message, genome_build)]
+        if results:
+            for_all_genome_builds.append(results)
+
     return itertools.chain(*for_all_genome_builds)
 
 

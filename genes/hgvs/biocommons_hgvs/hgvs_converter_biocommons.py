@@ -7,7 +7,9 @@ from bioutils.sequences import reverse_complement
 from django.conf import settings
 from hgvs.assemblymapper import AssemblyMapper
 from hgvs.edit import NARefAlt
-from hgvs.exceptions import HGVSDataNotAvailableError, HGVSError, HGVSInvalidVariantError
+from hgvs.exceptions import HGVSDataNotAvailableError, HGVSError, HGVSInvalidVariantError, HGVSInvalidIntervalError, \
+    HGVSNormalizationError, HGVSParseError, HGVSUnsupportedOperationError, HGVSInternalError, HGVSUsageError, \
+    HGVSVerifyFailedError
 from hgvs.extras.babelfish import Babelfish
 from hgvs.normalizer import Normalizer
 from hgvs.parser import Parser
@@ -15,7 +17,7 @@ from hgvs.sequencevariant import SequenceVariant
 from hgvs.validator import ExtrinsicValidator
 from hgvs.variantmapper import VariantMapper
 
-from genes.hgvs import HGVSVariant, HGVSException
+from genes.hgvs import HGVSVariant, HGVSException, HGVSNomenclatureException, HGVSImplementationException
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele, HGVSConverterType
 from genes.models import TranscriptVersion
@@ -153,7 +155,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
             else:
                 coord_span = abs(sequence_variant.posedit.length_change())
             if coord_span != provided_span_length:
-                raise HGVSException(f"coordinate span ({coord_span}) not equal to provided ref length {provided_span_length}")
+                raise HGVSNomenclatureException(f"coordinate span ({coord_span}) not equal to provided ref length {provided_span_length}")
         return sequence_variant
 
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
@@ -162,7 +164,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
             sequence_variant = self._parser_hgvs(hgvs_string)
             return BioCommonsHGVSVariant(sequence_variant)
         except HGVSError as e:
-            raise HGVSException from e
+            raise HGVSNomenclatureException from e
 
     def _variant_coordinate_to_sequence_variant(self, vc: VariantCoordinate) -> SequenceVariant:
         chrom, position, ref, alt, _svlen = vc.as_external_explicit(self.genome_build)
@@ -173,7 +175,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
         return BioCommonsHGVSVariant(var_g)
 
     def variant_coordinate_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
-        """ In VG we call non-coding "c.HGVS" as well - so hanve to handle that """
+        """ In VG we call non-coding "c.HGVS" as well - so have to handle that """
         try:
             var_g = self._variant_coordinate_to_sequence_variant(vc)  # returns normalized (default HGVS 3')
             # Biocommons HGVS doesn't normalize introns as it works with transcript sequences so doesn't have introns
@@ -186,7 +188,8 @@ class BioCommonsHGVSConverter(HGVSConverter):
             else:
                 var_c = self.am.g_to_n(var_g, transcript_version.accession)
         except HGVSError as e:  # Can be out of bounds etc
-            raise HGVSException(e) from e
+            klass = self._get_exception_class(e)
+            raise klass(e) from e
 
         if gene_symbol := transcript_version.gene_symbol:
             var_c.gene = gene_symbol.symbol
@@ -305,3 +308,36 @@ class BioCommonsHGVSConverter(HGVSConverter):
             ref = var_g.posedit.edit.ref
             matches_reference = HgvsMatchRefAllele(provided_ref='', calculated_ref=ref)
         return var_g, matches_reference
+
+
+    @staticmethod
+    def _get_exception_class(hgvs_error: HGVSError) -> type:
+        """ Convert from HGVS to our generic errors """
+
+        exception_mappings = {
+            HGVSNomenclatureException: {
+                HGVSInvalidIntervalError,
+                HGVSInvalidVariantError,
+                HGVSNormalizationError,
+                HGVSParseError,
+                HGVSUnsupportedOperationError
+            },
+            HGVSImplementationException: {
+                HGVSDataNotAvailableError,
+                HGVSInternalError,
+                HGVSUsageError,
+                HGVSVerifyFailedError,
+            },
+        }
+
+        for our_ex, biocommons_hgvs_exceptions in exception_mappings.items():
+            for hgvs_ex in biocommons_hgvs_exceptions:
+                if isinstance(hgvs_error, hgvs_ex):
+                    return our_ex
+        return HGVSException  # General one...
+
+
+
+
+
+

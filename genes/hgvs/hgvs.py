@@ -393,6 +393,17 @@ class HGVSException(Exception):
     pass
 
 
+class HGVSNomenclatureException(HGVSException):
+    """ HGVSException subclass for when problem is with HGVS string (users can fix) """
+    pass
+
+
+class HGVSImplementationException(HGVSException):
+    """ HGVSException subclass for when problem is with the library (users can NOT fix) """
+    pass
+
+
+
 class HGVSVariant(abc.ABC):
     """ This class wraps pyhgvs HGVSName and BioCommons SequenceVariant functionality,
         to allow library independent code """

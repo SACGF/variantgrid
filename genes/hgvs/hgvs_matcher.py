@@ -8,7 +8,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Max, Min
 
-from genes.hgvs import HGVSVariant, CHGVS
+from genes.hgvs import HGVSVariant, CHGVS, HGVSImplementationException, HGVSNomenclatureException
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
 from genes.hgvs.hgvs_converter import HGVSConverterType, HgvsMatchRefAllele, HGVSConverter
 from genes.hgvs.hgvs_converter_combo import ComboCheckerHGVSConverter
@@ -96,7 +96,7 @@ class HGVSConverterFactory:
         elif hgvs_converter_type == HGVSConverterType.CLINGEN_ALLELE_REGISTRY:
             return ClinGenHGVSConverter(genome_build)
 
-        raise ValueError(f"HGVSConverter type {hgvs_converter_type} not supported")
+        raise HGVSImplementationException(f"HGVSConverter type {hgvs_converter_type} not supported")
 
 
 class VariantResolvingError(ValueError):
@@ -217,7 +217,7 @@ class HGVSMatcher:
             variant_coordinate, matches_reference = self._clingen_get_variant_coordinate_and_matches_reference(hgvs_string)
             return variant_coordinate, lrg_transcript_accession, HGVSConverterType.CLINGEN_ALLELE_REGISTRY, method, matches_reference
         except ClinGenAllele.ClinGenAlleleRegistryException as cga_re:
-            raise ValueError(f"Could not retrieve {hgvs_string} from ClinGen Allele Registry") from cga_re
+            raise HGVSImplementationException(f"Could not retrieve {hgvs_string} from ClinGen Allele Registry") from cga_re
 
     @staticmethod
     def _get_clingen_allele_registry_key(transcript_accession: str) -> str:
@@ -287,14 +287,14 @@ class HGVSMatcher:
         try:
             transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
         except ValueError:
-            raise ValueError(f"Error parsing transcript version from \"{transcript_accession}\"")
+            raise HGVSNomenclatureException(f"Error parsing transcript version from \"{transcript_accession}\"")
 
         tv_qs = TranscriptVersion.objects.filter(genome_build=self.genome_build, transcript_id=transcript_id)
         if not settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT:
             if version:
                 return tv_qs.get(version=version)
             else:
-                raise ValueError("Transcript version must be provided")  #  if settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT=False
+                raise HGVSNomenclatureException("Transcript version must be provided")  #  if settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT=False
 
         tv_by_version = {tv.version: tv for tv in tv_qs}
         if not tv_by_version:
@@ -452,7 +452,7 @@ class HGVSMatcher:
                 problems.append(f"{ca} didn't contain HGVS for '{lrg_identifier}'")
 
         problem_str = ", ".join(problems)
-        raise ValueError(f"Could not convert {variant_coordinate} to HGVS using '{lrg_identifier}': {problem_str}")
+        raise HGVSImplementationException(f"Could not convert {variant_coordinate} to HGVS using '{lrg_identifier}': {problem_str}")
 
     def variant_coordinate_to_hgvs_used_converter_type_and_method(self, variant_coordinate: VariantCoordinate,
                                                                   transcript_accession: str = None) -> tuple[HGVSVariant, HGVSConverterType, str]:
@@ -519,7 +519,7 @@ class HGVSMatcher:
                             method += ": " + errors
                         method_and_errors.append(method)
                     attempts = ", ".join(method_and_errors)
-                    raise ValueError(f"Could not convert {variant_coordinate} to HGVS - tried: {attempts}")
+                    raise HGVSImplementationException(f"Could not convert {variant_coordinate} to HGVS - tried: {attempts}")
             else:
                 # No methods tried, mustn't have had any transcripts
                 TranscriptVersion.raise_bad_or_missing_transcript(transcript_accession)
