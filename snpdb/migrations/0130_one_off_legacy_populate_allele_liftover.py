@@ -7,7 +7,6 @@ from manual.operations.manual_operations import ManualOperation
 
 def _one_off_allele_liftover(apps, schema_editor):
     AlleleLiftover = apps.get_model("snpdb", "AlleleLiftover")
-    VariantAllele = apps.get_model("snpdb", "VariantAllele")
 
     records = []
     for al in AlleleLiftover.objects.filter(error_message__isnull=False):
