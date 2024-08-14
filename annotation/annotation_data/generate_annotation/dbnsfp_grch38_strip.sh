@@ -20,16 +20,16 @@ set -e
 # Get column names from dbNSFP data file
 # df = pd.read_csv("header.txt", sep='\t', index_col=None, nrows=0)
 # vep_fields = 'GERP++_RS,Interpro_domain,CADD_raw_rankscore,REVEL_rankscore,BayesDel_noAF_rankscore,ClinPred_rankscore,VEST4_rankscore,MetaLR_rankscore,Aloft_prob_Tolerant,Aloft_prob_Recessive,Aloft_prob_Dominant,Aloft_pred,Aloft_Confidence,AlphaMissense_rankscore,AlphaMissense_pred'
-# new_vep_fields = "CADD_raw,REVEL_score,BayesDel_noAF_score,ClinPred_score,ClinPred_pred,VEST4_score,MetaLR_score,MetaLR_pred,AlphaMissense_score"
+# new_vep_fields = "CADD_raw,REVEL_score,BayesDel_noAF_score,ClinPred_score,ClinPred_pred,VEST4_score,MetaLR_score,MetaLR_pred,AlphaMissense_score,MutPred_score,MutPred_rankscore,MutPred_protID,MutPred_AAchange,MutPred_Top5features"
 # columns = ['#chr', 'pos(1-based)', 'ref', 'alt', 'aaref', 'aaalt', 'Ensembl_transcriptid'] + vep_fields.split(",") + new_vep_fields.split(",")
 # cols = []
 # for i in columns:
 #    cols.append(list(df.columns).index(i) + 1)
 # print(",".join([str(c) for c in sorted(cols)]))
-# columns are: '1,2,3,4,5,6,15,68,69,73,74,75,83,84,105,106,108,109,110,138,139,140,146,147,148,149,150,151,152,189,447'
+# columns are: '1,2,3,4,5,6,15,68,69,73,74,75,83,84,85,86,87,88,89,105,106,108,109,110,138,139,140,146,147,148,149,150,151,152,189,447'
 
 TMP_DIR=/tmp/dbnsfp38
-CUT_COLUMNS="1,2,3,4,5,6,15,68,69,73,74,75,83,84,105,106,108,109,110,138,139,140,146,147,148,149,150,151,152,189,447"
+CUT_COLUMNS="1,2,3,4,5,6,15,68,69,73,74,75,83,84,85,86,87,88,89,105,106,108,109,110,138,139,140,146,147,148,149,150,151,152,189,447"
 SEQ_COL=1  # chr
 POS_COL=2  # pos(1-based)
 
@@ -38,10 +38,8 @@ out_file=dbNSFP${version}_grch38.stripped
 
 mkdir -p ${TMP_DIR}
 
-zcat dbNSFP${version}_variant.chr1.gz | head -n1 | cut -f ${CUT_COLUMNS} > ${out_file}
-
 # Sort chromosomes individually as that's much more efficient
-
+cat header.txt | cut -f ${CUT_COLUMNS} > ${OUT_FILE}
 for chrom in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y; do
     zgrep -h -v ^#chr dbNSFP${version}_variant.chr${chrom}.gz | cut -f ${CUT_COLUMNS} | sort -T ${TMP_DIR} -k${SEQ_COL},${SEQ_COL} -k${POS_COL},${POS_COL}n - >> ${out_file}
 done

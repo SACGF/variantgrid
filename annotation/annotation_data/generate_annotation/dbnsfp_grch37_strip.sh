@@ -20,17 +20,17 @@ set -e
 # import pandas as pd
 # df = pd.read_csv("header.txt", sep='\t', index_col=None, nrows=0)
 # vep_fields = 'GERP++_RS,Interpro_domain,CADD_raw_rankscore,REVEL_rankscore,BayesDel_noAF_rankscore,ClinPred_rankscore,VEST4_rankscore,MetaLR_rankscore,Aloft_prob_Tolerant,Aloft_prob_Recessive,Aloft_prob_Dominant,Aloft_pred,Aloft_Confidence,AlphaMissense_rankscore,AlphaMissense_pred'
-# new_vep_fields = "CADD_raw,REVEL_score,BayesDel_noAF_score,ClinPred_score,ClinPred_pred,VEST4_score,MetaLR_score,MetaLR_pred,AlphaMissense_score"
+# new_vep_fields = "CADD_raw,REVEL_score,BayesDel_noAF_score,ClinPred_score,ClinPred_pred,VEST4_score,MetaLR_score,MetaLR_pred,AlphaMissense_score,MutPred_score,MutPred_rankscore,MutPred_protID,MutPred_AAchange,MutPred_Top5features"
 # columns = ['ref', 'alt', 'aaref', 'aaalt', 'hg19_chr', 'hg19_pos(1-based)', 'Ensembl_transcriptid'] + vep_fields.split(",") + new_vep_fields.split(",")
 # cols = []
 # for i in columns:
 #    cols.append(list(df.columns).index(i) + 1)
 # print(",".join([str(c) for c in sorted(cols)]))
-# columns are: '3,4,5,6,8,9,15,68,69,73,74,75,83,84,105,106,108,109,110,138,139,140,146,147,148,149,150,151,152,189,447'
+# columns are: '3,4,5,6,8,9,15,68,69,73,74,75,83,84,85,86,87,88,89,105,106,108,109,110,138,139,140,146,147,148,149,150,151,152,189,447'
 
 # Note: We can't do this per-contig then join them, as some variants switch contigs between builds
 TMP_DIR=/tmp/dbnsfp37
-CUT_COLUMNS="3,4,5,6,8,9,15,68,69,73,74,75,83,84,105,106,108,109,110,138,139,140,146,147,148,149,150,151,152,189,447"
+CUT_COLUMNS="3,4,5,6,8,9,15,68,69,73,74,75,83,84,85,86,87,88,89,105,106,108,109,110,138,139,140,146,147,148,149,150,151,152,189,447"
 SEQ_COL=5  # hg19_chr (after cut)
 POS_COL=6  # hg19_pos(1-based) (after cut)
 
