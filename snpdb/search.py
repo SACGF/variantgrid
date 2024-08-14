@@ -285,7 +285,7 @@ class SearchResult:
     """
     Represents a single record found in a search
 
-    If you use preview = None, it's an error (using messages)
+    For errors, use static method 'error_result' which sets Preview.is_error = True, and fill in the messages
     """
 
     preview: PreviewData
@@ -341,6 +341,12 @@ class SearchResult:
         if self.preview.is_error:
             ms = LogLevel.ERROR
         return ms
+
+    @staticmethod
+    def error_result(message, genome_build) -> 'SearchResult':
+        preview = PreviewData.for_object(obj=None, category='', internal_url='',
+                                         is_error=True, genome_builds={genome_build})
+        return SearchResult(preview=preview, messages=[SearchMessage(severity=LogLevel.ERROR, message=message)])
 
     def __lt__(self, other):
         return self._sort_order < other._sort_order

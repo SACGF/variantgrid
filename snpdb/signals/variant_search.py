@@ -410,8 +410,13 @@ def _search_hgvs_using_gene_symbol(
                         # result is a ClassifyVariantHgvs or similar, yield it and only care about real variants for the rest
                         yield result
         except Exception as e:
-            logging.warning(e)
-            transcript_accessions_by_exception[str(e)].append(tv_message)
+            if settings.SEARCH_HGVS_GENE_SYMBOL_REPORT_FAILURES:
+                # TODO: Should we do the "simplify for non-admin users" here?
+                message = f"Could not resolve HGVS for transcript {transcript_version.accession}: {e}"
+                yield SearchResult.error_result(message, genome_build)
+            else:
+                # Add, and only report if no results found
+                transcript_accessions_by_exception[str(e)].append(tv_message)
 
     have_results = False
     for variant_identifier, results_for_record in results_by_variant_identifier.items():
@@ -502,9 +507,7 @@ def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
                 message = str(e)
             else:
                 message = "Cannot resolve HGVS"
-            preview = PreviewData.for_object(obj=None, category='', internal_url='',
-                                             is_error=True, genome_builds={genome_build})
-            results = [SearchResult(preview=preview, messages=[SearchMessage(severity=LogLevel.ERROR, message=message)])]
+            results = [SearchResult.error_result(message, genome_build)]
         for_all_genome_builds.append(results)
     return itertools.chain(*for_all_genome_builds)
 
