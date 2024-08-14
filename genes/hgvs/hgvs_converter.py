@@ -2,7 +2,7 @@ import abc
 import re
 from enum import Enum
 
-from genes.hgvs import HGVSVariant, HGVSException
+from genes.hgvs import HGVSVariant, HGVSException, HGVSNomenclatureException
 from snpdb.models import GenomeBuild, VariantCoordinate
 
 
@@ -69,9 +69,9 @@ class HGVSConverter(abc.ABC):
 
         if "ins" in hgvs_string:
             if re.match(r".*ins\d+$", hgvs_string):
-                raise HGVSException("Insertions require inserted sequence, not an integer length")
+                raise HGVSNomenclatureException("Insertions require inserted sequence, not an integer length")
             if re.match(".*ins$", hgvs_string):
-                raise HGVSException("Insertions require inserted sequence")
+                raise HGVSNomenclatureException("Insertions require inserted sequence")
 
 
 

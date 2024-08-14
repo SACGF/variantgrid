@@ -147,7 +147,12 @@ class BioCommonsHGVSConverter(HGVSConverter):
             provided_span_length = int(provided_span_length)
 
         parser = ParserSingleton.parser()
-        sequence_variant = parser.parse_hgvs_variant(hgvs_string)
+        try:
+            sequence_variant = parser.parse_hgvs_variant(hgvs_string)
+        except HGVSError as hgvs_error:
+            klass = BioCommonsHGVSConverter._get_exception_class(hgvs_error)
+            raise klass(hgvs_error) from hgvs_error
+
         if provided_span_length is not None:
             if sequence_variant.posedit.edit.type == 'inv':
                 # HGVS is 0 based
@@ -196,13 +201,18 @@ class BioCommonsHGVSConverter(HGVSConverter):
         return BioCommonsHGVSVariant(var_c)
 
     def hgvs_to_variant_coordinate_and_reference_match(self, hgvs_string: str, transcript_version=None) -> tuple[VariantCoordinate, HgvsMatchRefAllele]:
-        var_g, matches_reference = self._hgvs_to_g_hgvs(hgvs_string)
         try:
-            (chrom, position, ref, alt, typ) = self.babelfish.hgvs_to_vcf(var_g)
-            if alt == '.':
-                alt = ref
-        except HGVSDataNotAvailableError:
-            raise Contig.ContigNotInBuildError()
+            var_g, matches_reference = self._hgvs_to_g_hgvs(hgvs_string)
+            try:
+                (chrom, position, ref, alt, typ) = self.babelfish.hgvs_to_vcf(var_g)
+                if alt == '.':
+                    alt = ref
+            except HGVSDataNotAvailableError:
+                raise Contig.ContigNotInBuildError()
+        except HGVSError as hgvs_error:
+            klass = self._get_exception_class(hgvs_error)
+            raise klass(hgvs_error) from hgvs_error
+
         vc = VariantCoordinate.from_explicit_no_svlen(chrom, position, ref=ref, alt=alt)
         return vc.as_internal_symbolic(self.genome_build), matches_reference
 

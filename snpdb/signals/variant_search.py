@@ -16,7 +16,7 @@ from classification.models import Classification, CreateNoClassificationForbidde
 from genes.hgvs import HGVSMatcher, HGVSException, VariantResolvingError, HGVSImplementationException, \
     HGVSNomenclatureException
 from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
-from genes.models import MissingTranscript, MANE, TranscriptVersion
+from genes.models import MissingTranscript, MANE, TranscriptVersion, BadTranscript
 from genes.models_enums import AnnotationConsortium
 from library.enums.log_level import LogLevel
 from library.genomics import format_chrom
@@ -503,10 +503,13 @@ def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
                                   visible_variants=search_input.get_visible_variants(genome_build),
                                   classify=search_input.classify)
             results = list(results)  # read iterator to trigger exceptions
-        except HGVSNomenclatureException as e:
-            # We want to return errors with the HGVS but not show implementation details...
+        except (HGVSNomenclatureException, BadTranscript) as e:
+            # Show errors about HGVS the user can fix
             error_message = str(e)
         except (Exception, HGVSImplementationException) as e:
+            # Hide implementation details (user can't fix)
+            # log_traceback()
+            # logging.info("HGVS exception type(%s): %s", type(e), str(e))
             if search_input.user.is_superuser:
                 error_message = str(e)
             else:
