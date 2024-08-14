@@ -26,6 +26,7 @@ from library.django_utils.django_object_managers import ObjectManagerCachingRequ
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
 from library.genomics.vcf_enums import VCFSymbolicAllele
+from library.guardian_utils import admin_bot
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import FormerTuple, sha256sum_str
 from snpdb.models import Wiki
@@ -908,6 +909,24 @@ class LiftoverRun(TimeStampedModel):
     source_genome_build = models.ForeignKey(GenomeBuild, null=True, on_delete=CASCADE,
                                             related_name="liftover_source_genome_build")
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)  # destination
+
+    @staticmethod
+    def get_clingen_auto_fail_liftover_run(genome_build: GenomeBuild) -> 'LiftoverRun':
+        """ We can know straight away we're going to fail a ClinGen run (missing ClinGenAllele, no data for the build)
+            but would still like to record the failure - so put them all in 1 LiftoverRun per build """
+        kwargs = {
+            "user": admin_bot(),
+            "genome_build": genome_build,
+            "conversion_tool": AlleleConversionTool.CLINGEN_ALLELE_REGISTRY,
+        }
+        # There should have been 1 created in 'one_off_legacy_populate_allele_liftover'
+        lr = LiftoverRun.objects.filter(**kwargs).order_by("pk").first()
+        if not lr:
+            # Otherwise create it
+            lr = LiftoverRun.objects.create(**kwargs)
+        return lr
+
+
 
     def get_absolute_url(self):
         return reverse("view_liftover_run", kwargs={"liftover_run_id": self.pk})

@@ -222,12 +222,22 @@ def _liftover_using_dest_variant_coordinate(allele, dest_genome_build: GenomeBui
 
     conversion_tool = None
     g_hgvs = None
+    clingen_failure_message = None
     if allele.clingen_allele:
         try:
             g_hgvs = allele.clingen_allele.get_g_hgvs(dest_genome_build)
             conversion_tool = AlleleConversionTool.CLINGEN_ALLELE_REGISTRY
         except ValueError:  # Various contig errors all subclass from this
-            pass
+            clingen_failure_message = f"{allele.clingen_allele} did not contain g.HGVS for {dest_genome_build}"
+    else:
+        clingen_failure_message = f"No ClinGenAllele for variant"
+
+    # Store the fact that we couldn't use ClinGen
+    if clingen_failure_message:
+        lr = LiftoverRun.get_clingen_auto_fail_liftover_run(dest_genome_build)
+        AlleleLiftover.objects.create(liftover=lr, allele=allele, status=ProcessingStatus.ERROR,
+                                      error={"message": clingen_failure_message})
+
     if g_hgvs is None:
         if settings.LIFTOVER_DBSNP_ENABLED:
             va = allele.variantallele_set.all().first()
