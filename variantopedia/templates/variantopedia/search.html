@@ -159,7 +159,7 @@
 
                 {% comment %}Overall Messages{% endcomment %}
                 {% if search_results.results or search_results.messages_overall %}
-                    <a class="list-group search-results">
+                    <ul class="list-group search-results">
                         {% comment %}TOP LEVEL SEARCH INFO/WARNINGS/ERRORS{% endcomment %}
                         {% for message in search_results.messages_overall %}
                             <div class="list-group-item list-group-item-{{ message.severity|severity_bs }}">
@@ -231,21 +231,23 @@
                                                 </div>
                                             {% endif %}
                                             {% if not preview.is_error %}
-                                            <label class="search-identifier">{{ preview.identifier }}</label>&nbsp;{% if preview.title %}<span class="search-title">{{ preview.title }}</span>{% endif %}
-                                            {% if preview.summary_all %}<div class="d-block text-small text-secondary extra-summary">
-                                                {% for extra in preview.summary_all %}
-                                                    {% if not extra.link %}{% comment %}Don't show links in search results as they're just confusing{% endcomment %}
-                                                        <span class="extra {% if extra.dedicated_row %}important d-block{% else %}normal d-inline-block{% endif %}">{% if extra.icon %}<i class="{{ extra.icon }} text-success mr-1"></i>{% endif %}
-                                                        {% if "c.HGVS" in extra.key %}
-                                                            <label class="c-hgvs">{{ extra.key }}</label>{% c_hgvs extra.value %}
-                                                        {% else %}
-                                                            {% if extra.key %}<label>{{ extra.key }}{% if extra.is_count %}<span style="margin-left:2px">:</span>{% endif %} </label> {% endif %}
-                                                            {{ extra.value|format_value:200 }}
-                                                        {% endif %}
-                                                        </span>
-                                                    {% endif %}
-                                                {% endfor %}
-                                            </div>{% endif %}
+                                                <label class="search-identifier">{{ preview.identifier }}</label>&nbsp;{% if preview.title %}<span class="search-title">{{ preview.title }}</span>{% endif %}
+                                                {% if preview.summary_all %}
+                                                    <div class="d-block text-small text-secondary extra-summary">
+                                                        {% for extra in preview.summary_all %}
+                                                            {% if not extra.link %}{% comment %}Don't show links in search results as they're just confusing{% endcomment %}
+                                                                <span class="extra {% if extra.dedicated_row %}important d-block{% else %}normal d-inline-block{% endif %}">{% if extra.icon %}<i class="{{ extra.icon }} text-success mr-1"></i>{% endif %}
+                                                                {% if "c.HGVS" in extra.key %}
+                                                                    <label class="c-hgvs">{{ extra.key }}</label>{% c_hgvs extra.value %}
+                                                                {% else %}
+                                                                    {% if extra.key %}<label>{{ extra.key }}{% if extra.is_count %}<span style="margin-left:2px">:</span>{% endif %} </label> {% endif %}
+                                                                    {{ extra.value|format_value:200 }}
+                                                                {% endif %}
+                                                                </span>
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    </div>
+                                                {% endif %}
                                             {% endif %}
                                         </div>
                                         {% endspaceless %}
