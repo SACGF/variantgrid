@@ -74,6 +74,10 @@ class Command(BaseCommand):
                 # the total download and insertion time
                 combo_files = get_latest_combo_file_urls(annotation_consortia={annotation_consortium_label},
                                                          genome_builds=[genome_build_name])
+
+                genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+                annotation_consortium = AnnotationConsortium(ac_lookup[annotation_consortium_label])
+
                 combo_file_url = get_single_element(combo_files)
                 logging.info(f"%s/%s - downloading: %s",
                              genome_build, annotation_consortium.label, combo_file_url)
