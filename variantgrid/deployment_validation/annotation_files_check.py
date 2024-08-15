@@ -3,6 +3,7 @@ import os
 from django.conf import settings
 
 from annotation.vep_annotation import VEPConfig
+from genes.models import TranscriptVersion
 from snpdb.models import GenomeBuild
 
 _VARIANTGRID_DOWNLOAD_BASE_DIR = "http://variantgrid.com/download/annotation/VEP"
@@ -65,3 +66,26 @@ def annotation_data_exists(flat=False) -> dict:
         annotation_data = all_build_data
 
     return annotation_data
+
+
+def check_cdot_data() -> dict:
+    try:
+        from cdot.data_release import get_latest_data_release_tag_name, _get_version_from_tag_name
+
+        tag_name = get_latest_data_release_tag_name()
+        cdot_data_version = _get_version_from_tag_name(tag_name, data_version=True)
+        valid = False
+        if last_tv := TranscriptVersion.objects.all().order_by("pk").last():
+            our_latest_cdot = last_tv.data.get("cdot")
+            valid = cdot_data_version == our_latest_cdot
+        cdot_data = {
+            "valid": valid,
+            "notes": f"data version = latest ({cdot_data_version})",
+            "fix": "python3 manage.py import_latest_cdot"
+        }
+        return {
+            "cdot_data": cdot_data,
+        }
+    except ImportError:
+        # Will already be covered in library version > 0.2.26
+        return {}
