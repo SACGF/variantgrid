@@ -81,7 +81,7 @@ def check_cdot_data() -> dict:
         cdot_data = {
             "valid": valid,
             "notes": f"data version = latest ({cdot_data_version})",
-            "fix": "python3 manage.py import_latest_cdot"
+            "fix": "python3 manage.py import_cdot_latest"
         }
         return {
             "cdot_data": cdot_data,
