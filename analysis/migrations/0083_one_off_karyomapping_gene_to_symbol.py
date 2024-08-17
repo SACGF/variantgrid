@@ -7,6 +7,7 @@ from django.db import migrations
 def _one_off_karyomapping_gene_to_symbol(apps, _schema_editor):
     GenomeBuild = apps.get_model("snpdb", "GenomeBuild")
     KaryomappingGene = apps.get_model("analysis", "KaryomappingGene")
+    die_on_gene_conversion_failure = True
 
     records = []
     for genome_build_name in ["GRCh37", "GRCh38"]:
@@ -15,7 +16,11 @@ def _one_off_karyomapping_gene_to_symbol(apps, _schema_editor):
         for kg in KaryomappingGene.objects.filter(karyomapping_analysis__trio__cohort__genome_build=genome_build):
             gene_version = kg.gene.geneversion_set.filter(genome_build=genome_build).order_by("-version").first()
             if gene_version is None:
-                raise ValueError(f"Couldn't obtain latest gene version for '{kg.gene}'")
+                if die_on_gene_conversion_failure:
+                    raise ValueError(f"Couldn't obtain latest gene version for '{kg.gene}'")
+                else:
+                    kg.delete()
+                    continue
             kg.gene_symbol = gene_version.gene_symbol
             records.append(kg)
 
