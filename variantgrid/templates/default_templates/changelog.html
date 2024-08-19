@@ -145,6 +145,32 @@
 
     {% else %}
         <div class="card mt-4">
+            <div class="card-header">17 Aug 2024</div>
+            <div class="card-body">
+                <h3>Large Structural Variants</h3>
+                <ul>
+                    <li>Variant page works correctly for very long variants</li>
+                    <li>Use BCFtools for normalization (old program VT does not support symbolic alts)</li>
+                    <li>Support for symbolic alt - INV</li>
+                    <li>VCF export now includes SVLEN</li>
+                </ul>
+                <h3>Analysis</h3>
+
+                <ul>
+                    <li>Analysis now has audit log (records nodes being added/configured if you want to know what was changed when)</li>
+                    <li>AllVariantsNode - option to select variants type</li>
+                </ul>
+
+                <h3>Search / HGVS</h3>
+                <ul>
+                    <li>Detect a few edge cases (normalization, outside transcript bounds)</li>
+                    <li>Better error messages</li>
+                </ul>
+            </div>
+        </div>
+
+
+        <div class="card mt-4">
             <div class="card-header">24 May 2024</div>
             <div class="card-body">
                 <ul>
