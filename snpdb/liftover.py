@@ -20,7 +20,7 @@ from library.guardian_utils import admin_bot
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.models.models_enums import ImportSource, AlleleConversionTool, AlleleOrigin, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.models.models_variant import LiftoverRun, Allele, Variant, VariantAllele, AlleleLiftover, VariantCoordinate
+from snpdb.models.models_variant import LiftoverRun, Allele, Variant, VariantAllele, AlleleLiftover
 from upload.models import UploadedFile, UploadedLiftover, UploadPipeline, UploadedFileTypes
 from upload.upload_processing import process_upload_pipeline
 
@@ -297,7 +297,6 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
     ]
 
     conversion_tool = None
-    variant_coordinate: Optional[VariantCoordinate] = None
     for enabled, potential_conversion_tool, require_reference_match in options:
         if enabled:
             if AlleleLiftover.has_existing_failure(allele, dest_genome_build, potential_conversion_tool):
