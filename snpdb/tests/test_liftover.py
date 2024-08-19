@@ -30,16 +30,14 @@ class TestLiftover(TestCase):
     def test_liftover_using_existing_variant(self):
         clingen_api = MockClinGenAlleleRegistryAPI()
         # This is on chr3 - it is created for 37 but not 38
-        result = list(_liftover_using_existing_contig(self.allele, GenomeBuild.grch38()))[0]
-        conversion_tool, variant = result
+        conversion_tool, variant = _liftover_using_existing_contig(self.allele, GenomeBuild.grch38())
         self.assertIsNone(conversion_tool)
         self.assertIsNone(variant)
 
         # MT variant exists in 37 - shares same contig so should be able to re-use for 38
         clingen_allele = get_clingen_allele("CA337095804", clingen_api=clingen_api)
         mt_allele = clingen_allele.allele
-        result = list(_liftover_using_existing_contig(mt_allele, GenomeBuild.grch38()))[0]
-        conversion_tool, variant = result
+        conversion_tool, variant = _liftover_using_existing_contig(mt_allele, GenomeBuild.grch38())
         self.assertEqual(conversion_tool, AlleleConversionTool.SAME_CONTIG)
         self.assertIsNotNone(variant)
 

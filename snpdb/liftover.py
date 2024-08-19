@@ -7,7 +7,7 @@ import operator
 import os
 from collections import defaultdict
 from functools import reduce
-from typing import Iterable, Optional, Union
+from typing import Iterable, Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -219,7 +219,7 @@ def _liftover_using_existing_contig(allele, dest_genome_build: GenomeBuild) -> t
             conversion_tool = AlleleConversionTool.SAME_CONTIG
             # Return variant_id so we can create it directly
             variant = variant_allele.variant
-    yield conversion_tool, variant
+    return conversion_tool, variant
 
 
 def _liftover_using_dest_variant_coordinate(allele, dest_genome_build: GenomeBuild,
@@ -321,9 +321,9 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
 
 
 def allele_can_attempt_liftover(allele, genome_build) -> bool:
-    for conversion_tool, variant in _liftover_using_existing_contig(allele, genome_build):
-        if conversion_tool and variant:
-            return True
+    conversion_tool, variant = _liftover_using_existing_contig(allele, genome_build)
+    if conversion_tool and variant:
+        return True
 
     for conversion_tool, variant_coordinate, _error_message in _liftover_using_dest_variant_coordinate(allele, genome_build):
         if conversion_tool and variant_coordinate:
