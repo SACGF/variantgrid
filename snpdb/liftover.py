@@ -1,12 +1,13 @@
 """
     Liftover: convert variants to other genome builds
 """
+import itertools
 import logging
 import operator
 import os
 from collections import defaultdict
 from functools import reduce
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Union
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -16,16 +17,15 @@ from genes.hgvs import HGVSMatcher
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.genomics.vcf_utils import write_vcf_from_variant_coordinates, get_contigs_header_lines
 from library.guardian_utils import admin_bot
-from library.log_utils import log_traceback
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.models.models_enums import ImportSource, AlleleConversionTool, AlleleOrigin, ProcessingStatus
-from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
-from snpdb.models.models_variant import LiftoverRun, Allele, Variant, VariantAllele, AlleleLiftover
+from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_variant import LiftoverRun, Allele, Variant, VariantAllele, AlleleLiftover, VariantCoordinate
 from upload.models import UploadedFile, UploadedLiftover, UploadPipeline, UploadedFileTypes
 from upload.upload_processing import process_upload_pipeline
 
-LIFTOVER_TOOL_AND_COORDINATE = tuple[Optional[AlleleConversionTool], Optional['VariantCoordinate']]
-
+# VariantCoordinate can be None, with an error string at the end
+LIFTOVER_TUPLE = tuple[Optional[AlleleConversionTool], Optional['VariantCoordinate'], Optional[str]]
 
 def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                               import_source: ImportSource,
@@ -33,7 +33,7 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                               destination_genome_builds: list[GenomeBuild] = None):
     """ Creates and runs a liftover pipeline for each destination GenomeBuild (default = all other builds) """
 
-    build_liftover_existing_allele_and_variants, build_liftover_variant_coordinates = _get_build_liftover_dicts(alleles, inserted_genome_build, destination_genome_builds)
+    build_liftover_existing_allele_and_variants, build_liftover_allele_variant_coordinate_error = _get_build_liftover_dicts(alleles, inserted_genome_build, destination_genome_builds)
     for genome_build, liftover_tuples in build_liftover_existing_allele_and_variants.items():
         for conversion_tool, av_tuples in liftover_tuples.items():
             liftover = LiftoverRun.objects.create(user=user,
@@ -43,8 +43,8 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
             if conversion_tool == AlleleConversionTool.SAME_CONTIG:
                 _run_liftover_using_same_contig(liftover, av_tuples)
 
-    for genome_build, liftover_tuples in build_liftover_variant_coordinates.items():
-        for conversion_tool, allele_and_variant_coordinates in liftover_tuples.items():
+    for genome_build, liftover_tuples in build_liftover_allele_variant_coordinate_error.items():
+        for conversion_tool, allele_variant_coordinate_error in liftover_tuples.items():
             liftover = LiftoverRun.objects.create(user=user,
                                                   conversion_tool=conversion_tool,
                                                   genome_build=genome_build)
@@ -63,33 +63,47 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                 liftover.save()
 
             allele_liftover_records = []
-            used_chroms: set[str] = set()
-            for allele, variant_coordinate in allele_and_variant_coordinates:
-                used_chroms.add(variant_coordinate.chrom)
-                al = AlleleLiftover(allele=allele,
-                                    liftover=liftover,
-                                    status=ProcessingStatus.CREATED)
+            # These 2 are in sync, used to write VCF
+            vcf_ids = []
+            variant_coordinates = []
+            for allele, variant_coordinate, error_message in allele_variant_coordinate_error:
+                if variant_coordinate is not None:
+                    al = AlleleLiftover(allele=allele,
+                                        liftover=liftover,
+                                        status=ProcessingStatus.CREATED)
+                    vcf_ids.append(allele)
+                    variant_coordinates.append(variant_coordinate)
+                else:
+                    al = AlleleLiftover(allele=allele,
+                                        liftover=liftover,
+                                        status=ProcessingStatus.ERROR,
+                                        error = {
+                                            "error_message": f"Validation Error: {error_message}",
+                                        })
                 allele_liftover_records.append(al)
 
             if allele_liftover_records:
                 AlleleLiftover.objects.bulk_create(allele_liftover_records, batch_size=2000)
 
-            # BCFTools uses chromosomes not contigs
-            header_lines = get_contigs_header_lines(vcf_genome_build, use_accession=False, contig_allow_list=used_chroms)
-            vcf_ids = (allele.pk for allele, _ in allele_and_variant_coordinates)
-            variant_coordinates = (vc for _, vc in allele_and_variant_coordinates)
-            write_vcf_from_variant_coordinates(vcf_filename, variant_coordinates=variant_coordinates,
-                                               vcf_ids=vcf_ids, header_lines=header_lines)
-            uploaded_file = UploadedFile.objects.create(path=liftover_vcf_filename,
-                                                        import_source=import_source,
-                                                        name='Liftover',
-                                                        user=user,
-                                                        file_type=UploadedFileTypes.LIFTOVER)
+            if vcf_ids:  # Need to write VCF and run
+                # BCFTools uses chromosomes not contigs
+                used_chroms = set((vc.chrom for vc in variant_coordinates))
+                header_lines = get_contigs_header_lines(vcf_genome_build, use_accession=False,
+                                                        contig_allow_list=used_chroms)
+                write_vcf_from_variant_coordinates(vcf_filename, variant_coordinates=variant_coordinates,
+                                                   vcf_ids=vcf_ids, header_lines=header_lines)
+                uploaded_file = UploadedFile.objects.create(path=liftover_vcf_filename,
+                                                            import_source=import_source,
+                                                            name='Liftover',
+                                                            user=user,
+                                                            file_type=UploadedFileTypes.LIFTOVER)
 
-            UploadedLiftover.objects.create(uploaded_file=uploaded_file,
-                                            liftover=liftover)
-            upload_pipeline = UploadPipeline.objects.create(uploaded_file=uploaded_file)
-            process_upload_pipeline(upload_pipeline)
+                UploadedLiftover.objects.create(uploaded_file=uploaded_file,
+                                                liftover=liftover)
+                upload_pipeline = UploadPipeline.objects.create(uploaded_file=uploaded_file)
+                process_upload_pipeline(upload_pipeline)
+            else:
+                logging.info("LiftoverRun %s doesn't need to be run", liftover)
 
 
 def _get_build_liftover_dicts(alleles: Iterable[Allele], inserted_genome_build: GenomeBuild,
@@ -121,7 +135,7 @@ def _get_build_liftover_dicts(alleles: Iterable[Allele], inserted_genome_build: 
         allele_builds[allele_id].add(genome_build_name)
 
     build_liftover_existing_allele_and_variants = defaultdict(lambda: defaultdict(list))  # Already lifted over
-    build_liftover_variant_coordinates = defaultdict(lambda: defaultdict(list))  # Need to run pipelines
+    build_liftover_allele_variant_coordinate_error = defaultdict(lambda: defaultdict(list))  # Need to run pipelines
 
     for allele in alleles:
         existing_builds = allele_builds[allele.pk]
@@ -130,27 +144,29 @@ def _get_build_liftover_dicts(alleles: Iterable[Allele], inserted_genome_build: 
                 logging.info("%s already lifted over to %s", allele, genome_build)
                 continue
 
+            # Now try different liftover methods (same contig, using dest build coords, using other builds and tool)
+            # Then exit loop w/continue on first success
+
+            same_contig_tool, variant = _liftover_using_existing_contig(allele, genome_build)
+            if same_contig_tool:
+                build_liftover_existing_allele_and_variants[genome_build][same_contig_tool].append((allele, variant))
+                continue
+
             hgvs_matcher = hgvs_matchers[genome_build]
-            conversion_tool = None
-            variant_coordinate = None
-            try:
-                conversion_tool, variant = _liftover_using_existing_contig(allele, genome_build)
-                if conversion_tool:
-                    build_liftover_existing_allele_and_variants[genome_build][conversion_tool].append((allele, variant))
-                else:
-                    # Try and get coordinates for builds we want
-                    conversion_tool, variant_coordinate = _liftover_using_dest_variant_coordinate(allele, genome_build,
-                                                                                                  hgvs_matcher=hgvs_matcher)
-            except (Contig.ContigNotInBuildError, GenomeFasta.ContigNotInFastaError):
-                log_traceback()
 
-            if not variant_coordinate:
-                conversion_tool, variant_coordinate = _liftover_using_source_variant_coordinate(allele, inserted_genome_build, genome_build)
+            for tool_coordinate_error in itertools.chain(
+                    _liftover_using_dest_variant_coordinate(allele, genome_build,
+                                                            hgvs_matcher=hgvs_matcher),
+                    _liftover_using_source_variant_coordinate(allele, inserted_genome_build, genome_build),
+            ):
+                conversion_tool, variant_coordinate, error_string = tool_coordinate_error
+                allele_vc_err = (allele, variant_coordinate, error_string)
+                build_liftover_allele_variant_coordinate_error[genome_build][conversion_tool].append(allele_vc_err)
+                if variant_coordinate:
+                    # Quit on 1st success
+                    continue
 
-            if conversion_tool and variant_coordinate:
-                build_liftover_variant_coordinates[genome_build][conversion_tool].append((allele, variant_coordinate))
-
-    return build_liftover_existing_allele_and_variants, build_liftover_variant_coordinates
+    return build_liftover_existing_allele_and_variants, build_liftover_allele_variant_coordinate_error
 
 
 def liftover_alleles(allele_qs, user: User = None):
@@ -203,11 +219,11 @@ def _liftover_using_existing_contig(allele, dest_genome_build: GenomeBuild) -> t
             conversion_tool = AlleleConversionTool.SAME_CONTIG
             # Return variant_id so we can create it directly
             variant = variant_allele.variant
-    return conversion_tool, variant
+    yield conversion_tool, variant
 
 
 def _liftover_using_dest_variant_coordinate(allele, dest_genome_build: GenomeBuild,
-                                            hgvs_matcher=None) -> LIFTOVER_TOOL_AND_COORDINATE:
+                                            hgvs_matcher=None) -> Iterable[LIFTOVER_TUPLE]:
     """ This returns tuples FOR a genome build (if something can look them up)
 
         Used by to write VCF coordinates during liftover. Can be slow (API call)
@@ -222,95 +238,100 @@ def _liftover_using_dest_variant_coordinate(allele, dest_genome_build: GenomeBui
 
     conversion_tool = None
     g_hgvs = None
-    clingen_failure_message = None
-    if allele.clingen_allele:
-        try:
-            g_hgvs = allele.clingen_allele.get_g_hgvs(dest_genome_build)
-            conversion_tool = AlleleConversionTool.CLINGEN_ALLELE_REGISTRY
-        except ValueError:  # Various contig errors all subclass from this
-            clingen_failure_message = f"{allele.clingen_allele} did not contain g.HGVS for {dest_genome_build}"
-    else:
-        clingen_failure_message = f"No ClinGenAllele for variant"
+    if not AlleleLiftover.has_existing_failure(allele, dest_genome_build, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY):
+        clingen_failure_message = None
+        if allele.clingen_allele:
+            try:
+                g_hgvs = allele.clingen_allele.get_g_hgvs(dest_genome_build)
+                conversion_tool = AlleleConversionTool.CLINGEN_ALLELE_REGISTRY
+            except ValueError:  # Various contig errors all subclass from this
+                clingen_failure_message = f"{allele.clingen_allele} did not contain g.HGVS for {dest_genome_build}"
+        else:
+            clingen_failure_message = f"No ClinGenAllele for variant"
 
-    # Store the fact that we couldn't use ClinGen
-    if clingen_failure_message:
-        lr = LiftoverRun.get_clingen_auto_fail_liftover_run(dest_genome_build)
-        #  we may have been here many times before, so check if already exists
-        AlleleLiftover.objects.update_or_create(liftover=lr, allele=allele,
-                                                defaults={
-                                                    "status": ProcessingStatus.ERROR,
-                                                    "error": {"message": clingen_failure_message},
-                                                })
+        # Store the fact that we couldn't use ClinGen
+        if clingen_failure_message:
+            yield AlleleConversionTool.CLINGEN_ALLELE_REGISTRY, None, clingen_failure_message
 
     if g_hgvs is None:
         if settings.LIFTOVER_DBSNP_ENABLED:
-            va = allele.variantallele_set.all().first()
-            if va is None:
-                raise ValueError("Allele contains no VariantAlleles at all! Cannot liftover")
-            if dbsnp := DbSNP.get_for_variant(va.variant, VariantAnnotationVersion.latest(va.genome_build)):
-                g_hgvs = dbsnp.get_g_hgvs(dest_genome_build, alt=va.variant.alt)
+            if not AlleleLiftover.has_existing_failure(allele, dest_genome_build,
+                                                       AlleleConversionTool.DBSNP):
                 conversion_tool = AlleleConversionTool.DBSNP
+                error_message = None
+                if va := allele.variantallele_set.all().first():
+                    if dbsnp := DbSNP.get_for_variant(va.variant, VariantAnnotationVersion.latest(va.genome_build)):
+                        g_hgvs = dbsnp.get_g_hgvs(dest_genome_build, alt=va.variant.alt)
+                    else:
+                        error_message = f"No dbSNP for {va.variant} ({va.genome_build})"
+                else:
+                    error_message = "Allele contains no VariantAlleles at all! Cannot liftover"
+                if error_message:
+                    yield conversion_tool, None, error_message
 
-    variant_coordinate = None
     if g_hgvs:
         if hgvs_matcher:
             variant_coordinate = hgvs_matcher.get_variant_coordinate(g_hgvs)
         else:
             variant_coordinate = get_hgvs_variant_coordinate(g_hgvs, dest_genome_build)
 
-    return conversion_tool, variant_coordinate
+        yield conversion_tool, variant_coordinate, None
 
 
 def _liftover_using_source_variant_coordinate(allele, source_genome_build: GenomeBuild,
-                                             dest_genome_build: GenomeBuild) -> LIFTOVER_TOOL_AND_COORDINATE:
+                                             dest_genome_build: GenomeBuild) -> Iterable[LIFTOVER_TUPLE]:
     """ This gets tuples from another build to run through a tool """
+
+    variant = allele.variant_for_build(source_genome_build)
+    variant_coordinate = variant.coordinate
+
+    # BCFTools fails with "Unable to fetch sequence" if any variant is outside contig size
+    variant_errors = Variant.validate(source_genome_build, variant_coordinate.chrom,
+                                      variant_coordinate.position)
+    variant_errors_str = "\n".join(variant_errors)
 
     # Try tools that write other builds, then run conversion
     options = [
-        (settings.LIFTOVER_BCFTOOLS_ENABLED, AlleleConversionTool.BCFTOOLS_LIFTOVER),
+        # Enabled, Tool Enum, Requires reference to match genome build
+        (settings.LIFTOVER_BCFTOOLS_ENABLED, AlleleConversionTool.BCFTOOLS_LIFTOVER, True),
     ]
 
     conversion_tool = None
-    variant_coordinate = None
-    for enabled, potential_conversion_tool in options:
+    variant_coordinate: Optional[VariantCoordinate] = None
+    for enabled, potential_conversion_tool, require_reference_match in options:
         if enabled:
-            if allele.alleleliftover_set.filter(liftover__genome_build=dest_genome_build,
-                                                liftover__conversion_tool=potential_conversion_tool,
-                                                status=ProcessingStatus.ERROR).exists():
+            if AlleleLiftover.has_existing_failure(allele, dest_genome_build, potential_conversion_tool):
                 continue  # Skip as already failed liftover method to desired build
+
+            if variant_errors_str:
+                yield potential_conversion_tool, None, variant_errors_str
+                continue
+
+            if require_reference_match:
+                calculated_ref = variant_coordinate.calculated_reference(source_genome_build)
+                if calculated_ref != variant_coordinate.ref:
+                    error_message = f"reference='{variant_coordinate.ref}' not equal to calculated ref from genome {calculated_ref}"
+                    yield potential_conversion_tool, None, error_message
+                    continue
+
             conversion_tool = potential_conversion_tool
             break  # Just want 1st one
 
-    if conversion_tool:
-        # Return VCF tuples in inserted genome build
-        try:
-            variant = allele.variant_for_build(source_genome_build)
-            variant_coordinate = variant.coordinate
-            # BCFTools fails with "Unable to fetch sequence" if any variant is outside contig size
-            if errors := Variant.validate(source_genome_build, variant_coordinate.chrom, variant_coordinate.position):
-                raise ValueError("\n".join(errors))
-        except ValueError as e:  # No variant for source build (merged allele?)
-            logging.warning("Skipped %s: %s", allele, e)
-            return None, None
-
-    return conversion_tool, variant_coordinate
+    return conversion_tool, variant_coordinate, None
 
 
 def allele_can_attempt_liftover(allele, genome_build) -> bool:
-    try:
-        conversion_tool, _ = allele.liftover_using_existing_variant(genome_build)
-        if conversion_tool is not None:
+    for conversion_tool, variant in _liftover_using_existing_contig(allele, genome_build):
+        if conversion_tool and variant:
             return True
 
-        conversion_tool, _ = allele.liftover_using_dest_variant_coordinate(genome_build)[0]
-        if conversion_tool is not None:
+    for conversion_tool, variant_coordinate, _error_message in _liftover_using_dest_variant_coordinate(allele, genome_build):
+        if conversion_tool and variant_coordinate:
             return True
-    except:
-        pass
 
     for va in allele.variantallele_set.exclude(genome_build=genome_build):
-        conversion_tool, _ = _liftover_using_source_variant_coordinate(allele, va.genome_build, genome_build)
-        if conversion_tool is not None:
-            return True
+        for conversion_tool, variant_coordinate, _error_message in _liftover_using_source_variant_coordinate(allele, va.genome_build, genome_build):
+            if conversion_tool and variant_coordinate:
+                return True
 
     return False

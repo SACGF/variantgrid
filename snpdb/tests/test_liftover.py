@@ -30,35 +30,41 @@ class TestLiftover(TestCase):
     def test_liftover_using_existing_variant(self):
         clingen_api = MockClinGenAlleleRegistryAPI()
         # This is on chr3 - it is created for 37 but not 38
-        conversion_tool, variant = _liftover_using_existing_contig(self.allele, GenomeBuild.grch38())
+        result = list(_liftover_using_existing_contig(self.allele, GenomeBuild.grch38()))[0]
+        conversion_tool, variant = result
         self.assertIsNone(conversion_tool)
         self.assertIsNone(variant)
 
         # MT variant exists in 37 - shares same contig so should be able to re-use for 38
         clingen_allele = get_clingen_allele("CA337095804", clingen_api=clingen_api)
         mt_allele = clingen_allele.allele
-        conversion_tool, variant = _liftover_using_existing_contig(mt_allele, GenomeBuild.grch38())
+        result = list(_liftover_using_existing_contig(mt_allele, GenomeBuild.grch38()))[0]
+        conversion_tool, variant = result
         self.assertEqual(conversion_tool, AlleleConversionTool.SAME_CONTIG)
         self.assertIsNotNone(variant)
 
     def test_liftover_using_dest_variant_coordinate(self):
-        conversion_tool, variant_coordinate_37 = _liftover_using_dest_variant_coordinate(self.allele, GenomeBuild.grch37())
+        result = list(_liftover_using_dest_variant_coordinate(self.allele, GenomeBuild.grch37()))[0]
+        conversion_tool, variant_coordinate_37, _error_message = result
         self.assertEqual(conversion_tool, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
         self.assertEqual(variant_coordinate_37, self.expected_vc_37)
 
-        conversion_tool, variant_coordinate_38 = _liftover_using_dest_variant_coordinate(self.allele, GenomeBuild.grch38())
+        result = list(_liftover_using_dest_variant_coordinate(self.allele, GenomeBuild.grch38()))[0]
+        conversion_tool, variant_coordinate_38, _error_message = result
         self.assertEqual(conversion_tool, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
         self.assertEqual(variant_coordinate_38, self.expected_vc_38)
 
     def _liftover_using_source_variant_coordinate(self):
-        conversion_tool, variant_coordinate_37 = _liftover_using_source_variant_coordinate(self.allele,
-                                                                                           source_genome_build=GenomeBuild.grch37(),
-                                                                                           dest_genome_build=GenomeBuild.grch38())
+        result = list(_liftover_using_source_variant_coordinate(self.allele,
+                                                                source_genome_build=GenomeBuild.grch37(),
+                                                                dest_genome_build=GenomeBuild.grch38()))[0]
+        conversion_tool, variant_coordinate_37, _error_message = result
         self.assertEqual(conversion_tool, AlleleConversionTool.BCFTOOLS_LIFTOVER)
         self.assertEqual(variant_coordinate_37, self.expected_vc_37)
 
-        conversion_tool, variant_coordinate_38 = _liftover_using_source_variant_coordinate(self.allele,
-                                                                                           source_genome_build=GenomeBuild.grch38(),
-                                                                                           dest_genome_build=GenomeBuild.grch37())
+        result = list(_liftover_using_source_variant_coordinate(self.allele,
+                                                                source_genome_build=GenomeBuild.grch38(),
+                                                                dest_genome_build=GenomeBuild.grch37()))[0]
+        conversion_tool, variant_coordinate_38, _error_message = result
         self.assertEqual(conversion_tool, AlleleConversionTool.BCFTOOLS_LIFTOVER)
         self.assertEqual(variant_coordinate_38, self.expected_vc_38)

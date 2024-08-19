@@ -926,8 +926,6 @@ class LiftoverRun(TimeStampedModel):
             lr = LiftoverRun.objects.create(**kwargs)
         return lr
 
-
-
     def get_absolute_url(self):
         return reverse("view_liftover_run", kwargs={"liftover_run_id": self.pk})
 
@@ -986,6 +984,12 @@ class AlleleLiftover(models.Model):
             if msg := self.error.get("message"):
                 s += f" error: {msg}"
         return s
+
+    @staticmethod
+    def has_existing_failure(allele, dest_genome_build, conversion_tool) -> bool:
+        return allele.alleleliftover_set.filter(liftover__genome_build=dest_genome_build,
+                                                liftover__conversion_tool=conversion_tool,
+                                                status=ProcessingStatus.ERROR).exists()
 
     @staticmethod
     def get_last_failed_liftover_run(allele, genome_build) -> Optional['LiftoverRun']:
