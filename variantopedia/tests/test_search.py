@@ -20,8 +20,11 @@ class TestSearch(TestCase):
 
         create_fake_transcript_version(GenomeBuild.grch38())
 
-    def _verify_all_of_type(self, search_results, search_type):
+    def _verify_all_of_type(self, search_results, search_type, ignore_errors=False):
         for sr in search_results.results:
+            if ignore_errors:
+                if sr.preview.is_error:
+                    continue
             self.assertEqual(search_type, sr.search_type, f"Search result {sr} is of type {search_type}")
 
     def test_search_hgvs(self):
@@ -32,7 +35,8 @@ class TestSearch(TestCase):
         ]
         for hgvs_name in HGVS_NAMES:
             search_results = search_data(self.user, hgvs_name, False)
-            self._verify_all_of_type(search_results, SearchTypes.VARIANT)
+            # Need to ignore errors as 37 HGVS uses fake clingen
+            self._verify_all_of_type(search_results, SearchTypes.VARIANT, ignore_errors=True)
 
     def test_search_gene_hgvs(self):
         HGVS_NAMES = [
