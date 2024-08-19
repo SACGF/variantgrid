@@ -3,6 +3,7 @@ import logging
 import celery
 from django.contrib.auth.models import User
 
+from library.log_utils import log_traceback
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import GenomeBuild, ImportSource, Allele
 
@@ -24,4 +25,4 @@ def liftover_alleles(username, genome_build_name):
         create_liftover_pipelines(user, alleles, ImportSource.WEB, inserted_genome_build, [genome_build])
         logging.info("/ finished creating pipelines")
     except Exception as e:
-        logging.error(e)
+        log_traceback()
