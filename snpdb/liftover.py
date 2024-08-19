@@ -236,10 +236,11 @@ def _liftover_using_dest_variant_coordinate(allele, dest_genome_build: GenomeBui
     if clingen_failure_message:
         lr = LiftoverRun.get_clingen_auto_fail_liftover_run(dest_genome_build)
         #  we may have been here many times before, so check if already exists
-        AlleleLiftover.objects.get_or_create(liftover=lr, allele=allele, status=ProcessingStatus.ERROR,
-                                             defaults={
-                                                 "error": {"message": clingen_failure_message},
-                                             })
+        AlleleLiftover.objects.update_or_create(liftover=lr, allele=allele,
+                                                defaults={
+                                                    "status": ProcessingStatus.ERROR,
+                                                    "error": {"message": clingen_failure_message},
+                                                })
 
     if g_hgvs is None:
         if settings.LIFTOVER_DBSNP_ENABLED:
