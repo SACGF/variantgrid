@@ -50,7 +50,25 @@
     {% settings_value 'CLINGEN_ALLELE_REGISTRY_DOMAIN' as clingen_url %}
 
     <div class="container">
-        {% page_help page_id='variantdetails/view_allele_help' title='Allele' %}
+        {% page_help_embedded title='Allele' %}
+            <p>
+            An allele is a genetic change independent of a genome builds. Variants from different builds link to the same allele.
+            </p>
+
+            <p>
+            Variant classifications are compared across alleles, so classification differences can be detected regardless of what build it was originally classified against. Classifying a variant will create an allele, and linked variants for all genome builds supported by the server.
+            </p>
+
+            <p>
+            Alleles generally have 1 (and only 1) ClinGen Allele ID, from the <a href="http://reg.clinicalgenome.org">ClinGen Allele Registry</a>, which we use to perform liftover between builds.
+            </p>
+            {% settings_value "LIFTOVER_BCFTOOLS_ENABLED" as bcftools_enabled %}
+            {% if bcftools_enabled %}
+                <p>
+                If ClinGen fails, we use <a href="https://samtools.github.io/bcftools/">BCF tools</a>.
+                </p>
+            {% endif %}
+        {% end_page_help_embedded %}
 
         {% labelled label="Internal Allele ID" %}
             {{ allele_card.allele.pk }} {% admin_link allele_card.allele %}

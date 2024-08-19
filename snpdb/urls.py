@@ -134,8 +134,11 @@ urlpatterns = [
     perm_path('autocomplete/Lab/', views_autocomplete.LabAutocompleteView.as_view(), name='lab_autocomplete'),
     perm_path('autocomplete/VCF/', views_autocomplete.VCFAutocompleteView.as_view(), name='vcf_autocomplete'),
 
-    #Previews
+    # Previews
     perm_path('preview/<str:db>/<str:idx>', preview_view, name='preview_data'),
+
+    # For Uptime Robot
+    perm_path('uptime_check', views.view_uptime, name='uptime_check'),
 
     # Debug dev help
     perm_path('ajax_hello_world/<str:data>', views.ajax_hello_world, name='ajax_hello_world'),

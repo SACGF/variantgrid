@@ -38,6 +38,16 @@ class Keycloak:
         self.connector = connector
         self.realm = settings.KEY_CLOAK_REALM
 
+    def ping(self):
+        full_url = self.connector.url(f'/auth/admin/realms/{self.realm}/clients')
+        print(full_url)
+        response = requests.get(
+            auth=self.connector.auth,
+            url=self.connector.url(f'/auth/admin/realms/{self.realm}/clients'),
+            timeout=MINUTE_SECS,
+        )
+        response.raise_for_status()
+
     def change_password(self, user: User):
         user_settings = UserSettings.get_for_user(user)
         if not user_settings.oauth_sub:

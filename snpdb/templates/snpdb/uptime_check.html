@@ -1,0 +1,30 @@
+{% extends "uicore/page/base_external.html" %}
+{% load ui_utils %}
+{% block content %}
+    <div class="container mt-4">
+        <div class="jumbotron">
+            <h1>Uptime Status</h1>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>System</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for uptime_check in uptime_response.uptime_checks %}
+                    <tr>
+                        <td>{{ uptime_check.name }}</td>
+                        <td>{{ uptime_check.status.severity | severity_icon }}{{ uptime_check.status.pretty_label }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% if uptime_response.status == 1 %}
+                <div class="alert alert-success">Everything is OKAY</div>
+            {% else %}
+                <div class="alert alert-danger">{{ uptime_response.status.severity | severity_icon }}Overall Status {{ uptime_response.status.pretty_label }}</div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

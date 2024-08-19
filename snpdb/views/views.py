@@ -45,6 +45,7 @@ from classification.views.classification_datatables import ClassificationColumns
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import CustomGeneListForm, UserGeneListForm, GeneAndTranscriptForm
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList
+from library import uptime_check
 from library.constants import WEEK_SECS, HOUR_SECS
 from library.django_utils import add_save_message, get_model_fields, set_form_read_only, require_superuser, \
     get_field_counts
@@ -1668,3 +1669,9 @@ def view_contig(request, contig_accession):
         "genome_build": genome_build,
     }
     return render(request, "snpdb/genomics/view_contig.html", context)
+
+
+@login_not_required
+def view_uptime(request):
+    uptime_response = uptime_check.retrieve_uptime_response()
+    return render(request, "snpdb/uptime_check.html", {"uptime_response": uptime_response})

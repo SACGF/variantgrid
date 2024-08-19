@@ -53,16 +53,17 @@ CLASSIFICATION_NON_ACMG_ASSERTION_METHOD = [
 ]
 
 # Keycloak
+INSTALLED_APPS = ["oidc_auth"] + INSTALLED_APPS
 
 AUTHENTICATION_BACKENDS = (
-    'auth.backend.VariantGridOIDCAuthenticationBackend',
+    'oidc_auth.backend.VariantGridOIDCAuthenticationBackend',
     'django.contrib.auth.backends.ModelBackend',  # default
     'guardian.backends.ObjectPermissionBackend',
 )
 
 MIDDLEWARE += (
-    'auth.session_refresh.VariantGridSessionRefresh',
-    'auth.oidc_error_handler.HandleOIDC400Middleware',
+    'oidc_auth.session_refresh.VariantGridSessionRefresh',
+    'oidc_auth.oidc_error_handler.HandleOIDC400Middleware',
 )
 
 REST_FRAMEWORK = {
