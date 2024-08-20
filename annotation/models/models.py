@@ -932,6 +932,11 @@ class AnnotationRun(TimeStampedModel):
         return reverse('view_annotation_run', kwargs={'annotation_run_id': self.pk})
 
     @staticmethod
+    def count_not_successful_runs_for_version(version: VariantAnnotationVersion) -> int:
+        qs = AnnotationRun.objects.filter(annotation_range_lock__version=version)
+        return qs.exclude(status=AnnotationStatus.FINISHED).count()
+
+    @staticmethod
     def get_for_variant(variant: Variant, genome_build) -> Optional['AnnotationRun']:
         if variant.is_symbolic:
             pipeline_type = VariantAnnotationPipelineType.STRUCTURAL_VARIANT

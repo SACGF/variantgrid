@@ -1,6 +1,7 @@
 from django.db.models import Count
 
-from annotation.models import AnnotationRangeLock
+from annotation.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion
+from snpdb.models import GenomeBuild
 
 
 def check_annotation_status() -> dict:
@@ -25,4 +26,15 @@ def check_annotation_status() -> dict:
     annotation_status = {
         "AnnotationRangeLock duplicates": arl_data,
     }
+
+    for genome_build in GenomeBuild.builds_with_annotation():
+        vav = VariantAnnotationVersion.latest(genome_build, active=True)
+        num_not_success = AnnotationRun.count_not_successful_runs_for_version(vav)
+        anno_data = {
+            "valid": True,  # Just a warning
+        }
+        if num_not_success:
+            anno_data["warning"] = f"There are {num_not_success} annotation runs for {vav} with status error/incomplete"
+        annotation_status[f"variant_annotation_latest_{genome_build}"] = anno_data
+
     return annotation_status
