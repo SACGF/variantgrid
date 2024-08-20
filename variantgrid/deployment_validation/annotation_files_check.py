@@ -34,6 +34,12 @@ def annotation_data_exists(flat=False) -> dict:
                     filename = os.path.join(settings.ANNOTATION_VEP_BASE_DIR, filename)
                 check_files[key] = filename
 
+        if settings.LIFTOVER_BCFTOOLS_ENABLED:
+            annotation_build_config = settings.ANNOTATION[genome_build.name]
+            for dest_genome_build, chain_filename in annotation_build_config["liftover"].items():
+                key = f"bcftools_chain_{genome_build.name}_to_{dest_genome_build}"
+                check_files[key] = chain_filename
+
         vep_config = VEPConfig(genome_build)
         for key, rel_path in vep_config.vep_data.items():
             if rel_path is not None:
