@@ -1,3 +1,5 @@
+from django.urls import include, path
+from rest_framework import routers
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from library.django_utils.jqgrid_view import JQGridView
@@ -13,6 +15,8 @@ from seqauto.grids.sequencing_software_versions_grids import LibraryGrid, Sequen
     AssayGrid, AlignerGrid, VariantCallerGrid, VariantCallingPipelineGrid
 from seqauto.views import SequencerUpdate, LibraryUpdate, AssayUpdate, VariantCallerUpdate, \
     AlignerUpdate, VariantCallingPipelineUpdate
+from seqauto.views_rest import SequencingRunViewSet, EnrichmentKitViewSet, SequencerModelViewSet, SequencerViewSet, \
+    ExperimentViewSet, VariantCallerViewSet
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
 
@@ -105,10 +109,22 @@ urlpatterns = [
               name='sequencing_run_autocomplete'),
 ]
 
-#router = routers.DefaultRouter()
+router = routers.DefaultRouter()
+router.register(r'enrichment_kit', EnrichmentKitViewSet, basename='enrichment_kit')
+router.register(r'sequencer_model', SequencerModelViewSet, basename='sequencer_model')
+router.register(r'sequencer', SequencerViewSet, basename='sequencer')
+router.register(r'experiment', ExperimentViewSet, basename='experiment')
+router.register(r'variant_caller', VariantCallerViewSet, basename='variant_caller')
+router.register(r'sequencing_run', SequencingRunViewSet, basename='sequencing_run')
+
+urlpatterns += [
+    path('', include(router.urls)),
+]
+
 rest_urlpatterns = [
     perm_path('api/view_enrichment_kit_summary/<int:pk>', views_rest.EnrichmentKitSummaryView.as_view(), name='api_view_enrichment_kit_summary'),
-    perm_path('api/view_enrichment_kit/<int:pk>', views_rest.EnrichmentKitView.as_view(), name='api_view_enrichment_kit'),
+    perm_path('api/view_enrichment_kit/<int:pk>', EnrichmentKitViewSet.as_view({'get': 'retrieve'}),
+              name='api_view_enrichment_kit'),  # Deprecated, used for backwards compatability
     perm_path('api/enrichment_kit_gene_coverage/<int:enrichment_kit_id>/<gene_symbol>', views_rest.EnrichmentKitGeneCoverageView.as_view(), name='api_enrichment_kit_gene_coverage'),
     perm_path('api/enrichment_kit_gene_gold_coverage/<int:enrichment_kit_id>/<gene_symbol>', views_rest.EnrichmentKitGeneGoldCoverageView.as_view(), name='api_enrichment_kit_gene_gold_coverage'),
     perm_path('api/enrichment_kit_gene_gold_coverage_summary/<int:enrichment_kit_id>/<gene_symbol>', views_rest.GoldCoverageSummaryView.as_view(), name='api_enrichment_kit_gene_gold_coverage_summary'),
