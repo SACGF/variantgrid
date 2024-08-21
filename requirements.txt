@@ -4,7 +4,7 @@ stream-zip==0.0.47
 more-itertools==8.12.0
 beautifulsoup4==4.10.0
 bgzip==0.5.0
-biopython==1.81
+biopython==1.84
 cdot==0.2.26
 celery==5.3.6
 ConfigArgParse==1.5.3
@@ -49,14 +49,14 @@ git+https://github.com/SACGF/hgvs#egg=pyhgvs
 git+https://github.com/biocommons/hgvs#egg=hgvs
 git+https://github.com/dridk/PyVCF3#egg=pyvcf3
 gunicorn
-HTSeq==2.0.5
+HTSeq==2.0.8
 ijson==3.1.4
 ipython==8.15
 kombu==5.3.7
 levenshtein==0.20.9
 lxml==5.1.0
 Markdown==3.2
-matplotlib==3.5.1
+matplotlib==3.9.2
 mozilla_django_oidc==2.0.0
 nameparser==1.1.1
 networkx==2.7.1
@@ -65,7 +65,9 @@ numpy==1.25
 oauthlib==3.1.0
 pandas==1.4.0
 pronto==2.5.7
-psycopg2==2.9.3
+psycopg2==2.9.9
+# required by macOS
+# psycopg2-binary==2.9.9
 pypdf==4.0.2
 pysam==0.22.1
 python_dateutil==2.8.2
@@ -74,19 +76,21 @@ reportlab==3.6.13
 requests==2.32.0
 requests_oauthlib==1.3.1
 rollbar==0.16.3
-scipy==1.12.0
+scipy==1.14.1
 simplejson==3.18.0
 sqlparse==0.5.0
 toposort==1.7
 Unidecode==1.3.2
 # below are only required for environments directly integrating with s3
 # separate to django-amazon-ses
-boto3==1.21.13
+boto3==1.26.90
 django-storages==1.12.3
 django_threadlocals==0.10
 pyspellchecker==0.6.3
-frozendict==2.3.4
+frozendict==2.4.2
 pydantic==2.4.0
 deepdiff==6.5.0
 # required for omni importer
 openpyxl==3.1.2
+# only used indirectly, but be explicit for the sake of dependencies
+jmespath==1.0.1
