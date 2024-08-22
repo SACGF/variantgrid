@@ -19,11 +19,12 @@ from genes.views.views import get_coverage_stats
 from library.constants import WEEK_SECS
 from library.utils import defaultdict_to_dict
 from seqauto.models import GoldCoverageSummary, EnrichmentKit, SequencerModel, Sequencer, Experiment, VariantCaller, \
-    SequencingRun
+    SequencingRun, SampleSheet, VCFFile, SampleSheetCombinedVCFFile, FastQC
 from seqauto.serializers import EnrichmentKitSerializer, \
     GoldCoverageSummarySerializer, EnrichmentKitSummarySerializer
 from seqauto.serializers.sequencing_serializers import SequencerModelSerializer, SequencerSerializer, \
-    ExperimentSerializer, VariantCallerSerializer, SequencingRunSerializer
+    ExperimentSerializer, VariantCallerSerializer, SequencingRunSerializer, SampleSheetSerializer, VCFFileSerializer, \
+    SampleSheetCombinedVCFFileSerializer, FastQCSerializer
 
 
 class EnrichmentKitSummaryView(RetrieveAPIView):
@@ -66,9 +67,24 @@ class SequencingRunViewSet(ModelViewSet):
     serializer_class = SequencingRunSerializer
 
 
+class SampleSheetViewSet(ModelViewSet):
+    queryset = SampleSheet.objects.all()
+    serializer_class = SampleSheetSerializer
 
 
+class VCFFileViewSet(ModelViewSet):
+    queryset = VCFFile.objects.all()
+    serializer_class = VCFFileSerializer
 
+
+class SampleSheetCombinedVCFFileViewSet(ModelViewSet):
+    queryset = SampleSheetCombinedVCFFile.objects.all()
+    serializer_class = SampleSheetCombinedVCFFileSerializer
+
+
+class FastQCViewSet(ModelViewSet):
+    queryset = FastQC.objects.all()
+    serializer_class = FastQCSerializer
 
 
 class EnrichmentKitGeneCoverageView(APIView):

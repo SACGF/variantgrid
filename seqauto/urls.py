@@ -16,7 +16,8 @@ from seqauto.grids.sequencing_software_versions_grids import LibraryGrid, Sequen
 from seqauto.views import SequencerUpdate, LibraryUpdate, AssayUpdate, VariantCallerUpdate, \
     AlignerUpdate, VariantCallingPipelineUpdate
 from seqauto.views_rest import SequencingRunViewSet, EnrichmentKitViewSet, SequencerModelViewSet, SequencerViewSet, \
-    ExperimentViewSet, VariantCallerViewSet
+    ExperimentViewSet, VariantCallerViewSet, VCFFileViewSet, SampleSheetCombinedVCFFileViewSet, FastQCViewSet, \
+    SampleSheetViewSet
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
 
@@ -116,6 +117,10 @@ router.register(r'api/v1/sequencer', SequencerViewSet, basename='api_sequencer')
 router.register(r'api/v1/experiment', ExperimentViewSet, basename='api_experiment')
 router.register(r'api/v1/variant_caller', VariantCallerViewSet, basename='api_variant_caller')
 router.register(r'api/v1/sequencing_run', SequencingRunViewSet, basename='api_sequencing_run')
+router.register(r'api/v1/sample_sheet', SampleSheetViewSet, basename='api_sample_sheet')
+router.register(r'api/v1/vcf_file', VCFFileViewSet, basename='api_vcf_file')
+router.register(r'api/v1/sample_sheet_combined_vcf_file', SampleSheetCombinedVCFFileViewSet, basename='api_sample_sheet_combined_vcf_file')
+router.register(r'api/v1/fastqc', FastQCViewSet, basename='api_fastqc')
 
 urlpatterns += [
     path('', include(router.urls)),
