@@ -9,7 +9,7 @@ class EnrichmentKitSerializer(serializers.ModelSerializer):
     gene_list = GeneListSerializer()
     enrichment_kit_type = serializers.SerializerMethodField()
     manufacturer = serializers.StringRelatedField()
-    __str__ = serializers.SerializerMethodField()
+    __str__ = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = EnrichmentKit
@@ -26,7 +26,7 @@ class EnrichmentKitSummarySerializer(serializers.ModelSerializer):
     """ Doesn't return genes (much faster)  """
     enrichment_kit_type = serializers.SerializerMethodField()
     manufacturer = serializers.StringRelatedField()
-    __str__ = serializers.SerializerMethodField()
+    __str__ = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = EnrichmentKit

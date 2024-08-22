@@ -35,7 +35,7 @@ class SequencerModelSerializer(serializers.ModelSerializer):
 
 
 class SequencerSerializer(serializers.ModelSerializer):
-    sequencer_model = serializers.StringRelatedField()
+    sequencer_model = SequencerModelSerializer()
 
     class Meta:
         model = Sequencer

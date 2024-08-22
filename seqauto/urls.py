@@ -110,12 +110,12 @@ urlpatterns = [
 ]
 
 router = routers.DefaultRouter()
-router.register(r'enrichment_kit', EnrichmentKitViewSet, basename='enrichment_kit')
-router.register(r'sequencer_model', SequencerModelViewSet, basename='sequencer_model')
-router.register(r'sequencer', SequencerViewSet, basename='sequencer')
-router.register(r'experiment', ExperimentViewSet, basename='experiment')
-router.register(r'variant_caller', VariantCallerViewSet, basename='variant_caller')
-router.register(r'sequencing_run', SequencingRunViewSet, basename='sequencing_run')
+router.register(r'api/v1/enrichment_kit', EnrichmentKitViewSet, basename='api_enrichment_kit')
+router.register(r'api/v1/sequencer_model', SequencerModelViewSet, basename='api_sequencer_model')
+router.register(r'api/v1/sequencer', SequencerViewSet, basename='api_sequencer')
+router.register(r'api/v1/experiment', ExperimentViewSet, basename='api_experiment')
+router.register(r'api/v1/variant_caller', VariantCallerViewSet, basename='api_variant_caller')
+router.register(r'api/v1/sequencing_run', SequencingRunViewSet, basename='api_sequencing_run')
 
 urlpatterns += [
     path('', include(router.urls)),
