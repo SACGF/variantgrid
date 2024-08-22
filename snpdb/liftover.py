@@ -71,7 +71,7 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                     al = AlleleLiftover(allele=allele,
                                         liftover=liftover,
                                         status=ProcessingStatus.CREATED)
-                    vcf_ids.append(allele)
+                    vcf_ids.append(allele.pk)
                     variant_coordinates.append(variant_coordinate)
                 else:
                     al = AlleleLiftover(allele=allele,
