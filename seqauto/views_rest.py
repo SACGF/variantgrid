@@ -19,12 +19,15 @@ from genes.views.views import get_coverage_stats
 from library.constants import WEEK_SECS
 from library.utils import defaultdict_to_dict
 from seqauto.models import GoldCoverageSummary, EnrichmentKit, SequencerModel, Sequencer, Experiment, VariantCaller, \
-    SequencingRun, SampleSheet, VCFFile, SampleSheetCombinedVCFFile, FastQC
+    SequencingRun, SampleSheet, VCFFile, SampleSheetCombinedVCFFile, FastQC, QCExecSummary, QCGeneCoverage, QCGeneList, \
+    QC, IlluminaFlowcellQC
 from seqauto.serializers import EnrichmentKitSerializer, \
     GoldCoverageSummarySerializer, EnrichmentKitSummarySerializer
+from seqauto.serializers.seqauto_qc_serializers import FastQCSerializer, QCExecSummarySerializer, \
+    QCGeneCoverageSerializer, QCGeneListSerializer, QCSerializer, IlluminaFlowcellQCSerializer
 from seqauto.serializers.sequencing_serializers import SequencerModelSerializer, SequencerSerializer, \
     ExperimentSerializer, VariantCallerSerializer, SequencingRunSerializer, SampleSheetSerializer, VCFFileSerializer, \
-    SampleSheetCombinedVCFFileSerializer, FastQCSerializer
+    SampleSheetCombinedVCFFileSerializer
 
 
 class EnrichmentKitSummaryView(RetrieveAPIView):
@@ -85,6 +88,32 @@ class SampleSheetCombinedVCFFileViewSet(ModelViewSet):
 class FastQCViewSet(ModelViewSet):
     queryset = FastQC.objects.all()
     serializer_class = FastQCSerializer
+
+
+class IlluminaFlowcellQCViewSet(ModelViewSet):
+    queryset = IlluminaFlowcellQC.objects.all()
+    serializer_class = IlluminaFlowcellQCSerializer
+
+
+class QCViewSet(ModelViewSet):
+    queryset = QC.objects.all()
+    serializer_class = QCSerializer
+
+
+class QCGeneListViewSet(ModelViewSet):
+    queryset = QCGeneList.objects.all()
+    serializer_class = QCGeneListSerializer
+
+
+class QCGeneCoverageViewSet(ModelViewSet):
+    queryset = QCGeneCoverage.objects.all()
+    serializer_class = QCGeneCoverageSerializer
+
+
+class QCExecSummaryViewSet(ModelViewSet):
+    queryset = QCExecSummary.objects.all()
+    serializer_class = QCExecSummarySerializer
+
 
 
 class EnrichmentKitGeneCoverageView(APIView):

@@ -17,7 +17,8 @@ from seqauto.views import SequencerUpdate, LibraryUpdate, AssayUpdate, VariantCa
     AlignerUpdate, VariantCallingPipelineUpdate
 from seqauto.views_rest import SequencingRunViewSet, EnrichmentKitViewSet, SequencerModelViewSet, SequencerViewSet, \
     ExperimentViewSet, VariantCallerViewSet, VCFFileViewSet, SampleSheetCombinedVCFFileViewSet, FastQCViewSet, \
-    SampleSheetViewSet
+    SampleSheetViewSet, IlluminaFlowcellQCViewSet, QCViewSet, QCGeneListViewSet, QCGeneCoverageViewSet, \
+    QCExecSummaryViewSet
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
 
@@ -121,6 +122,10 @@ router.register(r'api/v1/sample_sheet', SampleSheetViewSet, basename='api_sample
 router.register(r'api/v1/vcf_file', VCFFileViewSet, basename='api_vcf_file')
 router.register(r'api/v1/sample_sheet_combined_vcf_file', SampleSheetCombinedVCFFileViewSet, basename='api_sample_sheet_combined_vcf_file')
 router.register(r'api/v1/fastqc', FastQCViewSet, basename='api_fastqc')
+router.register(r'api/v1/illumina_flowcell_qc', IlluminaFlowcellQCViewSet, basename='api_illumina_flowcell_qc')
+router.register(r'api/v1/qc_gene_list', QCGeneListViewSet, basename='api_qc_gene_list')
+router.register(r'api/v1/qc_gene_coverage', QCGeneCoverageViewSet, basename='api_qc_gene_coverage')
+router.register(r'api/v1/qc_exec_summary', QCExecSummaryViewSet, basename='api_qc_exec_summary')
 
 urlpatterns += [
     path('', include(router.urls)),

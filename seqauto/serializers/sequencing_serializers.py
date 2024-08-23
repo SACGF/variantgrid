@@ -6,7 +6,7 @@ from seqauto.models import Sequencer, Experiment, VariantCaller, SequencingRun, 
     SequencingSampleData, SequencingSample, UnalignedReads, Flagstats, FastQC, SampleSheetCombinedVCFFile, VCFFile, \
     BamFile, Fastq, Aligner
 from seqauto.serializers import EnrichmentKitSerializer
-from snpdb.models import Manufacturer
+from snpdb.models import Manufacturer, DataState
 
 
 class SequencerModelSerializer(serializers.ModelSerializer):
@@ -104,7 +104,31 @@ class VariantCallerSerializer(serializers.ModelSerializer):
         return instance
 
 
-class SequencingRunSerializer(serializers.ModelSerializer):
+class SeqAutoViewMixin:
+    """
+        This sets SeqAutoRecord.data_state to COMPLETED for anything created via API
+
+        SeqAutoRecord.data_state represents eg whether the file exists on disk or has been deleted
+        or we expect it, and it's not available yet.
+
+        Now we're moving to an API, I think we should just have the SeqAuto records match the disk
+        and be updated via clients, or just be added and then if they are deleted we don't care
+
+        TODO: We should consider removing the data_state field
+    """
+    def set_data_state_complete(self, validated_data):
+        validated_data['data_state'] = DataState.COMPLETE
+
+    def create(self, validated_data):
+        self.set_data_state_complete(validated_data)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        self.set_data_state_complete(validated_data)
+        return super().update(instance, validated_data)
+
+
+class SequencingRunSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
     sequencer = SequencerSerializer()
     experiment = ExperimentSerializer()
     enrichment_kit = EnrichmentKitSerializer()
@@ -175,8 +199,7 @@ class SequencingSampleSerializer(serializers.ModelSerializer):
         fields = ['sample_id', 'sample_name', 'sample_project', 'sample_number', 'lane', 'barcode', 'enrichment_kit', 'is_control', 'failed', 'sequencingsampledata_set']
 
 
-# TODO: Write ViewSet
-class SampleSheetSerializer(serializers.ModelSerializer):
+class SampleSheetSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
     sequencing_run = SequencingRunSerializer()
     sequencingsample_set = SequencingSampleSerializer(many=True)
 
@@ -212,13 +235,14 @@ class SampleSheetSerializer(serializers.ModelSerializer):
         return instance
 
 
-class FastqSerializer(serializers.ModelSerializer):
+class FastqSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
     class Meta:
         model = Fastq
         fields = ("path", "name", "read")
 
 
 class UnalignedReadsSerializer(serializers.ModelSerializer):
+    """ UnalignedReads is a joiner class - not represented by a file thus not SeqAutoRecord """
     sequencing_sample = SequencingSampleLookupSerializer()
     fastq_r1 = FastqSerializer()
     fastq_r2 = FastqSerializer()
@@ -244,13 +268,19 @@ class UnalignedReadsSerializer(serializers.ModelSerializer):
         return instance
 
 
-class FlagstatsSerializer(serializers.ModelSerializer):
+class FlagstatsSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
     class Meta:
         model = Flagstats
         fields = ("total", "read1", "read2", "mapped", "properly_paired")
 
 
-class BamFileSerializer(serializers.ModelSerializer):
+class BamFilePathSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BamFile
+        fields = ("path", )
+
+
+class BamFileSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
     unaligned_reads = UnalignedReadsSerializer()
     aligner = AlignerSerializer()
     flagstats = FlagstatsSerializer()  # 1-to-1 field
@@ -279,8 +309,13 @@ class BamFileSerializer(serializers.ModelSerializer):
         return instance
 
 
-# TODO: Write ViewSet - can we do in bulk?
-class VCFFileSerializer(serializers.ModelSerializer):
+class VCFFilePathSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VCFFile
+        fields = ("path", )
+
+
+class VCFFileSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
     bam_file = BamFileSerializer()
     variant_caller = VariantCallerSerializer()
 
@@ -289,20 +324,10 @@ class VCFFileSerializer(serializers.ModelSerializer):
         fields = ("path", "bam_file", "variant_caller")
 
 
-# TODO: Write ViewSet
-class SampleSheetCombinedVCFFileSerializer(serializers.ModelSerializer):
+class SampleSheetCombinedVCFFileSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
     sample_sheet = SampleSheetLookupSerializer()
     variant_caller = VariantCallerSerializer()
 
     class Meta:
         model = SampleSheetCombinedVCFFile
         fields = ("path", "sample_sheet", "variant_caller")
-
-
-# TODO: Write ViewSet
-class FastQCSerializer(serializers.ModelSerializer):
-    fastq = FastqSerializer()
-
-    class Meta:
-        model = FastQC
-        fields = ("fastq", "total_sequences", "filtered_sequences", "gc")
