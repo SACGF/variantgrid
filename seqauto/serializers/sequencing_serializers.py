@@ -165,28 +165,18 @@ class SampleSheetLookupSerializer(serializers.Serializer):
         hash = attrs.get('hash')
 
         try:
-            sample_sheet = SampleSheet.objects.get(
+            return SampleSheet.objects.get(
                 sequencing_run__name=sequencing_run,
                 hash=hash,
             )
         except SampleSheet.DoesNotExist:
             raise serializers.ValidationError("SampleSheet not found.")
 
-        attrs['sample_sheet'] = sample_sheet
-        return attrs
-
 
 class SequencingSampleLookupSerializer(serializers.Serializer):
     """ This is when we want to refer to it in related objects in a minimal way """
     sample_sheet = SampleSheetLookupSerializer()
     sample_name = serializers.CharField()
-
-    def validate(self, attrs):
-        sample_sheet_data = attrs.pop('sample_sheet')
-        validated_sample_sheet = SampleSheetLookupSerializer(data=sample_sheet_data)
-        validated_sample_sheet.is_valid(raise_exception=True)
-        attrs['sample_sheet'] = validated_sample_sheet.validated_data['sample_sheet']
-        return attrs
 
 
 class SequencingSampleSerializer(serializers.ModelSerializer):
