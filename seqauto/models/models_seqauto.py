@@ -378,7 +378,10 @@ class SequencingRunCurrentSampleSheet(models.Model):
 
 
 class SequencingSample(models.Model):
-    """ Represents a row in a SampleSheet.csv """
+    """ Represents a row in a SampleSheet.csv
+
+        As it's not a file, not a SeqAutoRecord
+     """
     sample_sheet = models.ForeignKey(SampleSheet, on_delete=CASCADE)
     sample_id = models.TextField()
     # sample_name is used to name files. In MiSeq/NextSeq samplesheet you can add names.
@@ -960,7 +963,12 @@ class QC(SeqAutoRecord):
 
 
 class QCGeneList(SeqAutoRecord):
-    """ This represents a text file containing genes which will be used for initial pass and QC filters """
+    """ This represents a text file containing genes which will be used for initial pass and QC filters
+
+        The reason we have both a sample_gene_list and a custom_text_gene_list is because we wanted to
+        represent the text from a file on disk. I think we probably could have gotten around that as
+        SeqAutoRecord contains a hash - could maybe remove that and just use gene list
+    """
     qc = models.ForeignKey(QC, on_delete=CASCADE)
     custom_text_gene_list = models.OneToOneField(CustomTextGeneList, null=True, on_delete=SET_NULL)
     sample_gene_list = models.ForeignKey(SampleGeneList, null=True, on_delete=SET_NULL)

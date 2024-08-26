@@ -556,6 +556,12 @@ FINISH_IMPORT_VCF_STEP_TASKS_CLASSES = []
 CACHE_GENERATED_FILES = True
 
 REST_FRAMEWORK = {
+    # NOTE: Middleware is run first - so GlobalLoginRequiredMiddleware will reject tokens w/o logins
+    # before DRF even sees it. You need to add your APIs to PUBLIC_PATHS
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+    ],
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
@@ -609,6 +615,7 @@ INSTALLED_APPS = [
     'jfu',
     'leaflet',
     'rest_framework',
+    'rest_framework.authtoken',
     'termsandconditions',
     'crispy_forms',  # used to make bootstrap compatible forms
     #    'debug_toolbar',
@@ -723,7 +730,9 @@ LOGGING = {
 PUBLIC_PATHS = [
     r'^/accounts/.*',  # allow public access to all django registration views,
     r'^/oidc/.*',  # all oidc URLs
-    r'^/classification/api/.*'  # REST framework used by command line tools
+    r'^/classification/api/.*',  # REST framework used by command line tools
+    r'^/seqauto/api/.*',
+    r'^/upload/api/.*',
 ]
 
 

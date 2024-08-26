@@ -1,9 +1,10 @@
 from rest_framework import serializers
 
 from genes.models import GeneInfo, GeneListCategory, GeneList, Gene, Transcript, GeneListGeneSymbol, \
-    GeneAnnotationRelease, SampleGeneList, ActiveSampleGeneList, GeneSymbol, TranscriptVersion, GeneVersion
+    GeneAnnotationRelease, SampleGeneList, ActiveSampleGeneList, GeneSymbol, TranscriptVersion, GeneVersion, HGNC, \
+    GeneCoverageCollection, GeneCoverageCanonicalTranscript
 from snpdb.models import Company
-from snpdb.serializers import UserSerializer, GenomeBuildSerializer
+from snpdb.serializers import GenomeBuildSerializer
 
 
 class GeneSymbolSerializer(serializers.ModelSerializer):
@@ -47,6 +48,18 @@ class TranscriptVersionSerializer(serializers.ModelSerializer):
         fields = ('transcript', 'version', 'genome_build', 'gene_version')
 
 
+class HGNCSerializer(serializers.ModelSerializer):
+    gene_symbol = GeneSymbolSerializer()
+    status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = HGNC
+        fields = ('hgnc_id', 'gene_symbol', 'approved_name', 'status')
+
+    def get_status(self, obj: HGNC):
+        return obj.get_status_display()
+
+
 class GeneListCategorySerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -62,7 +75,7 @@ class GeneListGeneSymbolSerializer(serializers.ModelSerializer):
 
 class GeneListSerializer(serializers.ModelSerializer):
     category = GeneListCategorySerializer()
-    user = UserSerializer()
+    user = serializers.StringRelatedField()
     genelistgenesymbol_set = GeneListGeneSymbolSerializer(many=True)
     can_write = serializers.SerializerMethodField()
     absolute_url = serializers.URLField(source='get_absolute_url', read_only=True)
@@ -87,6 +100,18 @@ class GeneListSerializer(serializers.ModelSerializer):
 
         return can_write
 
+    def get_fields(self):
+        # Code from https://timmytango.com/notes/excluding-fields-in-drf-serializers/
+        fields = super().get_fields()
+
+        exclude_fields = self.context.get('exclude_fields', [])
+        for field in exclude_fields:
+            # providing a default prevents a KeyError
+            # if the field does not exist
+            fields.pop(field, default=None)
+
+        return fields
+
 
 class GeneAnnotationReleaseSerializer(serializers.ModelSerializer):
     __str__ = serializers.SerializerMethodField()
@@ -107,14 +132,34 @@ class GeneInfoSerializer(serializers.ModelSerializer):
 
 
 class SampleGeneListSerializer(serializers.ModelSerializer):
-    active = serializers.SerializerMethodField()
+    active = serializers.SerializerMethodField(read_only=True)
+    gene_list = GeneListSerializer()
 
     class Meta:
         model = SampleGeneList
-        fields = ('pk', 'visible', 'active')
+        fields = ('pk', 'visible', 'gene_list', 'active')
 
     def get_active(self, obj):
         try:
             return obj.sample.activesamplegenelist.sample_gene_list == obj
         except ActiveSampleGeneList.DoesNotExist:
             return False
+
+
+class GeneCoverageCanonicalTranscriptSerializer(serializers.ModelSerializer):
+    transcript_version = TranscriptVersionSerializer()
+
+    class Meta:
+        model = GeneCoverageCanonicalTranscript
+        exclude = ("gene_coverage_collection", )
+        #fields = "__all__"
+
+
+class GeneCoverageCollectionSerializer(serializers.ModelSerializer):
+    genome_build = GenomeBuildSerializer()
+    genecoveragecanonicaltranscript_set = GeneCoverageCanonicalTranscriptSerializer(many=True)
+
+    class Meta:
+        model = GeneCoverageCollection
+        # TODO: Check if "__all__" also does related automatically?
+        fields = ["path", "data_state", "genome_build", "genecoveragecanonicaltranscript_set"]
