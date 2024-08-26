@@ -81,8 +81,6 @@ class HGVSConverterFactory:
         if isinstance(hgvs_converter_type, str):
             hgvs_converter_type = HGVSConverterType[hgvs_converter_type.upper()]
 
-        logging.debug("Using HGVSConverter = %s", hgvs_converter_type.name)
-
         if hgvs_converter_type == HGVSConverterType.BIOCOMMONS_HGVS:
             return BioCommonsHGVSConverter(genome_build, local_resolution=local_resolution, clingen_resolution=clingen_resolution)
         elif hgvs_converter_type == HGVSConverterType.PYHGVS:
