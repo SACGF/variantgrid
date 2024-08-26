@@ -1,9 +1,12 @@
+from django.urls import path
+
 from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
 from upload.grids import UploadPipelineModifiedVariantsGrid, UploadPipelineSkippedAnnotationGrid, \
     UploadStepColumns
 from upload.views import views
 from upload.views.views import view_upload_step_detail
+from upload.views.views_rest import APIFileUploadView
 from variantgrid.perm_path import perm_path
 
 urlpatterns = [
@@ -27,4 +30,8 @@ urlpatterns = [
     perm_path('jfu_upload/', views.jfu_upload, name='jfu_upload'),
     perm_path('jfu_delete/<int:pk>', views.jfu_upload_delete, name='jfu_delete'),
     perm_path('uploaded_file/download/<int:pk>', views.DownloadUploadedFile.as_view(), name='download_uploaded_file'),
+
+    # APIs - Django REST framework
+    perm_path('api/v1/file_upload', APIFileUploadView.as_view(), name='api_file_upload'),
+
 ]

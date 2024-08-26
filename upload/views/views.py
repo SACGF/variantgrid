@@ -49,7 +49,7 @@ def get_icon_for_uploaded_file_status(status):
     return None
 
 
-def uploadedfile_dict(uploaded_file):
+def uploadedfile_dict(uploaded_file) -> dict:
     try:
         size = uploaded_file.uploaded_file.size
     except:
@@ -104,6 +104,23 @@ def uploadedfile_dict(uploaded_file):
     return data
 
 
+def handle_file_upload(user, django_uploaded_file) -> UploadedFile:
+    original_filename = django_uploaded_file._name
+    kwargs = {
+        "name": original_filename,
+        "uploaded_file": django_uploaded_file,
+        "import_source": ImportSource.WEB_UPLOAD,
+        "user": user
+    }
+    uploaded_file = UploadedFile.objects.create(**kwargs)
+    # Save 1st to actually create file (need to open handling unicode)
+    uploaded_file.file_type = get_uploaded_file_type(uploaded_file, original_filename)
+    uploaded_file.save()
+
+    if uploaded_file.file_type:
+        upload_processing.process_uploaded_file(uploaded_file)
+    return uploaded_file
+
 @require_POST
 def jfu_upload(request):
     # The assumption here is that jQuery File Upload
@@ -121,23 +138,9 @@ def jfu_upload(request):
             raise ValueError(message)
 
         django_uploaded_file = upload_receive(request)
-        original_filename = django_uploaded_file._name
-        kwargs = {"name": original_filename,
-                  "uploaded_file": django_uploaded_file,
-                  "import_source": ImportSource.WEB_UPLOAD,
-                  "user": request.user}
+        uploaded_file = handle_file_upload(request.user, django_uploaded_file)
 
-        uploaded_file = UploadedFile.objects.create(**kwargs)
-        # Save 1st to actually create file (need to open handling unicode)
-        uploaded_file.file_type = get_uploaded_file_type(uploaded_file, original_filename)
-        uploaded_file.save()
-
-        file_dict = {}
-
-        if uploaded_file.file_type:
-            upload_processing.process_uploaded_file(uploaded_file)
-
-        file_dict.update(uploadedfile_dict(uploaded_file))
+        file_dict = uploadedfile_dict(uploaded_file)
     except Exception as e:
         logging.error(e)
         log_traceback()

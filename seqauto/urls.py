@@ -1,3 +1,5 @@
+from django.urls import include, path
+from rest_framework import routers
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from library.django_utils.jqgrid_view import JQGridView
@@ -13,6 +15,10 @@ from seqauto.grids.sequencing_software_versions_grids import LibraryGrid, Sequen
     AssayGrid, AlignerGrid, VariantCallerGrid, VariantCallingPipelineGrid
 from seqauto.views import SequencerUpdate, LibraryUpdate, AssayUpdate, VariantCallerUpdate, \
     AlignerUpdate, VariantCallingPipelineUpdate
+from seqauto.views_rest import SequencingRunViewSet, EnrichmentKitViewSet, SequencerModelViewSet, SequencerViewSet, \
+    ExperimentViewSet, VariantCallerViewSet, VCFFileViewSet, SampleSheetCombinedVCFFileViewSet, FastQCViewSet, \
+    SampleSheetViewSet, IlluminaFlowcellQCViewSet, QCViewSet, QCGeneListViewSet, QCGeneCoverageViewSet, \
+    QCExecSummaryViewSet
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
 
@@ -105,10 +111,30 @@ urlpatterns = [
               name='sequencing_run_autocomplete'),
 ]
 
-#router = routers.DefaultRouter()
+router = routers.DefaultRouter()
+router.register(r'api/v1/enrichment_kit', EnrichmentKitViewSet, basename='api_enrichment_kit')
+router.register(r'api/v1/sequencer_model', SequencerModelViewSet, basename='api_sequencer_model')
+router.register(r'api/v1/sequencer', SequencerViewSet, basename='api_sequencer')
+router.register(r'api/v1/experiment', ExperimentViewSet, basename='api_experiment')
+router.register(r'api/v1/variant_caller', VariantCallerViewSet, basename='api_variant_caller')
+router.register(r'api/v1/sequencing_run', SequencingRunViewSet, basename='api_sequencing_run')
+router.register(r'api/v1/sample_sheet', SampleSheetViewSet, basename='api_sample_sheet')
+router.register(r'api/v1/vcf_file', VCFFileViewSet, basename='api_vcf_file')
+router.register(r'api/v1/sample_sheet_combined_vcf_file', SampleSheetCombinedVCFFileViewSet, basename='api_sample_sheet_combined_vcf_file')
+router.register(r'api/v1/fastqc', FastQCViewSet, basename='api_fastqc')
+router.register(r'api/v1/illumina_flowcell_qc', IlluminaFlowcellQCViewSet, basename='api_illumina_flowcell_qc')
+router.register(r'api/v1/qc_gene_list', QCGeneListViewSet, basename='api_qc_gene_list')
+router.register(r'api/v1/qc_gene_coverage', QCGeneCoverageViewSet, basename='api_qc_gene_coverage')
+router.register(r'api/v1/qc_exec_summary', QCExecSummaryViewSet, basename='api_qc_exec_summary')
+
+urlpatterns += [
+    path('', include(router.urls)),
+]
+
 rest_urlpatterns = [
     perm_path('api/view_enrichment_kit_summary/<int:pk>', views_rest.EnrichmentKitSummaryView.as_view(), name='api_view_enrichment_kit_summary'),
-    perm_path('api/view_enrichment_kit/<int:pk>', views_rest.EnrichmentKitView.as_view(), name='api_view_enrichment_kit'),
+    perm_path('api/view_enrichment_kit/<int:pk>', EnrichmentKitViewSet.as_view({'get': 'retrieve'}),
+              name='api_view_enrichment_kit'),  # Deprecated, used for backwards compatability
     perm_path('api/enrichment_kit_gene_coverage/<int:enrichment_kit_id>/<gene_symbol>', views_rest.EnrichmentKitGeneCoverageView.as_view(), name='api_enrichment_kit_gene_coverage'),
     perm_path('api/enrichment_kit_gene_gold_coverage/<int:enrichment_kit_id>/<gene_symbol>', views_rest.EnrichmentKitGeneGoldCoverageView.as_view(), name='api_enrichment_kit_gene_gold_coverage'),
     perm_path('api/enrichment_kit_gene_gold_coverage_summary/<int:enrichment_kit_id>/<gene_symbol>', views_rest.GoldCoverageSummaryView.as_view(), name='api_enrichment_kit_gene_gold_coverage_summary'),

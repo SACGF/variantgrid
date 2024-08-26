@@ -12,14 +12,22 @@ from django.views.decorators.cache import cache_page
 from rest_framework.generics import get_object_or_404, RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.viewsets import ModelViewSet
 
 from genes.models import GeneVersion
 from genes.views.views import get_coverage_stats
 from library.constants import WEEK_SECS
 from library.utils import defaultdict_to_dict
-from seqauto.models import GoldCoverageSummary, EnrichmentKit
+from seqauto.models import GoldCoverageSummary, EnrichmentKit, SequencerModel, Sequencer, Experiment, VariantCaller, \
+    SequencingRun, SampleSheet, VCFFile, SampleSheetCombinedVCFFile, FastQC, QCExecSummary, QCGeneCoverage, QCGeneList, \
+    QC, IlluminaFlowcellQC
 from seqauto.serializers import EnrichmentKitSerializer, \
     GoldCoverageSummarySerializer, EnrichmentKitSummarySerializer
+from seqauto.serializers.seqauto_qc_serializers import FastQCSerializer, QCExecSummarySerializer, \
+    QCGeneCoverageSerializer, QCGeneListSerializer, QCSerializer, IlluminaFlowcellQCSerializer
+from seqauto.serializers.sequencing_serializers import SequencerModelSerializer, SequencerSerializer, \
+    ExperimentSerializer, VariantCallerSerializer, SequencingRunSerializer, SampleSheetSerializer, VCFFileSerializer, \
+    SampleSheetCombinedVCFFileSerializer
 
 
 class EnrichmentKitSummaryView(RetrieveAPIView):
@@ -31,12 +39,81 @@ class EnrichmentKitSummaryView(RetrieveAPIView):
         return EnrichmentKit.objects.all()
 
 
-class EnrichmentKitView(RetrieveAPIView):
+class EnrichmentKitViewSet(ModelViewSet):
+    queryset = EnrichmentKit.objects.all()
     serializer_class = EnrichmentKitSerializer
     lookup_field = 'pk'
 
-    def get_queryset(self):
-        return EnrichmentKit.objects.all()
+
+class SequencerModelViewSet(ModelViewSet):
+    queryset = SequencerModel.objects.all()
+    serializer_class = SequencerModelSerializer
+
+
+class SequencerViewSet(ModelViewSet):
+    queryset = Sequencer.objects.all()
+    serializer_class = SequencerSerializer
+
+
+class ExperimentViewSet(ModelViewSet):
+    queryset = Experiment.objects.all()
+    serializer_class = ExperimentSerializer
+
+
+class VariantCallerViewSet(ModelViewSet):
+    queryset = VariantCaller.objects.all()
+    serializer_class = VariantCallerSerializer
+
+
+class SequencingRunViewSet(ModelViewSet):
+    queryset = SequencingRun.objects.filter(hidden=False)
+    serializer_class = SequencingRunSerializer
+
+
+class SampleSheetViewSet(ModelViewSet):
+    queryset = SampleSheet.objects.all()
+    serializer_class = SampleSheetSerializer
+
+
+class VCFFileViewSet(ModelViewSet):
+    queryset = VCFFile.objects.all()
+    serializer_class = VCFFileSerializer
+
+
+class SampleSheetCombinedVCFFileViewSet(ModelViewSet):
+    queryset = SampleSheetCombinedVCFFile.objects.all()
+    serializer_class = SampleSheetCombinedVCFFileSerializer
+
+
+class FastQCViewSet(ModelViewSet):
+    queryset = FastQC.objects.all()
+    serializer_class = FastQCSerializer
+
+
+class IlluminaFlowcellQCViewSet(ModelViewSet):
+    queryset = IlluminaFlowcellQC.objects.all()
+    serializer_class = IlluminaFlowcellQCSerializer
+
+
+class QCViewSet(ModelViewSet):
+    queryset = QC.objects.all()
+    serializer_class = QCSerializer
+
+
+class QCGeneListViewSet(ModelViewSet):
+    queryset = QCGeneList.objects.all()
+    serializer_class = QCGeneListSerializer
+
+
+class QCGeneCoverageViewSet(ModelViewSet):
+    queryset = QCGeneCoverage.objects.all()
+    serializer_class = QCGeneCoverageSerializer
+
+
+class QCExecSummaryViewSet(ModelViewSet):
+    queryset = QCExecSummary.objects.all()
+    serializer_class = QCExecSummarySerializer
+
 
 
 class EnrichmentKitGeneCoverageView(APIView):
