@@ -38,3 +38,6 @@ pip-delete-this-directory.txt
 .pytest_cache/
 cover/
 /variant_symbolic_alt_changes.csv
+/.idea/dataSources.local.xml
+/.idea/dataSources.xml
+/.idea/dataSources
