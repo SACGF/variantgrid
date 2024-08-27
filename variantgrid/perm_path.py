@@ -12,8 +12,10 @@ from collections import defaultdict
 from typing import Mapping
 
 from django.conf import settings
-from django.urls.conf import path, re_path
+from django.urls.conf import re_path
 from django.urls.resolvers import get_resolver
+
+from django.urls.conf import path as django_path
 
 from library.cache import timed_cache
 from library.django_utils import require_superuser
@@ -29,8 +31,8 @@ def _perm_path(route, view, path_func, **kwargs):
     return path_func(route, view, **kwargs)
 
 
-def perm_path(route, view, **kwargs):
-    return _perm_path(route, view, path, **kwargs)
+def path(route, view, **kwargs):
+    return _perm_path(route, view, django_path, **kwargs)
 
 
 def re_perm_path(route, view, **kwargs):

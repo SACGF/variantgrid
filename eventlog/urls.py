@@ -1,11 +1,12 @@
 from eventlog import views
 from eventlog.grids import EventColumns
 from snpdb.views.datatable_view import DatabaseTableView
-from variantgrid.perm_path import perm_path
+from variantgrid.perm_path import path
+
 
 urlpatterns = [
-    perm_path('', views.eventlog, name='eventlog'),
-    perm_path('detail/<int:pk>', views.eventlog_detail, name='eventlog_detail'),
-    perm_path('create_event', views.create_event, name='create_event'),
-    perm_path('datatable', DatabaseTableView.as_view(column_class=EventColumns), name='event_log_datatable')
+    path('', views.eventlog, name='eventlog'),
+    path('detail/<int:pk>', views.eventlog_detail, name='eventlog_detail'),
+    path('create_event', views.create_event, name='create_event'),
+    path('datatable', DatabaseTableView.as_view(column_class=EventColumns), name='event_log_datatable')
 ]
