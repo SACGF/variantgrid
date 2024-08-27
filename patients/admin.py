@@ -1,13 +1,49 @@
 from django.contrib import admin
 
 from patients import models
+from snpdb.admin_utils import ModelAdminBasics
 
-admin.site.register(models.Patient)
-admin.site.register(models.Tissue)
-admin.site.register(models.Specimen)
-admin.site.register(models.PatientImport)
-admin.site.register(models.PatientModification)
-admin.site.register(models.PatientComment)
-admin.site.register(models.Clinician)
-admin.site.register(models.PatientRecords)
-admin.site.register(models.PatientRecord)
+
+@admin.register(models.Patient)
+class PatientAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.Tissue)
+class TissueAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.Specimen)
+class SpecimenAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.PatientImport)
+class PatientImportAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.PatientModification)
+class PatientModificationAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.PatientComment)
+class PatientCommentAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.Clinician)
+class ClinicianAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.PatientRecords)
+class PatientRecordsAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.PatientRecord)
+class PatientRecordAdmin(ModelAdminBasics):
+    pass

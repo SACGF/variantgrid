@@ -32,7 +32,7 @@ class ReviewQuestionInline(TabularInline):
 
 
 @admin.register(ReviewTopic)
-class ReviewQuestionTopicAdmin(ModelAdminBasics):
+class ReviewTopicAdmin(ModelAdminBasics):
     inlines = (ReviewQuestionInline,)
 
     def widget_overrides(self):

@@ -1,0 +1,12 @@
+# This file exists for PyCharm's Django Structure plugin
+from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped
+from classification.models.classification_import_run import ClassificationImportRun
+from classification.models.classification_variant_info_models import HGVSConverterVersion, ResolvedVariantInfo, ImportedAlleleInfoValidation, ImportedAlleleInfo
+from classification.models.evidence_key import EvidenceKey
+from classification.models.classification import ClassificationImport, ClassificationImportAlleleSource, AllClassificationsAlleleSource, Classification, ClassificationModification
+from classification.models.clinical_context_models import DiscordanceNotification, ClinicalContext
+from classification.models.discordance_models import DiscordanceReport, DiscordanceReportClassification, DiscordanceReportTriage
+from classification.models.variant_models import ClassificationAttachment
+from classification.models.condition_text_matching import ConditionText, ConditionTextMatch
+from classification.models.clinvar_export_models import ClinVarAllele, ClinVarExport, ClinVarExportBatch, ClinVarExportSubmission, ClinVarExportRequest
+from classification.models.classification_report_models import ClassificationReportTemplate

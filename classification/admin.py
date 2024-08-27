@@ -1,2 +1,4 @@
+# File for PyCharm DJango Structure plugin
 # noinspection PyUnresolvedReferences
-import classification.admin  # just need these to trigger the decorators
+from classification.admin import ClassificationImportRunAdmin, ClassificationAdmin, ClassificationImportAdmin, ClinicalContextAdmin, EvidenceKeyAdmin, ClassificationReportTemplateAdmin, DiscordanceReportAdmin, DiscordanceReportTriageAdmin, DiscordanceNotificationAdmin, UploadedClassificationsUnmappedAdmin, ResolvedVariantInfoAdmin, ImportedAlleleInfoAdmin, ImportedAlleleInfoValidationAdmin, ClinVarExportAdmin, ClinVarAlleleAdmin, ClinVarExportBatchAdmin, ConditionTextAdmin
+

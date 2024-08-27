@@ -40,11 +40,41 @@ class GeneSymbolAdmin(ModelAdminBasics):
             update_gene_relations(gene_symbol)
 
 
-admin.site.register(models.ActiveSampleGeneList)
-admin.site.register(models.GeneAnnotationRelease)
-admin.site.register(models.GeneInfo)
-admin.site.register(models.GeneListGeneSymbol)
-admin.site.register(models.GeneSymbolAlias)
-admin.site.register(models.PanelAppPanel)
-admin.site.register(models.PanelAppPanelLocalCache)
-admin.site.register(models.SampleGeneList)
+@admin.register(models.ActiveSampleGeneList)
+class ActiveSampleGeneListAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.GeneAnnotationRelease)
+class GeneAnnotationReleaseAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.GeneInfo)
+class GeneInfoAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.GeneListGeneSymbol)
+class GeneListGeneSymbolAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.GeneSymbolAlias)
+class GeneSymbolAliasAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.PanelAppPanel)
+class PanelAppPanelAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.PanelAppPanelLocalCache)
+class PanelAppPanelLocalCacheAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.SampleGeneList)
+class SampleGeneListAdmin(ModelAdminBasics):
+    pass

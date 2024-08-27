@@ -17,17 +17,66 @@ class EnrichmentKitAdmin(ModelAdminBasics):
         return super().is_readonly_field(f)
 
 
-# Register your models here.
-admin.site.register(models.Sequencer)
-admin.site.register(models.SequencerModel)
-admin.site.register(models.SeqAutoRun)
-admin.site.register(models.SequencingRun)
-admin.site.register(models.IlluminaFlowcellQC)
-admin.site.register(models.Fastq)
-admin.site.register(models.FastQC)
-admin.site.register(models.UnalignedReads)
-admin.site.register(models.BamFile)
-admin.site.register(models.Flagstats)
-admin.site.register(models.VCFFile)
-admin.site.register(models.QC)
-admin.site.register(models.QCExecSummary)
+@admin.register(models.Sequencer)
+class SequencerAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.SequencerModel)
+class SequencerModelAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.SeqAutoRun)
+class SeqAutoRunAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.SequencingRun)
+class SequencingRunAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.IlluminaFlowcellQC)
+class IlluminaFlowcellQCAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.Fastq)
+class FastqAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.FastQC)
+class FastQCAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.UnalignedReads)
+class UnalignedReadsAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.BamFile)
+class BamFileAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.Flagstats)
+class FlagstatsAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.VCFFile)
+class VCFFileAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.QC)
+class QCAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.QCExecSummary)
+class QCExecSummaryAdmin(ModelAdminBasics):
+    pass

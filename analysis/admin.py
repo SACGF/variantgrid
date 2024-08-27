@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from guardian.admin import GuardedModelAdmin
 
 from analysis import models
+from snpdb.admin_utils import ModelAdminBasics
 
 
 class AnalysisUserFilter(admin.SimpleListFilter):
@@ -20,15 +21,33 @@ class AnalysisUserFilter(admin.SimpleListFilter):
         return queryset
 
 
+@admin.register(models.Analysis)
 class AnalysisAdmin(GuardedModelAdmin):
     list_display = ['id', 'user', 'name', 'description', 'template_type', 'visible', 'created']
     list_filter = (AnalysisUserFilter,)
     search_fields = ('id', 'lab_record_id')
 
 
-admin.site.register(models.Analysis, AnalysisAdmin)
-admin.site.register(models.AnalysisTemplate)
-admin.site.register(models.AnalysisTemplateRun)
-admin.site.register(models.AnalysisTemplateVersion)
-admin.site.register(models.VariantTag)
-admin.site.register(models.VariantTagsImport)
+@admin.register(models.AnalysisTemplate)
+class AnalysisTemplateAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.AnalysisTemplateRun)
+class AnalysisTemplateRunAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.AnalysisTemplateVersion)
+class AnalysisTemplateRunAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.VariantTag)
+class VariantTagAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(models.VariantTagsImport)
+class VariantTagsImportAdmin(ModelAdminBasics):
+    pass
