@@ -170,10 +170,16 @@ class UniProt(models.Model):
 
 class GeneSymbol(models.Model, PreviewModelMixin):
     """
-        If you need to perform a 'like' query on this field, you need to:
+        If you want to do a like on symbol and get an error:
 
+            GeneSymbol.objects.filter(symbol__startswith='GATA')
+            django.db.utils.NotSupportedError: nondeterministic collations are not supported for operator class "text_pattern_ops"
+
+        Instead you need to do:
+
+        GeneSymbol.get_deterministic_queryset().filter(symbol_deterministic__startswith='GATA')
     """
-    symbol = TextField(primary_key=True, db_collation='case_insensitive')
+    symbol = TextField(primary_key=True, db_collation='case_insensitive')  # See note above if 'like' breaks
 
     objects = ObjectManagerCachingRequest()
 
