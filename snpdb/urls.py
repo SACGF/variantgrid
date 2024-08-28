@@ -1,6 +1,6 @@
 from django.contrib.auth.views import PasswordChangeView, PasswordChangeDoneView
 from django.urls import include
-from django.urls.conf import path
+from django.urls.conf import path as path_standard
 from rest_framework.documentation import include_docs_urls
 from rest_framework.urlpatterns import format_suffix_patterns
 
@@ -145,7 +145,7 @@ urlpatterns = [
 ]
 
 rest_urlpatterns = [
-    path('api-auth/', include('rest_framework.urls')),
+    path_standard('api-auth/', include('rest_framework.urls')),
     path('api/sample_variant_zygosity/<int:sample_id>/<int:variant_id>', views_rest.VariantZygosityForSampleView.as_view(), name='variant_zygosity_for_sample'),
     path('api/trio/<pk>', views_rest.TrioView.as_view(), name='api_view_trio'),
     path('api/variant_allele_for_variant/<int:variant_id>/<genome_build_name>',
