@@ -716,7 +716,7 @@ class VariantAnnotationVersion(SubVersionPartition):
         return int(self.gnomad.split(".")[0])
 
     @staticmethod
-    def latest(genome_build, active=True):
+    def latest(genome_build, active=True) -> 'VariantAnnotationVersion':
         qs = VariantAnnotationVersion.objects.filter(genome_build=genome_build, active=active)
         return qs.order_by("annotation_date").last()
 
