@@ -37,7 +37,7 @@ from classification.models.classification_utils import \
 from classification.models.classification_variant_info_models import ImportedAlleleInfo, ImportedAlleleInfoStatus
 from classification.models.evidence_key import EvidenceKeyValueType, \
     EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell, EvidenceKeyOverrides
-from classification.models.evidence_mixin import EvidenceMixin, VCPatch
+from classification.models.evidence_mixin import EvidenceMixin, VCPatch, SomaticClinicalSignificanceValue
 from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagPermissionLevel, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
@@ -221,15 +221,17 @@ class ConditionResolvedDict(TypedDict, total=False):
     """
     display_text: str  # plain text to show to users if not in a position to render links
     sort_text: str  # lower case representation of description
-    resolved_terms: List[ConditionResolvedTermDict]
+    resolved_terms: list[ConditionResolvedTermDict]
+    plain_text_terms: list[str]  # A full list of unresolved plain text conditions
     resolved_join: str
 
 
 @dataclass(frozen=True)
 class ConditionResolved:
     terms: List[OntologyTerm]
+    plain_text_terms: List[str] = None
     join: Optional['MultiCondition'] = None
-    plain_text: Optional[str] = field(default=None)  # fallback, not populated in all contexts
+    plain_text: Optional[str] = None  # fallback, not populated in all contexts
 
     def __hash__(self):
         hash_total = 0
@@ -260,7 +262,11 @@ class ConditionResolved:
             join = MultiCondition(condition_dict.get("resolved_join"))
 
         terms.sort()
-        return ConditionResolved(terms=terms, join=join)
+        return ConditionResolved(
+            terms=terms,
+            plain_text_terms=condition_dict.get("plain_text_terms"),
+            join=join
+        )
 
     @property
     def is_multi_condition(self) -> bool:
@@ -334,7 +340,7 @@ class ConditionResolved:
         else:
             return self.to_json()['display_text']
 
-    def to_json(self) -> ConditionResolvedDict:
+    def to_json(self, include_join: bool = True) -> ConditionResolvedDict:
         jsoned: ConditionResolvedDict
         if self.terms:
             from classification.models import MultiCondition
@@ -346,24 +352,28 @@ class ConditionResolved:
 
             terms = self.terms
             text = ", ".join([format_term(term) for term in terms])
+            if self.plain_text_terms:
+                text += ",".join(self.plain_text_terms)
+
             sort_text = ", ".join([term.name for term in terms]).lower()
             join: Optional[MultiCondition] = None
-            if len(terms) > 1:
+            if len(terms) > 1 and include_join:
                 join = self.join or MultiCondition.NOT_DECIDED
-                text = f"{text}; {self.join.label}"
+                text = f"{text}; {join.label}"
 
             resolved_term_dicts: List[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in
                                                                     self.terms]
-
             jsoned: ConditionResolvedDict = {
                 "resolved_terms": resolved_term_dicts,
                 "resolved_join": join,
+                "plain_text_terms": self.plain_text_terms,
                 "display_text": text,
                 "sort_text": sort_text
             }
             return jsoned
         else:
             jsoned: ConditionResolvedDict = {
+                "plain_text_terms": self.plain_text_terms,
                 "display_text": self.plain_text,
                 "sort_text": self.plain_text
             }
@@ -2122,43 +2132,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             raise CreateNoClassificationForbidden()
 
 
-@dataclass(frozen=True)
-class SomaticClinicalSignificanceValue:
-    tier_level: str
-    level: Optional[str] = None
-
-
-_SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES = {
-    SomaticClinicalSignificanceValue("tier_1", "A"): 9,
-    SomaticClinicalSignificanceValue("tier_1", "B"): 8,
-    SomaticClinicalSignificanceValue("tier_1"): 7,
-    SomaticClinicalSignificanceValue("tier_1_or_2"): 6,
-    SomaticClinicalSignificanceValue("tier_2", "C"): 5,
-    SomaticClinicalSignificanceValue("tier_2", "D"): 4,
-    SomaticClinicalSignificanceValue("tier_2"): 3,
-    SomaticClinicalSignificanceValue("tier_3"): 2,
-    SomaticClinicalSignificanceValue("tier_4"): 1
-}
-
-
-def calculate_somatic_clinical_significance_order(evidence: EvidenceMixin) -> Optional[int]:
-    if somatic_clin_sig := evidence.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE):
-        max_level: Optional[str] = None
-        for level_key, level in SpecialEKeys.AMP_LEVELS_TO_LEVEL.items():
-            if evidence.get(level_key):
-                max_level = level
-                break
-        if value := _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES.get(
-                SomaticClinicalSignificanceValue(somatic_clin_sig, max_level)
-        ):
-            return value
-        elif without_max_level := _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES.get(
-                SomaticClinicalSignificanceValue(somatic_clin_sig)
-        ):
-            return without_max_level
-    return None
-
-
 class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models.Model):
     classification = models.ForeignKey(Classification, on_delete=CASCADE)
     user = models.ForeignKey(User, on_delete=PROTECT)  # One who did last change, may not be classification.user
@@ -2193,16 +2166,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
 
     @staticmethod
     def column_name_for_build(genome_build: GenomeBuild, suffix: str = 'c_hgvs'):
-
-        build_str: str
-        if genome_build.is_equivalent(GenomeBuild.grch37()):
-            build_str = 'grch37'
-
-        elif genome_build.is_equivalent(GenomeBuild.grch38()):
-            build_str = 'grch38'
-        else:
-            raise ValueError(f'No cached column for genome build {genome_build.pk}')
-        return f'classification__allele_info__{build_str}__{suffix}'
+        return ImportedAlleleInfo.column_name_for_build(genome_build, "classification__allele_info", suffix)
 
     @property
     def share_level_enum(self) -> ShareLevel:
@@ -2398,7 +2362,10 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         self.published = True
         self.published_evidence = vc.evidence
         self.share_level_enum = share_level
-        self.somatic_clinical_significance_sort = calculate_somatic_clinical_significance_order(self)
+        if clin_sig_value := self.somatic_clinical_significance_value:
+            self.somatic_clinical_significance_sort = clin_sig_value.sort_value
+        else:
+            self.somatic_clinical_significance_sort = None
 
         if previously_published and previously_published.id != self.id:
             # make sure to unmark previous record as the last published

@@ -168,7 +168,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 # sort_keys=['variant_sort', 'c_hgvs'],  # annotated column
                 sort_keys=[ClassificationModification.column_name_for_build(genome_build_preferred, 'genomic_sort'), 'c_hgvs'],
                 name='c_hgvs',
-                label=f'HGVS ({user_settings.default_genome_build.name})',
+                label=f'HGVS ({genome_build_preferred.name})',
                 renderer=self.render_c_hgvs,
                 client_renderer='VCTable.hgvs',
                 orderable=True,

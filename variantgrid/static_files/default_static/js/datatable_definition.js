@@ -400,6 +400,23 @@ TableFormat.timestampMilliseconds = (data, type, row) => {
     }
 };
 
+TableFormat.list_codes = (data, type, row) => {
+    if (!data) {
+        return $("<span>", {text: "-"});
+    }
+    console.log(data);
+    let elements = [];
+    let isFirst = true;
+    for (value of data) {
+        if (!isFirst) {
+            elements.push(", ");
+        }
+        isFirst = false;
+        elements.push($('<span>', {class: 'text-monospace text-secondary', text: value}));
+    }
+    return $('<div>', {html: elements});
+}
+
 TableFormat.sizeBytes = (data, type, row) => {
     if (data) {
         let unit = 'bytes';
@@ -530,7 +547,7 @@ TableFormat.expandAjax = function(url_or_method, param, expectedHeight, data) {
         let reverseUrl = window[url_or_method] || Urls[url_or_method];
         if (!reverseUrl) {
             return `<i class="fas fa-bomb text-danger"></i> Method or URL not configured for "${url_or_method} : Developer may need to run<br/>
-            <div class="code">manage.py collectstatic_js_reverse</div>`;
+            <div class="code">python3 manage.py collectstatic_js_reverse</div>`;
         }
         if (param) {
             reverseUrl = reverseUrl(dataId);

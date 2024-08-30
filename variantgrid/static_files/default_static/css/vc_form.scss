@@ -310,6 +310,10 @@ table.diff {
         height: 16px;
         background-size: 16px 16px;
     }
+
+    td.dt-latest_curation_date {
+        min-width: 100px;
+    }
 }
 
 #vc-form .accordion {

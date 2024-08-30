@@ -957,6 +957,7 @@ const JS_DATE_FORMAT_SECONDS = 'YYYY-MM-DD HH:mm:ss';
 const JS_DATE_FORMAT_MILLISECONDS = 'YYYY-MM-DD HH:mm:ss.SSS';
 const JS_DATE_FORMAT_SCIENTIFIC = 'YYYY-MM-DD HH:mm';
 const JS_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; //'lll';
+const JS_DATE_ONLY_FORMAT = 'YYYY-MM-DD'
 function configureTimestamps() {
     $.timeago.settings.allowFuture = true;
     $.timeago.settings.strings = {
@@ -1013,8 +1014,23 @@ function createTimestampDom(unix, timeAgo) {
         return $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT)});
     }
 }
+
+function convertTimestampToMoment(timestamp) {
+    let m;
+    if (/[0-9]{4}-[0-9]{2}-[0-9]{2}/.test(timestamp)) {
+        return moment(timestamp);
+    } else {
+        return moment(Number(timestamp) * 1000);
+    }
+}
+
 function convertTimestamp(unixDate) {
-    return moment(Number(unixDate) * 1000).format(JS_DATE_FORMAT_SCIENTIFIC);
+    let m;
+    if (/[0-9]{4}-[0-9]{2}-[0-9]{2}/.test(unixDate)) {
+        return moment(unixDate).format(JS_DATE_ONLY_FORMAT);
+    } else {
+        return moment(Number(unixDate) * 1000).format(JS_DATE_FORMAT_SCIENTIFIC);
+    }
 }
 
 function blankToNull(val) {

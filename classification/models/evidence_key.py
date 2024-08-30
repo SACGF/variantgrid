@@ -325,7 +325,7 @@ class EvidenceKey(TimeStampedModel):
             return index_map.get(val, 0)
         return val
 
-    def sort_values(self, values: Iterable) -> List:
+    def sort_values(self, values: Iterable) -> list:
         sorter = self.classification_sorter_value
         sorted_list = sorted(values, key=lambda x: (sorter(x), x))
         return sorted_list
@@ -570,7 +570,7 @@ class EvidenceKeyMap:
             return self.key_dict[key]
         return EvidenceKey.dummy_key(key)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item) -> EvidenceKey:
         return self.get(item)
 
     def __contains__(self, item):

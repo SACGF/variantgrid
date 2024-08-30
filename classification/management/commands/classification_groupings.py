@@ -11,4 +11,5 @@ class Command(BaseCommand):
         for classification in Classification.objects.iterator():
             ClassificationGrouping.assign_grouping_for_classification(classification)
 
+        ClassificationGrouping.objects.all().update(dirty=True)
         ClassificationGrouping.update_all_dirty()

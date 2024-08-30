@@ -285,6 +285,9 @@ table.diff tbody tr.textarea td {
   height: 16px;
   background-size: 16px 16px;
 }
+.classification-table td.dt-latest_curation_date {
+  min-width: 100px;
+}
 
 #vc-form .accordion {
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);

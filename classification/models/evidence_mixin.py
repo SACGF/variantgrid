@@ -1,4 +1,5 @@
 import re
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Dict, Any, Mapping, Optional, Union, List, TypedDict
 
@@ -39,6 +40,68 @@ class VCBlobDict(TypedDict, total=False):
     validation: List[VCValidation]
 
 
+class SomaticValueDict(TypedDict):
+    somatic_clinical_significance: str
+    amp_level: Optional[str]
+
+
+@dataclass(frozen=True)
+class SomaticClinicalSignificanceValue:
+    tier_level: str
+    amp_level: Optional[str] = None
+
+    @property
+    def without_amp_level(self) -> 'SopmaticClinicalSignificanceValue':
+        return SomaticClinicalSignificanceValue(tier_level=self.tier_level)
+
+    @property
+    def sort_value(self) -> Optional[int]:
+        if sort_value := _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES.get(self):
+            return sort_value
+        elif self.amp_level:
+            if sort_value := _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES.get(self.without_amp_level):
+                return sort_value
+        return None
+
+    def __lt__(self, other):
+        return self.sort_value or 0 < other.sort_value or 0
+
+    def as_json(self):
+        return {
+            "somatic_clinical_significance": self.tier_level,
+            "amp_level": self.level
+        }
+
+    @property
+    def as_str(self):
+        if self.amp_level:
+            return f"{self.tier_level}|{self.amp_level}"
+        else:
+            return self.tier_level
+
+    @staticmethod
+    def from_str(value: str):
+        parts = value.split("|")
+        if len(parts > 1):
+            return SomaticClinicalSignificanceValue(parts[0], parts[1])
+        else:
+            return SomaticClinicalSignificanceValue(parts[0])
+
+
+
+_SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES = {
+    SomaticClinicalSignificanceValue("tier_1", "A"): 9,
+    SomaticClinicalSignificanceValue("tier_1", "B"): 8,
+    SomaticClinicalSignificanceValue("tier_1"): 7,
+    SomaticClinicalSignificanceValue("tier_1_or_2"): 6,
+    SomaticClinicalSignificanceValue("tier_2", "C"): 5,
+    SomaticClinicalSignificanceValue("tier_2", "D"): 4,
+    SomaticClinicalSignificanceValue("tier_2"): 3,
+    SomaticClinicalSignificanceValue("tier_3"): 2,
+    SomaticClinicalSignificanceValue("tier_4"): 1
+}
+
+
 VCStoreValue = VCBlobDict
 VCPatchValue = Union[None, VCStoreValue]
 VCStore = Dict[str, VCStoreValue]
@@ -75,7 +138,7 @@ class EvidenceMixin:
             return default
         return value
 
-    def get_value_list(self, key: str):
+    def get_value_list(self, key: str) -> list:
         value = self.get_optional_value_from(self._evidence or {}, key)
         if value is None:
             return []
@@ -159,6 +222,15 @@ class EvidenceMixin:
         for key, level in SpecialEKeys.AMP_LEVELS_TO_LEVEL.items():
             if self.get(key):
                 return level
+        return None
+
+    @property
+    def somatic_clinical_significance_value(self) -> SomaticClinicalSignificanceValue:
+        if somatic_clin_sig := self.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE):
+            return SomaticClinicalSignificanceValue(
+                tier_level=somatic_clin_sig,
+                amp_level=self.amp_level
+            )
         return None
 
     @cached_property

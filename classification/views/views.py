@@ -37,7 +37,7 @@ from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel, Wit
 from classification.forms import ClassificationAlleleOriginForm
 from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
-    ConditionResolvedDict, DiscordanceReport
+    ConditionResolvedDict, DiscordanceReport, ClassificationGrouping
 from classification.models.classification import ClassificationModification
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
@@ -53,6 +53,7 @@ from genes.hgvs import HGVSMatcher
 from library.django_utils import require_superuser, get_url_from_view_path
 from library.log_utils import log_traceback
 from library.utils import delimited_row
+from library.utils.django_utils import render_ajax_view
 from library.utils.file_utils import rm_if_exists
 from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm, LabMultiSelectForm
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -823,3 +824,11 @@ def clin_sig_change_data(request):
     # response['Last-Modified'] = modified_str
     response['Content-Disposition'] = f'attachment; filename="clin_sig_changes.tsv"'
     return response
+
+
+def view_classification_grouping_detail(request, classification_grouping_id: int):
+    grouping = ClassificationGrouping.objects.get(pk=classification_grouping_id)
+    # FIXME add security
+    return render_ajax_view(request, 'classification/classification_grouping_detail.html', {
+        "classification_grouping": grouping
+    })

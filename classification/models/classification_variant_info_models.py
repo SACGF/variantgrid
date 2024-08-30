@@ -476,6 +476,19 @@ class ImportedAlleleInfo(TimeStampedModel):
     def __str__(self):
         return f"{self.imported_genome_build_patch_version} {self.imported_c_hgvs or self.imported_g_hgvs}"
 
+    @staticmethod
+    def column_name_for_build(genome_build: GenomeBuild, prefix: str = "", suffix: str = 'c_hgvs'):
+        build_str: str
+        if genome_build.is_equivalent(GenomeBuild.grch37()):
+            build_str = 'grch37'
+
+        elif genome_build.is_equivalent(GenomeBuild.grch38()):
+            build_str = 'grch38'
+        else:
+            raise ValueError(f'No cached column for genome build {genome_build.pk}')
+        return f'{prefix}__{build_str}__{suffix}'
+
+
     @property
     def variant_coordinates_imported_and_resolved(self) -> tuple[VariantCoordinate, VariantCoordinate]:
         imported_vc: Optional[VariantCoordinate] = self.variant_coordinate_obj

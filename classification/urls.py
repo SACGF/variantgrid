@@ -10,6 +10,7 @@ from classification.views.classification_datatables import ClassificationColumns
 from classification.views.classification_email_view import summary_email_preview_html, \
     summary_email_preview_text
 from classification.views.classification_export_view import ClassificationApiExportView
+from classification.views.classification_grouping_datatables import ClassificationGroupingColumns
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context, view_overlaps_detail
 from classification.views.classification_overlaps_vus_view import view_overlaps_vus, view_overlaps_vus_detail
@@ -108,6 +109,7 @@ urlpatterns = [
     path('classification/<classification_id>/history', views.classification_history, name='classification_history'),
     # classification ID might have a version in it (e.g. a dot)
     path('classification/<classification_id>', views.view_classification, name='view_classification'),
+    path('classification/grouping/<classification_grouping_id>', views.view_classification_grouping_detail, name='classification_grouping_detail'),
 
     path('evidence_keys/<max_share_level>', views.evidence_keys, name='evidence_keys_max_share_level'),
     path('evidence_keys', views.evidence_keys, name='evidence_keys'),
@@ -195,6 +197,7 @@ rest_urlpatterns = [
 
     path('api/classifications/export', ClassificationApiExportView.as_view(), name='classification_export_api'),
     path('api/classifications/datatables/', DatabaseTableView.as_view(column_class=ClassificationColumns), name='classification_datatables'),
+    path('api/classification/groups/datatables/', DatabaseTableView.as_view(column_class=ClassificationGroupingColumns), name='classification_grouping_datatables'),
 
     path('api/classifications/gene_counts/<lab_id>', LabGeneClassificationCountsView.as_view(),
          name='lab_gene_classification_counts_api'),

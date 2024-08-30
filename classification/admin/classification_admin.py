@@ -18,7 +18,7 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
-    DiscordanceReportTriageStatus
+    DiscordanceReportTriageStatus, ClassificationGrouping
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -1281,3 +1281,25 @@ class ImportedAlleleInfoValidationAdmin(ModelAdminBasics):
         if f.name == 'confirmed_by_note':
             return False
         return True
+
+
+@admin.register(ClassificationGrouping)
+class ClassificationGroupingAdmin(ModelAdminBasics):
+
+    list_display = ("pk", "classification_count", "allele", "lab", "allele_origin_bucket", "classification_bucket", "gene_symbols", "dirty")
+    list_filter = ("lab", "allele_origin_bucket", "classification_bucket")
+
+    @admin_list_column("gene_symbols")
+    def gene_symbols(self, obj: ClassificationGrouping):
+        return ", ".join(obj.classificationgroupinggenesymbol_set.values_list("gene_symbol", flat=True))
+
+    @admin_action("Refresh")
+    def refresh(self, request, queryset: QuerySet[ClassificationGrouping]):
+        queryset.update(dirty=True)
+        for cg in queryset:
+            cg.update_based_on_entries()
+
+    @admin_model_action(url_slug="refresh_all/", short_description="Refresh All", icon="fa-solid fa-dolly")
+    def refresh_all(self, request):
+        ClassificationGrouping.objects.update(dirty=True)
+        ClassificationGrouping.update_all_dirty()

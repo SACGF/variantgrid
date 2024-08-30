@@ -2275,31 +2275,44 @@ const VCForm = (function() {
 })();
 
 VCForm.format_condition = function(condition_json) {
+    console.log(condition_json);
     if (!condition_json) {
-        return $('<span>');
+        return $('<span>', {text: "-", class:'no-value'});
     }
-    if (!condition_json.resolved_terms) {
-        return $('<span>', {class: 'ontology-term', html: {class:'free-text', text: condition_json.display_text}});
+    let dom = $('<span>');
+    let domUsed = false;
+    if (condition_json.resolved_terms) {
+
+        let first = true;
+        for (let term of condition_json.resolved_terms) {
+            domUsed = true;
+            if (!first) {
+                $('<br>').appendTo(dom);
+            }
+            first = false;
+            $('<span>', {
+                class: 'ontology-term',
+                html: [
+                    $('<a>', {
+                        class: 'hover-link',
+                        html: $('<span>', {class: 'term-id', text: term.term_id}),
+                        href: Urls.ontology_term(term.term_id.replace(':', '_'))
+                    }),
+                    " ",
+                    $('<span>', {text: term.name, class: 'term-name'})
+                ]
+            }).appendTo(dom);
+        }
+    }
+    if (condition_json.plain_text_terms) {
+        for (let term of condition_json.plain_text_terms) {
+            domUsed = true;
+            $('<span>', {text: term + "yy", class:'ontology-term free-text'}).appendTo(dom);
+        }
     }
 
-    let dom = $('<span>');
-    let first = true;
-    for (let term of condition_json.resolved_terms) {
-        if (!first) {
-            $('<br>').appendTo(dom);
-        }
-        first = false;
-        $('<span>', {
-            class: 'ontology-term',
-            html: [
-            $('<a>', {
-                class: 'hover-link',
-                html: $('<span>', {class: 'term-id', text: term.term_id}),
-                href: Urls.ontology_term(term.term_id.replace(':','_'))
-            }),
-            " ",
-            $('<span>', {text: term.name, class: 'term-name'})
-        ]}).appendTo(dom);
+    if (!domUsed) {
+        return $('<span>', {class: 'ontology-term free-text', text: condition_json.display_text});
     }
     if (condition_json.resolved_terms.length > 1 && condition_json.resolved_join) {
         $('<span>', {class: 'font-italic', text:condition_json.resolved_join === 'C' ? ' Co-occurring' : ' Uncertain'}).appendTo(dom);
@@ -2415,32 +2428,73 @@ VCTable.format_hgvs = (parts) => {
 
 VCTable.hgvs = (data, type, row) => {
     return VCTable.format_hgvs(data).prop('outerHTML');
+    return VCTable.format_hgvs(data).prop('outerHTML');
 }
 
 VCTable.condition = (data, type, row) => {
-    if (data.resolved_terms) {
-        return VCForm.format_condition(data).prop('outerHTML');
-    } else {
-        return data.display_text;
-    }
+    return VCForm.format_condition(data).prop('outerHTML');
 };
 
+VCTable.latest_curation_and_link = (data, type, row) => {
+    let lastCurated = data["curation_date"];
+    if (lastCurated) {
+        let curatedMoment = convertTimestampToMoment(lastCurated);
+        let timestampStr = curatedMoment.format(JS_DATE_ONLY_FORMAT);
+
+        // if we do time ago
+        let timeAgoText = jQuery.timeago(curatedMoment.valueOf());
+        let content = $('<time>', {class: 'ago', datetime: curatedMoment.toISOString(), text: timeAgoText, title: timestampStr});
+
+        // if we jsut want the date
+        //let content = $('<span>', {class: 'timestamp', text: timestampStr});
+
+        let classificationId = data["classification_id"];
+        if (classificationId) {
+            content = $('<a>', {
+                href: Urls.view_classification(classificationId),
+                class: 'hover-link',
+                html: content
+            });
+        }
+        return content.prop('outerHTML');
+    } else {
+        return $("<span>", {text:"-", class: "no-value"})
+    }
+}
+
 VCTable.somatic_clinical_significance = (data, type, row) => {
-    if (SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE in data) {
-        let scs = data[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE];
-        let dom;
-        if (scs) {
-            let scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
-            let scsLabel = scsKey.prettyValue(scs);
-            dom = $('<span>', {text: scsLabel.val, 'class': `c-pill scs scs-${scs}`});
 
-            let highest_level = data["highest_level"];
-            if (highest_level) {
-                dom.append(` <span class="amp-level">${highest_level}</span>`);
+    let allValues = []
+    if (Array.isArray(data)) {
+        for (value of data) {
+            let parts = value.split("|");
+            let scs = {};
+            scs[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE] = parts[0];
+            if (parts.length > 1) {
+                scs["highest_level"] = parts[1];
             }
+            allValues.push(scs);
+        }
+    } else if (data && SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE in data) {
+        allValues.push(data);
+    }
 
-        } else {
-            dom = $('<span>', {class: 'c-pill scs-none no-value', text: 'No Data'});
+    if (allValues.length > 0) {
+        let dom = $('<div>');
+        for (value of allValues) {
+            let scs = value[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE];
+            if (scs) {
+                let scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
+                let scsLabel = scsKey.prettyValue(scs);
+                let subDom = ($('<span>', {text: scsLabel.val, 'class': `c-pill scs scs-${scs}`})).appendTo(dom);
+
+                let highest_level = value["highest_level"];
+                if (highest_level) {
+                    subDom.append(` <span class="amp-level">${highest_level}</span>`);
+                }
+            } else {
+                dom.append($('<div>', {class: 'c-pill scs-none no-value', text: 'No Data'}));
+            }
         }
         return dom.prop('outerHTML');
     } else {
@@ -2449,15 +2503,28 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
 }
 
 VCTable.classification = (data, type, row) => {
-    let dom;
-    let cs = data[SpecialEKeys.CLINICAL_SIGNIFICANCE];
-    let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
-    let label = csKey.prettyValue(cs);
-    let csClass =  `cs-` + (cs || '').toLowerCase()
-    if (cs && cs.length) {
-        dom = $('<span>', {class: `c-pill cs ${csClass}`, text: label.val});
+    let dom = $('<span>');
+    let dataList = [];
+    if (Array.isArray(data)) {
+         for (let cs of data) {
+             let newData = {}
+             newData[SpecialEKeys.CLINICAL_SIGNIFICANCE] = cs;
+             dataList.push(newData);
+         }
     } else {
-        dom = $('<span>', {class: 'c-pill cs-none no-value', text: 'No Data'});
+        dataList = [data];
+    }
+
+    for (let entry of dataList) {
+        let cs = entry[SpecialEKeys.CLINICAL_SIGNIFICANCE];
+        let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
+        let label = csKey.prettyValue(cs);
+        let csClass = `cs-` + (cs || '').toLowerCase()
+        if (cs && cs.length) {
+            $('<span>', {class: `c-pill cs ${csClass}`, text: label.val}).appendTo(dom);
+        } else {
+            $('<span>', {class: 'c-pill cs-none no-value', text: 'No Data'}).appendTo(dom);
+        }
     }
     return dom.prop('outerHTML');
 };
@@ -2498,6 +2565,39 @@ VCTable.allele_origin_bucket_label = (allele_origin_bucket, override_text = "", 
     });
 }
 
+VCTable.groupIdentifier = (data, type, row) => {
+    let id = data.id;
+    let org_name = data.org_name;
+    let lab_name = data.lab_name;
+    let shareLevel = data.share_level;
+    let allele_origin_bucket = data.allele_origin_bucket;
+
+    let alleleOriginDiv = VCTable.allele_origin_bucket_label(allele_origin_bucket);
+
+    let shareInfo = EKeys.shareLevelInfo(shareLevel);
+    let icon = $('<img>', {src: shareInfo.icon, class:'share-icon'});
+
+    let classification_count = data.classification_count;
+
+    let dom = $('<div>', {html: [
+        icon,
+        $('<span>', {text: `${org_name} / ${lab_name}`})
+    ]});
+
+    if (classification_count === 0) {
+        dom.append("-Invalid Record - no Classifications")
+    } else if (classification_count > 1) {
+        dom.append($('<span>', {class:'text-muted text-small', text: `${classification_count} records`}));
+    }
+
+    let indicatorClassName = `allele-origin-indicator allele-origin-horizontal allele-origin-${allele_origin_bucket}`;
+    let fullDom = $('<div>', {style: 'margin-left: 5px; margin-top: -10px; display:flex; flex-direction:row', html:[
+        alleleOriginDiv,
+        dom
+    ]});
+    return fullDom.prop('outerHTML');
+}
+
 VCTable.identifier = (data, type, row) => {
     let id = data.id;
     let org_name = data.org_name;
@@ -2511,15 +2611,18 @@ VCTable.identifier = (data, type, row) => {
     let shareInfo = EKeys.shareLevelInfo(shareLevel);
     let icon = $('<img>', {src: shareInfo.icon, class:'share-icon'});
 
+    let classification_count = data.classification_count;
+
+    let content = [
+        icon,
+        $('<span>', {text: `${org_name} / ${lab_name}`}),
+        '<br/>',
+        limitLengthSpan(lab_record_id, 30)
+    ];
     let link = $('<a>', {
         href: Urls.view_classification(id),
         class: 'hover-link',
-        html: [
-            icon,
-            $('<span>', {text: `${org_name} / ${lab_name}`}),
-            '<br/>',
-            limitLengthSpan(lab_record_id, 30)
-        ]
+        html: content
     });
 
     let dom;
@@ -2535,9 +2638,12 @@ VCTable.identifier = (data, type, row) => {
             }));
         }
         dom = $('<div>', {html: match_doms});
-    } else {
+    } else if (link) {
         dom = link;
+    } else {
+        dom = $('<div>', {html: content})
     }
+
     let indicatorClassName = `allele-origin-indicator allele-origin-horizontal allele-origin-${allele_origin_bucket}`;
     let fullDom = $('<div>', {style: 'display:flex; flex-direction:row', html:[
         alleleOriginDiv,
