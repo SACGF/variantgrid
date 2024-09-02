@@ -21,6 +21,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
     def render_row_header(self, row: Dict[str, Any]) -> JsonDataType:
         return {
+            "dirty": row.get("dirty"),
             "id": row.get("id"),
             "classification_count": row.get('classification_count'),
             "org_name": row.get('lab__organization__short_name') or row.get('lab__organization__name'),
@@ -136,7 +137,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     'lab__organization__name',
                     'lab__name',
                     'allele_origin_bucket',
-                    'share_level'
+                    'share_level',
+                    'dirty'
                 ]
             ),
             RichColumn(

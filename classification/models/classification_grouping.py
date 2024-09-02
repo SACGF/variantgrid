@@ -51,6 +51,24 @@ class ClassificationClassificationBucket(TextChoices):
         # this goes a little against the buckets that we store directly into
 
 
+CLIN_SIG_TO_SORT = {
+    "B": 1,
+    "LB": 2,
+    "VUS_C": 3,
+    "VUS_B": 4,
+    "VUS": 5,
+    "VUS_A": 6,
+    "LP": 7,
+    "LO": 8,
+    "P": 9,
+    "O": 10
+}
+
+# TODO this would be better as a property of the evidence key
+def classification_sort_order(clin_sig: str):
+    return CLIN_SIG_TO_SORT.get(clin_sig, 0)
+
+
 class ClassificationGrouping(TimeStampedModel):
     # key
     allele = models.ForeignKey(Allele, on_delete=models.CASCADE)
@@ -86,6 +104,10 @@ class ClassificationGrouping(TimeStampedModel):
     latest_criteria = ArrayField(models.CharField(max_length=20), null=True, blank=True)
     latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
     latest_curation_date = models.DateField(null=True, blank=True)
+
+    somatic_clinical_significance_sort = models.IntegerField(db_index=True, null=True, blank=True)
+    classification_sort_value = models.TextField(null=True, blank=True)
+
 
     @staticmethod
     def desired_grouping_for_classification(classification: Classification) -> Optional['ClassificationGrouping']:
@@ -180,6 +202,9 @@ class ClassificationGrouping(TimeStampedModel):
             self.latest_classification = best_classification
             self.latest_curation_date = best_classification.curated_date
             self.latest_allele_info = best_classification.classification.allele_info
+            # TODO, calculate the somatic sort order here so we can remove it from classification
+            self.somatic_clinical_significance_sort = best_classification.somatic_clinical_significance_sort
+            self.clinical_significance_sort_order = classification_sort_order(best_classification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
 
             # GET ALL CRITERIA
             def criteria_converter(cm: ClassificationModification) -> set[CriteriaStrength]:
@@ -235,6 +260,8 @@ class ClassificationGrouping(TimeStampedModel):
 
                 all_zygosities |= set(modification.get_value_list(SpecialEKeys.ZYGOSITY))
 
+                # only store valid terms as quick links to the classification
+                all_terms = {term for term in all_terms if term.is_valid_for_condition}
                 self._update_conditions(all_terms)
 
             evidence_map = EvidenceKeyMap.instance()
@@ -330,7 +357,6 @@ class ClassificationGroupingGeneSymbol(TimeStampedModel):
         unique_together = ("grouping", "gene_symbol")
 
 
-# TODO remove the plural
 class ClassificationGroupingCondition(TimeStampedModel):
     grouping = models.ForeignKey(ClassificationGrouping, on_delete=CASCADE)
     ontology_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE)

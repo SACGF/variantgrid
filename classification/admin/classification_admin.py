@@ -1341,6 +1341,7 @@ class ClassificationGroupingAdmin(ModelAdminBasics):
 
     @admin_model_action(url_slug="refresh_all/", short_description="Refresh All", icon="fa-solid fa-dolly")
     def refresh_all(self, request):
+        # ClassificationGrouping.objects.all().delete()
         for classification in Classification.objects.iterator():
             ClassificationGrouping.assign_grouping_for_classification(classification)
 

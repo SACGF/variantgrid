@@ -2504,6 +2504,9 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
 VCTable.classification = (data, type, row) => {
     let dom = $('<span>');
     let dataList = [];
+    if (data === null) {
+        return "" // support for dirty groups still processing
+    }
     if (Array.isArray(data)) {
          for (let cs of data) {
              let newData = {}
@@ -2566,6 +2569,7 @@ VCTable.allele_origin_bucket_label = (allele_origin_bucket, override_text = "", 
 
 VCTable.groupIdentifier = (data, type, row) => {
     let id = data.id;
+    let dirty = data.dirty;
     let org_name = data.org_name;
     let lab_name = data.lab_name;
     let shareLevel = data.share_level;
@@ -2583,7 +2587,9 @@ VCTable.groupIdentifier = (data, type, row) => {
         $('<span>', {text: `${org_name} / ${lab_name}`})
     ]});
 
-    if (classification_count === 0) {
+    if (dirty) {
+        dom.append($("<div class='mt-2'><i class=\"fa-solid fa-clock\"></i> Data is currently being updated</div>"))
+    } else if (classification_count === 0) {
         dom.append("-Invalid Record - no Classifications")
     } else if (classification_count > 1) {
         dom.append($('<div>', {class:'text-muted text-small', text: `${classification_count} records`}));
