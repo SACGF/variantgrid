@@ -24,6 +24,7 @@
             {% endif %}
             </a>
     {% endif %}
+    {% if show_flags %}<div class="flags d-inline-block" style="margin-left:12px" data-flags="{{ vcm.classification.flag_collection_id }}">...</div>{% endif %}
 </span>
 {% else %}
     <span class="share-level-LAB"><span class="cs">DELETED</span> Unknown</span>

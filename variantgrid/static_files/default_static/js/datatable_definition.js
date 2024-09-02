@@ -404,7 +404,6 @@ TableFormat.list_codes = (data, type, row) => {
     if (!data) {
         return $("<span>", {text: "-"});
     }
-    console.log(data);
     let elements = [];
     let isFirst = true;
     for (value of data) {

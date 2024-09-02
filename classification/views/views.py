@@ -167,6 +167,26 @@ def classifications(request):
     return render(request, 'classification/classifications.html', context)
 
 
+def classification_groupings(request):
+    user_settings = UserSettingsManager.get_user_settings()
+    if settings.CLASSIFICATION_GRID_MULTI_LAB_FILTER:
+        lab_form = LabMultiSelectForm()
+    else:
+        lab_form = LabSelectForm()
+
+    context = {
+        "can_create_classification": Classification.can_create_via_web_form(request.user),
+        "gene_form": GeneSymbolForm(),
+        "user_form": UserSelectForm(),
+        "lab_form": lab_form,
+        "allele_origin_form": ClassificationAlleleOriginForm(),
+        "labs": Lab.valid_labs_qs(request.user),
+        "genome_build": user_settings.default_genome_build,
+        "user_settings": user_settings,
+    }
+    return render(request, 'classification/classification_groupings.html', context)
+
+
 class AutopopulateView(APIView):
 
     def get(self, request):

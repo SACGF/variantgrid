@@ -47,6 +47,7 @@ urlpatterns = [
     path('activity/user/<int:user_id>', views.activity, name='activity_user'),
     path('activity/report/<int:discordance_report_id>', views.activity, name='activity_discordance'),
     path('classifications', views.classifications, name='classifications'),
+    path('groups', views.classification_groupings, name='classification_groups'),
     path('create_for_variant/<int:variant_id>/<genome_build_name>', views.CreateClassificationForVariantView.as_view(),
          name='create_classification_for_variant'),
 

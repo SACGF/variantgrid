@@ -18,7 +18,8 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
-    DiscordanceReportTriageStatus, ClassificationGrouping
+    DiscordanceReportTriageStatus, ClassificationGrouping, ClassificationGroupingEntry, \
+    ClassificationGroupingGeneSymbol, ClassificationGroupingCondition
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -1283,9 +1284,48 @@ class ImportedAlleleInfoValidationAdmin(ModelAdminBasics):
         return True
 
 
+class ClassificationGroupingEntryAdmin(admin.TabularInline):
+    model = ClassificationGroupingEntry
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class ClassificationGroupingGeneSymbolAdmin(admin.TabularInline):
+    model = ClassificationGroupingGeneSymbol
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class ClassificationGroupingConditionAdmin(admin.TabularInline):
+    model = ClassificationGroupingCondition
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(ClassificationGrouping)
 class ClassificationGroupingAdmin(ModelAdminBasics):
-
+    inlines = (ClassificationGroupingEntryAdmin, ClassificationGroupingGeneSymbolAdmin, ClassificationGroupingConditionAdmin)
     list_display = ("pk", "classification_count", "allele", "lab", "allele_origin_bucket", "classification_bucket", "gene_symbols", "dirty")
     list_filter = ("lab", "allele_origin_bucket", "classification_bucket")
 
@@ -1301,5 +1341,8 @@ class ClassificationGroupingAdmin(ModelAdminBasics):
 
     @admin_model_action(url_slug="refresh_all/", short_description="Refresh All", icon="fa-solid fa-dolly")
     def refresh_all(self, request):
+        for classification in Classification.objects.iterator():
+            ClassificationGrouping.assign_grouping_for_classification(classification)
+
         ClassificationGrouping.objects.update(dirty=True)
         ClassificationGrouping.update_all_dirty()

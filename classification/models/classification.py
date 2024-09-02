@@ -2118,13 +2118,20 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return self._generate_c_hgvs(genome_build)
 
     def __str__(self) -> str:
+        parts = [f"({str(self.id)})"]
         genome_build = GenomeBuildManager.get_current_genome_build()
         cached_c_hgvs = self.get_c_hgvs(genome_build=genome_build)
         if not cached_c_hgvs:
             cached_c_hgvs = self.get(SpecialEKeys.C_HGVS)
+        parts.append(cached_c_hgvs)
 
         clinical_significance = self.get_clinical_significance_display() or "No Data"
-        return f"({str(self.id)}) {cached_c_hgvs} {clinical_significance}"
+        parts.append(clinical_significance)
+
+        if self.withdrawn:
+            parts.append("WITHDRAWN")
+
+        return " ".join(parts)
 
     @staticmethod
     def check_can_create_no_classification_via_web_form(_user: User):

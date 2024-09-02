@@ -2275,7 +2275,6 @@ const VCForm = (function() {
 })();
 
 VCForm.format_condition = function(condition_json) {
-    console.log(condition_json);
     if (!condition_json) {
         return $('<span>', {text: "-", class:'no-value'});
     }
@@ -2587,7 +2586,7 @@ VCTable.groupIdentifier = (data, type, row) => {
     if (classification_count === 0) {
         dom.append("-Invalid Record - no Classifications")
     } else if (classification_count > 1) {
-        dom.append($('<span>', {class:'text-muted text-small', text: `${classification_count} records`}));
+        dom.append($('<div>', {class:'text-muted text-small', text: `${classification_count} records`}));
     }
 
     let indicatorClassName = `allele-origin-indicator allele-origin-horizontal allele-origin-${allele_origin_bucket}`;
@@ -2595,6 +2594,11 @@ VCTable.groupIdentifier = (data, type, row) => {
         alleleOriginDiv,
         dom
     ]});
+
+    if (data.share_level == "lab" || data.share_level == "institution") {
+        fullDom.css({"opacity": 0.5});
+    }
+
     return fullDom.prop('outerHTML');
 }
 

@@ -1237,6 +1237,9 @@ let Flags = (function () {
             let flagGroup = props.flagGroup || 'default';
             if (props.filter) {
                 flagDoms = $(`${props.filter} *[data-flags]`);
+                console.log("Filtering on")
+                console.log(`${props.filter} *[data-flags]`);
+                console.log(`Found ${flagDoms.length}`);
             } else {
                 flagDoms = $('[data-flags]');
             }

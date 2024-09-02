@@ -89,6 +89,10 @@ class ClassificationGrouping(TimeStampedModel):
 
     @staticmethod
     def desired_grouping_for_classification(classification: Classification) -> Optional['ClassificationGrouping']:
+        # withdrawn classifications are removed from groupings
+        if classification.withdrawn:
+            return None
+
         allele = classification.allele_object
         lab = classification.lab
         share_level = classification.share_level
@@ -149,11 +153,11 @@ class ClassificationGrouping(TimeStampedModel):
         return list(sorted(gss.gene_symbol for gss in self.classificationgroupinggenesymbol_set.select_related("gene_symbol")))
 
     def _update_conditions(self, terms: list[OntologyTerm]):
-        ClassificationGroupingConditions.objects.filter(grouping=self).exclude(
+        ClassificationGroupingCondition.objects.filter(grouping=self).exclude(
             ontology_term_id__in=[term.pk for term in terms]).delete()
-        desired_entries = [ClassificationGroupingConditions(grouping=self, ontology_term_id=term.pk) for term in
+        desired_entries = [ClassificationGroupingCondition(grouping=self, ontology_term_id=term.pk) for term in
                            terms]
-        ClassificationGroupingConditions.objects.bulk_create(desired_entries, ignore_conflicts=True)
+        ClassificationGroupingCondition.objects.bulk_create(desired_entries, ignore_conflicts=True)
 
     @transaction.atomic
     def update_based_on_entries(self):
@@ -280,10 +284,12 @@ class ClassificationGrouping(TimeStampedModel):
         for rb in imported_allele_info.resolved_builds:
             if gene_symbol := rb.gene_symbol:
                 all_gene_symbols.add(gene_symbol)
-            if transcript_version := rb.transcript_version:
-                if gene_version := transcript_version.gene_version:
-                    if gene_symbol := gene_version.gene_symbol:
-                        all_gene_symbols.add(gene_symbol)
+
+            # For now exclude transcript versions linking to other gene symbols, revisit
+            # if transcript_version := rb.transcript_version:
+            #     if gene_version := transcript_version.gene_version:
+            #         if gene_symbol := gene_version.gene_symbol:
+            #             all_gene_symbols.add(gene_symbol)
 
         if c_hgvs := imported_allele_info.imported_c_hgvs_obj:
             # TODO if it's alias look up aliases
@@ -299,6 +305,13 @@ class ClassificationGrouping(TimeStampedModel):
             #     gene = annotation.gene
             #     GeneSymbolAliasesMeta.objects.filter()
         return all_gene_symbols
+
+    @cached_property
+    def classification_modifications(self) -> list[ClassificationModification]:
+        # show in date order
+        all_classifications = self.classificationgroupingentry_set.values_list("classification", flat=True)
+        modifications = ClassificationModification.objects.filter(classification_id__in=all_classifications, is_last_published=True)
+        return list(modifications.order_by("-modified"))
 
     @staticmethod
     def update_all_dirty():
@@ -318,9 +331,8 @@ class ClassificationGroupingGeneSymbol(TimeStampedModel):
 
 
 # TODO remove the plural
-class ClassificationGroupingConditions(TimeStampedModel):
+class ClassificationGroupingCondition(TimeStampedModel):
     grouping = models.ForeignKey(ClassificationGrouping, on_delete=CASCADE)
-    # TODO rename to ontology term
     ontology_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE)
 
     def __str__(self):
