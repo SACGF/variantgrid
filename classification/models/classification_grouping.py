@@ -68,10 +68,10 @@ class ClassificationGrouping(TimeStampedModel):
     dirty = models.BooleanField(default=True)
 
     # All values before need to be nullable as they wont be populated in the time between creating the ClassificationGrouping and updating it
-    classification_values = ArrayField(models.CharField(max_length=10), null=True, blank=True)  # values from EvidenceKey.CLINICAL_SIGNIFICANCE
-    somatic_clinical_significance_values = ArrayField(models.CharField(max_length=10), null=True, blank=True)
+    classification_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)  # values from EvidenceKey.CLINICAL_SIGNIFICANCE
+    somatic_clinical_significance_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
     conditions = models.JSONField(null=True, blank=True)
-    zygosity_values = ArrayField(models.CharField(max_length=20), null=True, blank=True)
+    zygosity_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
     # # for discordances
     # classification_bucket
     #
@@ -87,7 +87,7 @@ class ClassificationGrouping(TimeStampedModel):
     # summary_c_hgvses
     # summary_criteria
     latest_classification = models.ForeignKey(ClassificationModification, on_delete=SET_NULL, null=True, blank=True)
-    latest_criteria = ArrayField(models.CharField(max_length=20), null=True, blank=True)
+    latest_criteria = ArrayField(models.CharField(max_length=50), null=True, blank=True)
     latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
     latest_curation_date = models.DateField(null=True, blank=True)
 
