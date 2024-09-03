@@ -13,7 +13,7 @@ from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
 from library.utils import JsonDataType
 from snpdb.models import UserSettings, GenomeBuild, Lab
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, DC
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, DC, SortOrder
 from variantgrid import settings
 
 
@@ -144,8 +144,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             RichColumn(
                 key=ImportedAlleleInfo.column_name_for_build(genome_build_preferred, "latest_allele_info"),
                 # sort_keys=['variant_sort', 'c_hgvs'],  # annotated column
-                sort_keys=[ImportedAlleleInfo.column_name_for_build(genome_build_preferred, "latest_allele_info", "genomic_sort"),
-                           'c_hgvs'],
+                sort_keys=[ImportedAlleleInfo.column_name_for_build(genome_build_preferred, "latest_allele_info", "genomic_sort")],
                 name='c_hgvs',
                 label=f'HGVS ({genome_build_preferred.name})',
                 renderer=self.render_c_hgvs,
@@ -169,9 +168,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 name='classifications',
                 label='Classifications',
                 client_renderer='VCTable.classification',
-                sort_keys=['classification_values'], # FIXME add a sort column
-                orderable=False,
-                #order_sequence=[SortOrder.DESC, SortOrder.ASC]
+                sort_keys=['classification_sort_value'], # FIXME add a sort column
+                order_sequence=[SortOrder.DESC, SortOrder.ASC]
             ),
 
             RichColumn(
@@ -179,9 +177,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 name='somatic_clinical_significances',
                 label='Clinical Significance',
                 client_renderer='VCTable.somatic_clinical_significance',
-                # sort_keys=['classification_values'],  # FIXME add a sort column
-                orderable=False,
-                # order_sequence=[SortOrder.DESC, SortOrder.ASC]
+                sort_keys=['somatic_clinical_significance_sort'],
+                order_sequence=[SortOrder.DESC, SortOrder.ASC]
             ),
 
             RichColumn(
@@ -207,6 +204,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 label="Last Curated",
                 renderer=self.render_lastest_curation_date,
                 client_renderer='VCTable.latest_curation_and_link',
-                extra_columns=["latest_classification_id"]
+                extra_columns=["latest_classification_id"],
+                order_sequence=[SortOrder.DESC, SortOrder.ASC]
             )
         ]

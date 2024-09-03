@@ -71,7 +71,7 @@ class RichColumn:
                  enabled: bool = True,
                  renderer: Optional[Callable[[CellData], JsonDataType]] = None,
                  default_sort: Optional[SortOrder] = None,
-                 order_sequence: List[SortOrder] = [SortOrder.ASC, SortOrder.DESC],
+                 order_sequence: Optional[List[SortOrder]] = None,
                  client_renderer: Optional[str] = None,
                  client_renderer_td: Optional[str] = None,
                  visible: bool = True,
@@ -100,7 +100,9 @@ class RichColumn:
         self.key = key
         self.sort_keys = sort_keys
         if orderable is None:
-            orderable = bool(sort_keys)
+            orderable = bool(sort_keys) or bool(order_sequence) or bool(default_sort)
+        if not order_sequence:
+            order_sequence = [SortOrder.ASC, SortOrder.DESC]
         self.search = []
         if (search is None or search is True) and key:
             self.search = [key]

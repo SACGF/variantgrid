@@ -312,7 +312,7 @@ class EvidenceKey(TimeStampedModel):
         return None
 
     @cached_property
-    def _option_indexes(self) -> Optional[Dict[str, int]]:
+    def option_indexes(self) -> Optional[Dict[str, int]]:
         index_map: Optional[Dict[str, int]] = None
         if options := self.virtual_options:
             index_map = {}
@@ -321,7 +321,7 @@ class EvidenceKey(TimeStampedModel):
         return index_map
 
     def classification_sorter_value(self, val: Any) -> Union[int, Any]:
-        if index_map := self._option_indexes:
+        if index_map := self.option_indexes:
             return index_map.get(val, 0)
         return val
 

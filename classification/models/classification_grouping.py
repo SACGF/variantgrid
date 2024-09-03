@@ -11,7 +11,7 @@ from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, C
 from django.db import models, transaction
 
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
-    ConditionResolved, SomaticClinicalSignificanceValue
+    ConditionResolved, SomaticClinicalSignificanceValue, EvidenceKey
 from genes.models import GeneSymbol
 from library.utils import first
 from ontology.models import OntologyTerm
@@ -51,22 +51,8 @@ class ClassificationClassificationBucket(TextChoices):
         # this goes a little against the buckets that we store directly into
 
 
-CLIN_SIG_TO_SORT = {
-    "B": 1,
-    "LB": 2,
-    "VUS_C": 3,
-    "VUS_B": 4,
-    "VUS": 5,
-    "VUS_A": 6,
-    "LP": 7,
-    "LO": 8,
-    "P": 9,
-    "O": 10
-}
-
-# TODO this would be better as a property of the evidence key
-def classification_sort_order(clin_sig: str):
-    return CLIN_SIG_TO_SORT.get(clin_sig, 0)
+def classification_sort_order(clin_sig: str) -> int:
+    return EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_indexes.get(clin_sig, 0)
 
 
 class ClassificationGrouping(TimeStampedModel):
@@ -107,7 +93,6 @@ class ClassificationGrouping(TimeStampedModel):
 
     somatic_clinical_significance_sort = models.IntegerField(db_index=True, null=True, blank=True)
     classification_sort_value = models.TextField(null=True, blank=True)
-
 
     @staticmethod
     def desired_grouping_for_classification(classification: Classification) -> Optional['ClassificationGrouping']:
@@ -204,7 +189,10 @@ class ClassificationGrouping(TimeStampedModel):
             self.latest_allele_info = best_classification.classification.allele_info
             # TODO, calculate the somatic sort order here so we can remove it from classification
             self.somatic_clinical_significance_sort = best_classification.somatic_clinical_significance_sort
-            self.clinical_significance_sort_order = classification_sort_order(best_classification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
+
+            best_clin_sig = best_classification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+            self.classification_sort_value = classification_sort_order(best_clin_sig)
+            print(f"{best_clin_sig} -> {self.classification_sort_value}")
 
             # GET ALL CRITERIA
             def criteria_converter(cm: ClassificationModification) -> set[CriteriaStrength]:
