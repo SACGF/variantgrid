@@ -3,6 +3,7 @@ from typing import Optional, Set
 
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import CASCADE, TextChoices, SET_NULL
+from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from humanfriendly.decorators import cached
 
@@ -93,6 +94,9 @@ class ClassificationGrouping(TimeStampedModel):
 
     somatic_clinical_significance_sort = models.IntegerField(db_index=True, null=True, blank=True)
     classification_sort_value = models.TextField(null=True, blank=True)
+
+    def get_absolute_url(self):
+        return reverse('classification_grouping_detail', kwargs={"classification_grouping_id": self.pk})
 
     @staticmethod
     def desired_grouping_for_classification(classification: Classification) -> Optional['ClassificationGrouping']:
@@ -324,8 +328,7 @@ class ClassificationGrouping(TimeStampedModel):
     def classification_modifications(self) -> list[ClassificationModification]:
         # show in date order
         all_classifications = self.classificationgroupingentry_set.values_list("classification", flat=True)
-        modifications = ClassificationModification.objects.filter(classification_id__in=all_classifications, is_last_published=True)
-        return list(modifications.order_by("-modified"))
+        return list(sorted(ClassificationModification.objects.filter(classification_id__in=all_classifications, is_last_published=True), key=lambda mod: mod.curated_date_check))
 
     @staticmethod
     def update_all_dirty():

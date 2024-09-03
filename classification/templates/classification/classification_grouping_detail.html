@@ -15,7 +15,10 @@
 {% endlabelled %}
 {% with "grouping_records_"|append:classification_grouping.pk as expand_id %}
     {% labelled label="Records" row_id=expand_id %}
-        {% for record in classification_grouping.classification_modifications %}
+        {% if classification_grouping.classification_count > 10 %}
+            <div>Total of {{ classification_grouping.classification_count }} records, showing most recent 10</div>
+        {% endif %}
+        {% for record in classification_grouping.classification_modifications|slice:"-10:" %}
             <div>{% classification_quick record show_flags=True %}</div>
             {% comment %}
             <div class="mt-2 d-flex" style="align-items:center;position:relative;top:5px">
