@@ -1339,11 +1339,15 @@ class ClassificationGroupingAdmin(ModelAdminBasics):
         for cg in queryset:
             cg.update_based_on_entries()
 
-    @admin_model_action(url_slug="refresh_all/", short_description="Refresh All", icon="fa-solid fa-dolly")
+    @admin_model_action(url_slug="refresh_all/", short_description="Refresh All", icon="fa-solid fa-arrows-rotate")
     def refresh_all(self, request):
         # ClassificationGrouping.objects.all().delete()
         for classification in Classification.objects.iterator():
             ClassificationGrouping.assign_grouping_for_classification(classification)
 
         ClassificationGrouping.objects.update(dirty=True)
+        ClassificationGrouping.update_all_dirty()
+
+    @admin_model_action(url_slug="refresh_all/", short_description="Refresh Dirty", icon="fa-solid fa-splotch")
+    def refresh_dirty(self, request):
         ClassificationGrouping.update_all_dirty()

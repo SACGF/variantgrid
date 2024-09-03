@@ -192,7 +192,6 @@ class ClassificationGrouping(TimeStampedModel):
 
             best_clin_sig = best_classification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
             self.classification_sort_value = classification_sort_order(best_clin_sig)
-            print(f"{best_clin_sig} -> {self.classification_sort_value}")
 
             # GET ALL CRITERIA
             def criteria_converter(cm: ClassificationModification) -> set[CriteriaStrength]:
@@ -330,7 +329,7 @@ class ClassificationGrouping(TimeStampedModel):
 
     @staticmethod
     def update_all_dirty():
-        for dirty in ClassificationGrouping.objects.filter(dirty=True):
+        for dirty in ClassificationGrouping.objects.filter(dirty=True).iterator():
             dirty.update_based_on_entries()
 
 
