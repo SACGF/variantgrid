@@ -2,7 +2,7 @@ from functools import cached_property
 from typing import Optional, Set
 
 from django.contrib.postgres.fields import ArrayField
-from django.db.models import CASCADE, TextChoices, SET_NULL
+from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from humanfriendly.decorators import cached
@@ -56,9 +56,25 @@ def classification_sort_order(clin_sig: str) -> int:
     return EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_indexes.get(clin_sig, 0)
 
 
+class OverlapStatus(IntegerChoices):
+    NO_OVERLAP = 0, "No Overlap"
+    NOT_COMPARABLE_OVERLAP = 10, "Not Comparable"
+    AGREEMENT = 20, "Agreement"
+    CONFIDENCE = 30, "Confidence"
+    BENIGN_DISCORDANCE = 40, "Benign Discordance"
+    PATHOGENIC_DISCORDANCE = 50, "Pathogenic Discordance"
+
+
+class AlleleGrouping(TimeStampedModel):
+    allele = models.OneToOneField(Allele, on_delete=models.CASCADE, primary_key=True)
+    overlap_status = models.IntegerField(choices=OverlapStatus.choices, default=OverlapStatus.NO_OVERLAP)
+    dirty = models.BooleanField(default=True)
+    classification_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
+
+
 class ClassificationGrouping(TimeStampedModel):
     # key
-    allele = models.ForeignKey(Allele, on_delete=models.CASCADE)
+    allele_grouping = models.ForeignKey(AlleleGrouping, on_delete=models.CASCADE)
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices)
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices())
@@ -108,8 +124,10 @@ class ClassificationGrouping(TimeStampedModel):
         lab = classification.lab
         share_level = classification.share_level
         if allele:
+            allele_grouping, _ = AlleleGrouping.objects.get_or_create(allele=allele)
+
             grouping, _ = ClassificationGrouping.objects.get_or_create(
-                allele=allele,
+                allele_grouping=allele_grouping,
                 lab=lab,
                 allele_origin_bucket=classification.allele_origin_bucket,
                 share_level=share_level
@@ -323,6 +341,10 @@ class ClassificationGrouping(TimeStampedModel):
             #     gene = annotation.gene
             #     GeneSymbolAliasesMeta.objects.filter()
         return all_gene_symbols
+
+    @cached_property
+    def allele(self) -> Allele:
+        return self.allele_grouping.allele
 
     @cached_property
     def classification_modifications(self) -> list[ClassificationModification]:
