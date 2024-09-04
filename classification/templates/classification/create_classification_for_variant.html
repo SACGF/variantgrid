@@ -211,15 +211,15 @@
 
                 {% labelled label="Sample" %}
                     <div class='value'>
-                    {{ variant_sample_autocomplete_form.sample }} <span id='zygosity'></span>
-                    {{ variant_sample_autocomplete_form.media }}
-                    <div id='no-sample-link' class='hidden'>
-                        <a href="javascript:allowNoSample()">My sample isn't here</a>
-                    </div>
-                    <div id='no-sample-text' class='hidden'>
-                        <p>Please find or upload the sample if you have it, as it allows us to link classifications together, and auto-fill fields.
-                        <p>Please remember to set the SampleID field in the classification form manually.
-                    </div>
+                        {{ variant_sample_autocomplete_form.sample }} <span id='zygosity'></span>
+                        {{ variant_sample_autocomplete_form.media }}
+                        <div id='no-sample-link' class='hidden'>
+                            <a href="javascript:allowNoSample()">My sample isn't here</a>
+                        </div>
+                        <div id='no-sample-text' class='hidden'>
+                            <p>Please find or upload the sample if you have it, as it allows us to link classifications together, and auto-fill fields.
+                            <p>Please remember to set the SampleID field in the classification form manually.
+                        </div>
                     </div>
                 {% endlabelled %}
 

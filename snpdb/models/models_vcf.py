@@ -372,10 +372,16 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
         return self.vcf.cohort.cohort_genotype_collection
 
     def get_genotype(self, variant: Variant) -> 'SampleGenotype':
+        from snpdb.models import CohortGenotype
+
+        cgc = self.cohort_genotype_collection
+        collections = [cgc]
+        if cgc.common_collection:
+            collections.append(cgc.common_collection)
         try:
-            cg = self.cohort_genotype_collection.cohortgenotype_set.get(variant=variant)
+            cg = CohortGenotype.objects.filter(collection__in=collections).get(variant=variant)
             sample_genotype = cg.get_sample_genotype(self)
-        except ObjectDoesNotExist:
+        except CohortGenotype.DoesNotExist:
             sample_genotype = None
         return sample_genotype
 
