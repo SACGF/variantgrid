@@ -2426,11 +2426,11 @@ VCTable.format_hgvs = (parts) => {
 };
 
 VCTable.hgvs = (data, type, row) => {
-    return VCTable.format_hgvs(data).prop('outerHTML');
+    return VCTable.format_hgvs(data);
 }
 
 VCTable.condition = (data, type, row) => {
-    return VCForm.format_condition(data).prop('outerHTML');
+    return VCForm.format_condition(data);
 };
 
 VCTable.latest_curation_and_link = (data, type, row) => {
@@ -2494,7 +2494,7 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
                 dom.append($('<div>', {class: 'c-pill scs-none no-value', text: 'No Data'}));
             }
         }
-        return dom.prop('outerHTML');
+        return dom;
     } else {
         return "";
     }
@@ -2527,7 +2527,7 @@ VCTable.classification = (data, type, row) => {
             $('<span>', {class: 'c-pill cs-none no-value', text: 'No Data'}).appendTo(dom);
         }
     }
-    return dom.prop('outerHTML');
+    return dom;
 };
 
 VCTable.evidence_key = (key_name, data, type, row) => {
@@ -2539,7 +2539,7 @@ VCTable.evidence_key = (key_name, data, type, row) => {
         span = $('<span>');
         csKey.formatValue(data, span);
     }
-    return span.prop('outerHTML');
+    return span;
 };
 
 VCTable.allele_origin_bucket_label = (allele_origin_bucket, override_text = "", alignment="vertical") => {
@@ -2564,6 +2564,14 @@ VCTable.allele_origin_bucket_label = (allele_origin_bucket, override_text = "", 
             })
         ]
     });
+}
+
+VCTable.alleleGroupingIdentifier = (data, type, row) => {
+    let dom = $("div");
+    for (let allele of data.alleles) {
+        dom.append(VCTable.format_hgvs(allele))
+    }
+    return dom;
 }
 
 VCTable.groupIdentifier = (data, type, row) => {
@@ -2604,7 +2612,7 @@ VCTable.groupIdentifier = (data, type, row) => {
         fullDom.css({"opacity": 0.5});
     }
 
-    return fullDom.prop('outerHTML');
+    return fullDom;
 }
 
 VCTable.identifier = (data, type, row) => {
@@ -2658,7 +2666,7 @@ VCTable.identifier = (data, type, row) => {
         alleleOriginDiv,
         dom
     ]});
-    return fullDom.prop('outerHTML');
+    return fullDom;
 };
 
 VCTable.sample = (sample_name, type, row) => {
@@ -2673,5 +2681,5 @@ VCTable.sample = (sample_name, type, row) => {
         });
         dom = link;
     }
-    return dom.prop('outerHTML');
+    return dom;
 };

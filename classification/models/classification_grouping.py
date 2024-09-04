@@ -403,6 +403,15 @@ class ClassificationGrouping(TimeStampedModel):
         all_classifications = self.classificationgroupingentry_set.values_list("classification", flat=True)
         return list(sorted(ClassificationModification.objects.filter(classification_id__in=all_classifications, is_last_published=True), key=lambda mod: mod.curated_date_check))
 
+    def to_json(self):
+        scs = self.latest_classification.somatic_clinical_significance_value
+        return {
+            "lab": str(self.lab),
+            "classification": self.latest_classification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
+            "somatic_clinical_significance": scs.as_json() if scs else None,
+            "curated_date": str(self.latest_curation_date)  # fixme, need a quick way for yyyy-mm-dd
+        }
+
     @staticmethod
     def update_all_dirty():
         for dirty in ClassificationGrouping.objects.filter(dirty=True).iterator():
