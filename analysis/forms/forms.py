@@ -354,15 +354,6 @@ class KaryomappingGeneForm(forms.ModelForm):
         return obj
 
 
-class InputSamplesForm(forms.Form):
-    sample = forms.ModelChoiceField(queryset=Sample.objects.none(), required=True)
-
-    def __init__(self, *args, **kwargs):
-        samples = kwargs.pop("samples")
-        super().__init__(*args, **kwargs)
-        self.fields['sample'].queryset = Sample.objects.filter(pk__in=[sample.pk for sample in samples])
-
-
 class VCFLocusFilterForm(forms.Form):
 
     def __init__(self, *args, **kwargs):

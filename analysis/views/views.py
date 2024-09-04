@@ -29,7 +29,7 @@ from htmlmin.decorators import not_minified_response
 from analysis import forms
 from analysis.analysis_templates import populate_analysis_from_template_run
 from analysis.exceptions import NonFatalNodeError, NodeOutOfDateException
-from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, VCFLocusFilterForm, InputSamplesForm, \
+from analysis.forms import SelectGridColumnForm, UserTrioWizardForm, VCFLocusFilterForm, \
     AnalysisChoiceForm, AnalysisTemplateTypeChoiceForm, AnalysisTemplateVersionForm, AnalysisTemplateForm
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
@@ -55,6 +55,7 @@ from library.guardian_utils import is_superuser
 from library.utils import full_class_name, defaultdict_to_dict
 from library.utils.database_utils import run_sql, queryset_to_sql
 from pedigree.models import Pedigree
+from snpdb.forms import SampleChoiceForm
 from snpdb.graphs import graphcache
 from snpdb.models import UserSettings, Sample, \
     Cohort, CohortSample, ImportStatus, VCF, get_igv_data, Trio, Variant, GenomeBuild
@@ -944,8 +945,9 @@ class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
                 samples = self.variant_tag.analysis.get_samples()
 
         if samples:
-            form = InputSamplesForm(samples=samples)
+            form = SampleChoiceForm()
             form.fields['sample'].required = False
+            form.fields['sample'].queryset = Sample.objects.filter(pk__in=[s.pk for s in samples])
         else:
             form = super()._get_sample_form()
         return form
