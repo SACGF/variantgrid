@@ -19,7 +19,7 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
     DiscordanceReportTriageStatus, ClassificationGrouping, ClassificationGroupingEntry, \
-    ClassificationGroupingGeneSymbol, ClassificationGroupingCondition
+    ClassificationGroupingGeneSymbol, ClassificationGroupingCondition, AlleleGrouping
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -1337,7 +1337,7 @@ class ClassificationGroupingAdmin(ModelAdminBasics):
     def refresh(self, request, queryset: QuerySet[ClassificationGrouping]):
         queryset.update(dirty=True)
         for cg in queryset:
-            cg.update_based_on_entries()
+            cg.update()
 
     @admin_model_action(url_slug="refresh_all/", short_description="Refresh All", icon="fa-solid fa-arrows-rotate")
     def refresh_all(self, request):
@@ -1351,3 +1351,8 @@ class ClassificationGroupingAdmin(ModelAdminBasics):
     @admin_model_action(url_slug="refresh_all/", short_description="Refresh Dirty", icon="fa-solid fa-splotch")
     def refresh_dirty(self, request):
         ClassificationGrouping.update_all_dirty()
+
+
+@admin.register(AlleleGrouping)
+class AlleleGroupingAdmin(ModelAdminBasics):
+    list_display = ("allele", "overlap_status", "classification_values", "dirty")

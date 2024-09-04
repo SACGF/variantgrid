@@ -2427,7 +2427,6 @@ VCTable.format_hgvs = (parts) => {
 
 VCTable.hgvs = (data, type, row) => {
     return VCTable.format_hgvs(data).prop('outerHTML');
-    return VCTable.format_hgvs(data).prop('outerHTML');
 }
 
 VCTable.condition = (data, type, row) => {

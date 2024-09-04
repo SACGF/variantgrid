@@ -26,15 +26,10 @@ def deleted_variant(sender, instance: Classification, **kwargs):  # pylint: disa
     # when a classification is deleted, it will delete the corresponding ClassificationGroupingEntry
     # so we need to mark the overall grouping
     if entry := ClassificationGroupingEntry.objects.filter(classification=instance).first():
-        grouping = entry.grouping
-        grouping.dirty = True
-        grouping.save(update_fields=entry.grouping)
+        entry.dirty_up()
 
 
 @receiver(classification_withdraw_signal, sender=Classification)
 def withdraw_changed(sender, classification: Classification, **kwargs):  # pylint: disable=unused-argument
     if entry := ClassificationGroupingEntry.objects.filter(classification=classification).first():
-        grouping = entry.grouping
-        grouping.dirty = True
-        grouping.save(update_fields=entry.grouping)
-        # FIXME what actually triggers the updating of a dirty ClassificationGrouping?
+        entry.dirty_up()

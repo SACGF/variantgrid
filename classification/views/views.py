@@ -187,6 +187,10 @@ def classification_groupings(request):
     return render(request, 'classification/classification_groupings.html', context)
 
 
+def allele_groupings(request):
+    return render(request, 'classification/allele_groupings.html', {})
+
+
 class AutopopulateView(APIView):
 
     def get(self, request):

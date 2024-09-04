@@ -5,14 +5,13 @@ from django.contrib.postgres.fields import ArrayField
 from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
-from humanfriendly.decorators import cached
 
 from classification.criteria_strengths import CriteriaStrength
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, CriteriaEvaluation
 from django.db import models, transaction
 
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
-    ConditionResolved, SomaticClinicalSignificanceValue, EvidenceKey
+    ConditionResolved, SomaticClinicalSignificanceValue
 from genes.models import GeneSymbol
 from library.utils import first
 from ontology.models import OntologyTerm
@@ -66,10 +65,55 @@ class OverlapStatus(IntegerChoices):
 
 
 class AlleleGrouping(TimeStampedModel):
-    allele = models.OneToOneField(Allele, on_delete=models.CASCADE, primary_key=True)
+    allele = models.ForeignKey(Allele, on_delete=models.CASCADE)
+    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices)
     overlap_status = models.IntegerField(choices=OverlapStatus.choices, default=OverlapStatus.NO_OVERLAP)
     dirty = models.BooleanField(default=True)
     classification_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
+
+    def update(self):
+        # not sure if this is the best solution, or if an AlleleGrouping should just refuse to update if attached allele groupings are dirty
+        all_classification_values = set()
+        classification_groupings: list[ClassificationGrouping] = list(self.classificationgrouping_set.all())
+        for cg in classification_groupings:
+            if cg.dirty:
+                cg.update()
+        shared_groupings = [cg for cg in classification_groupings if cg.share_level_obj.is_discordant_level]
+        for cg in shared_groupings:
+            all_classification_values |= set(cg.classification_values)
+
+        self.classification_values = list(all_classification_values)
+
+        overlap_status: OverlapStatus
+        if len(shared_groupings) <= 1:
+            overlap_status = OverlapStatus.NO_OVERLAP
+        elif self.allele_origin_bucket == AlleleOriginBucket.GERMLINE:
+            bucket_mapping = EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
+            buckets = {bucket_mapping.get(class_value) for class_value in self.classification_values}
+            if None in buckets:
+                buckets.remove(None)
+
+            if len(buckets) > 1:
+                # discordant
+                if "P" in all_classification_values or "LP" in all_classification_values:
+                    overlap_status = OverlapStatus.PATHOGENIC_DISCORDANCE
+                else:
+                    overlap_status = OverlapStatus.BENIGN_DISCORDANCE
+            else:
+                if len(all_classification_values) > 1:
+                    overlap_status = OverlapStatus.CONFIDENCE
+                else:
+                    # complete agreement
+                    overlap_status = OverlapStatus.AGREEMENT
+        else:
+            # SOMATIC / UNKNOWN
+            overlap_status = OverlapStatus.NOT_COMPARABLE_OVERLAP
+
+        self.overlap_status = overlap_status
+        self.dirty = False
+        self.save()
+
+        # TODO manage pending classifications
 
 
 class ClassificationGrouping(TimeStampedModel):
@@ -78,6 +122,9 @@ class ClassificationGrouping(TimeStampedModel):
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices)
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices())
+    @property
+    def share_level_obj(self):
+        return ShareLevel(self.share_level)
     quality_level = models.CharField(max_length=1, choices=ClassificationQualityLevel.choices, default=ClassificationQualityLevel.STANDARD)
     classification_bucket = models.CharField(max_length=1, choices=ClassificationClassificationBucket.choices, default=ClassificationClassificationBucket.NO_DATA)
     classification_count = models.IntegerField(default=0)
@@ -124,7 +171,9 @@ class ClassificationGrouping(TimeStampedModel):
         lab = classification.lab
         share_level = classification.share_level
         if allele:
-            allele_grouping, _ = AlleleGrouping.objects.get_or_create(allele=allele)
+            allele_grouping, _ = AlleleGrouping.objects.get_or_create(allele=allele, allele_origin_bucket=classification.allele_origin_bucket)
+            allele_grouping.dirty = True
+            allele_grouping.save(update_fields=["dirty"])
 
             grouping, _ = ClassificationGrouping.objects.get_or_create(
                 allele_grouping=allele_grouping,
@@ -189,8 +238,10 @@ class ClassificationGrouping(TimeStampedModel):
         ClassificationGroupingCondition.objects.bulk_create(desired_entries, ignore_conflicts=True)
 
     @transaction.atomic
-    def update_based_on_entries(self):
-        # TODO update a lot of fields
+    def update(self):
+
+        self.allele_grouping.dirty = True
+        self.allele_grouping.save(update_fields=["dirty"])
 
         # UPDATE GENE SYMBOLS
         self._update_gene_symbols()
@@ -355,7 +406,9 @@ class ClassificationGrouping(TimeStampedModel):
     @staticmethod
     def update_all_dirty():
         for dirty in ClassificationGrouping.objects.filter(dirty=True).iterator():
-            dirty.update_based_on_entries()
+            dirty.update()
+        for dirty in AlleleGrouping.objects.filter(dirty=True).iterator():
+            dirty.update()
 
 
 class ClassificationGroupingGeneSymbol(TimeStampedModel):
@@ -384,6 +437,12 @@ class ClassificationGroupingEntry(TimeStampedModel):
     # this is just here so this model can stay completely separate from Classification
     classification = models.ForeignKey(Classification, on_delete=CASCADE)
     grouping = models.ForeignKey(ClassificationGrouping, on_delete=CASCADE)
+
+    def dirty_up(self):
+        self.grouping.dirty = True
+        self.grouping.save(update_fields=["dirty"])
+        self.grouping.allele_grouping.dirty = True
+        self.grouping.allele_grouping.save(update_fields=["dirty"])
 
     def __str__(self):
         return f"Grouping {self.grouping} : Classification {self.classification}"

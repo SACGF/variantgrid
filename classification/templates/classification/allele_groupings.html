@@ -1,0 +1,24 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load compress %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% load settings_tags %}
+{% load classification_tags %}
+{% block title %}Classifications{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block content %}
+    <div id="classifications-page">
+        <div class="container-table">
+            <h3>Allele Groupings</h3>
+
+            <div class="row">
+                <div class="col">
+                    <table id="vc-datatable" data-datatable-url="{% url 'allele_grouping_datatables' %}" class="sticky-header classification-table"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
