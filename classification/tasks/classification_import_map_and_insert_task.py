@@ -136,7 +136,7 @@ class ClassificationImportMapInsertTask(Task):
             stdout, _ = process.communicate()
             _ = stdout.decode()
             if error_code := process.returncode:
-                raise ValueError(f"cwd {self.omni_importer_dir : {' '.join(args)}} returned {error_code}")
+                raise ValueError(f"cwd {self.omni_importer_dir} : {' '.join(args)} returned {error_code}")
 
             output_dir = working_sub_folder / "output"
             classifications_file = output_dir / "classifications.json"
