@@ -3,6 +3,8 @@ from abc import abstractmethod
 from functools import reduce
 from typing import Type
 
+from django.conf import settings
+
 from library.utils import full_class_name, is_not_none
 from upload.import_task_factories.import_task_factory import ImportTaskFactory
 from upload.models import UploadStep, UploadStepTaskType, VCFPipelineStage
@@ -22,6 +24,10 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
 
     def get_possible_extensions(self):
         return ['vcf', 'vcf.gz']
+
+    def get_vcf_split_rows(self) -> int:
+        """ Lines in VCF to split in order to parallelize task. Use smaller for more intensive tasks """
+        return settings.VCF_IMPORT_FILE_SPLIT_ROWS
 
     @abstractmethod
     def get_create_data_from_vcf_header_task_class(self):
@@ -64,13 +70,15 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
     def get_preprocess_vcf_step_and_task(self, upload_pipeline, input_filename):
         preprocess_clazz = self._get_preprocess_class()
         class_name = full_class_name(preprocess_clazz)
+        split_file_rows = self.get_vcf_split_rows()
         preprocess_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
                                                     name=UploadStep.PREPROCESS_VCF_NAME,
                                                     sort_order=self.get_sort_order(),
                                                     task_type=UploadStepTaskType.CELERY,
                                                     pipeline_stage=VCFPipelineStage.INSERT_UNKNOWN_VARIANTS,
                                                     input_filename=input_filename,
-                                                    script=class_name)
+                                                    script=class_name,
+                                                    split_file_rows=split_file_rows)
         preprocess_task = preprocess_clazz.si(preprocess_step.pk, 0)
         return preprocess_step, preprocess_task
 

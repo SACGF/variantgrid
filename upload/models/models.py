@@ -305,6 +305,7 @@ class UploadStep(models.Model):
     origin = models.CharField(max_length=1, choices=UploadStepOrigin.choices, default=UploadStepOrigin.IMPORT_TASK_FACTORY)
     items_to_process = models.IntegerField(null=True)
     items_processed = models.IntegerField(null=True)
+    split_file_rows = models.IntegerField(null=True)
     error_message = models.TextField()
     input_upload_step = models.ForeignKey("self", null=True, on_delete=CASCADE)
     input_filename = models.TextField()

@@ -210,6 +210,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
                 variant_hgvs.append(hgvs_matcher.variant_to_g_hgvs(v))
             else:
                 skip_variant_ids_without_alleles.append(variant_id)
+        else:
             num_existing_records += 1
 
     num_no_record = len(variant_ids_without_alleles)

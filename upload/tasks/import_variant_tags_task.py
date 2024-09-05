@@ -11,7 +11,6 @@ from library.genomics.vcf_utils import write_vcf_from_variant_coordinates
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.pandas_utils import df_nan_to_none
 from library.utils import invert_dict
-from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import GenomeBuild, Variant, ImportSource, Tag, VariantAllele, VariantCoordinate, Allele
 from upload.models import UploadedVariantTags, UploadStep, ModifiedImportedVariant, SimpleVCFImportInfo
@@ -170,14 +169,19 @@ class VariantTagsInsertTask(ImportVCFStepTask):
             last_variant = variant
             last_variant_string = ivt.variant_string
 
-        # Now we need to create the alleles
+        logging.info("Loaded variants")
+        # The Alleles would have been made in BulkClinGenAlleleVCFProcessor
         variants = set(ivt_variants.values())
-        populate_clingen_alleles_for_variants(genome_build, variants)
+        # populate_clingen_alleles_for_variants(genome_build, variants)
 
         va_qs = VariantAllele.objects.filter(variant__in=variants, genome_build=genome_build)
         allele_id_by_variant_id = dict(va_qs.values_list("variant_id", "allele_id"))
+        logging.info("Loaded Alleles")
 
-        for ivt, variant in ivt_variants.items():
+        for i, (ivt, variant) in enumerate(ivt_variants.items()):
+            if i and i % 1000:
+                logging.info("Processed %d Imported Variant Tags", i)
+
             tag = tag_cache.get(ivt.tag_string)
             if tag is None:
                 tag, _ = Tag.objects.get_or_create(pk=ivt.tag_string)

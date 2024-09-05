@@ -23,7 +23,7 @@ from upload.tasks.vcf.genotype_vcf_tasks import VCFCheckAnnotationTask, ProcessG
     ImportCreateVCFModelForGenotypeVCFTask, SomalierVCFTask
 from upload.tasks.vcf.import_vcf_tasks import ProcessVCFSetMaxVariantTask, \
     ImportCreateUploadedVCFTask, ProcessVCFLinkAllelesSetMaxVariantTask, LiftoverCompleteTask, LiftoverCreateVCFTask, \
-    PreprocessAndAnnotateVCFTask
+    PreprocessAndAnnotateVCFTask, ProcessVCFClinGenAlleleTask
 
 
 class BedImportTaskFactory(ImportTaskFactory):
@@ -264,6 +264,13 @@ class VariantTagsImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
                                                 input_filename=variant_tags_filename,
                                                 output_filename=vcf_filename)
         return VariantTagsCreateVCFTask.si(upload_step.pk, 0)
+
+    def get_vcf_split_rows(self) -> int:
+        # We want to insert ClinGenAlleles so
+        return 10000
+
+    def get_known_variants_parallel_vcf_processing_task_class(self):
+        return ProcessVCFClinGenAlleleTask
 
     def get_post_data_insertion_classes(self):
         post_data_insertion_classes = super().get_post_data_insertion_classes()
