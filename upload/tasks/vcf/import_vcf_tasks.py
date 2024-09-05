@@ -1,4 +1,6 @@
+import abc
 import logging
+from abc import abstractmethod
 
 import celery
 from django.contrib.auth.models import User
@@ -13,6 +15,7 @@ from upload.models import UploadStep, UploadedVCF, ModifiedImportedVariants
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_vcf_file
 from upload.vcf.bulk_allele_linking_vcf_processor import BulkAlleleLinkingVCFProcessor, FailedLiftoverVCFProcessor
+from upload.vcf.bulk_clingen_allele_vcf_processor import BulkClinGenAlleleVCFProcessor
 from upload.vcf.bulk_minimal_vcf_processor import BulkMinimalVCFProcessor
 from upload.vcf.vcf_import import import_vcf_file
 from upload.vcf.vcf_preprocess import preprocess_vcf
@@ -90,15 +93,25 @@ class ImportCreateUploadedVCFTask(ImportVCFStepTask):
         return 0
 
 
-class ProcessVCFSetMaxVariantTask(ImportVCFStepTask):
-    """ Finds highest variant_id in VCF so we can tell whether we're done annotating or not
-        Can run in parallel on split VCFs """
+class AbstractProcessVCFTask(abc.ABC, ImportVCFStepTask):
+    @abstractmethod
+    def _get_vcf_processor(self, upload_step, preprocess_vcf_import_info):
+        pass
 
     def process_items(self, upload_step):
         preprocess_vcf_import_info = ModifiedImportedVariants.get_for_pipeline(upload_step.upload_pipeline)
-        bulk_inserter = BulkMinimalVCFProcessor(upload_step, preprocess_vcf_import_info)
+        bulk_inserter = self._get_vcf_processor(upload_step, preprocess_vcf_import_info)
         items_processed = import_vcf_file(upload_step, bulk_inserter)
         return items_processed
+
+
+
+class ProcessVCFSetMaxVariantTask(AbstractProcessVCFTask):
+    """ Finds highest variant_id in VCF so we can tell whether we're done annotating or not
+        Can run in parallel on split VCFs """
+
+    def _get_vcf_processor(self, upload_step, preprocess_vcf_import_info):
+        return BulkMinimalVCFProcessor(upload_step, preprocess_vcf_import_info)
 
 
 class ProcessVCFLinkAllelesSetMaxVariantTask(ImportVCFStepTask):
@@ -106,11 +119,16 @@ class ProcessVCFLinkAllelesSetMaxVariantTask(ImportVCFStepTask):
         Finds highest variant_id in VCF so we can tell whether we're done annotating or not
         Can run in parallel on split VCFs """
 
-    def process_items(self, upload_step):
-        preprocess_vcf_import_info = ModifiedImportedVariants.get_for_pipeline(upload_step.upload_pipeline)
-        bulk_inserter = BulkAlleleLinkingVCFProcessor(upload_step, preprocess_vcf_import_info)
-        items_processed = import_vcf_file(upload_step, bulk_inserter)
-        return items_processed
+    def _get_vcf_processor(self, upload_step, preprocess_vcf_import_info):
+        return BulkAlleleLinkingVCFProcessor(upload_step, preprocess_vcf_import_info)
+
+
+class ProcessVCFClinGenAlleleTask(AbstractProcessVCFTask):
+    """ Gets ClinGenAlleles for variants """
+
+    def _get_vcf_processor(self, upload_step, preprocess_vcf_import_info):
+        return BulkClinGenAlleleVCFProcessor(upload_step, preprocess_vcf_import_info)
+
 
 
 class DoNothingVCFTask(ImportVCFStepTask):
@@ -177,6 +195,7 @@ UploadPipelineFinishedTask = app.register_task(UploadPipelineFinishedTask())
 ImportCreateUploadedVCFTask = app.register_task(ImportCreateUploadedVCFTask())
 ProcessVCFSetMaxVariantTask = app.register_task(ProcessVCFSetMaxVariantTask())
 ProcessVCFLinkAllelesSetMaxVariantTask = app.register_task(ProcessVCFLinkAllelesSetMaxVariantTask())
+ProcessVCFClinGenAlleleTask = app.register_task(ProcessVCFClinGenAlleleTask())
 DoNothingVCFTask = app.register_task(DoNothingVCFTask())
 LiftoverCreateVCFTask = app.register_task(LiftoverCreateVCFTask())
 LiftoverProcessFailureVCFTask = app.register_task(LiftoverProcessFailureVCFTask())

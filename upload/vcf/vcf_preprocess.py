@@ -126,9 +126,10 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     norm_substep_names = [UploadStep.NORMALIZE_SUB_STEP]
 
     # Split up the VCF
+    split_file_rows = upload_step.split_file_rows or settings.VCF_IMPORT_FILE_SPLIT_ROWS
     split_vcf_dir = upload_pipeline.get_pipeline_processing_subdir("split_vcf")
     pipe_commands[SPLIT_VCF_SUB_STEP] = ["split", "-", vcf_name, "--additional-suffix=.vcf.gz", "--numeric-suffixes",
-                                         "--lines", str(settings.VCF_IMPORT_FILE_SPLIT_ROWS),
+                                         "--lines", str(split_file_rows),
                                          f"--filter='sh -c \"{{ cat {cleaned_vcf_header_filename}; cat; }} | bgzip -c > {split_vcf_dir}/$FILE\"'"]
 
     for sub_step_name in norm_substep_names:

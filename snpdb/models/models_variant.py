@@ -587,11 +587,15 @@ class Variant(PreviewModelMixin, models.Model):
             return None
 
     @staticmethod
-    def get_from_variant_coordinate(variant_coordinate: VariantCoordinate, genome_build: GenomeBuild) -> 'Variant':
+    def qs_from_variant_coordinate(variant_coordinate: VariantCoordinate, genome_build: GenomeBuild) -> QuerySet['Variant']:
         variant_coordinate = variant_coordinate.as_internal_symbolic(genome_build)
         params = ["locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq", "svlen"]
-        return Variant.objects.get(locus__contig__genomebuildcontig__genome_build=genome_build,
-                                   **dict(zip(params, variant_coordinate)))
+        return Variant.objects.filter(locus__contig__genomebuildcontig__genome_build=genome_build,
+                                      **dict(zip(params, variant_coordinate)))
+
+    @staticmethod
+    def get_from_variant_coordinate(variant_coordinate: VariantCoordinate, genome_build: GenomeBuild) -> 'Variant':
+        return Variant.qs_from_variant_coordinate(variant_coordinate, genome_build).get()
 
     @cached_property
     def genome_builds(self) -> set['GenomeBuild']:
