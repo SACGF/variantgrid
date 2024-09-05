@@ -99,6 +99,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(_fix_issue_1010, reverse_code=lambda apps, schema_editor: None),
+        migrations.RunPython(_fix_issue_1010, reverse_code=migrations.RunPython.noop),
         migrations.RunPython(_new_gnomad_sv_columns, reverse_code=_reverse_new_gnomad_sv_columns),
     ]

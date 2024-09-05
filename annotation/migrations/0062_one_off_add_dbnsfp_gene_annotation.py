@@ -38,5 +38,5 @@ class Migration(migrations.Migration):
         # Only need this if using gene annotation
         ManualOperation(task_id=ManualOperation.task_id_manage(["gene_annotation", "--add-dbnsfp-gene"]),
                         test=_test_needs_gene_annotation_update),
-        migrations.RunPython(_one_off_remove_loftool_vep, reverse_code=lambda apps, schema_editor: None),
+        migrations.RunPython(_one_off_remove_loftool_vep, reverse_code=migrations.RunPython.noop),
     ]
