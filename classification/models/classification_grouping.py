@@ -56,23 +56,44 @@ def classification_sort_order(clin_sig: str) -> int:
 
 
 class OverlapStatus(IntegerChoices):
-    NO_OVERLAP = 0, "No Overlap"
-    NOT_COMPARABLE_OVERLAP = 10, "Not Comparable"
-    AGREEMENT = 20, "Agreement"
-    CONFIDENCE = 30, "Confidence"
-    BENIGN_DISCORDANCE = 40, "Benign Discordance"
-    PATHOGENIC_DISCORDANCE = 50, "Pathogenic Discordance"
+    NO_SHARED_RECORDS = 0, "No Shared Records"
+    SINGLE_SUBMITTER = 10, "Single Shared Submitter"
+    NOT_COMPARABLE_OVERLAP = 20, "Multiple Submitters"  # e.g. no method to work out discordance
+    AGREEMENT = 30, "Agreement"
+    CONFIDENCE = 40, "Confidence"
+    BENIGN_DISCORDANCE = 50, "Benign Discordance"
+    PATHOGENIC_DISCORDANCE = 60, "Pathogenic Discordance"
 
 
 class AlleleGrouping(TimeStampedModel):
-    allele = models.ForeignKey(Allele, on_delete=models.CASCADE)
+    allele = models.OneToOneField(Allele, on_delete=models.CASCADE)
+    # TODO probably some more summary fields ew could have here?
+    # otherwise what is this serving that Allele isn't?
+
+    @cached_property
+    def allele_origin_dict(self) -> dict[AlleleOriginBucket, 'AlleleOriginGrouping']:
+        by_bucket = {}
+        for ao in AlleleOriginGrouping.objects.filter(allele_grouping=self).prefetch_related("classificationgrouping_set"):
+            by_bucket[ao.allele_origin_bucket] = ao
+        return by_bucket
+
+    def allele_origin_grouping(self, allele_origin_bucket: AlleleOriginBucket) -> Optional['AlleleOriginGrouping']:
+        return self.allele_origin_dict.get(allele_origin_bucket)
+
+
+class AlleleOriginGrouping(TimeStampedModel):
+    allele_grouping = models.ForeignKey(AlleleGrouping, on_delete=models.CASCADE)
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices)
-    overlap_status = models.IntegerField(choices=OverlapStatus.choices, default=OverlapStatus.NO_OVERLAP)
+
+    class Meta:
+        unique_together = ("allele_grouping", "allele_origin_bucket")
+
+    overlap_status = models.IntegerField(choices=OverlapStatus.choices, default=OverlapStatus.NO_SHARED_RECORDS)
     dirty = models.BooleanField(default=True)
     classification_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
 
     def update(self):
-        # not sure if this is the best solution, or if an AlleleGrouping should just refuse to update if attached allele groupings are dirty
+        # not sure if this is the best solution, or if an AlleleOriginGrouping should just refuse to update if attached allele groupings are dirty
         all_classification_values = set()
         classification_groupings: list[ClassificationGrouping] = list(self.classificationgrouping_set.all())
         for cg in classification_groupings:
@@ -85,9 +106,13 @@ class AlleleGrouping(TimeStampedModel):
         self.classification_values = list(all_classification_values)
 
         overlap_status: OverlapStatus
-        if len(shared_groupings) <= 1:
-            overlap_status = OverlapStatus.NO_OVERLAP
-        elif self.allele_origin_bucket == AlleleOriginBucket.GERMLINE:
+        if len(shared_groupings) == 0:
+            overlap_status = OverlapStatus.NO_SHARED_RECORDS
+        elif len(shared_groupings) == 1:
+            overlap_status = OverlapStatus.SINGLE_SUBMITTER
+        elif self.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
+            overlap_status = OverlapStatus.NOT_COMPARABLE_OVERLAP
+        else:
             bucket_mapping = EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
             buckets = {bucket_mapping.get(class_value) for class_value in self.classification_values}
             if None in buckets:
@@ -105,9 +130,6 @@ class AlleleGrouping(TimeStampedModel):
                 else:
                     # complete agreement
                     overlap_status = OverlapStatus.AGREEMENT
-        else:
-            # SOMATIC / UNKNOWN
-            overlap_status = OverlapStatus.NOT_COMPARABLE_OVERLAP
 
         self.overlap_status = overlap_status
         self.dirty = False
@@ -118,7 +140,7 @@ class AlleleGrouping(TimeStampedModel):
 
 class ClassificationGrouping(TimeStampedModel):
     # key
-    allele_grouping = models.ForeignKey(AlleleGrouping, on_delete=models.CASCADE)
+    allele_origin_grouping = models.ForeignKey(AlleleOriginGrouping, on_delete=models.CASCADE)
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices)
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices())
@@ -171,12 +193,13 @@ class ClassificationGrouping(TimeStampedModel):
         lab = classification.lab
         share_level = classification.share_level
         if allele:
-            allele_grouping, _ = AlleleGrouping.objects.get_or_create(allele=allele, allele_origin_bucket=classification.allele_origin_bucket)
-            allele_grouping.dirty = True
-            allele_grouping.save(update_fields=["dirty"])
+            allele_grouping, _ = AlleleGrouping.objects.get_or_create(allele=allele)
+            allele_origin_grouping, _ = AlleleOriginGrouping.objects.get_or_create(allele_grouping=allele_grouping, allele_origin_bucket=classification.allele_origin_bucket)
+            allele_origin_grouping.dirty = True
+            allele_origin_grouping.save(update_fields=["dirty"])
 
             grouping, _ = ClassificationGrouping.objects.get_or_create(
-                allele_grouping=allele_grouping,
+                allele_origin_grouping=allele_origin_grouping,
                 lab=lab,
                 allele_origin_bucket=classification.allele_origin_bucket,
                 share_level=share_level
@@ -240,8 +263,8 @@ class ClassificationGrouping(TimeStampedModel):
     @transaction.atomic
     def update(self):
 
-        self.allele_grouping.dirty = True
-        self.allele_grouping.save(update_fields=["dirty"])
+        self.allele_origin_grouping.dirty = True
+        self.allele_origin_grouping.save(update_fields=["dirty"])
 
         # UPDATE GENE SYMBOLS
         self._update_gene_symbols()
@@ -395,7 +418,7 @@ class ClassificationGrouping(TimeStampedModel):
 
     @cached_property
     def allele(self) -> Allele:
-        return self.allele_grouping.allele
+        return self.allele_origin_grouping.allele
 
     @cached_property
     def classification_modifications(self) -> list[ClassificationModification]:
@@ -416,7 +439,7 @@ class ClassificationGrouping(TimeStampedModel):
     def update_all_dirty():
         for dirty in ClassificationGrouping.objects.filter(dirty=True).iterator():
             dirty.update()
-        for dirty in AlleleGrouping.objects.filter(dirty=True).iterator():
+        for dirty in AlleleOriginGrouping.objects.filter(dirty=True).iterator():
             dirty.update()
 
 
@@ -450,8 +473,8 @@ class ClassificationGroupingEntry(TimeStampedModel):
     def dirty_up(self):
         self.grouping.dirty = True
         self.grouping.save(update_fields=["dirty"])
-        self.grouping.allele_grouping.dirty = True
-        self.grouping.allele_grouping.save(update_fields=["dirty"])
+        self.grouping.allele_origin_grouping.dirty = True
+        self.grouping.allele_origin_grouping.save(update_fields=["dirty"])
 
     def __str__(self):
         return f"Grouping {self.grouping} : Classification {self.classification}"

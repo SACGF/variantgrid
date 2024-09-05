@@ -49,7 +49,10 @@ urlpatterns = [
     path('activity/report/<int:discordance_report_id>', views.activity, name='activity_discordance'),
     path('classifications', views.classifications, name='classifications'),
     path('groups', views.classification_groupings, name='classification_groups'),
+    path('groups/<classification_grouping_id>', views.view_classification_grouping_detail, name='classification_grouping_detail'),
     path('allele_groups', views.allele_groupings, name='allele_groups'),
+    path('allele_groups/<allele_grouping_id>', views.view_allele_grouping_detail, name='allele_grouping_detail'),
+
     path('create_for_variant/<int:variant_id>/<genome_build_name>', views.CreateClassificationForVariantView.as_view(),
          name='create_classification_for_variant'),
 
@@ -112,7 +115,6 @@ urlpatterns = [
     path('classification/<classification_id>/history', views.classification_history, name='classification_history'),
     # classification ID might have a version in it (e.g. a dot)
     path('classification/<classification_id>', views.view_classification, name='view_classification'),
-    path('classification/grouping/<classification_grouping_id>', views.view_classification_grouping_detail, name='classification_grouping_detail'),
 
     path('evidence_keys/<max_share_level>', views.evidence_keys, name='evidence_keys_max_share_level'),
     path('evidence_keys', views.evidence_keys, name='evidence_keys'),

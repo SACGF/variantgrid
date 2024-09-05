@@ -19,7 +19,7 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
     DiscordanceReportTriageStatus, ClassificationGrouping, ClassificationGroupingEntry, \
-    ClassificationGroupingGeneSymbol, ClassificationGroupingCondition, AlleleGrouping
+    ClassificationGroupingGeneSymbol, ClassificationGroupingCondition, AlleleOriginGrouping
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -1353,6 +1353,6 @@ class ClassificationGroupingAdmin(ModelAdminBasics):
         ClassificationGrouping.update_all_dirty()
 
 
-@admin.register(AlleleGrouping)
+@admin.register(AlleleOriginGrouping)
 class AlleleGroupingAdmin(ModelAdminBasics):
-    list_display = ("allele", "overlap_status", "classification_values", "dirty")
+    list_display = ("allele_grouping", "overlap_status", "classification_values", "dirty")

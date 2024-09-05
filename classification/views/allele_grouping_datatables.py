@@ -2,20 +2,21 @@ import json
 from functools import cached_property
 from typing import Any
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, OuterRef, Subquery
 from django.http import HttpRequest
 
-from classification.models import AlleleGrouping, ClassificationGrouping, OverlapStatus
+from classification.enums import AlleleOriginBucket
+from classification.models import AlleleOriginGrouping, ClassificationGrouping, OverlapStatus, AlleleGrouping
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.utils import JsonDataType
-from snpdb.models import GenomeBuild, UserSettings
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData
+from snpdb.models import GenomeBuild, UserSettings, Lab
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData, SortOrder
 
 
 @timed_cache(size_limit=1, ttl=60)
-def _classification_groups_for_allele_group(allele_group_id: int) -> list[ClassificationGrouping]:
-    return list(ClassificationGrouping.objects.filter(allele_grouping__pk=allele_group_id))
+def _allele_group(allele_id: int) -> AlleleGrouping:
+    return AlleleGrouping.objects.get(allele=allele_id)
 
 
 class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
@@ -27,7 +28,29 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
 
     def get_initial_queryset(self) -> QuerySet[AlleleGrouping]:
         # TODO, consider making the groups GuardianPermission rather than this manual security check
-        return AlleleGrouping.objects.all()
+        qs = AlleleGrouping.objects.all()
+
+        germline_subquery = AlleleOriginGrouping.objects.filter(
+            allele_grouping=OuterRef('pk'),
+            allele_origin_bucket=AlleleOriginBucket.GERMLINE
+        ).values_list("overlap_status", flat=True)
+        somatic_subquery = AlleleOriginGrouping.objects.filter(
+            allele_grouping=OuterRef('pk'),
+            allele_origin_bucket=AlleleOriginBucket.SOMATIC
+        ).values_list("overlap_status", flat=True)
+
+        qs = qs.annotate(germline_overlap_status=Subquery(germline_subquery))
+        qs = qs.annotate(somatic_overlap_status=Subquery(somatic_subquery))
+        return qs
+
+    def render_labs(self, row: CellData) -> set[Lab]:
+        ag = _allele_group(row.get("allele"))
+        labs: set[Lab] = set()
+        for ag in ag.allele_origin_dict.values():
+            for cg in ag.classificationgrouping_set.all():
+                labs.add(cg.lab)
+        labs_list = list(sorted(labs))
+        return "".join("<div>" + str(lab) +"</div>" for lab in labs_list)
 
     def c_hgvs_for(self, cg: ClassificationGrouping) -> CHGVS:
         is_preferred_genome_build = True
@@ -44,7 +67,8 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
         return c_hgvs
 
     def render_allele(self, row: CellData) -> JsonDataType:
-        cgs = _classification_groups_for_allele_group(row.get("id"))
+        allele_group = _allele_group(row.get("allele"))
+        cgs = ClassificationGrouping.objects.filter(allele_origin_grouping__allele_grouping=allele_group.pk)
         all_chgvs = list(sorted({self.c_hgvs_for(cg) for cg in cgs}))
         c_hgvs_json: JsonDataType
         if all_chgvs:
@@ -55,20 +79,35 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
         return c_hgvs_json
         # format_hgvs
 
-    def render_overlap_status(self, row: CellData) -> JsonDataType:
-        overlap_status = OverlapStatus(row["overlap_status"])
-        return overlap_status.label
+    def _render_bucket_status(self, row: CellData, bucket: AlleleOriginBucket) -> JsonDataType:
+        aog = _allele_group(row.get("allele"))
+        if germline := aog.allele_origin_grouping(bucket):
+            return OverlapStatus(germline.overlap_status).label
+        else:
+            # FIXME make No shared records status
+            return OverlapStatus.NO_SHARED_RECORDS.label
 
-    def render_details(self, row: CellData) -> JsonDataType:
-        cgs = _classification_groups_for_allele_group(row.get("id"))
-        return json.dumps([cg.to_json() for cg in cgs])
+    def render_germline_status(self, row: CellData) -> JsonDataType:
+        return self._render_bucket_status(row, AlleleOriginBucket.GERMLINE)
 
+    def render_somatic_status(self, row: CellData) -> JsonDataType:
+        return self._render_bucket_status(row, AlleleOriginBucket.SOMATIC)
+
+    # def render_details(self, row: CellData) -> JsonDataType:
+    #     cgs = _allele_group(row.get("id"))
+    #     return json.dumps([cg.to_json() for cg in cgs])
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
 
+        self.expand_client_renderer = DatatableConfig._row_expand_ajax('allele_grouping_detail',
+                                                                       expected_height=108)
+
         self.rich_columns = [
-            RichColumn(key="allele", extra_columns=["id"], renderer=self.render_allele, client_renderer='VCTable.hgvs'),
-            RichColumn(key="overlap_status", renderer=self.render_overlap_status, orderable=True),
-            RichColumn(name="details", label="Details", extra_columns=["id"], renderer=self.render_details),
+            RichColumn(key="allele", renderer=self.render_allele, client_renderer='VCTable.hgvs'),
+            RichColumn(name="germline_overlap", renderer=self.render_germline_status, order_sequence=[SortOrder.DESC, SortOrder.ASC], default_sort=SortOrder.DESC, sort_keys=["germline_overlap_status"], extra_columns=["allele"]),
+            RichColumn(name="somatic_overlap", renderer=self.render_somatic_status, order_sequence=[SortOrder.DESC, SortOrder.ASC], sort_keys=["somatic_overlap_status"], extra_columns=["allele"]),
+            RichColumn(name="labs", renderer=self.render_labs, extra_columns=["allele"]),
+            RichColumn(key="id", visible=False)
+            # RichColumn(name="details", label="Details", extra_columns=["allele"], renderer=self.render_details),
         ]
