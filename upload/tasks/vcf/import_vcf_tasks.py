@@ -114,7 +114,7 @@ class ProcessVCFSetMaxVariantTask(AbstractProcessVCFTask):
         return BulkMinimalVCFProcessor(upload_step, preprocess_vcf_import_info)
 
 
-class ProcessVCFLinkAllelesSetMaxVariantTask(ImportVCFStepTask):
+class ProcessVCFLinkAllelesSetMaxVariantTask(AbstractProcessVCFTask):
     """ Link Alleles provided as the ID column in VCF
         Finds highest variant_id in VCF so we can tell whether we're done annotating or not
         Can run in parallel on split VCFs """

@@ -141,7 +141,7 @@ def _get_build_liftover_dicts(alleles: Iterable[Allele], inserted_genome_build: 
         existing_builds = allele_builds[allele.pk]
         for genome_build in other_builds:
             if genome_build.pk in existing_builds:
-                logging.info("%s already lifted over to %s", allele, genome_build)
+                # logging.info("%s already lifted over to %s", allele, genome_build)
                 continue
 
             # Now try different liftover methods (same contig, using dest build coords, using other builds and tool)
