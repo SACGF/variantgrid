@@ -1,4 +1,5 @@
 import logging
+import time
 from collections import defaultdict
 
 import pandas as pd
@@ -12,7 +13,8 @@ from library.guardian_utils import assign_permission_to_user_and_groups
 from library.pandas_utils import df_nan_to_none
 from library.utils import invert_dict
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import GenomeBuild, Variant, ImportSource, Tag, VariantAllele, VariantCoordinate, Allele
+from snpdb.models import GenomeBuild, ImportSource, Tag, VariantAllele, VariantCoordinate, Allele
+from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import UploadedVariantTags, UploadStep, ModifiedImportedVariant, SimpleVCFImportInfo
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
@@ -138,50 +140,47 @@ class VariantTagsInsertTask(ImportVCFStepTask):
         logging.info("_create_tags_from_variant_tags_import: %s!!", variant_tags_import)
 
         genome_build = variant_tags_import.genome_build
+        variant_pk_lookup = VariantPKLookup(genome_build)
 
         tag_cache = {}
         user_matcher = UserMatcher(default_user=variant_tags_import.user)
         variant_tags = []
         created_date = []
-        ivt_variants = {}
+        ivt_variant_hashes = {}
         vts_qs = variant_tags_import.importedvarianttag_set.all()
-        # We often have a lot of tags per variant - so do in order, then can re-use lookup code
-        last_variant = None
-        last_variant_string = None
-        for ivt in vts_qs.order_by("variant_string"):
-            if ivt.variant_string == last_variant_string:
-                variant = last_variant
-            else:
+        for i, ivt in enumerate(vts_qs.order_by("variant_string")):
+            variant_coordinate = VariantCoordinate.from_string(ivt.variant_string)
+            ivt_variant_hashes[ivt] = variant_pk_lookup.get_variant_coordinate_hash(variant_coordinate)
+
+        # Retrieve them all. Some may be None as they were modified/normalized
+        variant_hashes = list(set(ivt_variant_hashes.values()))
+        variant_ids_inc_null = variant_pk_lookup.get_variant_ids(variant_hashes, validate_not_null=False)
+        variant_ids_by_hash = dict(zip(variant_hashes, variant_ids_inc_null))
+
+        ivt_variants = {}
+        for ivt, variant_hash in ivt_variant_hashes.items():
+            variant_id = variant_ids_by_hash.get(variant_hash)
+            if variant_id is None:
                 variant_coordinate = VariantCoordinate.from_string(ivt.variant_string)
                 try:
-                    variant = Variant.get_from_variant_coordinate(variant_coordinate, genome_build)
-                except Variant.DoesNotExist:
-                    # Must have been normalized
-                    try:
-                        variant = ModifiedImportedVariant.get_variant_for_unnormalized_variant(upload_step.upload_pipeline,
-                                                                                               variant_coordinate)
-                    except ModifiedImportedVariant.DoesNotExist as mvi:
-                        msg = f"Could not find tag variant '{ivt.variant_string}' as Variant or ModifiedImportedVariant"
-                        raise ValueError(msg) from mvi
-
-            ivt_variants[ivt] = variant
-
-            last_variant = variant
-            last_variant_string = ivt.variant_string
+                    variant = ModifiedImportedVariant.get_variant_for_unnormalized_variant(upload_step.upload_pipeline,
+                                                                                           variant_coordinate)
+                except ModifiedImportedVariant.DoesNotExist as mvi:
+                    msg = f"Could not find tag variant '{ivt.variant_string}' as Variant or ModifiedImportedVariant"
+                    raise ValueError(msg) from mvi
+                variant_id = variant.pk
+            ivt_variants[ivt] = variant_id
 
         logging.info("Loaded variants")
         # The Alleles would have been made in BulkClinGenAlleleVCFProcessor
-        variants = set(ivt_variants.values())
+        variant_ids = set(ivt_variants.values())
         # populate_clingen_alleles_for_variants(genome_build, variants)
 
-        va_qs = VariantAllele.objects.filter(variant__in=variants, genome_build=genome_build)
+        va_qs = VariantAllele.objects.filter(variant__in=variant_ids, genome_build=genome_build)
         allele_id_by_variant_id = dict(va_qs.values_list("variant_id", "allele_id"))
         logging.info("Loaded Alleles")
 
-        for i, (ivt, variant) in enumerate(ivt_variants.items()):
-            if i and i % 1000:
-                logging.info("Processed %d Imported Variant Tags", i)
-
+        for ivt, variant_id in ivt_variants.items():
             tag = tag_cache.get(ivt.tag_string)
             if tag is None:
                 tag, _ = Tag.objects.get_or_create(pk=ivt.tag_string)
@@ -190,10 +189,10 @@ class VariantTagsInsertTask(ImportVCFStepTask):
             # We're not going to link analysis/nodes - as probably don't match up across systems
             analysis = None
             node = None
-            allele_id = allele_id_by_variant_id.get(variant.pk)
+            allele_id = allele_id_by_variant_id.get(variant_id)
 
             # TODO: We should also look at not creating dupes somehow??
-            vt = VariantTag(variant=variant,
+            vt = VariantTag(variant_id=variant_id,
                             allele_id=allele_id,
                             genome_build=genome_build,
                             tag=tag,
