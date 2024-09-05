@@ -23,5 +23,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(_one_off_set_cgc_common, reverse_code=lambda _, __: None),
+        migrations.RunPython(_one_off_set_cgc_common, reverse_code=migrations.RunPython.noop),
     ]

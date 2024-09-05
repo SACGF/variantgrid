@@ -159,5 +159,5 @@ class Migration(migrations.Migration):
                              reverse_code=_reverse_remove_new_vg_columns),
 
         migrations.RunPython(_custom_columns_for_new_vg_columns,
-                             reverse_code=lambda apps, schema_editor: None),
+                             reverse_code=migrations.RunPython.noop),
     ]
