@@ -1,6 +1,7 @@
 import json
 import mimetypes
 import re
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Any
 
@@ -37,7 +38,7 @@ from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel, Wit
 from classification.forms import ClassificationAlleleOriginForm
 from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
-    ConditionResolvedDict, DiscordanceReport, ClassificationGrouping, AlleleGrouping
+    ConditionResolvedDict, DiscordanceReport, ClassificationGrouping, AlleleGrouping, AlleleOriginGrouping
 from classification.models.classification import ClassificationModification
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
@@ -858,18 +859,30 @@ def view_classification_grouping_detail(request, classification_grouping_id: int
     })
 
 
+@dataclass(frozen=True)
+class AlleleOriginGroupingVisible:
+    allele_origin_grouping: list[AlleleOriginGrouping]
+    classification_groupings: list[ClassificationGrouping]
+
+    @staticmethod
+    def from_grouping(allele_grouping: AlleleGrouping, user: User) -> list['AlleleOriginGroupingVisible']:
+        # FIXME add security checks to filter out
+        visible_groups: list[AlleleOriginGroupingVisible] = []
+        for bucket in [AlleleOriginBucket.GERMLINE, AlleleOriginBucket.SOMATIC, AlleleOriginBucket.UNKNOWN]:
+            if allele_origin_grouping := allele_grouping.allele_origin_dict.get(bucket):
+                visible_groups.append(
+                    AlleleOriginGroupingVisible(
+                        allele_origin_grouping=allele_origin_grouping,
+                        classification_groupings=list(sorted(allele_origin_grouping.classificationgrouping_set.all()))
+                    )
+                )
+        return visible_groups
+
+
 def view_allele_grouping_detail(request, allele_grouping_id: int):
     allele_grouping = AlleleGrouping.objects.get(pk=allele_grouping_id)
 
-    allele_origin_groupings = allele_grouping.allele_origin_dict
-    origin_groupings: list = list()
-    for bucket in [AlleleOriginBucket.GERMLINE, AlleleOriginBucket.SOMATIC, AlleleOriginBucket.UNKNOWN]:
-        if allele_origin_grouping := allele_origin_groupings.get(bucket):
-            origin_groupings.append(origin_groupigns)
-            # TODO see if user can see at least one group in this
-
-
-    # FIXME add security
     return render_ajax_view(request, 'classification/allele_grouping_detail.html', {
-        "allele_grouping": allele_grouping
+        "allele_grouping": allele_grouping,
+        "groupings": AlleleOriginGroupingVisible.from_grouping(allele_grouping=allele_grouping, user=request.user)
     })

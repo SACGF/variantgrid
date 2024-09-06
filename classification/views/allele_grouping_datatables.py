@@ -68,7 +68,8 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
 
     def render_allele(self, row: CellData) -> JsonDataType:
         allele_group = _allele_group(row.get("allele"))
-        cgs = ClassificationGrouping.objects.filter(allele_origin_grouping__allele_grouping=allele_group.pk)
+        # FIXME cache this
+        cgs = ClassificationGrouping.objects.filter(allele_origin_grouping__allele_grouping=allele_group.pk, dirty=False)
         all_chgvs = list(sorted({self.c_hgvs_for(cg) for cg in cgs}))
         c_hgvs_json: JsonDataType
         if all_chgvs:
@@ -82,10 +83,10 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
     def _render_bucket_status(self, row: CellData, bucket: AlleleOriginBucket) -> JsonDataType:
         aog = _allele_group(row.get("allele"))
         if germline := aog.allele_origin_grouping(bucket):
-            return OverlapStatus(germline.overlap_status).label
+            return OverlapStatus(germline.overlap_status)
         else:
             # FIXME make No shared records status
-            return OverlapStatus.NO_SHARED_RECORDS.label
+            return OverlapStatus.NO_SHARED_RECORDS
 
     def render_germline_status(self, row: CellData) -> JsonDataType:
         return self._render_bucket_status(row, AlleleOriginBucket.GERMLINE)
@@ -105,8 +106,8 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
 
         self.rich_columns = [
             RichColumn(key="allele", renderer=self.render_allele, client_renderer='VCTable.hgvs'),
-            RichColumn(name="germline_overlap", renderer=self.render_germline_status, order_sequence=[SortOrder.DESC, SortOrder.ASC], default_sort=SortOrder.DESC, sort_keys=["germline_overlap_status"], extra_columns=["allele"]),
-            RichColumn(name="somatic_overlap", renderer=self.render_somatic_status, order_sequence=[SortOrder.DESC, SortOrder.ASC], sort_keys=["somatic_overlap_status"], extra_columns=["allele"]),
+            RichColumn(name="germline_overlap", renderer=self.render_germline_status, client_renderer=RichColumn.choices_client_renderer(OverlapStatus.choices), order_sequence=[SortOrder.DESC, SortOrder.ASC], default_sort=SortOrder.DESC, sort_keys=["germline_overlap_status"], extra_columns=["allele"]),
+            RichColumn(name="somatic_overlap", renderer=self.render_somatic_status, client_renderer=RichColumn.choices_client_renderer(OverlapStatus.choices), order_sequence=[SortOrder.DESC, SortOrder.ASC], sort_keys=["somatic_overlap_status"], extra_columns=["allele"]),
             RichColumn(name="labs", renderer=self.render_labs, extra_columns=["allele"]),
             RichColumn(key="id", visible=False)
             # RichColumn(name="details", label="Details", extra_columns=["allele"], renderer=self.render_details),

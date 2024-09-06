@@ -2362,7 +2362,7 @@ VCTable.format_hgvs = (parts) => {
     }
     // also turn into a link
 
-    let outterDom = $('<div>');
+    let outterDom = $('<div>').css("display", "inline-block");
     let dom = $('<div>').appendTo(outterDom);
 
     if (allele) {

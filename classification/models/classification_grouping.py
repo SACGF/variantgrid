@@ -84,6 +84,9 @@ class AlleleGrouping(TimeStampedModel):
 class AlleleOriginGrouping(TimeStampedModel):
     allele_grouping = models.ForeignKey(AlleleGrouping, on_delete=models.CASCADE)
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices)
+    @property
+    def allele_origin_bucket_obj(self):
+        return AlleleOriginBucket(self.allele_origin_bucket)
 
     class Meta:
         unique_together = ("allele_grouping", "allele_origin_bucket")
@@ -179,6 +182,11 @@ class ClassificationGrouping(TimeStampedModel):
 
     somatic_clinical_significance_sort = models.IntegerField(db_index=True, null=True, blank=True)
     classification_sort_value = models.TextField(null=True, blank=True)
+
+    def __lt__(self, other):
+        def _sort_value(obj: ClassificationGrouping):
+            return obj.share_level_obj, obj.lab
+        return _sort_value(self) < _sort_value(other)
 
     def get_absolute_url(self):
         return reverse('classification_grouping_detail', kwargs={"classification_grouping_id": self.pk})

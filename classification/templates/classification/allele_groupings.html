@@ -9,9 +9,28 @@
 {% load classification_tags %}
 {% block title %}Classifications{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <style>
+        td.dt-germline_overlap .val-0, td.dt-somatic_overlap .val-0 {
+            color: #BBBBBB !important;
+            font-style: italic;
+        }
+        td.dt-germline_overlap .val-10, td.dt-somatic_overlap .val-10 {
+            color: #666;
+        }
+        td.dt-germline_overlap .val-50, td.dt-somatic_overlap .val-50 {
+            font-weight: bold;
+            color: #8888bb;
+        }
+        td.dt-germline_overlap .val-60, td.dt-somatic_overlap .val-60 {
+            font-weight: bold;
+            color: #bb8888;
+        }
+    </style>
+{% endblock %}
 {% block content %}
     <div id="classifications-page">
-        <div class="container-table">
+        <div class="container">
             <h3>Allele Groupings</h3>
 
             <div class="row">
