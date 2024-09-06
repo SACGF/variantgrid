@@ -271,20 +271,7 @@
                     </div>
                 </div>
             </div>
-
-            <div class="row">
-                <div class="col">
-                    <table id="vc-datatable" data-datatable-url="{% url 'classification_datatables' %}" data-datatable-data='classificationFilter' class="sticky-header classification-table"></table>
-                    <div>
-                    Download as
-                        <a class='hover-link download-link' href="javascript:downloadAs('csv')">CSV</a>
-                        {% if CLASSIFICATION_REDCAP_EXPORT %},
-                        <a class='hover-link download-link' href="javascript:downloadAs('redcap')">REDCap</a>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
+        
         </div>
     </div>
 {% endblock %}
