@@ -246,6 +246,9 @@ def create_classification_object(request) -> Classification:
     ensembl_transcript_accession = request.POST.get("ensembl_transcript_accession")
     sample_id = request.POST.get("sample_id")
     copy_from_id = request.POST.get("copy_from_vcm_id")
+    if copy_from_id:
+        copy_from_id = int(copy_from_id)
+
     evidence_json = request.POST.get("evidence_json")
 
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
