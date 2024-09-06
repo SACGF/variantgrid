@@ -1,2 +1,11 @@
+{% load ui_utils %}
 {% comment %}{% if dr.clinical_context.name != "default" %}{{ dr.clinical_context.name }}{% endif %} -- this is usually redundant {% endcomment %}
-<a href="{% url 'discordance_report' discordance_report.pk %}" class="hover-link">{% if discordance_report.status %}{% endif %}<strong>{{ discordance_report.status }}</strong></a>
+<span {% if not discordance_report.is_active %}style="opacity:0.5"{% endif %}>
+<i class="fa-solid fa-arrow-down-up-across-line preview-icon"></i>
+<a href="{% url 'discordance_report' discordance_report.pk %}" class="hover-link">DR_{{ discordance_report.pk }}</a>
+<strong>{{ discordance_report.status }}</strong>
+{% if discordance_report.resolution == "C" %}{{ 'S' | severity_icon }}
+{% elif discordance_report.resolution == "D" %}<i class="fa-solid fa-handshake-simple-slash"></i>
+{% elif discordance_report.is_pending_concordance %}<i class="fa-regular fa-clock"></i>
+{% endif %}
+</span>

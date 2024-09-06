@@ -4,7 +4,9 @@
     {% for grouping in groupings %}
         {% if not forloop.first %}<hr class="dashed"/>{% endif %}
         <div>
-            <h5>{{ grouping.allele_origin_grouping.allele_origin_bucket_obj.label }}</h5>
+            <div class="allele-origin-box horizontal allele-origin-{{ grouping.allele_origin_grouping.allele_origin_bucket }}">
+                <div class="allele-origin-text">{{ grouping.allele_origin_grouping.allele_origin_bucket_obj.label }}</div>
+            </div>
             {% for classification_grouping in grouping.classification_groupings %}
                 <div class="mt-2">
                 {% if classification_grouping.classification_count > 10 %}
@@ -22,6 +24,13 @@
                 {% endfor %}
                 </div>
             {% endfor %}
+            {% if grouping.discordance_reports %}
+                <div class="mt-4">
+                {% for dr in grouping.discordance_reports %}
+                    <div class="my-2">{% discordance_report dr %}</div>
+                {% endfor %}
+                </div>
+            {% endif %}
         </div>
     {% endfor %}
 </div>

@@ -41,6 +41,7 @@ from classification.models import ClassificationAttachment, Classification, \
     ConditionResolvedDict, DiscordanceReport, ClassificationGrouping, AlleleGrouping, AlleleOriginGrouping
 from classification.models.classification import ClassificationModification
 from classification.models.clinical_context_models import ClinicalContext
+from classification.models.discordance_models_utils import DiscordanceReportRowData
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from classification.views.classification_datatables import ClassificationColumns
@@ -58,6 +59,7 @@ from library.utils.django_utils import render_ajax_view
 from library.utils.file_utils import rm_if_exists
 from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm, LabMultiSelectForm
 from snpdb.genome_build_manager import GenomeBuildManager
+from snpdb.lab_picker import LabPickerData
 from snpdb.models import Variant, UserSettings, Sample, Lab, Allele
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.user_settings_manager import UserSettingsManager
@@ -863,17 +865,26 @@ def view_classification_grouping_detail(request, classification_grouping_id: int
 class AlleleOriginGroupingVisible:
     allele_origin_grouping: list[AlleleOriginGrouping]
     classification_groupings: list[ClassificationGrouping]
+    discordance_reports: list[DiscordanceReport]
 
     @staticmethod
     def from_grouping(allele_grouping: AlleleGrouping, user: User) -> list['AlleleOriginGroupingVisible']:
         # FIXME add security checks to filter out
+
         visible_groups: list[AlleleOriginGroupingVisible] = []
         for bucket in [AlleleOriginBucket.GERMLINE, AlleleOriginBucket.SOMATIC, AlleleOriginBucket.UNKNOWN]:
             if allele_origin_grouping := allele_grouping.allele_origin_dict.get(bucket):
+
+                discordance_reports = list(DiscordanceReport.objects.filter(
+                    clinical_context__in=ClinicalContext.objects.filter(allele=allele_grouping.allele,
+                                                                        allele_origin_bucket=bucket)
+                ).order_by('-report_started_date'))
+
                 visible_groups.append(
                     AlleleOriginGroupingVisible(
                         allele_origin_grouping=allele_origin_grouping,
-                        classification_groupings=list(sorted(allele_origin_grouping.classificationgrouping_set.all()))
+                        classification_groupings=list(sorted(allele_origin_grouping.classificationgrouping_set.all())),
+                        discordance_reports=discordance_reports
                     )
                 )
         return visible_groups
