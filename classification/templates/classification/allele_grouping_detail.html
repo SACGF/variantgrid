@@ -11,7 +11,7 @@
                 <div class="mt-2">
 
                 {% for sub in classification_grouping.sub_groupings %}
-                    {% classification_quick sub.latest_modification record_count=sub.count %}
+                    <div>{% classification_quick sub.latest_modification record_count=sub.count %}</div>
                 {% endfor %}
 
                 {% comment %}
