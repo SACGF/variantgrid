@@ -534,6 +534,33 @@ TableFormat.severeNumber = function(severity, data, type, columns) {
     }
 };
 
+TableFormat.combine = function(formatters, settings, data, type, columns) {
+    if (settings === null) {
+        settings = {};
+    }
+    let dom = $('<div>');
+    formatters.forEach((formatter, index) => {
+        let part;
+        if (settings.dataMode === "combined") {
+            part = eval(formatter)(data, type, columns);
+        } else {
+            part = eval(formatter)(data[index], type, columns);
+        }
+        if (settings.separator) {
+            dom.append($(separator));
+            dom.append(part);
+        } else {
+            dom.append($('<div>', {'html': part}));
+        }
+    });
+    return dom;
+};
+
+TableFormat.json = function(data, type, columns) {
+    // TODO format JSON
+    return JSON.stringify(data);
+}
+
 TableFormat.expandAjax = function(url_or_method, param, expectedHeight, data) {
     if (data) {
         let dataId = data[param];

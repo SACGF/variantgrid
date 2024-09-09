@@ -54,6 +54,11 @@ class RichColumn:
     """
 
     @staticmethod
+    def combine_client_renderers(formatters: list[str]) -> str:
+        json_str = json.dumps(formatters)
+        return f'TableFormat.combine.bind(null, {json_str}, null)'  # 2nd null is settings
+
+    @staticmethod
     def choices_client_renderer(choices):
         json_data = {}
         for choice in choices:

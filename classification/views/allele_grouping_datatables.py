@@ -1,12 +1,13 @@
 import json
 from functools import cached_property
-from typing import Any
+from typing import Any, Optional
 
 from django.db.models import QuerySet, OuterRef, Subquery
 from django.http import HttpRequest
 
 from classification.enums import AlleleOriginBucket
 from classification.models import AlleleOriginGrouping, ClassificationGrouping, OverlapStatus, AlleleGrouping
+from classification.templatetags.classification_tags import classification
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.utils import JsonDataType
@@ -89,10 +90,21 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
             return OverlapStatus.NO_SHARED_RECORDS
 
     def render_germline_status(self, row: CellData) -> JsonDataType:
-        return self._render_bucket_status(row, AlleleOriginBucket.GERMLINE)
+        germline_status = self._render_bucket_status(row, AlleleOriginBucket.GERMLINE)
+        aog = _allele_group(row.get("allele"))
+        classification_values: Optional[list[str]] = None
+        if germline := aog.allele_origin_grouping(AlleleOriginBucket.GERMLINE):
+            classification_values = germline.classification_values
+
+        return [germline_status, classification_values]
 
     def render_somatic_status(self, row: CellData) -> JsonDataType:
-        return self._render_bucket_status(row, AlleleOriginBucket.SOMATIC)
+        somatic_status = self._render_bucket_status(row, AlleleOriginBucket.SOMATIC)
+        aog = _allele_group(row.get("allele"))
+        classification_values: Optional[list[str]] = None
+        if somatic := aog.allele_origin_grouping(AlleleOriginBucket.SOMATIC):
+            classification_values = somatic.somatic_clinical_significance_values
+        return [somatic_status, classification_values]
 
     # def render_details(self, row: CellData) -> JsonDataType:
     #     cgs = _allele_group(row.get("id"))
@@ -106,8 +118,29 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
 
         self.rich_columns = [
             RichColumn(key="allele", renderer=self.render_allele, client_renderer='VCTable.hgvs'),
-            RichColumn(name="germline_overlap", renderer=self.render_germline_status, client_renderer=RichColumn.choices_client_renderer(OverlapStatus.choices), order_sequence=[SortOrder.DESC, SortOrder.ASC], default_sort=SortOrder.DESC, sort_keys=["germline_overlap_status"], extra_columns=["allele"]),
-            RichColumn(name="somatic_overlap", renderer=self.render_somatic_status, client_renderer=RichColumn.choices_client_renderer(OverlapStatus.choices), order_sequence=[SortOrder.DESC, SortOrder.ASC], sort_keys=["somatic_overlap_status"], extra_columns=["allele"]),
+            RichColumn(
+                name="germline_overlap",
+                renderer=self.render_germline_status,
+                client_renderer=RichColumn.combine_client_renderers([
+                    RichColumn.choices_client_renderer(OverlapStatus.choices),
+                    'VCTable.classification'
+                ]),
+                order_sequence=[SortOrder.DESC, SortOrder.ASC],
+                default_sort=SortOrder.DESC,
+                sort_keys=["germline_overlap_status"],
+                extra_columns=["allele"]
+            ),
+            RichColumn(
+                name="somatic_overlap",
+                renderer=self.render_somatic_status,
+                client_renderer=RichColumn.combine_client_renderers([
+                    RichColumn.choices_client_renderer(OverlapStatus.choices),
+                    'VCTable.somatic_clinical_significance'
+                ]),
+                order_sequence=[SortOrder.DESC, SortOrder.ASC],
+                sort_keys=["somatic_overlap_status"],
+                extra_columns=["allele"]
+            ),
             RichColumn(name="labs", renderer=self.render_labs, extra_columns=["allele"]),
             RichColumn(key="id", visible=False)
             # RichColumn(name="details", label="Details", extra_columns=["allele"], renderer=self.render_details),

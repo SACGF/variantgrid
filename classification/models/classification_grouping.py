@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Set
 
@@ -61,8 +62,8 @@ class OverlapStatus(IntegerChoices):
     NOT_COMPARABLE_OVERLAP = 20, "Multiple Submitters"  # e.g. no method to work out discordance
     AGREEMENT = 30, "Agreement"
     CONFIDENCE = 40, "Confidence"
-    BENIGN_DISCORDANCE = 50, "Benign Discordance"
-    PATHOGENIC_DISCORDANCE = 60, "Pathogenic Discordance"
+    DISCORDANCE = 50, "Discordance"
+    DISCORDANCE_MEDICALLY_SIGNIFICANT = 60, "Discordance"
 
 
 class AlleleGrouping(TimeStampedModel):
@@ -94,19 +95,28 @@ class AlleleOriginGrouping(TimeStampedModel):
     overlap_status = models.IntegerField(choices=OverlapStatus.choices, default=OverlapStatus.NO_SHARED_RECORDS)
     dirty = models.BooleanField(default=True)
     classification_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
+    somatic_clinical_significance_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
 
     def update(self):
         # not sure if this is the best solution, or if an AlleleOriginGrouping should just refuse to update if attached allele groupings are dirty
         all_classification_values = set()
+        all_somatic_clinical_significance_values = set()
         classification_groupings: list[ClassificationGrouping] = list(self.classificationgrouping_set.all())
         for cg in classification_groupings:
             if cg.dirty:
                 cg.update()
         shared_groupings = [cg for cg in classification_groupings if cg.share_level_obj.is_discordant_level]
         for cg in shared_groupings:
-            all_classification_values |= set(cg.classification_values)
+            if classification_values := cg.classification_values:
+                all_classification_values |= set(classification_values)
+            if somatic_values := cg.somatic_clinical_significance_values:
+                all_somatic_clinical_significance_values |= set(somatic_values)
 
-        self.classification_values = list(all_classification_values)
+        print(all_classification_values)
+        print(all_somatic_clinical_significance_values)
+
+        self.classification_values = list(EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).sort_values(all_classification_values))
+        self.somatic_clinical_significance_values = [sg.as_str for sg in sorted(SomaticClinicalSignificanceValue.from_str(sg) for sg in all_somatic_clinical_significance_values)]
 
         overlap_status: OverlapStatus
         if len(shared_groupings) == 0:
@@ -124,9 +134,9 @@ class AlleleOriginGrouping(TimeStampedModel):
             if len(buckets) > 1:
                 # discordant
                 if "P" in all_classification_values or "LP" in all_classification_values:
-                    overlap_status = OverlapStatus.PATHOGENIC_DISCORDANCE
+                    overlap_status = OverlapStatus.DISCORDANCE_MEDICALLY_SIGNIFICANT
                 else:
-                    overlap_status = OverlapStatus.BENIGN_DISCORDANCE
+                    overlap_status = OverlapStatus.DISCORDANCE
             else:
                 if len(all_classification_values) > 1:
                     overlap_status = OverlapStatus.CONFIDENCE
@@ -139,6 +149,26 @@ class AlleleOriginGrouping(TimeStampedModel):
         self.save()
 
         # TODO manage pending classifications
+
+
+@dataclass
+class ClassificationSubGrouping:
+    latest_modification: ClassificationModification
+    count: int
+
+    @staticmethod
+    def from_modifications(modifications: list[ClassificationModification]) -> list['ClassificationSubGrouping']:
+        # sub group by classification value for germline and
+        by_status: dict[str, ClassificationSubGrouping] = {}
+        for mod in modifications:
+            key = str(mod.somatic_clinical_significance_value) + str(mod.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
+            if existing := by_status.get(key):
+                existing.count += 1
+                existing.latest_modification = max(mod, existing.latest_modification, key=lambda m: (m.curated_date_check, m.pk))
+            else:
+                by_status[key] = ClassificationSubGrouping(latest_modification=mod, count=1)
+        # FIXME sort
+        return list(by_status.values())
 
 
 class ClassificationGrouping(TimeStampedModel):
@@ -155,6 +185,9 @@ class ClassificationGrouping(TimeStampedModel):
     classification_count = models.IntegerField(default=0)
 
     dirty = models.BooleanField(default=True)
+
+    def sub_groupings(self) -> list[ClassificationSubGrouping]:
+        return ClassificationSubGrouping.from_modifications(self.classification_modifications)
 
     # All values before need to be nullable as they wont be populated in the time between creating the ClassificationGrouping and updating it
     classification_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)  # values from EvidenceKey.CLINICAL_SIGNIFICANCE

@@ -226,7 +226,10 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     # ClinVarExport
     "clinvar_key_summary": True,
     "clinvar_match": True,
-    "vus": True
+    "vus": True,
+
+    # New Overlaps page
+    "allele_groups": True
 })
 
 PREFER_ALLELE_LINKS = True

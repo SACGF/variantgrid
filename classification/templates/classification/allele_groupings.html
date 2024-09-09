@@ -20,11 +20,18 @@
         }
         td.dt-germline_overlap .val-50, td.dt-somatic_overlap .val-50 {
             font-weight: bold;
-            color: #8888bb;
+            color: #bb8888;
         }
         td.dt-germline_overlap .val-60, td.dt-somatic_overlap .val-60 {
             font-weight: bold;
-            color: #bb8888;
+            color: #bb4444;
+        }
+        td.dt-germline_overlap .val-60::before, td.dt-somatic_overlap .val-60::before {
+            position: relative;
+            left: -4px;
+            content: '\f479';
+            font-family: 'Font Awesome 6 Free', 'FontAwesome';
+            font-weight: 900;
         }
     </style>
 {% endblock %}

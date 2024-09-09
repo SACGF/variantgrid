@@ -15,6 +15,9 @@
             {% else %}
                 {% clinical_significance vcm "somatic:clinical_significance" show_if_none=False %}
             {% endif %}
+            {% if record_count and record_count != 1 %}
+                x {{ record_count }}
+            {% endif %}
 
             <a class="hover-link" href="{% url 'view_classification' vcm.classification.id %}">
                 &nbsp;

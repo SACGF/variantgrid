@@ -79,10 +79,13 @@ class SomaticClinicalSignificanceValue:
         else:
             return self.tier_level
 
+    def __str__(self):
+        return self.as_str
+
     @staticmethod
     def from_str(value: str):
         parts = value.split("|")
-        if len(parts > 1):
+        if len(parts) > 1:
             return SomaticClinicalSignificanceValue(parts[0], parts[1])
         else:
             return SomaticClinicalSignificanceValue(parts[0])

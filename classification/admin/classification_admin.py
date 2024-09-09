@@ -1354,5 +1354,10 @@ class ClassificationGroupingAdmin(ModelAdminBasics):
 
 
 @admin.register(AlleleOriginGrouping)
-class AlleleGroupingAdmin(ModelAdminBasics):
-    list_display = ("allele_grouping", "overlap_status", "classification_values", "dirty")
+class AlleleOriginGroupingAdmin(ModelAdminBasics):
+    list_display = ("allele_grouping", "overlap_status", "classification_values", "somatic_clinical_significance_values", "dirty")
+
+    @admin_model_action(url_slug="refresh_all/", short_description="Refresh All", icon="fa-solid fa-arrows-rotate")
+    def refresh_all(self, request):
+        AlleleOriginGrouping.objects.update(dirty=True)
+        ClassificationGrouping.update_all_dirty()

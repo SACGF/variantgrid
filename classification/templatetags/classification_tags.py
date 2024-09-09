@@ -257,12 +257,12 @@ def clinical_context(context, cc: ClinicalContext, orientation: str = 'horizonta
 
 
 @register.inclusion_tag("classification/tags/classification_quick.html", takes_context=True)
-def classification_quick(context, vc: Union[Classification, ClassificationModification], show_clinical_grouping=True, mode: Optional[str] = "detailed", show_flags=False):
+def classification_quick(context, vc: Union[Classification, ClassificationModification], show_clinical_grouping=True, mode: Optional[str] = "detailed", show_flags=False, record_count: Optional[int] = None):
     user = context.request.user
     vcm = vc
     if isinstance(vc, Classification):
         vcm = ClassificationModification.latest_for_user(user=user, classification=vc, published=True, exclude_withdrawn=False).first()
-    return {"vcm": vcm, "show_clinical_grouping": show_clinical_grouping, "mode": mode, "show_flags": show_flags}
+    return {"vcm": vcm, "show_clinical_grouping": show_clinical_grouping, "mode": mode, "show_flags": show_flags, "record_count": record_count}
 
 
 class ClinicalGrouping:

@@ -2683,3 +2683,4 @@ VCTable.sample = (sample_name, type, row) => {
     }
     return dom;
 };
+
