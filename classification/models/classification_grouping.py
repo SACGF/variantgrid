@@ -112,9 +112,6 @@ class AlleleOriginGrouping(TimeStampedModel):
             if somatic_values := cg.somatic_clinical_significance_values:
                 all_somatic_clinical_significance_values |= set(somatic_values)
 
-        print(all_classification_values)
-        print(all_somatic_clinical_significance_values)
-
         self.classification_values = list(EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).sort_values(all_classification_values))
         self.somatic_clinical_significance_values = [sg.as_str for sg in sorted(SomaticClinicalSignificanceValue.from_str(sg) for sg in all_somatic_clinical_significance_values)]
 
@@ -459,7 +456,7 @@ class ClassificationGrouping(TimeStampedModel):
 
     @cached_property
     def allele(self) -> Allele:
-        return self.allele_origin_grouping.allele
+        return self.allele_origin_grouping.allele_grouping.allele
 
     @cached_property
     def classification_modifications(self) -> list[ClassificationModification]:
