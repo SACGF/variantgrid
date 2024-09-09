@@ -70,6 +70,7 @@ var CODE_THRESHOLDS = {
     "grantham": [57, 105],
     "gerp_pp_rs": [0, 3],
     //
+    "alphamissense_rankscore": pathogenicity_rankscore_threshold,
     "cadd_raw_rankscore": pathogenicity_rankscore_threshold,
     "revel_rankscore": pathogenicity_rankscore_threshold,
     "bayesdel_noaf_rankscore": pathogenicity_rankscore_threshold,
@@ -427,6 +428,7 @@ $(document).ready(function() {
 function applyVariantValues() {
     // Render variant annotation values this way so it's colored correctly etc as it
     // goes through the same formatting as transcript JavaScript values if done through here
+    applyValue("alphamissense_rankscore", {{ variant_annotation.bayesdel_noaf_rankscore | jsonify}});
     applyValue("bayesdel_noaf_rankscore", {{ variant_annotation.bayesdel_noaf_rankscore | jsonify}});
     applyValue("cadd_raw_rankscore", {{ variant_annotation.cadd_raw_rankscore | jsonify}});
     applyValue("clinpred_rankscore", {{ variant_annotation.clinpred_rankscore | jsonify}});
@@ -730,6 +732,7 @@ function applyVariantValues() {
                         {% labelled id='af_uk10k' label='UK10K' help=annotation_description.af_uk10k hint="tiny" value_css="text-monospace" %}{{ variant_annotation.af_uk10k|format_unit_as_percent }}{% endlabelled %}
                         {% labelled id='topmed_af' label='TopMed' help=annotation_description.topmed_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.topmed_af|format_unit_as_percent }}{% endlabelled %}
                     {% endif %}
+                        {% labelled label='gnomAD version' hint='tiny' %}{{ variant_annotation.version.gnomad }}{% endlabelled %}
                         {% if variant_annotation.gnomad_af %}
                             {% labelled id='gnomad_af' label='gnomAD Allele Frequency' help=annotation_description.gnomad_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_af|format_unit_as_percent }}{% endlabelled %}
                             {% if variant_annotation.has_gnomad_faf %}
@@ -747,7 +750,7 @@ function applyVariantValues() {
                                 {% labelled label="gnomAD Is Filtered" help=annotation_description.gnomad_filtered hint="tiny" %}{% endlabelled %}
                             {% endif %}
 
-                            {% labelled id='gnomad_total_homozygotes' label='gnomAD Total Homozygotes' help=annotation_description.gnomad_total_homozygotes hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_hom_alt }}{% endlabelled %}
+                            {% labelled id='gnomad_total_homozygotes' label='gnomAD Total Homozygotes' help=annotation_description.gnomad_hom_alt hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_hom_alt }}{% endlabelled %}
                             {% if variant_annotation.has_extended_gnomad_fields %}
                                 {% labelled id='gnomad_ac' label='gnomAD Alt Allele Count' help=annotation_description.gnomad_ac hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_ac }}{% endlabelled %}
                                 {% labelled id='gnomad_an' label='gnomAD Total number of alleles' help=annotation_description.gnomad_an hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_an }}{% endlabelled %}
@@ -808,7 +811,7 @@ function applyVariantValues() {
                                 {% labelled id='gnomad_sas_af' label='South Asian' help=annotation_description.gnomad_sas_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_sas_af|format_unit_as_percent }}{% endlabelled %}
                             </div>
                         {% else %}
-                            {% labelled id='gnomad_none' label='gnomAD' hint="tiny" %}No gnomAD entry{% endlabelled %}
+                            {% labelled id='gnomad_none' label='gnomAD' hint="tiny" help=annotation_description.gnomad %}No gnomAD entry{% endlabelled %}
                         {% endif %}
                     </div>
                 </div>
@@ -826,7 +829,7 @@ function applyVariantValues() {
                             <span id="maxentscan_alt"></span>&nbsp;<span class="text-secondary">Alt</span>,
                             <span id="maxentscan_diff"></span>&nbsp;<span class="text-secondary">Diff</span>
                         {% endlabelled %}
-                        {% labelled label="MexEnt %Diff/Ref" hint="tiny" %}<span id="maxentscan_percent_diff_ref" data-suffix="%"></span>{% endlabelled %}
+                        {% labelled label="MaxEnt %Diff/Ref" help=annotation_description.maxentscan_percent_diff_ref hint="tiny" %}<span id="maxentscan_percent_diff_ref" data-suffix="%"></span>{% endlabelled %}
                         {% labelled id="dbscsnv_ada_score" label="dbscSNV (Ada)" help=annotation_description.dbscsnv_ada_score hint="tiny" %}{{ variant_annotation.dbscsnv_ada_score|floatformat:2 }}{% endlabelled %}
                         {% labelled id="dbscsnv_rf_score" label="dbscSNV (RF)" help=annotation_description.dbscsnv_rf_score hint="tiny" %}{{ variant_annotation.dbscsnv_rf_score|floatformat:2 }}{% endlabelled %}
 
@@ -875,7 +878,7 @@ function applyVariantValues() {
                         {% labelled id='dbsnp_rs_id' label='dbSNP' help=annotation_description.dbsnp_rs_id hint="tiny" %}{{ variant_annotation.dbsnp_rs_id }}{% endlabelled %}
                         {% labelled id='ensembl_protein' label='Ensembl Protein' help=annotation_description.ensembl_protein hint="tiny" %}{% endlabelled %}
                     {% if variant_annotation.has_mavedb %}
-                        {% labelled id='mave_db_url' label='MaveDB' help=annotation_description.mave_db_url hint='tiny' %}
+                        {% labelled id='mave_db_url' label='MaveDB' help=annotation_description.mave_db hint='tiny' %}
                             {% with mave_urls=variant_annotation.get_mave_urls %}
                                 {% for label, url in mave_urls.items %}
                                     <a target="_blank" class='hover-link' href="{{ url }}">{{ label }}</a>
@@ -925,7 +928,7 @@ function applyVariantValues() {
                                 {% endfor %}
                             {% endlabelled %}
                         {% else %}
-                            {% labelled label="Mastermind" hint="tiny" %}No local Mastermind entry<br><i>may be others on site</i>{% endlabelled %}
+                            {% labelled label="Mastermind" hint="tiny" help=annotation_description.mastermind %}No local Mastermind entry<br><i>may be others on site</i>{% endlabelled %}
                         {% endif %}
 
                     </div>
