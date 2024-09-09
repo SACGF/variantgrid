@@ -71,6 +71,9 @@ class AlleleGrouping(TimeStampedModel):
     # TODO probably some more summary fields ew could have here?
     # otherwise what is this serving that Allele isn't?
 
+    def get_absolute_url(self) -> str:
+        return reverse('allele_grouping_detail', kwargs={"allele_grouping_id": self.pk})
+
     @cached_property
     def allele_origin_dict(self) -> dict[AlleleOriginBucket, 'AlleleOriginGrouping']:
         by_bucket = {}
@@ -96,6 +99,9 @@ class AlleleOriginGrouping(TimeStampedModel):
     dirty = models.BooleanField(default=True)
     classification_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
     somatic_clinical_significance_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
+
+    def get_absolute_url(self) -> str:
+        return reverse('allele_grouping_detail', kwargs={"allele_grouping_id": self.allele_grouping_id})
 
     def update(self):
         # not sure if this is the best solution, or if an AlleleOriginGrouping should just refuse to update if attached allele groupings are dirty

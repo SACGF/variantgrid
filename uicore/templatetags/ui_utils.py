@@ -640,7 +640,7 @@ def admin_link(context, object: Model):
     url: Optional[str] = None
     if isinstance(object, Model):
         url = get_admin_url(object)
-    return {"url": url}
+    return {"url": url, "is_admin": True, "object": object}
 
 
 @register.inclusion_tag(name="value_with_icon", filename="uicore/tags/value_with_icon.html")

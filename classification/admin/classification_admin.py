@@ -3,7 +3,7 @@ from datetime import timedelta
 from typing import Union, Optional
 
 from django.contrib import admin, messages
-from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter, DateFieldListFilter
+from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter, DateFieldListFilter, TabularInline
 from django.db.models import QuerySet
 from django.forms import Widget
 from django.utils import timezone
@@ -19,7 +19,7 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
     DiscordanceReportTriageStatus, ClassificationGrouping, ClassificationGroupingEntry, \
-    ClassificationGroupingGeneSymbol, ClassificationGroupingCondition, AlleleOriginGrouping
+    ClassificationGroupingGeneSymbol, ClassificationGroupingCondition, AlleleOriginGrouping, AlleleGrouping
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -1353,11 +1353,44 @@ class ClassificationGroupingAdmin(ModelAdminBasics):
         ClassificationGrouping.update_all_dirty()
 
 
+class ClassificationGroupingTabularAdmin(TabularInline):
+    model = ClassificationGrouping
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(AlleleOriginGrouping)
 class AlleleOriginGroupingAdmin(ModelAdminBasics):
     list_display = ("allele_grouping", "overlap_status", "classification_values", "somatic_clinical_significance_values", "dirty")
+    inlines = (ClassificationGroupingTabularAdmin,)
 
     @admin_model_action(url_slug="refresh_all/", short_description="Refresh All", icon="fa-solid fa-arrows-rotate")
     def refresh_all(self, request):
         AlleleOriginGrouping.objects.update(dirty=True)
         ClassificationGrouping.update_all_dirty()
+
+
+class AlleleOriginGroupingTabularAdmin(TabularInline):
+    model = AlleleOriginGrouping
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(AlleleGrouping)
+class AlleleGroupingAdmin(ModelAdminBasics):
+    inlines = (AlleleOriginGroupingTabularAdmin,)
+    pass

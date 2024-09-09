@@ -11,6 +11,17 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
     <style>
+        th.dt-allele {
+            width: 27%;
+        }
+        th.dt-germline_overlap, th.dt-somatic_overlap {
+            width: 27%;
+        }
+        /*
+        labs is the left over 100 - 27*3 = 19
+         */
+
+
         td.dt-germline_overlap .val-0, td.dt-somatic_overlap .val-0 {
             color: #BBBBBB !important;
             font-style: italic;
