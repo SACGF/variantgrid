@@ -30,7 +30,7 @@ def user_post_save_handler(sender, instance, **kwargs):
             org_message = getattr(settings, "USER_CREATE_ORG_MESSAGE", {})
 
             for org_group_name, lab_pattern in org_labs.items():
-                organization = Organization.objects.get(group_name=org_group_name)
+                organization, _ = Organization.objects.get_or_create(group_name=org_group_name)
                 lab_name = lab_pattern % instance.__dict__
                 lab_group_name = f"{organization.group_name}/{lab_name.lower()}"
                 lab, _ = Lab.objects.get_or_create(name=lab_name, organization=organization, group_name=lab_group_name)
