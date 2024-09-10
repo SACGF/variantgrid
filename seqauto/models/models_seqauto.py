@@ -604,19 +604,25 @@ class Fastq(SeqAutoRecord):
                              "%(sequencing_run_dir)s/Data/Intensities/BaseCalls/%(sample_project)s/%(sample_id)s"]
             unaligned_dir_patterns.extend(fastq_subdirs)
         unaligned_dir_patterns.append("%(sequencing_run_dir)s/Data/Intensities/BaseCalls")
-        unaligned_dir_patterns.append(settings.SEQAUTO_FASTQ_DIR_PATTERN % sequencing_sample.get_params())
+        unaligned_dir_patterns.append(settings.SEQAUTO_FASTQ_DIR_PATTERN)
 
         pair_paths = []
         for unaligned_dir_pattern in unaligned_dir_patterns:
-            fastq_dir = unaligned_dir_pattern % params
+            try:
+                pattern = unaligned_dir_pattern
+                fastq_dir = pattern % params
 
-            for pattern in patterns:
-                name1 = pattern % r1_params
-                name2 = pattern % r2_params
+                for pattern in patterns:
+                    name1 = pattern % r1_params
+                    name2 = pattern % r2_params
 
-                fastq_r1 = os.path.abspath(os.path.join(fastq_dir, name1))
-                fastq_r2 = os.path.abspath(os.path.join(fastq_dir, name2))
-                pair_paths.append((fastq_r1, fastq_r2))
+                    fastq_r1 = os.path.abspath(os.path.join(fastq_dir, name1))
+                    fastq_r2 = os.path.abspath(os.path.join(fastq_dir, name2))
+                    pair_paths.append((fastq_r1, fastq_r2))
+            except KeyError as ke:
+                logging.error("Cannot populate old style string formatting: '%s', params: %s: %s",
+                              pattern, params, ke)
+                raise
 
         return pair_paths
 
