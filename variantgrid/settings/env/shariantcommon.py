@@ -229,7 +229,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "vus": True,
 
     # New Overlaps page
-    "allele_groups": True
+    "allele_groupings": True
 })
 
 PREFER_ALLELE_LINKS = True

@@ -11,6 +11,7 @@ from classification.templatetags.classification_tags import classification
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.utils import JsonDataType
+from snpdb.lab_picker import LabPickerData
 from snpdb.models import GenomeBuild, UserSettings, Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData, SortOrder
 
@@ -27,6 +28,10 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
         user_settings = UserSettings.get_for_user(self.user)
         return GenomeBuild.builds_with_annotation_priority(user_settings.default_genome_build)
 
+    @cached_property
+    def lab_picker(self) -> LabPickerData:
+        return LabPickerData.for_user(user=self.user, selection=self.get_query_param("lab_id"))
+
     def get_initial_queryset(self) -> QuerySet[AlleleGrouping]:
         # TODO, consider making the groups GuardianPermission rather than this manual security check
         qs = AlleleGrouping.objects.all()
@@ -42,6 +47,14 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
 
         qs = qs.annotate(germline_overlap_status=Subquery(germline_subquery))
         qs = qs.annotate(somatic_overlap_status=Subquery(somatic_subquery))
+
+        lab_picker = self.lab_picker
+        if not lab_picker.is_admin_mode:
+            linked_class_groupings = ClassificationGrouping.objects.filter(
+                lab__in=lab_picker.selected_labs
+            ).values_list('allele_origin_grouping__allele_grouping', flat=True)
+            qs = qs.filter(pk__in=linked_class_groupings)
+
         return qs
 
     def render_labs(self, row: CellData) -> set[Lab]:
@@ -105,6 +118,7 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
         if somatic := aog.allele_origin_grouping(AlleleOriginBucket.SOMATIC):
             classification_values = somatic.somatic_clinical_significance_values
         return [somatic_status, classification_values]
+
 
     # def render_details(self, row: CellData) -> JsonDataType:
     #     cgs = _allele_group(row.get("id"))

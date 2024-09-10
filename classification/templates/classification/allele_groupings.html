@@ -7,10 +7,26 @@
 {% load ui_menu_bars %}
 {% load settings_tags %}
 {% load classification_tags %}
+{% load lab_tags %}
 {% block title %}Classifications{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
     <style>
+        span.classifications {
+            display: inline-block;
+            margin-top: 4px;
+        }
+        span.classifications span.c-pill:not(:last-child) {
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+            border-right: none;
+        }
+        span.classifications span.c-pill:not(:first-child) {
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+            border-left: none;
+        }
+
         th.dt-allele {
             width: 27%;
         }
@@ -20,7 +36,6 @@
         /*
         labs is the left over 100 - 27*3 = 19
          */
-
 
         td.dt-germline_overlap .val-0, td.dt-somatic_overlap .val-0 {
             color: #BBBBBB !important;
@@ -53,7 +68,8 @@
 
             <div class="row">
                 <div class="col">
-                    <table id="vc-datatable" data-datatable-url="{% url 'allele_grouping_datatables' %}" class="sticky-header classification-table"></table>
+                    lab picker selection = {{ dlab.lab_picker.selection }}
+                    <table id="vc-datatable" data-datatable-url="{% url 'allele_grouping_datatables' lab_id=dlab.lab_picker.selection %}" class="sticky-header classification-table"></table>
                 </div>
             </div>
         </div>

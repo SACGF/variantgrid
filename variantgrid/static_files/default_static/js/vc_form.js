@@ -2501,7 +2501,7 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
 }
 
 VCTable.classification = (data, type, row) => {
-    let dom = $('<span>');
+    let dom = $('<span>', {"class": "classifications"});
     let dataList = [];
     if (data === null) {
         return "" // support for dirty groups still processing

@@ -3,7 +3,7 @@ import mimetypes
 import re
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional, Any, Union
 
 import rest_framework
 from crispy_forms.bootstrap import FieldWithButtons
@@ -44,6 +44,7 @@ from classification.models.clinical_context_models import ClinicalContext
 from classification.models.discordance_models_utils import DiscordanceReportRowData
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
+from classification.views.classification_dashboard_view import ClassificationDashboard
 from classification.views.classification_datatables import ClassificationColumns
 from classification.views.exports import ClassificationExportFormatterCSV, ClassificationExportFormatterRedCap
 from classification.views.exports.classification_export_filter import ClassificationFilter
@@ -188,10 +189,6 @@ def classification_groupings(request):
         "user_settings": user_settings,
     }
     return render(request, 'classification/classification_groupings.html', context)
-
-
-def allele_groupings(request):
-    return render(request, 'classification/allele_groupings.html', {})
 
 
 class AutopopulateView(APIView):
@@ -854,6 +851,13 @@ def clin_sig_change_data(request):
     # response['Last-Modified'] = modified_str
     response['Content-Disposition'] = f'attachment; filename="clin_sig_changes.tsv"'
     return response
+
+
+def allele_groupings(request, lab_id: Optional[Union[str, int]] = None):
+    lab_picker = LabPickerData.from_request(request, lab_id, 'allele_groupings_lab')
+    return render(request, 'classification/allele_groupings.html', {
+        "dlab": ClassificationDashboard(lab_picker=lab_picker)
+    })
 
 
 def view_classification_grouping_detail(request, classification_grouping_id: int):
