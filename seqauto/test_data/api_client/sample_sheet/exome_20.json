@@ -1,0 +1,87 @@
+    {
+        "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_exome/Exome_20_022_200920_NB501009_0410_AHNLYFBGXG/SampleSheet.csv",
+        "sequencing_run": {
+            "name": "Exome_20_022_200920_NB501009_0410_AHNLYFBGXG",
+            "date": "2020-09-20",
+            "sequencer": {
+                "name": "SN1101",
+                "sequencer_model": {
+                    "model": "HiSeq 2500",
+                    "manufacturer": "Illumina",
+                    "data_naming_convention": "HiSeq"
+                }
+            },
+            "gold_standard": false,
+            "bad": false,
+            "hidden": false,
+            "experiment": {
+                "name": "EXOME_20_022"
+            },
+            "enrichment_kit": {
+                "pk": 2,
+                "name": "idt_exome",
+                "version": 1,
+                "enrichment_kit_type": null,
+                "manufacturer": null,
+                "gene_list": null,
+                "__str__": "idt_exome"
+            },
+            "has_basecalls": false,
+            "has_interop": false
+        },
+        "file_last_modified": 1725438112.609659,
+        "hash": "83dd24c2fb59e47a19a4f50d40eb349f",
+        "sequencingsample_set": [
+            {
+                "sample_id": "hiseq_sample1",
+                "sample_name": "hiseq_sample1",
+                "sample_project": null,
+                "sample_number": 1,
+                "lane": 3,
+                "barcode": "GCCAAT",
+                "enrichment_kit": {
+                    "pk": 2,
+                    "name": "idt_exome",
+                    "version": 1,
+                    "enrichment_kit_type": null,
+                    "manufacturer": null,
+                    "gene_list": null,
+                    "__str__": "idt_exome"
+                },
+                "is_control": false,
+                "failed": false,
+                "sequencingsampledata_set": [
+                    {
+                        "column": "SAPOrderNumber",
+                        "value": "SAP123456"
+                    }
+                ]
+            },
+            {
+                "sample_id": "hiseq_sample2",
+                "sample_name": "hiseq_sample2",
+                "sample_project": null,
+                "sample_number": 2,
+                "lane": 3,
+                "barcode": "CAGATC",
+                "enrichment_kit": {
+                    "pk": 2,
+                    "name": "idt_exome",
+                    "version": 1,
+                    "enrichment_kit_type": null,
+                    "manufacturer": null,
+                    "gene_list": null,
+                    "__str__": "idt_exome"
+                },
+                "is_control": false,
+                "failed": false,
+                "sequencingsampledata_set": [
+                    {
+                        "column": "SAPOrderNumber",
+                        "value": "SAP123457"
+                    }
+                ]
+            }
+        ]
+    }
+

@@ -43,6 +43,13 @@ class SequencerSerializer(serializers.ModelSerializer):
         model = Sequencer
         fields = "__all__"
 
+    def to_internal_value(self, data):
+        # When POSTing, you can use just name (PK)
+        name = data.get('name')
+        if sequencer := Sequencer.objects.filter(name=name).first():
+            return sequencer
+        return super().to_internal_value(data)
+
     def create(self, validated_data):
         name = validated_data.get('name')
         sequencer_model = validated_data.get('sequencer_model')
@@ -61,6 +68,13 @@ class ExperimentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Experiment
         fields = ["name"]
+
+    def to_internal_value(self, data):
+        # When POSTing, we expect only the `name` to be passed
+        name = data.get('name')
+        if experiment := Experiment.objects.filter(name=name).first():
+            return experiment
+        return super().to_internal_value(data)
 
     def create(self, validated_data):
         name = validated_data.get('name')
