@@ -479,7 +479,11 @@ def process_illuminate_qc(seqauto_run, existing_files, results):
     illumina_flowcell_qcs = []
     sequencing_runs = results[SequencingFileType.SAMPLE_SHEET]
     for sequencing_run in sequencing_runs.values():
-        illuminate_path = IlluminaFlowcellQC.get_path_from_sequencing_run(sequencing_run)
+        try:
+            illuminate_path = IlluminaFlowcellQC.get_path_from_sequencing_run(sequencing_run)
+        except KeyError:
+            logging.info("Couldn't determine IlluminaFlowcellQC")
+            continue
 
         exists = illuminate_path in existing_illumina_qcs
 
@@ -1050,7 +1054,12 @@ def create_resource_models(seqauto_run, seqauto_file_types_and_scripts):
         lines = file_to_array(output_filename)
         processor = PROCESSORS[file_type]
 
-        data = processor(seqauto_run, lines, results)
+        try:
+            data = processor(seqauto_run, lines, results)
+        except KeyError as ke:
+            if "enrichment_kit" in str(ke):
+                logging.error("Enrichment kit not set on SeqAuto objects: This is usually done by events in lab specific apps (eg 'SA Path' - check that's loaded?)")
+            raise
         results[file_type] = data
 
         print_data_state_stats(data)

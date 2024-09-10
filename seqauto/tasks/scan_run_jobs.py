@@ -48,6 +48,9 @@ def scan_resources(seqauto_run, seqauto_scripts):
 
 @celery.shared_task(track_started=True, queue="seqauto_single_worker")
 def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None, run_launch_script=None, fake_data=None):
+    if not settings.SEQAUTO_ENABLED:
+        raise ValueError("settings.SEQAUTO_ENABLED=False")
+
     if run_launch_script is None:
         run_launch_script = settings.SEQAUTO_SCAN_RUN_SCRIPTS
     if only_launch_file_types is None:
