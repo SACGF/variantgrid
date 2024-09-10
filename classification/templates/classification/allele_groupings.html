@@ -62,13 +62,14 @@
     </style>
 {% endblock %}
 {% block content %}
+    {% lab_picker data=dlab.lab_picker %}
+
     <div id="classifications-page">
         <div class="container">
             <h3>Allele Groupings</h3>
 
             <div class="row">
                 <div class="col">
-                    lab picker selection = {{ dlab.lab_picker.selection }}
                     <table id="vc-datatable" data-datatable-url="{% url 'allele_grouping_datatables' lab_id=dlab.lab_picker.selection %}" class="sticky-header classification-table"></table>
                 </div>
             </div>
