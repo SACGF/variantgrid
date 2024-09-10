@@ -1,0 +1,64 @@
+{
+        "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_exome/Exome_20_022_200920_NB501009_0410_AHNLYFBGXG/0_goi/Exome_20_022_200920_NB501009_0410_AHNLYFBGXG_hiseq_sample2.txt",
+        "qc": {
+            "sequencing_sample": {
+                "sample_sheet": {
+                    "sequencing_run": "Exome_20_022_200920_NB501009_0410_AHNLYFBGXG",
+                    "hash": "83dd24c2fb59e47a19a4f50d40eb349f"
+                },
+                "sample_name": "hiseq_sample2"
+            },
+            "bam_file": {
+                "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_exome/Exome_20_022_200920_NB501009_0410_AHNLYFBGXG/1_BAM/hiseq_sample2.hg38.bam"
+            },
+            "vcf_file": {
+                "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_exome/Exome_20_022_200920_NB501009_0410_AHNLYFBGXG/2_variants/gatk_per_sample/hiseq_sample2.gatk.hg38.vcf.gz"
+            }
+        },
+        "sample_gene_list": {
+            "pk": 7,
+            "visible": true,
+            "gene_list": {
+                "pk": 23,
+                "category": {
+                    "name": "SampleGeneList",
+                    "public": false,
+                    "company": null,
+                    "icon_css_class": "",
+                    "description": ""
+                },
+                "name": "QC GeneList for hiseq_sample2",
+                "user": "seqauto",
+                "import_status": "S",
+                "genelistgenesymbol_set": [
+                    {
+                        "original_name": "TUBB8",
+                        "gene_symbol": "TUBB8",
+                        "gene_symbol_alias": null,
+                        "modification_info": null
+                    },
+                    {
+                        "original_name": "NLGN4Y",
+                        "gene_symbol": "NLGN4Y",
+                        "gene_symbol_alias": null,
+                        "modification_info": null
+                    },
+                    {
+                        "original_name": "ALPL",
+                        "gene_symbol": "ALPL",
+                        "gene_symbol_alias": null,
+                        "modification_info": null
+                    },
+                    {
+                        "original_name": "PLCXD1",
+                        "gene_symbol": "PLCXD1",
+                        "gene_symbol_alias": null,
+                        "modification_info": null
+                    }
+                ],
+                "can_write": false,
+                "absolute_url": "/genes/view_gene_list/23"
+            },
+            "active": true
+        }
+    }
