@@ -1,6 +1,6 @@
 Version 0.1.0
 Date run 20/01/2016
-Sample miseq_sample2
+Sample fake_sample_2
 
 	Observed	Range in reference standard
 % of bases with >20x coverage across GOI	48.66

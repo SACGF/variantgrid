@@ -1,0 +1,13 @@
+    {
+        "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_exome/Exome_20_022_200920_NB501009_0410_AHNLYFBGXG/2_variants/Exome_20_022_200920_NB501009_0410_AHNLYFBGXG.gatk.hg38.vcf.gz",
+        "sample_sheet": {
+            "sequencing_run": "Exome_20_022_200920_NB501009_0410_AHNLYFBGXG",
+            "hash": "83dd24c2fb59e47a19a4f50d40eb349f"
+        },
+        "variant_caller": {
+            "id": 4,
+            "name": "GATK",
+            "version": "4.1.9.0",
+            "run_params": null
+        }
+    }
