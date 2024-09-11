@@ -334,6 +334,7 @@ class AbstractVariantGrid(JqGridUserRowConfig):
         self._count = None
         self.queryset_is_sorted = False
         self.sort_by_contig_and_position = False
+        self.use_iterator_if_no_pagination = True  # Paginator disabled on downloads
 
     def _get_standard_overrides(self, af_show_in_percent):
         overrides = {
