@@ -1,0 +1,24 @@
+{
+        "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_exome/Exome_20_022_200920_NB501009_0410_AHNLYFBGXG/0_goi/Exome_20_022_200920_NB501009_0410_AHNLYFBGXG_hiseq_sample2.txt",
+        "qc": {
+            "sequencing_sample": {
+                "sample_sheet": {
+                    "sequencing_run": "Exome_20_022_200920_NB501009_0410_AHNLYFBGXG",
+                    "hash": "83dd24c2fb59e47a19a4f50d40eb349f"
+                },
+                "sample_name": "hiseq_sample2"
+            },
+            "bam_file": {
+                "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_exome/Exome_20_022_200920_NB501009_0410_AHNLYFBGXG/1_BAM/hiseq_sample2.hg38.bam"
+            },
+            "vcf_file": {
+                "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_exome/Exome_20_022_200920_NB501009_0410_AHNLYFBGXG/2_variants/gatk_per_sample/hiseq_sample2.gatk.hg38.vcf.gz"
+            }
+        },
+        "gene_list": [
+            "TUBB8",
+            "NLGN4Y",
+            "ALPL",
+            "PLCXD1"
+        ]
+    }

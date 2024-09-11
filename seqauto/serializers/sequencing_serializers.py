@@ -3,7 +3,7 @@ import logging
 from rest_framework import serializers
 
 from seqauto.models import Sequencer, Experiment, VariantCaller, SequencingRun, SequencerModel, SampleSheet, \
-    SequencingSampleData, SequencingSample, UnalignedReads, Flagstats, FastQC, SampleSheetCombinedVCFFile, VCFFile, \
+    SequencingSampleData, SequencingSample, UnalignedReads, Flagstats, SampleSheetCombinedVCFFile, VCFFile, \
     BamFile, Fastq, Aligner
 from seqauto.serializers import EnrichmentKitSerializer
 from snpdb.models import Manufacturer, DataState
@@ -65,6 +65,7 @@ class SequencerSerializer(serializers.ModelSerializer):
 
 
 class ExperimentSerializer(serializers.ModelSerializer):
+    # TODO: duplicated logic below in internal/create - I think we can just use SlugRelatedField
     class Meta:
         model = Experiment
         fields = ["name"]
