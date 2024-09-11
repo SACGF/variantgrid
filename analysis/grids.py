@@ -1,3 +1,4 @@
+import time
 from collections import defaultdict
 from typing import Optional, Any
 
@@ -44,8 +45,7 @@ class VariantGrid(AbstractVariantGrid):
         'tags': {'classes': 'no-word-wrap', 'formatter': 'tagsFormatter', 'sortable': False},
     }
 
-    def __init__(self, user, node, extra_filters=None, sort_by_contig_and_position=False, af_show_in_percent=None,
-                 paging=True):
+    def __init__(self, user, node, extra_filters=None, af_show_in_percent=None):
         if af_show_in_percent is None:
             af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
 
@@ -54,7 +54,6 @@ class VariantGrid(AbstractVariantGrid):
         super().__init__(user)  # Need to call init after setting fields
 
         self.url = SimpleLazyObject(lambda: reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id}))
-        self.sort_by_contig_and_position = sort_by_contig_and_position
         self.extra_config.update(node.get_extra_grid_config())
         default_sort_by_column = node.analysis.default_sort_by_column
         if default_sort_by_column:
@@ -64,7 +63,6 @@ class VariantGrid(AbstractVariantGrid):
 
         self.node = node
         self.name = node.name
-        self.paging = paging
 
         try:
             node_count = NodeCount.load_for_node(self.node, extra_filters)
@@ -142,11 +140,6 @@ class VariantGrid(AbstractVariantGrid):
 
         msg = f"{column_name} not found in grid column model"
         raise PermissionDenied(msg)
-
-    def get_paginate_by(self, request):
-        if self.paging:
-            return super().get_paginate_by(request)
-        return None  # No paging
 
     def _get_fields_and_overrides(self, node: AnalysisNode, af_show_in_percent: bool) -> tuple[list, dict]:
         ccc = node.analysis.custom_columns_collection
@@ -276,6 +269,42 @@ class VariantGrid(AbstractVariantGrid):
                 sidx = sort_alias
 
         return super()._sort_items(items, sidx, sord)
+
+
+
+class ExportVariantGrid(VariantGrid):
+    """ This is for exporting into VCF/CSV - ie not using any paging """
+
+    def __init__(self, *args, **kwargs):
+        self.order_by = kwargs.pop("order_by", None)
+        super().__init__(*args, **kwargs)
+
+    def sort_items(self, request, items):
+        if self.order_by:
+            items = items.order_by(*self.order_by)
+        return items
+
+    @staticmethod
+    def _iter_time(items):
+        start = time.time()
+        yield from items
+        end = time.time()
+        print(f"Download took {end-start} seconds")
+
+    @staticmethod
+    def _iter_by_contigs(genome_build, items):
+        for contig in genome_build.standard_contigs:
+            # print(f"getting {contig}")
+            contig_items = items.filter(locus__contig=contig).iterator()
+            yield from contig_items
+
+    def paginate_items(self, request, items):
+        # This is the step after queryset is sorted
+        # We want everything, but will retrieve contig at a time to reduce DB query
+        genome_build = self.node.analysis.genome_build
+        items = self._iter_by_contigs(genome_build, items)
+        # items = self._iter_time(items)
+        return None, None, items
 
 
 class AnalysesGrid(JqGridUserRowConfig):

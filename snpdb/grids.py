@@ -333,8 +333,6 @@ class AbstractVariantGrid(JqGridUserRowConfig):
         super().__init__(*args, **kwargs)
         self._count = None
         self.queryset_is_sorted = False
-        self.sort_by_contig_and_position = False
-        self.use_iterator_if_no_pagination = True  # Paginator disabled on downloads
 
     def _get_standard_overrides(self, af_show_in_percent):
         overrides = {
@@ -409,10 +407,6 @@ class AbstractVariantGrid(JqGridUserRowConfig):
         qs = self.filter_items(request, qs)  # JQGrid filtering from request
         if q := self._get_q():
             qs = qs.filter(q)
-
-        if self.sort_by_contig_and_position:
-            # These 2 are custom_columns.ID_FORMATTER_REQUIRED_FIELDS so won't add extra cols
-            qs = qs.order_by("locus__contig__name", "locus__position")
 
         field_names = self.get_queryset_field_names()
         a_kwargs = self._get_grid_only_annotation_kwargs()

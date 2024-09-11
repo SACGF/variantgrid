@@ -240,7 +240,7 @@ def cohort_grid_export(request, cohort_id, export_type):
     node = analysis.analysisnode_set.get_subclass(output_node=True)  # Should only be 1
     basename = "_".join([name_from_filename(cohort.name), "annotated", f"v{analysis.annotation_version.pk}",
                          str(cohort.genome_build)])
-    return _node_grid_export(request, node, export_type, basename=basename, grid_kwargs={"paging": False})
+    return _node_grid_export(request, node, export_type, basename=basename)
 
 
 def sample_grid_export(request, sample_id, export_type):
@@ -287,10 +287,12 @@ def _node_grid_export(request, node, export_type, canonical_transcript_collectio
         grid_kwargs = grid_kwargs.copy()
 
     if export_type == 'vcf':
-        grid_kwargs["sort_by_contig_and_position"] = True
+        # TODO: If we use the contig at a time method in ExportVariantGrid we can remove the sort by contig
+        grid_kwargs["order_by"] = ["locus__contig__name", "locus__position"]
         grid_kwargs["af_show_in_percent"] = False
 
-    grid = _variant_grid_from_request(request, node, **grid_kwargs)
+    extra_filters = request.GET.get("extra_filters")
+    grid = grids.ExportVariantGrid(request.user, node, extra_filters, **grid_kwargs)
 
     if basename is None:
         basename = get_node_export_basename(node)
