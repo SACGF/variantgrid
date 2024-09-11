@@ -286,10 +286,6 @@ def view_vcf(request, vcf_id):
         except ValueError:
             pass
 
-    # TEMPORARILY DISABLED
-    can_download_annotated_vcf = False
-
-
     context = {
         'vcf': vcf,
         'sample_stats_het_hom_count': sample_stats_het_hom_count,
