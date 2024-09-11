@@ -84,8 +84,6 @@ class JqGrid:
     colmodel_overrides = {}  # Class member, do not modify in instances!
 
     def __init__(self):
-        # Use for enormous querysets (eg downloads) to reduce RAM usage
-        self.use_iterator_if_no_pagination = False
         self.extra_config = {}
         self._overrides = deepcopy(self.colmodel_overrides)
         if not self.fields:
@@ -308,9 +306,6 @@ class JqGrid:
     def paginate_items(self, request, items):
         paginate_by = self.get_paginate_by(request)
         if not paginate_by:
-            if self.use_iterator_if_no_pagination:
-                items = items.iterator()
-
             return None, None, items
 
         paginator = Paginator(items, paginate_by,
