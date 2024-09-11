@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Set
 
+from django.contrib.auth.models import User, Group
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices
 from django.urls import reverse

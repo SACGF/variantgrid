@@ -980,6 +980,7 @@ function configureTimestamps() {
         numbers: []
     };
 }
+
 function convertTimestampDom(elem) {
     elem = $(elem);
     let unix= Number(elem.attr('data-timestamp'));
@@ -1004,6 +1005,7 @@ function convertTimestampDom(elem) {
         elem.replaceWith(newElement);
     }
 }
+
 function createTimestampDom(unix, timeAgo) {
     let jsTime = unix * 1000;
     let m = moment(jsTime);

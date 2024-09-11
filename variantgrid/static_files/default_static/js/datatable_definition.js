@@ -556,10 +556,30 @@ TableFormat.combine = function(formatters, settings, data, type, columns) {
     return dom;
 };
 
+TableFormat.repeat = function(settings, data, type, columns) {
+    if (settings === null) {
+        settings = {};
+    }
+    if (data === null) {
+        return "";
+    }
+    let subFormatter = eval(settings.formatter);
+    let cssClass = "repeat";
+    if (settings.groupCSS) {
+        cssClass = settings.groupCSS;
+    }
+    let dom = $('<div>');
+    data.forEach((subData, index) => {
+        let subDom = subFormatter(subData, type, columns);
+        dom.append(subDom);
+    });
+    return dom;
+};
+
 TableFormat.json = function(data, type, columns) {
     // TODO format JSON
     return JSON.stringify(data);
-}
+};
 
 TableFormat.expandAjax = function(url_or_method, param, expectedHeight, data) {
     if (data) {

@@ -887,6 +887,8 @@ class AlleleOriginGroupingVisible:
                                                                         allele_origin_bucket=bucket)
                 ).order_by('-report_started_date'))
 
+
+
                 visible_groups.append(
                     AlleleOriginGroupingVisible(
                         allele_origin_grouping=allele_origin_grouping,
