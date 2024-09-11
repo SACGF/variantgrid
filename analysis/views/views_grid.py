@@ -9,6 +9,7 @@ from urllib.parse import urlencode
 
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.core.cache import cache
+from django.db import transaction
 from django.http.response import Http404, StreamingHttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -226,6 +227,7 @@ def get_node_export_basename(node: AnalysisNode) -> str:
     return "_".join(name_parts)
 
 
+@transaction.non_atomic_requests
 def cohort_grid_export(request, cohort_id, export_type):
     EXPORT_TYPES = {"csv", "vcf"}
 
