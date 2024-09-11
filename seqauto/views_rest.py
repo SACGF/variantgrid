@@ -24,7 +24,8 @@ from seqauto.models import GoldCoverageSummary, EnrichmentKit, SequencerModel, S
 from seqauto.serializers import EnrichmentKitSerializer, \
     GoldCoverageSummarySerializer, EnrichmentKitSummarySerializer
 from seqauto.serializers.seqauto_qc_serializers import FastQCSerializer, QCExecSummarySerializer, \
-    QCGeneCoverageSerializer, QCGeneListSerializer, QCSerializer, IlluminaFlowcellQCSerializer
+    QCGeneCoverageSerializer, QCGeneListSerializer, QCSerializer, IlluminaFlowcellQCSerializer, \
+    QCGeneListCreateSerializer
 from seqauto.serializers.sequencing_serializers import SequencerModelSerializer, SequencerSerializer, \
     ExperimentSerializer, VariantCallerSerializer, SequencingRunSerializer, SampleSheetSerializer, VCFFileSerializer, \
     SampleSheetCombinedVCFFileSerializer
@@ -102,7 +103,11 @@ class QCViewSet(ModelViewSet):
 
 class QCGeneListViewSet(ModelViewSet):
     queryset = QCGeneList.objects.all()
-    serializer_class = QCGeneListSerializer
+
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return QCGeneListCreateSerializer
+        return QCGeneListSerializer
 
 
 class QCGeneCoverageViewSet(ModelViewSet):

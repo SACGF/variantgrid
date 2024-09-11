@@ -22,7 +22,7 @@ from django.utils.timezone import make_aware
 from django_extensions.db.models import TimeStampedModel
 
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, GeneCoverageCollection, \
-    Transcript, GeneSymbol, SampleGeneList, TranscriptVersion, GeneCoverageCanonicalTranscript
+    Transcript, GeneSymbol, SampleGeneList, TranscriptVersion, GeneCoverageCanonicalTranscript, ActiveSampleGeneList
 from library.constants import DAY_SECS
 from library.enums.log_level import LogLevel
 from library.genomics.vcf_utils import get_variant_caller_and_version_from_vcf
@@ -984,8 +984,12 @@ class QC(SeqAutoRecord):
 class QCGeneList(SeqAutoRecord):
     """ This represents a text file containing genes which will be used for initial pass and QC filters
 
+        The VCF may not be loaded yet, so we'll just store gene list and link it later
+
         The reason we have both a sample_gene_list and a custom_text_gene_list is because we wanted to
-        represent the text from a file on disk. I think we probably could have gotten around that as
+        represent the text from a file on disk.
+
+        I think we probably could have gotten around that as
         SeqAutoRecord contains a hash - could maybe remove that and just use gene list
     """
     qc = models.ForeignKey(QC, on_delete=CASCADE)
@@ -1001,18 +1005,24 @@ class QCGeneList(SeqAutoRecord):
         pattern = os.path.join(settings.SEQAUTO_GOI_DIR_PATTERN, settings.SEQAUTO_GOI_LIST_PATTERN)
         return pattern % qc.get_params()
 
-    def load_from_file(self, seqauto_run, **kwargs):
+    @staticmethod
+    def create_gene_list(custom_gene_list_text, sequencing_sample):
         from genes.custom_text_gene_list import create_custom_text_gene_list
+
+        custom_text_gene_list = CustomTextGeneList(name=f"QC GeneList for {sequencing_sample.sample_name}",
+                                                   text=custom_gene_list_text)
+        custom_text_gene_list.save()
+        seqauto_user = get_seqauto_user()
+        create_custom_text_gene_list(custom_text_gene_list, seqauto_user, GeneListCategory.SAMPLE_GENE_LIST,
+                                     hidden=True)
+        custom_text_gene_list.gene_list.locked = True
+        custom_text_gene_list.gene_list.save()
+        return custom_text_gene_list
+
+    def load_from_file(self, seqauto_run, **kwargs):
         with open(self.path, encoding="utf-8") as f:
             custom_gene_list_text = f.read()
-            custom_text_gene_list = CustomTextGeneList(name=f"QC GeneList for {self.sequencing_sample.sample_name}",
-                                                       text=custom_gene_list_text)
-            custom_text_gene_list.save()
-            seqauto_user = get_seqauto_user()
-            create_custom_text_gene_list(custom_text_gene_list, seqauto_user, GeneListCategory.SAMPLE_GENE_LIST, hidden=True)
-            custom_text_gene_list.gene_list.locked = True
-            custom_text_gene_list.gene_list.save()
-
+            custom_text_gene_list = self.create_gene_list(custom_gene_list_text, self.sequencing_sample)
             if custom_text_gene_list.gene_list.import_status != ImportStatus.SUCCESS:
                 message = f"Problem importing QC Gene List {self.path}\n"
                 message += f"Contents: {custom_gene_list_text}"
@@ -1023,20 +1033,31 @@ class QCGeneList(SeqAutoRecord):
                                               severity=LogLevel.ERROR)
 
             self.custom_text_gene_list = custom_text_gene_list
+            self.save()
+
+        self.link_samples_if_exist()
+
+    def link_samples_if_exist(self, force_active=False):
 
         try:
             # SampleFromSequencingSample is only done after VCF import, so this may not be linked yet.
-            for sfss in self.sequencing_sample.samplefromsequencingsample_set.all():
+            if sfss := self.sequencing_sample.samplefromsequencingsample_set.first():
                 sample = sfss.sample
-                self.create_and_assign_sample_gene_list(sample)  # Also saves
+                self.create_and_assign_sample_gene_list(sample, force_active=force_active)  # Also saves
         except SampleFromSequencingSample.DoesNotExist:
-            self.save()
+            pass
 
-    def create_and_assign_sample_gene_list(self, sample: Sample):
+    def create_and_assign_sample_gene_list(self, sample: Sample, force_active=False):
         logging.info("QCGeneList: %d - create_and_assign_sample_gene_list for %s", self.pk, sample)
+        # On create, 'sample_gene_list_created' sets to active gene list
         self.sample_gene_list = SampleGeneList.objects.get_or_create(sample=sample,
                                                                      gene_list=self.custom_text_gene_list.gene_list)[0]
         self.save()
+
+        if force_active:
+            ActiveSampleGeneList.objects.update_or_create(sample=sample,
+                                                          defaults={'sample_gene_list': self.sample_gene_list})
+
 
 
 class QCExecSummary(SeqAutoRecord):
