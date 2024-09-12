@@ -316,7 +316,7 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
             conversion_tool = potential_conversion_tool
             break  # Just want 1st one
 
-    return conversion_tool, variant_coordinate, None
+    yield conversion_tool, variant_coordinate, None
 
 
 def allele_can_attempt_liftover(allele, genome_build) -> bool:
