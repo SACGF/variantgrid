@@ -255,7 +255,7 @@ def sample_grid_export(request, sample_id, export_type):
     node = SampleNode.objects.get(analysis=analysis, output_node=True)  # Should only be 1
     basename = "_".join([name_from_filename(sample.name), "annotated", f"v{analysis.annotation_version.pk}",
                          str(sample.genome_build)])
-    return _node_grid_export(request, node, export_type, basename=basename, grid_kwargs={"paging": False})
+    return _node_grid_export(request, node, export_type, basename=basename)
 
 
 def node_grid_export(request, analysis_id):
