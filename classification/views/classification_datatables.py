@@ -197,7 +197,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             RichColumn(
                 key='published_evidence__somatic:clinical_significance__value',
                 name='somatic_clinical_significance',
-                label='Clinical Significance',
+                label='Somatic Clinical Significance',
                 renderer=self.render_somatic_clinical_significance,
                 client_renderer='VCTable.somatic_clinical_significance',
                 extra_columns=[

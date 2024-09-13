@@ -262,17 +262,13 @@
                 {% endcomment %}
             </div>
 
-            <div class="row">
-                <div class="col">
-                    <table id="vc-grouping-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table"></table>
-                    <div>
-                    Download as
-                        <a class='hover-link download-link' href="javascript:downloadAsdownloadAs('csv')">CSV</a>
-                        {% if CLASSIFICATION_REDCAP_EXPORT %},
-                        <a class='hover-link download-link' href="javascript:downloadAs('redcap')">REDCap</a>
-                        {% endif %}
-                    </div>
-                </div>
+            <table id="vc-grouping-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table"></table>
+            <div>
+            Download as
+                <a class='hover-link download-link' href="javascript:downloadAsdownloadAs('csv')">CSV</a>
+                {% if CLASSIFICATION_REDCAP_EXPORT %},
+                <a class='hover-link download-link' href="javascript:downloadAs('redcap')">REDCap</a>
+                {% endif %}
             </div>
 
         </div>

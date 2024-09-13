@@ -8,10 +8,11 @@ from more_itertools import first
 
 from classification.enums import ShareLevel, AlleleOriginBucket
 from classification.models import ClassificationModification, ClassificationGrouping, ImportedAlleleInfo, \
-    ClassificationGroupingGeneSymbol
+    ClassificationGroupingGeneSymbol, ClassificationGroupingCondition
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
 from library.utils import JsonDataType
+from ontology.models import OntologyTerm, OntologyService, OntologyRelation, OntologyTermRelation, OntologySnake
 from snpdb.models import UserSettings, GenomeBuild, Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, DC, SortOrder
 from variantgrid import settings
@@ -94,15 +95,38 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             base_qs = base_qs.filter(reduce(operator.or_, permission_q))
         return base_qs
 
-    def filter_queryset(self, qs: QuerySet[ClassificationModification]) -> QuerySet[ClassificationModification]:
+    def filter_queryset(self, qs: QuerySet[ClassificationGrouping]) -> QuerySet[ClassificationGrouping]:
         filters: List[Q] = []
         if lab_id := self.get_query_param('lab'):
             lab_list = lab_id.split(",")
             filters.append(Q(lab_id__in=lab_list))
 
+        if allele_id := self.get_query_param('allele_id'):
+            filters.append(Q(allele_origin_grouping__allele_grouping__allele_id=int(allele_id)))
+
         if allele_origin := self.get_query_param("allele_origin"):
             if allele_origin != "A":
                 filters.append(Q(allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
+
+        if condition := self.get_query_param('condition'):
+            term = OntologyTerm.get_or_stub(condition)
+
+            all_terms = set([term])
+            if mondo_term := OntologyTermRelation.as_mondo(term):
+                # if we have (or can translate) into a mondo term
+                # get all the direct parent and all the direct children terms
+                # and then the OMIM equiv of them
+                mondo_terms = set([mondo_term])
+                mondo_terms |= OntologySnake.get_children(mondo_term)
+                mondo_terms |= OntologySnake.get_parents(mondo_term)
+                all_terms |= mondo_terms
+                for term in mondo_terms:
+                    if omim_term := OntologyTermRelation.as_omim(term):
+                        all_terms.add(omim_term)
+
+            groups_for_condition = ClassificationGroupingCondition.objects.filter(ontology_term__in=all_terms).values_list("grouping", flat=True)
+            filters.append(Q(pk__in=groups_for_condition))
+            # TODO maybe check parent and children and OMIM/MONDO equiv
 
         if gene_symbol_str := self.get_query_param("gene_symbol"):
             if gene_symbol := GeneSymbol.objects.filter(symbol=gene_symbol_str).first():
@@ -175,7 +199,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             RichColumn(
                 key='somatic_clinical_significance_values',
                 name='somatic_clinical_significances',
-                label='Clinical<br/>Significance',
+                label='Somatic Clinical<br/>Significance',
                 client_renderer=RichColumn.client_renderer_repeat({"formatter": 'VCTable.somatic_clinical_significance'}),
                 sort_keys=['somatic_clinical_significance_sort'],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC]

@@ -292,6 +292,24 @@ table.diff tbody tr.textarea td {
 .classification-table td.dt-latest_curation_date {
   width: 100px;
 }
+.classification-table .repeat {
+  display: block;
+  margin-top: 4px;
+}
+.classification-table .repeat span.c-pill {
+  display: block;
+}
+.classification-table .repeat span.c-pill {
+  border-radius: 0 0 0 0;
+}
+.classification-table .repeat span.c-pill:first-child {
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+.classification-table .repeat span.c-pill:last-child {
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
 
 #vc-form .accordion {
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
