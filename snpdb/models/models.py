@@ -15,6 +15,7 @@ from html import escape
 from re import RegexFlag
 from typing import TypedDict, Optional
 
+from celery import signature
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -52,7 +53,7 @@ class CachedGeneratedFile(models.Model):
     filename = models.TextField(null=True)
     exception = models.TextField(null=True)
     generator = models.TextField()
-    params_hash = models.TextField()  # sha256 of params used to generate graph
+    params_hash = models.TextField()  # sha256 of params
     task_id = models.CharField(max_length=36, null=True)
     task_status = models.TextField(null=True)  # TODO: what's the actual size?
     generate_start = models.DateTimeField(null=True)
@@ -67,6 +68,25 @@ class CachedGeneratedFile(models.Model):
         else:
             description = f"task: {self.task_id} sent: {self.generate_start}"
         return f"{self.generator}({self.params_hash}): {description}"
+
+    @staticmethod
+    def get_or_create_and_launch(generator, params_hash, task: signature) -> 'CachedGeneratedFile':
+        cgf, created = CachedGeneratedFile.objects.get_or_create(generator=generator,
+                                                                 params_hash=params_hash)
+        if created or not cgf.task_id:
+            logging.debug("Launching Celery Job for CachedGeneratedFile(generator=%s, params_hash=%s)",
+                          generator, params_hash)
+            async_result = task.apply_async()
+            cgf.task_id = async_result.id
+            cgf.generate_start = timezone.now()
+            cgf.save()
+        else:
+            async_result = AsyncResult(cgf.task_id)
+
+        if async_result.result:
+            cgf.save_from_async_result(async_result)
+
+        return cgf
 
     def save_from_async_result(self, async_result):
         self.task_status = async_result.status
