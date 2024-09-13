@@ -14,6 +14,7 @@ from django.db.models.aggregates import Count, Max
 from django.db.models.base import ModelBase
 from django.db.models.fields.reverse_related import OneToOneRel
 from django.db.models.query_utils import Q
+from django.http import HttpRequest
 from django.urls.base import reverse_lazy
 from django.utils import timezone
 from django.utils.timezone import localtime
@@ -347,3 +348,12 @@ class UserMatcher:
                 user = self.default_user
             self.user_cache[username] = user
         return user
+
+
+class FakeRequest(HttpRequest):
+    """ Used as a hack for things that require it, eg JqGrid in a celery task """
+    def __init__(self, user):
+        super().__init__()
+        self.user = user
+        self.method = 'GET'
+        self.GET = {}

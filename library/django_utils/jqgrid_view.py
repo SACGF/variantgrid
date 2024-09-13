@@ -1,13 +1,14 @@
+import csv
 import json
-from typing import Type, Any, Optional
+from typing import Type, Any, Optional, Iterator
 
 from django.core.exceptions import PermissionDenied
-from django.http.response import JsonResponse, HttpResponse
+from django.http.response import JsonResponse, HttpResponse, StreamingHttpResponse
 from django.urls.base import resolve, reverse
+from django.utils.text import slugify
 from django.views.generic.base import View
 
-from library.jqgrid.jqgrid_export import grid_export_request
-from library.utils import nice_class_name
+from library.utils import nice_class_name, StashFile
 
 
 class JQGridViewOp:
@@ -110,3 +111,56 @@ class JQGridView(View):
             return HttpResponse()
 
         raise ValueError(f"Unknown post op of {op}")
+
+
+def grid_export_request(request, grid, basename):
+    MAX_FILE_NAME_LENGTH = 100  # Shorted as someone got a DDE error opening it in Windows
+
+    request.GET = request.GET.copy()  # Immutable
+    request.GET['rows'] = 0  # No pagination
+    items = grid.get_items(request)[2]
+    colmodels = grid.get_colmodels()
+    csv_iterator = grid_export_csv(colmodels, items)
+    basename = basename[:MAX_FILE_NAME_LENGTH]
+    response = StreamingHttpResponse(csv_iterator, content_type="text/csv")
+    response['Content-Disposition'] = f'attachment; filename="{slugify(basename)}.csv"'
+    return response
+
+
+
+def grid_export_csv(colmodels, items) -> Iterator[str]:
+    # If you make the first letters “ID” of a text file
+    # Excel incorrectly assumes you are trying to open an SYLK file.
+    label_overrides = {"id": "variant_id"}
+
+    pseudo_buffer = StashFile()
+    header, labels = colmodel_header_labels(colmodels, label_overrides=label_overrides)
+    # Don't use dictwriter as some sample names may be the same
+    writer = csv.writer(pseudo_buffer, dialect='excel')
+    writer.writerow(header)
+
+    def iter_row_writer():
+        yield pseudo_buffer.value
+        for obj in items:
+            # labels dict is in same sorted order as header
+            row = [obj.get(k) for k in labels]
+            writer.writerow(row)
+            yield pseudo_buffer.value
+
+    return iter_row_writer
+
+
+def colmodel_header_labels(colmodels, label_overrides=None):
+    labels = {}
+
+    header = []
+    for c in colmodels:
+        name = c['name']
+        column_label = c.get("label", name)
+        if label_overrides:
+            column_label = label_overrides.get(name, column_label)
+
+        labels[name] = column_label
+        header.append(column_label)
+
+    return header, labels

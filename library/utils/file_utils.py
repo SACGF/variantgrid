@@ -108,6 +108,22 @@ class IteratorFile:
             return rv
 
 
+class StashFile:
+    """ File-like object that holds a value """
+
+    def __init__(self):
+        self.data = ''
+
+    def write(self, value):
+        self.data += value
+
+    @property
+    def value(self):
+        data = self.data
+        self.data = ''
+        return data
+
+
 def add_permissions_to_file(filename: str, add_stat: int):
     """ Adds file permission on a existing file path """
     st = os.stat(filename)
