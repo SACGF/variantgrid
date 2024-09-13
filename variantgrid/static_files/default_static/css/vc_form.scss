@@ -230,39 +230,46 @@ table.diff {
 
 .classification-table {
 
-    tbody tr {
-        height: 39px; // give a minimum height so flags don't always stretch the row
-        font-size: 12px;
-    }
-
-    td.dt-gene_symbol, td.gene_symbol {
-        width: 60px;
-    }
-
-    td.dt-clinical_significance, td.cs, td.scs {
-        width: 125px;
-    }
-
-    td.allele_origin {
-        width: 90px;
-    }
-
-    td.dt-condition, td.condition {
-        min-width: 200px;
-        max-width: 200px;
-        word-break: break-word;
-    }
-
+    // old ones - moving away from these
     td.dt-lab, td.lab {
         width: 150px;
     }
-
+    td.allele_origin {
+        width: 90px;
+    }
+    .dt-classification, .dt-somatic_clinical_significance {
+        width: 135px;
+    }
+    td.dt-gene_symbol, td.gene_symbol {
+        width: 60px;
+    }
     td.dt-created, td.created {
         font-size: 12px;
         width: 140px;
         min-width: 100px;
     }
+    td.dt-user, td.user {
+        font-size: 10px;
+        color: #666666;
+    }
+    td.dt-flags {
+        width: 110px;
+        min-width: 110px;
+    }
+    td .flags {
+        padding: 2px;
+    }
+    td .flags .flag {
+        width: 16px;
+        height: 16px;
+        background-size: 16px 16px;
+    }
+    // end old
 
+    tbody tr {
+        height: 39px; // give a minimum height so flags don't always stretch the row
+        font-size: 12px;
+    }
     td.dt-id, td.id {
         width: 240px;
         min-width: 190px;
@@ -281,38 +288,28 @@ table.diff {
             }
         }
     }
-
     td.dt-c_hgvs, td.hgvs {
         .genome-build {
             font-size: 12px;
         }
         min-width: 150px;
-        max-width: 150px;
         word-break: break-all;
     }
 
-    td.dt-user, td.user {
-        font-size: 10px;
-        color: #666666;
+    td.dt-classifications, td.dt-somatic_clinical_significances {
+        width: 125px;
     }
 
-    td.dt-flags {
-        width: 110px;
-        min-width: 110px;
+    td.dt-condition, td.dt-conditions, td.condition {
+        width: 200px;
+        word-break: break-word;
     }
-
-    td .flags {
-        padding: 2px;
-    }
-
-    td .flags .flag {
-        width: 16px;
-        height: 16px;
-        background-size: 16px 16px;
+    td.dt-latest_criteria {
+        width: 150px;
     }
 
     td.dt-latest_curation_date {
-        min-width: 100px;
+        width: 100px;
     }
 }
 

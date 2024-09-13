@@ -217,31 +217,42 @@ table.diff tbody tr.textarea td {
   color: #888;
 }
 
-.classification-table tbody tr {
-  height: 39px;
-  font-size: 12px;
-}
-.classification-table td.dt-gene_symbol, .classification-table td.gene_symbol {
-  width: 60px;
-}
-.classification-table td.dt-clinical_significance, .classification-table td.cs, .classification-table td.scs {
-  width: 125px;
+.classification-table td.dt-lab, .classification-table td.lab {
+  width: 150px;
 }
 .classification-table td.allele_origin {
   width: 90px;
 }
-.classification-table td.dt-condition, .classification-table td.condition {
-  min-width: 200px;
-  max-width: 200px;
-  word-break: break-word;
+.classification-table .dt-classification, .classification-table .dt-somatic_clinical_significance {
+  width: 135px;
 }
-.classification-table td.dt-lab, .classification-table td.lab {
-  width: 150px;
+.classification-table td.dt-gene_symbol, .classification-table td.gene_symbol {
+  width: 60px;
 }
 .classification-table td.dt-created, .classification-table td.created {
   font-size: 12px;
   width: 140px;
   min-width: 100px;
+}
+.classification-table td.dt-user, .classification-table td.user {
+  font-size: 10px;
+  color: #666666;
+}
+.classification-table td.dt-flags {
+  width: 110px;
+  min-width: 110px;
+}
+.classification-table td .flags {
+  padding: 2px;
+}
+.classification-table td .flags .flag {
+  width: 16px;
+  height: 16px;
+  background-size: 16px 16px;
+}
+.classification-table tbody tr {
+  height: 39px;
+  font-size: 12px;
 }
 .classification-table td.dt-id, .classification-table td.id {
   width: 240px;
@@ -263,30 +274,23 @@ table.diff tbody tr.textarea td {
 }
 .classification-table td.dt-c_hgvs, .classification-table td.hgvs {
   min-width: 150px;
-  max-width: 150px;
   word-break: break-all;
 }
 .classification-table td.dt-c_hgvs .genome-build, .classification-table td.hgvs .genome-build {
   font-size: 12px;
 }
-.classification-table td.dt-user, .classification-table td.user {
-  font-size: 10px;
-  color: #666666;
+.classification-table td.dt-classifications, .classification-table td.dt-somatic_clinical_significances {
+  width: 125px;
 }
-.classification-table td.dt-flags {
-  width: 110px;
-  min-width: 110px;
+.classification-table td.dt-condition, .classification-table td.dt-conditions, .classification-table td.condition {
+  width: 200px;
+  word-break: break-word;
 }
-.classification-table td .flags {
-  padding: 2px;
-}
-.classification-table td .flags .flag {
-  width: 16px;
-  height: 16px;
-  background-size: 16px 16px;
+.classification-table td.dt-latest_criteria {
+  width: 150px;
 }
 .classification-table td.dt-latest_curation_date {
-  min-width: 100px;
+  width: 100px;
 }
 
 #vc-form .accordion {

@@ -135,9 +135,9 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
             RichColumn(
                 name="germline_overlap",
                 renderer=self.render_germline_status,
-                client_renderer=RichColumn.combine_client_renderers([
+                client_renderer=RichColumn.client_renderer_combine([
                     RichColumn.choices_client_renderer(OverlapStatus.choices),
-                    'VCTable.classification'
+                    RichColumn.client_renderer_repeat({"formatter": 'VCTable.classification'})
                 ]),
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 default_sort=SortOrder.DESC,
@@ -147,9 +147,9 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
             RichColumn(
                 name="somatic_overlap",
                 renderer=self.render_somatic_status,
-                client_renderer=RichColumn.combine_client_renderers([
+                client_renderer=RichColumn.client_renderer_combine([
                     RichColumn.choices_client_renderer(OverlapStatus.choices),
-                    'VCTable.somatic_clinical_significance'
+                    RichColumn.client_renderer_repeat({"formatter": "VCTable.somatic_clinical_significance"})
                 ]),
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 sort_keys=["somatic_overlap_status"],

@@ -121,6 +121,7 @@
         data.lab = blankToNull(getLabValue());
         data.user = blankToNull($('#id_user').val());
 
+        /*
         let flags = [];
         $('input[flagtypeid]').each((index, dom) => {
             let input = $(dom);
@@ -132,6 +133,7 @@
         if (flags.length) {
             data.flags = JSON.stringify(flags);
         }
+         */
         let allele_origin_filter_value = $("input[name='allele-origin-toggle']:checked").val();
         data.allele_origin = blankToNull(allele_origin_filter_value);
         data.id_filter = blankToNull($('#id_filter').val());
@@ -234,6 +236,7 @@
                     {% allele_origin_toggle show_label=False %}
                 </div>
 
+                {% comment %}
                 {% if CLASSIFICATION_ID_FILTER %}
                 <div class="col-md-4 col-lg-2">
                     <br/>
@@ -256,6 +259,7 @@
                         <div class="clear"></div>
                     </div>
                 </div>
+                {% endcomment %}
             </div>
 
             <div class="row">
@@ -263,7 +267,7 @@
                     <table id="vc-grouping-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table"></table>
                     <div>
                     Download as
-                        <a class='hover-link download-link' href="javascript:downloadAs('csv')">CSV</a>
+                        <a class='hover-link download-link' href="javascript:downloadAsdownloadAs('csv')">CSV</a>
                         {% if CLASSIFICATION_REDCAP_EXPORT %},
                         <a class='hover-link download-link' href="javascript:downloadAs('redcap')">REDCap</a>
                         {% endif %}

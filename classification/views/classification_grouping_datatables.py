@@ -167,7 +167,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 key='classification_values',
                 name='classifications',
                 label='Classifications',
-                client_renderer='VCTable.classification',
+                client_renderer=RichColumn.client_renderer_repeat({"formatter": 'VCTable.classification'}),
                 sort_keys=['classification_sort_value'], # FIXME add a sort column
                 order_sequence=[SortOrder.DESC, SortOrder.ASC]
             ),
@@ -175,8 +175,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             RichColumn(
                 key='somatic_clinical_significance_values',
                 name='somatic_clinical_significances',
-                label='Clinical Significance',
-                client_renderer='VCTable.somatic_clinical_significance',
+                label='Clinical<br/>Significance',
+                client_renderer=RichColumn.client_renderer_repeat({"formatter": 'VCTable.somatic_clinical_significance'}),
                 sort_keys=['somatic_clinical_significance_sort'],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC]
             ),

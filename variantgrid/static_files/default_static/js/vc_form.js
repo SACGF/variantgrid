@@ -2461,73 +2461,54 @@ VCTable.latest_curation_and_link = (data, type, row) => {
 }
 
 VCTable.somatic_clinical_significance = (data, type, row) => {
-
-    let allValues = []
-    if (Array.isArray(data)) {
-        for (value of data) {
-            let parts = value.split("|");
-            let scs = {};
-            scs[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE] = parts[0];
-            if (parts.length > 1) {
-                scs["highest_level"] = parts[1];
-            }
-            allValues.push(scs);
+    let value = null;
+    if (data === null) {
+        return "";
+    }
+    if (typeof(data) === "string") {
+        let parts = data.split("|");
+        value = {};
+        value[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE] = parts[0];
+        if (parts.length > 1) {
+            value["highest_level"] = parts[1];
         }
-    } else if (data && SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE in data) {
-        allValues.push(data);
+    } else {
+        value = data;
     }
 
-    if (allValues.length > 0) {
-        let dom = $('<div>');
-        for (value of allValues) {
-            let scs = value[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE];
-            if (scs) {
-                let scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
-                let scsLabel = scsKey.prettyValue(scs);
-                let subDom = ($('<span>', {text: scsLabel.val, 'class': `c-pill scs scs-${scs}`})).appendTo(dom);
+    let scs = value[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE];
+    if (scs) {
+        let scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
+        let scsLabel = scsKey.prettyValue(scs);
+        let dom = ($('<span>', {text: scsLabel.val, 'class': `c-pill scs scs-${scs}`}));
 
-                let highest_level = value["highest_level"];
-                if (highest_level) {
-                    subDom.append(` <span class="amp-level">${highest_level}</span>`);
-                }
-            } else {
-                dom.append($('<div>', {class: 'c-pill scs-none no-value', text: 'No Data'}));
-            }
+        let highest_level = value["highest_level"];
+        if (highest_level) {
+            dom.append(`<span class="amp-level">${highest_level}</span>`);
         }
         return dom;
     } else {
-        return "";
+        return $('<div>', {class: 'c-pill scs-none no-value', text: 'No Data'});
     }
 }
 
 VCTable.classification = (data, type, row) => {
-    let dom = $('<span>', {"class": "classifications"});
-    let dataList = [];
     if (data === null) {
         return "" // support for dirty groups still processing
     }
-    if (Array.isArray(data)) {
-         for (let cs of data) {
-             let newData = {}
-             newData[SpecialEKeys.CLINICAL_SIGNIFICANCE] = cs;
-             dataList.push(newData);
-         }
+    let cs = data;
+    if (typeof(cs) !== "string") {
+        console.log(cs);
+        cs = cs[SpecialEKeys.CLINICAL_SIGNIFICANCE];
+    }
+    let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
+    let label = csKey.prettyValue(cs);
+    let csClass = `cs-` + (cs || '').toLowerCase()
+    if (cs && cs.length) {
+        return $('<span>', {class: `c-pill cs ${csClass}`, text: label.val});
     } else {
-        dataList = [data];
+        return $('<span>', {class: 'c-pill cs-none no-value', text: 'No Data'});
     }
-
-    for (let entry of dataList) {
-        let cs = entry[SpecialEKeys.CLINICAL_SIGNIFICANCE];
-        let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
-        let label = csKey.prettyValue(cs);
-        let csClass = `cs-` + (cs || '').toLowerCase()
-        if (cs && cs.length) {
-            $('<span>', {class: `c-pill cs ${csClass}`, text: label.val}).appendTo(dom);
-        } else {
-            $('<span>', {class: 'c-pill cs-none no-value', text: 'No Data'}).appendTo(dom);
-        }
-    }
-    return dom;
 };
 
 VCTable.evidence_key = (key_name, data, type, row) => {

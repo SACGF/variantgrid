@@ -568,7 +568,7 @@ TableFormat.repeat = function(settings, data, type, columns) {
     if (settings.groupCSS) {
         cssClass = settings.groupCSS;
     }
-    let dom = $('<div>');
+    let dom = $('<div>', {"class": cssClass});
     data.forEach((subData, index) => {
         let subDom = subFormatter(subData, type, columns);
         dom.append(subDom);
