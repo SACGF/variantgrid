@@ -724,6 +724,7 @@ REST_FRAMEWORK = {
     # NOTE: Middleware is run first - so GlobalLoginRequiredMiddleware will reject tokens w/o logins
     # before DRF even sees it. You need to add your APIs to PUBLIC_PATHS
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.BasicAuthentication',  # Needed to classification export clients
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
     ],
