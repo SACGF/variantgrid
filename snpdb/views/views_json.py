@@ -7,7 +7,7 @@ from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
 
-from library.django_utils import require_superuser
+from library.django_utils import require_superuser, get_url_from_media_root_filename
 from snpdb.models import CachedGeneratedFile, Cohort, Sample, VCF, CustomColumnsCollection, TagColorsCollection
 from snpdb.tasks.clingen_tasks import populate_clingen_alleles_from_vcf
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_and_launch_task
@@ -34,9 +34,7 @@ def cached_generated_file_check(request, cgf_id):
     if cgf.exception:
         data["exception"] = str(cgf.exception)
     elif cgf.task_status == "SUCCESS":
-        media_root_dir = os.path.join(settings.MEDIA_ROOT, "")  # with end slash
-        file_path = cgf.filename.replace(media_root_dir, "")
-        data["url"] = os.path.join(settings.MEDIA_URL, file_path)
+        data["url"] = cgf.get_media_url()
 
     return JsonResponse(data)
 

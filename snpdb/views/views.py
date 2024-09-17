@@ -1,6 +1,7 @@
 import itertools
 import json
 import logging
+import os
 from collections import OrderedDict, defaultdict
 from typing import Iterable
 
@@ -27,6 +28,7 @@ from termsandconditions.decorators import terms_required
 from analysis.analysis_templates import get_sample_analysis
 from analysis.forms import AnalysisOutputNodeChoiceForm
 from analysis.models import AnalysisTemplate
+from analysis.tasks.analysis_grid_export_tasks import get_grid_downloadable_file_params_hash
 from annotation.forms import GeneCountTypeChoiceForm
 from annotation.manual_variant_entry import create_manual_variants, can_create_variants
 from annotation.models import AnnotationVersion, SampleVariantAnnotationStats, SampleGeneAnnotationStats, \
@@ -245,9 +247,11 @@ def view_vcf(request, vcf_id):
 
         add_save_message(request, valid, "VCF")
 
+    cohort_id = None
     try:
         # Some legacy data was too hard to fix and relies on being re-imported
         _ = vcf.cohort
+        cohort_id = vcf.cohort.pk
         _ = vcf.cohort.cohort_genotype_collection
     except (Cohort.DoesNotExist, CohortGenotypeCollection.DoesNotExist):
         messages.add_message(request, messages.ERROR, "This legacy VCF is missing data and needs to be reloaded.")
@@ -279,10 +283,20 @@ def view_vcf(request, vcf_id):
         can_view_upload_pipeline = False
 
     can_download_annotated_vcf = False
-    if vcf.import_status == ImportStatus.SUCCESS:
+    annotated_vcf_url = None
+    annotated_csv_url = None
+    if vcf.import_status == ImportStatus.SUCCESS and cohort_id:
         try:
             AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
             can_download_annotated_vcf = True
+            params_hash_vcf = get_grid_downloadable_file_params_hash(cohort_id, "vcf")
+            if cgf_vcf := CachedGeneratedFile.objects.filter(generator="export_cohort_to_downloadable_file",
+                                                             params_hash=params_hash_vcf).first():
+                annotated_vcf_url = cgf_vcf.get_media_url()
+            params_hash_csv = get_grid_downloadable_file_params_hash(cohort_id, "csv")
+            if cgf_csv := CachedGeneratedFile.objects.filter(generator="export_cohort_to_downloadable_file",
+                                                             params_hash=params_hash_csv).first():
+                annotated_csv_url = cgf_csv.get_media_url()
         except ValueError:
             pass
 
@@ -299,6 +313,8 @@ def view_vcf(request, vcf_id):
         'can_download_vcf': (not settings.VCF_DOWNLOAD_ADMIN_ONLY) or request.user.is_superuser,
         'can_download_annotated_vcf': can_download_annotated_vcf,
         'can_view_upload_pipeline': can_view_upload_pipeline,
+        'annotated_vcf_url': annotated_vcf_url,
+        'annotated_csv_url': annotated_csv_url,
         "variant_zygosity_count_collections": variant_zygosity_count_collections,
     }
     return render(request, 'snpdb/data/view_vcf.html', context)
@@ -1619,26 +1635,25 @@ def global_sample_gene_matrix(request):
 def genomic_intervals_graph(request, genomic_intervals_collection_id):
     graph_class_name = full_class_name(ChromosomeIntervalsGraph)
     cached_graph = graphcache.async_graph(graph_class_name, genomic_intervals_collection_id)
-    return HttpResponseRedirect(reverse("cached_generated_file_check", kwargs={"cgf_id": cached_graph.id}))
+    return redirect(cached_graph)
 
 
 def chrom_density_graph(request, sample_id, cmap):
     graph_class_name = full_class_name(SampleChromosomeDensityGraph)
-
     cached_graph = graphcache.async_graph(graph_class_name, cmap, sample_id)
-    return HttpResponseRedirect(reverse("cached_generated_file_check", kwargs={"cgf_id": cached_graph.id}))
+    return redirect(cached_graph)
 
 
 def homozygosity_graph(request, sample_id, cmap):
     graph_class_name = full_class_name(HomozygosityPercentGraph)
     cached_graph = graphcache.async_graph(graph_class_name, cmap, sample_id)
-    return HttpResponseRedirect(reverse("cached_generated_file_check", kwargs={"cgf_id": cached_graph.id}))
+    return redirect(cached_graph)
 
 
 def sample_allele_frequency_histogram_graph(request, sample_id, min_read_depth):
     graph_class_name = full_class_name(AlleleFrequencyHistogramGraph)
     cached_graph = graphcache.async_graph(graph_class_name, sample_id, min_read_depth)
-    return HttpResponseRedirect(reverse("cached_generated_file_check", kwargs={"cgf_id": cached_graph.id}))
+    return redirect(cached_graph)
 
 
 def view_genome_build(request, genome_build_name):

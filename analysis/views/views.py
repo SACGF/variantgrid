@@ -609,14 +609,14 @@ def node_graph(request, analysis_id, node_id, graph_type_id, cmap):
     get_node_subclass_or_404(request.user, node_id)  # Permission check
     node_graph_type = NodeGraphType.objects.get(pk=graph_type_id)
     cached_graph = graphcache.async_graph(node_graph_type.graph_class, cmap, node_id)
-    return HttpResponseRedirect(reverse("cached_generated_file_check", kwargs={"cgf_id": cached_graph.id}))
+    return redirect(cached_graph)
 
 
 def column_summary_boxplot(request, analysis_id, node_id, label, variant_column):
     get_node_subclass_or_404(request.user, node_id)  # Permission check
     graph_class_name = full_class_name(ColumnBoxplotGraph)
     cached_graph = graphcache.async_graph(graph_class_name, node_id, label, variant_column)
-    return HttpResponseRedirect(reverse("cached_generated_file_check", kwargs={"cgf_id": cached_graph.id}))
+    return redirect(cached_graph)
 
 
 def cohort_zygosity_filters(request, analysis_id, node_id, cohort_id):

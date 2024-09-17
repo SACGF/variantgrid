@@ -6,6 +6,7 @@ from django.contrib.postgres.aggregates.general import StringAgg
 from django.core.cache import cache
 from django.http import JsonResponse
 from django.http.response import StreamingHttpResponse, HttpResponseRedirect
+from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -118,7 +119,7 @@ def cohort_grid_export(request, cohort_id, export_type):
     params_hash = get_grid_downloadable_file_params_hash(cohort_id, export_type)
     task = export_cohort_to_downloadable_file.si(cohort_id, export_type)
     cgf = CachedGeneratedFile.get_or_create_and_launch("export_cohort_to_downloadable_file", params_hash, task)
-    return JsonResponse({"celery_task": cgf.task_id})
+    return redirect(cgf)
 
 
 def sample_grid_export(request, sample_id, export_type):

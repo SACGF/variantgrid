@@ -1,11 +1,8 @@
 import abc
-import logging
 import os
 
 from celery import signature
-from celery.result import AsyncResult
 from django.conf import settings
-from django.utils import timezone
 
 from library.graphs import graph_base
 from library.utils import import_class

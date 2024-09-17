@@ -10,6 +10,7 @@
 {% block title %}{{ vcf.name }}{% endblock %}
 {% block head %}
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/generated_graphs.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 
 <style>
@@ -281,6 +282,43 @@ $(document).ready(function() {
             },
         });
     });
+
+    function pollAndDownloadFile(selector, fileType) {
+        const spinnerId = 'spinner-' + fileType;
+        function downloadFile(data) {
+            /*
+            $("#" + spinnerId).replaceWith('<i class="fas fa-xmark"></i> Error retrieving download...');
+
+                                <a href="{{ annotated_vcf_url }}">
+                                    <div class="icon24 left margin-r-5 vcf-icon"></div> Annotated VCF
+                                </a>
+
+
+             */
+            window.location.href = data.url;
+        }
+
+        let failureFunc = function(data) {
+            console.log("Fail!");
+            $("#" + spinnerId).replaceWith('<i class="fas fa-xmark"></i> Error retrieving download...');
+        }
+
+        $(selector).replaceWith(`<span id="${spinnerId}"><i class="fas fa-spinner fa-spin"></i> Preparing download...</span>`);
+        let pollUrl = Urls.cohort_grid_export({{ vcf.cohort.pk  }}, fileType);
+        poll_cached_generated_file(pollUrl, downloadFile, failureFunc);
+    }
+
+    $("#generate-vcf-download").click(function(event) {
+        event.preventDefault();
+        pollAndDownloadFile(this, "vcf");
+    });
+
+
+    $("#generate-csv-download").click(function(event) {
+        event.preventDefault();
+        pollAndDownloadFile(this, "csv");
+    });
+
 });
 </script>
 <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
@@ -321,8 +359,29 @@ $(document).ready(function() {
                         <div class="p-2"><a href="{% url 'download_uploaded_file' vcf.uploadedvcf.uploaded_file.pk %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Original VCF</a> ({{ vcf.uploadedvcf.uploaded_file.size|filesizeformat }})</div>
                     {% endif %}
                     {% if can_download_annotated_vcf %}
-                        <div class="p-2"><a href="{% url 'cohort_grid_export' vcf.cohort.pk 'vcf' %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Annotated VCF</a></div>
-                        <div class="p-2"><a href="{% url 'cohort_grid_export' vcf.cohort.pk 'csv' %}"><div class="icon24 left margin-r-5 csv-icon"></div> Annotated CSV</a></div>
+                        <div class="p-2">
+                            {% if annotated_vcf_url %}
+                                <a href="{{ annotated_vcf_url }}">
+                                    <div class="icon24 left margin-r-5 vcf-icon"></div> Annotated VCF
+                                </a>
+                            {% else %}
+                                <a href="#" id="generate-vcf-download">
+                                    <div class="icon24 left margin-r-5 vcf-icon"></div> Annotated VCF
+                                </a>
+                            {% endif %}
+                        </div>
+                        <div class="p-2">
+                            {% if annotated_csv_url %}
+                                <a href="{{ annotated_csv_url }}">
+                                    <div class="icon24 left margin-r-5 csv-icon"></div> Annotated CSV
+                                </a>
+                            {% else %}
+                                <a href="#" id="generate-csv-download">
+                                    <div class="icon24 left margin-r-5 csv-icon"></div> Annotated CSV
+                                </a>
+                            {% endif %}
+
+                        </div>
                     {% endif %}
                 </div>
             </div>
