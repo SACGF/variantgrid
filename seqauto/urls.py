@@ -128,7 +128,7 @@ router.register(r'api/v1/qc_gene_coverage', QCGeneCoverageViewSet, basename='api
 router.register(r'api/v1/qc_exec_summary', QCExecSummaryViewSet, basename='api_qc_exec_summary')
 
 urlpatterns += [
-    path('', include(router.urls)),
+    path('', include(router.urls), name='seqauto_apis'),
 ]
 
 rest_urlpatterns = [

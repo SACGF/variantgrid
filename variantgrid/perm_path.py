@@ -27,7 +27,8 @@ def _perm_path(route, view, path_func, **kwargs):
         if not settings.URLS_NAME_REGISTER[name]:
             view = require_superuser(view)
     else:
-        logging.warning("url: '%s' has no name, so is not tested via URLS_NAME_REGISTER", route)
+        logging.warning("url: route='%s', has no name, so is not tested via URLS_NAME_REGISTER",
+                        route, str(view))
     return path_func(route, view, **kwargs)
 
 
