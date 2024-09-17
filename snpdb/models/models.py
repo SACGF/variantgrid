@@ -10,6 +10,7 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime
+from fileinput import filename
 from functools import cached_property, total_ordering
 from html import escape
 from re import RegexFlag
@@ -33,6 +34,7 @@ from model_utils.managers import InheritanceManager
 from more_itertools import first
 
 from classification.enums.classification_enums import ShareLevel
+from library.django_utils import get_url_from_media_root_filename
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.enums.log_level import LogLevel
 from library.preview_request import PreviewModelMixin
@@ -68,6 +70,14 @@ class CachedGeneratedFile(models.Model):
         else:
             description = f"task: {self.task_id} sent: {self.generate_start}"
         return f"{self.generator}({self.params_hash}): {description}"
+
+    def get_absolute_url(self):
+        return reverse("cached_generated_file_check", kwargs={"cgf_id": self.pk})
+
+    def get_media_url(self):
+        if self.filename is None:
+            raise ValueError(f"{self}.filename is None")
+        return get_url_from_media_root_filename(self.filename)
 
     @staticmethod
     def get_or_create_and_launch(generator, params_hash, task: signature) -> 'CachedGeneratedFile':

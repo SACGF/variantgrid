@@ -14,6 +14,7 @@ from django.utils.text import slugify
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
+from library.django_utils import get_url_from_media_root_filename
 from library.utils import execute_cmd
 from patients.models_enums import Sex
 from pedigree.ped.export_ped import write_unrelated_ped, write_trio_ped
@@ -72,11 +73,7 @@ class AbstractSomalierModel(TimeStampedModel):
     @staticmethod
     def media_url(file_path):
         # Need to use a slash, so that later joins don't have absolute path
-        media_root_with_slash = os.path.join(settings.MEDIA_ROOT, "")
-        if not file_path.startswith(media_root_with_slash):
-            raise ValueError(f"'{file_path}' must start with MEDIA_ROOT: {media_root_with_slash}")
-
-        return os.path.join(settings.MEDIA_URL, file_path[len(media_root_with_slash):])
+        return get_url_from_media_root_filename(file_path)
 
 
 class SomalierVCFExtract(AbstractSomalierModel):

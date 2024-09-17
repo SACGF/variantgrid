@@ -29,11 +29,13 @@ def _write_cached_generated_file(cgf: CachedGeneratedFile, filename, file_iterat
             for line in file_iterator():
                 f.write(line)  # Already has newline
         cgf.filename = media_root_filename
+        cgf.task_status = "SUCCESS"
         cgf.generate_end = timezone.now()
         logging.info("Wrote %s", media_root_filename)
     except Exception as e:
         logging.error("Failed to write %s: %s", media_root_filename, e)
         cgf.exception = str(e)
+        cgf.task_status = "FAILURE"
     cgf.save()
 
 

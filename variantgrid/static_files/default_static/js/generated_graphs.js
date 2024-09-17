@@ -46,3 +46,18 @@ function poll_graph_status(graph_selector, poll_url, delete_url) {
 	});
 }
 
+
+function poll_cached_generated_file(poll_url, success_func, failure_func) {
+	$.getJSON(poll_url, function(data) {
+		if (data.status == "SUCCESS") {
+			success_func(data);
+		} else if (data.status == 'FAILURE') {
+			failure_func(data);
+		} else {
+			const retry_func = function () {
+				poll_cached_generated_file(poll_url, success_func, failure_func);
+			};
+			window.setTimeout(retry_func, freq);
+		}
+	});
+}
