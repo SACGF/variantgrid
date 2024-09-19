@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import re
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from fileinput import filename
@@ -52,9 +53,11 @@ class Tag(models.Model):
         return self.id
 
 
-class CachedGeneratedFile(models.Model):
-    """ Matplotlib graph generated via async Celery task
-        @see snpdb.graphs.graphcache.CacheableGraph """
+class CachedGeneratedFile(TimeStampedModel):
+    # We use a UUID for these so people can't guess the IDs and see other people's graphs/downloads etc
+    # The generator and params hash are unique - we look these up in a view where we do the appropriate
+    # security checks on any objects - then can just pass the hash around (big enough to be secret)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     filename = models.TextField(null=True)
     exception = models.TextField(null=True)
     generator = models.TextField()
