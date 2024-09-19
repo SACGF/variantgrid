@@ -283,42 +283,67 @@ $(document).ready(function() {
         });
     });
 
-    function pollAndDownloadFile(selector, fileType) {
-        const spinnerId = 'spinner-' + fileType;
-        function downloadFile(data) {
-            /*
-            $("#" + spinnerId).replaceWith('<i class="fas fa-xmark"></i> Error retrieving download...');
-
-                                <a href="{{ annotated_vcf_url }}">
-                                    <div class="icon24 left margin-r-5 vcf-icon"></div> Annotated VCF
-                                </a>
-
-
-             */
-            window.location.href = data.url;
+    class AnnotatedFileDownload {
+        constructor(selector, pollUrl, fileType) {
+            this.selector = $(selector);
+            this.pollUrl = pollUrl;
+            this.fileType = fileType;
+            this.ucFileType = this.fileType.toUpperCase()
         }
 
-        let failureFunc = function(data) {
-            console.log("Fail!");
-            $("#" + spinnerId).replaceWith('<i class="fas fa-xmark"></i> Error retrieving download...');
+        setGenerateDownloadLink() {
+            // console.log("setGenerateDownloadLink");
+            const that = this;
+            const generateLink = $(`<a href="#" id="generate-${this.fileType}-download"><div class="icon24 left margin-r-5 ${this.fileType}-icon"></div> Annotated ${this.ucFileType}</a>`);
+            generateLink.click(function(event) {
+                event.preventDefault();
+                that.setPolling(true);
+            });
+            this.selector.empty();
+            this.selector.append(generateLink);
+            console.log("/setGenerateDownloadLink");
         }
 
-        $(selector).replaceWith(`<span id="${spinnerId}"><i class="fas fa-spinner fa-spin"></i> Preparing download...</span>`);
-        let pollUrl = Urls.cohort_grid_export({{ vcf.cohort.pk  }}, fileType);
-        poll_cached_generated_file(pollUrl, downloadFile, failureFunc);
+        setDownloadLink(url) {
+            // console.log("setDownloadLink");
+            this.selector.html(`<a href="${url}"><div class="icon24 left margin-r-5 ${this.fileType}-icon"></div> Annotated ${this.ucFileType}</a>`);
+        }
+
+        setError() {
+            // console.log("setError");
+            this.selector.html('<i class="fas fa-xmark"></i> Error retrieving download...');
+        }
+
+        setPolling(download) {
+            // console.log("setPolling");
+            let that = this;
+            function downloadFile(data) {
+                that.setDownloadLink(data.url);
+                if (download) {
+                    window.location.href = data.url;
+                }
+            }
+            $(this.selector).html(`<span><i class="fas fa-spinner fa-spin"></i> Preparing download...</span>`);
+            poll_cached_generated_file(this.pollUrl, downloadFile, this.setError)
+        }
     }
 
-    $("#generate-vcf-download").click(function(event) {
-        event.preventDefault();
-        pollAndDownloadFile(this, "vcf");
-    });
-
-
-    $("#generate-csv-download").click(function(event) {
-        event.preventDefault();
-        pollAndDownloadFile(this, "csv");
-    });
-
+    {% for file_type, cgf in annotated_download_files.items %}
+        var pollUrl = Urls.cohort_grid_export({{ vcf.cohort.pk  }}, "{{ file_type }}");
+        var afdSelector = $("div#generate-{{ file_type }}-download");
+        var afd = new AnnotatedFileDownload(afdSelector, pollUrl, "{{ file_type }}");
+        {% if cgf %}
+            {% if cgf.exception %}
+                afd.setError()
+            {% elif cgf.status == "SUCCESS" %}
+                afd.setDownloadLink("{{ cgf.get_media_url  }}");
+            {% else %}
+                afd.setPolling(false);
+            {% endif %}
+        {% else %}
+            afd.setGenerateDownloadLink();
+        {% endif %}
+    {% endfor %}
 });
 </script>
 <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
@@ -351,38 +376,16 @@ $(document).ready(function() {
         {% csrf_token %}
         {% crispy vcf_form form_helper.horizontal %}
 
-        {% if can_download_vcf %}
+        {% if annotated_download_files or vcf.uploadedvcf.uploaded_file.exists %}
             <div class="form-group-row row">
                 <label class="col-form-label col-12 col-md-3 text-md-right">Download</label>
                 <div class="d-flex flex-row">
                     {% if vcf.uploadedvcf.uploaded_file.exists %}
                         <div class="p-2"><a href="{% url 'download_uploaded_file' vcf.uploadedvcf.uploaded_file.pk %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Original VCF</a> ({{ vcf.uploadedvcf.uploaded_file.size|filesizeformat }})</div>
                     {% endif %}
-                    {% if can_download_annotated_vcf %}
-                        <div class="p-2">
-                            {% if annotated_vcf_url %}
-                                <a href="{{ annotated_vcf_url }}">
-                                    <div class="icon24 left margin-r-5 vcf-icon"></div> Annotated VCF
-                                </a>
-                            {% else %}
-                                <a href="#" id="generate-vcf-download">
-                                    <div class="icon24 left margin-r-5 vcf-icon"></div> Annotated VCF
-                                </a>
-                            {% endif %}
-                        </div>
-                        <div class="p-2">
-                            {% if annotated_csv_url %}
-                                <a href="{{ annotated_csv_url }}">
-                                    <div class="icon24 left margin-r-5 csv-icon"></div> Annotated CSV
-                                </a>
-                            {% else %}
-                                <a href="#" id="generate-csv-download">
-                                    <div class="icon24 left margin-r-5 csv-icon"></div> Annotated CSV
-                                </a>
-                            {% endif %}
-
-                        </div>
-                    {% endif %}
+                    {% for file_type in annotated_download_files %}
+                        <div id="generate-{{ file_type }}-download" class="p-2"></div>
+                    {% endfor %}
                 </div>
             </div>
         {% endif %}

@@ -282,21 +282,18 @@ def view_vcf(request, vcf_id):
     except UploadedVCF.DoesNotExist:
         can_view_upload_pipeline = False
 
-    can_download_annotated_vcf = False
-    annotated_vcf_url = None
-    annotated_csv_url = None
+    annotated_download_files = {}
     if vcf.import_status == ImportStatus.SUCCESS and cohort_id:
         try:
             AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
-            can_download_annotated_vcf = True
             params_hash_vcf = get_grid_downloadable_file_params_hash(cohort_id, "vcf")
-            if cgf_vcf := CachedGeneratedFile.objects.filter(generator="export_cohort_to_downloadable_file",
-                                                             params_hash=params_hash_vcf).first():
-                annotated_vcf_url = cgf_vcf.get_media_url()
+            cgf_vcf = CachedGeneratedFile.objects.filter(generator="export_cohort_to_downloadable_file",
+                                                         params_hash=params_hash_vcf).first()
             params_hash_csv = get_grid_downloadable_file_params_hash(cohort_id, "csv")
-            if cgf_csv := CachedGeneratedFile.objects.filter(generator="export_cohort_to_downloadable_file",
-                                                             params_hash=params_hash_csv).first():
-                annotated_csv_url = cgf_csv.get_media_url()
+            cgf_csv = CachedGeneratedFile.objects.filter(generator="export_cohort_to_downloadable_file",
+                                                         params_hash=params_hash_csv).first()
+
+            annotated_download_files = {"vcf": cgf_vcf, "csv": cgf_csv}
         except ValueError:
             pass
 
@@ -311,10 +308,8 @@ def view_vcf(request, vcf_id):
         'patient_form': PatientForm(user=request.user),  # blank
         'has_write_permission': has_write_permission,
         'can_download_vcf': (not settings.VCF_DOWNLOAD_ADMIN_ONLY) or request.user.is_superuser,
-        'can_download_annotated_vcf': can_download_annotated_vcf,
         'can_view_upload_pipeline': can_view_upload_pipeline,
-        'annotated_vcf_url': annotated_vcf_url,
-        'annotated_csv_url': annotated_csv_url,
+        'annotated_download_files': annotated_download_files,
         "variant_zygosity_count_collections": variant_zygosity_count_collections,
     }
     return render(request, 'snpdb/data/view_vcf.html', context)

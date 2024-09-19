@@ -57,7 +57,7 @@ class CachedGeneratedFile(models.Model):
     generator = models.TextField()
     params_hash = models.TextField()  # sha256 of params
     task_id = models.CharField(max_length=36, null=True)
-    task_status = models.TextField(null=True)  # TODO: what's the actual size?
+    task_status = models.TextField(null=True)
     generate_start = models.DateTimeField(null=True)
     generate_end = models.DateTimeField(null=True)
 

@@ -136,7 +136,7 @@ def grid_export_csv(colmodels, items) -> Iterator[str]:
     pseudo_buffer = StashFile()
     header, labels = colmodel_header_labels(colmodels, label_overrides=label_overrides)
     # Don't use dictwriter as some sample names may be the same
-    writer = csv.writer(pseudo_buffer, dialect='excel')
+    writer = csv.writer(pseudo_buffer, dialect='excel', escapechar='\\', quoting=csv.QUOTE_NONE)
     writer.writerow(header)
 
     def iter_row_writer():
