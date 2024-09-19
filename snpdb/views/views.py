@@ -28,7 +28,8 @@ from termsandconditions.decorators import terms_required
 from analysis.analysis_templates import get_sample_analysis
 from analysis.forms import AnalysisOutputNodeChoiceForm
 from analysis.models import AnalysisTemplate
-from analysis.tasks.analysis_grid_export_tasks import get_grid_downloadable_file_params_hash
+from analysis.tasks.analysis_grid_export_tasks import get_grid_downloadable_file_params_hash, \
+    get_annotated_download_files_cgf
 from annotation.forms import GeneCountTypeChoiceForm
 from annotation.manual_variant_entry import create_manual_variants, can_create_variants
 from annotation.models import AnnotationVersion, SampleVariantAnnotationStats, SampleGeneAnnotationStats, \
@@ -283,19 +284,9 @@ def view_vcf(request, vcf_id):
         can_view_upload_pipeline = False
 
     annotated_download_files = {}
-    if vcf.import_status == ImportStatus.SUCCESS and cohort_id:
-        try:
-            AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
-            params_hash_vcf = get_grid_downloadable_file_params_hash(cohort_id, "vcf")
-            cgf_vcf = CachedGeneratedFile.objects.filter(generator="export_cohort_to_downloadable_file",
-                                                         params_hash=params_hash_vcf).first()
-            params_hash_csv = get_grid_downloadable_file_params_hash(cohort_id, "csv")
-            cgf_csv = CachedGeneratedFile.objects.filter(generator="export_cohort_to_downloadable_file",
-                                                         params_hash=params_hash_csv).first()
-
-            annotated_download_files = {"vcf": cgf_vcf, "csv": cgf_csv}
-        except ValueError:
-            pass
+    if not settings.VCF_DOWNLOAD_ADMIN_ONLY or request.user.is_superuser:
+        if vcf.import_status == ImportStatus.SUCCESS and cohort_id:
+            annotated_download_files = get_annotated_download_files_cgf("export_cohort_to_downloadable_file", cohort_id)
 
     context = {
         'vcf': vcf,
@@ -307,7 +298,6 @@ def view_vcf(request, vcf_id):
         'samples_form': samples_form,
         'patient_form': PatientForm(user=request.user),  # blank
         'has_write_permission': has_write_permission,
-        'can_download_vcf': (not settings.VCF_DOWNLOAD_ADMIN_ONLY) or request.user.is_superuser,
         'can_view_upload_pipeline': can_view_upload_pipeline,
         'annotated_download_files': annotated_download_files,
         "variant_zygosity_count_collections": variant_zygosity_count_collections,
@@ -406,22 +396,18 @@ def view_sample(request, sample_id):
         related_samples = SomalierRelatePairs.get_for_sample(sample).order_by("relate")
 
     sample_stats_variant_class_df, sample_stats_zygosity_df = _sample_stats(sample)
-    can_download_annotated_vcf = False
-    if sample.import_status == ImportStatus.SUCCESS:
-        try:
-            AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_SAMPLE")
-            can_download_annotated_vcf = True
-        except ValueError:
-            pass
+    annotated_download_files = {}
+    if not settings.VCF_DOWNLOAD_ADMIN_ONLY or request.user.is_superuser:
+        if sample.import_status == ImportStatus.SUCCESS:
+            annotated_download_files = get_annotated_download_files_cgf("export_sample_to_downloadable_file", sample.pk)
 
     context = {
+        'annotated_download_files': annotated_download_files,
         'sample': sample,
         'samples': [sample],
         'sample_locus_count': sample_locus_count,
         'form': form,
         'patient_form': patient_form,
-        'can_download_vcf': (not settings.VCF_DOWNLOAD_ADMIN_ONLY) or request.user.is_superuser,
-        'can_download_annotated_vcf': can_download_annotated_vcf,
         'cohorts': cohorts,
         'has_write_permission': has_write_permission,
         'igv_data': igv_data,

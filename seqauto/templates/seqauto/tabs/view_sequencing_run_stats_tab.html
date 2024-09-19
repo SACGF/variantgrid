@@ -3,7 +3,7 @@
 {% load seqauto_record_tags %}
 <link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
 <link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
-<script src="{% static 'js/generated_graphs.js' %}"></script>
+<script src="{% static 'js/cached_generated_files.js' %}"></script>
 <script>
 	var DELETE_URL = "{% url 'cached_generated_file_delete' %}";
 	var BASE_QC_POLL_URL = "{% url 'sequencing_run_qc_graph' sequencing_run.pk 'QC_COMPARE_TYPE' %}";

@@ -7,6 +7,7 @@ etc and things that don't fit anywhere else.
 """
 import json
 import logging
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -25,6 +26,8 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models
 from django.db.models import QuerySet, TextChoices
 from django.db.models.deletion import SET_NULL, CASCADE, PROTECT
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.safestring import SafeString
@@ -120,6 +123,15 @@ class CachedGeneratedFile(models.Model):
         else:
             logging.debug("Not caching generated files - skipped save!")
 
+
+@receiver(pre_delete, sender=CachedGeneratedFile)
+def cgf_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    if instance.filename:
+        if os.path.exists(instance.filename):
+            os.unlink(instance.filename)
+        dirname = os.path.dirname(instance.filename)
+        if os.path.isdir(dirname):
+            os.rmdir(dirname)
 
 class Company(models.Model):
     name = models.TextField(primary_key=True)
