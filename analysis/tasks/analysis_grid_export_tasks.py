@@ -1,6 +1,7 @@
 import logging
 import os
 import uuid
+from typing import Optional
 
 import celery
 
@@ -14,6 +15,24 @@ from library.django_utils import FakeRequest
 from library.guardian_utils import admin_bot
 from library.utils import name_from_filename, sha256sum_str, mk_path_for_file
 from snpdb.models import Cohort, Sample, CachedGeneratedFile
+
+
+def get_annotated_download_files_cgf(generator, pk) -> dict[str, Optional[CachedGeneratedFile]]:
+    annotated_download_files = {}
+    try:
+        AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
+        params_hash_vcf = get_grid_downloadable_file_params_hash(pk, "vcf")
+        cgf_vcf = CachedGeneratedFile.objects.filter(generator=generator,
+                                                     params_hash=params_hash_vcf).first()
+        params_hash_csv = get_grid_downloadable_file_params_hash(pk, "csv")
+        cgf_csv = CachedGeneratedFile.objects.filter(generator=generator,
+                                                     params_hash=params_hash_csv).first()
+
+        annotated_download_files = {"vcf": cgf_vcf, "csv": cgf_csv}
+    except ValueError:
+        pass
+
+    return annotated_download_files
 
 
 def get_grid_downloadable_file_params_hash(pk, export_type):

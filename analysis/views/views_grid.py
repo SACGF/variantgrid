@@ -133,7 +133,9 @@ def sample_grid_export(request, sample_id, export_type):
     params_hash = get_grid_downloadable_file_params_hash(sample_id, export_type)
     task = export_sample_to_downloadable_file.si(sample_id, export_type)
     cgf = CachedGeneratedFile.get_or_create_and_launch("export_sample_to_downloadable_file", params_hash, task)
-    return JsonResponse({"celery_task": cgf.task_id})
+    if cgf.exception:
+        raise ValueError(cgf.exception)
+    return redirect(cgf)
 
 
 def node_grid_export(request, analysis_id):

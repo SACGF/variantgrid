@@ -61,3 +61,49 @@ function poll_cached_generated_file(poll_url, success_func, failure_func) {
 		}
 	}).fail(failure_func);
 }
+
+
+class AnnotatedFileDownload {
+	constructor(selector, pollUrl, fileType) {
+		this.selector = $(selector);
+		this.pollUrl = pollUrl;
+		this.fileType = fileType;
+		this.ucFileType = this.fileType.toUpperCase()
+	}
+
+	setGenerateDownloadLink() {
+		// console.log("setGenerateDownloadLink");
+		const that = this;
+		const generateLink = $(`<a href="#" id="generate-${this.fileType}-download"><div class="icon24 left margin-r-5 ${this.fileType}-icon"></div> Annotated ${this.ucFileType}</a>`);
+		generateLink.click(function(event) {
+			event.preventDefault();
+			that.setPolling(true);
+		});
+		this.selector.empty();
+		this.selector.append(generateLink);
+		// console.log("/setGenerateDownloadLink");
+	}
+
+	setDownloadLink(url) {
+		// console.log("setDownloadLink");
+		this.selector.html(`<a href="${url}"><div class="icon24 left margin-r-5 ${this.fileType}-icon"></div> Annotated ${this.ucFileType}</a>`);
+	}
+
+	setError() {
+		// console.log("setError");
+		this.selector.html('<i class="fas fa-xmark"></i> Error retrieving download...');
+	}
+
+	setPolling(download) {
+		// console.log("setPolling");
+		let that = this;
+		function downloadFile(data) {
+			that.setDownloadLink(data.url);
+			if (download) {
+				window.location.href = data.url;
+			}
+		}
+		$(this.selector).html(`<span><i class="fas fa-spinner fa-spin"></i> Preparing download...</span>`);
+		poll_cached_generated_file(this.pollUrl, downloadFile, this.setError)
+	}
+}
