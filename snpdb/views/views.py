@@ -28,8 +28,7 @@ from termsandconditions.decorators import terms_required
 from analysis.analysis_templates import get_sample_analysis
 from analysis.forms import AnalysisOutputNodeChoiceForm
 from analysis.models import AnalysisTemplate
-from analysis.tasks.analysis_grid_export_tasks import get_grid_downloadable_file_params_hash, \
-    get_annotated_download_files_cgf
+from analysis.tasks.analysis_grid_export_tasks import get_annotated_download_files_cgf
 from annotation.forms import GeneCountTypeChoiceForm
 from annotation.manual_variant_entry import create_manual_variants, can_create_variants
 from annotation.models import AnnotationVersion, SampleVariantAnnotationStats, SampleGeneAnnotationStats, \
