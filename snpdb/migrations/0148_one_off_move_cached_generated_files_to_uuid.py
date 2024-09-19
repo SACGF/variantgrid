@@ -10,7 +10,6 @@ def _one_off_move_cached_generated_files_to_uuid(apps, _schema_editor):
     records = []
     for values in CachedGeneratedFile.objects.all().values():
         values.pop("id")  # Want UUID
-        print(values)
         cgf2 = CachedGeneratedFile2(**values)
         records.append(cgf2)
 
