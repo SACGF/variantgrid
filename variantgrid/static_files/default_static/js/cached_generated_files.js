@@ -47,15 +47,19 @@ function poll_graph_status(graph_selector, poll_url, delete_url) {
 }
 
 
-function poll_cached_generated_file(poll_url, success_func, failure_func) {
+function poll_cached_generated_file(poll_url, success_func, failure_func, update_func) {
 	$.getJSON(poll_url, function (data) {
 		if (data.status == "SUCCESS") {
 			success_func(data);
 		} else if (data.status == 'FAILURE') {
 			failure_func(data);
 		} else {
+			if (update_func) {
+				update_func(data.progress);
+			}
+
 			const retry_func = function () {
-				poll_cached_generated_file(poll_url, success_func, failure_func);
+				poll_cached_generated_file(poll_url, success_func, failure_func, update_func);
 			};
 			window.setTimeout(retry_func, freq);
 		}
@@ -103,7 +107,18 @@ class AnnotatedFileDownload {
 				window.location.href = data.url;
 			}
 		}
-		$(this.selector).html(`<span><i class="fas fa-spinner fa-spin"></i> Preparing download...</span>`);
-		poll_cached_generated_file(this.pollUrl, downloadFile, this.setError)
+		let spinner = $(`<span><i class="fas fa-spinner fa-spin"></i> Preparing download... </span>`);
+		let progressIndicator = $("<span></span>");
+		spinner.append(progressIndicator);
+
+		function updateProgress(progress) {
+			console.log("updateProgress");
+			let percent = Math.floor(100 * progress);
+			progressIndicator.empty();
+			progressIndicator.append(`${percent}% complete`);
+		}
+
+		$(this.selector).html(spinner);
+		poll_cached_generated_file(this.pollUrl, downloadFile, this.setError, updateProgress)
 	}
 }

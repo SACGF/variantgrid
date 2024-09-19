@@ -1,5 +1,4 @@
 import json
-import os
 
 from celery.result import AsyncResult
 from django.conf import settings
@@ -7,7 +6,7 @@ from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
 
-from library.django_utils import require_superuser, get_url_from_media_root_filename
+from library.django_utils import require_superuser
 from snpdb.models import CachedGeneratedFile, Cohort, Sample, VCF, CustomColumnsCollection, TagColorsCollection
 from snpdb.tasks.clingen_tasks import populate_clingen_alleles_from_vcf
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_and_launch_task
@@ -28,8 +27,11 @@ def job_status(request, job_id):
 def cached_generated_file_check(request, cgf_id):
     cgf = get_object_or_404(CachedGeneratedFile, pk=cgf_id)
     cgf.check_ready()
-    data = {"status": cgf.task_status,
-            "cgf_id": cgf.id}
+    data = {
+        "status": cgf.task_status,
+        "cgf_id": cgf.id,
+        "progress": cgf.progress
+    }
 
     if cgf.exception:
         data["exception"] = str(cgf.exception)
