@@ -10,6 +10,7 @@
 {% block title %}{{ vcf.name }}{% endblock %}
 {% block head %}
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/cached_generated_files.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 
 <style>
@@ -281,6 +282,23 @@ $(document).ready(function() {
             },
         });
     });
+
+    {% for file_type, cgf in annotated_download_files.items %}
+        var pollUrl = Urls.cohort_grid_export({{ vcf.cohort.pk  }}, "{{ file_type }}");
+        var afdSelector = $("div#generate-{{ file_type }}-download");
+        var afd = new AnnotatedFileDownload(afdSelector, pollUrl, "{{ file_type }}");
+        {% if cgf %}
+            {% if cgf.exception %}
+                afd.setError()
+            {% elif cgf.status == "SUCCESS" %}
+                afd.setDownloadLink("{{ cgf.get_media_url  }}");
+            {% else %}
+                afd.setPolling(false);
+            {% endif %}
+        {% else %}
+            afd.setGenerateDownloadLink();
+        {% endif %}
+    {% endfor %}
 });
 </script>
 <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
@@ -313,17 +331,16 @@ $(document).ready(function() {
         {% csrf_token %}
         {% crispy vcf_form form_helper.horizontal %}
 
-        {% if can_download_vcf %}
+        {% if annotated_download_files or vcf.uploadedvcf.uploaded_file.exists %}
             <div class="form-group-row row">
                 <label class="col-form-label col-12 col-md-3 text-md-right">Download</label>
                 <div class="d-flex flex-row">
                     {% if vcf.uploadedvcf.uploaded_file.exists %}
                         <div class="p-2"><a href="{% url 'download_uploaded_file' vcf.uploadedvcf.uploaded_file.pk %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Original VCF</a> ({{ vcf.uploadedvcf.uploaded_file.size|filesizeformat }})</div>
                     {% endif %}
-                    {% if can_download_annotated_vcf %}
-                        <div class="p-2"><a href="{% url 'cohort_grid_export' vcf.cohort.pk 'vcf' %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Annotated VCF</a></div>
-                        <div class="p-2"><a href="{% url 'cohort_grid_export' vcf.cohort.pk 'csv' %}"><div class="icon24 left margin-r-5 csv-icon"></div> Annotated CSV</a></div>
-                    {% endif %}
+                    {% for file_type in annotated_download_files %}
+                        <div id="generate-{{ file_type }}-download" class="p-2"></div>
+                    {% endfor %}
                 </div>
             </div>
         {% endif %}

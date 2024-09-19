@@ -7,14 +7,18 @@ etc and things that don't fit anywhere else.
 """
 import json
 import logging
+import os
 import re
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from fileinput import filename
 from functools import cached_property, total_ordering
 from html import escape
 from re import RegexFlag
 from typing import TypedDict, Optional
 
+from celery import signature
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -23,6 +27,8 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models
 from django.db.models import QuerySet, TextChoices
 from django.db.models.deletion import SET_NULL, CASCADE, PROTECT
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.safestring import SafeString
@@ -32,6 +38,7 @@ from model_utils.managers import InheritanceManager
 from more_itertools import first
 
 from classification.enums.classification_enums import ShareLevel
+from library.django_utils import get_url_from_media_root_filename
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.enums.log_level import LogLevel
 from library.preview_request import PreviewModelMixin
@@ -46,17 +53,20 @@ class Tag(models.Model):
         return self.id
 
 
-class CachedGeneratedFile(models.Model):
-    """ Matplotlib graph generated via async Celery task
-        @see snpdb.graphs.graphcache.CacheableGraph """
+class CachedGeneratedFile(TimeStampedModel):
+    # We use a UUID for these so people can't guess the IDs and see other people's graphs/downloads etc
+    # The generator and params hash are unique - we look these up in a view where we do the appropriate
+    # security checks on any objects - then can just pass the hash around (big enough to be secret)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     filename = models.TextField(null=True)
     exception = models.TextField(null=True)
     generator = models.TextField()
-    params_hash = models.TextField()  # sha256 of params used to generate graph
+    params_hash = models.TextField()  # sha256 of params
     task_id = models.CharField(max_length=36, null=True)
-    task_status = models.TextField(null=True)  # TODO: what's the actual size?
+    task_status = models.TextField(null=True)
     generate_start = models.DateTimeField(null=True)
     generate_end = models.DateTimeField(null=True)
+    progress = models.FloatField(null=True)
 
     class Meta:
         unique_together = ("generator", "params_hash")
@@ -67,6 +77,34 @@ class CachedGeneratedFile(models.Model):
         else:
             description = f"task: {self.task_id} sent: {self.generate_start}"
         return f"{self.generator}({self.params_hash}): {description}"
+
+    def get_absolute_url(self):
+        return reverse("cached_generated_file_check", kwargs={"cgf_id": self.pk})
+
+    def get_media_url(self):
+        if self.filename is None:
+            raise ValueError(f"{self}.filename is None")
+        return get_url_from_media_root_filename(self.filename)
+
+    @staticmethod
+    def get_or_create_and_launch(generator, params_hash, task: signature) -> 'CachedGeneratedFile':
+        cgf, created = CachedGeneratedFile.objects.get_or_create(generator=generator,
+                                                                 params_hash=params_hash)
+        if created or not cgf.task_id:
+            logging.debug("Launching Celery Job for CachedGeneratedFile(generator=%s, params_hash=%s)",
+                          generator, params_hash)
+            async_result = task.apply_async()
+            cgf.task_id = async_result.id
+            cgf.generate_start = timezone.now()
+            cgf.progress = 0.0
+            cgf.save()
+        else:
+            async_result = AsyncResult(cgf.task_id)
+
+        if async_result.result:
+            cgf.save_from_async_result(async_result)
+
+        return cgf
 
     def save_from_async_result(self, async_result):
         self.task_status = async_result.status
@@ -90,6 +128,15 @@ class CachedGeneratedFile(models.Model):
         else:
             logging.debug("Not caching generated files - skipped save!")
 
+
+@receiver(pre_delete, sender=CachedGeneratedFile)
+def cgf_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    if instance.filename:
+        if os.path.exists(instance.filename):
+            os.unlink(instance.filename)
+        dirname = os.path.dirname(instance.filename)
+        if os.path.isdir(dirname):
+            os.rmdir(dirname)
 
 class Company(models.Model):
     name = models.TextField(primary_key=True)

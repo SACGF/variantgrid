@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db.models.aggregates import Count
 from django.http.response import HttpResponseRedirect, JsonResponse, HttpResponse
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.urls.base import reverse
 from django.utils.decorators import method_decorator
 from django.utils.safestring import mark_safe
@@ -478,7 +478,7 @@ def sequencing_run_qc_graph(request, sequencing_run_id, qc_compare_type):
     _ = QCCompareType(qc_compare_type)  # Check valid
     graph_class_name = full_class_name(SequencingRunQCGraph)
     cached_graph = graphcache.async_graph(graph_class_name, sequencing_run_id, qc_compare_type)
-    return HttpResponseRedirect(reverse("cached_generated_file_check", kwargs={"cgf_id": cached_graph.id}))
+    return redirect(cached_graph)
 
 
 def sequencing_run_qc_json_graph(request, sequencing_run_id, qc_compare_type):
@@ -565,13 +565,13 @@ def qc_column_graph(request, qc_column_id, use_percent):
 def index_metrics_qc_graph(request, illumina_qc_id):
     graph_class_name = full_class_name(IndexMetricsQCGraph)
     cached_graph = graphcache.async_graph(graph_class_name, illumina_qc_id)
-    return HttpResponseRedirect(reverse("cached_generated_file_check", kwargs={"cgf_id": cached_graph.id}))
+    return redirect(cached_graph)
 
 
 def qc_exec_summary_graph(request, qc_exec_summary_id, qc_compare_type):
     graph_class_name = full_class_name(QCExecSummaryGraph)
     cached_graph = graphcache.async_graph(graph_class_name, qc_exec_summary_id, qc_compare_type)
-    return HttpResponseRedirect(reverse("cached_generated_file_check", kwargs={"cgf_id": cached_graph.id}))
+    return redirect(cached_graph)
 
 
 def qc_exec_summary_json_graph(request, qc_exec_summary_id, qc_compare_type):

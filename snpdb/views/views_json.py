@@ -1,5 +1,4 @@
 import json
-import os
 
 from celery.result import AsyncResult
 from django.conf import settings
@@ -28,15 +27,16 @@ def job_status(request, job_id):
 def cached_generated_file_check(request, cgf_id):
     cgf = get_object_or_404(CachedGeneratedFile, pk=cgf_id)
     cgf.check_ready()
-    data = {"status": cgf.task_status,
-            "cgf_id": cgf.id}
+    data = {
+        "status": cgf.task_status,
+        "cgf_id": cgf.id,
+        "progress": cgf.progress
+    }
 
     if cgf.exception:
         data["exception"] = str(cgf.exception)
     elif cgf.task_status == "SUCCESS":
-        media_root_dir = os.path.join(settings.MEDIA_ROOT, "")  # with end slash
-        file_path = cgf.filename.replace(media_root_dir, "")
-        data["url"] = os.path.join(settings.MEDIA_URL, file_path)
+        data["url"] = cgf.get_media_url()
 
     return JsonResponse(data)
 

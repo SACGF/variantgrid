@@ -4,21 +4,22 @@ from urllib.parse import urlencode
 
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.core.cache import cache
+from django.http import JsonResponse
 from django.http.response import StreamingHttpResponse, HttpResponseRedirect
+from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
 
 from analysis import grids
-from analysis.analysis_templates import get_sample_analysis, get_cohort_analysis
 from analysis.grid_export import node_grid_get_export_iterator
-from analysis.models import AnalysisNode, AnalysisTemplate, SampleNode
+from analysis.models import AnalysisNode
+from analysis.tasks.analysis_grid_export_tasks import export_cohort_to_downloadable_file, export_sample_to_downloadable_file, get_grid_downloadable_file_params_hash
 from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
 from analysis.views.node_json_view import NodeJSONGetView, NodeJSONViewMixin
 from library.constants import WEEK_SECS
-from library.utils import name_from_filename
-from snpdb.models import Sample, Cohort
+from snpdb.models import Sample, Cohort, CachedGeneratedFile
 from snpdb.models.models_variant import Variant
 
 _NODE_GRID_ALLOWED_PARAMS = {
@@ -111,35 +112,30 @@ class NodeGridConfig(NodeJSONGetView):
 
 def cohort_grid_export(request, cohort_id, export_type):
     EXPORT_TYPES = {"csv", "vcf"}
-
-    cohort = Cohort.get_for_user(request.user, cohort_id)
+    Cohort.get_for_user(request.user, cohort_id)  # Permission check
     if export_type not in EXPORT_TYPES:
         raise ValueError(f"{export_type} must be one of: {EXPORT_TYPES}")
 
-    analysis_template = AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
-    analysis = get_cohort_analysis(cohort, analysis_template)
-    node = analysis.analysisnode_set.get_subclass(output_node=True)  # Should only be 1
-    basename = "_".join([name_from_filename(cohort.name), "annotated", f"v{analysis.annotation_version.pk}",
-                         str(cohort.genome_build)])
-
-    filename, file_iterator = node_grid_get_export_iterator(request, node, export_type, basename=basename)
-    return _get_streaming_response(filename, file_iterator)
+    params_hash = get_grid_downloadable_file_params_hash(cohort_id, export_type)
+    task = export_cohort_to_downloadable_file.si(cohort_id, export_type)
+    cgf = CachedGeneratedFile.get_or_create_and_launch("export_cohort_to_downloadable_file", params_hash, task)
+    if cgf.exception:
+        raise ValueError(cgf.exception)
+    return redirect(cgf)
 
 
 def sample_grid_export(request, sample_id, export_type):
     EXPORT_TYPES = {"csv", "vcf"}
-
-    sample = Sample.get_for_user(request.user, sample_id)
+    Sample.get_for_user(request.user, sample_id)  # Permission check
     if export_type not in EXPORT_TYPES:
         raise ValueError(f"{export_type} must be one of: {EXPORT_TYPES}")
 
-    analysis_template = AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_SAMPLE")
-    analysis = get_sample_analysis(sample, analysis_template)
-    node = SampleNode.objects.get(analysis=analysis, output_node=True)  # Should only be 1
-    basename = "_".join([name_from_filename(sample.name), "annotated", f"v{analysis.annotation_version.pk}",
-                         str(sample.genome_build)])
-    filename, file_iterator = node_grid_get_export_iterator(request, node, export_type, basename=basename)
-    return _get_streaming_response(filename, file_iterator)
+    params_hash = get_grid_downloadable_file_params_hash(sample_id, export_type)
+    task = export_sample_to_downloadable_file.si(sample_id, export_type)
+    cgf = CachedGeneratedFile.get_or_create_and_launch("export_sample_to_downloadable_file", params_hash, task)
+    if cgf.exception:
+        raise ValueError(cgf.exception)
+    return redirect(cgf)
 
 
 def node_grid_export(request, analysis_id):

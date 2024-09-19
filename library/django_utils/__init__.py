@@ -1,5 +1,6 @@
 import datetime
 import operator
+import os
 from functools import reduce
 from functools import wraps, partial
 
@@ -37,6 +38,13 @@ def get_url_from_view_path(view_path):
     if 'shariant.org.au' in current_site.domain or 'variantgrid.com.au' in current_site.domain:
         protocol = 'https'
     return f'{protocol}://{current_site.domain}{view_path}'
+
+
+def get_url_from_media_root_filename(filename):
+    media_root_with_slash = os.path.join(settings.MEDIA_ROOT, "")
+    if not filename.startswith(media_root_with_slash):
+        raise ValueError(f"'{filename}' must start with MEDIA_ROOT: {media_root_with_slash}")
+    return os.path.join(settings.MEDIA_URL, filename[len(media_root_with_slash):])
 
 
 def add_save_message(request, valid, name, created=False):

@@ -4,7 +4,7 @@ from django.forms.forms import Form
 from django.forms.formsets import formset_factory
 from django.forms.models import ModelChoiceField
 from django.http.response import HttpResponseRedirect
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, render, redirect
 from django.urls.base import reverse
 
 from library.utils import full_class_name
@@ -37,7 +37,7 @@ def pedigree_chart(request, ped_file_id):
     ped_file = PedFile.get_for_user(request.user, ped_file_id)  # Make sure we can access it
     graph_class_name = full_class_name(PedigreeChart)
     cached_graph = graphcache.async_graph(graph_class_name, ped_file.pk)
-    return HttpResponseRedirect(reverse("cached_generated_file_check", kwargs={"cgf_id": cached_graph.id}))
+    return redirect(cached_graph)
 
 
 def ped_files(request):

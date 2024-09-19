@@ -30,6 +30,7 @@
         margin-left: 2px;
     }
 </style>
+<script type="text/javascript" src="{% static 'js/cached_generated_files.js' %}"></script>
 <script>
 function getBams() {
     const bams = {{ bam_list | jsonify }};
@@ -68,6 +69,24 @@ $(document).ready(function() {
     const dialog = setupCreatePatientDialog();
     const sampleName = $("#id_name").val();
     addCreatePatientButton(dialog, patientSelect, sampleName, "p");
+
+    {% for file_type, cgf in annotated_download_files.items %}
+        var pollUrl = Urls.sample_grid_export({{ sample.pk  }}, "{{ file_type }}");
+        var afdSelector = $("div#generate-{{ file_type }}-download");
+        var afd = new AnnotatedFileDownload(afdSelector, pollUrl, "{{ file_type }}");
+        {% if cgf %}
+            {% if cgf.exception %}
+                afd.setError()
+            {% elif cgf.status == "SUCCESS" %}
+                afd.setDownloadLink("{{ cgf.get_media_url  }}");
+            {% else %}
+                afd.setPolling(false);
+            {% endif %}
+        {% else %}
+            afd.setGenerateDownloadLink();
+        {% endif %}
+    {% endfor %}
+
 });
 </script>
 <!-- jqGrid is used in variants tab -->
@@ -122,14 +141,13 @@ $(document).ready(function() {
             <form method="post" id='sample-form'>
                 {% csrf_token %}
                 {% crispy form form_helper.horizontal %}
-                {% if can_download_vcf %}
+                {% if annotated_download_files %}
                     <div class="form-group-row row">
                         <label class="col-form-label col-12 col-md-3 text-md-right">Download</label>
                         <div class="d-flex flex-row">
-                            {% if can_download_annotated_vcf %}
-                                <div class="p-2"><a href="{% url 'sample_grid_export' sample.pk 'vcf' %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Annotated Sample VCF</a></div>
-                                <div class="p-2"><a href="{% url 'sample_grid_export' sample.pk 'csv' %}"><div class="icon24 left margin-r-5 csv-icon"></div> Annotated Sample CSV</a></div>
-                            {% endif %}
+                            {% for file_type in annotated_download_files %}
+                                <div id="generate-{{ file_type }}-download" class="p-2"></div>
+                            {% endfor %}
                         </div>
                     </div>
                 {% endif %}

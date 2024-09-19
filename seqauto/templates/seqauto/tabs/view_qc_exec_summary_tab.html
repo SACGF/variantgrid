@@ -22,7 +22,7 @@ table th.num, table td.num {
 }
 
 </style>
-<script src="{% static 'js/generated_graphs.js' %}"></script>
+<script src="{% static 'js/cached_generated_files.js' %}"></script>
 <script>
 {% if qc.data_state == 'C' and exec_summary.data_state == 'C' %}
     EXEC_SUMMARY_ID = {{ exec_summary.pk }};
