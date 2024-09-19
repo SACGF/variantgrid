@@ -112,7 +112,6 @@ class AnnotatedFileDownload {
 		spinner.append(progressIndicator);
 
 		function updateProgress(progress) {
-			console.log("updateProgress");
 			let percent = Math.floor(100 * progress);
 			progressIndicator.empty();
 			progressIndicator.append(`${percent}% complete`);
