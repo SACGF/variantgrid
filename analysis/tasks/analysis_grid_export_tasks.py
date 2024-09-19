@@ -39,13 +39,16 @@ def get_grid_downloadable_file_params_hash(pk, export_type):
     return sha256sum_str(f"{pk}-{export_type}")
 
 
-def _write_cached_generated_file(cgf: CachedGeneratedFile, filename, file_iterator):
+def _write_cached_generated_file(cgf: CachedGeneratedFile, total_records, filename, file_iterator):
+    update_size = max(1000, total_records / 100)  # 1% or every 1k records
+    update_progress_iterator = update_cgf_progress_iterator(file_iterator(), cgf.pk, total_records, update_size)
+
     logging.info("Starting to write %s", filename)
     media_root_filename = os.path.join(settings.MEDIA_ROOT, str(uuid.uuid4()), filename)
     try:
         mk_path_for_file(media_root_filename)
         with open(media_root_filename, "w") as f:
-            for line in file_iterator():
+            for line in update_progress_iterator:
                 f.write(line)  # Already has newline
         cgf.filename = media_root_filename
         cgf.task_status = "SUCCESS"
@@ -56,6 +59,19 @@ def _write_cached_generated_file(cgf: CachedGeneratedFile, filename, file_iterat
         cgf.exception = str(e)
         cgf.task_status = "FAILURE"
     cgf.save()
+
+
+def update_cgf_progress_iterator(iterator, cgf_id, total_records, update_size):
+    update_size = int(update_size)  # make sure int so modulus below will hit
+    cgf_qs = CachedGeneratedFile.objects.filter(id=cgf_id)
+    cgf_qs.update(progress=0)
+
+    for i, record in enumerate(iterator):
+        if i % update_size == 0:
+            progress = i / total_records
+            cgf_qs.update(progress=progress)
+        yield record
+    cgf_qs.update(progress=1, task_status='SUCCESS')
 
 
 @celery.shared_task
@@ -74,7 +90,7 @@ def export_cohort_to_downloadable_file(cohort_id, export_type):
 
     request = FakeRequest(user=admin_bot())
     filename, file_iterator = node_grid_get_export_iterator(request, node, export_type, basename=basename)
-    _write_cached_generated_file(cgf, filename, file_iterator)
+    _write_cached_generated_file(cgf, node.count, filename, file_iterator)
 
 
 @celery.shared_task
@@ -92,4 +108,4 @@ def export_sample_to_downloadable_file(sample_id, export_type):
                          str(sample.genome_build)])
     request = FakeRequest(user=admin_bot())
     filename, file_iterator = node_grid_get_export_iterator(request, node, export_type, basename=basename)
-    _write_cached_generated_file(cgf, filename, file_iterator)
+    _write_cached_generated_file(cgf, node.count, filename, file_iterator)

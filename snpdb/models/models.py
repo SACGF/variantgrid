@@ -63,6 +63,7 @@ class CachedGeneratedFile(models.Model):
     task_status = models.TextField(null=True)
     generate_start = models.DateTimeField(null=True)
     generate_end = models.DateTimeField(null=True)
+    progress = models.FloatField(null=True)
 
     class Meta:
         unique_together = ("generator", "params_hash")
@@ -92,6 +93,7 @@ class CachedGeneratedFile(models.Model):
             async_result = task.apply_async()
             cgf.task_id = async_result.id
             cgf.generate_start = timezone.now()
+            cgf.progress = 0.0
             cgf.save()
         else:
             async_result = AsyncResult(cgf.task_id)
