@@ -119,6 +119,8 @@ def cohort_grid_export(request, cohort_id, export_type):
     params_hash = get_grid_downloadable_file_params_hash(cohort_id, export_type)
     task = export_cohort_to_downloadable_file.si(cohort_id, export_type)
     cgf = CachedGeneratedFile.get_or_create_and_launch("export_cohort_to_downloadable_file", params_hash, task)
+    if cgf.exception:
+        raise ValueError(cgf.exception)
     return redirect(cgf)
 
 

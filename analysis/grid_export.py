@@ -92,6 +92,14 @@ def _grid_export_vcf(genome_build, colmodels, items, sample_ids, sample_names_by
     pseudo_buffer = StashFile()
 
     vcf_writer = Writer(pseudo_buffer, vcf_reader)
+    # Need to pass escapechar
+    vcf_writer.writer = csv.writer(
+        pseudo_buffer,
+        delimiter="\t",
+        lineterminator="\n",
+        quoting=csv.QUOTE_NONE,
+        escapechar="\\",
+    )
 
     def iter_row_writer():
         for obj in items:
