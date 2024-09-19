@@ -1,7 +1,6 @@
 import gzip
 import logging
 import os
-import uuid
 import zipfile
 from typing import Optional
 
@@ -13,6 +12,7 @@ from django.utils import timezone
 from analysis.analysis_templates import get_cohort_analysis, get_sample_analysis
 from analysis.grid_export import node_grid_get_export_iterator
 from analysis.models import AnalysisTemplate, SampleNode
+from analysis.tasks.node_update_tasks import wait_for_node
 from library.django_utils import FakeRequest
 from library.guardian_utils import admin_bot
 from library.utils import name_from_filename, sha256sum_str, mk_path_for_file
@@ -106,6 +106,9 @@ def export_cohort_to_downloadable_file(cohort_id, export_type):
     analysis_template = AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
     analysis = get_cohort_analysis(cohort, analysis_template)
     node = analysis.analysisnode_set.get_subclass(output_node=True)  # Should only be 1
+    if not node.ready:
+        wait_for_node(node.pk)  # Needs to be ready
+        node = node.get_subclass()  # Easy way to reload
     _write_node_to_cached_generated_file(cgf, analysis, node, cohort.name, export_type)
 
 

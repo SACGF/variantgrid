@@ -4,7 +4,6 @@ from urllib.parse import urlencode
 
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.core.cache import cache
-from django.http import JsonResponse
 from django.http.response import StreamingHttpResponse, HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse
