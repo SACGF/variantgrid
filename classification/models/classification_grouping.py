@@ -545,8 +545,8 @@ class ClassificationGroupingGeneSymbolSyncer:
             ClassificationGroupingGeneSymbol(
                 grouping=self.classification_grouping,
                 gene_symbol=gene_symbol,
-                is_new=True
-            )
+            ),
+            is_new=True
         )
         self.by_gene_symbol[gene_symbol] = sync
         return sync
