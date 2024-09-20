@@ -626,3 +626,7 @@ def classification_groups(
 
     return tag_context
 
+
+@register.inclusion_tag("classification/tags/classification_groupings.html", takes_context=True)
+def classification_groupings(context):
+    return {}

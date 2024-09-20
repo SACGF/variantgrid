@@ -1,20 +1,18 @@
+from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Set
-
-from django.contrib.auth.models import User, Group
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
-
+from annotation.models import VariantAnnotation, AnnotationVersion
 from classification.criteria_strengths import CriteriaStrength
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, CriteriaEvaluation
 from django.db import models, transaction
-
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
     ConditionResolved, SomaticClinicalSignificanceValue
-from genes.models import GeneSymbol
+from genes.models import GeneSymbol, TranscriptVersion, GeneSymbolAlias, GeneVersion
 from library.utils import first
 from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
@@ -89,6 +87,7 @@ class AlleleGrouping(TimeStampedModel):
 class AlleleOriginGrouping(TimeStampedModel):
     allele_grouping = models.ForeignKey(AlleleGrouping, on_delete=models.CASCADE)
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices)
+
     @property
     def allele_origin_bucket_obj(self):
         return AlleleOriginBucket(self.allele_origin_bucket)
@@ -277,22 +276,6 @@ class ClassificationGrouping(TimeStampedModel):
                 grouping.dirty = True
                 grouping.save(update_fields=["dirty"])
 
-    def _update_gene_symbols(self):
-        all_gene_symbols = set()
-        all_imported_allele_ids = ImportedAlleleInfo.objects.filter(
-            pk__in=self.classificationgroupingentry_set.all().values_list('classification__allele_info_id',
-                                                                          flat=True)
-        )
-        for imported_allele_info in all_imported_allele_ids:
-            all_gene_symbols |= ClassificationGrouping.gene_symbols_for_imported_allele_info(imported_allele_info)
-
-        # delete any gene symbols links that are no longer relevant
-        ClassificationGroupingGeneSymbol.objects.filter(grouping=self).exclude(
-            gene_symbol__in=all_gene_symbols).delete()
-        # bulk create all the ones it should be in
-        desired_entries = [ClassificationGroupingGeneSymbol(grouping=self, gene_symbol=gene_symbol) for gene_symbol in
-                           all_gene_symbols]
-        output = ClassificationGroupingGeneSymbol.objects.bulk_create(desired_entries, ignore_conflicts=True)
 
     @cached_property
     def gene_symbols(self) -> list[GeneSymbol]:
@@ -312,7 +295,7 @@ class ClassificationGrouping(TimeStampedModel):
         self.allele_origin_grouping.save(update_fields=["dirty"])
 
         # UPDATE GENE SYMBOLS
-        self._update_gene_symbols()
+        ClassificationGroupingGeneSymbolSyncer.gene_symbol_sync(self)
 
         all_modifications: list[ClassificationModification] = list(ClassificationModification.objects.filter(
             is_last_published=True,
@@ -433,33 +416,6 @@ class ClassificationGrouping(TimeStampedModel):
             # there are no classifications, time to die
             self.delete()
 
-    @staticmethod
-    def gene_symbols_for_imported_allele_info(imported_allele_info: ImportedAlleleInfo) -> Set[GeneSymbol]:
-        all_gene_symbols: Set[GeneSymbol] = set()
-        for rb in imported_allele_info.resolved_builds:
-            if gene_symbol := rb.gene_symbol:
-                all_gene_symbols.add(gene_symbol)
-
-            # For now exclude transcript versions linking to other gene symbols, revisit
-            # if transcript_version := rb.transcript_version:
-            #     if gene_version := transcript_version.gene_version:
-            #         if gene_symbol := gene_version.gene_symbol:
-            #             all_gene_symbols.add(gene_symbol)
-
-        if c_hgvs := imported_allele_info.imported_c_hgvs_obj:
-            # TODO if it's alias look up aliases
-            if included_gene_symbol := GeneSymbol.objects.filter(symbol=c_hgvs.gene_symbol).first():
-                all_gene_symbols.add(included_gene_symbol)
-
-            # # need to invert how GeneSymbolAliasesMeta works by starting from symbol and going back to
-            # if annotation := VariantAnnotation.objects.filter(
-            #     version=VariantAnnotationVersion.latest(genome_build=rb.genome_build),
-            #     variant=rb.variant
-            # ).first():
-            #     annotation: VariantAnnotation
-            #     gene = annotation.gene
-            #     GeneSymbolAliasesMeta.objects.filter()
-        return all_gene_symbols
 
     @cached_property
     def allele(self) -> Allele:
@@ -482,6 +438,7 @@ class ClassificationGrouping(TimeStampedModel):
 
     @staticmethod
     def update_all_dirty():
+        # maybe move this out since it does AlleleOriginGroupings too
         for dirty in ClassificationGrouping.objects.filter(dirty=True).iterator():
             dirty.update()
         for dirty in AlleleOriginGrouping.objects.filter(dirty=True).iterator():
@@ -492,11 +449,128 @@ class ClassificationGroupingGeneSymbol(TimeStampedModel):
     grouping = models.ForeignKey(ClassificationGrouping, on_delete=CASCADE)
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE, db_index=False)
 
+    from_normalized = models.BooleanField(default=False)
+    from_imported = models.BooleanField(default=False)
+    from_allele = models.BooleanField(default=False)
+    from_transcript = models.BooleanField(default=False)
+
     def __str__(self):
         return f"Grouping {self.grouping} : GeneSymbol {self.gene_symbol}"
 
     class Meta:
         unique_together = ("grouping", "gene_symbol")
+
+
+
+class ClassificationGroupingGeneSymbolSync:
+
+    def __init__(self, gene_symbol_grouping: ClassificationGroupingGeneSymbol, is_new=False):
+        self.gene_symbol_grouping = gene_symbol_grouping
+        self.from_normalized = False
+        self.from_imported = False
+        self.from_allele = False
+        self.from_transcript = False
+        self.is_new = is_new
+
+    @property
+    def is_dirty(self):
+        return \
+                self.from_normalized != self.gene_symbol_grouping.from_normalized or \
+                self.from_imported != self.gene_symbol_grouping.from_imported or \
+                self.from_allele != self.gene_symbol_grouping.from_allele or \
+                self.from_transcript != self.gene_symbol_grouping.from_transcript
+
+    def apply(self):
+        self.gene_symbol_grouping.from_normalized = self.from_normalized
+        self.gene_symbol_grouping.from_imported = self.from_imported
+        self.gene_symbol_grouping.from_allele = self.from_allele
+        self.gene_symbol_grouping.from_transcript = self.from_transcript
+
+
+class ClassificationGroupingGeneSymbolSyncer:
+
+    @staticmethod
+    def gene_symbol_sync(classification_grouping: ClassificationGrouping):
+        imported_allele_infos = ImportedAlleleInfo.objects.filter(
+            pk__in=classification_grouping.classificationgroupingentry_set.all().values_list('classification__allele_info_id', flat=True)
+        )
+
+        syncer = ClassificationGroupingGeneSymbolSyncer(classification_grouping)
+
+        all_transcript_versions: set[TranscriptVersion] = set()
+        genome_build_to_variants = defaultdict(set)
+
+        for imported_allele_info in imported_allele_infos:
+            for rb in imported_allele_info.resolved_builds:
+                if variant := rb.variant:
+                    genome_build_to_variants[rb.genome_build].add(variant)
+
+                all_transcript_versions.add(rb.transcript_version)
+                if gene_symbol := rb.gene_symbol:
+                    syncer.for_gene_symbol(gene_symbol).from_normalized = True
+
+            if c_hgvs := imported_allele_info.imported_c_hgvs_obj:
+                if gene_symbol := GeneSymbol.objects.filter(symbol=c_hgvs.gene_symbol).first():
+                    syncer.for_gene_symbol(gene_symbol).from_imported = True
+                else:
+                    for alias in GeneSymbolAlias.objects.filter(alias=c_hgvs.gene_symbol).select_related("gene_symbol"):
+                        syncer.for_gene_symbol(alias.gene_symbol).from_imported = True
+
+        # gene symbols from transcripts
+        if all_transcript_versions:
+            for gv in GeneVersion.objects.filter(transcriptversion__in=all_transcript_versions).select_related(
+                    "gene_symbol"):
+                syncer.for_gene_symbol(gv.gene_symbol).from_transcript = True
+
+        # gene symbols from allele
+        for genome_build, variants in genome_build_to_variants.items():
+            vav = AnnotationVersion.latest(genome_build=genome_build).variant_annotation_version
+            for va in VariantAnnotation.objects.filter(variant__in=variants, version=vav).select_related("gene"):
+                if gene := va.gene:
+                    for gene_symbol in gene.get_symbols():
+                        syncer.for_gene_symbol(gene_symbol).from_allele = True
+
+        syncer.sync()
+
+    def __init__(self, classification_grouping: ClassificationGrouping):
+        self.classification_grouping = classification_grouping
+        self.by_gene_symbol: dict[GeneSymbol, ClassificationGroupingGeneSymbolSync] = {}
+        for cggs in self.classification_grouping.classificationgroupinggenesymbol_set.all():
+            self.by_gene_symbol[cggs.gene_symbol] = ClassificationGroupingGeneSymbolSync(cggs)
+
+    def for_gene_symbol(self, gene_symbol: GeneSymbol) -> ClassificationGroupingGeneSymbolSync:
+        if entry := self.by_gene_symbol.get(gene_symbol):
+            return entry
+        sync = ClassificationGroupingGeneSymbolSync(
+            ClassificationGroupingGeneSymbol(
+                grouping=self.classification_grouping,
+                gene_symbol=gene_symbol,
+                is_new=True
+            )
+        )
+        self.by_gene_symbol[gene_symbol] = sync
+        return sync
+
+    def sync(self):
+        insert_us = list()
+        update_us = list()
+        delete_us = list()
+        for cggs in self.by_gene_symbol.values():
+            if cggs.is_new:
+                insert_us.append(cggs.gene_symbol_grouping)
+            elif cggs.is_dirty:
+                cggs.apply()
+                update_us.append(cggs.gene_symbol_grouping)
+            else:
+                delete_us.append(cggs.gene_symbol_grouping)
+        if insert_us:
+            ClassificationGroupingGeneSymbol.objects.bulk_create(insert_us)
+        if update_us:
+            ClassificationGroupingGeneSymbol.objects.bulk_update(update_us, fields=["from_normalized", "from_imported", "from_transcript", "from_allele"])
+        if delete_us:
+            for du in delete_us:
+                # insert is going to be 99% of the operations we ever have to do, so can deal with
+                du.delete()
 
 
 class ClassificationGroupingCondition(TimeStampedModel):

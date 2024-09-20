@@ -358,6 +358,9 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                                                              flag__resolution__status=FlagStatus.OPEN)
             filters.append(Q(classification__flag_collection__in=flag_collections))
 
+        if allele_id := self.get_query_param("allele_id"):
+            filters.append(Q(classification__allele_info__allele_id=int(allele_id)))
+
         if id_filter := self.get_query_param("id_filter"):
             id_keys = self.id_columns
             ids_contain_q_list: List[Q] = []
@@ -412,6 +415,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             filters.append(Q(classification__sample__in=sample_ids))
 
         if protein_position := self.get_query_param("protein_position"):
+
             protein_position_transcript_version_id = self.get_query_param("protein_position_transcript_version_id")
             transcript_version = TranscriptVersion.objects.get(pk=protein_position_transcript_version_id)
             variant_qs = Variant.objects.filter(varianttranscriptannotation__transcript_version=transcript_version,

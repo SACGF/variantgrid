@@ -1,0 +1,60 @@
+{% load settings_tags %}
+{% load classification_tags %}
+<script>
+    function alleleOriginToggle() {
+        classificationGroupingRedraw();
+    }
+
+    function classificationGroupingRedraw() {
+        $('#vc-datatable').DataTable().ajax.reload();
+    }
+    let debounceClassificationGroupingRedraw = debounce(classificationGroupingRedraw);
+
+    $(document).ready(() => {
+        $('.filter').on("change", function() {
+            classificationGroupingRedraw();
+        });
+    });
+
+    function classificationGroupingFilter(data) {
+        let allele_origin_filter_value = blankToNull($("input[name='allele-origin-toggle']:checked").val());
+        if (allele_origin_filter_value) {
+            data.allele_origin = allele_origin_filter_value;
+            let germline_only = allele_origin_filter_value === "G";
+            let column = $('#vc-datatable').DataTable().column(3);
+            column.visible(!germline_only);
+        }
+
+        // allows implementation of classificationFilterExtra if surrounded code provides more filters
+        if (typeof(classificationGroupingFilterExtra) === 'function') {
+            classificationGroupingFilterExtra(data);
+        }
+    }
+    function downloadAs(mode) {
+        let data = {};
+        classificationGroupingFilter(data);
+        let querystring = EncodeQueryData(data, true);
+		let url = null;
+		if (mode === 'redcap') {
+		  url = "{% url 'export_classifications_grid_redcap' %}" + "?" + querystring;
+		} else {
+		  url = "{% url 'export_classifications_grid' %}" + "?" + querystring;
+		}
+		window.location = url;
+		return false;
+    }
+</script>
+<div class="row">
+    <div class="col">
+        {% allele_origin_toggle show_label=False %}
+        <table id="vc-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table"></table>
+        <div>
+        Download as
+            <a class='hover-link download-link' onclick="downloadAs('csv')">CSV</a>
+            {% settings_value 'CLASSIFICATION_REDCAP_EXPORT' as CLASSIFICATION_REDCAP_EXPORT %}
+            {% if CLASSIFICATION_REDCAP_EXPORT %},
+            <a class='hover-link download-link' onclick="downloadAs('redcap')">REDCap</a>
+            {% endif %}
+        </div>
+    </div>
+</div>

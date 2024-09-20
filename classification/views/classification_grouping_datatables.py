@@ -9,11 +9,12 @@ from more_itertools import first
 from classification.enums import ShareLevel, AlleleOriginBucket
 from classification.models import ClassificationModification, ClassificationGrouping, ImportedAlleleInfo, \
     ClassificationGroupingGeneSymbol, ClassificationGroupingCondition
+from classification.templatetags.classification_tags import gene_symbol
 from genes.hgvs import CHGVS
-from genes.models import GeneSymbol
+from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType
 from ontology.models import OntologyTerm, OntologyService, OntologyRelation, OntologyTermRelation, OntologySnake
-from snpdb.models import UserSettings, GenomeBuild, Lab
+from snpdb.models import UserSettings, GenomeBuild, Lab, Variant
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, DC, SortOrder
 from variantgrid import settings
 
@@ -108,6 +109,15 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             if allele_origin != "A":
                 filters.append(Q(allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
 
+        # for view gene symbol
+        if protein_position := self.get_query_param("protein_position"):
+            protein_position_transcript_version_id = self.get_query_param("protein_position_transcript_version_id")
+            transcript_version = TranscriptVersion.objects.get(pk=protein_position_transcript_version_id)
+            variant_qs = Variant.objects.filter(varianttranscriptannotation__transcript_version=transcript_version,
+                                                varianttranscriptannotation__protein_position__icontains=protein_position)
+            # Join through allele so it works across genome builds
+            filters.append(Q(allele_origin_grouping__allele_grouing__allele__variantallele__variant__in=variant_qs))
+
         if condition := self.get_query_param('condition'):
             term = OntologyTerm.get_or_stub(condition)
 
@@ -126,11 +136,14 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
             groups_for_condition = ClassificationGroupingCondition.objects.filter(ontology_term__in=all_terms).values_list("grouping", flat=True)
             filters.append(Q(pk__in=groups_for_condition))
-            # TODO maybe check parent and children and OMIM/MONDO equiv
 
         if gene_symbol_str := self.get_query_param("gene_symbol"):
             if gene_symbol := GeneSymbol.objects.filter(symbol=gene_symbol_str).first():
-                groups_for_gene_symbol = ClassificationGroupingGeneSymbol.objects.filter(gene_symbol=gene_symbol).values_list("grouping", flat=True)
+                aliased_gene_symbols = GeneSymbol.objects.filter(symbol__in=gene_symbol.alias_meta.alias_symbol_strs)
+                use_gene_symbols = set([gene_symbol])
+                use_gene_symbols |= set(aliased_gene_symbols)
+                # ClassificationGroupingGeneSymbol already takes
+                groups_for_gene_symbol = ClassificationGroupingGeneSymbol.objects.filter(gene_symbol__in=use_gene_symbols).values_list("grouping", flat=True)
                 filters.append(Q(pk__in=groups_for_gene_symbol))
 
         return qs.filter(*filters)

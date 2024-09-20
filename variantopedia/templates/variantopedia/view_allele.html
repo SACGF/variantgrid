@@ -262,12 +262,11 @@
         </table>
 
     <script>
-        function classificationGroupingFilter(data) {
+        function classificationGroupingFilterExtra(data) {
             data.allele_id = {{ allele.pk }};
         }
     </script>
-    FIXME Need to re-introduce overlap status
-    <table id="vc-grouping-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table"></table>
+    {% classification_groupings %}
     {% comment %}
     {% if classifications_new_grouping and not edit_clinical_groupings %}
         <div class="container mt-4" id="view-allele-classification-records">

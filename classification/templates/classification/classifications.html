@@ -265,9 +265,9 @@
             <table id="vc-grouping-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table"></table>
             <div>
             Download as
-                <a class='hover-link download-link' href="javascript:downloadAsdownloadAs('csv')">CSV</a>
+                <a class='hover-link download-link' onclick="downloadAs('csv')">CSV</a>
                 {% if CLASSIFICATION_REDCAP_EXPORT %},
-                <a class='hover-link download-link' href="javascript:downloadAs('redcap')">REDCap</a>
+                <a class='hover-link download-link' onclick="downloadAs('redcap')">REDCap</a>
                 {% endif %}
             </div>
 
