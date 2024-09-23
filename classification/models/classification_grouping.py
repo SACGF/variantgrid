@@ -600,3 +600,12 @@ class ClassificationGroupingEntry(TimeStampedModel):
 
     class Meta:
         unique_together = ("grouping", "classification")
+
+
+class ClassificationGroupingSearchTermType(TextChoices):
+    CLASSIFICATION_ID = "CR_ID", "Classification Record ID"
+    CLASSIFICATION_LAB_ID = "CR_LAB_ID", "Classification Lab Record ID"
+    SOURCE_ID = "SOURCE_ID", "Classification Source ID"
+    CONDITION_ID = "CON_ID", "Condition ID"
+    CONDITION_TEXT = "CON_TEXT", "Condition Text"
+    CLINVAR_SCV = "SCV", "Clinvar SCV"
