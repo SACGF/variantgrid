@@ -7,9 +7,8 @@ from django.http import HttpRequest
 from more_itertools import first
 
 from classification.enums import ShareLevel, AlleleOriginBucket
-from classification.models import ClassificationModification, ClassificationGrouping, ImportedAlleleInfo, \
-    ClassificationGroupingGeneSymbol, ClassificationGroupingCondition
-from classification.templatetags.classification_tags import gene_symbol
+from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
+    ClassificationGroupingSearchTermType
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType
@@ -35,7 +34,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
     def render_lastest_curation_date(self, row: Dict[str, Any]) -> JsonDataType:
         return {
             "curation_date": row["latest_curation_date"],
-            "classification_id": row["latest_classification_id"]
+            "classification_id": row["latest_classification_modification__classification_id"]
         }
 
     @cached_property
@@ -134,17 +133,14 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     if omim_term := OntologyTermRelation.as_omim(term):
                         all_terms.add(omim_term)
 
-            groups_for_condition = ClassificationGroupingCondition.objects.filter(ontology_term__in=all_terms).values_list("grouping", flat=True)
-            filters.append(Q(pk__in=groups_for_condition))
+            all_strs = [term.id.upper() for term in all_terms]
+            filters.append(ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.CONDITION_ID, all_strs))
 
         if gene_symbol_str := self.get_query_param("gene_symbol"):
             if gene_symbol := GeneSymbol.objects.filter(symbol=gene_symbol_str).first():
-                aliased_gene_symbols = GeneSymbol.objects.filter(symbol__in=gene_symbol.alias_meta.alias_symbol_strs)
-                use_gene_symbols = set([gene_symbol])
-                use_gene_symbols |= set(aliased_gene_symbols)
-                # ClassificationGroupingGeneSymbol already takes
-                groups_for_gene_symbol = ClassificationGroupingGeneSymbol.objects.filter(gene_symbol__in=use_gene_symbols).values_list("grouping", flat=True)
-                filters.append(Q(pk__in=groups_for_gene_symbol))
+                all_strs = [gene_symbol_str] + gene_symbol.alias_meta.alias_symbol_strs
+                all_strs = [gs.upper() for gs in all_strs]
+                filters.append(ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.GENE_SYMBOL, all_strs))
 
         return qs.filter(*filters)
 
@@ -241,7 +237,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 label="Last Curated",
                 renderer=self.render_lastest_curation_date,
                 client_renderer='VCTable.latest_curation_and_link',
-                extra_columns=["latest_classification_id"],
+                extra_columns=["latest_classification_modification__classification_id"],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC]
             )
         ]

@@ -19,7 +19,7 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
     DiscordanceReportTriageStatus, ClassificationGrouping, ClassificationGroupingEntry, \
-    ClassificationGroupingGeneSymbol, ClassificationGroupingCondition, AlleleOriginGrouping, AlleleGrouping
+    AlleleOriginGrouping, AlleleGrouping, ClassificationGroupingSearchTerm
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -1297,21 +1297,8 @@ class ClassificationGroupingEntryAdmin(admin.TabularInline):
         return False
 
 
-class ClassificationGroupingGeneSymbolAdmin(admin.TabularInline):
-    model = ClassificationGroupingGeneSymbol
-
-    def has_add_permission(self, request, obj):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-
-class ClassificationGroupingConditionAdmin(admin.TabularInline):
-    model = ClassificationGroupingCondition
+class ClassificationGroupingSearchTermAdmin(admin.TabularInline):
+    model = ClassificationGroupingSearchTerm
 
     def has_add_permission(self, request, obj):
         return False
@@ -1325,13 +1312,13 @@ class ClassificationGroupingConditionAdmin(admin.TabularInline):
 
 @admin.register(ClassificationGrouping)
 class ClassificationGroupingAdmin(ModelAdminBasics):
-    inlines = (ClassificationGroupingEntryAdmin, ClassificationGroupingGeneSymbolAdmin, ClassificationGroupingConditionAdmin)
-    list_display = ("pk", "classification_count", "allele", "lab", "allele_origin_bucket", "classification_bucket", "gene_symbols", "dirty")
+    inlines = (ClassificationGroupingEntryAdmin, ClassificationGroupingSearchTermAdmin)
+    list_display = ("pk", "classification_count", "allele", "lab", "allele_origin_bucket", "classification_bucket", "dirty")
     list_filter = ("lab", "allele_origin_bucket", "classification_bucket")
 
-    @admin_list_column("gene_symbols")
-    def gene_symbols(self, obj: ClassificationGrouping):
-        return ", ".join(obj.classificationgroupinggenesymbol_set.values_list("gene_symbol", flat=True))
+    # @admin_list_column("gene_symbols")
+    # def gene_symbols(self, obj: ClassificationGrouping):
+    #     return ", ".join(obj.classificationgroupinggenesymbol_set.values_list("gene_symbol", flat=True))
 
     @admin_action("Refresh")
     def refresh(self, request, queryset: QuerySet[ClassificationGrouping]):

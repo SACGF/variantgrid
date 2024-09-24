@@ -1,21 +1,24 @@
-from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Optional, Set
+from typing import Optional, Set, Any
+
+import django
 from django.contrib.postgres.fields import ArrayField
-from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices
+from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
-from annotation.models import VariantAnnotation, AnnotationVersion
+from frozendict import frozendict
 from classification.criteria_strengths import CriteriaStrength
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, CriteriaEvaluation
 from django.db import models, transaction
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
     ConditionResolved, SomaticClinicalSignificanceValue
-from genes.models import GeneSymbol, TranscriptVersion, GeneSymbolAlias, GeneVersion
 from library.utils import first
 from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
+
+
+classification_grouping_search_term_signal = django.dispatch.Signal()  # args: "grouping", expects iterable of ClassificationGroupingSearchTermStub
 
 
 # TODO this needs to be moved to Classification
@@ -211,7 +214,7 @@ class ClassificationGrouping(TimeStampedModel):
     # summary_somatic_clinical_significance
     # summary_c_hgvses
     # summary_criteria
-    latest_classification = models.ForeignKey(ClassificationModification, on_delete=SET_NULL, null=True, blank=True)
+    latest_classification_modification = models.ForeignKey(ClassificationModification, on_delete=SET_NULL, null=True, blank=True)
     latest_criteria = ArrayField(models.CharField(max_length=50), null=True, blank=True)
     latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
     latest_curation_date = models.DateField(null=True, blank=True)
@@ -276,17 +279,24 @@ class ClassificationGrouping(TimeStampedModel):
                 grouping.dirty = True
                 grouping.save(update_fields=["dirty"])
 
+    @cached_property
+    def classification_modifications(self) -> list[ClassificationModification]:
+        # show in date order
+        all_classifications = self.classificationgroupingentry_set.values_list("classification", flat=True)
+        return list(sorted(ClassificationModification.objects.filter(classification_id__in=all_classifications, is_last_published=True), key=lambda mod: mod.curated_date_check))
 
     @cached_property
-    def gene_symbols(self) -> list[GeneSymbol]:
-        return list(sorted(gss.gene_symbol for gss in self.classificationgroupinggenesymbol_set.select_related("gene_symbol")))
+    def allele(self) -> Allele:
+        return self.allele_origin_grouping.allele_grouping.allele
 
-    def _update_conditions(self, terms: list[OntologyTerm]):
-        ClassificationGroupingCondition.objects.filter(grouping=self).exclude(
-            ontology_term_id__in=[term.pk for term in terms]).delete()
-        desired_entries = [ClassificationGroupingCondition(grouping=self, ontology_term_id=term.pk) for term in
-                           terms]
-        ClassificationGroupingCondition.objects.bulk_create(desired_entries, ignore_conflicts=True)
+    def to_json(self):
+        scs = self.latest_classification_modification.somatic_clinical_significance_value
+        return {
+            "lab": str(self.lab),
+            "classification": self.latest_classification_modification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
+            "somatic_clinical_significance": scs.as_json() if scs else None,
+            "curated_date": str(self.latest_curation_date)  # fixme, need a quick way for yyyy-mm-dd
+        }
 
     @transaction.atomic
     def update(self):
@@ -294,21 +304,11 @@ class ClassificationGrouping(TimeStampedModel):
         self.allele_origin_grouping.dirty = True
         self.allele_origin_grouping.save(update_fields=["dirty"])
 
-        # UPDATE GENE SYMBOLS
-        ClassificationGroupingGeneSymbolSyncer.gene_symbol_sync(self)
-
-        all_modifications: list[ClassificationModification] = list(ClassificationModification.objects.filter(
-            is_last_published=True,
-            classification__in=self.classificationgroupingentry_set.values_list("classification"),
-            classification__withdrawn=False
-        ).select_related('classification'))
-        all_modifications: list[ClassificationModification] = list(sorted(all_modifications, key=lambda x: x.curated_date, reverse=True))
-
-        if all_modifications:
+        if all_modifications := self.classification_modifications:
             # FIND THE MOST RECENT CLASSIFICATION
             best_classification = first(all_modifications)
 
-            self.latest_classification = best_classification
+            self.latest_classification_modification = best_classification
             self.latest_curation_date = best_classification.curated_date
             self.latest_allele_info = best_classification.classification.allele_info
             # TODO, calculate the somatic sort order here so we can remove it from classification
@@ -335,7 +335,7 @@ class ClassificationGrouping(TimeStampedModel):
                             )
                 return list(sorted(strengths))
 
-            self.latest_criteria = [str(crit) for crit in criteria_converter(self.latest_classification)]
+            self.latest_criteria = [str(crit) for crit in criteria_converter(self.latest_classification_modification)]
 
             if self.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
                 all_somatic_clin_sigs: set[SomaticClinicalSignificanceValue] = set()
@@ -373,7 +373,7 @@ class ClassificationGrouping(TimeStampedModel):
 
                 # only store valid terms as quick links to the classification
                 all_terms = {term for term in all_terms if term.is_valid_for_condition and not term.is_stub}
-                self._update_conditions(all_terms)
+                # self._update_conditions(all_terms)
 
             evidence_map = EvidenceKeyMap.instance()
             all_classification_values = evidence_map[SpecialEKeys.CLINICAL_SIGNIFICANCE].sort_values(all_classification_values)
@@ -396,7 +396,6 @@ class ClassificationGrouping(TimeStampedModel):
                 all_classification_buckets.remove(ClassificationClassificationBucket.NO_DATA)
                 bucket_count = len(all_classification_buckets)
 
-            # FIXME need the concept of an OTHER that's low priority and doesn't interfere with anything
             use_bucket: ClassificationClassificationBucket
             match bucket_count:
                 case 0:
@@ -407,34 +406,28 @@ class ClassificationGrouping(TimeStampedModel):
                     use_bucket = ClassificationClassificationBucket.CONFLICTING
 
             self.classification_bucket = use_bucket
-
             self.classification_count = len(all_modifications)
+
+            # update search terms
+
+            # TODO do a better syncing of existing values
+
+            all_term_stubs: list[ClassificationGroupingSearchTermStub] = []
+            for _, term_stubs in classification_grouping_search_term_signal.send(sender=ClassificationGrouping, grouping=self):
+                if term_stubs:
+                    all_term_stubs += [ts.to_search_term(grouping=self) for ts in term_stubs]
+            ClassificationGroupingSearchTerm.objects.filter(grouping=self).delete()
+            ClassificationGroupingSearchTerm.objects.bulk_create(all_term_stubs)
+
             self.dirty = False
             self.save()
+
+            # TODO update search terms
+
 
         else:
             # there are no classifications, time to die
             self.delete()
-
-
-    @cached_property
-    def allele(self) -> Allele:
-        return self.allele_origin_grouping.allele_grouping.allele
-
-    @cached_property
-    def classification_modifications(self) -> list[ClassificationModification]:
-        # show in date order
-        all_classifications = self.classificationgroupingentry_set.values_list("classification", flat=True)
-        return list(sorted(ClassificationModification.objects.filter(classification_id__in=all_classifications, is_last_published=True), key=lambda mod: mod.curated_date_check))
-
-    def to_json(self):
-        scs = self.latest_classification.somatic_clinical_significance_value
-        return {
-            "lab": str(self.lab),
-            "classification": self.latest_classification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
-            "somatic_clinical_significance": scs.as_json() if scs else None,
-            "curated_date": str(self.latest_curation_date)  # fixme, need a quick way for yyyy-mm-dd
-        }
 
     @staticmethod
     def update_all_dirty():
@@ -445,143 +438,68 @@ class ClassificationGrouping(TimeStampedModel):
             dirty.update()
 
 
-class ClassificationGroupingGeneSymbol(TimeStampedModel):
-    grouping = models.ForeignKey(ClassificationGrouping, on_delete=CASCADE)
-    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE, db_index=False)
-
-    from_normalized = models.BooleanField(default=False)
-    from_imported = models.BooleanField(default=False)
-    from_allele = models.BooleanField(default=False)
-    from_transcript = models.BooleanField(default=False)
-
-    def __str__(self):
-        return f"Grouping {self.grouping} : GeneSymbol {self.gene_symbol}"
-
-    class Meta:
-        unique_together = ("grouping", "gene_symbol")
-
-
-
-class ClassificationGroupingGeneSymbolSync:
-
-    def __init__(self, gene_symbol_grouping: ClassificationGroupingGeneSymbol, is_new=False):
-        self.gene_symbol_grouping = gene_symbol_grouping
-        self.from_normalized = False
-        self.from_imported = False
-        self.from_allele = False
-        self.from_transcript = False
-        self.is_new = is_new
+class ClassificationGroupingSearchTermType(TextChoices):
+    CLASSIFICATION_ID = "CR_ID", "Classification Record ID"
+    CLASSIFICATION_LAB_ID = "CR_LAB_ID", "Classification Lab Record ID"
+    SOURCE_ID = "SOURCE_ID", "Classification Source ID"
+    CONDITION_ID = "CON_ID", "Condition ID"
+    CONDITION_TEXT = "CON_TEXT", "Condition Text"
+    CLINVAR_SCV = "SCV", "Clinvar SCV"
+    GENE_SYMBOL = "GENE_SYMBOL", "Gene Symbol"
+    USER = "USER", "User"
+    DISCORDANCE_REPORT = "DR", "Discordance Report"
+    PATIENT_ID = "PATIENT_ID", "Patient ID"
+    SAMPLE_ID = "SAMPLE_ID", "Sample ID"
 
     @property
-    def is_dirty(self):
-        return \
-                self.from_normalized != self.gene_symbol_grouping.from_normalized or \
-                self.from_imported != self.gene_symbol_grouping.from_imported or \
-                self.from_allele != self.gene_symbol_grouping.from_allele or \
-                self.from_transcript != self.gene_symbol_grouping.from_transcript
-
-    def apply(self):
-        self.gene_symbol_grouping.from_normalized = self.from_normalized
-        self.gene_symbol_grouping.from_imported = self.from_imported
-        self.gene_symbol_grouping.from_allele = self.from_allele
-        self.gene_symbol_grouping.from_transcript = self.from_transcript
+    def is_private(self):
+        return self in {ClassificationGroupingSearchTermType.PATIENT_ID, ClassificationGroupingSearchTermType.SAMPLE_ID}
 
 
-class ClassificationGroupingGeneSymbolSyncer:
-
-    @staticmethod
-    def gene_symbol_sync(classification_grouping: ClassificationGrouping):
-        imported_allele_infos = ImportedAlleleInfo.objects.filter(
-            pk__in=classification_grouping.classificationgroupingentry_set.all().values_list('classification__allele_info_id', flat=True)
-        )
-
-        syncer = ClassificationGroupingGeneSymbolSyncer(classification_grouping)
-
-        all_transcript_versions: set[TranscriptVersion] = set()
-        genome_build_to_variants = defaultdict(set)
-
-        for imported_allele_info in imported_allele_infos:
-            for rb in imported_allele_info.resolved_builds:
-                if variant := rb.variant:
-                    genome_build_to_variants[rb.genome_build].add(variant)
-
-                all_transcript_versions.add(rb.transcript_version)
-                if gene_symbol := rb.gene_symbol:
-                    syncer.for_gene_symbol(gene_symbol).from_normalized = True
-
-            if c_hgvs := imported_allele_info.imported_c_hgvs_obj:
-                if gene_symbol := GeneSymbol.objects.filter(symbol=c_hgvs.gene_symbol).first():
-                    syncer.for_gene_symbol(gene_symbol).from_imported = True
-                else:
-                    for alias in GeneSymbolAlias.objects.filter(alias=c_hgvs.gene_symbol).select_related("gene_symbol"):
-                        syncer.for_gene_symbol(alias.gene_symbol).from_imported = True
-
-        # gene symbols from transcripts
-        if all_transcript_versions:
-            for gv in GeneVersion.objects.filter(transcriptversion__in=all_transcript_versions).select_related(
-                    "gene_symbol"):
-                syncer.for_gene_symbol(gv.gene_symbol).from_transcript = True
-
-        # gene symbols from allele
-        for genome_build, variants in genome_build_to_variants.items():
-            vav = AnnotationVersion.latest(genome_build=genome_build).variant_annotation_version
-            for va in VariantAnnotation.objects.filter(variant__in=variants, version=vav).select_related("gene"):
-                if gene := va.gene:
-                    for gene_symbol in gene.get_symbols():
-                        syncer.for_gene_symbol(gene_symbol).from_allele = True
-
-        syncer.sync()
-
-    def __init__(self, classification_grouping: ClassificationGrouping):
-        self.classification_grouping = classification_grouping
-        self.by_gene_symbol: dict[GeneSymbol, ClassificationGroupingGeneSymbolSync] = {}
-        for cggs in self.classification_grouping.classificationgroupinggenesymbol_set.all():
-            self.by_gene_symbol[cggs.gene_symbol] = ClassificationGroupingGeneSymbolSync(cggs)
-
-    def for_gene_symbol(self, gene_symbol: GeneSymbol) -> ClassificationGroupingGeneSymbolSync:
-        if entry := self.by_gene_symbol.get(gene_symbol):
-            return entry
-        sync = ClassificationGroupingGeneSymbolSync(
-            ClassificationGroupingGeneSymbol(
-                grouping=self.classification_grouping,
-                gene_symbol=gene_symbol,
-            ),
-            is_new=True
-        )
-        self.by_gene_symbol[gene_symbol] = sync
-        return sync
-
-    def sync(self):
-        insert_us = list()
-        update_us = list()
-        delete_us = list()
-        for cggs in self.by_gene_symbol.values():
-            if cggs.is_new:
-                insert_us.append(cggs.gene_symbol_grouping)
-            elif cggs.is_dirty:
-                cggs.apply()
-                update_us.append(cggs.gene_symbol_grouping)
-            else:
-                delete_us.append(cggs.gene_symbol_grouping)
-        if insert_us:
-            ClassificationGroupingGeneSymbol.objects.bulk_create(insert_us)
-        if update_us:
-            ClassificationGroupingGeneSymbol.objects.bulk_update(update_us, fields=["from_normalized", "from_imported", "from_transcript", "from_allele"])
-        if delete_us:
-            for du in delete_us:
-                # insert is going to be 99% of the operations we ever have to do, so can deal with
-                du.delete()
-
-
-class ClassificationGroupingCondition(TimeStampedModel):
+class ClassificationGroupingSearchTerm(TimeStampedModel):
     grouping = models.ForeignKey(ClassificationGrouping, on_delete=CASCADE)
-    ontology_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE)
-
-    def __str__(self):
-        return f"Grouping {self.grouping} : OntologyTerm {self.ontology_term}"
+    term = models.TextField()
+    term_type = models.CharField(max_length=20, choices=ClassificationGroupingSearchTermType.choices)
+    extra = models.JSONField(null=True, blank=True)
 
     class Meta:
-        unique_together = ("grouping", "ontology_term")
+        unique_together = ("grouping", "term", "term_type")
+
+    @staticmethod
+    def filter_q(term_type: ClassificationGroupingSearchTermType, terms: list[str]) -> Q:
+        # TODO add support for partial search based on type
+        # TODO add support for different privacy levels based on type
+        matching_values = ClassificationGroupingSearchTerm.objects.filter(term_type=term_type, term__in=[t.upper() for t in terms]).values_list('grouping_id', flat=True)
+        return Q(pk__in=matching_values)
+
+
+@dataclass(frozen=True)
+class ClassificationGroupingSearchTermStub:
+    term_type: ClassificationGroupingSearchTermType
+    term: str
+    extra: Optional[frozendict] = None
+
+    def to_search_term(self, grouping: ClassificationGrouping) -> 'ClassificationGroupingSearchTerm':
+        return ClassificationGroupingSearchTerm(
+            grouping=grouping,
+            term=self.term,
+            term_type=self.term_type,
+            extra=self.extra
+        )
+
+
+@dataclass
+class ClassificationGroupingSearchTermBuilder:
+    term: str
+    term_type: ClassificationGroupingSearchTermType
+    extra: dict = field(default_factory=dict)
+
+    def as_stub(self) -> ClassificationGroupingSearchTermStub:
+        return ClassificationGroupingSearchTermStub(
+            term=self.term,
+            term_type=ClassificationGroupingSearchTermType(self.term_type),
+            extra=frozendict(self.extra) if self.extra else None
+        )
 
 
 class ClassificationGroupingEntry(TimeStampedModel):
@@ -600,12 +518,3 @@ class ClassificationGroupingEntry(TimeStampedModel):
 
     class Meta:
         unique_together = ("grouping", "classification")
-
-
-class ClassificationGroupingSearchTermType(TextChoices):
-    CLASSIFICATION_ID = "CR_ID", "Classification Record ID"
-    CLASSIFICATION_LAB_ID = "CR_LAB_ID", "Classification Lab Record ID"
-    SOURCE_ID = "SOURCE_ID", "Classification Source ID"
-    CONDITION_ID = "CON_ID", "Condition ID"
-    CONDITION_TEXT = "CON_TEXT", "Condition Text"
-    CLINVAR_SCV = "SCV", "Clinvar SCV"

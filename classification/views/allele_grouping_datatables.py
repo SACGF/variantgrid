@@ -68,7 +68,7 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
 
     def c_hgvs_for(self, cg: ClassificationGrouping) -> CHGVS:
         is_preferred_genome_build = True
-        allele_info = cg.latest_classification.classification.allele_info
+        allele_info = cg.latest_classification_modification.classification.allele_info
         for gb in self.genome_build_prefs:
             if ri := allele_info[gb]:
                 if c_hgvs := ri.c_hgvs_obj:
