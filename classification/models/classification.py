@@ -1,4 +1,5 @@
 import copy
+import json
 import re
 import uuid
 from collections import Counter, namedtuple
@@ -25,6 +26,7 @@ from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
+from unidecode import unidecode
 
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
 from annotation.regexes import db_ref_regexes, DbRegexes
@@ -1130,6 +1132,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         value = cell.value
         e_key = cell.e_key
         note = cell.note
+
+        if value and '\u00a0' in value:
+            value = value.replace('\u00a0', ' ')
+        if note and '\u00a0' in note:
+            note = note.replace('\u00a0', ' ')
 
         if self.lab.external:
             cell.validate = False
