@@ -75,9 +75,9 @@ def _condition_terms(grouping: ClassificationGrouping, **kwargs) -> Optional[Ite
         if condition := modification.classification.condition_resolution_obj:
             all_terms |= set(condition.terms)
             if plain_text := condition.plain_text:
-                all_free_text_conditions.add(plain_text)
+                all_free_text_conditions.add(plain_text.upper())
         elif condition_text := modification.get(SpecialEKeys.CONDITION):
-            all_free_text_conditions.add(condition_text)
+            all_free_text_conditions.add(condition_text.upper())
 
     for term in all_terms:
         all_stubs.append(ClassificationGroupingSearchTermStub(
@@ -87,6 +87,6 @@ def _condition_terms(grouping: ClassificationGrouping, **kwargs) -> Optional[Ite
     for free_text in all_free_text_conditions:
         all_stubs.append(ClassificationGroupingSearchTermStub(
             term_type=ClassificationGroupingSearchTermType.CONDITION_TEXT,
-            term=free_text.upper()
+            term=free_text
         ))
     return all_stubs
