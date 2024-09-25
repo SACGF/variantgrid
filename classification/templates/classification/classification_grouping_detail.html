@@ -7,7 +7,7 @@
 {% labelled row_id="allele-imported-as" label="Imported As" %}
     {% imported_allele_info classification_grouping.latest_allele_info %}
 {% endlabelled %}
-{% labelled label="Gene Symbol(s)" %}
+{% labelled label="Gene Symbol" %}
     {% for gene_symbol in classification_grouping.gene_symbols %}{% if not forloop.first %}, {% endif %}<a class="hover-link" href="{{ gene_symbol.get_absolute_url }}">{{ gene_symbol }}</a>{% endfor %}
 {% endlabelled %}
 {% labelled label="Zygosites" %}

@@ -179,7 +179,7 @@
     {% if is_ontology %}
         <script>
         function classificationGroupingFilter(data) {
-            data.condition = {{ term.id | jsonify }};
+            data.ontology_term_id = {{ term.id | jsonify }};
         }
         </script>
         <div class="container-table mt-4">

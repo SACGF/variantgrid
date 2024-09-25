@@ -2583,6 +2583,21 @@ VCTable.groupIdentifier = (data, type, row) => {
         dom.append($('<div>', {class:'text-muted text-small', text: `${classification_count} records`}));
     }
 
+    // matches
+    if (data.matches) {
+        let searchTerm = data.search;
+        let match_doms = [];
+        let ekeys = EKeys.cachedKeys;
+        for (let [key, value] of Object.entries(data.matches)) {
+            match_doms.push($('<div>', {class: 'search-result', html:[
+                $('<span>', { text: ekeys.key(key).label + ' : '}),
+                    highlightTextAsDom(searchTerm, value)
+                ]
+            }));
+        }
+        dom.append($('<div>', {html: match_doms}));
+    }
+
     let indicatorClassName = `allele-origin-indicator allele-origin-horizontal allele-origin-${allele_origin_bucket}`;
     let fullDom = $('<div>', {style: 'margin-left: 5px; margin-top: -10px; display:flex; flex-direction:row', html:[
         alleleOriginDiv,

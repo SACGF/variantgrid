@@ -1,26 +1,40 @@
 import operator
 from functools import cached_property, reduce
-from typing import Any, Dict, List
-
+from typing import Any, Dict, List, Optional
+from django.conf import settings
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from more_itertools import first
-
-from classification.enums import ShareLevel, AlleleOriginBucket
+from classification.enums import ShareLevel, AlleleOriginBucket, EvidenceCategory, SpecialEKeys
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
-    ClassificationGroupingSearchTermType
+    ClassificationGroupingSearchTermType, EvidenceKeyMap, ClassificationModification, ClassificationGroupingEntry, \
+    Classification
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType
 from ontology.models import OntologyTerm, OntologyService, OntologyRelation, OntologyTermRelation, OntologySnake
 from snpdb.models import UserSettings, GenomeBuild, Lab, Variant
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, DC, SortOrder
-from variantgrid import settings
 
 
 class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
     def render_row_header(self, row: Dict[str, Any]) -> JsonDataType:
+
+        matches: Optional[Dict[str, str]] = None
+        search: Optional[str] = None
+
+        if settings.CLASSIFICATION_ID_FILTER:
+            if id_filter := self.get_query_param("id_filter"):
+                search = id_filter
+                id_filter = id_filter.lower()
+                matches = {}
+
+                for cm in ClassificationGrouping.objects.get(pk=row.get("id")).classification_modifications:
+                    for id_key in self.id_columns:
+                        if (value := cm.get(id_key)) and id_filter in value.lower():
+                            matches[id_key] = value
+
         return {
             "dirty": row.get("dirty"),
             "id": row.get("id"),
@@ -28,7 +42,9 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             "org_name": row.get('lab__organization__short_name') or row.get('lab__organization__name'),
             "lab_name": row.get('lab__name'),
             "share_level": row.get('share_level'),
-            "allele_origin_bucket": row.get('allele_origin_bucket')
+            "allele_origin_bucket": row.get('allele_origin_bucket'),
+            "matches": matches,
+            "search": search
         }
 
     def render_lastest_curation_date(self, row: Dict[str, Any]) -> JsonDataType:
@@ -117,8 +133,74 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             # Join through allele so it works across genome builds
             filters.append(Q(allele_origin_grouping__allele_grouing__allele__variantallele__variant__in=variant_qs))
 
-        if condition := self.get_query_param('condition'):
-            term = OntologyTerm.get_or_stub(condition)
+        if condition := self.get_query_param('ontology_term_id'):
+            if c_filter := self.condition_filter(condition):
+                filters.append(c_filter)
+
+        if gene_symbol_str := self.get_query_param("gene_symbol"):
+            if gs_filter := self.gene_symbol_filter(gene_symbol_str):
+                filters.append(gs_filter)
+
+        if settings.CLASSIFICATION_ID_FILTER:
+            if filter_text := self.get_query_param("id_filter"):
+                filters.append(self.id_filter(filter_text))
+
+        if settings.CLASSIFICATION_GRID_SHOW_USERNAME:
+            if user_id := self.get_query_param('user'):
+                filters.append(self.classification_filter_to_grouping(Q(user__pk=user_id)))
+
+        return qs.filter(*filters)
+
+    @cached_property
+    def id_columns(self) -> List[str]:
+        keys = EvidenceKeyMap.instance()
+        return [e_key.key for e_key in keys.all_keys if '_id' in e_key.key and
+                e_key.evidence_category in (EvidenceCategory.HEADER_PATIENT, EvidenceCategory.HEADER_TEST, EvidenceCategory.SIGN_OFF)]
+
+    def classification_modification_filter_to_grouping(self, cm_q: Q) -> Q:
+        return Q(
+            pk__in=\
+                ClassificationGroupingEntry.objects.filter(
+                    classification__in=ClassificationModification.objects.filter(is_last_published=True).filter(cm_q).values_list('classification_id', flat=True)
+                ).values_list('grouping_id', flat=True)
+        )
+
+    def classification_filter_to_grouping(self, cm_q: Q) -> Q:
+        return Q(
+            pk__in=\
+                ClassificationGroupingEntry.objects.filter(
+                    classification__in=Classification.objects.filter(cm_q).values_list('pk', flat=True)
+                ).values_list('grouping_id', flat=True)
+        )
+
+    def id_filter(self, text: str):
+        ids_contain_q_list: List[Q] = []
+        for id_key in self.id_columns:
+            ids_contain_q_list.append(Q(**{f'published_evidence__{id_key}__value__icontains': text}))
+        id_filter_q = reduce(operator.or_, ids_contain_q_list)
+        return Q(
+            pk__in=\
+                ClassificationGroupingEntry.objects.filter(
+                    classification__in=ClassificationModification.objects.filter(is_last_published=True).filter(id_filter_q).values_list('classification_id', flat=True)
+                ).values_list('grouping_id', flat=True)
+        )
+
+    def gene_symbol_filter(self, gene_symbol: str):
+        if gene_symbol := GeneSymbol.objects.filter(symbol=gene_symbol).first():
+            all_strs = [gene_symbol.symbol] + gene_symbol.alias_meta.alias_symbol_strs
+            all_strs = [gs.upper() for gs in all_strs]
+            return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.GENE_SYMBOL, all_strs)
+        # FIXME add support for gene symbol alias
+
+    def scv_filter(self, scv: str):
+        if scv.startswith("SCV"):
+            return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.CLINVAR_SCV, scv)
+
+    def condition_filter(self, text, must_exist: bool = False):
+        try:
+            term = OntologyTerm.get_or_stub(text)
+            if must_exist and term.is_stub:
+                return False
 
             all_terms = set([term])
             if mondo_term := OntologyTermRelation.as_mondo(term):
@@ -134,15 +216,9 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                         all_terms.add(omim_term)
 
             all_strs = [term.id.upper() for term in all_terms]
-            filters.append(ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.CONDITION_ID, all_strs))
-
-        if gene_symbol_str := self.get_query_param("gene_symbol"):
-            if gene_symbol := GeneSymbol.objects.filter(symbol=gene_symbol_str).first():
-                all_strs = [gene_symbol_str] + gene_symbol.alias_meta.alias_symbol_strs
-                all_strs = [gs.upper() for gs in all_strs]
-                filters.append(ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.GENE_SYMBOL, all_strs))
-
-        return qs.filter(*filters)
+            return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.CONDITION_ID, all_strs)
+        except ValueError:
+            pass
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)

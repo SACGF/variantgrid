@@ -1,5 +1,6 @@
+import operator
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cached_property, reduce
 from typing import Optional, Set, Any
 
 import django
@@ -13,6 +14,7 @@ from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, C
 from django.db import models, transaction
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
     ConditionResolved, SomaticClinicalSignificanceValue
+from genes.models import GeneSymbol
 from library.utils import first
 from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
@@ -192,6 +194,12 @@ class ClassificationGrouping(TimeStampedModel):
 
     dirty = models.BooleanField(default=True)
 
+    def dirty_up(self):
+        self.dirty = True
+        self.save(update_fields=["dirty"])
+        self.allele_origin_grouping.dirty = True
+        self.allele_origin_grouping.save(update_fields=["dirty"])
+
     def sub_groupings(self) -> list[ClassificationSubGrouping]:
         return ClassificationSubGrouping.from_modifications(self.classification_modifications)
 
@@ -255,7 +263,7 @@ class ClassificationGrouping(TimeStampedModel):
         return None
 
     @staticmethod
-    def assign_grouping_for_classification(classification: Classification):
+    def assign_grouping_for_classification(classification: Classification, force_dirty_up=True):
         if desired_grouping := ClassificationGrouping.desired_grouping_for_classification(classification):
             entry, is_new = ClassificationGroupingEntry.objects.get_or_create(
                 classification=classification,
@@ -267,17 +275,16 @@ class ClassificationGrouping(TimeStampedModel):
                     entry.grouping = desired_grouping
                     entry.save()
 
-                    old_grouping.dirty = True
-                    old_grouping.save(update_fields=["dirty"])
-                    desired_grouping.dirty = True
-                    desired_grouping.save(update_fields=["dirty"])
+                    old_grouping.dirty_up()
+                    desired_grouping.dirty_up()
+                elif force_dirty_up:
+                    entry.dirty_up()
         else:
             # if we don't even have an allele, make sure we are removed from any grouping
             if existing := ClassificationGroupingEntry.objects.filter(classification=classification).first():
                 grouping = existing.grouping
+                grouping.dirty_up()
                 existing.delete()
-                grouping.dirty = True
-                grouping.save(update_fields=["dirty"])
 
     @cached_property
     def classification_modifications(self) -> list[ClassificationModification]:
@@ -429,6 +436,10 @@ class ClassificationGrouping(TimeStampedModel):
             # there are no classifications, time to die
             self.delete()
 
+    def gene_symbols(self):
+        terms = set(self.classificationgroupingsearchterm_set.filter(term_type=ClassificationGroupingSearchTermType.GENE_SYMBOL).values_list("term", flat=True))
+        return GeneSymbol.objects.filter(symbol__in=terms)
+
     @staticmethod
     def update_all_dirty():
         # maybe move this out since it does AlleleOriginGroupings too
@@ -439,21 +450,21 @@ class ClassificationGrouping(TimeStampedModel):
 
 
 class ClassificationGroupingSearchTermType(TextChoices):
-    CLASSIFICATION_ID = "CR_ID", "Classification Record ID"
-    CLASSIFICATION_LAB_ID = "CR_LAB_ID", "Classification Lab Record ID"
-    SOURCE_ID = "SOURCE_ID", "Classification Source ID"
+    # CLASSIFICATION_ID = "CR_ID", "Classification Record ID"
+    # CLASSIFICATION_LAB_ID = "CR_LAB_ID", "Classification Lab Record ID"
+    # SOURCE_ID = "SOURCE_ID", "Classification Source ID"
     CONDITION_ID = "CON_ID", "Condition ID"
-    CONDITION_TEXT = "CON_TEXT", "Condition Text"
     CLINVAR_SCV = "SCV", "Clinvar SCV"
     GENE_SYMBOL = "GENE_SYMBOL", "Gene Symbol"
-    USER = "USER", "User"
     DISCORDANCE_REPORT = "DR", "Discordance Report"
-    PATIENT_ID = "PATIENT_ID", "Patient ID"
-    SAMPLE_ID = "SAMPLE_ID", "Sample ID"
 
     @property
     def is_private(self):
         return self in {ClassificationGroupingSearchTermType.PATIENT_ID, ClassificationGroupingSearchTermType.SAMPLE_ID}
+
+    @property
+    def is_partial_text(self):
+        return False
 
 
 class ClassificationGroupingSearchTerm(TimeStampedModel):
@@ -464,12 +475,20 @@ class ClassificationGroupingSearchTerm(TimeStampedModel):
 
     class Meta:
         unique_together = ("grouping", "term", "term_type")
+        indexes = [models.Index(fields=["term_type", "term"])]
 
     @staticmethod
-    def filter_q(term_type: ClassificationGroupingSearchTermType, terms: list[str]) -> Q:
+    def filter_q(term_type: ClassificationGroupingSearchTermType, terms: str | list[str]) -> Q:
         # TODO add support for partial search based on type
         # TODO add support for different privacy levels based on type
-        matching_values = ClassificationGroupingSearchTerm.objects.filter(term_type=term_type, term__in=[t.upper() for t in terms]).values_list('grouping_id', flat=True)
+        if isinstance(terms, str):
+            terms = [terms]
+        if term_type.is_partial_text:
+            matching_values = ClassificationGroupingSearchTerm.objects.filter(
+                Q(term_type=term_type) & reduce(operator.or_, [Q(term__icontains=t.upper()) for t in terms])
+            ).values_list('grouping_id', flat=True)
+        else:
+            matching_values = ClassificationGroupingSearchTerm.objects.filter(term_type=term_type, term__in=[t.upper() for t in terms]).values_list('grouping_id', flat=True)
         return Q(pk__in=matching_values)
 
 
@@ -508,10 +527,7 @@ class ClassificationGroupingEntry(TimeStampedModel):
     grouping = models.ForeignKey(ClassificationGrouping, on_delete=CASCADE)
 
     def dirty_up(self):
-        self.grouping.dirty = True
-        self.grouping.save(update_fields=["dirty"])
-        self.grouping.allele_origin_grouping.dirty = True
-        self.grouping.allele_origin_grouping.save(update_fields=["dirty"])
+        self.grouping.dirty_up()
 
     def __str__(self):
         return f"Grouping {self.grouping} : Classification {self.classification}"

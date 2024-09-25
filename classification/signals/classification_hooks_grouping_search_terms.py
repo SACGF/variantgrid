@@ -5,7 +5,7 @@ from annotation.models import AnnotationVersion, VariantAnnotation
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationGroupingSearchTermStub, ClassificationGroupingSearchTermType, \
     ClassificationGrouping, ImportedAlleleInfo, classification_grouping_search_term_signal, \
-    ClassificationGroupingSearchTermBuilder
+    ClassificationGroupingSearchTermBuilder, ClinVarExport
 from genes.models import GeneSymbol, GeneSymbolAlias, GeneVersion, TranscriptVersion
 from ontology.models import OntologyTerm
 from snpdb.models import GenomeBuild, Variant
@@ -66,27 +66,49 @@ def _gene_symbol_search_for(grouping: ClassificationGrouping, **kwargs) -> Optio
 @receiver(classification_grouping_search_term_signal)
 def _condition_terms(grouping: ClassificationGrouping, **kwargs) -> Optional[Iterable[ClassificationGroupingSearchTermStub]]:
     all_terms: Set[OntologyTerm] = set()
-    all_free_text_conditions: Set[str] = set()
-
     all_stubs: list[ClassificationGroupingSearchTermStub] = []
 
-    # this is duplicated from the code that populates the grouped classification, but still seems cleanest to do so
+    # redundantly duplicate a lot for the condition free text
+    # this means that this needs to stay in sync with ontology
     for modification in grouping.classification_modifications:
         if condition := modification.classification.condition_resolution_obj:
             all_terms |= set(condition.terms)
-            if plain_text := condition.plain_text:
-                all_free_text_conditions.add(plain_text.upper())
-        elif condition_text := modification.get(SpecialEKeys.CONDITION):
-            all_free_text_conditions.add(condition_text.upper())
 
     for term in all_terms:
         all_stubs.append(ClassificationGroupingSearchTermStub(
             term_type=ClassificationGroupingSearchTermType.CONDITION_ID,
             term=term.id.upper()
         ))
-    for free_text in all_free_text_conditions:
-        all_stubs.append(ClassificationGroupingSearchTermStub(
-            term_type=ClassificationGroupingSearchTermType.CONDITION_TEXT,
-            term=free_text
-        ))
+
     return all_stubs
+
+
+# @receiver(classification_grouping_search_term_signal)
+# def _patient_sample_ids(grouping: ClassificationGrouping, **kwargs) -> Optional[Iterable[ClassificationGroupingSearchTermStub]]:
+#     # TODO consider only checking this if we've got
+#     stubs = []
+#     for cm in grouping.classification_modifications:
+#         if patient_id := cm.get(SpecialEKeys.PATIENT_ID):
+#             stubs.append(ClassificationGroupingSearchTermStub(
+#                 term_type=ClassificationGroupingSearchTermType.PATIENT_ID,
+#                 term=patient_id
+#             ))
+#         if sample_id := cm.get(SpecialEKeys.SAMPLE_ID):
+#             stubs.append(ClassificationGroupingSearchTermStub(
+#                 term_type=ClassificationGroupingSearchTermType.PATIENT_ID,
+#                 term=sample_id
+#             ))
+#     return stubs
+
+
+@receiver(classification_grouping_search_term_signal)
+def _clinvar_scv(grouping: ClassificationGrouping, **kwargs) -> Optional[Iterable[ClassificationGroupingSearchTermStub]]:
+    stubs = []
+    for scv in ClinVarExport.objects.filter(classification_based_on__classification__in=[cm.classification_id for cm in grouping.classification_modifications]).values_list("scv", flat=True):
+        if scv:
+            stubs.append(ClassificationGroupingSearchTermStub(
+                term_type=ClassificationGroupingSearchTermType.CLINVAR_SCV,
+                term=scv
+            ))
+    return stubs
+

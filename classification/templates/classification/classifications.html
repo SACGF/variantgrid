@@ -114,6 +114,8 @@
         data.gene_symbol = blankToNull($('#id_gene_symbol').val());
         data.lab = blankToNull(getLabValue());
         data.allele_origin = blankToNull($("input[name='allele-origin-toggle']:checked").val());
+        data.id_filter = blankToNull($('#id_filter').val());
+        data.user = blankToNull($('#id_user').val());
     }
 
     function classificationFilter(data, type) {
@@ -236,13 +238,13 @@
                     {% allele_origin_toggle show_label=False %}
                 </div>
 
-                {% comment %}
                 {% if CLASSIFICATION_ID_FILTER %}
                 <div class="col-md-4 col-lg-2">
                     <br/>
                     <input type="text" id="id_filter" placeholder="IDs filter" class="form-control" title="Filters on various ID evidence fields" />
                 </div>
                 {% endif %}
+                {% comment %}
                 <div class="col-md-4 col-lg-2">
                     <br/>
                     <div id='show-flag-filter-container' style="display:flex">
