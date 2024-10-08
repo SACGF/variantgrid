@@ -79,7 +79,7 @@ def _write_node_to_cached_generated_file(cgf, analysis, node, name, export_type)
         if export_type == 'csv':
             original_filename = media_root_filename
             zip_file_path = media_root_filename + ".zip"
-            with zipfile.ZipFile(zip_file_path, 'w') as zipf:
+            with zipfile.ZipFile(zip_file_path, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
                 zipf.write(original_filename, arcname=os.path.basename(original_filename))
             os.unlink(original_filename)
             media_root_filename = zip_file_path
