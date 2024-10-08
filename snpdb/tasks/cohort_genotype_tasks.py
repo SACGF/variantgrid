@@ -141,9 +141,13 @@ def get_insert_cohort_genotype_sql(cgc: CohortGenotypeCollection):
                 for zygosity in ZYGOSITY_COUNT_COLUMNS:
                     zygosity_count_lists[zygosity].append(_get_sample_zygosity_count_sql(sample_value, zygosity))
 
+    empty_json_list = "'[]'::jsonb"
     columns = {
         "variant_id": '"snpdb_variant"."id"',
         "collection_id": f"{cgc.pk}",
+        # TODO: These should be joined properly, only doing this to avoid not NULL constraint
+        "format": empty_json_list,
+        "info": empty_json_list,
     }
 
     for zygosity, c in ZYGOSITY_COUNT_COLUMNS.items():
