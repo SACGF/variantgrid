@@ -5,6 +5,12 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
+def _delete_failed_csv_exports(apps, _schema_editor):
+    CachedGeneratedFile = apps.get_model("snpdb", "CachedGeneratedFile")
+    AFFECTED_GENERATORS = ["export_sample_to_downloadable_file", "export_cohort_to_downloadable_file"]
+    CachedGeneratedFile.objects.filter(generator__in=AFFECTED_GENERATORS, exception__contains='NoneType').delete()
+
+
 def _test_for_csv_export(apps):
     CachedGeneratedFile = apps.get_model("snpdb", "CachedGeneratedFile")
 
@@ -19,6 +25,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(_delete_failed_csv_exports),
         ManualOperation(task_id=ManualOperation.task_id_manage(["one_off_fix_csv_export_quoting"]),
                         test=_test_for_csv_export)
     ]
