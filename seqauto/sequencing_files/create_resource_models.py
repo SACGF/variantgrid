@@ -440,22 +440,7 @@ def process_sequencing_run(seqauto_run, sequencers, flowcell_checker, sequencing
             sample_sheet.file_last_modified = SeqAutoRecord.get_file_last_modified(samplesheet_path)
             sample_sheet.save()
             create_samplesheet_samples(sample_sheet)
-            sequencing_run_sample_sheet_created_signal.send(sender=os.path.basename(__file__),
-                                                            sample_sheet=sample_sheet)
-        # Make sure SequencingRunCurrentSampleSheet is set to what we found on disk
-        try:
-            # Update existing
-            current_ss = sequencing_run.sequencingruncurrentsamplesheet
-            on_disk_not_current = current_ss.sample_sheet != sample_sheet
-            if on_disk_not_current:
-                current_sample_sheet_changed(seqauto_run, current_ss, sample_sheet)
-
-        except SequencingRunCurrentSampleSheet.DoesNotExist:
-            # Create new
-            current_ss = SequencingRunCurrentSampleSheet.objects.create(sequencing_run=sequencing_run,
-                                                                        sample_sheet=sample_sheet)
-            logging.info("Created new SequencingRunCurrentSampleSheet: %s", current_ss)
-
+        sample_sheet.set_as_current_sample_sheet(sequencing_run, created=created, seqauto_run=seqauto_run)
     return sequencing_run
 
 

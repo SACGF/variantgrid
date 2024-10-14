@@ -5,7 +5,6 @@
             "hash": "f0ac87bcae3f0e56b3f65b70fd6389ce"
         },
         "variant_caller": {
-            "id": 5,
             "name": "VarDict",
             "version": "1.8.2",
             "run_params": null

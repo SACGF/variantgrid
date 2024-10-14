@@ -297,7 +297,8 @@ def create_backend_vcf_links(uploaded_vcf):
 
     backend_vcf = None
     uploaded_file = uploaded_vcf.uploaded_file
-    if uploaded_file.import_source == ImportSource.SEQAUTO:
+    sequencing_vcf_sources = {ImportSource.SEQAUTO, ImportSource.API}
+    if uploaded_file.path and uploaded_file.import_source in sequencing_vcf_sources:
         path = uploaded_file.path
         if path:
             combo_vcf = None
