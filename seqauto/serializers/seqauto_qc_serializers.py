@@ -31,7 +31,7 @@ class IlluminaFlowcellQCSerializer(SeqAutoViewMixin, serializers.ModelSerializer
 class QCSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
     # Instead of dealing with all the bam/vcf etc - we'll just deal with sequencing_sample and
     # assume we're using the latest ones associated with that
-    sequencing_sample = serializers.SerializerMethodField(read_only=True)
+    sequencing_sample = SequencingSampleLookupSerializer()
     bam_file = BamFilePathSerializer()
     vcf_file = VCFFilePathSerializer()
 
@@ -39,7 +39,8 @@ class QCSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
         model = QC
         fields = ("sequencing_sample", "bam_file", "vcf_file")
 
-    def to_internal_value(self, data):
+    @staticmethod
+    def get_object(data):
         # We are passed "sequencing_sample" - which we can use to get what we really want
         sequencing_sample_data = data.pop("sequencing_sample")
         sheet_data = sequencing_sample_data["sample_sheet"]
@@ -57,7 +58,7 @@ class QCSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
                                        bam_file=bam_file)
 
         qc, _ = QC.objects.get_or_create(
-            # path=   should we pass it in???
+            path=data["path"],
             sequencing_run=sequencing_run,
             bam_file=bam_file,
             vcf_file=vcf_file,
@@ -65,14 +66,6 @@ class QCSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
         qc.data_state = DataState.COMPLETE
         qc.save()
         return qc
-
-    def get_sequencing_sample(self, instance):
-        try:
-            ss = instance.bam_file.unaligned_reads.sequencing_sample
-            serializer = SequencingSampleLookupSerializer(ss)
-            return serializer.data
-        except SequencingSample.DoesNotExist:
-            return None
 
 
 class QCGeneListSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
@@ -101,7 +94,8 @@ class QCGeneListCreateSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
         fields = ("path", "qc", "gene_list")
 
     def create(self, validated_data):
-        qc = validated_data.pop("qc")
+        qc_data = validated_data.pop("qc")
+        qc = QCSerializer.get_object(qc_data)
         gene_list_data = validated_data.pop("gene_list")
         gene_list_text = ",".join(gene_list_data)
         custom_text_gene_list = QCGeneList.create_gene_list(gene_list_text,

@@ -104,13 +104,14 @@ def uploadedfile_dict(uploaded_file) -> dict:
     return data
 
 
-def handle_file_upload(user, django_uploaded_file) -> UploadedFile:
+def handle_file_upload(user, django_uploaded_file, import_source=ImportSource.WEB_UPLOAD, path=None) -> UploadedFile:
     original_filename = django_uploaded_file._name
     kwargs = {
         "name": original_filename,
         "uploaded_file": django_uploaded_file,
-        "import_source": ImportSource.WEB_UPLOAD,
-        "user": user
+        "import_source": import_source,
+        "user": user,
+        "path": path,
     }
     uploaded_file = UploadedFile.objects.create(**kwargs)
     # Save 1st to actually create file (need to open handling unicode)
