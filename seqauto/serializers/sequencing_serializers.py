@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from seqauto.models import Sequencer, Experiment, VariantCaller, SequencingRun, SequencerModel, SampleSheet, \
     SequencingSampleData, SequencingSample, UnalignedReads, Flagstats, SampleSheetCombinedVCFFile, VCFFile, \
-    BamFile, Fastq, Aligner
+    BamFile, Fastq, Aligner, EnrichmentKit
 from seqauto.serializers import EnrichmentKitSerializer
 from snpdb.models import Manufacturer, DataState
 
@@ -37,6 +37,7 @@ class SequencerModelSerializer(serializers.ModelSerializer):
 
 
 class SequencerSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(validators=[])  # Disable UniqueValidator
     sequencer_model = SequencerModelSerializer()
 
     class Meta:
@@ -47,7 +48,7 @@ class SequencerSerializer(serializers.ModelSerializer):
         # When POSTing, you can use just name (PK)
         name = data.get('name')
         if sequencer := Sequencer.objects.filter(name=name).first():
-            return sequencer
+            data = self.to_representation(sequencer)
         return super().to_internal_value(data)
 
     def create(self, validated_data):
@@ -66,6 +67,8 @@ class SequencerSerializer(serializers.ModelSerializer):
 
 class ExperimentSerializer(serializers.ModelSerializer):
     # TODO: duplicated logic below in internal/create - I think we can just use SlugRelatedField
+    name = serializers.CharField(validators=[])  # Remove the UniqueValidator
+
     class Meta:
         model = Experiment
         fields = ["name"]
@@ -74,7 +77,7 @@ class ExperimentSerializer(serializers.ModelSerializer):
         # When POSTing, we expect only the `name` to be passed
         name = data.get('name')
         if experiment := Experiment.objects.filter(name=name).first():
-            return experiment
+            data = self.to_representation(experiment)
         return super().to_internal_value(data)
 
     def create(self, validated_data):
@@ -144,8 +147,9 @@ class SeqAutoViewMixin:
 
 
 class SequencingRunSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
-    sequencer = SequencerSerializer()
-    experiment = ExperimentSerializer()
+    name = serializers.CharField(validators=[])  # disable UniqueValidator
+    sequencer = serializers.PrimaryKeyRelatedField(queryset=Sequencer.objects.all())
+    experiment = serializers.PrimaryKeyRelatedField(queryset=Experiment.objects.all())
     enrichment_kit = EnrichmentKitSerializer()
 
     class Meta:
@@ -154,6 +158,10 @@ class SequencingRunSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
 
     def create(self, validated_data):
         name = validated_data.get('name')
+        if ek_data := validated_data.pop('enrichment_kit', None):
+            enrichment_kit = EnrichmentKitSerializer.get_from_data(ek_data)
+            validated_data['enrichment_kit'] = enrichment_kit
+        validated_data['enrichment_kit'] = enrichment_kit
         instance, _created = SequencingRun.objects.get_or_create(
             name=name,
             defaults=validated_data
@@ -175,9 +183,10 @@ class SampleSheetLookupSerializer(serializers.Serializer):
     sequencing_run = serializers.CharField()
     hash = serializers.CharField()
 
-    def validate(self, attrs):
-        sequencing_run = attrs.get('sequencing_run')
-        hash = attrs.get('hash')
+    @staticmethod
+    def get_object(validated_data):
+        sequencing_run = validated_data['sequencing_run']
+        hash = validated_data['hash']
 
         try:
             return SampleSheet.objects.get(
@@ -205,7 +214,7 @@ class SequencingSampleSerializer(serializers.ModelSerializer):
 
 
 class SampleSheetSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
-    sequencing_run = SequencingRunSerializer()
+    sequencing_run = serializers.PrimaryKeyRelatedField(queryset=SequencingRun.objects.all())
     sequencingsample_set = SequencingSampleSerializer(many=True)
 
     class Meta:
@@ -215,19 +224,31 @@ class SampleSheetSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
     @staticmethod
     def _create_sequencing_samples(sample_sheet, sequencing_samples_data):
         for sample_data in sequencing_samples_data:
-            sample_data_data = sample_data.pop('sample_data', [])
-            sequencing_sample = SequencingSample.objects.create(sample_sheet=sample_sheet, **sample_data)
-            for data in sample_data_data:
-                SequencingSampleData.objects.create(sequencing_sample=sequencing_sample, **data)
+            ss_data = sample_data.pop('sequencingsampledata_set', [])
+            if ek_data := sample_data.pop("enrichment_kit", None):
+                enrichment_kit = EnrichmentKitSerializer.get_from_data(ek_data)
+                sample_data["enrichment_kit"] = enrichment_kit
+            sample_id = sample_data.pop("sample_id")
+            sequencing_sample, _ = SequencingSample.objects.update_or_create(sample_sheet=sample_sheet,
+                                                                             sample_id=sample_id,
+                                                                             defaults=sample_data)
+            for data in ss_data:
+                column = data.pop("column")
+                SequencingSampleData.objects.update_or_create(sequencing_sample=sequencing_sample,
+                                                              column=column,
+                                                              defaults=data)
 
     def create(self, validated_data):
-        sequencing_samples_data = validated_data.pop('sequencing_samples')
-        sample_sheet, _created = SampleSheet.objects.update_or_create(
-            sequencing_run=validated_data["sequencing_run"],
+        sequencing_samples_data = validated_data.pop('sequencingsample_set')
+        sequencing_run = validated_data["sequencing_run"]
+        sample_sheet, created = SampleSheet.objects.update_or_create(
+            sequencing_run=sequencing_run,
             hash=validated_data["hash"],
             defaults=validated_data,
         )
         self._create_sequencing_samples(sample_sheet, sequencing_samples_data)
+        # Whatever is last sent via API is the current sample sheet
+        sample_sheet.set_as_current_sample_sheet(sequencing_run, created)
         return sample_sheet
 
     def update(self, instance, validated_data):
@@ -336,3 +357,15 @@ class SampleSheetCombinedVCFFileSerializer(SeqAutoViewMixin, serializers.ModelSe
     class Meta:
         model = SampleSheetCombinedVCFFile
         fields = ("path", "sample_sheet", "variant_caller")
+
+
+    def create(self, validated_data):
+        sample_sheet = SampleSheetLookupSerializer.get_object(validated_data.pop('sample_sheet'))
+        variant_caller = VariantCallerSerializer().create(validated_data.pop('variant_caller'))
+        sscvcf, _ = SampleSheetCombinedVCFFile.objects.get_or_create(sequencing_run=sample_sheet.sequencing_run,
+                                                                     sample_sheet=sample_sheet,
+                                                                     variant_caller=variant_caller,
+                                                                     path=validated_data["path"])
+        return sscvcf
+
+

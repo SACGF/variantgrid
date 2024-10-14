@@ -41,6 +41,7 @@ from seqauto.qc.exec_summary import load_exec_summary
 from seqauto.qc.fastqc_parser import read_fastqc_data
 from seqauto.qc.flag_stats import load_flagstats
 from seqauto.qc.qc_utils import meta_data_file
+from seqauto.signals.signals_list import sequencing_run_sample_sheet_created_signal
 from snpdb.models import VCF, Sample, GenomeBuild, DataState, InheritanceManager, Wiki
 from snpdb.models.models_enums import ImportStatus, ImportSource
 from variantgrid.celery import app
@@ -363,6 +364,27 @@ class SampleSheet(SeqAutoRecord):
     def get_version_string(self):
         date = "TODO"
         return f"{self.hash}/{date}"
+
+    def set_as_current_sample_sheet(self, sequencing_run, created=False, seqauto_run=None):
+        if created:
+            sequencing_run_sample_sheet_created_signal.send(sender=os.path.basename(__file__),
+                                                            sample_sheet=self)
+
+        # Make sure SequencingRunCurrentSampleSheet is set to what we found on disk
+        try:
+            # Update existing
+            current_ss = sequencing_run.sequencingruncurrentsamplesheet
+            on_disk_not_current = current_ss.sample_sheet != self
+            if on_disk_not_current:
+                from seqauto.sequencing_files.create_resource_models import current_sample_sheet_changed
+                current_sample_sheet_changed(seqauto_run, current_ss, self)
+
+        except SequencingRunCurrentSampleSheet.DoesNotExist:
+            # Create new
+            current_ss = SequencingRunCurrentSampleSheet.objects.create(sequencing_run=sequencing_run,
+                                                                        sample_sheet=self)
+            logging.info("Created new SequencingRunCurrentSampleSheet: %s", current_ss)
+
 
     def __str__(self):
         return self.path
