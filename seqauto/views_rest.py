@@ -9,6 +9,7 @@ from django.conf import settings
 from django.db.models.query_utils import Q
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
+from rest_framework import status
 from rest_framework.generics import get_object_or_404, RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -25,10 +26,10 @@ from seqauto.serializers import EnrichmentKitSerializer, \
     GoldCoverageSummarySerializer, EnrichmentKitSummarySerializer
 from seqauto.serializers.seqauto_qc_serializers import FastQCSerializer, QCExecSummarySerializer, \
     QCGeneCoverageSerializer, QCGeneListSerializer, QCSerializer, IlluminaFlowcellQCSerializer, \
-    QCGeneListCreateSerializer
+    QCGeneListCreateSerializer, QCGeneListBulkCreateSerializer
 from seqauto.serializers.sequencing_serializers import SequencerModelSerializer, SequencerSerializer, \
     ExperimentSerializer, VariantCallerSerializer, SequencingRunSerializer, SampleSheetSerializer, VCFFileSerializer, \
-    SampleSheetCombinedVCFFileSerializer
+    SampleSheetCombinedVCFFileSerializer, SequencingFilesBulkCreateSerializer
 
 
 class EnrichmentKitSummaryView(RetrieveAPIView):
@@ -96,6 +97,15 @@ class IlluminaFlowcellQCViewSet(ModelViewSet):
     serializer_class = IlluminaFlowcellQCSerializer
 
 
+class SequencingFilesBulkCreateView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = SequencingFilesBulkCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Records created successfully"}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class QCViewSet(ModelViewSet):
     queryset = QC.objects.all()
     serializer_class = QCSerializer
@@ -108,6 +118,15 @@ class QCGeneListViewSet(ModelViewSet):
         if self.request.method == 'POST':
             return QCGeneListCreateSerializer
         return QCGeneListSerializer
+
+
+class QCGeneListBulkCreateView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = QCGeneListBulkCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Records created successfully"}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class QCGeneCoverageViewSet(ModelViewSet):

@@ -1,0 +1,60 @@
+{
+  "sample_sheet": {
+    "sequencing_run": "Haem_21_001_210216_M02027_0112_000000000_JFT79",
+    "hash": "f0ac87bcae3f0e56b3f65b70fd6389ce"
+  },
+  "records": [
+    {
+      "sample_name": "fake_sample_1",
+      "unaligned_reads": {
+        "fastq_r1": {
+          "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/0_fastq/fake_sample_1_R1.fastq.gz"
+        },
+        "fastq_r2": {
+          "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/0_fastq/fake_sample_1_R2.fastq.gz"
+        }
+      },
+      "bam_file": {
+        "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/1_BAM/fake_sample_1.hg38.bam",
+        "aligner": {
+          "name": "BWA",
+          "version": "0.7.18"
+        }
+      },
+      "vcf_file": {
+        "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/2_variants/gatk_per_sample/fake_sample_1.gatk.hg38.vcf.gz",
+        "variant_caller": {
+          "name": "GATK",
+          "version": "4.1.9.0",
+          "run_params": null
+        }
+      }
+    },
+    {
+      "sample_name": "fake_sample_2",
+      "unaligned_reads": {
+        "fastq_r1": {
+          "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/0_fastq/fake_sample_2_R1.fastq.gz"
+        },
+        "fastq_r2": {
+          "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/0_fastq/fake_sample_2_R2.fastq.gz"
+        }
+      },
+      "bam_file": {
+        "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/1_BAM/fake_sample_2.hg38.bam",
+        "aligner": {
+          "name": "BWA",
+          "version": "0.7.18"
+        }
+      },
+      "vcf_file": {
+        "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/2_variants/gatk_per_sample/fake_sample_2.gatk.hg38.vcf.gz",
+        "variant_caller": {
+          "name": "GATK",
+          "version": "4.1.9.0",
+          "run_params": null
+        }
+      }
+    }
+  ]
+}
