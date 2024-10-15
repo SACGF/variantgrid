@@ -21,12 +21,13 @@ class Command(BaseCommand):
     TEST_DATA_DIR = os.path.join(settings.BASE_DIR, 'seqauto', 'test_data')
     API_DATA = os.path.join(TEST_DATA_DIR, 'api_client')
     URLS = {
-        "experiment": "api_experiment",
-        "enrichment_kit": "api_enrichment_kit",
-        "sequencing_run": "api_sequencing_run",
-        "sample_sheet": "api_sample_sheet",
-        "sample_sheet_combined_vcf_file": "api_sample_sheet_combined_vcf_file",
-        "qc_gene_list": "api_qc_gene_list",
+        "experiment": "api_experiment-list",
+        "enrichment_kit": "api_enrichment_kit-list",
+        "sequencing_run": "api_sequencing_run-list",
+        "sample_sheet": "api_sample_sheet-list",
+        "sample_sheet_combined_vcf_file": "api_sample_sheet_combined_vcf_file-list",
+        "qc_gene_lists": "api_qc_gene_list_bulk_create",
+        "sequencing_data": "api_sequencing_files_bulk_create",
         "upload_file": "api_file_upload",
     }
 
@@ -36,8 +37,9 @@ class Command(BaseCommand):
             "enrichment_kit": os.path.join(API_DATA, "enrichment_kit", "idt_haem.json"),
             "sequencing_run": os.path.join(API_DATA, "sequencing_run", "haem_21_minimal.json"),
             "sample_sheet": os.path.join(API_DATA, "sample_sheet", "haem_21_minimal.json"),
-            "sample_sheet_combined_vcf_file": os.path.join(API_DATA, "sample_sheet_combined_vcf_file", "haem_21_sample_1.json"),
-            "qc_gene_list": os.path.join(API_DATA, "qc_gene_list", "haem_21_sample_1.json"),
+            "sample_sheet_combined_vcf_file": os.path.join(API_DATA, "sample_sheet_combined_vcf_file", "haem_21.json"),
+            "sequencing_data": os.path.join(API_DATA, "sequencing_data", "haem_21_bulk_sequencing_files.json"),
+            "qc_gene_lists": os.path.join(API_DATA, "qc_gene_list", "haem_21_bulk_samples.json"),
             "upload_file": os.path.join(TEST_DATA_DIR, "clinical_hg38", "idt_haem", "Haem_21_001_210216_M02027_0112_000000000_JFT79", "2_variants", "Haem_21_001_210216_M02027_0112_000000000_JFT79.vardict.hg38.vcf.gz"),
         }
     }
@@ -74,7 +76,6 @@ class Command(BaseCommand):
                     with open(filename, "r") as f:
                         json_data = json.load(f)
                         kwargs["json"] = json_data
-                    view_path += "-list"
 
                 if server:
                     url = server + reverse(view_path)
@@ -82,9 +83,9 @@ class Command(BaseCommand):
                     url = get_url_from_view_path(view_path)
                 print(f"{url=}")
                 response = requests.post(url, headers=headers, **kwargs)
-                if response.ok:
+                try:
                     json_response = response.json()
-                else:
-                    json_response = None
+                except Exception as e:
+                    json_response = f"Couldn't convert JSON: {e}"
                 print(f"{response.status_code=} - {json_response=}")
                 print("-" * 50)

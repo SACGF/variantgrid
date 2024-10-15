@@ -18,7 +18,7 @@ from seqauto.views import SequencerUpdate, LibraryUpdate, AssayUpdate, VariantCa
 from seqauto.views_rest import SequencingRunViewSet, EnrichmentKitViewSet, SequencerModelViewSet, SequencerViewSet, \
     ExperimentViewSet, VariantCallerViewSet, VCFFileViewSet, SampleSheetCombinedVCFFileViewSet, FastQCViewSet, \
     SampleSheetViewSet, IlluminaFlowcellQCViewSet, QCViewSet, QCGeneListViewSet, QCGeneCoverageViewSet, \
-    QCExecSummaryViewSet
+    QCExecSummaryViewSet, QCGeneListBulkCreateView, SequencingFilesBulkCreateView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
 
@@ -123,21 +123,24 @@ router.register(r'api/v1/sample_sheet_combined_vcf_file', SampleSheetCombinedVCF
 router.register(r'api/v1/fastqc', FastQCViewSet, basename='api_fastqc')
 router.register(r'api/v1/illumina_flowcell_qc', IlluminaFlowcellQCViewSet, basename='api_illumina_flowcell_qc')
 router.register(r'api/v1/qc_gene_list', QCGeneListViewSet, basename='api_qc_gene_list')
+
 router.register(r'api/v1/qc_gene_coverage', QCGeneCoverageViewSet, basename='api_qc_gene_coverage')
 router.register(r'api/v1/qc_exec_summary', QCExecSummaryViewSet, basename='api_qc_exec_summary')
 
 urlpatterns += [
-    path('', include(router.urls)),
+    path('', include(router.urls), name='seqauto_apis'),
 ]
 
 rest_urlpatterns = [
     perm_path('api/view_enrichment_kit_summary/<int:pk>', views_rest.EnrichmentKitSummaryView.as_view(), name='api_view_enrichment_kit_summary'),
     perm_path('api/view_enrichment_kit/<int:pk>', EnrichmentKitViewSet.as_view({'get': 'retrieve'}),
-              name='api_view_enrichment_kit'),  # Deprecated, used for backwards compatability
+         name='api_view_enrichment_kit'),  # Deprecated, used for backwards compatability
     perm_path('api/enrichment_kit_gene_coverage/<int:enrichment_kit_id>/<gene_symbol>', views_rest.EnrichmentKitGeneCoverageView.as_view(), name='api_enrichment_kit_gene_coverage'),
     perm_path('api/enrichment_kit_gene_gold_coverage/<int:enrichment_kit_id>/<gene_symbol>', views_rest.EnrichmentKitGeneGoldCoverageView.as_view(), name='api_enrichment_kit_gene_gold_coverage'),
     perm_path('api/enrichment_kit_gene_gold_coverage_summary/<int:enrichment_kit_id>/<gene_symbol>', views_rest.GoldCoverageSummaryView.as_view(), name='api_enrichment_kit_gene_gold_coverage_summary'),
     perm_path('api/enrichment_kit_gene_gold_coverage_summary/batch/<int:enrichment_kit_id>', views_rest.BatchGoldCoverageSummaryView.as_view(), name='api_batch_enrichment_kit_gene_gold_coverage_summary'),
+    perm_path('api/v1/qc_gene_list/bulk_create', QCGeneListBulkCreateView.as_view(), name='api_qc_gene_list_bulk_create'),
+    perm_path('api/v1/sequencing_files/bulk_create', SequencingFilesBulkCreateView.as_view(), name='api_sequencing_files_bulk_create'),
 ]
 
 urlpatterns += format_suffix_patterns(rest_urlpatterns)
