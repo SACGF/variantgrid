@@ -57,11 +57,15 @@ class QCSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
         vcf_file = VCFFile.objects.get(path=vcf_file_data["path"],
                                        bam_file=bam_file)
 
+        defaults = {}
+        if qc_path := data.get("path"):
+            defaults["path"] = qc_path
+
         qc, _ = QC.objects.get_or_create(
-            path=data["path"],
             sequencing_run=sequencing_run,
             bam_file=bam_file,
             vcf_file=vcf_file,
+            defaults=defaults
         )
         qc.data_state = DataState.COMPLETE
         qc.save()
@@ -107,6 +111,20 @@ class QCGeneListCreateSerializer(SeqAutoRecordMixin, serializers.ModelSerializer
         instance.link_samples_if_exist(force_active=True)
         return instance
 
+
+class QCGeneListBulkCreateSerializer(serializers.Serializer):
+    records = QCGeneListCreateSerializer(many=True)
+
+    def create(self, validated_data):
+        records = validated_data.get("records", [])
+        qcgl_serializer = QCGeneListCreateSerializer()
+        created_records = []
+        for record in records:
+            qcgl = qcgl_serializer.create(record)
+            created_records.append(qcgl)
+        return {
+            "records": created_records,
+        }
 
 class QCGeneCoverageSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
     qc = QCSerializer()

@@ -12,13 +12,8 @@
                 "lane": 3,
                 "barcode": "GCCAAT",
                 "enrichment_kit": {
-                    "pk": 1,
                     "name": "idt_haem",
-                    "version": 1,
-                    "enrichment_kit_type": null,
-                    "manufacturer": null,
-                    "gene_list": null,
-                    "__str__": "idt_haem"
+                    "version": 1
                 },
                 "is_control": false,
                 "failed": false,
@@ -32,13 +27,8 @@
                 "lane": 3,
                 "barcode": "CAGATC",
                 "enrichment_kit": {
-                    "pk": 1,
                     "name": "idt_haem",
-                    "version": 1,
-                    "enrichment_kit_type": null,
-                    "manufacturer": null,
-                    "gene_list": null,
-                    "__str__": "idt_haem"
+                    "version": 1
                 },
                 "is_control": false,
                 "failed": false,
