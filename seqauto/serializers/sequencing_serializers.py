@@ -122,7 +122,7 @@ class VariantCallerSerializer(serializers.ModelSerializer):
         return instance
 
 
-class SeqAutoViewMixin:
+class SeqAutoRecordMixin:
     """
         This sets SeqAutoRecord.data_state to COMPLETED for anything created via API
 
@@ -146,7 +146,7 @@ class SeqAutoViewMixin:
         return super().update(instance, validated_data)
 
 
-class SequencingRunSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
+class SequencingRunSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
     name = serializers.CharField(validators=[])  # disable UniqueValidator
     sequencer = serializers.PrimaryKeyRelatedField(queryset=Sequencer.objects.all())
     experiment = serializers.PrimaryKeyRelatedField(queryset=Experiment.objects.all())
@@ -213,7 +213,7 @@ class SequencingSampleSerializer(serializers.ModelSerializer):
         fields = ['sample_id', 'sample_name', 'sample_project', 'sample_number', 'lane', 'barcode', 'enrichment_kit', 'is_control', 'failed', 'sequencingsampledata_set']
 
 
-class SampleSheetSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
+class SampleSheetSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
     sequencing_run = serializers.PrimaryKeyRelatedField(queryset=SequencingRun.objects.all())
     sequencingsample_set = SequencingSampleSerializer(many=True)
 
@@ -261,7 +261,7 @@ class SampleSheetSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
         return instance
 
 
-class FastqSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
+class FastqSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
     class Meta:
         model = Fastq
         fields = ("path", "name", "read")
@@ -294,7 +294,7 @@ class UnalignedReadsSerializer(serializers.ModelSerializer):
         return instance
 
 
-class FlagstatsSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
+class FlagstatsSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
     class Meta:
         model = Flagstats
         fields = ("total", "read1", "read2", "mapped", "properly_paired")
@@ -306,7 +306,7 @@ class BamFilePathSerializer(serializers.ModelSerializer):
         fields = ("path", )
 
 
-class BamFileSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
+class BamFileSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
     unaligned_reads = UnalignedReadsSerializer()
     aligner = AlignerSerializer()
     flagstats = FlagstatsSerializer()  # 1-to-1 field
@@ -341,7 +341,7 @@ class VCFFilePathSerializer(serializers.ModelSerializer):
         fields = ("path", )
 
 
-class VCFFileSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
+class VCFFileSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
     bam_file = BamFileSerializer()
     variant_caller = VariantCallerSerializer()
 
@@ -350,7 +350,7 @@ class VCFFileSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
         fields = ("path", "bam_file", "variant_caller")
 
 
-class SampleSheetCombinedVCFFileSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
+class SampleSheetCombinedVCFFileSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
     sample_sheet = SampleSheetLookupSerializer()
     variant_caller = VariantCallerSerializer()
 
