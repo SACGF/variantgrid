@@ -6,12 +6,12 @@ from genes.serializers import SampleGeneListSerializer, GeneCoverageCollectionSe
 from library.utils import Value
 from seqauto.models import IlluminaFlowcellQC, QCGeneList, QC, QCGeneCoverage, QCExecSummary, FastQC, SequencingSample, \
     SampleSheet, SequencingRun, BamFile, VCFFile
-from seqauto.serializers.sequencing_serializers import SampleSheetLookupSerializer, FastqSerializer, SeqAutoViewMixin, \
+from seqauto.serializers.sequencing_serializers import SampleSheetLookupSerializer, FastqSerializer, SeqAutoRecordMixin, \
     BamFilePathSerializer, VCFFilePathSerializer, SequencingSampleLookupSerializer
 from snpdb.models import DataState
 
 
-class FastQCSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
+class FastQCSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
     fastq = FastqSerializer()
 
     class Meta:
@@ -19,7 +19,7 @@ class FastQCSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
         fields = "__all__"
 
 
-class IlluminaFlowcellQCSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
+class IlluminaFlowcellQCSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
     sample_sheet = SampleSheetLookupSerializer()
 
     class Meta:
@@ -28,7 +28,7 @@ class IlluminaFlowcellQCSerializer(SeqAutoViewMixin, serializers.ModelSerializer
         exclude = ("sequencing_run", )  # Already part of sample_sheet
 
 
-class QCSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
+class QCSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
     # Instead of dealing with all the bam/vcf etc - we'll just deal with sequencing_sample and
     # assume we're using the latest ones associated with that
     sequencing_sample = SequencingSampleLookupSerializer()
@@ -68,7 +68,7 @@ class QCSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
         return qc
 
 
-class QCGeneListSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
+class QCGeneListSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
     """ When we retrieve this, we want to see linked sample gene list """
     qc = QCSerializer()
     sample_gene_list = SampleGeneListSerializer()
@@ -78,7 +78,7 @@ class QCGeneListSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
         fields = ("path", "qc", "sample_gene_list")
 
 
-class QCGeneListCreateSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
+class QCGeneListCreateSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
     """ When we create, we just want to send up gene list
 
         This also handles complexity of setting active gene list
@@ -108,7 +108,7 @@ class QCGeneListCreateSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
         return instance
 
 
-class QCGeneCoverageSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
+class QCGeneCoverageSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
     qc = QCSerializer()
     gene_coverage_collection = GeneCoverageCollectionSerializer()
 
@@ -117,7 +117,7 @@ class QCGeneCoverageSerializer(SeqAutoViewMixin, serializers.ModelSerializer):
         fields = ("path", "qc", "gene_coverage_collection")
 
 
-class QCExecSummarySerializer(SeqAutoViewMixin, serializers.ModelSerializer):
+class QCExecSummarySerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
     qc = QCSerializer()
 
     class Meta:
