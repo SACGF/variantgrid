@@ -2,7 +2,7 @@ import copy
 import re
 import uuid
 from collections import Counter, namedtuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 from functools import cached_property
@@ -37,7 +37,8 @@ from classification.models.classification_utils import \
 from classification.models.classification_variant_info_models import ImportedAlleleInfo, ImportedAlleleInfoStatus
 from classification.models.evidence_key import EvidenceKeyValueType, \
     EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell, EvidenceKeyOverrides
-from classification.models.evidence_mixin import EvidenceMixin, VCPatch, SomaticClinicalSignificanceValue
+from classification.models.evidence_mixin import EvidenceMixin, VCPatch
+from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCalculator
 from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagPermissionLevel, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
@@ -493,15 +494,28 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     """ Reason for withdrawing the classification """
 
     clinical_significance = models.CharField(max_length=1, choices=ClinicalSignificance.CHOICES, null=True, blank=True)
-    """ Used as an optimisation for queries """
+    """ Used as an optimisation for queries, is relatively out of date now """
 
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, default=AlleleOriginBucket.GERMLINE)
     """ Used to cache if we consider this classification germline or somatic """
 
     condition_resolution = models.JSONField(null=True, blank=True)  # of type ConditionProcessedDict
 
+    summary = models.JSONField(null=False, blank=True, default=dict)  # useful for overall classification details
+    """ Will be a ClassificationSummaryCacheDict """
+
     last_source_id = models.TextField(blank=True, null=True)
     last_import_run = models.ForeignKey(ClassificationImportRun, null=True, blank=True, on_delete=SET_NULL)
+
+    class Meta:
+        unique_together = ('lab', 'lab_record_id')
+        indexes = [
+            models.Index(fields=["share_level"]),
+            models.Index(fields=["withdrawn"]),
+            models.Index(fields=["allele_origin_bucket"]),
+            models.Index(models.F("summary__classification_sort"), name="summary__csort_idx"),
+            models.Index(models.F("summary__somatic_sort"), name="summary__ssort_idx")
+        ]
 
     @classmethod
     def preview_icon(cls) -> str:
@@ -622,13 +636,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 self.save()
                 return True
         return False
-
-    class Meta:
-        unique_together = ('lab', 'lab_record_id')
-        indexes = [
-            models.Index(fields=["share_level"]),
-            models.Index(fields=["withdrawn"])
-        ]
 
     @staticmethod
     def can_create_via_web_form(user: User):
@@ -766,6 +773,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if date_str:
             return datetime.strptime(date_str, '%Y-%m-%d')
         return None
+
+    @staticmethod
+    def to_date_str(datetime_value: datetime) -> str:
+        return datetime_value.strftime('%Y-%m-%d')
+
 
     def set_withdrawn(self, user: User, withdraw: bool = False, reason: str = 'OTHER') -> bool:
         if not self.id and withdraw:
@@ -2158,6 +2170,10 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices(), null=True, blank=True)
 
     @property
+    def allele_origin_bucket_obj(self) -> AlleleOriginBucket:
+        return self.classification.allele_origin_bucket
+
+    @property
     def condition_text(self):
         if crd := self.classification.condition_resolution_dict:
             return crd.get('display_text')
@@ -2194,9 +2210,6 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         self.share_level = value.value
 
     clinical_significance = models.CharField(max_length=1, choices=ClinicalSignificance.CHOICES, null=True, blank=True)
-
-    somatic_clinical_significance_sort = models.IntegerField(db_index=True, null=True, blank=True)
-    """ Used as an optimisation to sort by somatic clinical significance, null implies no relevant values """
 
     is_last_published = models.BooleanField(db_index=True, null=False, blank=True, default=False)
     is_last_edited = models.BooleanField(db_index=True, null=False, blank=True, default=False)
@@ -2369,10 +2382,6 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         self.published = True
         self.published_evidence = vc.evidence
         self.share_level_enum = share_level
-        if clin_sig_value := self.somatic_clinical_significance_value:
-            self.somatic_clinical_significance_sort = clin_sig_value.sort_value
-        else:
-            self.somatic_clinical_significance_sort = None
 
         if previously_published and previously_published.id != self.id:
             # make sure to unmark previous record as the last published
@@ -2385,6 +2394,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         if group:
             assign_perm(self.get_read_perm(), group, self)
 
+        vc.summary = ClassificationSummaryCalculator(self).cache_dict()
         vc.save()
 
         debug_timer.tick("Published Modification")
@@ -2580,6 +2590,10 @@ class ClassificationConsensus:
 class ClassificationDateType:
     date: datetime
     name: Optional[str] = None
+
+    @property
+    def date_str(self) -> str:
+        return Classification.to_date_str(self.date)
 
     @property
     def is_fallback(self) -> bool:

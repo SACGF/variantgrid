@@ -607,7 +607,7 @@ class EvidenceKeyMap:
 
     @staticmethod
     @timed_cache(ttl=60)
-    def clinical_significance_to_bucket():
+    def clinical_significance_to_bucket() -> dict[str, int]:
         return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
 
 

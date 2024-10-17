@@ -113,37 +113,15 @@
     function classificationGroupingFilter(data, type) {
         data.gene_symbol = blankToNull($('#id_gene_symbol').val());
         data.lab = blankToNull(getLabValue());
+        let allele_origin_filter_value = blankToNull($("input[name='allele-origin-toggle']:checked").val());
         data.allele_origin = blankToNull($("input[name='allele-origin-toggle']:checked").val());
         data.id_filter = blankToNull($('#id_filter').val());
         data.user = blankToNull($('#id_user').val());
-    }
-
-    function classificationFilter(data, type) {
-        data.gene_symbol = blankToNull($('#id_gene_symbol').val());
-        data.lab = blankToNull(getLabValue());
-        data.user = blankToNull($('#id_user').val());
-
-        /*
-        let flags = [];
-        $('input[flagtypeid]').each((index, dom) => {
-            let input = $(dom);
-            let isChecked = input.is(":checked");
-            if (isChecked) {
-                flags.push(input.attr("flagTypeId"));
-            }
-        });
-        if (flags.length) {
-            data.flags = JSON.stringify(flags);
-        }
-         */
-        let allele_origin_filter_value = $("input[name='allele-origin-toggle']:checked").val();
-        data.allele_origin = blankToNull(allele_origin_filter_value);
-        data.id_filter = blankToNull($('#id_filter').val());
-
-        let column = $('#vc-datatable').DataTable().column(3);
+        let column = $('#vc-grouping-datatable').DataTable().column(3);
         let germline_only = allele_origin_filter_value == "G";
         column.visible(!germline_only);
     }
+
     function downloadAs(mode) {
         let data = {};
         classificationFilter(data);
@@ -214,7 +192,7 @@
                 {% endif %}
             {% end_page_help_embedded %}
         </div>
-        <div class="container-table">
+        <div class="container">
             <div class="row filter-row">
                 <div class="col-md-4 col-lg-2">
                     <br/>
@@ -222,13 +200,13 @@
                 </div>
                 <div class="col-md-4 col-lg-2">
                     {% if user_settings.default_lab %}
-                    <a class="hover-link" onclick="filterDefaultLab()">Filter : {{ user_settings.default_lab.name }}</a>
+                    <a class="hover-link" onclick="filterDefaultLab()" title="{{ user_settings.default_lab.name }}">Filter : My Lab</a>
                     {% else %}<span style="visibility: hidden">.</span>{% endif %}
                     {% crispy lab_form form_helper.horizontal_no_labels %}
                 </div>
                 {% if CLASSIFICATION_GRID_SHOW_USERNAME %}
                 <div class="col-md-4 col-lg-2">
-                    <a class="hover-link" onclick="filterDefaultUser()">Filter : My Classification Records</a>
+                    <a class="hover-link" onclick="filterDefaultUser()">Filter : My Records</a>
                     {% crispy user_form form_helper.horizontal_no_labels %}
                 </div>
                 {% endif %}
@@ -241,7 +219,7 @@
                 {% if CLASSIFICATION_ID_FILTER %}
                 <div class="col-md-4 col-lg-2">
                     <br/>
-                    <input type="text" id="id_filter" placeholder="IDs filter" class="form-control" title="Filters on various ID evidence fields" />
+                    <input style="position:relative; bottom:4px" type="text" id="id_filter" placeholder="IDs filter" class="form-control" title="Filters on various ID evidence fields" />
                 </div>
                 {% endif %}
                 {% comment %}

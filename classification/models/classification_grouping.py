@@ -1,7 +1,7 @@
 import operator
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
-from typing import Optional, Set, Any
+from typing import Optional, Set
 
 import django
 from django.contrib.postgres.fields import ArrayField
@@ -9,11 +9,10 @@ from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
-from classification.criteria_strengths import CriteriaStrength
-from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, CriteriaEvaluation
+from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
 from django.db import models, transaction
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
-    ConditionResolved, SomaticClinicalSignificanceValue
+    ConditionResolved
 from genes.models import GeneSymbol
 from library.utils import first
 from ontology.models import OntologyTerm
@@ -91,7 +90,7 @@ class AlleleGrouping(TimeStampedModel):
 
 class AlleleOriginGrouping(TimeStampedModel):
     allele_grouping = models.ForeignKey(AlleleGrouping, on_delete=models.CASCADE)
-    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices)
+    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, default=AlleleOriginBucket.UNKNOWN)
 
     @property
     def allele_origin_bucket_obj(self):
@@ -102,57 +101,59 @@ class AlleleOriginGrouping(TimeStampedModel):
 
     overlap_status = models.IntegerField(choices=OverlapStatus.choices, default=OverlapStatus.NO_SHARED_RECORDS)
     dirty = models.BooleanField(default=True)
-    classification_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
-    somatic_clinical_significance_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
+    # classification_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
+    # somatic_clinical_significance_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
 
     def get_absolute_url(self) -> str:
         return reverse('allele_grouping_detail', kwargs={"allele_grouping_id": self.allele_grouping_id})
 
     def update(self):
-        # not sure if this is the best solution, or if an AlleleOriginGrouping should just refuse to update if attached allele groupings are dirty
-        all_classification_values = set()
-        all_somatic_clinical_significance_values = set()
-        classification_groupings: list[ClassificationGrouping] = list(self.classificationgrouping_set.all())
-        for cg in classification_groupings:
-            if cg.dirty:
-                cg.update()
-        shared_groupings = [cg for cg in classification_groupings if cg.share_level_obj.is_discordant_level]
-        for cg in shared_groupings:
-            if classification_values := cg.classification_values:
-                all_classification_values |= set(classification_values)
-            if somatic_values := cg.somatic_clinical_significance_values:
-                all_somatic_clinical_significance_values |= set(somatic_values)
+        # FIX-ME re-do this once we work out how we handle discordance within a single lab ClassificationGrouping
 
-        self.classification_values = list(EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).sort_values(all_classification_values))
-        self.somatic_clinical_significance_values = [sg.as_str for sg in sorted(SomaticClinicalSignificanceValue.from_str(sg) for sg in all_somatic_clinical_significance_values)]
-
-        overlap_status: OverlapStatus
-        if len(shared_groupings) == 0:
-            overlap_status = OverlapStatus.NO_SHARED_RECORDS
-        elif len(shared_groupings) == 1:
-            overlap_status = OverlapStatus.SINGLE_SUBMITTER
-        elif self.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
-            overlap_status = OverlapStatus.NOT_COMPARABLE_OVERLAP
-        else:
-            bucket_mapping = EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
-            buckets = {bucket_mapping.get(class_value) for class_value in self.classification_values}
-            if None in buckets:
-                buckets.remove(None)
-
-            if len(buckets) > 1:
-                # discordant
-                if "P" in all_classification_values or "LP" in all_classification_values:
-                    overlap_status = OverlapStatus.DISCORDANCE_MEDICALLY_SIGNIFICANT
-                else:
-                    overlap_status = OverlapStatus.DISCORDANCE
-            else:
-                if len(all_classification_values) > 1:
-                    overlap_status = OverlapStatus.CONFIDENCE
-                else:
-                    # complete agreement
-                    overlap_status = OverlapStatus.AGREEMENT
-
-        self.overlap_status = overlap_status
+        # # not sure if this is the best solution, or if an AlleleOriginGrouping should just refuse to update if attached allele groupings are dirty
+        # all_classification_values = set()
+        # all_somatic_clinical_significance_values = set()
+        # classification_groupings: list[ClassificationGrouping] = list(self.classificationgrouping_set.all())
+        # for cg in classification_groupings:
+        #     if cg.dirty:
+        #         cg.update()
+        # shared_groupings = [cg for cg in classification_groupings if cg.share_level_obj.is_discordant_level]
+        # for cg in shared_groupings:
+        #     if classification_values := cg.classification_values:
+        #         all_classification_values |= set(classification_values)
+        #     if somatic_values := cg.somatic_clinical_significance_values:
+        #         all_somatic_clinical_significance_values |= set(somatic_values)
+        #
+        # self.classification_values = list(EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).sort_values(all_classification_values))
+        # self.somatic_clinical_significance_values = [sg.as_str for sg in sorted(SomaticClinicalSignificanceValue.from_str(sg) for sg in all_somatic_clinical_significance_values)]
+        #
+        # overlap_status: OverlapStatus
+        # if len(shared_groupings) == 0:
+        #     overlap_status = OverlapStatus.NO_SHARED_RECORDS
+        # elif len(shared_groupings) == 1:
+        #     overlap_status = OverlapStatus.SINGLE_SUBMITTER
+        # elif self.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
+        #     overlap_status = OverlapStatus.NOT_COMPARABLE_OVERLAP
+        # else:
+        #     bucket_mapping = EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
+        #     buckets = {bucket_mapping.get(class_value) for class_value in self.classification_values}
+        #     if None in buckets:
+        #         buckets.remove(None)
+        #
+        #     if len(buckets) > 1:
+        #         # discordant
+        #         if "P" in all_classification_values or "LP" in all_classification_values:
+        #             overlap_status = OverlapStatus.DISCORDANCE_MEDICALLY_SIGNIFICANT
+        #         else:
+        #             overlap_status = OverlapStatus.DISCORDANCE
+        #     else:
+        #         if len(all_classification_values) > 1:
+        #             overlap_status = OverlapStatus.CONFIDENCE
+        #         else:
+        #             # complete agreement
+        #             overlap_status = OverlapStatus.AGREEMENT
+        #
+        # self.overlap_status = overlap_status
         self.dirty = False
         self.save()
 
@@ -166,7 +167,7 @@ class ClassificationSubGrouping:
 
     @staticmethod
     def from_modifications(modifications: list[ClassificationModification]) -> list['ClassificationSubGrouping']:
-        # sub group by classification value for germline and
+        # subgroup by classification value for germline and
         by_status: dict[str, ClassificationSubGrouping] = {}
         for mod in modifications:
             key = str(mod.somatic_clinical_significance_value) + str(mod.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
@@ -185,9 +186,11 @@ class ClassificationGrouping(TimeStampedModel):
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices)
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices())
+
     @property
     def share_level_obj(self):
         return ShareLevel(self.share_level)
+
     quality_level = models.CharField(max_length=1, choices=ClassificationQualityLevel.choices, default=ClassificationQualityLevel.STANDARD)
     classification_bucket = models.CharField(max_length=1, choices=ClassificationClassificationBucket.choices, default=ClassificationClassificationBucket.NO_DATA)
     classification_count = models.IntegerField(default=0)
@@ -203,10 +206,9 @@ class ClassificationGrouping(TimeStampedModel):
     def sub_groupings(self) -> list[ClassificationSubGrouping]:
         return ClassificationSubGrouping.from_modifications(self.classification_modifications)
 
-    # All values before need to be nullable as they wont be populated in the time between creating the ClassificationGrouping and updating it
-    classification_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)  # values from EvidenceKey.CLINICAL_SIGNIFICANCE
-    somatic_clinical_significance_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
     conditions = models.JSONField(null=True, blank=True)
+    conflicting_ratings = models.BooleanField(default=False)
+
     zygosity_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
     # # for discordances
     # classification_bucket
@@ -223,12 +225,9 @@ class ClassificationGrouping(TimeStampedModel):
     # summary_c_hgvses
     # summary_criteria
     latest_classification_modification = models.ForeignKey(ClassificationModification, on_delete=SET_NULL, null=True, blank=True)
-    latest_criteria = ArrayField(models.CharField(max_length=50), null=True, blank=True)
     latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
+    latest_criteria = ArrayField(models.CharField(max_length=50), null=True, blank=True)
     latest_curation_date = models.DateField(null=True, blank=True)
-
-    somatic_clinical_significance_sort = models.IntegerField(db_index=True, null=True, blank=True)
-    classification_sort_value = models.TextField(null=True, blank=True)
 
     def __lt__(self, other):
         def _sort_value(obj: ClassificationGrouping):
@@ -296,14 +295,14 @@ class ClassificationGrouping(TimeStampedModel):
     def allele(self) -> Allele:
         return self.allele_origin_grouping.allele_grouping.allele
 
-    def to_json(self):
-        scs = self.latest_classification_modification.somatic_clinical_significance_value
-        return {
-            "lab": str(self.lab),
-            "classification": self.latest_classification_modification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
-            "somatic_clinical_significance": scs.as_json() if scs else None,
-            "curated_date": str(self.latest_curation_date)  # fixme, need a quick way for yyyy-mm-dd
-        }
+    # def to_json(self):
+    #     scs = self.latest_classification_modification.somatic_clinical_significance_value
+    #     return {
+    #         "lab": str(self.lab),
+    #         "classification": self.latest_classification_modification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
+    #         "somatic_clinical_significance": scs.as_json() if scs else None,
+    #         "curated_date": str(self.latest_curation_date)  # fixme, need a quick way for yyyy-mm-dd
+    #     }
 
     @transaction.atomic
     def update(self):
@@ -318,43 +317,8 @@ class ClassificationGrouping(TimeStampedModel):
             self.latest_classification_modification = best_classification
             self.latest_curation_date = best_classification.curated_date
             self.latest_allele_info = best_classification.classification.allele_info
-            # TODO, calculate the somatic sort order here so we can remove it from classification
-            self.somatic_clinical_significance_sort = best_classification.somatic_clinical_significance_sort
 
-            best_clin_sig = best_classification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-            self.classification_sort_value = classification_sort_order(best_clin_sig)
-
-            # GET ALL CRITERIA
-            def criteria_converter(cm: ClassificationModification) -> set[CriteriaStrength]:
-                strengths: set[CriteriaStrength] = set()
-                for e_key in EvidenceKeyMap.cached().criteria():
-                    strength = cm.get(e_key.key)
-                    if CriteriaEvaluation.is_met(strength):
-                        strengths.add(CriteriaStrength(e_key, strength))
-                for amp_level, letter in SpecialEKeys.AMP_LEVELS_TO_LEVEL.items():
-                    if value := cm.get_value_list(amp_level):
-                        e_key = EvidenceKeyMap.cached_key(amp_level)
-                        for sub_value in value:
-                            sub_value_label = e_key.pretty_value(sub_value)
-                            strengths.add(CriteriaStrength(
-                                ekey=EvidenceKeyMap.cached_key(amp_level),
-                                custom_strength=f"{letter}_{sub_value_label}")
-                            )
-                return list(sorted(strengths))
-
-            self.latest_criteria = [str(crit) for crit in criteria_converter(self.latest_classification_modification)]
-
-            if self.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
-                all_somatic_clin_sigs: set[SomaticClinicalSignificanceValue] = set()
-                for cm in all_modifications:
-                    if somatic_clin_sig := cm.somatic_clinical_significance_value:
-                        all_somatic_clin_sigs.add(somatic_clin_sig)
-                sorted_somatic_clin_sig = sorted(all_somatic_clin_sigs)
-                self.somatic_clinical_significance_values = [scs.as_str for scs in sorted_somatic_clin_sig]
-            else:
-                self.somatic_clinical_significance_values = None
-
-            all_classification_values: Set[str] = set()
+            # TODO check for dirty values
             all_terms: Set[OntologyTerm] = set()
             all_free_text_conditions: Set[str] = set()
 
@@ -371,11 +335,6 @@ class ClassificationGrouping(TimeStampedModel):
                 elif condition_text := modification.get(SpecialEKeys.CONDITION):
                     all_free_text_conditions.add(condition_text)
 
-                classification_value = modification.classification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-                all_classification_values.add(classification_value)
-                classification_bucket = ClassificationClassificationBucket.bucket_for_classification(classification_value)
-                all_classification_buckets.add(classification_bucket)
-
                 all_zygosities |= set(modification.get_value_list(SpecialEKeys.ZYGOSITY))
 
                 # only store valid terms as quick links to the classification
@@ -383,8 +342,6 @@ class ClassificationGrouping(TimeStampedModel):
                 # self._update_conditions(all_terms)
 
             evidence_map = EvidenceKeyMap.instance()
-            all_classification_values = evidence_map[SpecialEKeys.CLINICAL_SIGNIFICANCE].sort_values(all_classification_values)
-            self.classification_values = all_classification_values
 
             # the below shouldn't happen but has in development environemnts
             if None in all_zygosities:
@@ -428,10 +385,6 @@ class ClassificationGrouping(TimeStampedModel):
 
             self.dirty = False
             self.save()
-
-            # TODO update search terms
-
-
         else:
             # there are no classifications, time to die
             self.delete()
@@ -457,10 +410,6 @@ class ClassificationGroupingSearchTermType(TextChoices):
     CLINVAR_SCV = "SCV", "Clinvar SCV"
     GENE_SYMBOL = "GENE_SYMBOL", "Gene Symbol"
     DISCORDANCE_REPORT = "DR", "Discordance Report"
-
-    @property
-    def is_private(self):
-        return self in {ClassificationGroupingSearchTermType.PATIENT_ID, ClassificationGroupingSearchTermType.SAMPLE_ID}
 
     @property
     def is_partial_text(self):

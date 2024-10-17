@@ -8,7 +8,7 @@ from django.conf import settings
 from annotation.models import CitationFetchRequest
 from annotation.models.models_citations import CitationFetchResponse
 from classification.criteria_strengths import CriteriaStrength, CriteriaStrengths
-from classification.enums import SpecialEKeys
+from classification.enums import SpecialEKeys, AlleleOriginBucket
 from genes.hgvs import CHGVS, PHGVS
 from library.log_utils import report_message
 from library.utils import empty_to_none
@@ -91,7 +91,7 @@ class SomaticClinicalSignificanceValue:
             return SomaticClinicalSignificanceValue(parts[0])
 
 
-
+# FIXME redundant now, remove
 _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES = {
     SomaticClinicalSignificanceValue("tier_1", "A"): 9,
     SomaticClinicalSignificanceValue("tier_1", "B"): 8,
@@ -119,6 +119,10 @@ class EvidenceMixin:
 
     @property
     def _evidence(self) -> VCStore:
+        raise NotImplementedError('EvidenceMixin must implement evidence_dict')
+
+    @property
+    def allele_origin_bucket_obj(self) -> AlleleOriginBucket:
         raise NotImplementedError('EvidenceMixin must implement evidence_dict')
 
     @staticmethod

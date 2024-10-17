@@ -468,6 +468,11 @@ TableFormat.text = (data, type, row) => {
         return data;
     }
 };
+
+TableFormat.plain = (data, type, row) => {
+    return data;
+}
+
 TableFormat.number = (data, type, row) => {
     if (data === '' || data === null) {
         return $('<span/>', {class:'no-value', text:'-'}).prop('outerHTML');

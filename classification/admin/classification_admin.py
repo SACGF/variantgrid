@@ -1355,7 +1355,7 @@ class ClassificationGroupingTabularAdmin(TabularInline):
 
 @admin.register(AlleleOriginGrouping)
 class AlleleOriginGroupingAdmin(ModelAdminBasics):
-    list_display = ("allele_grouping", "overlap_status", "classification_values", "somatic_clinical_significance_values", "dirty")
+    list_display = ("allele_grouping", "dirty")
     inlines = (ClassificationGroupingTabularAdmin,)
 
     @admin_model_action(url_slug="refresh_all/", short_description="Refresh All", icon="fa-solid fa-arrows-rotate")
