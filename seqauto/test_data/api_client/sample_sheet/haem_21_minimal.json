@@ -17,7 +17,12 @@
                 },
                 "is_control": false,
                 "failed": false,
-                "sequencingsampledata_set": []
+                "sequencingsampledata_set": [
+                    {
+                        "column": "SAPOrderNumber",
+                        "value": "SAP1000001"
+                    }
+                ]
             },
             {
                 "sample_id": "fake_sample_2",
@@ -32,7 +37,12 @@
                 },
                 "is_control": false,
                 "failed": false,
-                "sequencingsampledata_set": []
+                "sequencingsampledata_set": [
+                    {
+                        "column": "SAPOrderNumber",
+                        "value": "SAP1000002"
+                    }
+                ]
             }
         ]
     }
