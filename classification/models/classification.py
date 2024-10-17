@@ -513,8 +513,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             models.Index(fields=["share_level"]),
             models.Index(fields=["withdrawn"]),
             models.Index(fields=["allele_origin_bucket"]),
-            models.Index(models.F("summary__classification_sort"), name="summary__csort_idx"),
-            models.Index(models.F("summary__somatic_sort"), name="summary__ssort_idx")
+            models.Index(models.F("summary__pathogenicity__sort"), name="summary__p_sort_idx"),
+            models.Index(models.F("summary__somatic__sort"), name="summary__s_sort_idx"),
+            models.Index(models.F("summary__date__value"), name="summary__d_sort_idx")
         ]
 
     @classmethod

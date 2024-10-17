@@ -44,6 +44,10 @@ class CellData:
     def __getitem__(self, item):
         return self.all_data[item]
 
+    def get_nested_json(self, key, sub_key):
+        if data := self.all_data.get(key):
+            return data.get(sub_key)
+
     def get(self, key: Any, default: Optional[Any] = None) -> Any:
         return self.all_data.get(key, default)
 

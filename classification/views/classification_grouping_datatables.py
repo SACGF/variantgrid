@@ -55,10 +55,16 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
     def render_somatic(self, row: CellData) -> JsonDataType:
         if row["allele_origin_bucket"] != "G":
-            return {
-                SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE: row["latest_classification_modification__classification__summary__somatic_clinical_significance"],
-                "highest_level": row["latest_classification_modification__classification__summary__somatic_amp_level"],
-            }
+            if somatic_dict := row["latest_classification_modification__classification__summary__somatic"]:
+                return somatic_dict
+
+    def _render_date(self, row: CellData) -> JsonDataType:
+        # TODO list date type
+        return {
+            "classification_id": "latest_classification_modification__classification_id",
+            "curation_date": row.get_nested_json("latest_classification_modification__classification__summary__date", "value"),
+            "date_type": row.get_nested_json("latest_classification_modification__classification__summary__date", "type")
+        }
 
     @cached_property
     def genome_build_prefs(self) -> List[GenomeBuild]:
@@ -286,13 +292,12 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 name='somatic_clinical_significances',
                 label='Somatic Clinical<br/>Significance',
                 client_renderer="VCTable.somatic_clinical_significance",
-                sort_keys=['latest_classification_modification__classification__summary__sort'],
+                sort_keys=['latest_classification_modification__classification__summary__pathogenicity__sort'],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 renderer=self.render_somatic,
                 extra_columns=[
-                    "allele_origin_bucket",
-                    "latest_classification_modification__classification__summary__somatic_clinical_significance",
-                    "latest_classification_modification__classification__summary__somatic_amp_level",
+                    "latest_classification_modification__classification__summary__somatic",
+                    "allele_origin_bucket"
                 ]
             ),
             RichColumn(
@@ -310,10 +315,15 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 orderable=True
             ),
             RichColumn(
-                key="latest_classification_modification__classification__summary__record_date",
+                key="latest_classification_modification__classification__summary__date",
                 name="latest_curation_date",
                 label="Latest Curated",
-                client_renderer='TableFormat.timestamp',
+                sort_keys=["latest_classification_modification__classification__summary__date__value"],
+                client_renderer="VCTable.latest_curation_and_link",
+                renderer=self._render_date,
+                extra_columns=[
+                    "latest_classification_modification__classification_id"
+                ],
                 default_sort=SortOrder.DESC
             ),
             # RichColumn(

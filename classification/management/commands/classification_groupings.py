@@ -31,8 +31,10 @@ class Command(BaseCommand):
                 dirty.update()
                 if index % 1000 == 0 and index:
                     print(f"Updating {index} classification groupings")
+            print(f"Updated {index+1} classification groupings")
 
             for index, dirty in enumerate(AlleleOriginGrouping.objects.filter(dirty=True).iterator()):
                 dirty.update()
                 if index % 1000 == 0 and index:
                     print(f"Updating {index} allele groupings")
+            print(f"Updated {index+1} allele groupings")

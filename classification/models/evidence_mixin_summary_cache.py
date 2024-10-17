@@ -4,17 +4,49 @@ from typing import TypedDict, Optional, Self
 from classification.criteria_strengths import CriteriaStrength
 from classification.enums import AlleleOriginBucket, SpecialEKeys, CriteriaEvaluation
 
+"""
+return {
+            "criteria_labels": self.criteria_labels,
+            "classification_value": self.classification_value,
+            "classification_sort": self.classification_sort,
+            "pathogenicity": {
+                "classification": self.classification_value,
+                "sort": self.classification_sort,
+                "bucket": self.germline_bucket
+            },
+            "somatic": {
+                "clinical_significance": self.somatic_clinical_significance,
+                "amp_level": self.somatic_amp_level,
+                "sort": self.somatic_sort
+            },
+            "date": {
+                "value": curated_date.date_str,
+                "type": curated_date.name
+            }
+        }
+"""
+
+class ClassificationSummaryCacheDictPathogenicity(TypedDict):
+    classification: Optional[str]
+    sort: int
+    bucket: Optional[int]
+
+
+class ClassificationSummaryCacheDictSomatic(TypedDict):
+    clinical_significance: Optional[str]
+    amp_level: Optional[str]
+    sort: int
+
+
+class ClassificationSummaryCachedDictDate(TypedDict):
+    date: str
+    type: Optional[str]
+
 
 class ClassificationSummaryCacheDict(TypedDict):
     criteria_labels: list[str]
-    classification_value: Optional[str]
-    classification_sort: int
-    somatic_clinical_significance: Optional[str]
-    somatic_amp_level: Optional[str]
-    somatic_sort: int
-    germline_bucket: Optional[int]
-    record_date: str
-    record_date_type: Optional[str]
+    pathogenicity: ClassificationSummaryCacheDictPathogenicity
+    somatic: ClassificationSummaryCacheDictSomatic
 
 
 @dataclass(frozen=True)
@@ -62,12 +94,20 @@ class ClassificationSummaryCalculator:
             "criteria_labels": self.criteria_labels,
             "classification_value": self.classification_value,
             "classification_sort": self.classification_sort,
-            "somatic_clinical_significance": self.somatic_clinical_significance,
-            "somatic_amp_level": self.somatic_amp_level,
-            "somatic_sort": self.somatic_sort,
-            "germline_bucket": self.germline_bucket,
-            "record_date": curated_date.date_str,
-            "record_date_type": curated_date.name
+            "pathogenicity": {
+                "classification": self.classification_value,
+                "sort": self.classification_sort,
+                "bucket": self.germline_bucket
+            },
+            "somatic": {
+                "clinical_significance": self.somatic_clinical_significance,
+                "amp_level": self.somatic_amp_level,
+                "sort": self.somatic_sort
+            },
+            "date": {
+                "value": curated_date.date_str,
+                "type": curated_date.name
+            }
         }
 
     @cached_property

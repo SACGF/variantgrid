@@ -2436,6 +2436,7 @@ VCTable.condition = (data, type, row) => {
 VCTable.latest_curation_and_link = (data, type, row) => {
     let lastCurated = data["curation_date"];
     if (lastCurated) {
+        let dom = $("<div>")
         let curatedMoment = convertTimestampToMoment(lastCurated);
         let timestampStr = curatedMoment.format(JS_DATE_ONLY_FORMAT);
 
@@ -2454,7 +2455,14 @@ VCTable.latest_curation_and_link = (data, type, row) => {
                 html: content
             });
         }
-        return content.prop('outerHTML');
+        dom.append(content);
+
+        let dateType = data["date_type"];
+        if (dateType) {
+            dom.append($("<div>", {text: dateType}));
+        }
+
+        return dom;
     } else {
         return $("<span>", {text:"-", class: "no-value"})
     }
@@ -2470,7 +2478,7 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
         value = {};
         value[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE] = parts[0];
         if (parts.length > 1) {
-            value["highest_level"] = parts[1];
+            value["amp_level"] = parts[1];
         }
     } else {
         value = data;
@@ -2482,7 +2490,7 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
         let scsLabel = scsKey.prettyValue(scs);
         let dom = ($('<span>', {text: scsLabel.val, 'class': `c-pill scs scs-${scs}`}));
 
-        let highest_level = value["highest_level"];
+        let highest_level = value["amp_level"];
         if (highest_level) {
             dom.append(`<span class="amp-level">${highest_level}</span>`);
         }

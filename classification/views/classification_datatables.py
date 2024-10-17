@@ -44,7 +44,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
             return {
                 SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}__value"],
-                "highest_level": highest_level
+                "amp_level": highest_level
             }
         else:
             return {}
