@@ -182,7 +182,7 @@
             data.ontology_term_id = {{ term.id | jsonify }};
         }
         </script>
-        <div class="container-table mt-4">
+        <div class="container mt-4">
             <h4>Classification Records</h4>
             Filtering on records with resolved conditions to <b>{{ term }}</b>, OMIM/MONDO equivalents and direct parent and children terms
             <table id="vc-grouping-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table"></table>

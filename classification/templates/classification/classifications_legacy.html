@@ -30,7 +30,7 @@
 </style>
 <script>
     function filterGrid() {
-        $('#vc-grouping-datatable').DataTable().ajax.reload();
+        $('#vc-datatable').DataTable().ajax.reload();
     }
 
     function checkIfAllChecked(toggle, array) {
@@ -109,7 +109,19 @@
         return labVal;
     }
 
-    function classificationGroupingFilter(data, type) {
+    function classificationFilter(data, type) {
+        let flags = [];
+        $('input[flagtypeid]').each((index, dom) => {
+            let input = $(dom);
+            let isChecked = input.is(":checked");
+            if (isChecked) {
+                flags.push(input.attr("flagTypeId"));
+            }
+        });
+        if (flags.length) {
+            data.flags = JSON.stringify(flags);
+        }
+
         data.gene_symbol = blankToNull($('#id_gene_symbol').val());
         data.lab = blankToNull(getLabValue());
         let allele_origin_filter_value = blankToNull($("input[name='allele-origin-toggle']:checked").val());
@@ -123,7 +135,7 @@
 
     function downloadAs(mode) {
         let data = {};
-        classificationGroupingFilter(data);
+        classificationFilter(data);
         let querystring = EncodeQueryData(data, true);
 		let url = null;
 		if (mode === 'redcap') {
@@ -144,6 +156,11 @@
 
         $('#id_filter').keyup(function() {
             debouncedFilterGrid();
+        });
+
+        let vcDatatable = $('#vc-datatable');
+        vcDatatable.on('draw.dt', () => {
+            Flags.instance.init({userId: '{{user.id}}'});
         });
     });
 </script>
@@ -186,7 +203,7 @@
                 {% endif %}
             {% end_page_help_embedded %}
         </div>
-        <div class="container">
+        <div class="container-table">
             <div class="row filter-row">
                 <div class="col-md-4 col-lg-2">
                     <br/>
@@ -215,13 +232,7 @@
                     <br/>
                     <input style="position:relative; bottom:4px" type="text" id="id_filter" placeholder="IDs filter" class="form-control" title="Filters on various ID evidence fields" />
                 </div>
-
-                <div class="col-md-2">
-                    <br/>
-                    <a class="hover-link font-italic" href="?legacy=True">Single record mode</a>
-                </div>
                 {% endif %}
-                {% comment %}
                 <div class="col-md-4 col-lg-2">
                     <br/>
                     <div id='show-flag-filter-container' style="display:flex">
@@ -238,10 +249,9 @@
                         <div class="clear"></div>
                     </div>
                 </div>
-                {% endcomment %}
             </div>
 
-            <table id="vc-grouping-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table"></table>
+            <table id="vc-datatable" data-datatable-data='classificationFilter' data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table"></table>
             <div>
             Download as
                 <a class='hover-link download-link' onclick="downloadAs('csv')">CSV</a>
