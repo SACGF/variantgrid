@@ -61,7 +61,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
     def _render_date(self, row: CellData) -> JsonDataType:
         # TODO list date type
         return {
-            "classification_id": "latest_classification_modification__classification_id",
+            "classification_id": row["latest_classification_modification__classification_id"],
             "curation_date": row.get_nested_json("latest_classification_modification__classification__summary__date", "value"),
             "date_type": row.get_nested_json("latest_classification_modification__classification__summary__date", "type")
         }
