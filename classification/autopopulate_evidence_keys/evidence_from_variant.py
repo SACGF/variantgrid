@@ -412,7 +412,7 @@ def get_evidence_fields_from_preferred_transcript(
         gs_count = GeneSymbolPubMedCount.get_for_gene_symbol(gene_symbol_id)
         pubmed_data = {"value": gs_count.count,
                        "note": f"Retrieved {gs_count.modified.date()}"}
-    except HTTPError:
+    except (HTTPError, RuntimeError) as _e:
         pubmed_data = {
             "value": "<NOT AVAILABLE> - network error connecting to PubMed. Please fill this in manually."
         }
