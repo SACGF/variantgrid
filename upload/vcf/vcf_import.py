@@ -319,9 +319,10 @@ def create_backend_vcf_links(uploaded_vcf):
                     msg = f"Couldn't find Combo or single VCF for path '{path}'"
                     raise ValueError(msg)
 
-            backend_vcf = BackendVCF.objects.create(uploaded_vcf=uploaded_vcf,
-                                                    vcf_file=vcf_file,
-                                                    combo_vcf=combo_vcf)
+            defaults = {"uploaded_vcf": uploaded_vcf}
+            backend_vcf, _ = BackendVCF.objects.update_or_create(vcf_file=vcf_file,
+                                                                 combo_vcf=combo_vcf,
+                                                                 defaults=defaults)
     return backend_vcf
 
 
@@ -345,9 +346,10 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
                 logging.warning("SR %s already linked to non-deleting vcf: %s (%s/%s)", sequencing_run,
                                 vfsr.vcf, vfsr.vcf.pk, vfsr.vcf.import_status)
         except VCFFromSequencingRun.DoesNotExist:
-            VCFFromSequencingRun.objects.create(vcf=vcf,
-                                                sequencing_run=sequencing_run,
-                                                variant_caller=backend_vcf.variant_caller)
+            # We also have unique_together on sequencing_run/variant_caller
+            VCFFromSequencingRun.objects.update_or_create(sequencing_run=sequencing_run,
+                                                          variant_caller=backend_vcf.variant_caller,
+                                                          defaults={"vcf": vcf})
 
         samples_by_sequencing_sample = backend_vcf.get_samples_by_sequencing_sample()
 
