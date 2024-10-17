@@ -123,31 +123,7 @@ class VariantCallerSerializer(serializers.ModelSerializer):
         return instance
 
 
-class SeqAutoRecordMixin:
-    """
-        This sets SeqAutoRecord.data_state to COMPLETED for anything created via API
-
-        SeqAutoRecord.data_state represents eg whether the file exists on disk or has been deleted
-        or we expect it, and it's not available yet.
-
-        Now we're moving to an API, I think we should just have the SeqAuto records match the disk
-        and be updated via clients, or just be added and then if they are deleted we don't care
-
-        TODO: We should consider removing the data_state field
-    """
-    def set_data_state_complete(self, validated_data):
-        validated_data['data_state'] = DataState.COMPLETE
-
-    def create(self, validated_data):
-        self.set_data_state_complete(validated_data)
-        return super().create(validated_data)
-
-    def update(self, instance, validated_data):
-        self.set_data_state_complete(validated_data)
-        return super().update(instance, validated_data)
-
-
-class SequencingRunSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
+class SequencingRunSerializer(serializers.ModelSerializer):
     name = serializers.CharField(validators=[])  # disable UniqueValidator
     sequencer = serializers.PrimaryKeyRelatedField(queryset=Sequencer.objects.all())
     experiment = serializers.PrimaryKeyRelatedField(queryset=Experiment.objects.all())
@@ -214,7 +190,7 @@ class SequencingSampleSerializer(serializers.ModelSerializer):
         fields = ['sample_id', 'sample_name', 'sample_project', 'sample_number', 'lane', 'barcode', 'enrichment_kit', 'is_control', 'failed', 'sequencingsampledata_set']
 
 
-class SampleSheetSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
+class SampleSheetSerializer(serializers.ModelSerializer):
     sequencing_run = serializers.PrimaryKeyRelatedField(queryset=SequencingRun.objects.all())
     sequencingsample_set = SequencingSampleSerializer(many=True)
 
@@ -241,6 +217,7 @@ class SampleSheetSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
 
     def create(self, validated_data):
         sequencing_samples_data = validated_data.pop('sequencingsample_set')
+        validated_data["data_state"] = DataState.COMPLETE
         sequencing_run = validated_data["sequencing_run"]
         sample_sheet, created = SampleSheet.objects.update_or_create(
             sequencing_run=sequencing_run,
@@ -262,7 +239,7 @@ class SampleSheetSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
         return instance
 
 
-class FastqSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
+class FastqSerializer(serializers.ModelSerializer):
     name = serializers.CharField(read_only=True)
     read = serializers.SerializerMethodField(read_only=True)
 
@@ -306,12 +283,13 @@ class UnalignedReadsSerializer(serializers.ModelSerializer):
         else:
             unaligned_reads_kwargs["fastq_r2"] = None  # Be able to blank it out
 
+        # Unaligned reads isn't a file so doesn't have 'data_state'
         instance, _created = UnalignedReads.objects.update_or_create(sequencing_sample=sequencing_sample,
                                                                      defaults=unaligned_reads_kwargs)
         return instance
 
 
-class FlagstatsSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
+class FlagstatsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Flagstats
         fields = ("total", "read1", "read2", "mapped", "properly_paired")
@@ -323,7 +301,7 @@ class BamFilePathSerializer(serializers.ModelSerializer):
         fields = ("path", )
 
 
-class BamFileSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
+class BamFileSerializer(serializers.ModelSerializer):
     unaligned_reads = UnalignedReadsSerializer(required=False)
     aligner = AlignerSerializer(required=False)
     flagstats = FlagstatsSerializer(read_only=True, required=False)  # 1-to-1 field
@@ -350,6 +328,7 @@ class BamFileSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
                                                        defaults={"data_state": DataState.COMPLETE})
 
         if flagstats_data:
+            flagstats_data["data_state"] = DataState.COMPLETE
             Flagstats.objects.create(bam_file=bam_file, **flagstats_data)
 
         return bam_file
@@ -371,7 +350,7 @@ class VCFFilePathSerializer(serializers.ModelSerializer):
         fields = ("path", )
 
 
-class VCFFileSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
+class VCFFileSerializer(serializers.ModelSerializer):
     bam_file = BamFileSerializer(required=False)
     variant_caller = VariantCallerSerializer()
 
@@ -450,7 +429,7 @@ class SequencingFilesBulkCreateSerializer(serializers.Serializer):
         }
 
 
-class SampleSheetCombinedVCFFileSerializer(SeqAutoRecordMixin, serializers.ModelSerializer):
+class SampleSheetCombinedVCFFileSerializer(serializers.ModelSerializer):
     sample_sheet = SampleSheetLookupSerializer()
     variant_caller = VariantCallerSerializer()
 
@@ -462,10 +441,12 @@ class SampleSheetCombinedVCFFileSerializer(SeqAutoRecordMixin, serializers.Model
     def create(self, validated_data):
         sample_sheet = SampleSheetLookupSerializer.get_object(validated_data.pop('sample_sheet'))
         variant_caller = VariantCallerSerializer().create(validated_data.pop('variant_caller'))
-        sscvcf, _ = SampleSheetCombinedVCFFile.objects.get_or_create(sequencing_run=sample_sheet.sequencing_run,
-                                                                     sample_sheet=sample_sheet,
-                                                                     variant_caller=variant_caller,
-                                                                     path=validated_data["path"])
+        defaults = {"data_state": DataState.COMPLETE}
+        sscvcf, _ = SampleSheetCombinedVCFFile.objects.update_or_create(sequencing_run=sample_sheet.sequencing_run,
+                                                                        sample_sheet=sample_sheet,
+                                                                        variant_caller=variant_caller,
+                                                                        path=validated_data["path"],
+                                                                        defaults=defaults)
         return sscvcf
 
 

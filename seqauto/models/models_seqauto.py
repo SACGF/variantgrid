@@ -118,6 +118,10 @@ class SeqAutoRecord(TimeStampedModel):
     file_last_modified = models.FloatField(default=0.0)
     hash = models.TextField(blank=True)  # Not used for everything
     is_valid = models.BooleanField(default=False)  # Set in save
+    # data_state was used to create 'expected' objects ie vcfs for bam files
+    # that was then set based on whether the file turned up. If it disappeared it would be set to DELETED
+    # But with API - we assume anything sent to us is COMPLETED
+    # We will probably remove this field in the future as we go API only
     data_state = models.CharField(max_length=1, choices=DataState.choices)
 
     def save(self, force_insert=False, force_update=False, using=None,
