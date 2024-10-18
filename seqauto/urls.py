@@ -18,7 +18,8 @@ from seqauto.views import SequencerUpdate, LibraryUpdate, AssayUpdate, VariantCa
 from seqauto.views_rest import SequencingRunViewSet, EnrichmentKitViewSet, SequencerModelViewSet, SequencerViewSet, \
     ExperimentViewSet, VariantCallerViewSet, VCFFileViewSet, SampleSheetCombinedVCFFileViewSet, FastQCViewSet, \
     SampleSheetViewSet, IlluminaFlowcellQCViewSet, QCViewSet, QCGeneListViewSet, QCGeneCoverageViewSet, \
-    QCExecSummaryViewSet, QCGeneListBulkCreateView, SequencingFilesBulkCreateView
+    QCExecSummaryViewSet, QCGeneListBulkCreateView, SequencingFilesBulkCreateView, QCExecSummaryBulkCreateView, \
+    QCGeneCoverageBulkCreateView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 
@@ -141,6 +142,8 @@ rest_urlpatterns = [
     path('api/enrichment_kit_gene_gold_coverage_summary/<int:enrichment_kit_id>/<gene_symbol>', views_rest.GoldCoverageSummaryView.as_view(), name='api_enrichment_kit_gene_gold_coverage_summary'),
     path('api/enrichment_kit_gene_gold_coverage_summary/batch/<int:enrichment_kit_id>', views_rest.BatchGoldCoverageSummaryView.as_view(), name='api_batch_enrichment_kit_gene_gold_coverage_summary'),
     path('api/v1/qc_gene_list/bulk_create', QCGeneListBulkCreateView.as_view(), name='api_qc_gene_list_bulk_create'),
+    path('api/v1/qc_exec_summary/bulk_create', QCExecSummaryBulkCreateView.as_view(), name='api_qc_exec_summary_bulk_create'),
+    path('api/v1/qc_gene_coverage/bulk_create', QCGeneCoverageBulkCreateView.as_view(), name='api_qc_gene_coverage_bulk_create'),
     path('api/v1/sequencing_files/bulk_create', SequencingFilesBulkCreateView.as_view(), name='api_sequencing_files_bulk_create'),
 
 

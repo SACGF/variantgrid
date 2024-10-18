@@ -66,7 +66,7 @@ class GeneCoverageImportTaskFactory(ImportTaskFactory):
         return UploadedFileTypes.GENE_COVERAGE
 
     def get_possible_extensions(self):
-        return ['txt']
+        return ['txt', 'tsv', 'tsv.gz']
 
     def get_data_classes(self):
         return [UploadedGeneCoverage]

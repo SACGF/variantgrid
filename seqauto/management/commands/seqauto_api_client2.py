@@ -90,6 +90,16 @@ class QCData:
     vcf_file: VCFFile
     gene_list: List[str]
 
+@dataclass
+class QCExecStats:
+    pass
+
+@dataclass
+class QCGeneCoverage:
+    pass
+
+# TODO: Look into https://github.com/lidatong/dataclasses-json
+
 
 class VGAPI:
     def __init__(self, server, api_token):
@@ -117,8 +127,22 @@ class VGAPI:
     def create_sequencing_data(self, sample_sheet: SampleSheet, sequencing_files: List[SequencingFiles]):
         url = self._get_url("/seqauto/api/v1/sequencing_files/bulk_create")
 
-    def create_qc_gene_lists(self, sample_sheet: SampleSheet, qc_fene_lists: List[QCData]):
+    def create_qc_gene_list(self):
+        # TODO
+        pass
+
+    def create_multiple_qc_gene_lists(self, sample_sheet: SampleSheet, qc_gene_lists: List[QCData]):
         url = self._get_url("seqauto/api/v1/qc_gene_list/bulk_create")
+
+    def create_qc_exec_stats(self):
+        # TODO
+        pass
+
+    def create_multiple_qc_exec_stats(self, sample_sheet: SampleSheet, qc_exec_stats: List[QCExecStats]):
+        pass
+
+    def create_multiple_qc_gene_coverage(self, sample_sheet: SampleSheet, qc_fene_lists: List[QCGeneCoverage]):
+        pass
 
     def upload_vcf_file(self, vcf_filename):
         url = self._get_url("upload/api/v1/file_upload")
@@ -154,7 +178,7 @@ class Command(BaseCommand):
             "enrichment_kit": os.path.join(API_DATA, "enrichment_kit", "idt_haem.json"),
             "sequencing_run": os.path.join(API_DATA, "sequencing_run", "haem_21_minimal.json"),
             "sample_sheet": os.path.join(API_DATA, "sample_sheet", "haem_21_minimal.json"),
-            "sample_sheet_combined_vcf_file": os.path.join(API_DATA, "sample_sheet_combined_vcf_file", "haem_21.json"),
+            "sample_sheet_combined_vcf_file": os.path.join(API_DATA, "sample_sheet_combined_vcf_file", "haem_21_bulk_exec_summaries.json"),
             "sequencing_data": os.path.join(API_DATA, "sequencing_data", "haem_21_bulk_sequencing_files.json"),
             "qc_gene_lists": os.path.join(API_DATA, "qc_gene_list", "haem_21_bulk_samples.json"),
             "upload_file": os.path.join(TEST_DATA_DIR, "clinical_hg38", "idt_haem", "Haem_21_001_210216_M02027_0112_000000000_JFT79", "2_variants", "Haem_21_001_210216_M02027_0112_000000000_JFT79.vardict.hg38.vcf.gz"),
