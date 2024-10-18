@@ -27,10 +27,14 @@ class Command(BaseCommand):
         "sample_sheet": "api_sample_sheet-list",
         "sample_sheet_combined_vcf_file": "api_sample_sheet_combined_vcf_file-list",
         "qc_gene_lists": "api_qc_gene_list_bulk_create",
+        "qc_exec_summaries": "api_qc_exec_summary_bulk_create",
+        "qc_gene_coverage": "api_qc_gene_coverage_bulk_create",
         "sequencing_data": "api_sequencing_files_bulk_create",
-        "upload_file": "api_file_upload",
+        "upload_qc_gene_coverage_file": "api_file_upload",
+        "upload_vcf_file": "api_file_upload",
     }
 
+    HAEM_DIR = os.path.join(TEST_DATA_DIR, "clinical_hg38", "idt_haem", "Haem_21_001_210216_M02027_0112_000000000_JFT79")
     SEQUENCING_RUNS = {
         "Haem_21_001_210216_M02027_0112_000000000_JFT79": {
             "experiment": os.path.join(API_DATA, "experiment", "haem_21_001.json"),
@@ -40,7 +44,10 @@ class Command(BaseCommand):
             "sample_sheet_combined_vcf_file": os.path.join(API_DATA, "sample_sheet_combined_vcf_file", "haem_21.json"),
             "sequencing_data": os.path.join(API_DATA, "sequencing_data", "haem_21_bulk_sequencing_files.json"),
             "qc_gene_lists": os.path.join(API_DATA, "qc_gene_list", "haem_21_bulk_samples.json"),
-            "upload_file": os.path.join(TEST_DATA_DIR, "clinical_hg38", "idt_haem", "Haem_21_001_210216_M02027_0112_000000000_JFT79", "2_variants", "Haem_21_001_210216_M02027_0112_000000000_JFT79.vardict.hg38.vcf.gz"),
+            "qc_exec_summaries": os.path.join(API_DATA, "qc_exec_summary", "haem_21_bulk_exec_summaries.json"),
+            "qc_gene_coverage": os.path.join(API_DATA, "qc_gene_coverage", "haem_21_bulk_qc_gene_coverage.json"),
+            "upload_qc_gene_coverage_file": os.path.join(HAEM_DIR, "4_QC", "bam_stats", "samples", "fake_sample_1.per_gene_coverage.tsv.gz"),
+            "upload_vcf_file": os.path.join(HAEM_DIR, "2_variants", "Haem_21_001_210216_M02027_0112_000000000_JFT79.vardict.hg38.vcf.gz"),
         }
     }
 
@@ -69,7 +76,7 @@ class Command(BaseCommand):
 
                 view_path = self.URLS[name]
                 kwargs = {}
-                if name == "upload_file":
+                if view_path == "api_file_upload":
                     kwargs["files"] = {"file": open(filename, 'rb')}
                     kwargs["params"] = {"path": filename}
                 else:

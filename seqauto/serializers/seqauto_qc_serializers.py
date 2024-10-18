@@ -134,18 +134,74 @@ class QCGeneListBulkCreateSerializer(serializers.Serializer):
             "records": created_records,
         }
 
+
 class QCGeneCoverageSerializer(serializers.ModelSerializer):
+    """ The goal here is to just set the path - so that when we upload the file (and path)
+        we can match paths in ImportGeneCoverageTask """
     qc = QCSerializer()
-    gene_coverage_collection = GeneCoverageCollectionSerializer()
+    gene_coverage_collection = GeneCoverageCollectionSerializer(read_only=True)
 
     class Meta:
         model = QCGeneCoverage
         fields = ("path", "qc", "gene_coverage_collection")
 
+    def create(self, validated_data):
+        qc_data = validated_data.pop("qc")
+        qc = QCSerializer.get_object(qc_data)
+        path = validated_data["path"]
+
+        defaults = {
+            "path": path,
+        }
+        instance, _created = QCGeneCoverage.objects.update_or_create(qc=qc,
+                                                                     defaults=defaults)
+        return instance
+
+
 
 class QCExecSummarySerializer(serializers.ModelSerializer):
     qc = QCSerializer()
+    data_state = serializers.CharField(read_only=True)
 
     class Meta:
         model = QCExecSummary
         exclude = ('gene_list', )
+
+    def create(self, validated_data):
+        qc_data = validated_data.pop("qc")
+        qc = QCSerializer.get_object(qc_data)
+        validated_data["data_state"] = DataState.COMPLETE
+        instance, _created = QCExecSummary.objects.update_or_create(qc=qc,
+                                                                    defaults=validated_data)
+        return instance
+
+
+class QCExecSummaryBulkCreateSerializer(serializers.Serializer):
+    records = QCExecSummarySerializer(many=True)
+
+    def create(self, validated_data):
+        records = validated_data.get("records", [])
+        qces_serializer = QCExecSummarySerializer()
+        created_records = []
+        for record in records:
+            qcgl = qces_serializer.create(record)
+            created_records.append(qcgl)
+        return {
+            "records": created_records,
+        }
+
+
+class QCGeneCoverageBulkCreateSerializer(serializers.Serializer):
+    records = QCGeneCoverageSerializer(many=True)
+
+    def create(self, validated_data):
+        records = validated_data.get("records", [])
+        qcgc_serializer = QCGeneCoverageSerializer()
+        created_records = []
+        for record in records:
+            qcgl = qcgc_serializer.create(record)
+            created_records.append(qcgl)
+        return {
+            "records": created_records,
+        }
+

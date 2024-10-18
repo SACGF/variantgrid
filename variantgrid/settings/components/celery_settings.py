@@ -81,7 +81,7 @@ CELERY_ROUTES = {
     'upload.tasks.vcf.genotype_vcf_tasks.ProcessGenotypeVCFDataTask': WEB_WORKERS,
     'upload.tasks.import_bedfile_task.ImportBedFileTask': WEB_WORKERS,
     'upload.tasks.import_expression_task.ImportExpressionTask': WEB_WORKERS,
-    'upload.tasks.import_gene_list_task.ImportGeneCoverageTask': WEB_WORKERS,
+    'upload.tasks.import_gene_coverage_task.ImportGeneCoverageTask': WEB_WORKERS,
     'upload.tasks.import_gene_list_task.ImportGeneListTask': WEB_WORKERS,
     'upload.tasks.import_patient_records_task.ImportPatientRecords': WEB_WORKERS,
     'upload.tasks.import_ped_task.ImportPedTask': WEB_WORKERS,

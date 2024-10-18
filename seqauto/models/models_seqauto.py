@@ -956,7 +956,12 @@ class QC(SeqAutoRecord):
 
     @property
     def genome_build(self):
-        return GenomeBuild.legacy_build()
+        try:
+            gb = GenomeBuild.objects.get(vcf__sample__samplefromsequencingsample__sequencing_sample=self.sequencing_sample)
+        except GenomeBuild.DoesNotExist:
+            logging.warning("%s: requested genome build, but don't know (no VCFs linked)", self)
+            gb = GenomeBuild.legacy_build()
+        return gb
 
     def get_params(self):
         return self.vcf_file.get_params()

@@ -24,7 +24,8 @@ from seqauto.serializers import EnrichmentKitSerializer, \
     GoldCoverageSummarySerializer, EnrichmentKitSummarySerializer
 from seqauto.serializers.seqauto_qc_serializers import FastQCSerializer, QCExecSummarySerializer, \
     QCGeneCoverageSerializer, QCGeneListSerializer, QCSerializer, IlluminaFlowcellQCSerializer, \
-    QCGeneListCreateSerializer, QCGeneListBulkCreateSerializer
+    QCGeneListCreateSerializer, QCGeneListBulkCreateSerializer, QCExecSummaryBulkCreateSerializer, \
+    QCGeneCoverageBulkCreateSerializer
 from seqauto.serializers.sequencing_serializers import SequencerModelSerializer, SequencerSerializer, \
     ExperimentSerializer, VariantCallerSerializer, SequencingRunSerializer, SampleSheetSerializer, VCFFileSerializer, \
     SampleSheetCombinedVCFFileSerializer, SequencingFilesBulkCreateSerializer
@@ -125,6 +126,25 @@ class QCGeneListBulkCreateView(APIView):
             serializer.save()
             return Response({"message": "Records created successfully"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class QCExecSummaryBulkCreateView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = QCExecSummaryBulkCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Records created successfully"}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class QCGeneCoverageBulkCreateView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = QCGeneCoverageBulkCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Records created successfully"}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class QCGeneCoverageViewSet(ModelViewSet):
