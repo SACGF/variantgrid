@@ -1,0 +1,105 @@
+{
+  "records": [
+    {
+      "qc": {
+        "sequencing_sample": {
+          "sample_sheet": {
+            "sequencing_run": "Haem_21_001_210216_M02027_0112_000000000_JFT79",
+            "hash": "f0ac87bcae3f0e56b3f65b70fd6389ce"
+          },
+          "sample_name": "fake_sample_1"
+        },
+        "bam_file": {
+          "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/1_BAM/fake_sample_1.hg38.bam"
+        },
+        "vcf_file": {
+          "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/2_variants/gatk_per_sample/fake_sample_1.gatk.hg38.vcf.gz"
+        }
+      },
+      "created": "2024-10-18T11:45:26.826823+10:30",
+      "modified": "2024-10-18T11:45:26.826844+10:30",
+      "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/4_QC/exec_stats/fake_sample_1_qc_summary.txt",
+      "hash": "",
+      "is_valid": true,
+      "deduplicated_reads": 165107,
+      "indels_dbsnp_percent": 95.75,
+      "mean_coverage_across_genes": 162.84,
+      "mean_coverage_across_kit": 201.43,
+      "median_insert": 153.0,
+      "number_indels": 923,
+      "number_snps": 363,
+      "percent_10x_goi": 100.0,
+      "percent_20x_goi": 100.0,
+      "percent_20x_kit": 98.35,
+      "percent_100x_goi": null,
+      "percent_100x_kit": null,
+      "percent_250x_goi": null,
+      "percent_250x_kit": null,
+      "percent_500x_goi": null,
+      "percent_500x_kit": null,
+      "percent_error_rate": 0.91,
+      "percent_map_to_diff_chr": 0.75,
+      "percent_read_enrichment": 54.28,
+      "percent_reads": 3.552,
+      "percent_softclip": 0.02,
+      "percent_duplication": 3.42,
+      "reads": 120760,
+      "sample_id_lod": 16.6,
+      "sex_match": "M=yes",
+      "snp_dbsnp_percent": 96.62,
+      "ts_to_tv_ratio": 2.1,
+      "uniformity_of_coverage": 84.69,
+      "sequencing_run": "Haem_21_001_210216_M02027_0112_000000000_JFT79"
+    },
+    {
+      "qc": {
+        "sequencing_sample": {
+          "sample_sheet": {
+            "sequencing_run": "Haem_21_001_210216_M02027_0112_000000000_JFT79",
+            "hash": "f0ac87bcae3f0e56b3f65b70fd6389ce"
+          },
+          "sample_name": "fake_sample_2"
+        },
+        "bam_file": {
+          "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/1_BAM/fake_sample_2.hg38.bam"
+        },
+        "vcf_file": {
+          "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/2_variants/gatk_per_sample/fake_sample_2.gatk.hg38.vcf.gz"
+        }
+      },
+      "created": "2024-10-18T11:45:26.838244+10:30",
+      "modified": "2024-10-18T11:45:26.838262+10:30",
+      "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/4_QC/exec_stats/fake_sample_2_qc_summary.txt",
+      "hash": "",
+      "is_valid": true,
+      "deduplicated_reads": 275107,
+      "indels_dbsnp_percent": 88.75,
+      "mean_coverage_across_genes": 162.84,
+      "mean_coverage_across_kit": 150.43,
+      "median_insert": 222.0,
+      "number_indels": 853,
+      "number_snps": 1213,
+      "percent_10x_goi": 100.0,
+      "percent_20x_goi": 100.0,
+      "percent_20x_kit": 87.35,
+      "percent_100x_goi": null,
+      "percent_100x_kit": null,
+      "percent_250x_goi": null,
+      "percent_250x_kit": null,
+      "percent_500x_goi": null,
+      "percent_500x_kit": null,
+      "percent_error_rate": 0.55,
+      "percent_map_to_diff_chr": 0.75,
+      "percent_read_enrichment": 55.28,
+      "percent_reads": 3.32,
+      "percent_softclip": 0.02,
+      "percent_duplication": 5.42,
+      "reads": 410760,
+      "sample_id_lod": 16.6,
+      "sex_match": "M=yes",
+      "snp_dbsnp_percent": 88.62,
+      "ts_to_tv_ratio": 2.1,
+      "uniformity_of_coverage": 83.69
+    }
+  ]
+}

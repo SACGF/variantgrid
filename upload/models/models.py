@@ -80,7 +80,7 @@ class UploadedFile(TimeStampedModel):
         return open(self.get_filename(), "rb")
 
     def get_filename(self):
-        if self.import_source == ImportSource.WEB_UPLOAD:
+        if self.import_source in (ImportSource.WEB_UPLOAD, ImportSource.API):
             filename = self.uploaded_file.path
         else:
             filename = self.path

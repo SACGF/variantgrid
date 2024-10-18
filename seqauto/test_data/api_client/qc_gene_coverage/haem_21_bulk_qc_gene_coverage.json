@@ -1,0 +1,40 @@
+{
+  "records": [
+    {
+      "qc": {
+        "sequencing_sample": {
+          "sample_sheet": {
+            "sequencing_run": "Haem_21_001_210216_M02027_0112_000000000_JFT79",
+            "hash": "f0ac87bcae3f0e56b3f65b70fd6389ce"
+          },
+          "sample_name": "fake_sample_1"
+        },
+        "bam_file": {
+          "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/1_BAM/fake_sample_1.hg38.bam"
+        },
+        "vcf_file": {
+          "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/2_variants/gatk_per_sample/fake_sample_1.gatk.hg38.vcf.gz"
+        }
+      },
+      "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/4_QC/bam_stats/samples/fake_sample_1.per_gene_coverage.tsv.gz"
+    },
+    {
+      "qc": {
+        "sequencing_sample": {
+          "sample_sheet": {
+            "sequencing_run": "Haem_21_001_210216_M02027_0112_000000000_JFT79",
+            "hash": "f0ac87bcae3f0e56b3f65b70fd6389ce"
+          },
+          "sample_name": "fake_sample_2"
+        },
+        "bam_file": {
+          "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/1_BAM/fake_sample_2.hg38.bam"
+        },
+        "vcf_file": {
+          "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/2_variants/gatk_per_sample/fake_sample_2.gatk.hg38.vcf.gz"
+        }
+      },
+      "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/4_QC/bam_stats/samples/fake_sample_2.per_gene_coverage.tsv.gz"
+    }
+  ]
+}
