@@ -119,7 +119,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             labs = Lab.valid_labs_qs(self.user, admin_check=False)
             orgs = {lab.organization for lab in labs}
             permission_q.append(Q(share_level=ShareLevel.LAB) & Q(lab__in=labs))
-            permission_q.append(Q(share_evel=ShareLevel.INSTITUTION) & Q(org__in=orgs))
+            permission_q.append(Q(share_level=ShareLevel.INSTITUTION) & Q(org__in=orgs))
             permission_q.append(Q(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS))
             base_qs = base_qs.filter(reduce(operator.or_, permission_q))
         return base_qs
