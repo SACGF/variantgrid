@@ -401,31 +401,33 @@ def severity_icon(severity: str, title: Optional[str] = None) -> str:
         title_html = f' title="{title}"'
 
     def severity_for(severity_part: str) -> Optional[list[str]]:
-        # TODO make the below more robust
-        if severity_part == "CREATED":
-            return ['fa-solid fa-clock']
-        elif severity_part == "PROCESSING":
-            return ['fa-solid fa-person-running']
-        elif severity_part == "SKIPPED":
-            return ['fa-solid fa-forward text-muted']
-        elif severity_part == "TERMINATED EARLY":
-            return ['fa-solid fa-circle-xmark text-danger']
-        elif severity_part == "TIMED OUT":
-            return ['fa-solid fa-clock text-danger']
-        elif severity_part.startswith('C'):  # critical
-            return ['fa-bomb', 'text-danger']
-        elif severity_part.startswith('E') or severity_part == 'DANGER':  # error
-            return ['fa-exclamation-circle', 'text-danger']
-        elif severity_part.startswith('W'):  # warning
-            return ['fa-exclamation-triangle', 'text-warning']
-        elif severity_part.startswith('I'):  # info
-            return ['fa-info-circle', 'text-info']
-        elif severity_part.startswith('D'):  # debug
-            return ['fa-key', 'text-info']
-        elif severity_part.startswith('S'):  # success
-            return ['fa-check-circle', 'text-success']
-        else:
-            return None
+        match severity_part:
+            case "CREATED" | "CREATE":
+                return ['fa-solid fa-clock']
+            case "PROCESSING" | "PROCESS":
+                return ['fa-solid fa-person-running']
+            case "SKIPPED" | "SKIP":
+                return ['fa-solid fa-forward text-muted']
+            case "TERMINATED EARLY":
+                return ['fa-solid fa-circle-xmark text-danger']
+            case "TIMED OUT":
+                return ['fa-solid fa-clock text-danger']
+            case "DANGER":
+                return ['fa-exclamation-circle', 'text-danger']
+            case _:
+                match severity_part[0]:
+                    case "C":  # critical
+                        return ['fa-bomb', 'text-danger']
+                    case "E":
+                        return ['fa-exclamation-circle', 'text-danger']
+                    case "W":
+                        return ['fa-exclamation-triangle', 'text-warning']
+                    case "I":
+                        return ['fa-info-circle', 'text-info']
+                    case "D": # debug
+                        return ['fa-key', 'text-info']
+                    case "S":
+                        return ['fa-check-circle', 'text-success']
 
     found_extra_classes = False
     for part in [s for s in severity.upper().split(" ") if s]:
