@@ -2484,7 +2484,7 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
         value = data;
     }
 
-    let scs = value[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE];
+    let scs = value["clinical_significance"];
     if (scs) {
         let scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
         let scsLabel = scsKey.prettyValue(scs);
