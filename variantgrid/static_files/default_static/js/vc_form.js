@@ -2485,6 +2485,12 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
     }
 
     let scs = value["clinical_significance"];
+    let diff = value["diff"];
+    let diffHtml = "";
+    if (diff) {
+        diffHtml = ' <i class="fa-solid fa-asterisk" title="Multiple values have been recorded - showing latest"></i>';
+    }
+
     if (scs) {
         let scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
         let scsLabel = scsKey.prettyValue(scs);
@@ -2494,9 +2500,10 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
         if (highest_level) {
             dom.append(`<span class="amp-level">${highest_level}</span>`);
         }
+        dom.append(diffHtml);
         return dom;
     } else {
-        return $('<div>', {class: 'c-pill scs-none no-value', text: 'No Data'});
+        return $('<div>', {class: 'c-pill scs-none no-value', html: 'No Data' + diffHtml});
     }
 }
 
@@ -2505,16 +2512,22 @@ VCTable.classification = (data, type, row) => {
         return "" // support for dirty groups still processing
     }
     let cs = data;
+    let diff = 0;
     if (typeof(cs) !== "string") {
+        diff = cs["diff"];
         cs = cs["classification"] || cs[SpecialEKeys.CLINICAL_SIGNIFICANCE];
     }
     let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
     let label = csKey.prettyValue(cs);
     let csClass = `cs-` + (cs || '').toLowerCase()
+    let diffHtml = "";
+    if (diff) {
+        diffHtml = ' <i class="fa-solid fa-asterisk" title="Multiple values have been recorded - showing latest"></i>';
+    }
     if (cs && cs.length) {
-        return $('<span>', {class: `c-pill cs ${csClass}`, text: label.val});
+        return $('<span>', {class: `c-pill cs ${csClass}`, html:label.val + diffHtml});
     } else {
-        return $('<span>', {class: 'c-pill cs-none no-value', text: 'No Data'});
+        return $('<span>', {class: 'c-pill cs-none no-value', html: 'No Data' + + diffHtml});
     }
 };
 

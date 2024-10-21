@@ -55,11 +55,16 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
     def render_somatic(self, row: CellData) -> JsonDataType:
         if row["allele_origin_bucket"] != "G":
+            diff_value = row["somatic_difference"]
             if somatic_dict := row["latest_classification_modification__classification__summary__somatic"]:
+                somatic_dict["diff"] = diff_value
                 return somatic_dict
 
     def render_pathogenic(self, row: CellData) -> JsonDataType:
-        return row["latest_classification_modification__classification__summary__pathogenicity"]
+        diff_value = row["pathogenic_difference"]
+        result_dict = row["latest_classification_modification__classification__summary__pathogenicity"] or {}
+        result_dict["diff"] = diff_value
+        return result_dict
 
     def _render_date(self, row: CellData) -> JsonDataType:
         # TODO list date type
@@ -285,12 +290,15 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 ]
             ),
             RichColumn(
-                key="latest_classification_modification__classification__summary__pathogenicity",
                 name="Classification",
                 sort_keys=["latest_classification_modification__classification__summary__classification_sort"],
                 client_renderer='VCTable.classification',
                 renderer=self.render_pathogenic,
-                order_sequence=[SortOrder.DESC, SortOrder.ASC]
+                order_sequence=[SortOrder.DESC, SortOrder.ASC],
+                extra_columns=[
+                    "latest_classification_modification__classification__summary__pathogenicity",
+                    "pathogenic_difference"
+                ]
             ),
             RichColumn(
                 name='somatic_clinical_significances',
@@ -301,7 +309,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 renderer=self.render_somatic,
                 extra_columns=[
                     "latest_classification_modification__classification__summary__somatic",
-                    "allele_origin_bucket"
+                    "allele_origin_bucket",
+                    "somatic_difference"
                 ]
             ),
             RichColumn(
