@@ -302,7 +302,7 @@ class ClassificationGrouping(TimeStampedModel):
         all_classifications = self.classificationgroupingentry_set.values_list("classification", flat=True)
         all_modifications = ClassificationModification.objects.filter(classification_id__in=all_classifications, is_last_published=True)
         all_modifications = all_modifications.select_related("classification")
-        return list(sorted(all_modifications))
+        return list(sorted(all_modifications, key=lambda mod: mod.curated_date_check))
 
     @cached_property
     def allele(self) -> Allele:
@@ -336,8 +336,6 @@ class ClassificationGrouping(TimeStampedModel):
 
             # UPDATE CLASSIFICATION / CLINICAL SIGNIFICANCE
             # TODO - CLINICAL SIGNIFICANCE
-            all_somatic_values: set[str] = set()
-            all_pathogenic_values: set[str] = set()
             all_zygosities: set[str] = set()
 
             all_buckets = set()
@@ -389,15 +387,15 @@ class ClassificationGrouping(TimeStampedModel):
             self.classification_count = len(all_modifications)
 
             pathogenic_difference = ClassificationGroupingPathogenicDifference.NO_DIFF
-            if len(bucket) > 1:
+            if len(all_buckets) > 1:
                 pathogenic_difference = ClassificationGroupingPathogenicDifference.CLIN_SIG_DIFFS
-            elif len(path_val) > 1:
+            elif len(all_pathogenic_values) > 1:
                 pathogenic_difference = ClassificationGroupingPathogenicDifference.SMALL_DIFF
 
             somatic_difference = ClassificationGroupingSomaticDifference.NO_DIFF
-            if len(tier) > 1:
+            if len(all_tiers) > 1:
                 somatic_difference = ClassificationGroupingSomaticDifference.TIER_DIFF
-            elif len(level) > 1:
+            elif len(all_levels) > 1:
                 somatic_difference = ClassificationGroupingSomaticDifference.AMP_DIFF
 
             self.pathogenic_difference = pathogenic_difference
