@@ -92,8 +92,6 @@ class ClassificationSummaryCalculator:
 
         return {
             "criteria_labels": self.criteria_labels,
-            "classification_value": self.classification_value,
-            "classification_sort": self.classification_sort,
             "pathogenicity": {
                 "classification": self.classification_value,
                 "sort": self.classification_sort,

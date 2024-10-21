@@ -226,8 +226,6 @@ class ClassificationGrouping(TimeStampedModel):
     # summary_criteria
     latest_classification_modification = models.ForeignKey(ClassificationModification, on_delete=SET_NULL, null=True, blank=True)
     latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
-    latest_criteria = ArrayField(models.CharField(max_length=50), null=True, blank=True)
-    latest_curation_date = models.DateField(null=True, blank=True)
 
     def __lt__(self, other):
         def _sort_value(obj: ClassificationGrouping):
@@ -315,7 +313,6 @@ class ClassificationGrouping(TimeStampedModel):
             best_classification = first(all_modifications)
 
             self.latest_classification_modification = best_classification
-            self.latest_curation_date = best_classification.curated_date
             self.latest_allele_info = best_classification.classification.allele_info
 
             # TODO check for dirty values

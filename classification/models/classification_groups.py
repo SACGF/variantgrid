@@ -252,7 +252,8 @@ class ClassificationGroup:
 
     @property
     def somatic_clin_sig_sort(self):
-        return self.most_recent.somatic_clinical_significance_sort or 0
+        # TODO make this a proper object or something a bit more type hint friendly
+        return self.most_recent.classification.summary.get("somatic", {}).get("sort") or 0
 
     @property
     def amp_level(self):
