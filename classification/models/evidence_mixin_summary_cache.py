@@ -6,24 +6,24 @@ from classification.enums import AlleleOriginBucket, SpecialEKeys, CriteriaEvalu
 
 """
 return {
-            "criteria_labels": self.criteria_labels,
-            "classification_value": self.classification_value,
-            "classification_sort": self.classification_sort,
-            "pathogenicity": {
-                "classification": self.classification_value,
-                "sort": self.classification_sort,
-                "bucket": self.germline_bucket
-            },
-            "somatic": {
-                "clinical_significance": self.somatic_clinical_significance,
-                "amp_level": self.somatic_amp_level,
-                "sort": self.somatic_sort
-            },
-            "date": {
-                "value": curated_date.date_str,
-                "type": curated_date.name
-            }
-        }
+    "criteria_labels": self.criteria_labels,
+    "classification_value": self.classification_value,
+    "classification_sort": self.classification_sort,
+    "pathogenicity": {
+        "classification": self.classification_value,
+        "sort": self.classification_sort,
+        "bucket": self.germline_bucket
+    },
+    "somatic": {
+        "clinical_significance": self.somatic_clinical_significance,
+        "amp_level": self.somatic_amp_level,
+        "sort": self.somatic_sort
+    },
+    "date": {
+        "value": curated_date.date_str,
+        "type": curated_date.name
+    }
+}
 """
 
 class ClassificationSummaryCacheDictPathogenicity(TypedDict):

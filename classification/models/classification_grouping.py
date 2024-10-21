@@ -13,6 +13,8 @@ from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
 from django.db import models, transaction
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
     ConditionResolved
+from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheDict, \
+    ClassificationSummaryCacheDictPathogenicity, ClassificationSummaryCacheDictSomatic
 from genes.models import GeneSymbol
 from library.utils import first
 from ontology.models import OntologyTerm
@@ -23,10 +25,10 @@ classification_grouping_search_term_signal = django.dispatch.Signal()  # args: "
 
 
 # TODO this needs to be moved to Classification
-class ClassificationQualityLevel(TextChoices):
-    STANDARD = "S", "Standard"
-    LEGACY = "L", "Legacy"
-    INCOMPLETE = "I", "Incomplete"
+# class ClassificationQualityLevel(TextChoices):
+#     STANDARD = "S", "Standard"
+#     LEGACY = "L", "Legacy"
+#     INCOMPLETE = "I", "Incomplete"
 
 
 class ClassificationClassificationBucket(TextChoices):
@@ -180,6 +182,18 @@ class ClassificationSubGrouping:
         return list(by_status.values())
 
 
+class ClassificationGroupingPathogenicDifference(IntegerChoices):
+    NO_DIFF = 0, "No Differences"
+    SMALL_DIFF = 1, "Differences"
+    CLIN_SIG_DIFFS = 2, "Clinical Significance Difference"
+
+
+class ClassificationGroupingSomaticDifference(IntegerChoices):
+    NO_DIFF = 0, "No Differences"
+    AMP_DIFF = 1, "Same Tier, different AMP Level"
+    TIER_DIFF = 2, "Different Tier"
+
+
 class ClassificationGrouping(TimeStampedModel):
     # key
     allele_origin_grouping = models.ForeignKey(AlleleOriginGrouping, on_delete=models.CASCADE)
@@ -191,9 +205,9 @@ class ClassificationGrouping(TimeStampedModel):
     def share_level_obj(self):
         return ShareLevel(self.share_level)
 
-    quality_level = models.CharField(max_length=1, choices=ClassificationQualityLevel.choices, default=ClassificationQualityLevel.STANDARD)
-    classification_bucket = models.CharField(max_length=1, choices=ClassificationClassificationBucket.choices, default=ClassificationClassificationBucket.NO_DATA)
     classification_count = models.IntegerField(default=0)
+    pathogenic_difference = models.IntegerField(choices=ClassificationGroupingPathogenicDifference.choices, default=ClassificationGroupingPathogenicDifference.NO_DIFF)
+    somatic_difference = models.IntegerField(choices=ClassificationGroupingSomaticDifference.choices, default=ClassificationGroupingSomaticDifference.NO_DIFF)
 
     dirty = models.BooleanField(default=True)
 
@@ -207,7 +221,6 @@ class ClassificationGrouping(TimeStampedModel):
         return ClassificationSubGrouping.from_modifications(self.classification_modifications)
 
     conditions = models.JSONField(null=True, blank=True)
-    conflicting_ratings = models.BooleanField(default=False)
 
     zygosity_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
     # # for discordances
@@ -287,7 +300,9 @@ class ClassificationGrouping(TimeStampedModel):
     def classification_modifications(self) -> list[ClassificationModification]:
         # show in date order
         all_classifications = self.classificationgroupingentry_set.values_list("classification", flat=True)
-        return list(sorted(ClassificationModification.objects.filter(classification_id__in=all_classifications, is_last_published=True), key=lambda mod: mod.curated_date_check))
+        all_modifications = ClassificationModification.objects.filter(classification_id__in=all_classifications, is_last_published=True)
+        all_modifications = all_modifications.select_related("classification")
+        return list(sorted(all_modifications))
 
     @cached_property
     def allele(self) -> Allele:
@@ -321,8 +336,14 @@ class ClassificationGrouping(TimeStampedModel):
 
             # UPDATE CLASSIFICATION / CLINICAL SIGNIFICANCE
             # TODO - CLINICAL SIGNIFICANCE
-            all_classification_buckets: set[ClassificationClassificationBucket] = set()
+            all_somatic_values: set[str] = set()
+            all_pathogenic_values: set[str] = set()
             all_zygosities: set[str] = set()
+
+            all_buckets = set()
+            all_pathogenic_values = set()
+            all_tiers = set()
+            all_levels = set()
 
             for modification in all_modifications:
                 if condition := modification.classification.condition_resolution_obj:
@@ -337,6 +358,19 @@ class ClassificationGrouping(TimeStampedModel):
                 # only store valid terms as quick links to the classification
                 all_terms = {term for term in all_terms if term.is_valid_for_condition and not term.is_stub}
                 # self._update_conditions(all_terms)
+                summary_dict: ClassificationSummaryCacheDict = modification.classification.summary
+
+                pathogenicity_dict: ClassificationSummaryCacheDictPathogenicity = summary_dict.get("pathogenicity", {})
+                somatic_dict: ClassificationSummaryCacheDictSomatic = summary_dict.get("somatic", {})
+
+                if bucket := pathogenicity_dict.get("bucket"):
+                    all_buckets.add(bucket)
+                if path_val := pathogenicity_dict.get("value"):
+                    all_pathogenic_values.add(path_val)
+                if tier := somatic_dict.get("clinical_significance"):
+                    all_tiers.add(tier)
+                if level := somatic_dict.get("amp_level"):
+                    all_levels.add(level)
 
             evidence_map = EvidenceKeyMap.instance()
 
@@ -352,26 +386,22 @@ class ClassificationGrouping(TimeStampedModel):
                 plain_text=list(sorted(all_free_text_conditions))
             ).to_json(include_join=False)
 
-            bucket_count = len(all_classification_buckets)
-            if bucket_count > 1 and ClassificationClassificationBucket.NO_DATA in all_classification_buckets:
-                all_classification_buckets.remove(ClassificationClassificationBucket.NO_DATA)
-                bucket_count = len(all_classification_buckets)
-
-            use_bucket: ClassificationClassificationBucket
-            match bucket_count:
-                case 0:
-                    use_bucket = ClassificationClassificationBucket.OTHER
-                case 1:
-                    use_bucket = first(all_classification_buckets)
-                case _:
-                    use_bucket = ClassificationClassificationBucket.CONFLICTING
-
-            self.classification_bucket = use_bucket
             self.classification_count = len(all_modifications)
 
-            # update search terms
+            pathogenic_difference = ClassificationGroupingPathogenicDifference.NO_DIFF
+            if len(bucket) > 1:
+                pathogenic_difference = ClassificationGroupingPathogenicDifference.CLIN_SIG_DIFFS
+            elif len(path_val) > 1:
+                pathogenic_difference = ClassificationGroupingPathogenicDifference.SMALL_DIFF
 
-            # TODO do a better syncing of existing values
+            somatic_difference = ClassificationGroupingSomaticDifference.NO_DIFF
+            if len(tier) > 1:
+                somatic_difference = ClassificationGroupingSomaticDifference.TIER_DIFF
+            elif len(level) > 1:
+                somatic_difference = ClassificationGroupingSomaticDifference.AMP_DIFF
+
+            self.pathogenic_difference = pathogenic_difference
+            self.somatic_difference = somatic_difference
 
             all_term_stubs: list[ClassificationGroupingSearchTermStub] = []
             for _, term_stubs in classification_grouping_search_term_signal.send(sender=ClassificationGrouping, grouping=self):
