@@ -1313,8 +1313,8 @@ class ClassificationGroupingSearchTermAdmin(admin.TabularInline):
 @admin.register(ClassificationGrouping)
 class ClassificationGroupingAdmin(ModelAdminBasics):
     inlines = (ClassificationGroupingEntryAdmin, ClassificationGroupingSearchTermAdmin)
-    list_display = ("pk", "classification_count", "allele", "lab", "allele_origin_bucket", "dirty")
-    list_filter = ("lab", "allele_origin_bucket", "dirty")
+    list_display = ("pk", "classification_count", "allele", "lab", "allele_origin_bucket", "pathogenic_difference", "somatic_difference", "dirty")
+    list_filter = ("lab", "allele_origin_bucket", "pathogenic_difference", "somatic_difference", "dirty")
 
     # @admin_list_column("gene_symbols")
     # def gene_symbols(self, obj: ClassificationGrouping):

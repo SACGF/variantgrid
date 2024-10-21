@@ -2506,8 +2506,7 @@ VCTable.classification = (data, type, row) => {
     }
     let cs = data;
     if (typeof(cs) !== "string") {
-        console.log(cs);
-        cs = cs[SpecialEKeys.CLINICAL_SIGNIFICANCE];
+        cs = cs["classification"] || cs[SpecialEKeys.CLINICAL_SIGNIFICANCE];
     }
     let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
     let label = csKey.prettyValue(cs);

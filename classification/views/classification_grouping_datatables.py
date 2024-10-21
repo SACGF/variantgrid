@@ -58,6 +58,9 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             if somatic_dict := row["latest_classification_modification__classification__summary__somatic"]:
                 return somatic_dict
 
+    def render_pathogenic(self, row: CellData) -> JsonDataType:
+        return row["latest_classification_modification__classification__summary__pathogenicity"]
+
     def _render_date(self, row: CellData) -> JsonDataType:
         # TODO list date type
         return {
@@ -282,10 +285,11 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 ]
             ),
             RichColumn(
-                key="latest_classification_modification__classification__summary__classification_value",
+                key="latest_classification_modification__classification__summary__pathogenicity",
                 name="Classification",
                 sort_keys=["latest_classification_modification__classification__summary__classification_sort"],
                 client_renderer='VCTable.classification',
+                renderer=self.render_pathogenic,
                 order_sequence=[SortOrder.DESC, SortOrder.ASC]
             ),
             RichColumn(
