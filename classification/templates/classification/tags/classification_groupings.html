@@ -46,7 +46,11 @@
 </script>
 <div class="row">
     <div class="col">
-        {% allele_origin_toggle show_label=False %}
+        <div class="text-right display-flex">
+            <div class="spacer"></div>
+            <div class="mr-2 mt-1">Allele Origin</div>
+            {% allele_origin_toggle show_label=False %}
+        </div>
         <table id="vc-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table"></table>
         <div>
         Download as

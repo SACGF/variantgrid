@@ -267,25 +267,6 @@
         }
     </script>
     {% classification_groupings %}
-    {% comment %}
-    {% if classifications_new_grouping and not edit_clinical_groupings %}
-        <div class="container mt-4" id="view-allele-classification-records">
-            <h4>Classification Records</h4>
-            {% url 'allele_classifications_download' allele.id as download_link %}
-            {% classification_groups classifications link_discordance_reports=discordance_enabled download_link=download_link context_object=allele %}
-        </div>
-    {% else %}
-        <div class="container-table mt-4" id="view-allele-classification-records">
-            <h4 style="margin-bottom:0">Classification Records</h4>
-            {% if classifications %}
-                {% classification_table classifications show_clinical_context=True allele=allele edit_clinical_groupings=edit_clinical_groupings %}
-            {% else %}
-                <p>
-                No internal classifications.
-            {% endif %}
-        </div>
-    {% endif %}
-    {% endcomment %}
 
     <div class="mt-4">
         {% clinvar allele=allele expert_panel_only=True %}

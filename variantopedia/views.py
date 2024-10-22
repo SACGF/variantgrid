@@ -477,21 +477,10 @@ def view_allele(request, allele_id: int):
     allele: Allele = get_object_or_404(Allele, pk=allele_id)
     link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
 
-    latest_classifications = ClassificationModification.latest_for_user(
-        user=request.user,
-        allele=allele,
-        published=True
-    ).select_related(
-        'classification__allele_info__allele',
-        'classification__allele_info__imported_genome_build_patch_version',
-        'classification__allele_info__latest_validation'
-    )
-
     context = {
         "allele_card": AlleleCard(user=request.user, allele=allele),
         "allele": allele,
-        "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True',
-        "classifications": latest_classifications
+        "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True'
     }
     return render(request, "variantopedia/view_allele.html", context)
 
@@ -556,12 +545,6 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     num_variant_annotation_versions = variant.variantannotation_set.count()
     user_settings = UserSettings.get_for_user(request.user)
 
-    latest_classifications = ClassificationModification.latest_for_user(
-        user=request.user,
-        variant=variant.equivalent_variants,
-        published=True
-    )
-
     if variant.can_have_annotation:
         try:
             vts = VariantTranscriptSelections(variant, genome_build, annotation_version)
@@ -610,7 +593,6 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "annotation_description": annotation_description,
         "annotation_version": annotation_version,
         "can_create_classification": Classification.can_create_via_web_form(request.user),
-        "classifications": latest_classifications,
         "genes_canonical_transcripts": genes_canonical_transcripts,
         "genome_build": genome_build,
         "has_tags": has_tags,
