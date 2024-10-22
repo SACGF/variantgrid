@@ -45,21 +45,17 @@ class QCSerializer(serializers.ModelSerializer):
         sample_sheet = SampleSheet.objects.get(hash=sheet_data["hash"], sequencing_run=sequencing_run)
         sample_name = sequencing_sample_data["sample_name"]
         sequencing_sample = SequencingSample.objects.get(sample_sheet=sample_sheet, sample_name=sample_name)
+        # Occasionally we could have multiple bam and VCF files in there that match path
+        # we want to make sure we get the bam out that is linked to the VCF file we pull out
         bam_file_data = data.pop("bam_file")
-        # Occasionally we could have multiples in there, we don't really care so take 1st
-        bam_file_kwargs = {
-            "path": bam_file_data["path"],
-            "sequencing_run": sequencing_run,
-            "unaligned_reads__sequencing_sample": sequencing_sample
-        }
-        bam_file = BamFile.objects.filter(**bam_file_kwargs).first()
-        if not bam_file:
-            raise BamFile.DoesNotExist(f"No bam file for {bam_file_kwargs=}")
-
         vcf_file_data = data.pop("vcf_file")
         vcf_file_kwargs = {
             "path": vcf_file_data["path"],
-            "bam_file": bam_file,
+            # Make sure bam file also matches
+            "bam_file__path": bam_file_data["path"],
+            "bam_file__sequencing_run": sequencing_run,
+            "bam_file__unaligned_reads__sequencing_sample": sequencing_sample
+
         }
         vcf_file = VCFFile.objects.filter(**vcf_file_kwargs).first()
         if not vcf_file:
@@ -71,7 +67,7 @@ class QCSerializer(serializers.ModelSerializer):
 
         qc, _ = QC.objects.get_or_create(
             sequencing_run=sequencing_run,
-            bam_file=bam_file,
+            bam_file=vcf_file.bam_file,
             vcf_file=vcf_file,
             defaults=defaults
         )
@@ -112,8 +108,9 @@ class QCGeneListCreateSerializer(serializers.ModelSerializer):
         gene_list_text = ",".join(gene_list_data)
         custom_text_gene_list = QCGeneList.create_gene_list(gene_list_text,
                                                             sequencing_sample=qc.sequencing_sample)
-        instance = QCGeneList.objects.create(qc=qc,
-                                             custom_text_gene_list=custom_text_gene_list)
+        instance, _created = QCGeneList.objects.update_or_create(qc=qc,
+                                                                 custom_text_gene_list=custom_text_gene_list,
+                                                                 defaults={"data_state": DataState.COMPLETE})
 
         # With API - whatever we sent is always the active one
         instance.link_samples_if_exist(force_active=True)
