@@ -1069,14 +1069,10 @@ class QCGeneList(SeqAutoRecord):
         self.link_samples_if_exist()
 
     def link_samples_if_exist(self, force_active=False):
-
-        try:
-            # SampleFromSequencingSample is only done after VCF import, so this may not be linked yet.
-            if sfss := self.sequencing_sample.samplefromsequencingsample_set.first():
-                sample = sfss.sample
-                self.create_and_assign_sample_gene_list(sample, force_active=force_active)  # Also saves
-        except SampleFromSequencingSample.DoesNotExist:
-            pass
+        # SampleFromSequencingSample is only done after VCF import, so this may not be linked yet.
+        for sfss in self.sequencing_sample.samplefromsequencingsample_set.all():
+            sample = sfss.sample
+            self.create_and_assign_sample_gene_list(sample, force_active=force_active)  # Also saves
 
     def create_and_assign_sample_gene_list(self, sample: Sample, force_active=False):
         logging.info("QCGeneList: %d - create_and_assign_sample_gene_list for %s", self.pk, sample)
