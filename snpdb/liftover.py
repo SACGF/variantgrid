@@ -296,27 +296,25 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
         (settings.LIFTOVER_BCFTOOLS_ENABLED, AlleleConversionTool.BCFTOOLS_LIFTOVER, True),
     ]
 
-    conversion_tool = None
-    for enabled, potential_conversion_tool, require_reference_match in options:
+    for enabled, conversion_tool, require_reference_match in options:
         if enabled:
-            if AlleleLiftover.has_existing_failure(allele, dest_genome_build, potential_conversion_tool):
+            if AlleleLiftover.has_existing_failure(allele, dest_genome_build, conversion_tool):
                 continue  # Skip as already failed liftover method to desired build
 
             if variant_errors_str:
-                yield potential_conversion_tool, None, variant_errors_str
+                yield conversion_tool, None, variant_errors_str
                 continue
 
             if require_reference_match:
                 calculated_ref = variant_coordinate.calculated_reference(source_genome_build)
                 if calculated_ref != variant_coordinate.ref:
                     error_message = f"reference='{variant_coordinate.ref}' not equal to calculated ref from genome {calculated_ref}"
-                    yield potential_conversion_tool, None, error_message
+                    yield conversion_tool, None, error_message
                     continue
 
-            conversion_tool = potential_conversion_tool
+            yield conversion_tool, variant_coordinate, None
             break  # Just want 1st one
 
-    yield conversion_tool, variant_coordinate, None
 
 
 def allele_can_attempt_liftover(allele, genome_build) -> bool:
