@@ -96,12 +96,12 @@ def uploadedfile_dict(uploaded_file) -> dict:
     return data
 
 
-def handle_file_upload(user, django_uploaded_file, import_source=ImportSource.WEB_UPLOAD, path=None) -> UploadedFile:
+def handle_file_upload(user, django_uploaded_file, path=None) -> UploadedFile:
     original_filename = django_uploaded_file._name
     kwargs = {
         "name": original_filename,
         "uploaded_file": django_uploaded_file,
-        "import_source": import_source,
+        "import_source": ImportSource.WEB_UPLOAD,
         "user": user,
         "path": path,
     }
