@@ -64,9 +64,9 @@ class Command(BaseCommand):
         if should_commit:
             if not is_valid:
                 print("Can't update records due to ID Clash")
-        else:
-            Classification.objects.bulk_update(pending_changes, fields="lab_record_id")
-
+            else:
+                Classification.objects.bulk_update(pending_changes, fields=["lab_record_id"])
+            
 
 # rematching
 """
