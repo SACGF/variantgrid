@@ -6,7 +6,6 @@ from django.views.decorators.csrf import csrf_exempt
 
 from rest_framework.views import APIView
 
-from snpdb.models import ImportSource
 from upload.views.views import handle_file_upload
 
 
@@ -17,8 +16,9 @@ class APIFileUploadView(APIView):
         try:
             django_uploaded_file = request.FILES['file']
             path = request.query_params.get("path")
-            uploaded_file = handle_file_upload(request.user, django_uploaded_file,
-                                               import_source=ImportSource.API, path=path)
+            # This is still a Django UploadedFile - even though it's API we save as import_source.WEB_UPLOAD
+            # So we know to handle it as UploadedFile rather than 'path' (which is the path on the API client)
+            uploaded_file = handle_file_upload(request.user, django_uploaded_file, path=path)
             return JsonResponse({"uploaded_file_id": uploaded_file.pk})
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
