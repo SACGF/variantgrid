@@ -2527,7 +2527,7 @@ VCTable.classification = (data, type, row) => {
     if (cs && cs.length) {
         return $('<span>', {class: `c-pill cs ${csClass}`, html:label.val + diffHtml});
     } else {
-        return $('<span>', {class: 'c-pill cs-none no-value', html: 'No Data' + + diffHtml});
+        return $('<span>', {class: 'c-pill cs-none no-value', html: 'No Data' + diffHtml});
     }
 };
 
