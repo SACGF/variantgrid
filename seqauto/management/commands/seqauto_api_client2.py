@@ -1,20 +1,24 @@
+import copy
+import dataclasses
 import json
 import logging
 import os
 from datetime import date, datetime
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 import requests
 from dataclasses_json import dataclass_json, config
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
+
 @dataclass_json
 @dataclass
 class EnrichmentKit:
     name: str
     version: int
+
 
 @dataclass_json
 @dataclass
@@ -49,11 +53,17 @@ class SampleSheet:
     hash: str
     sequencing_samples: List[SequencingSample] = field(metadata=config(field_name="sequencingsample_set"))
 
-    def to_simplified_dict(self):
-        return {
-            "sequencing_run": self.sequencing_run.name,
-            "hash": self.hash,
-        }
+
+@dataclass_json
+@dataclass
+class SampleSheetLookup:
+    """ Only used as arguments to find existing sample sheets on server - not enough details to create one """
+    sequencing_run: str
+    hash: str
+
+    @staticmethod
+    def from_sample_sheet(sample_sheet: SampleSheet) -> 'SampleSheetLookup':
+        return SampleSheetLookup(sequencing_run=sample_sheet.sequencing_run.name, hash=sample_sheet.hash)
 
 
 @dataclass_json
@@ -61,6 +71,7 @@ class SampleSheet:
 class Aligner:
     name: str
     version: str
+
 
 @dataclass_json
 @dataclass
@@ -74,7 +85,7 @@ class VariantCaller:
 @dataclass
 class SampleSheetCombinedVCFFile:
     path: str
-    sample_sheet: SampleSheet
+    sample_sheet_lookup: SampleSheetLookup = field(metadata=config(field_name="sample_sheet"))
     variant_caller: VariantCaller
 
 
@@ -82,14 +93,14 @@ class SampleSheetCombinedVCFFile:
 @dataclass
 class BamFile:
     path: str
-    aligner: Aligner
+    aligner: Optional[Aligner] = field(default=None, metadata=config(exclude=lambda x: x is None))
 
 
 @dataclass_json
 @dataclass
 class VCFFile:
     path: str
-    variant_caller: VariantCaller
+    variant_caller: Optional[VariantCaller] = field(default=None, metadata=config(exclude=lambda x: x is None))
 
 
 @dataclass_json
@@ -104,18 +115,18 @@ class SequencingFile:
 
 @dataclass_json
 @dataclass
+class SequencingSampleLookup:
+    """ Only used as arguments to find existing sequencing sample on server - not enough details to create one """
+    sample_sheet_lookup: SampleSheetLookup = field(metadata=config(field_name="sample_sheet"))
+    sample_name: str
+
+
+@dataclass_json
+@dataclass
 class QC:
-    sequencing_sample: SequencingSample
+    sequencing_sample_lookup: SequencingSampleLookup = field(metadata=config(field_name="sequencing_sample"))
     bam_file: BamFile
     vcf_file: VCFFile
-
-@dataclass
-class SampleGeneList:
-    """ This is never sent to API (it needs QC)
-        But it can be convenient to create it in this object, and create QCs later """
-    path: str
-    sample_name: str
-    gene_list: List[str]
 
 
 @dataclass_json
@@ -129,13 +140,49 @@ class QCGeneList:
 @dataclass_json
 @dataclass
 class QCExecStats:
-    pass
+    path: str
+    qc: QC
+    created: datetime
+    modified: datetime
+    hash: str
+    is_valid: bool
+    deduplicated_reads: int
+    indels_dbsnp_percent: float
+    mean_coverage_across_genes: float
+    mean_coverage_across_kit: float
+    median_insert: float
+    number_indels: int
+    number_snps: int
+    percent_10x_goi: float
+    percent_20x_goi: float
+    percent_20x_kit: float
+    percent_error_rate: float
+    percent_map_to_diff_chr: float
+    percent_read_enrichment: float
+    percent_reads: float
+    percent_softclip: float
+    percent_duplication: float
+    reads: int
+    sample_id_lod: float
+    sex_match: str
+    snp_dbsnp_percent: float
+    ts_to_tv_ratio: float
+    uniformity_of_coverage: float
+    percent_100x_goi: Optional[float] = None
+    percent_100x_kit: Optional[float] = None
+    percent_250x_goi: Optional[float] = None
+    percent_250x_kit: Optional[float] = None
+    percent_500x_goi: Optional[float] = None
+    percent_500x_kit: Optional[float] = None
+
 
 @dataclass_json
 @dataclass
 class QCGeneCoverage:
-    pass
-
+    """ We send this up to associate coverage file path with sequencing sample
+        Then, later we upload the coverage file (plus path) """
+    qc: QC
+    path: str
 
 
 class VariantGridAPI:
@@ -181,13 +228,12 @@ class VariantGridAPI:
         return self._post("seqauto/api/v1/sample_sheet/",
                           json_data)
 
-    def create_sample_sheet_combined_vcf_file(self, sample_sheet_combined_vcf_file):
+    def create_sample_sheet_combined_vcf_file(self, sample_sheet_combined_vcf_file: SampleSheetCombinedVCFFile):
         json_data = sample_sheet_combined_vcf_file.to_dict()
-        json_data["sample_sheet"] = sample_sheet_combined_vcf_file.sample_sheet.to_simplified_dict()
         return self._post("seqauto/api/v1/sample_sheet_combined_vcf_file/",
                           json_data)
 
-    def create_sequencing_data(self, sample_sheet: SampleSheet, sequencing_files: List[SequencingFile]):
+    def create_sequencing_data(self, sample_sheet_lookup: SampleSheetLookup, sequencing_files: List[SequencingFile]):
         records = []
         for sf in sequencing_files:
             data = sf.to_dict()
@@ -201,37 +247,58 @@ class VariantGridAPI:
             records.append(data)
 
         json_data = {
-            "sample_sheet": sample_sheet.to_simplified_dict(),
+            "sample_sheet": sample_sheet_lookup.to_dict(),
             "records": records
         }
         return self._post("seqauto/api/v1/sequencing_files/bulk_create",
                           json_data)
 
-    def create_qc_gene_list(self):
-        # TODO
-        pass
+    def create_qc_gene_list(self, qc_gene_list: QCGeneList):
+        json_data = qc_gene_list.to_dict()
+        return self._post("seqauto/api/v1/qc_gene_list/",
+                          json_data)
+
 
     def create_multiple_qc_gene_lists(self, qc_gene_lists: List[QCGeneList]):
-        url = self._get_url("seqauto/api/v1/qc_gene_list/bulk_create")
+        json_data = {
+            "records": [
+                qcgl.to_dict() for qcgl in qc_gene_lists
+            ]
+        }
+        return self._post("seqauto/api/v1/qc_gene_list/bulk_create",
+                          json_data)
 
-    def create_qc_exec_stats(self):
-        # TODO
-        pass
+    def create_qc_exec_stats(self, qc_exec_stats: QCExecStats):
+        json_data = qc_exec_stats.to_dict()
+        return self._post("seqauto/api/v1/qc_exec_summary/",
+                          json_data)
 
-    def create_multiple_qc_exec_stats(self, sample_sheet: SampleSheet, qc_exec_stats: List[QCExecStats]):
-        pass
+    def create_multiple_qc_exec_stats(self, qc_exec_stats: List[QCExecStats]):
+        json_data = {
+            "records": [
+                qces.to_dict() for qces in qc_exec_stats
+            ]
+        }
+        return self._post("seqauto/api/v1/qc_exec_summary/bulk_create",
+                          json_data)
 
-    def create_multiple_qc_gene_coverage(self, sample_sheet: SampleSheet, qc_fene_lists: List[QCGeneCoverage]):
-        pass
+    def create_multiple_qc_gene_coverage(self, qc_gene_coverage_list: List[QCGeneCoverage]):
+        json_data = {
+            "records": [
+                qcgc.to_dict() for qcgc in qc_gene_coverage_list
+            ]
+        }
+        return self._post("seqauto/api/v1/qc_gene_coverage/bulk_create",
+                          json_data)
 
-    def upload_vcf_file(self, vcf_filename):
+    def upload_file(self, filename: str):
         url = self._get_url("upload/api/v1/file_upload")
-        with open(vcf_filename, "rb") as f:
+        with open(filename, "rb") as f:
             kwargs = {
                 "files": {"file": f},
-                "params": {"path": vcf_filename}
+                "params": {"path": filename}
             }
-            response = requests.post(url, headers=self.headers, **kwargs)
+            return requests.post(url, headers=self.headers, **kwargs)
 
 
 class Command(BaseCommand):
@@ -240,6 +307,9 @@ class Command(BaseCommand):
         Version 6 - Extract into library / example script
     """
     TEST_DATA_DIR = os.path.join(settings.BASE_DIR, 'seqauto', 'test_data')
+    HAEM_DIR = os.path.join(TEST_DATA_DIR, "clinical_hg38", "idt_haem",
+                            "Haem_21_001_210216_M02027_0112_000000000_JFT79")
+
     def add_arguments(self, parser):
         parser.add_argument('--token', help="API token (create via drf_user_api_token)")
         parser.add_argument('--server', help="default = obtain from current site config")
@@ -264,17 +334,17 @@ class Command(BaseCommand):
             SequencingSample(sample_id="fake_sample_1",
                              sample_project=None,
                              sample_number=1,
-                             lane= 3,
-                             barcode= "GCCAAT",
+                             lane=3,
+                             barcode="GCCAAT",
                              enrichment_kit=enrichment_kit,
                              is_control=False,
                              failed=False,
                              data=[
                                  {
-                                    "column": "SAPOrderNumber",
-                                    "value": "SAP1000001"
+                                     "column": "SAPOrderNumber",
+                                     "value": "SAP1000001"
                                  }
-                            ]),
+                             ]),
             SequencingSample(sample_id="fake_sample_2",
                              sample_project=None,
                              sample_number=2,
@@ -291,28 +361,36 @@ class Command(BaseCommand):
                              ])
         ]
 
-        sample_sheet = SampleSheet(path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/SampleSheet.csv",
-                                   sequencing_run=sequencing_run,
-                                   file_last_modified=1725941707.0033002,
-                                   hash="f0ac87bcae3f0e56b3f65b70fd6389ce",
-                                   sequencing_samples=sequencing_samples)
+        sample_sheet = SampleSheet(
+            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/SampleSheet.csv",
+            sequencing_run=sequencing_run,
+            file_last_modified=1725941707.0033002,
+            hash="f0ac87bcae3f0e56b3f65b70fd6389ce",
+            sequencing_samples=sequencing_samples)
+
+        sample_sheet_lookup = SampleSheetLookup.from_sample_sheet(sample_sheet)
 
         variant_caller_var_dict = VariantCaller(name="VarDict", version="1.8.2")
-        sample_sheet_combined_vcf_file = SampleSheetCombinedVCFFile(path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/2_variants/Haem_21_001_210216_M02027_0112_000000000_JFT79.vardict.hg38.vcf.gz",
-                                                                    sample_sheet=sample_sheet,
-                                                                    variant_caller=variant_caller_var_dict)
+        sample_sheet_combined_vcf_file = SampleSheetCombinedVCFFile(
+            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/2_variants/Haem_21_001_210216_M02027_0112_000000000_JFT79.vardict.hg38.vcf.gz",
+            sample_sheet_lookup=sample_sheet_lookup,
+            variant_caller=variant_caller_var_dict)
 
         aligner = Aligner(name='BWA', version="0.7.18")
         variant_caller_gatk = VariantCaller(name="GATK", version="4.1.9.0")
-        bam_file_1 = BamFile(path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/1_BAM/fake_sample_1.hg38.bam",
-                             aligner=aligner)
-        vcf_file_1 = VCFFile(path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/2_variants/gatk_per_sample/fake_sample_1.gatk.hg38.vcf.gz",
-                             variant_caller=variant_caller_gatk)
+        bam_file_1 = BamFile(
+            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/1_BAM/fake_sample_1.hg38.bam",
+            aligner=aligner)
+        vcf_file_1 = VCFFile(
+            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/2_variants/gatk_per_sample/fake_sample_1.gatk.hg38.vcf.gz",
+            variant_caller=variant_caller_gatk)
 
-        bam_file_2 = BamFile(path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/1_BAM/fake_sample_2.hg38.bam",
-                             aligner=aligner)
-        vcf_file_2 = VCFFile(path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/2_variants/gatk_per_sample/fake_sample_2.gatk.hg38.vcf.gz",
-                             variant_caller=variant_caller_gatk)
+        bam_file_2 = BamFile(
+            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/1_BAM/fake_sample_2.hg38.bam",
+            aligner=aligner)
+        vcf_file_2 = VCFFile(
+            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/2_variants/gatk_per_sample/fake_sample_2.gatk.hg38.vcf.gz",
+            variant_caller=variant_caller_gatk)
 
         sequencing_files = [
             SequencingFile(sample_name="fake_sample_1",
@@ -327,6 +405,7 @@ class Command(BaseCommand):
                            vcf_file=vcf_file_2)
         ]
 
+        qc_by_sample_name = self._get_qc_by_sample_name(sample_sheet_lookup, sequencing_files)
         gene_list = [
             "TUBA1A",
             "TUBA8",
@@ -336,15 +415,50 @@ class Command(BaseCommand):
             "COL4A1",
             "KIAA1279"
         ]
-        sample_gene_lists = [
-            SampleGeneList(sample_name="fake_sample_1", gene_list=gene_list),
-            SampleGeneList(sample_name="fake_sample_2", gene_list=gene_list)
+        qc_gene_lists = [
+            QCGeneList(
+                path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/0_goi/Haem_21_001_210216_M02027_0112_000000000_JFT79_fake_sample_1.txt",
+                qc=qc_by_sample_name["fake_sample_1"],
+                gene_list=gene_list),
+            QCGeneList(
+                path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/0_goi/Haem_21_001_210216_M02027_0112_000000000_JFT79_fake_sample_2.txt",
+                qc=qc_by_sample_name["fake_sample_2"],
+                gene_list=gene_list)
         ]
-        qc_gene_lists = self._convert_sample_to_qc_gene_lists(sample_sheet, sequencing_files, sample_gene_lists)
 
+        qc_exec_stats = [
+            QCExecStats(
+                qc=qc_by_sample_name["fake_sample_1"],
+                path='/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/4_QC/exec_stats/fake_sample_1_qc_summary.txt',
+                created='2024-10-18T11:45:26.826823+10:30', modified='2024-10-18T11:45:26.826844+10:30', hash='',
+                is_valid=True, deduplicated_reads=165107, indels_dbsnp_percent=95.75, mean_coverage_across_genes=162.84,
+                mean_coverage_across_kit=201.43, median_insert=153.0, number_indels=923, number_snps=363,
+                percent_10x_goi=100.0, percent_20x_goi=100.0, percent_20x_kit=98.35, percent_error_rate=0.91,
+                percent_map_to_diff_chr=0.75, percent_read_enrichment=54.28, percent_reads=3.552, percent_softclip=0.02,
+                percent_duplication=3.42, reads=120760, sample_id_lod=16.6, sex_match='M=yes', snp_dbsnp_percent=96.62,
+                ts_to_tv_ratio=2.1, uniformity_of_coverage=84.69),
+            QCExecStats(
+                qc=qc_by_sample_name["fake_sample_2"],
+                path='/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/4_QC/exec_stats/fake_sample_2_qc_summary.txt',
+                created='2024-10-18T11:45:26.838244+10:30', modified='2024-10-18T11:45:26.838262+10:30', hash='',
+                is_valid=True, deduplicated_reads=275107, indels_dbsnp_percent=88.75, mean_coverage_across_genes=162.84,
+                mean_coverage_across_kit=150.43, median_insert=222.0, number_indels=853, number_snps=1213,
+                percent_10x_goi=100.0, percent_20x_goi=100.0, percent_20x_kit=87.35, percent_error_rate=0.55,
+                percent_map_to_diff_chr=0.75, percent_read_enrichment=55.28, percent_reads=3.32, percent_softclip=0.02,
+                percent_duplication=5.42, reads=410760, sample_id_lod=16.6, sex_match='M=yes', snp_dbsnp_percent=88.62,
+                ts_to_tv_ratio=2.1, uniformity_of_coverage=83.69)
+        ]
 
-        vcf_filename = os.path.join(self.TEST_DATA_DIR, "clinical_hg38", "idt_haem",
-                                    "Haem_21_001_210216_M02027_0112_000000000_JFT79", "2_variants",
+        qc_gene_coverage_list = [
+            QCGeneCoverage(qc=qc_by_sample_name["fake_sample_1"],
+                           path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/4_QC/bam_stats/samples/fake_sample_1.per_gene_coverage.tsv.gz"),
+            QCGeneCoverage(qc=qc_by_sample_name["fake_sample_2"],
+                           path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/4_QC/bam_stats/samples/fake_sample_2.per_gene_coverage.tsv.gz")
+        ]
+
+        gene_coverage_file = os.path.join(self.HAEM_DIR, "4_QC", "bam_stats", "samples",
+                                          "fake_sample_1.per_gene_coverage.tsv.gz")
+        vcf_filename = os.path.join(self.HAEM_DIR, "2_variants",
                                     "Haem_21_001_210216_M02027_0112_000000000_JFT79.vardict.hg38.vcf.gz")
 
         API_STEPS = {
@@ -352,13 +466,16 @@ class Command(BaseCommand):
             "enrichment_kit": lambda: vg_api.create_enrichment_kit(enrichment_kit),
             "sequencing_run": lambda: vg_api.create_sequencing_run(sequencing_run),
             "sample_sheet": lambda: vg_api.create_sample_sheet(sample_sheet),
-            "sample_sheet_combined_vcf_file": lambda: vg_api.create_sample_sheet_combined_vcf_file(sample_sheet_combined_vcf_file),
-            "sequencing_data": lambda: vg_api.create_sequencing_data(sample_sheet, sequencing_files),
+            "sample_sheet_combined_vcf_file": lambda: vg_api.create_sample_sheet_combined_vcf_file(
+                sample_sheet_combined_vcf_file),
+            "sequencing_data": lambda: vg_api.create_sequencing_data(sample_sheet_lookup, sequencing_files),
+            "qc_gene_list": lambda: vg_api.create_qc_gene_list(qc_gene_lists[0]),
             "qc_gene_lists": lambda: vg_api.create_multiple_qc_gene_lists(qc_gene_lists),
-            "qc_exec_summaries": lambda: None,
-            "qc_gene_coverage": lambda: None,
-            "upload_qc_gene_coverage_file": lambda: None,
-            "upload_file": lambda: logging.info("TODO: qc_gene_lists"),
+            "qc_exec_summary": lambda: vg_api.create_qc_exec_stats(qc_exec_stats[0]),
+            "qc_exec_summaries": lambda: vg_api.create_multiple_qc_exec_stats(qc_exec_stats),
+            "qc_gene_coverage": lambda: vg_api.create_multiple_qc_gene_coverage(qc_gene_coverage_list),
+            "upload_qc_gene_coverage_file": lambda: vg_api.upload_file(gene_coverage_file),
+            "upload_vcf_file": lambda: vg_api.upload_file(vcf_filename),
         }
 
         for name, func in API_STEPS.items():
@@ -371,11 +488,19 @@ class Command(BaseCommand):
             print("-" * 50)
 
     @staticmethod
-    def _convert_sample_to_qc_gene_lists(sample_sheet: SampleSheet, sequencing_files: List[SequencingFile],
-                                         sample_gene_lists: List[SampleGeneList]):
-        # Make a lookup
-        # Map into QC objects
-        return []
+    def _get_qc_by_sample_name(sample_sheet_lookup: SampleSheetLookup, sequencing_files: List[SequencingFile]) -> Dict[
+        str, QC]:
+        bam_and_vcf_by_name = {}
+        for sf in sequencing_files:
+            bam_file = dataclasses.replace(sf.bam_file, aligner=None)
+            vcf_file = dataclasses.replace(sf.vcf_file, variant_caller=None)
+            bam_and_vcf_by_name[sf.sample_name] = (bam_file, vcf_file)
 
-
-
+        qc_by_name = {}
+        for sample_name, (bam_file, vcf_file) in bam_and_vcf_by_name.items():
+            sequencing_sample_lookup = SequencingSampleLookup(sample_sheet_lookup=sample_sheet_lookup,
+                                                              sample_name=sample_name)
+            qc_by_name[sample_name] = QC(sequencing_sample_lookup=sequencing_sample_lookup,
+                                         bam_file=bam_file,
+                                         vcf_file=vcf_file)
+        return qc_by_name
