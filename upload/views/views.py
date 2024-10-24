@@ -225,6 +225,14 @@ def view_upload_stats(request):
     return render(request, 'upload/view_upload_stats.html', context)
 
 
+def view_upload_step_detail(request, upload_step_id: int):
+    upload_step = get_object_or_404(UploadStep, pk=upload_step_id)
+    upload_step.upload_pipeline.uploaded_file.check_can_view(request.user)
+    return render_ajax_view(request, 'upload/upload_step.html', {
+        "upload_step": upload_step
+    })
+
+
 def view_upload_pipeline(request, upload_pipeline_id):
     upload_pipeline = get_object_or_404(UploadPipeline, pk=upload_pipeline_id)
     uploaded_file = upload_pipeline.uploaded_file
