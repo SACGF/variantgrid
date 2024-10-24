@@ -73,8 +73,9 @@ def variants_classification_changed(sender, **kwargs):  # pylint: disable=unused
 
     logging.info("variants_classification_changed_signal!! %s, %s", genome_build, variants)
 
-    # Look to see if any of these are in common filter (and not already handled)
-    for cgcfv in CohortGenotypeCommonFilterVersion.objects.filter(genome_build=genome_build):
+    # Look to see if any of these are used in a common filter (and not already handled)
+    for cgcfv in CohortGenotypeCommonFilterVersion.objects.filter(genome_build=genome_build,
+                                                                  cohortgenotypecollection__isnull=False):
         va_qs = VariantAllele.objects.filter(variant__in=variants,
                                              genome_build=genome_build)
         va_qs = va_qs.exclude(variant__commonvariantclassified__common_filter=cgcfv)
