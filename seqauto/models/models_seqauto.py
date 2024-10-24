@@ -41,6 +41,7 @@ from seqauto.qc.exec_summary import load_exec_summary
 from seqauto.qc.fastqc_parser import read_fastqc_data
 from seqauto.qc.flag_stats import load_flagstats
 from seqauto.qc.qc_utils import meta_data_file
+from seqauto.signals.signals_list import sequencing_run_sample_sheet_created_signal
 from snpdb.models import VCF, Sample, GenomeBuild, DataState, InheritanceManager, Wiki
 from snpdb.models.models_enums import ImportStatus, ImportSource
 from variantgrid.celery import app
@@ -114,6 +115,10 @@ class SeqAutoRecord(TimeStampedModel):
     file_last_modified = models.FloatField(default=0.0)
     hash = models.TextField()  # Not used for everything
     is_valid = models.BooleanField(default=False)  # Set in save
+    # data_state was used to create 'expected' objects ie vcfs for bam files
+    # that was then set based on whether the file turned up. If it disappeared it would be set to DELETED
+    # But with API - we assume anything sent to us is COMPLETED
+    # We will probably remove this field in the future as we go API only
     data_state = models.CharField(max_length=1, choices=DataState.choices)
 
     def save(self, force_insert=False, force_update=False, using=None,
@@ -363,6 +368,27 @@ class SampleSheet(SeqAutoRecord):
     def get_version_string(self):
         date = "TODO"
         return f"{self.hash}/{date}"
+
+    def set_as_current_sample_sheet(self, sequencing_run, created=False, seqauto_run=None):
+        if created:
+            sequencing_run_sample_sheet_created_signal.send(sender=os.path.basename(__file__),
+                                                            sample_sheet=self)
+
+        # Make sure SequencingRunCurrentSampleSheet is set to what we found on disk
+        try:
+            # Update existing
+            current_ss = sequencing_run.sequencingruncurrentsamplesheet
+            on_disk_not_current = current_ss.sample_sheet != self
+            if on_disk_not_current:
+                from seqauto.sequencing_files.create_resource_models import current_sample_sheet_changed
+                current_sample_sheet_changed(seqauto_run, current_ss, self)
+
+        except SequencingRunCurrentSampleSheet.DoesNotExist:
+            # Create new
+            current_ss = SequencingRunCurrentSampleSheet.objects.create(sequencing_run=sequencing_run,
+                                                                        sample_sheet=self)
+            logging.info("Created new SequencingRunCurrentSampleSheet: %s", current_ss)
+
 
     def __str__(self):
         return self.path
@@ -927,7 +953,12 @@ class QC(SeqAutoRecord):
 
     @property
     def genome_build(self):
-        return GenomeBuild.legacy_build()
+        try:
+            gb = GenomeBuild.objects.get(vcf__sample__samplefromsequencingsample__sequencing_sample=self.sequencing_sample)
+        except GenomeBuild.DoesNotExist:
+            logging.warning("%s: requested genome build, but don't know (no VCFs linked)", self)
+            gb = GenomeBuild.legacy_build()
+        return gb
 
     def get_params(self):
         return self.vcf_file.get_params()
@@ -996,20 +1027,27 @@ class QCGeneList(SeqAutoRecord):
                                               severity=LogLevel.ERROR)
 
             self.custom_text_gene_list = custom_text_gene_list
-
-        try:
-            # SampleFromSequencingSample is only done after VCF import, so this may not be linked yet.
-            for sfss in self.sequencing_sample.samplefromsequencingsample_set.all():
-                sample = sfss.sample
-                self.create_and_assign_sample_gene_list(sample)  # Also saves
-        except SampleFromSequencingSample.DoesNotExist:
             self.save()
+
+        self.link_samples_if_exist()
+
+    def link_samples_if_exist(self, force_active=False):
+        # SampleFromSequencingSample is only done after VCF import, so this may not be linked yet.
+        for sfss in self.sequencing_sample.samplefromsequencingsample_set.all():
+            sample = sfss.sample
+            self.create_and_assign_sample_gene_list(sample, force_active=force_active)  # Also saves
 
     def create_and_assign_sample_gene_list(self, sample: Sample):
         logging.info("QCGeneList: %d - create_and_assign_sample_gene_list for %s", self.pk, sample)
+        # On create, 'sample_gene_list_created' sets to active gene list
         self.sample_gene_list = SampleGeneList.objects.get_or_create(sample=sample,
                                                                      gene_list=self.custom_text_gene_list.gene_list)[0]
         self.save()
+
+        if force_active:
+            ActiveSampleGeneList.objects.update_or_create(sample=sample,
+                                                          defaults={'sample_gene_list': self.sample_gene_list})
+
 
 
 class QCExecSummary(SeqAutoRecord):

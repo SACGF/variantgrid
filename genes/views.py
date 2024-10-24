@@ -622,7 +622,9 @@ def sample_gene_lists_tab(request, sample_id):
     sample_gene_lists_data = []
     gene_grid_arg_list = []
     for sgl in sample.samplegenelist_set.all():
-        sample_gene_lists_data.append(SampleGeneListSerializer(sgl).data)
+        sgl_serializer = SampleGeneListSerializer(sgl)
+        sgl_serializer.context["request"] = request
+        sample_gene_lists_data.append(sgl_serializer.data)
         gene_grid_arg_list.append(f"gene-list-{sgl.gene_list_id}")
 
     if gene_grid_arg_list:
