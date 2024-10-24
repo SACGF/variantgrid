@@ -1,9 +1,6 @@
-from django.urls import path
-
 from library.django_utils.jqgrid_view import JQGridView
 from upload.grids import UploadStepsGrid, UploadPipelineModifiedVariantsGrid, UploadPipelineSkippedAnnotationGrid
 from upload.views import views
-from upload.views.views import view_upload_step_detail
 from upload.views.views_rest import APIFileUploadView
 from variantgrid.perm_path import perm_path
 
