@@ -20,7 +20,6 @@ from seqauto.views_rest import SequencingRunViewSet, EnrichmentKitViewSet, Seque
     SampleSheetViewSet, IlluminaFlowcellQCViewSet, QCViewSet, QCGeneListViewSet, QCGeneCoverageViewSet, \
     QCExecSummaryViewSet, QCGeneListBulkCreateView, SequencingFilesBulkCreateView, QCExecSummaryBulkCreateView, \
     QCGeneCoverageBulkCreateView
-from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
 
 urlpatterns = [

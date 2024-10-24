@@ -16,7 +16,6 @@ from genes.views import get_coverage_stats
 from library.constants import WEEK_SECS
 from library.utils import defaultdict_to_dict
 import numpy as np
-from seqauto.models import GoldCoverageSummary, EnrichmentKit
 from seqauto.models import GoldCoverageSummary, EnrichmentKit, SequencerModel, Sequencer, Experiment, VariantCaller, \
     SequencingRun, SampleSheet, VCFFile, SampleSheetCombinedVCFFile, FastQC, QCExecSummary, QCGeneCoverage, QCGeneList, \
     QC, IlluminaFlowcellQC

@@ -41,7 +41,7 @@ from seqauto.qc.exec_summary import load_exec_summary
 from seqauto.qc.fastqc_parser import read_fastqc_data
 from seqauto.qc.flag_stats import load_flagstats
 from seqauto.qc.qc_utils import meta_data_file
-from seqauto.signals.signals_list import sequencing_run_sample_sheet_created_signal
+from seqauto.signals import sequencing_run_sample_sheet_created_signal
 from snpdb.models import VCF, Sample, GenomeBuild, DataState, InheritanceManager, Wiki
 from snpdb.models.models_enums import ImportStatus, ImportSource
 from variantgrid.celery import app
