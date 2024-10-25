@@ -9,7 +9,6 @@ from library.file_utils import name_from_filename
 from library.log_utils import log_traceback
 import pandas as pd
 from snpdb.models import Sample, GenomeBuild, DataState, ImportSource
-from library.utils.file_utils import name_from_filename
 from upload.models import UploadedGeneCoverage
 from upload.tasks.import_task import ImportTask
 from variantgrid.celery import app
