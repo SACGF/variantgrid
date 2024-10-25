@@ -131,7 +131,7 @@ class SequencingRunSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SequencingRun
-        fields = ("name", "date", "sequencer", "gold_standard", "bad", "hidden", "experiment", "enrichment_kit", "has_basecalls", "has_interop")
+        fields = ("path", "name", "date", "sequencer", "gold_standard", "bad", "hidden", "experiment", "enrichment_kit", "has_basecalls", "has_interop")
 
     def create(self, validated_data):
         name = validated_data.get('name')
