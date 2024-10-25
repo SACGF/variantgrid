@@ -304,7 +304,8 @@ def create_backend_vcf_links(uploaded_vcf):
 
     backend_vcf = None
     uploaded_file = uploaded_vcf.uploaded_file
-    sequencing_vcf_sources = {ImportSource.SEQAUTO, ImportSource.API}
+    # APIFileUploadView comes through as WEB_UPLOAD
+    sequencing_vcf_sources = {ImportSource.SEQAUTO, ImportSource.WEB_UPLOAD}
     if uploaded_file.path and uploaded_file.import_source in sequencing_vcf_sources:
         path = uploaded_file.path
         if path:
