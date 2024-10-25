@@ -308,7 +308,7 @@ class Command(BaseCommand):
     """
     TEST_DATA_DIR = os.path.join(settings.BASE_DIR, 'seqauto', 'test_data')
     HAEM_DIR = os.path.join(TEST_DATA_DIR, "clinical_hg38", "idt_haem",
-                            "Haem_21_001_210216_M02027_0112_000000000_JFT79")
+                            "Haem_20_999_201231_M02027_0112_000000000_JFT79")
 
     def add_arguments(self, parser):
         parser.add_argument('--token', help="API token (create via drf_user_api_token)")
@@ -322,10 +322,10 @@ class Command(BaseCommand):
 
         vg_api = VariantGridAPI(server, api_token)
 
-        experiment = "HAEM_21_001"
+        experiment = "HAEM_20_999"
         enrichment_kit = EnrichmentKit(name='idt_haem', version=1)
-        sequencing_run = SequencingRun(name="Haem_21_001_210216_M02027_0112_000000000_JFT79",
-                                       date="2021-02-16",
+        sequencing_run = SequencingRun(name="Haem_20_999_201231_M02027_0112_000000000_JFT79",
+                                       date="2020-12-31",
                                        sequencer="SN1101",
                                        experiment=experiment,
                                        enrichment_kit=enrichment_kit)
@@ -362,7 +362,7 @@ class Command(BaseCommand):
         ]
 
         sample_sheet = SampleSheet(
-            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/SampleSheet.csv",
+            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/SampleSheet.csv",
             sequencing_run=sequencing_run,
             file_last_modified=1725941707.0033002,
             hash="f0ac87bcae3f0e56b3f65b70fd6389ce",
@@ -372,35 +372,35 @@ class Command(BaseCommand):
 
         variant_caller_var_dict = VariantCaller(name="VarDict", version="1.8.2")
         sample_sheet_combined_vcf_file = SampleSheetCombinedVCFFile(
-            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/2_variants/Haem_21_001_210216_M02027_0112_000000000_JFT79.vardict.hg38.vcf.gz",
+            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/2_variants/Haem_20_999_201231_M02027_0112_000000000_JFT79.vardict.hg38.vcf.gz",
             sample_sheet_lookup=sample_sheet_lookup,
             variant_caller=variant_caller_var_dict)
 
         aligner = Aligner(name='BWA', version="0.7.18")
         variant_caller_gatk = VariantCaller(name="GATK", version="4.1.9.0")
         bam_file_1 = BamFile(
-            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/1_BAM/fake_sample_1.hg38.bam",
+            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/1_BAM/fake_sample_1.hg38.bam",
             aligner=aligner)
         vcf_file_1 = VCFFile(
-            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/2_variants/gatk_per_sample/fake_sample_1.gatk.hg38.vcf.gz",
+            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/2_variants/gatk_per_sample/fake_sample_1.gatk.hg38.vcf.gz",
             variant_caller=variant_caller_gatk)
 
         bam_file_2 = BamFile(
-            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/1_BAM/fake_sample_2.hg38.bam",
+            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/1_BAM/fake_sample_2.hg38.bam",
             aligner=aligner)
         vcf_file_2 = VCFFile(
-            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/2_variants/gatk_per_sample/fake_sample_2.gatk.hg38.vcf.gz",
+            path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/2_variants/gatk_per_sample/fake_sample_2.gatk.hg38.vcf.gz",
             variant_caller=variant_caller_gatk)
 
         sequencing_files = [
             SequencingFile(sample_name="fake_sample_1",
-                           fastq_r1="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/0_fastq/fake_sample_1_R1.fastq.gz",
-                           fastq_r2="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/0_fastq/fake_sample_1_R2.fastq.gz",
+                           fastq_r1="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/0_fastq/fake_sample_1_R1.fastq.gz",
+                           fastq_r2="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/0_fastq/fake_sample_1_R2.fastq.gz",
                            bam_file=bam_file_1,
                            vcf_file=vcf_file_1),
             SequencingFile(sample_name="fake_sample_2",
-                           fastq_r1="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/0_fastq/fake_sample_2_R1.fastq.gz",
-                           fastq_r2="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/0_fastq/fake_sample_2_R1.fastq.gz",
+                           fastq_r1="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/0_fastq/fake_sample_2_R1.fastq.gz",
+                           fastq_r2="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/0_fastq/fake_sample_2_R1.fastq.gz",
                            bam_file=bam_file_2,
                            vcf_file=vcf_file_2)
         ]
@@ -417,11 +417,11 @@ class Command(BaseCommand):
         ]
         qc_gene_lists = [
             QCGeneList(
-                path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/0_goi/Haem_21_001_210216_M02027_0112_000000000_JFT79_fake_sample_1.txt",
+                path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/0_goi/Haem_20_999_201231_M02027_0112_000000000_JFT79_fake_sample_1.txt",
                 qc=qc_by_sample_name["fake_sample_1"],
                 gene_list=gene_list),
             QCGeneList(
-                path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/0_goi/Haem_21_001_210216_M02027_0112_000000000_JFT79_fake_sample_2.txt",
+                path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/0_goi/Haem_20_999_201231_M02027_0112_000000000_JFT79_fake_sample_2.txt",
                 qc=qc_by_sample_name["fake_sample_2"],
                 gene_list=gene_list)
         ]
@@ -429,7 +429,7 @@ class Command(BaseCommand):
         qc_exec_stats = [
             QCExecStats(
                 qc=qc_by_sample_name["fake_sample_1"],
-                path='/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/4_QC/exec_stats/fake_sample_1_qc_summary.txt',
+                path='/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/4_QC/exec_stats/fake_sample_1_qc_summary.txt',
                 created='2024-10-18T11:45:26.826823+10:30', modified='2024-10-18T11:45:26.826844+10:30', hash='',
                 is_valid=True, deduplicated_reads=165107, indels_dbsnp_percent=95.75, mean_coverage_across_genes=162.84,
                 mean_coverage_across_kit=201.43, median_insert=153.0, number_indels=923, number_snps=363,
@@ -439,7 +439,7 @@ class Command(BaseCommand):
                 ts_to_tv_ratio=2.1, uniformity_of_coverage=84.69),
             QCExecStats(
                 qc=qc_by_sample_name["fake_sample_2"],
-                path='/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/4_QC/exec_stats/fake_sample_2_qc_summary.txt',
+                path='/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/4_QC/exec_stats/fake_sample_2_qc_summary.txt',
                 created='2024-10-18T11:45:26.838244+10:30', modified='2024-10-18T11:45:26.838262+10:30', hash='',
                 is_valid=True, deduplicated_reads=275107, indels_dbsnp_percent=88.75, mean_coverage_across_genes=162.84,
                 mean_coverage_across_kit=150.43, median_insert=222.0, number_indels=853, number_snps=1213,
@@ -451,15 +451,15 @@ class Command(BaseCommand):
 
         qc_gene_coverage_list = [
             QCGeneCoverage(qc=qc_by_sample_name["fake_sample_1"],
-                           path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/4_QC/bam_stats/samples/fake_sample_1.per_gene_coverage.tsv.gz"),
+                           path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/4_QC/bam_stats/samples/fake_sample_1.per_gene_coverage.tsv.gz"),
             QCGeneCoverage(qc=qc_by_sample_name["fake_sample_2"],
-                           path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/4_QC/bam_stats/samples/fake_sample_2.per_gene_coverage.tsv.gz")
+                           path="/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/4_QC/bam_stats/samples/fake_sample_2.per_gene_coverage.tsv.gz")
         ]
 
         gene_coverage_file = os.path.join(self.HAEM_DIR, "4_QC", "bam_stats", "samples",
                                           "fake_sample_1.per_gene_coverage.tsv.gz")
         vcf_filename = os.path.join(self.HAEM_DIR, "2_variants",
-                                    "Haem_21_001_210216_M02027_0112_000000000_JFT79.vardict.hg38.vcf.gz")
+                                    "Haem_20_999_201231_M02027_0112_000000000_JFT79.vardict.hg38.vcf.gz")
 
         API_STEPS = {
             "experiment": lambda: vg_api.create_experiment(experiment),
