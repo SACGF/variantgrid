@@ -23,6 +23,7 @@ class EnrichmentKit:
 @dataclass_json
 @dataclass
 class SequencingRun:
+    path: str
     name: str
     date: date
     sequencer: str
@@ -324,7 +325,8 @@ class Command(BaseCommand):
 
         experiment = "HAEM_20_999"
         enrichment_kit = EnrichmentKit(name='idt_haem', version=1)
-        sequencing_run = SequencingRun(name="Haem_20_999_201231_M02027_0112_000000000_JFT79",
+        sequencing_run = SequencingRun(path=self.HAEM_DIR,
+                                       name="Haem_20_999_201231_M02027_0112_000000000_JFT79",
                                        date="2020-12-31",
                                        sequencer="SN1101",
                                        experiment=experiment,
