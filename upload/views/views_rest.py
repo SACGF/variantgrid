@@ -1,3 +1,4 @@
+import logging
 from http import HTTPStatus
 
 from django.http import JsonResponse
@@ -21,4 +22,5 @@ class APIFileUploadView(APIView):
             uploaded_file = handle_file_upload(request.user, django_uploaded_file, path=path)
             return JsonResponse({"uploaded_file_id": uploaded_file.pk})
         except Exception as e:
+            logging.error(e)
             return JsonResponse({"error": str(e)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
