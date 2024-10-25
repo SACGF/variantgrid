@@ -12,6 +12,8 @@ from dataclasses_json import dataclass_json, config
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
+from library.utils import file_md5sum
+
 
 @dataclass_json
 @dataclass
@@ -199,12 +201,13 @@ class VariantGridAPI:
         logging.info("url='%s', JSON data:", url)
         logging.info(json.dumps(json_data))
         response = requests.post(url, headers=self.headers, json=json_data)
-        if not response.ok:
-            response.raise_for_status()
         try:
             json_response = response.json()
         except Exception as e:
             json_response = f"Couldn't convert JSON: {e}"
+        logging.info("Response: %s", json_response)
+        if not response.ok:
+            response.raise_for_status()
         return json_response
 
     def create_experiment(self, experiment: str):
@@ -428,11 +431,14 @@ class Command(BaseCommand):
                 gene_list=gene_list)
         ]
 
+        qc_exec_stats_filename_1 = '/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/4_QC/exec_stats/fake_sample_1_qc_summary.txt'
+        qc_exec_stats_filename_2 = '/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/4_QC/exec_stats/fake_sample_2_qc_summary.txt'
+
         qc_exec_stats = [
             QCExecStats(
                 qc=qc_by_sample_name["fake_sample_1"],
-                path='/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/4_QC/exec_stats/fake_sample_1_qc_summary.txt',
-                created='2024-10-18T11:45:26.826823+10:30', modified='2024-10-18T11:45:26.826844+10:30', hash='',
+                path=qc_exec_stats_filename_1, hash=file_md5sum(qc_exec_stats_filename_1),
+                created='2024-10-18T11:45:26.826823+10:30', modified='2024-10-18T11:45:26.826844+10:30',
                 is_valid=True, deduplicated_reads=165107, indels_dbsnp_percent=95.75, mean_coverage_across_genes=162.84,
                 mean_coverage_across_kit=201.43, median_insert=153.0, number_indels=923, number_snps=363,
                 percent_10x_goi=100.0, percent_20x_goi=100.0, percent_20x_kit=98.35, percent_error_rate=0.91,
@@ -441,8 +447,8 @@ class Command(BaseCommand):
                 ts_to_tv_ratio=2.1, uniformity_of_coverage=84.69),
             QCExecStats(
                 qc=qc_by_sample_name["fake_sample_2"],
-                path='/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_20_999_201231_M02027_0112_000000000_JFT79/4_QC/exec_stats/fake_sample_2_qc_summary.txt',
-                created='2024-10-18T11:45:26.838244+10:30', modified='2024-10-18T11:45:26.838262+10:30', hash='',
+                path=qc_exec_stats_filename_2, hash=file_md5sum(qc_exec_stats_filename_2),
+                created='2024-10-18T11:45:26.838244+10:30', modified='2024-10-18T11:45:26.838262+10:30',
                 is_valid=True, deduplicated_reads=275107, indels_dbsnp_percent=88.75, mean_coverage_across_genes=162.84,
                 mean_coverage_across_kit=150.43, median_insert=222.0, number_indels=853, number_snps=1213,
                 percent_10x_goi=100.0, percent_20x_goi=100.0, percent_20x_kit=87.35, percent_error_rate=0.55,
