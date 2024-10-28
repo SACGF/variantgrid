@@ -33,11 +33,11 @@ class Command(BaseCommand):
                 # new ID should exclude transcript version and gene symbol
                 # only include genome_build if it's not GRCh38
 
-                parts = []
-                if genome_build != GenomeBuild.grch38():
-                    parts.append(genome_build.name)
-                parts.append(c_hgvs.transcript_parts.identifier)
-                parts.append(c_hgvs.c_dot)
+                parts = [
+                    genome_build.name,
+                    c_hgvs.transcript_parts.identifier,
+                    c_hgvs.c_do
+                ]
 
                 record_id = "_".join(parts)
                 record_id = record_id.replace('*', 'x')
@@ -66,7 +66,7 @@ class Command(BaseCommand):
                 print("Can't update records due to ID Clash")
             else:
                 Classification.objects.bulk_update(pending_changes, fields=["lab_record_id"])
-            
+
 
 # rematching
 """
