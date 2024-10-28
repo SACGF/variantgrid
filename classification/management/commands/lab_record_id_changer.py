@@ -36,7 +36,7 @@ class Command(BaseCommand):
                 parts = [
                     genome_build.name,
                     c_hgvs.transcript_parts.identifier,
-                    c_hgvs.c_do
+                    c_hgvs.c_dot
                 ]
 
                 record_id = "_".join(parts)
