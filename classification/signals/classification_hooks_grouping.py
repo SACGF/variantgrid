@@ -36,7 +36,6 @@ def published(sender,
               previous_share_level: ShareLevel,
               user: User,
               debug_timer: DebugTimer,
-              source: SubmissionSource,
               **kwargs):  # pylint: disable=unused-argument
     # CLASSIFICATION PUBLISHED
     # we call assign_grouping_for_classification as we might have a new allele origin,
