@@ -44,6 +44,13 @@ class ClassificationLab(ExportRow):
     def record_count(self):
         return len(self.cms)
 
+    @export_column("Lab Record ID")
+    def lab_record_id(self):
+        if len(self.cms) <= 5:
+            return ", ".join(cms.classification.lab_record_id for cms in self.cms)
+        else:
+            return "multiple"
+
     @export_column("c.HGVSs")
     def c_hgvs(self):
         return self.list_of(SpecialEKeys.C_HGVS)
