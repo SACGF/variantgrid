@@ -131,7 +131,7 @@ class SequencingRunSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SequencingRun
-        fields = ("name", "date", "sequencer", "gold_standard", "bad", "hidden", "experiment", "enrichment_kit", "has_basecalls", "has_interop")
+        fields = ("path", "name", "date", "sequencer", "gold_standard", "bad", "hidden", "experiment", "enrichment_kit", "has_basecalls", "has_interop")
 
     def create(self, validated_data):
         name = validated_data.get('name')
@@ -201,6 +201,9 @@ class SampleSheetSerializer(serializers.ModelSerializer):
     @staticmethod
     def _create_sequencing_samples(sample_sheet, sequencing_samples_data):
         for sample_data in sequencing_samples_data:
+            if not sample_data.get("sample_name"):
+                sample_data["sample_name"] = sample_data["sample_id"]
+
             ss_data = sample_data.pop('sequencingsampledata_set', [])
             if ek_data := sample_data.pop("enrichment_kit", None):
                 enrichment_kit = EnrichmentKitSerializer.get_from_data(ek_data)
