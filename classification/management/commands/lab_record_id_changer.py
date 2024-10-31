@@ -16,6 +16,9 @@ class Command(BaseCommand):
         parser.add_argument('--commit', action='store_true')
 
     def handle(self, *args, **options):
+
+        re_nucleotides = re.compile(r"(.*(?:del|dup))[ATCG]*$")
+
         lab = Lab.objects.get(pk=options['lab_id'])
         new_id_count = defaultdict(int)
         old_to_new = {}
@@ -33,10 +36,15 @@ class Command(BaseCommand):
                 # new ID should exclude transcript version and gene symbol
                 # only include genome_build if it's not GRCh38
 
+                c_dot_normal = c_hgvs.c_dot
+                if m := re_nucleotides.match(c_dot_normal):
+                    c_dot_normal = m.group(1)
+                c_dot_normal = c_dot_normal.replace("c.-", "c_minus")
+
                 parts = [
                     genome_build.name,
                     c_hgvs.transcript_parts.identifier,
-                    c_hgvs.c_dot
+                    c_dot_normal
                 ]
 
                 record_id = "_".join(parts)
@@ -66,29 +74,3 @@ class Command(BaseCommand):
                 print("Can't update records due to ID Clash")
             else:
                 Classification.objects.bulk_update(pending_changes, fields=["lab_record_id"])
-
-
-# rematching
-"""
-all_groups = []
-next_group = None
-for pending in ImportedAlleleInfo.objects.filter(status="P").iterator():
-    if next_group is None or len(next_group) >= 100:
-        next_group = []
-        all_groups.append(next_group)
-    next_group.append(pending)
-
-index = 0
-for group in all_groups:
-    index += 1
-    for allele_info in group:
-        allele_info.update_variant_coordinate()
-        allele_info.refresh_and_save(force_update=True)
-        allele_info.classification_import = None
-        allele_info.status = ImportedAlleleInfoStatus.PROCESSING
-        allele_info.save()
-
-    print(f"Group {index} of {len(all_groups)}")
-    rematched = reattempt_variant_matching(admin_bot(), ImportedAlleleInfo.objects.filter(pk__in=[ai.pk for ai in group]), False)
-    print(f"rematched {rematched}")
-"""
