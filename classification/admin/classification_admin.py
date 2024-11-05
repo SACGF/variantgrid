@@ -553,7 +553,7 @@ class EvidenceKeyAdmin(ModelAdminBasics):
     list_per_page = 500
     list_filter = (EvidenceKeySectionFilter, MaxShareLevelFilter)
     ordering = ('key',)
-    list_display = ('key', 'label', 'value_type', 'max_share_level', 'evidence_category', 'order')
+    list_display = ('key', 'label', 'value_type', 'max_share_level', 'evidence_category', 'order', 'created_detailed', 'modified_detailed')
     search_fields = ('key', 'label')
 
     fieldsets = (
@@ -563,8 +563,17 @@ class EvidenceKeyAdmin(ModelAdminBasics):
                              'crit_allows_override_strengths', 'crit_uses_points')}),
         ('Overrides', {'fields': ('namespace_overrides',)}),
         ('Help', {'fields': ('description', 'examples', 'see')}),
-        ('Admin', {'fields': ('max_share_level', 'copy_consensus', 'variantgrid_column', 'immutable')})
+        ('Admin', {'fields': ('max_share_level', 'copy_consensus', 'variantgrid_column', 'immutable')}),
+        ('History', {'fields': ('created', 'modified')})
     )
+
+    @admin_list_column(short_description="Created", order_field="created")
+    def created_detailed(self, obj: ClassificationImportRun):
+        return self.format_datetime_seconds(obj.created)
+
+    @admin_list_column(short_description="Modified", order_field="modified")
+    def modified_detailed(self, obj: ClassificationImportRun):
+        return self.format_datetime_seconds(obj.modified)
 
     @admin_action("Validate key")
     def validate(self, request, queryset):
