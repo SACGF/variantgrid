@@ -119,18 +119,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         return response
 
     def get_initial_queryset(self) -> QuerySet[DC]:
-        # TODO, consider making the groups GuardianPermission rather than this manual security check
-        base_qs = ClassificationGrouping.objects.all()
-        if not self.user.is_superuser:
-            permission_q: list[Q] = []
-            # super user can see everyone
-            labs = Lab.valid_labs_qs(self.user, admin_check=False)
-            orgs = {lab.organization for lab in labs}
-            permission_q.append(Q(share_level=ShareLevel.LAB) & Q(lab__in=labs))
-            permission_q.append(Q(share_level=ShareLevel.INSTITUTION) & Q(lab__organization__in=orgs))
-            permission_q.append(Q(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS))
-            base_qs = base_qs.filter(reduce(operator.or_, permission_q))
-        return base_qs
+        return ClassificationGrouping.filter_for_user(self.user, ClassificationGrouping.objects.all())
 
     def filter_queryset(self, qs: QuerySet[ClassificationGrouping]) -> QuerySet[ClassificationGrouping]:
         filters: List[Q] = []

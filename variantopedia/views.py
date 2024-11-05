@@ -21,6 +21,7 @@ from analysis.models import VariantTag
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, \
     VariantAnnotationVersion, VariantAnnotation, AnnotationStatus
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
+from classification.models import ClassificationGrouping, AlleleOriginGrouping
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.variant_card import AlleleCard
 from classification.views.exports import ClassificationExportFormatterCSV
@@ -477,7 +478,18 @@ def view_allele(request, allele_id: int):
     allele: Allele = get_object_or_404(Allele, pk=allele_id)
     link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
 
+    # Filter on classification grouping first, so we can find all unique AlleleGroupings
+    # that the user has access to
+    aog_qs = AlleleOriginGrouping.objects.filter(pk__in=\
+        ClassificationGrouping.filter_for_user(
+            request.user,
+            ClassificationGrouping.objects.filter(allele_origin_grouping__allele_grouping__allele=allele_id)
+        ).values_list("allele_origin_grouping")
+    )
+    aogs = list(sorted(aog_qs.all()))
+
     context = {
+        "allele_origin_groupings": aogs,
         "allele_card": AlleleCard(user=request.user, allele=allele),
         "allele": allele,
         "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True'

@@ -266,6 +266,18 @@
             data.allele_id = {{ allele.pk }};
         }
     </script>
+    {% for allele_origin_grouping in allele_origin_groupings %}
+        <div>
+            <div class="hover-link" href="{% url 'classification_diff' %}?allele_origin_grouping={{ allele_origin_grouping.pk }}">
+                <span class="allele-origin-box horizontal allele-origin-{{ allele_origin_grouping.allele_origin_bucket }}">
+                    <div class="allele-origin-text">
+                        {{ allele_origin_grouping.get_allele_origin_bucket_display }}
+                    </div>
+                </span>
+                Show Diffs
+            </div>
+        </div>
+    {% endfor %}
     {% classification_groupings %}
 
     <div class="mt-4">

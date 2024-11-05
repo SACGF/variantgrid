@@ -498,6 +498,15 @@ def view_classification_diff(request):
         compare_all.sort(key=lambda cm: cm.curated_date_check, reverse=True)
         records = compare_all
 
+    elif allele_origin_grouping_str := request.GET.get("allele_origin_grouping"):
+        allele_origin_grouping = AlleleOriginGrouping.objects.get(pk=int(allele_origin_grouping_str))
+        record_qs = ClassificationGrouping.objects.filter(allele_origin_grouping=allele_origin_grouping)
+        record_qs = ClassificationGrouping.filter_for_user(user=request.user, qs=record_qs)
+        record_ids = record_qs.values_list(
+            "latest_classification_modification", flat=True
+        )
+        records = ClassificationModification.objects.filter(pk__in=record_ids)
+
     elif cids := request.GET.get('cids'):
         records = [ClassificationModification.latest_for_user(user=request.user, classification=cid, published=True).first() for cid in [cid.strip() for cid in cids.split(',')]]
 

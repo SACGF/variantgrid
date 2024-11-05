@@ -1,11 +1,12 @@
 import operator
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
-from typing import Optional, Set
+from typing import Optional, Set, Self
 
 import django
+from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
-from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q
+from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, QuerySet
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
@@ -106,6 +107,11 @@ class AlleleOriginGrouping(TimeStampedModel):
     # classification_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
     # somatic_clinical_significance_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
 
+    def __lt__(self, other: Self):
+        if id_diff := self.allele_grouping.pk - other.allele_grouping.pk:
+            return id_diff
+        return self.allele_origin_bucket < other.allele_origin_bucket
+
     def get_absolute_url(self) -> str:
         return reverse('allele_grouping_detail', kwargs={"allele_grouping_id": self.allele_grouping_id})
 
@@ -204,6 +210,20 @@ class ClassificationGrouping(TimeStampedModel):
     @property
     def share_level_obj(self):
         return ShareLevel(self.share_level)
+
+    @staticmethod
+    def filter_for_user(user: User, qs: QuerySet[Self]) -> QuerySet[Self]:
+        # TODO, consider making the groups GuardianPermission rather than this manual security check
+        if not user.is_superuser:
+            permission_q: list[Q] = []
+            labs = Lab.valid_labs_qs(user, admin_check=True).select_related("organization")
+            orgs = {lab.organization for lab in labs}
+            permission_q.append(Q(share_level=ShareLevel.LAB) & Q(lab__in=labs))
+            permission_q.append(Q(share_level=ShareLevel.INSTITUTION) & Q(lab__organization__in=orgs))
+            permission_q.append(Q(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS))
+            return qs.filter(reduce(operator.or_, permission_q))
+        else:
+            return qs
 
     classification_count = models.IntegerField(default=0)
     pathogenic_difference = models.IntegerField(choices=ClassificationGroupingPathogenicDifference.choices, default=ClassificationGroupingPathogenicDifference.NO_DIFF)
