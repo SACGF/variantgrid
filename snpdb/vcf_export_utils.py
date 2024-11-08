@@ -15,6 +15,10 @@ def get_vcf_header_lines(top_lines=None, info_dict=None, formats=None, contig_li
             data['id'] = info_id
             if data.get("number") is None:
                 data["number"] = 1
+            if description := data.get("description"):
+                # Using double quotes so need to change to singles inside
+                data["description"] = description.replace('"', "'")
+
             line_template = '##INFO=<ID=%(id)s,Number=%(number)s,Type=%(type)s,Description="%(description)s">'
             line = line_template % data
             header_lines.append(line)
