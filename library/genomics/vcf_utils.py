@@ -161,6 +161,10 @@ def get_contigs_header_lines(genome_build, standard_only=True, use_accession=Tru
     if contig_allow_list:
         logging.info("Writing contigs header for contigs: %s", contig_allow_list)
 
+    reference_lines = [
+        f"##reference={genome_build.name}>"
+    ]
+
     contigs = []
     for contig in contig_qs:
         if use_accession:
@@ -171,7 +175,8 @@ def get_contigs_header_lines(genome_build, standard_only=True, use_accession=Tru
             if contig_name not in contig_allow_list:
                 continue
         contigs.append((contig_name, contig.length, genome_build.name))
-    return get_vcf_header_contig_lines(contigs)
+    contig_lines = get_vcf_header_contig_lines(contigs)
+    return reference_lines + contig_lines
 
 
 def write_cleaned_vcf_header(genome_build, source_vcf_filename: str, output_filename: str,
