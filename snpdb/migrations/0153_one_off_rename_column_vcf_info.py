@@ -12,6 +12,12 @@ def _one_off_rename_column_vcf_info(apps, _schema_editor):
         cvi.info_id = cvi.info_id.strip()
         cvi.save()
 
+def _one_off_add_description(apps, _schema_editor):
+    ColumnVCFInfo = apps.get_model('snpdb', 'ColumnVCFInfo')
+    for cvi in ColumnVCFInfo.objects.filter(description=''):
+        cvi.description = cvi.column.description
+        cvi.save()
+
 
 class Migration(migrations.Migration):
 
@@ -20,5 +26,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(_one_off_rename_column_vcf_info)
+        migrations.RunPython(_one_off_rename_column_vcf_info),
+        migrations.RunPython(_one_off_add_description),
     ]
