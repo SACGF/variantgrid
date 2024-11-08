@@ -1,4 +1,5 @@
 import logging
+import mimetypes
 import sys
 
 from django.apps import AppConfig
@@ -53,3 +54,6 @@ class SnpdbConfig(AppConfig):
 
         if sys.version_info < (3, 10):
             raise SystemExit("VariantGrid requires Python 3.10 or later.")
+
+        # So static serve of MEDIA_ROOT just prompts to download VCF (used to rename to vcf.vcf)
+        mimetypes.add_type("application/octet-stream", ".vcf", strict=True)
