@@ -20,7 +20,7 @@ def _new_columns_clinvar_conflicting_clinical_significance(apps, _schema_editor)
     ]
 
     NEW_COLUMN_VCF_INFO = [
-        {'info_id': ' CLNSIGCONF',
+        {'info_id': 'CLNSIGCONF',
          'column_id': 'conflicting_clinical_significance',
          'number': None,
          'type': 'S',
