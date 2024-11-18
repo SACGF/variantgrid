@@ -412,6 +412,9 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
     def cohortgenotype_alias(self):
         return f"cohortgenotype_{self.pk}"
 
+    def get_packed_column_alias(self, column) -> str:
+        return f"{self.cohortgenotype_alias}_packed_{column}"
+
     def get_partition_table(self, base_table_name=None):
         if base_table_name == "common":
             partition_table = self.common_collection.get_partition_table()
@@ -540,6 +543,7 @@ class SampleGenotype:
 class CohortGenotype(models.Model):
     """ Genotype information for multiple samples in a single database row. """
     MISSING_NUMBER_VALUE = -1
+    MISSING_FT_VALUE = "NULL"  # This can't be '.' as that could be a code....
 
     COLUMN_IS_ARRAY_EMPTY_VALUE = {
         "samples_zygosity": (False, "."),
@@ -548,7 +552,7 @@ class CohortGenotype(models.Model):
         "samples_read_depth": (True, MISSING_NUMBER_VALUE),
         "samples_genotype_quality": (True, MISSING_NUMBER_VALUE),
         "samples_phred_likelihood": (True, MISSING_NUMBER_VALUE),
-        "samples_filters": (True, "NULL"),
+        "samples_filters": (True, MISSING_FT_VALUE),
     }
 
     collection = models.ForeignKey(CohortGenotypeCollection, on_delete=CASCADE)

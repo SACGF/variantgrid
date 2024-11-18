@@ -165,7 +165,9 @@ class VariantGrid(AbstractVariantGrid):
         """ A function to capture loop variable """
 
         def packed_data_formatter(row, _field):
-            packed_data = row[f"packed_{column}"]
+            cgc = sample.vcf.cohort.cohort_genotype_collection
+            packed_column = cgc.get_packed_column_alias(column)
+            packed_data = row[packed_column]
             val = packed_data[i]
             return packed_data_replace.get(val, val)
 
@@ -205,23 +207,21 @@ class VariantGrid(AbstractVariantGrid):
         packed_data_replace = dict(Zygosity.CHOICES)
         # Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for
         # empty values (what CyVCF2 returns using format()) @see https://github.com/SACGF/variantgrid/issues/59
-        MISSING_VALUES = [CohortGenotype.MISSING_NUMBER_VALUE, -2147483648]
+        MISSING_VALUES = [CohortGenotype.MISSING_NUMBER_VALUE, CohortGenotype.MISSING_FT_VALUE, -2147483648]
         packed_data_replace.update({mv: VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE for mv in MISSING_VALUES})
 
-        # Record the 1st cohort a sample appears in, and the concatenated cohorts index
-        sample_cohort_cat_cohorts_index = {}
-        cohorts_offset = 0
+        # We now have separate aliases for packed data, so each cohort handled separately
+        sample_cohort_index = {}
         for cohort in cohorts:
             for cohort_sample in cohort.get_cohort_samples():  # orders by sort_order
                 sample = cohort_sample.sample
-                if visibility.get(sample) and sample not in sample_cohort_cat_cohorts_index:
-                    cc_index = cohorts_offset + cohort_sample.cohort_genotype_packed_field_index
-                    sample_cohort_cat_cohorts_index[sample] = (cohort, cc_index)
-            cohorts_offset += cohort.cohort_genotype_collection.num_samples
+                if visibility.get(sample) and sample not in sample_cohort_index:
+                    cohort_index = cohort_sample.cohort_genotype_packed_field_index
+                    sample_cohort_index[sample] = (cohort, cohort_index)
 
         column_names = []
         column_data = []
-        for sample, (cohort, cc_index) in sample_cohort_cat_cohorts_index.items():
+        for sample, (cohort, cohort_index) in sample_cohort_index.items():
             for column, (column_label, label_format, width) in sample_columns.items():
                 if not available_format_columns[column]:
                     continue
@@ -229,7 +229,7 @@ class VariantGrid(AbstractVariantGrid):
                 label = label_format % {"sample": sample.name, "label": column_label}
                 server_side_formatter = VariantGrid._get_sample_columns_server_side_formatter(sample,
                                                                                               packed_data_replace,
-                                                                                              column, cc_index,
+                                                                                              column, cohort_index,
                                                                                               af_show_in_percent)
                 cgc = cohort.cohort_genotype_collection
                 sql_index = cgc.get_sql_index_for_sample_id(sample.pk)
