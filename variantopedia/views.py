@@ -5,10 +5,11 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import reduce
-from typing import Any
+from typing import Any, Optional
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.models import User
 from django.db import connection
 from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404, render, redirect
@@ -21,7 +22,8 @@ from analysis.models import VariantTag
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, \
     VariantAnnotationVersion, VariantAnnotation, AnnotationStatus
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
-from classification.models import ClassificationGrouping, AlleleOriginGrouping
+from classification.enums import AlleleOriginBucket, ShareLevel
+from classification.models import ClassificationGrouping, AlleleOriginGrouping, DiscordanceReport
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.variant_card import AlleleCard
 from classification.views.exports import ClassificationExportFormatterCSV
@@ -474,6 +476,42 @@ def view_allele_from_variant(request, variant_id):
     return redirect(reverse('view_variant', kwargs={"variant_id": variant_id}))
 
 
+@dataclass
+class ShareLevelRecordCounts:
+    lab_count: int
+    # record_count: int
+
+
+@dataclass
+class AlleleOriginGroupingDescription:
+    allele_origin_grouping: AlleleOriginGrouping
+    discordance_report: Optional[DiscordanceReport]
+    shared_counts: int
+    unshared_counts: int
+
+    @staticmethod
+    def describe(allele_origin_grouping: AlleleOriginGrouping, for_user: User) -> 'AlleleOriginGroupingDescription':
+        discordance_report: Optional[DiscordanceReport] = None
+
+        allele = allele_origin_grouping.allele_grouping.allele
+        if allele_origin_grouping.allele_origin_bucket == AlleleOriginBucket.GERMLINE:
+            for cc in allele.clinicalcontext_set.all():
+                if dr := DiscordanceReport.latest_report(cc):
+                    if dr.is_active:
+                        discordance_report = dr
+
+        shared_counts = allele_origin_grouping.classificationgrouping_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
+        unshared_counts = (
+            ClassificationGrouping.filter_for_user(for_user, allele_origin_grouping.classificationgrouping_set.exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)).count())
+
+        return AlleleOriginGroupingDescription(
+            allele_origin_grouping,
+            discordance_report,
+            shared_counts,
+            unshared_counts
+        )
+
+
 def view_allele(request, allele_id: int):
     allele: Allele = get_object_or_404(Allele, pk=allele_id)
     link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
@@ -486,10 +524,10 @@ def view_allele(request, allele_id: int):
             ClassificationGrouping.objects.filter(allele_origin_grouping__allele_grouping__allele=allele_id)
         ).values_list("allele_origin_grouping")
     )
-    aogs = list(sorted(aog_qs.all()))
+    aogs = [AlleleOriginGroupingDescription.describe(aog, request.user) for aog in sorted(aog_qs.all())]
 
     context = {
-        "allele_origin_groupings": aogs,
+        "allele_origin_groupings_desc": aogs,
         "allele_card": AlleleCard(user=request.user, allele=allele),
         "allele": allele,
         "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True'

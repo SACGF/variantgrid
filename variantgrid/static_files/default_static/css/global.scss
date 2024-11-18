@@ -1316,6 +1316,11 @@ select[disabled] {
 	content: ", ";
 }
 
+.pipe-sep+.pipe-sep:before {
+	content: "| ";
+	color: #888;
+}
+
 .error-value {
 	font-weight: bold;
 	color: red;
