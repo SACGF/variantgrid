@@ -173,7 +173,9 @@ img.thumbnail {
 		$form.fileupload({ success : update_uploads });
 	};
 
-	var UPDATE_TIME = 1000;
+    const INITIAL_UPDATE_SECS = 1;
+    const MAX_UPDATE_SECS = 16;
+    let update_secs = INITIAL_UPDATE_SECS;
 
 	function update_uploads() {
 		// console.log("update_uploads()");
@@ -200,7 +202,11 @@ img.thumbnail {
 			}
 		}
 		if (needsUpdate) {
-			setTimeout(update_uploads, UPDATE_TIME);
+            if (update_secs < MAX_UPDATE_SECS) {
+                update_secs *= 2;
+            }
+            // console.log("Sleeping for " + update_secs + " secs");
+			setTimeout(update_uploads, update_secs * 1000);
 		}
 	}
 
@@ -291,7 +297,7 @@ img.thumbnail {
 		$("#show-file-types-toggle").click(function() {
 			$("#file-types-description").hide()
 		});
-		setTimeout(update_uploads, UPDATE_TIME);
+		setTimeout(update_uploads, update_secs * 1000);
         
         let userAgent = navigator.userAgent.toLowerCase();
         let isFirefox = userAgent.indexOf('firefox') > -1;

@@ -305,7 +305,8 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
                 yield conversion_tool, None, variant_errors_str
                 continue
 
-            if require_reference_match:
+            # Symbolics will pull out reference from build so always match, no point testing
+            if require_reference_match and not variant_coordinate.is_symbolic():
                 calculated_ref = variant_coordinate.calculated_reference(source_genome_build)
                 if calculated_ref != variant_coordinate.ref:
                     error_message = f"reference='{variant_coordinate.ref}' not equal to calculated ref from genome {calculated_ref}"

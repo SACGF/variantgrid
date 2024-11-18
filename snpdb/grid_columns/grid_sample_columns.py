@@ -56,7 +56,7 @@ def get_variantgrid_zygosity_annotation_kwargs(cohorts: Iterable[Cohort], common
                 empty_data = empty_value * cohort.sample_count
 
             output_field = cgc_fields[column]
-            packed_column = f"packed_{column}"
+            packed_column = cgc.get_packed_column_alias(column)
             alias = cgc.cohortgenotype_alias
             annotation_kwargs[packed_column] = Coalesce(f"{alias}__{column}", Value(empty_data),
                                                         output_field=output_field)

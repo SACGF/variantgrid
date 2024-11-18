@@ -18,7 +18,7 @@ def _new_column_spliceai_gene(apps, _schema_editor):
     ]
 
     NEW_COLUMN_VCF_INFO = [
-        {'info_id': ' SpliceAI_pred_SYMBOL',
+        {'info_id': 'SpliceAI_pred_SYMBOL',
          'column_id': 'spliceai_gene_symbol',
          'number': None,
          'type': 'S',

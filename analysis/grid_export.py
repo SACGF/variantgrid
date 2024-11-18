@@ -85,8 +85,9 @@ def get_node_export_basename(node: AnalysisNode) -> str:
 def _grid_export_vcf(genome_build, colmodels, items, sample_ids, sample_names_by_id) -> Iterator[str]:
     samples = [sample_names_by_id[s_id] for s_id in sample_ids]
 
+    use_accession = False
     info_dict = _get_colmodel_info_dict(colmodels)
-    vcf_template_file = _colmodels_to_vcf_header(genome_build, info_dict, samples)
+    vcf_template_file = _colmodels_to_vcf_header(genome_build, info_dict, samples, use_accession=use_accession)
     vcf_reader = Reader(vcf_template_file, strict_whitespace=True)
 
     pseudo_buffer = StashFile()
@@ -103,7 +104,7 @@ def _grid_export_vcf(genome_build, colmodels, items, sample_ids, sample_names_by
 
     def iter_row_writer():
         for obj in items:
-            record = _grid_item_to_vcf_record(info_dict, obj, sample_ids, samples)
+            record = _grid_item_to_vcf_record(info_dict, obj, sample_ids, samples, use_accession=use_accession)
             vcf_writer.write_record(record)
             yield pseudo_buffer.value
 
@@ -134,16 +135,20 @@ def _get_colmodel_info_dict(colmodels):
     return info_dict
 
 
-def _colmodels_to_vcf_header(genome_build, info_dict, samples):
+def _colmodels_to_vcf_header(genome_build, info_dict, samples, use_accession=True):
     """ returns file which contains header """
 
-    header_lines = get_vcf_header_from_contigs(genome_build, info_dict, samples)
+    header_lines = get_vcf_header_from_contigs(genome_build, info_dict, samples, use_accession=use_accession)
     return StringIO('\n'.join(header_lines))
 
 
 
-def _grid_item_to_vcf_record(info_dict, obj, sample_ids, sample_names):  # , get_genotype_from_expanded_zygosity):
-    CHROM = obj.get("locus__contig__name", ".")
+def _grid_item_to_vcf_record(info_dict, obj, sample_ids, sample_names, use_accession=True):
+    if use_accession:
+        CHROM = obj.get("locus__contig__refseq_accession", ".")
+    else:
+        CHROM = obj.get("locus__contig__name", ".")
+
     POS = obj.get("locus__position", ".")
     ID = obj.get("variantannotation__dbsnp_rs_id")
     REF = obj.get("locus__ref__seq", ".")
@@ -154,8 +159,10 @@ def _grid_item_to_vcf_record(info_dict, obj, sample_ids, sample_names):  # , get
 
     for info_id, data in info_dict.items():
         col = data['column__variant_column']
-        val = obj.get(col)
-        if val:
+        if val := obj.get(col):
+            if isinstance(val, str):
+                # info uses ';' as delimiter, so need to get rid of these within INFO
+                val = val.replace(";", ",:")
             INFO[info_id] = val
 
     FORMAT = None
@@ -183,13 +190,13 @@ def _grid_item_to_vcf_record(info_dict, obj, sample_ids, sample_names):  # , get
             # TODO: Ideally, we'd not write them out
             pl = obj.get(f"{sample_prefix}_phred_likelihood", ".")
             gq = obj.get(f"{sample_prefix}_genotype_quality", ".")
-            # TODO: Need to grab information for reference base to be able to properly fill in this data.
+            # These are all number=1
             data_args = {'AD': ['.', ad],
                          'GT': gt,
-                         'PL': ['.', pl],
-                         'DP': ['.', dp],
-                         'GQ': ['.', gq],
-                         'AF': ['.', af]}
+                         'PL': [pl],
+                         'DP': [dp],
+                         'GQ': [gq],
+                         'AF': [af]}
 
             data = CallData(**data_args)
             call = _Call(record, sample, data)

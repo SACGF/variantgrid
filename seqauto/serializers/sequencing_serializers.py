@@ -138,7 +138,6 @@ class SequencingRunSerializer(serializers.ModelSerializer):
         if ek_data := validated_data.pop('enrichment_kit', None):
             enrichment_kit = EnrichmentKitSerializer.get_from_data(ek_data)
             validated_data['enrichment_kit'] = enrichment_kit
-        validated_data['enrichment_kit'] = enrichment_kit
         instance, _created = SequencingRun.objects.get_or_create(
             name=name,
             defaults=validated_data
