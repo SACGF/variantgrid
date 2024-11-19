@@ -8,6 +8,8 @@ from classification.evidence_key_rename import EvidenceKeyRenamer, OptionUpdator
 def _migrate_testing_context(apps, schema):
     EvidenceKeyRenamer.rename(apps, old_key="somatic:testing_context", new_key="testing_context")
     e_key = apps.get_model('classification', 'EvidenceKey').objects.get(key="testing_context")
+    e_key.sub_label = None
+    e_key.save()
     options = OptionUpdator(e_key=e_key)
     options.ensure_option({"key": "vascular", "label": "Vascular malformation & overgrowth"})
     options.ensure_option({"key": "suspected_mosaicism", "label": "Suspected mosaicism"})
@@ -19,8 +21,10 @@ def _migrate_testing_context(apps, schema):
 
 
 def _reverse_migrate_testing_context(apps, schema):
-    EvidenceKeyRenamer.rename(apps, old_key="somatic:testing_context", new_key="testing_context")
+    EvidenceKeyRenamer.rename(apps, old_key="testing_context", new_key="somatic:testing_context")
     e_key = apps.get_model('classification', 'EvidenceKey').objects.get(key="somatic:testing_context")
+    e_key.sub_label = "Somatic"
+    e_key.save()
     options = OptionUpdator(e_key=e_key)
     options.remove_options("vascular", "suspected_mosaicism", "diagnostic_germline", "reproductive_carrier_screening", "other")
     options.save()
