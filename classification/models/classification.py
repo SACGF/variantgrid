@@ -1156,8 +1156,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         e_key = cell.e_key
         note = cell.note
 
-        if value and '\u00a0' in value:
-            value = value.replace('\u00a0', ' ')
+        if isinstance(value, str):
+            if '\u00a0' in value:
+                value = value.replace('\u00a0', ' ')
         if note and '\u00a0' in note:
             note = note.replace('\u00a0', ' ')
 
