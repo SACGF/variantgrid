@@ -316,7 +316,14 @@ class EvidenceMixin:
 
         clean: VCPatch = {}
         for key, value_obj in raw.items():
-            key = keys.with_namespace_if_required(EvidenceMixin._clean_key(key))
+            key = EvidenceMixin._clean_key(key)
+            if ":" in key:
+                # somatic:testing_context to testing_context
+                key = keys.without_namespace_if_required(key)
+            else:
+                # bp1 to acmg:bp1, etc
+                key = keys.with_namespace_if_required(key)
+
             if key in clean:
                 report_message(message=f'Multiple keys have been normalised to {key}',
                                extra_data={'raw_keys': list(raw.keys())},

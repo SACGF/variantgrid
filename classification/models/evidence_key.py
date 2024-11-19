@@ -555,8 +555,19 @@ class EvidenceKeyMap:
             self.all_keys.append(key)
 
     def with_namespace_if_required(self, key: str):
+        """
+        This is primarily to prefix "acmg:" to evidence keys where the ACMG codes didn't use to have a prefix
+        """
         if key not in self.key_dict and key in self.un_namespaced:
             key = first(self.un_namespaced.get(key)).key
+        return key
+
+    def without_namespace_if_required(self, key: str):
+        """
+        This is for the few instances where a prefix has been removed, e.g. "somatic:testing_context" going to "testing_con
+        """
+        if key not in self.key_dict and ":" in key and key.split(":")[1] in self.key_dict:
+            key = key.split(":")[1]
         return key
 
     def with_overrides(self, config: EvidenceKeyOverrides) -> 'EvidenceKeyMap':

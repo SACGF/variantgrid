@@ -19,17 +19,32 @@ class OptionUpdator:
         for matching_option in matching_options:
             matching_option.update(kwargs)
 
+    def next_index(self):
+        return max(option.get("index", 0) for option in self.options) + 1
+
     def ensure_option(self, option_data: dict, update_existing: bool = False):
         option_key = option_data.get("key")
         if not option_key:
             raise ValueError("Option Data must have key of 'key'")
         matching_options = [option for option in self.options if option.get('key') == option_key]
         if not matching_options:
+            if "index" not in option_data:
+                option_data["index"] = self.next_index()
             self.options.append(option_data)
         elif update_existing:
             for matching_option in matching_options:
                 matching_option.update(option_data)
+                if "index" not in matching_option:
+                    matching_option["index"] = self.next_index()
         self.e_key.options = self.options
+
+    def remove_options(self, option_keys: set[str]):
+        filtered_options = list[dict]
+        for e_key in self.options:
+            if e_key.get("key") not in option_keys:
+                filtered_options.append(e_key)
+        self.options = filtered_options
+
 
     def preferred_order(self, option_keys: list[str]):
         known_options = set(option_keys)
@@ -49,8 +64,17 @@ class OptionUpdator:
         self.options.extend(options_unknown)
         self.e_key.options = self.options
 
-    def alphabetical_order(self):
-        self.options = list(sorted(self.options, key=lambda x: x.get("key")))
+    def alphabetical_order(self, other_last=True):
+
+        def sort_value(e_key_options: dict):
+            nonlocal other_last
+            key = e_key_options.get("key")
+            if key == "other" and other_last:
+                return "zzz"
+            else:
+                return (e_key_options.get("label") or e_key_options.get("key")).lower()
+
+        self.options = list(sorted(self.options, key=lambda x: sort_value(x)))
         self.e_key.options = self.options
 
     def save(self):
@@ -133,6 +157,7 @@ class EvidenceKeyRenamer:
         ClassificationModification = self.apps.get_model("classification", "ClassificationModification")
 
         self._move_evidence_keys()
+        print("Moving historic values")
 
         with BulkUpdator.instance(model=Classification, fields=["evidence"]) as batch_update:
             for vc in Classification.objects.iterator():
