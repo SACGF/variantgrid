@@ -26,7 +26,7 @@ def _reverse_migrate_testing_context(apps, schema):
     e_key.sub_label = "Somatic"
     e_key.save()
     options = OptionUpdator(e_key=e_key)
-    options.remove_options("vascular", "suspected_mosaicism", "diagnostic_germline", "reproductive_carrier_screening", "other")
+    options.remove_options(["vascular", "suspected_mosaicism", "diagnostic_germline", "reproductive_carrier_screening", "other"])
     options.save()
 
 
