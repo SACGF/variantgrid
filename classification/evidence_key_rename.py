@@ -39,7 +39,7 @@ class OptionUpdator:
         self.e_key.options = self.options
 
     def remove_options(self, option_keys: set[str]):
-        filtered_options = list[dict]
+        filtered_options: list[dict] = []
         for e_key in self.options:
             if e_key.get("key") not in option_keys:
                 filtered_options.append(e_key)
