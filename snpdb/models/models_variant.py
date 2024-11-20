@@ -279,7 +279,8 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         position = int(match.group(2))
         ref = match.group(3).strip().upper()
         alt = match.group(4).strip().upper()
-        return VariantCoordinate.from_explicit_no_svlen(chrom, position, ref, alt)
+        vc = VariantCoordinate.from_explicit_no_svlen(chrom, position, ref, alt)
+        return vc.as_symbolic_or_explicit_according_to_size(genome_build)
 
     @staticmethod
     def from_symbolic_match(match, genome_build=None):
@@ -288,6 +289,9 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             chrom = format_chrom(chrom, genome_build.reference_fasta_has_chr)
         start = int(start)
         range_end = int(range_end)
+        if range_end < start + 1:
+            raise ValueError("End coordinate must be at least 1 base after start")
+
         if alt == "DEL":
             svlen = start - range_end
         else:
@@ -299,7 +303,8 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             ref = contig_sequence[start-1:start].upper()
         else:
             ref = "N"
-        return VariantCoordinate(chrom=chrom, position=start, ref=ref, alt=alt, svlen=svlen)
+        vc = VariantCoordinate(chrom=chrom, position=start, ref=ref, alt=alt, svlen=svlen)
+        return vc.as_symbolic_or_explicit_according_to_size(genome_build)
 
     @staticmethod
     def from_string(variant_string: str, genome_build=None):
@@ -407,6 +412,29 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
                         alt = VCFSymbolicAllele.INV
                         svlen = len(self.ref) - 1  # explicit inv had same length ref/alt, now we have len(ref) == 1
         return VariantCoordinate(chrom=self.chrom, position=self.position, ref=ref, alt=alt, svlen=svlen)
+
+    def as_symbolic_or_explicit_according_to_size(self, genome_build: Optional[GenomeBuild]) -> 'VariantCoordinate':
+        """ Make sure we only have 1 representation for a variant """
+
+        max_sequence_length = self.max_sequence_length
+        vc = self
+        if self.is_symbolic():
+            if max_sequence_length < settings.VARIANT_SYMBOLIC_ALT_SIZE:
+                if genome_build is None:
+                    raise ValueError(
+                        f"Symbolic variant created with SVLEN below minimum '{settings.VARIANT_SYMBOLIC_ALT_SIZE}' and no genome_build passed to convert to explicit bases")
+                vc = self.as_external_explicit(genome_build)
+        else:
+            if max_sequence_length >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
+                if genome_build is None:
+                    raise ValueError(
+                        f"Explicit variant created with SVLEN >= minimum '{settings.VARIANT_SYMBOLIC_ALT_SIZE}' and no genome_build passed to convert to explicit bases")
+                vc = self.as_internal_symbolic(genome_build)
+
+        return vc
+
+
+
 
 
 class Sequence(models.Model):
