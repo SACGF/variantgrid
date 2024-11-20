@@ -243,8 +243,6 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
     @property
     def end(self) -> int:
         """
-            THIS IMPLEMENTATION IS WRONG. Correct is below:
-
             This corresponds to VCF INFO["END"] which is defined in spec as:
 
             END position of the longest variant described in this record. The END of each allele is defined as:
