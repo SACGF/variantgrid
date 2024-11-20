@@ -30,7 +30,6 @@ class DataFixer:
     def __init__(self, bad_pattern: re.Pattern, replacement: Any):
         self.bad_pattern = bad_pattern
         self.replacement = replacement
-        print(self.replacement)
 
     def fix_classification_data(self, type: str, data: dict) -> Optional[DataFixRun]:
         modifications = []
@@ -53,7 +52,7 @@ class Command(BaseCommand):
         parser.add_argument('--pattern', type=str, required=True)
         parser.add_argument('--pattern_icase', action='store_true')
         parser.add_argument('--apply', type=int, default=0)
-        parser.add_argument('--replacement', type=str, default='REDACTED')
+        parser.add_argument('--replacement', type=str, required=True)
 
     def handle(self, *args, **options):
         lab_id = options["lab"]
@@ -88,7 +87,7 @@ class Command(BaseCommand):
                     modifying_mod = True
 
                 if modifying_mod and apply_remaining:
-                    cm.save(update_fields=["published", "delta"])
+                    cm.save(update_fields=["published_evidence", "delta"])
 
             if changes:
                 print(f"{classification.friendly_label}: ")
