@@ -30,6 +30,7 @@ class DataFixer:
     def __init__(self, bad_pattern: re.Pattern, replacement: Any):
         self.bad_pattern = bad_pattern
         self.replacement = replacement
+        print(self.replacement)
 
     def fix_classification_data(self, type: str, data: dict) -> Optional[DataFixRun]:
         modifications = []
@@ -58,11 +59,16 @@ class Command(BaseCommand):
         lab_id = options["lab"]
         pattern = options["pattern"]
         pattern_icase = options["pattern_icase"]
-
         apply_remaining = options["apply"]
+        replacement = options["replacement"]
+
+        print(f"Lab = {str(Lab.objects.get(id=lab_id))}")
+        print(f"Pattern = {pattern}, icase = {pattern_icase}")
+        print(f"Apply to = {apply_remaining}")
+        print(f"Replacement = \"{replacement}\"")
 
         bad_pattern = re.compile(pattern, flags=re.IGNORECASE if pattern_icase else 0)
-        data_fixer = DataFixer(bad_pattern, options["replacement"])
+        data_fixer = DataFixer(bad_pattern, replacement)
 
         for classification in Classification.objects.filter(lab_id=lab_id).iterator():
             changes = []
