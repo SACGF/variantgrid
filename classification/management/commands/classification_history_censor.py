@@ -43,7 +43,7 @@ class Command(BaseCommand):
 
         data_fixer = DataFixer(bad_pattern, REPLACEMENT_REDACT)
 
-        for classification in Classification.objects.all(lab_id=lab_id):
+        for classification in Classification.objects.filter(lab_id=lab_id).iterator():
             classification_fix = False
             history_count = 0
             if data_fixer.fix_classificaiton_data(classification.evidence):
