@@ -1,4 +1,5 @@
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Optional
 
 from django.core.management import BaseCommand
 import re
@@ -9,25 +10,44 @@ from snpdb.models import Lab
 
 REPLACEMENT_REDACT = object()
 
+
+@dataclass
+class DataFix:
+    field: str
+    suspect_value: str
+
+    def __str__(self):
+        return f"{self.field}: !{self.suspect_value}!"
+
+@dataclass
+class DataFixRun:
+    type: str
+    fixes: list[DataFix]
+
+    def __str__(self):
+        return f"{self.type} - " + ", ".join(str(df) for df in self.fixes)
+
 class DataFixer:
 
     def __init__(self, bad_pattern: re.Pattern, replacement: Any):
         self.bad_pattern = bad_pattern
         self.replacement = replacement
 
-    def fix_classificaiton_data(self, data: dict) -> bool:
-        has_modified = False
+    def fix_classification_data(self, type: str, data: dict) -> Optional[DataFixRun]:
+        modifications = []
         for key, blob in data.items():
             if isinstance(blob, dict):
                 if text := blob.get("value"):
                     if isinstance(text, str):
                         if self.bad_pattern.search(text):
-                            has_modified = True
+                            modifications.append(DataFix(key, ", ".join(self.bad_pattern.findall(text))))
                             if self.replacement == REPLACEMENT_REDACT:
                                 blob["value"] = "REDACTED"
                             else:
                                 raise ValueError(f"Replacement method {self.replacement} is not supported")
-        return has_modified
+
+        if modifications:
+            return DataFixRun(type=type, fixes=modifications)
 
 
 class Command(BaseCommand):
@@ -44,20 +64,18 @@ class Command(BaseCommand):
         data_fixer = DataFixer(bad_pattern, REPLACEMENT_REDACT)
 
         for classification in Classification.objects.filter(lab_id=lab_id).iterator():
-            classification_fix = False
-            history_count = 0
-            if data_fixer.fix_classificaiton_data(classification.evidence):
-                classification_fix = True
+            changes = []
+            if class_change := data_fixer.fix_classification_data("classification", classification.evidence):
+                changes.append(class_change)
 
-            for cm in classification.classificationmodification_set.all():
-                modification_fix = False
+            for cm in classification.classificationmodification_set.order_by('created').all():
                 if published := cm.published_evidence:
-                    if data_fixer.fix_classificaiton_data(published):
-                        modification_fix = True
-                    if data_fixer.fix_classificaiton_data(cm.delta):
-                        modification_fix = True
-                if modification_fix:
-                    history_count += 1
+                    if published_change := data_fixer.fix_classification_data(f"published {cm.pk}", published):
+                        changes.append(published_change)
+                    if delta_changes := data_fixer.fix_classification_data(f"delta {cm.pk}", cm.delta):
+                        changes.append(delta_changes)
 
-            if classification_fix or history_count:
-                print(f"{classification.friendly_label} Classification fixed = {classification_fix}, history fixes = {history_count}")
+            if changes:
+                print(f"{classification.friendly_label}: ")
+                for change in changes:
+                    print("  " + str(change))
