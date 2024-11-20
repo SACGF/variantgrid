@@ -8,9 +8,6 @@ from classification.models import Classification
 from snpdb.models import Lab
 
 
-REPLACEMENT_REDACT = object()
-
-
 @dataclass
 class DataFix:
     field: str
@@ -42,10 +39,7 @@ class DataFixer:
                     if isinstance(text, str):
                         if matches := self.bad_pattern.findall(text):
                             modifications.append(DataFix(key, ", ".join(matches)))
-                            if self.replacement == REPLACEMENT_REDACT:
-                                blob["value"] = "REDACTED"
-                            else:
-                                raise ValueError(f"Replacement method {self.replacement} is not supported")
+                            blob["value"] = self.replacement
 
         if modifications:
             return DataFixRun(type=type, fixes=modifications)
@@ -56,16 +50,19 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--lab', type=str, required=True)
         parser.add_argument('--pattern', type=str, required=True)
+        parser.add_argument('--pattern_icase', action='store_true')
         parser.add_argument('--apply', type=int, default=0)
+        parser.add_argument('--replacement', type=str, default='REDACTED')
 
     def handle(self, *args, **options):
         lab_id = options["lab"]
         pattern = options["pattern"]
+        pattern_icase = options["pattern_icase"]
 
         apply_remaining = options["apply"]
 
-        bad_pattern = re.compile(pattern, flags=re.IGNORECASE)
-        data_fixer = DataFixer(bad_pattern, REPLACEMENT_REDACT)
+        bad_pattern = re.compile(pattern, flags=re.IGNORECASE if pattern_icase else 0)
+        data_fixer = DataFixer(bad_pattern, options["replacement"])
 
         for classification in Classification.objects.filter(lab_id=lab_id).iterator():
             changes = []
