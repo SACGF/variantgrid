@@ -28,8 +28,17 @@ class VariantGridColumn(models.Model):
     model_field = models.BooleanField(default=True)  # Standard field, can use Meta inspection to determine colmodel
     queryset_field = models.BooleanField(default=True)  # In queryset.values() (field or alias)
 
+    # These are required to be in custom columns
+    _MANDATORY_COLUMNS = {
+        "tags",
+        "tags_global",
+    }
+
     def get_css_classes(self):
         css_classes = ["user-column"]
+        if self.grid_column_name in self._MANDATORY_COLUMNS:
+            css_classes.append("mandatory")
+
         if self.annotation_level:
             annotation_level_class = ColumnAnnotationLevel(self.annotation_level).label
             css_classes.append("%s-column" % annotation_level_class.lower())
