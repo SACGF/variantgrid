@@ -176,7 +176,7 @@ def wait_for_node(node_id):
             #logging.info("node status: %s", node.status)
 
             if NodeStatus.is_ready(node.status):
-                #logging.info("Node was ready")
+                logging.info(f"Node {node} status={node.get_status_display()} was ready")
                 return
 
             try:
@@ -187,13 +187,13 @@ def wait_for_node(node_id):
             except NodeTask.DoesNotExist:
                 pass
 
-            # QUEUED - there won't be a celery task yet
-            if node.status == NodeStatus.QUEUED:
+            # loading (eg QUEUED) - there won't be a celery task yet
+            if node.status in NodeStatus.LOADING_STATUSES:
                 details = f"Waiting on parent node {node_id} which is QUEUED"
                 details += f" - waiting for {sleep_time} secs, {total_time} so far!"
                 create_event(None, EVENT_NAME, details, severity=LogLevel.WARNING)
             else:
-                details = f"Waiting on parent node {node_id} status {node.status} no celery task!"
+                details = f"Waiting on parent node {node_id} NON LOADING status {node.get_status_display()} no celery task!"
                 create_event(None, EVENT_NAME, details, severity=LogLevel.ERROR)
                 return
 

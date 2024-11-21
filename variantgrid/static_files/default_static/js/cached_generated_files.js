@@ -117,7 +117,11 @@ class AnnotatedFileDownload {
 			progressIndicator.append(`${percent}% complete`);
 		}
 
+		function setError(data) {
+			that.setError(data);
+		}
+
 		$(this.selector).html(spinner);
-		poll_cached_generated_file(this.pollUrl, downloadFile, this.setError, updateProgress)
+		poll_cached_generated_file(this.pollUrl, downloadFile, setError, updateProgress)
 	}
 }
