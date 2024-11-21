@@ -124,7 +124,7 @@ class VariantPKLookup:
         return self._get_variant_hash(contig_id, variant_coordinate.position, ref_id, alt_id, variant_coordinate.svlen)
 
     def add(self, variant_coordinate: VariantCoordinate) -> VariantHash:
-        variant_coordinate = variant_coordinate.as_internal_symbolic(self.genome_build)
+        variant_coordinate = variant_coordinate.as_symbolic_or_explicit_according_to_size(self.genome_build)
 
         # If sequence isn't known, variant is definitely unknown
         if variant_coordinate.ref in self.sequence_pk_by_seq and variant_coordinate.alt in self.sequence_pk_by_seq:
