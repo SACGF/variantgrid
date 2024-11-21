@@ -12,7 +12,8 @@ from snpdb.models.models_enums import ColumnAnnotationLevel
 
 
 def get_custom_column_fields_override_and_sample_position(custom_columns_collection: CustomColumnsCollection,
-                                                          annotation_version: AnnotationVersion):
+                                                          annotation_version: AnnotationVersion,
+                                                          analysis_tags=False):
     q_cvf = ColumnVEPField.get_columns_version_q(annotation_version.variant_annotation_version.columns_version)
     cvf_qs = ColumnVEPField.objects.filter(q_cvf)
     q_columns_this_version = Q(column__columnvepfield__isnull=True) | Q(column__columnvepfield__in=cvf_qs)
@@ -25,6 +26,9 @@ def get_custom_column_fields_override_and_sample_position(custom_columns_collect
 
     for field_pos, c in enumerate(columns_queryset):
         if f := c.column.variant_column:
+            # Tags are only shown in the analysis they are in (otherwise will just show tags_global)
+            if f == "tags" and not analysis_tags:
+                continue
             fields.append(f)
 
         if c.column.model_field is False:
