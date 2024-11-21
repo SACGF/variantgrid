@@ -157,12 +157,17 @@ def _grid_item_to_vcf_record(info_dict, obj, sample_ids, sample_names, use_acces
     FILTER = None
     INFO = {}
 
+    INFO_REPLACE = {
+        ";": ",:",  # semi-colon used as INFO delimiter
+        ",": "|",  # commas forbidden except as list
+    }
+
     for info_id, data in info_dict.items():
         col = data['column__variant_column']
         if val := obj.get(col):
             if isinstance(val, str):
-                # info uses ';' as delimiter, so need to get rid of these within INFO
-                val = val.replace(";", ",:")
+                for old, new in INFO_REPLACE.items():
+                    val = val.replace(old, new)
             INFO[info_id] = val
 
     FORMAT = None
@@ -191,7 +196,7 @@ def _grid_item_to_vcf_record(info_dict, obj, sample_ids, sample_names, use_acces
             pl = obj.get(f"{sample_prefix}_phred_likelihood", ".")
             gq = obj.get(f"{sample_prefix}_genotype_quality", ".")
             # These are all number=1
-            data_args = {'AD': ['.', ad],
+            data_args = {'AD': [ad],
                          'GT': gt,
                          'PL': [pl],
                          'DP': [dp],
