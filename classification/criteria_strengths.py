@@ -62,8 +62,7 @@ class CriteriaStrength:
         # else:
         #     return True
 
-    @staticmethod
-    def strength_suffix_for(strength: str, short: bool = False):
+    def strength_suffix_for(self, strength: str, short: bool = False):
         if strength is None:
             return "NM"
         elif strength == "X":
@@ -76,6 +75,8 @@ class CriteriaStrength:
                 return strength[0] + "_X"
             else:
                 return strength[0] + "_unspecified"
+        elif self.ekey.crit_uses_points and (points := CriteriaEvaluation.POINTS.get(self.strength)):
+            return f"{points}_points"
         return strength
 
     @property
@@ -98,7 +99,7 @@ class CriteriaStrength:
             if self.is_expected_direction:
                 suffix = suffix[1:]
 
-        return f"{pretty_label}_{CriteriaStrength.strength_suffix_for(suffix, short=format_spec=='short')}"
+        return f"{pretty_label}_{self.strength_suffix_for(suffix, short=format_spec=='short')}"
 
     def __repr__(self):
         return format(self)
