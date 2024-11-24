@@ -242,7 +242,12 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             RichColumn(
                 key='lab',
                 # share_level_sort annotated column
-                sort_keys=['lab__organization__name', 'lab__name'],
+                sort_keys=[
+                    'allele_origin_bucket',
+                    'lab__organization__name',
+                    'lab__name',
+                    'share_level'
+                ],
                 name='id',
                 label='ID',
                 orderable=True,
