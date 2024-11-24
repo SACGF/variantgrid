@@ -117,6 +117,7 @@ let DataTableDefinition = (function() {
                 pageLength: lengthValue,
                 dom: domString,
                 order: defn.order,
+                fixedOrder: defn.order,
                 pagingType: "input",
                 classes: {
                     'sPageButton': 'btn btn-outline-primary btn-rnd-rect',
