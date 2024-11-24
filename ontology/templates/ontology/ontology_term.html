@@ -10,7 +10,7 @@
 {% block title %}{{ term.id }}{% endblock title %}
 {% block content %}
     <script>
-        function classificationFilter(data, type) {
+        function classificationGroupingFilterExtra(data, type) {
             data.ontology_term_id = "{{ term.id }}";
             return data;
         }
