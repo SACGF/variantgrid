@@ -65,7 +65,6 @@ class AllVariantsGrid(AbstractVariantGrid):
         self.annotation_version = AnnotationVersion.latest(genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
                                                                                     self.annotation_version)
-        fields.remove("tags")
         self.fields = fields
         super().__init__(user)
         af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
@@ -110,7 +109,6 @@ class NearbyVariantsGrid(AbstractVariantGrid):
         self.annotation_version = AnnotationVersion.latest(self.genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
                                                                                     self.annotation_version)
-        fields.remove("tags")
         self.fields = fields
         super().__init__(user)
         af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
@@ -212,10 +210,6 @@ class TaggedVariantGrid(AbstractVariantGrid):
         self.annotation_version = AnnotationVersion.latest(genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
                                                                                     self.annotation_version)
-        # We don't want this, as it's analysis specific
-        tags_field = "tags"
-        if tags_field in fields:
-            fields.remove(tags_field)
         self.fields = fields
         super().__init__(user)
 

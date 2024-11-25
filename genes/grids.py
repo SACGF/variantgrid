@@ -148,8 +148,6 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
         """ Remove fields that'll all be the same """
         non_gene_fields = []
         for f in fields:
-            if f == "tags":
-                continue
             keep = True
             for gene_fields in ["__transcript_version__", "__gene__"]:
                 if gene_fields in f:

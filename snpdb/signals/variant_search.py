@@ -23,7 +23,8 @@ from library.genomics import format_chrom
 from library.preview_request import PreviewData
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import Variant, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DbSNP, DBSNP_PATTERN, VariantCoordinate, \
-    ClinGenAllele, GenomeBuild, Contig, HGVS_UNCLEANED_PATTERN, VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN, Allele
+    ClinGenAllele, GenomeBuild, Contig, HGVS_UNCLEANED_PATTERN, VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN, Allele, \
+    Sequence
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample, SearchResult, SearchMessageOverall, \
     SearchMessage, INVALID_INPUT
 from upload.models import ModifiedImportedVariant
@@ -218,8 +219,10 @@ def _yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, va
     # search for alt alts
     alts = get_results_from_variant_coordinate(genome_build, variant_qs, variant_coordinate, any_alt=True)
     for alt in alts:
+        abbreviated_alt = Sequence.abbreviate(variant_coordinate.alt)
+
         alt_messages = search_messages + [
-            SearchMessage(f'No results for alt "{variant_coordinate.alt}", but found this using alt "{alt.alt}"',
+            SearchMessage(f'No results for alt "{abbreviated_alt}", but found this using alt "{alt.alt}"',
                           severity=LogLevel.ERROR, substituted=True)]
         yield SearchResult(alt.preview, messages=alt_messages)
 
@@ -253,21 +256,23 @@ def get_results_from_variant_coordinate(genome_build: GenomeBuild, qs: QuerySet,
 def yield_search_variant_match(search_input: SearchInputInstance, get_variant_coordinate: Callable):
     for genome_build in search_input.genome_builds:
         variant_coordinate = get_variant_coordinate(search_input.match, genome_build)
+        # Coordinate is explicit/symbolic according to length
         if errors := Variant.validate(genome_build, variant_coordinate.chrom, variant_coordinate.position):
             yield SearchMessageOverall(", ".join(errors), genome_builds=[genome_build])
             continue
 
         search_messages = []
-        calculated_ref = variant_coordinate.calculated_reference(genome_build)
-        logging.info(f"calc ref: %s, provided ref: %s", calculated_ref, variant_coordinate.ref)
-        if calculated_ref != variant_coordinate.ref:
-            provided_ref = variant_coordinate.ref
-            sm = SearchMessage(f'Using genomic reference "{calculated_ref}" from our build, in place of provided reference "{provided_ref}"',
-                               LogLevel.WARNING, substituted=True)
-            search_messages.append(sm)
-            variant_coordinate.ref = calculated_ref
+        if not variant_coordinate.is_symbolic():
+            # Only check refs if explicit, non-symbolic refs
+            calculated_ref = variant_coordinate.calculated_reference(genome_build)
+            logging.info(f"calc ref: %s, provided ref: %s", calculated_ref, variant_coordinate.ref)
+            if calculated_ref != variant_coordinate.ref:
+                provided_ref = variant_coordinate.ref
+                sm = SearchMessage(f'Using genomic reference "{calculated_ref}" from our build, in place of provided reference "{provided_ref}"',
+                                   LogLevel.WARNING, substituted=True)
+                search_messages.append(sm)
+                variant_coordinate.ref = calculated_ref
 
-        variant_coordinate = variant_coordinate.as_internal_symbolic(genome_build)
         visible_variants_qs = search_input.get_visible_variants(genome_build)
         results = get_results_from_variant_coordinate(genome_build, visible_variants_qs, variant_coordinate)
         if results.exists():

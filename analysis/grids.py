@@ -144,15 +144,17 @@ class VariantGrid(AbstractVariantGrid):
     def _get_fields_and_overrides(self, node: AnalysisNode, af_show_in_percent: bool) -> tuple[list, dict]:
         ccc = node.analysis.custom_columns_collection
         annotation_version = node.analysis.annotation_version
-        fields, overrides, sample_columns_position = get_custom_column_fields_override_and_sample_position(ccc, annotation_version)
+        fields, overrides, sample_cols_pos = get_custom_column_fields_override_and_sample_position(ccc,
+                                                                                                   annotation_version,
+                                                                                                   analysis_tags=True)
         fields.extend(node.get_extra_columns())
 
         update_dict_of_dict_values(overrides, self._get_standard_overrides(af_show_in_percent))
         update_dict_of_dict_values(overrides, node.get_extra_colmodel_overrides())
         if self.cohorts:
             sample_columns, sample_overrides = VariantGrid.get_grid_genotype_columns_and_overrides(self.cohorts, self.visibility, af_show_in_percent)
-            if sample_columns_position:
-                fields = fields[:sample_columns_position] + sample_columns + fields[sample_columns_position:]
+            if sample_cols_pos:
+                fields = fields[:sample_cols_pos] + sample_columns + fields[sample_cols_pos:]
             else:
                 fields.extend(sample_columns)
 

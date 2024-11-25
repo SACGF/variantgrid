@@ -96,3 +96,9 @@ class VariantTestCase(TestCase):
         vc_symbolic = vc.as_internal_symbolic(self.grch37)
         self.assertEqual(len(alt), settings.VARIANT_SYMBOLIC_ALT_SIZE)  # If this fails, the test below won't work
         self.assertEqual(vc_symbolic.alt, VCFSymbolicAllele.DUP)
+
+    def test_short_symbolic_alt(self):
+        vc = VariantCoordinate(chrom='3', position=37047542, ref='A', alt="<DUP>",
+                               svlen=settings.VARIANT_SYMBOLIC_ALT_SIZE-1)
+        vc = vc.as_symbolic_or_explicit_according_to_size(self.grch37)
+        self.assertIsNone(vc.svlen)

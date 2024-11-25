@@ -11,10 +11,11 @@ from django.utils import timezone
 
 from analysis.analysis_templates import get_cohort_analysis, get_sample_analysis
 from analysis.grid_export import node_grid_get_export_iterator
-from analysis.models import AnalysisTemplate, SampleNode, NodeStatus
+from analysis.models import AnalysisTemplate, NodeStatus, CohortNode, SampleNode
 from analysis.tasks.node_update_tasks import wait_for_node
 from library.django_utils import FakeRequest
 from library.guardian_utils import admin_bot
+from library.log_utils import log_traceback
 from library.utils import name_from_filename, sha256sum_str, mk_path_for_file
 from snpdb.models import Cohort, Sample, CachedGeneratedFile
 
@@ -94,35 +95,47 @@ def _write_node_to_cached_generated_file(cgf, analysis, node, name, export_type)
         cgf.task_status = "FAILURE"
     cgf.save()
 
+def _wait_for_output_node(node):
+    if not NodeStatus.is_ready(node.status):
+        logging.info("Waiting for node...")
+        wait_for_node(node.pk)  # Needs to be ready
+        node = node.get_subclass()  # Easy way to reload
+    if node.count is None:
+        raise ValueError(f"Node {node}/{node.version} - {node.status} count is None")
+    return node
 
 @celery.shared_task
 def export_cohort_to_downloadable_file(cohort_id, export_type):
-    # This should have been created in analysis.views.views_grid.cohort_grid_export
-    params_hash = get_grid_downloadable_file_params_hash(cohort_id, export_type)
-    cgf = CachedGeneratedFile.objects.get(generator="export_cohort_to_downloadable_file",
-                                          params_hash=params_hash)
+    try:
+        # This should have been created in analysis.views.views_grid.cohort_grid_export
+        params_hash = get_grid_downloadable_file_params_hash(cohort_id, export_type)
+        cgf = CachedGeneratedFile.objects.get(generator="export_cohort_to_downloadable_file",
+                                              params_hash=params_hash)
 
-    cohort = Cohort.objects.get(pk=cohort_id)
-    analysis_template = AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
-    analysis = get_cohort_analysis(cohort, analysis_template)
-    node = analysis.analysisnode_set.get_subclass(output_node=True)  # Should only be 1
-    if not NodeStatus.is_ready(node.status):
-        wait_for_node(node.pk)  # Needs to be ready
-        node = node.get_subclass()  # Easy way to reload
-        if node.count is None:
-            raise ValueError(f"Node {node.pk} count is None")
-    _write_node_to_cached_generated_file(cgf, analysis, node, cohort.name, export_type)
-
+        cohort = Cohort.objects.get(pk=cohort_id)
+        analysis_template = AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT")
+        analysis = get_cohort_analysis(cohort, analysis_template)
+        node = CohortNode.objects.get_subclass(analysis=analysis, output_node=True)  # Should only be 1
+        node = _wait_for_output_node(node)
+        _write_node_to_cached_generated_file(cgf, analysis, node, cohort.name, export_type)
+    except Exception:
+        log_traceback()
+        raise
 
 @celery.shared_task
 def export_sample_to_downloadable_file(sample_id, export_type):
-    # This should have been created in analysis.views.views_grid.sample_grid_export
-    params_hash = get_grid_downloadable_file_params_hash(sample_id, export_type)
-    cgf = CachedGeneratedFile.objects.get(generator="export_sample_to_downloadable_file",
-                                          params_hash=params_hash)
+    try:
+        # This should have been created in analysis.views.views_grid.sample_grid_export
+        params_hash = get_grid_downloadable_file_params_hash(sample_id, export_type)
+        cgf = CachedGeneratedFile.objects.get(generator="export_sample_to_downloadable_file",
+                                              params_hash=params_hash)
 
-    sample = Sample.objects.get(pk=sample_id)
-    analysis_template = AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_SAMPLE")
-    analysis = get_sample_analysis(sample, analysis_template)
-    node = SampleNode.objects.get(analysis=analysis, output_node=True)  # Should only be 1
-    _write_node_to_cached_generated_file(cgf, analysis, node, sample.name, export_type)
+        sample = Sample.objects.get(pk=sample_id)
+        analysis_template = AnalysisTemplate.get_template_from_setting("ANALYSIS_TEMPLATES_AUTO_SAMPLE")
+        analysis = get_sample_analysis(sample, analysis_template)
+        node = SampleNode.objects.get_subclass(analysis=analysis, output_node=True)  # Should only be 1
+        node = _wait_for_output_node(node)
+        _write_node_to_cached_generated_file(cgf, analysis, node, sample.name, export_type)
+    except Exception:
+        log_traceback()
+        raise
