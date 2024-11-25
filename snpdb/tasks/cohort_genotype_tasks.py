@@ -1,6 +1,7 @@
 import logging
 import time
 from collections import defaultdict
+from typing import Optional
 
 import celery
 from celery.result import AsyncResult
@@ -105,7 +106,11 @@ def _get_left_outer_join_on_variant(partition_table):
     return f'LEFT OUTER JOIN "{partition_table}" ON ("snpdb_variant"."id" = "{partition_table}"."variant_id")'
 
 
-def get_insert_cohort_genotype_sql(cgc: CohortGenotypeCollection):
+def _get_insert_cohort_genotype_sql(cgc: CohortGenotypeCollection, common=False) -> Optional[str]:
+    """ common: use common cohort genotype collection
+        For old VCFs, imported before we had common filters - this can return None
+        as nothing to do (everything in rare/default)
+     """
     cohort = cgc.cohort
     samples = cohort.get_samples()
 
@@ -122,6 +127,12 @@ def get_insert_cohort_genotype_sql(cgc: CohortGenotypeCollection):
 
     for sample in samples:
         sample_cgc = sample.vcf.cohort.cohort_genotype_collection
+        if common:
+            if cc := sample_cgc.common_collection:
+                sample_cgc = cc
+            else:
+                # No common - all in normal
+                continue
         partition_table = sample_cgc.get_partition_table()
         joins.add(_get_left_outer_join_on_variant(partition_table))
         i = sample_cgc.get_sql_index_for_sample_id(sample.pk)
@@ -159,6 +170,9 @@ def get_insert_cohort_genotype_sql(cgc: CohortGenotypeCollection):
         else:
             columns[c] = " || ".join(column_pack_lists[c])
 
+    if not joins:
+        return None
+
     joins = "\n".join(joins)
     insert_sql = f"""
 insert into {cgc.get_partition_table()}
@@ -170,6 +184,12 @@ FROM snpdb_variant
 WHERE
 ({columns['ref_count']} + {columns['het_count']} + {columns['hom_count']} + {columns['unk_count']}) > 0
 """
+    # For the where clause, we could simplify (if running out of max SQL limit)
+    # CASE WHEN COALESCE(SUBSTRING(samples_zygosity, 2, 1), '.') IN ('R', 'E', 'O', 'U') THEN 1 ELSE 0 END AS match_2
+    # Though we are already calculating the columns in the select, so probably best to leave as it
+    # Doesn't seem to have performance hit
+
+
     return insert_sql
 
 
@@ -184,7 +204,8 @@ def cohort_genotype_task(cohort_genotype_collection_id):
     # 1. Legacy - inserted to tag legacy data before we added task_version
     # 2. cohort_genotype_task - 20200319 - Split hom_count into ref_count, hom_count
     # 3. cohort_genotype_task - 20200514 - Use code from grid_sample_columns
-    NAME = "cohort_genotype_task - 20200514 - packed fields"  # Change this if the data changes!
+    # 4. cohort_genotype_task - 20241125 - Handle rare/common
+    NAME = "cohort_genotype_task - 20241125 - packed fields (handle rare/common)"  # Change this if the data changes!
     task_version, _ = CohortGenotypeTaskVersion.objects.get_or_create(name=NAME)
 
     cohort = cgc.cohort
@@ -192,21 +213,27 @@ def cohort_genotype_task(cohort_genotype_collection_id):
     cohort.save()
 
     try:
-        insert_sql = get_insert_cohort_genotype_sql(cgc)
-        logging.info("cohort_genotype_task SQL:")
-        logging.info(insert_sql)
+        cohort_genotype_collection_list = [
+            (cgc, False)
+        ]
+        if cc := cgc.common_collection:
+            cohort_genotype_collection_list.append((cc, True))
 
-        start = time.time()
-        run_sql(insert_sql)
-        end = time.time()
-        logging.info("SQL took %d secs to run", end - start)
+        for cgc, common in cohort_genotype_collection_list:
+            if insert_sql := _get_insert_cohort_genotype_sql(cgc, common=common):
+                logging.info("cohort_genotype_task %s/common=%s SQL:", cgc, common)
+                logging.info(insert_sql)
+
+                start = time.time()
+                run_sql(insert_sql)
+                end = time.time()
+                logging.info("SQL took %d secs to run", end - start)
+                cgc.task_version = task_version
+                cgc.save()
 
         # Do as an update as other jobs may be modifying object
         import_status = ImportStatus.SUCCESS
         Cohort.objects.filter(pk=cohort.pk).update(import_status=import_status)
-
-        cgc.task_version = task_version
-        cgc.save()
     except:
         import_status = ImportStatus.ERROR
         Cohort.objects.filter(pk=cohort.pk).update(import_status=import_status)
