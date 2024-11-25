@@ -278,7 +278,8 @@
             {% if allele_origin_grouping_desc.discordance_report %}
                 <span class="pipe-sep">{% discordance_report allele_origin_grouping_desc.discordance_report %}</span>
             {% endif %}
-            {% if allele_origin_grouping_desc.shared_counts %}
+            <span class="pipe-sep">{{ allele_origin_grouping_desc.get_overlap_status_display }}</span>
+            {% if allele_origin_grouping_desc.shared_counts > 1 %}
                 <span class="pipe-sep">&nbsp;<strong>{{ allele_origin_grouping_desc.shared_counts }}</strong> Sharing Lab{% plural allele_origin_grouping_desc.shared_counts %}</span>
             {% endif %}
             {% if allele_origin_grouping_desc.unshared_counts %}
