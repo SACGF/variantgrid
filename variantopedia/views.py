@@ -495,6 +495,10 @@ class AlleleOriginGroupingDescription:
     def get_overlap_status_display(self):
         return OverlapStatus(self.overlap_status).label
 
+    @property
+    def should_show_diffs(self):
+        return self.shared_counts + self.unshared_counts > 1
+
     @staticmethod
     def describe(allele_origin_grouping: AlleleOriginGrouping, for_user: User) -> 'AlleleOriginGroupingDescription':
         discordance_report: Optional[DiscordanceReport] = None

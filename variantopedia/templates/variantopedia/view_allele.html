@@ -286,11 +286,13 @@
             {% if allele_origin_grouping_desc.unshared_counts %}
                 <span class="pipe-sep" style="opacity:0.7">includes unshared records</span>
             {% endif %}
-            <span class="pipe-sep">
-            <a class="hover-link" href="{% url 'classification_diff' %}?allele_origin_grouping={{ allele_origin_grouping_desc.allele_origin_grouping.pk }}">
-                    show diffs
-                </a>
-            </span>
+            {% if allele_origin_grouping_desc.should_show_diffs %}
+                <span class="pipe-sep">
+                    <a class="hover-link" href="{% url 'classification_diff' %}?allele_origin_grouping={{ allele_origin_grouping_desc.allele_origin_grouping.pk }}">
+                        show diffs
+                    </a>
+                </span>
+            {% endif %}
         </div>
     {% endfor %}
     {% classification_groupings %}
