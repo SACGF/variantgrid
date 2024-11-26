@@ -17,7 +17,7 @@ from sync.shariant.query_json_filter import QueryJsonFilter
 from sync.sync_runner import register_sync_runner, SyncRunner, SyncRunInstance
 
 # add variant_type to private fields as the key has been deprecated
-SHARIANT_PRIVATE_FIELDS = ['patient_id', 'family_id', 'sample_id', 'patient_summary', 'internal_use', 'variant_type', 'age_units']
+SHARIANT_PRIVATE_FIELDS = ['patient_id', 'family_id', 'sample_id', 'patient_summary', 'internal_use', 'variant_type', 'age_units', 'dob']
 
 
 def insert_nones(data: dict) -> dict:
