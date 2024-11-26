@@ -38,7 +38,7 @@ def create_cohort_genotype_and_launch_task(cohort, run_async=True):
     else:
         launch_task = False
         try:
-            cgc = CohortGenotypeCollection.objects.get(cohort=cohort, cohort_version=cohort.version)
+            cgc = Cohort.cohort_genotype_collection
             celery_task = cgc.celery_task
             logging.warning("This count task was already running")
             result = AsyncResult(celery_task)
