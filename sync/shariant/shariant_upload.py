@@ -18,7 +18,9 @@ from classification.models.classification_utils import ClassificationJsonParams
 from sync.shariant.query_json_filter import QueryJsonFilter
 
 # add variant_type to private fields as the key has been deprecated
-SHARIANT_PRIVATE_FIELDS = ['patient_id', 'family_id', 'sample_id', 'patient_summary', 'internal_use', 'variant_type', 'age_units']
+SHARIANT_PRIVATE_FIELDS = [
+    'age_units', 'dob', 'family_id', 'internal_use', 'patient_id', 'patient_summary', 'sample_id', 'variant_type'
+]
 
 
 def insert_nones(data: Dict) -> Dict:
