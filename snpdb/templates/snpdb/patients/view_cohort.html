@@ -114,9 +114,9 @@
 				launchTask.show();
                 samplesTabState = "warning";
 			} else if (cohortCountStatus == CC_STATUS_RUNNING) {
-                const loading_icon = $('<div>').attr({class: 'loading icon16', style: 'margin-right:10px;'});
+                const loading_icon = $('<i class="fa fa-spinner"></i>');
                 taskInfo.html(loading_icon);
-				taskInfo.append("Cohort Count task is running...");
+				taskInfo.append(" Cohort Count task is running...");
 				taskInfo.show();
 			} else if (cohortCountStatus == CC_STATUS_COMPLETE) {
 				taskInfo.html("Your cohort has been processed successfully. ");
