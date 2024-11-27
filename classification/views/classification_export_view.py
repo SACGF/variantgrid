@@ -18,6 +18,7 @@ from requests.models import Response
 from rest_framework.views import APIView
 
 from classification.enums import ShareLevel
+from classification.models import EvidenceKeyMap
 from classification.models.classification import ClassificationModification
 from classification.models.classification_ref import ClassificationRef
 from classification.views.classification_export_report import ClassificationReport
@@ -118,6 +119,8 @@ def _export_view_context(request: HttpRequest) -> dict:
     ]
 
     labs_for_user = list(sorted(Lab.valid_labs_qs(request.user, admin_check=True)))
+    downloadable_field_counts = len(EvidenceKeyMap.cached().vital())
+    all_field_counts = len(EvidenceKeyMap.cached().all_keys)
 
     return {
         'labs': labs,
@@ -128,7 +131,10 @@ def _export_view_context(request: HttpRequest) -> dict:
         'formats': formats,
         'default_format': format_csv,
         'base_url': get_url_from_view_path(reverse('classification_export_api')),
-        'base_url_redirect': get_url_from_view_path(reverse('classification_export_redirect'))
+        'base_url_redirect': get_url_from_view_path(reverse('classification_export_redirect')),
+        'restricted_data': settings.CLASSIFICATION_DOWNLOADABLE_FIELDS != "*" or not settings.CLASSIFICATION_DOWNLOADABLE_NOTES_AND_EXPLAINS,
+        'restricted_evidence_keys_comment': f'Allowing {downloadable_field_counts} of {all_field_counts} Evidence Keys in download',
+        'restricted_notes_and_explains_comment': "Allows notes and comments" if settings.CLASSIFICATION_DOWNLOADABLE_NOTES_AND_EXPLAINS else "Excludes notes and comments"
     }
 
 
@@ -329,7 +335,7 @@ def internal_lab_download(request):
 
         response = ClassificationExportFormatterCSV(
             filter_data,
-            FormatDetailsCSV(exclude_discordances=True, exclude_transient=True)
+            FormatDetailsCSV(exclude_discordances=True, exclude_transient=True, full_detail=True)
         ).serve()
         return response
     else:

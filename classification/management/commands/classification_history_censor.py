@@ -48,7 +48,7 @@ class DataFixer:
 class Command(BaseCommand):
 
     def add_arguments(self, parser):
-        parser.add_argument('--lab', type=str, required=True)
+        parser.add_argument('--lab', type=str, required=False)
         parser.add_argument('--pattern', type=str, required=True)
         parser.add_argument('--pattern_icase', action='store_true')
         parser.add_argument('--apply', type=int, default=0)
@@ -61,7 +61,8 @@ class Command(BaseCommand):
         apply_remaining = options["apply"]
         replacement = options["replacement"]
 
-        print(f"Lab = {str(Lab.objects.get(id=lab_id))}")
+        if lab_id:
+            print(f"Lab = {str(Lab.objects.get(id=lab_id))}")
         print(f"Pattern = {pattern}, icase = {pattern_icase}")
         print(f"Apply to = {apply_remaining}")
         print(f"Replacement = \"{replacement}\"")
@@ -69,7 +70,11 @@ class Command(BaseCommand):
         bad_pattern = re.compile(pattern, flags=re.IGNORECASE if pattern_icase else 0)
         data_fixer = DataFixer(bad_pattern, replacement)
 
-        for classification in Classification.objects.filter(lab_id=lab_id).iterator():
+        qs = Classification.objects.all()
+        if lab_id:
+            qs = qs.filter(lab_id=lab_id)
+
+        for classification in qs.iterator():
             changes = []
             if class_change := data_fixer.fix_classification_data("classification", classification.evidence):
                 changes.append(class_change)

@@ -1119,3 +1119,6 @@ def get_s3_secrets() -> dict:
         "AWS_S3_ACCESS_KEY_ID": get_secret("AWS.S3.access_key_id"),
         "AWS_S3_SECRET_ACCESS_KEY": get_secret("AWS.S3.secret_access_key")
     }
+
+CLASSIFICATION_DOWNLOADABLE_NOTES_AND_EXPLAINS = True
+CLASSIFICATION_DOWNLOADABLE_FIELDS = "*"

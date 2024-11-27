@@ -94,30 +94,36 @@ class UsedKeyTracker:
                  key_value_formatter: KeyValueFormatter,
                  pretty: bool = False,
                  cell_formatter: Optional[Callable[[Any], Any]] = None,
-                 include_explains: bool = False,
-                 ignore_evidence_keys: Optional[set[str]] = None):
+                 include_explains_and_notes: bool = False,
+                 ignore_evidence_keys: Optional[set[str]] = None,
+                 include_only_evidence_keys: Optional[set[str]] = None):
         self.user = user
         self.ekeys = ekeys
         self.key_value_formatter = key_value_formatter
         self.calc_dict: dict[str, UsedKey] = {}
         self.pretty = pretty
         self.cell_formatter = cell_formatter
-        self.include_explains = include_explains
+        self.include_explains_and_notes = include_explains_and_notes
         self.ignore_evidence_keys = ignore_evidence_keys
+        self.include_only_evidence_keys = include_only_evidence_keys
 
     @property
-    def keys_ignore_exclude(self) -> Iterable[EvidenceKey]:
+    def considered_keys(self) -> Iterable[EvidenceKey]:
+        consider_keys = self.ekeys.all_keys
+        if include_only_keys := self.include_only_evidence_keys:
+            consider_keys = [e_key for e_key in consider_keys if e_key.key in include_only_keys]
+
         if self.ignore_evidence_keys:
-            return [e_key for e_key in self.ekeys.all_keys if e_key.key not in self.ignore_evidence_keys]
-        else:
-            return self.ekeys.all_keys
+            consider_keys = [e_key for e_key in consider_keys if e_key.key not in self.ignore_evidence_keys]
+
+        return consider_keys
 
     def all_key_properties(self) -> list[KeyProperty]:
         all_props: list[KeyProperty] = []
-        properties = ['value', 'note']
-        if self.include_explains:
-            properties.append('explain')
-        for e_key in self.keys_ignore_exclude:
+        properties = ['value']
+        if self.include_explains_and_notes:
+            properties += ['note', 'explain']
+        for e_key in self.considered_keys:
             for prop in properties:
                 all_props.append(KeyProperty(key=e_key.key, prop=prop))
         return all_props
@@ -149,7 +155,7 @@ class UsedKeyTracker:
                 has_note = valueObj.get('note') is not None
                 has_explain = valueObj.get('explain') is not None
 
-            if has_value or has_note or (self.include_explains and has_explain):
+            if has_value or (self.include_only_evidence_keys and (has_note or has_explain)):
                 used_key = self.calc_dict.get(key)
                 if not used_key:
                     used_key = UsedKey()
@@ -162,7 +168,7 @@ class UsedKeyTracker:
     @cached_property
     def ordered_keys(self) -> list[UsedKey]:
         ordered_keys: list[UsedKey] = []
-        for ekey in self.keys_ignore_exclude:
+        for ekey in self.considered_keys:
             used_key = self.calc_dict.get(ekey.key)
             if used_key:
                 used_key.ekey = ekey
@@ -174,9 +180,9 @@ class UsedKeyTracker:
         for used_key in self.ordered_keys:
             if used_key.has_value:
                 cols.append(self.key_value_formatter.header_for(used_key.ekey, pretty=self.pretty))
-            if used_key.has_note:
+            if self.include_explains_and_notes and used_key.has_note:
                 cols.append(self.key_value_formatter.header_for(used_key.ekey, is_note=True, pretty=self.pretty))
-            if self.include_explains and used_key.has_explain:
+            if self.include_explains_and_notes and used_key.has_explain:
                 cols.append(self.key_value_formatter.header_for(used_key.ekey, pretty=self.pretty) + '.explain')
         return cols
 
@@ -199,12 +205,12 @@ class UsedKeyTracker:
                             value = str(points)
 
                     cols.append(self.key_value_formatter.value_for(used_key.ekey, value, pretty=self.pretty, cell_formatter=self.cell_formatter))
-            if used_key.has_note:
+            if self.include_explains_and_notes and used_key.has_note:
                 if not value_obj:
                     cols.append(None)
                 else:
                     cols.append(value_obj.get('note'))
-            if self.include_explains and used_key.has_explain:
+            if self.include_explains_and_notes and used_key.has_explain:
                 if not value_obj:
                     cols.append(None)
                 else:

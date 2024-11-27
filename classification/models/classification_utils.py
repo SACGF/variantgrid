@@ -200,6 +200,7 @@ class ClassificationJsonParams:
                  include_lab_config=False,
                  include_messages=True,
                  strip_complicated=False,
+                 strip_notes_and_explains=False,
                  api_version=1,
                  hardcode_extra_data: Dict = None,
                  fix_data_types=False,
@@ -223,6 +224,7 @@ class ClassificationJsonParams:
         self.include_lab_config = include_lab_config
         self.include_messages = include_messages
         self.strip_complicated = strip_complicated
+        self.strip_notes_and_explains = strip_notes_and_explains
         self.api_version = api_version
         self.hardcode_extra_data = hardcode_extra_data
         self.fix_data_types = fix_data_types
