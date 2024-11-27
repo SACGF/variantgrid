@@ -1,0 +1,173 @@
+{% extends "analysis/node_editors/grid_editor.html" %}
+{% load js_tags %}
+{% block content %}
+<style>
+	.slider-container {
+		margin-left: 10px;
+		display: inline-block;
+	}
+
+	.slider {
+		display: inline-block;
+		width: 200px;
+	}
+	
+	.slider label {
+	    position: absolute;
+	    width: 20px;
+	    margin-left: -10px;
+	    text-align: center;
+	    margin-top: 20px;
+	}
+
+	.slider-labels {
+		width: 200px;
+	}
+
+	.label {
+		font-weight: bold;
+	}
+
+	.slider-value {
+        min-width: 50px;
+        height: 25px;
+		margin-left: 15px;
+	}
+
+	.individual-conservation-scores {
+	    display: none;
+	}
+
+</style>
+<script>
+    function showIndividualConservationScores() {
+        $(".individual-conservation-scores").show();
+        $("#show-individual-conservation-scores").hide();
+    }
+
+    function setSliderEnabled(sliderSelector, enabled) {
+        if (enabled) {
+            sliderSelector.slider("enable");
+        } else {
+            sliderSelector.slider("disable");
+        }
+    }
+
+    function setupConservationNodeSlider(inputSelector, sliderSelector, enableInput) {
+        setupSlider(inputSelector, sliderSelector);
+        if (enableInput) {
+            function setEnabledIfChecked() {
+                setSliderEnabled(sliderSelector, enableInput.is(":checked"));
+            }
+            setEnabledIfChecked(); // initial setting
+            enableInput.change(setEnabledIfChecked);
+        }
+    }
+
+    function setIndividualSlidersFromMaster(masterValue) {
+        if ($("#id_use_individual_sliders").is(":checked")) {
+            return;
+        }
+        let floatVal = parseFloat(masterValue);
+
+        {% for field_name in form.individual_conservation_score_fields %}
+            var inputSelector = $("#id_{{ field_name }}");
+            var sliderSelector = $("#{{ field_name }}-slider");
+            var min = parseFloat(inputSelector.attr("min"));
+            var max = parseFloat(inputSelector.attr("max"));
+            var range = max-min;
+            var newSliderValue = min + range * floatVal;
+            sliderSelector.slider('value', newSliderValue);
+            inputSelector.val(newSliderValue);
+            setVisibleSliderValue(inputSelector, sliderSelector, newSliderValue);
+        {% endfor %}
+    }
+
+    function masterSliderChanged(event, ui) {
+        setIndividualSlidersFromMaster(ui.value);
+    }
+
+    $(document).ready(function() {
+        let conservationForm = $("form#conservation-filter");
+        ajaxForm(conservationForm);
+
+        const useIndividualSliders = $("#id_use_individual_sliders");
+        let masterInput = $("#id_any_scaled_min");
+        let masterSlider = $("#any_scaled_min-slider");
+        setupSlider(masterInput, masterSlider);
+
+        function setEnabledIfNotChecked() {
+            setSliderEnabled(masterSlider, !useIndividualSliders.is(":checked"));
+        }
+        useIndividualSliders.change(setEnabledIfNotChecked);
+        setEnabledIfNotChecked();
+        masterSlider.slider('option', 'change', masterSliderChanged);
+
+        {% for field_name in form.individual_conservation_score_fields %}
+            setupConservationNodeSlider($("#id_{{ field_name }}"), $("#{{ field_name }}-slider"), useIndividualSliders);
+        {% endfor %}
+
+        // after all setup, now set from initial master value if applicable
+        setIndividualSlidersFromMaster(masterInput.val());
+    });
+</script>
+<div>
+	<form id="conservation-filter" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+
+		{{ form.non_field_errors }}
+        <table>
+            <tr>
+                <th>{{ form.any_scaled_min.label }}</th>
+                <td>
+                    {{ form.any_scaled_min.errors }}
+                    <span class='slider-container'>
+                        <div class="display-flex">
+                            <div id="any_scaled_min-slider" class='slider'></div>
+                            <div class='label slider-value'></div>
+                        </div>
+                        <div class='slider-labels'>
+                            <span class='label min-value left'></span>
+                            <span class='label max-value right'></span>
+                        </div>
+                    </span>
+                </td>
+            </tr>
+            <tr id="show-individual-conservation-scores">
+                <td colspan="2">
+                    <a class="hover-link" href="javascript:showIndividualConservationScores()">Show Individual Conservation Scores</a>
+                </td>
+            </tr>
+            <tr class="individual-conservation-scores">
+                <th>{{ form.use_individual_sliders.label }}</th>
+                <td>{{ form.use_individual_sliders }}</td>
+            </tr>
+            {% for field_name, field in form.individual_conservation_score_fields.items %}
+                <tr class="individual-conservation-scores">
+                    <th>{{ field.label }}</th>
+                    <td>{{ field.errors }}
+                        <span class='slider-container'>
+                            <div class="display-flex">
+                                <div id="{{ field_name }}-slider" class='slider'></div>
+                                <div class='label slider-value'></div>
+                            </div>
+                            <div class='slider-labels'>
+                                <span class='label min-value left'></span>
+                                <span class='label max-value right'></span>
+                            </div>
+                        </span>
+                    </td>
+                </tr>
+            {% endfor %}
+        </table>
+
+        {% if has_write_permission %}
+    		<button id='damage-save' class="btn btn-primary">save</button>
+        {% endif %}
+	    {{ form.media }}
+	</form>
+</div>
+{% endblock content %}

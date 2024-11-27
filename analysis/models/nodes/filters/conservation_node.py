@@ -2,6 +2,8 @@ import operator
 from functools import cached_property, reduce
 from typing import Optional
 
+from auditlog.registry import auditlog
+
 from analysis.models import AnalysisNode
 from django.db import models
 from django.db.models.query_utils import Q
@@ -28,7 +30,7 @@ class ConservationNode(AnalysisNode):
 
     """
 
-    # Any Scaled Conservation Score (0-1)
+    # master slider - Any Scaled Conservation Score (0-1)
     any_scaled_min = models.FloatField(default=0.0)
 
     # Individual scores - minimums
@@ -39,8 +41,7 @@ class ConservationNode(AnalysisNode):
     phastcons_30_way_mammalian = models.FloatField(default=0.0)
     phastcons_46_way_mammalian = models.FloatField(default=0.0)
     phastcons_100_way_vertebrate = models.FloatField(default=0.0)
-
-    accordion_panel = models.IntegerField(default=0)
+    use_individual_sliders = models.BooleanField(default=False, blank=True)
 
     # Need a way to work out what columns we have
     @cached_property
@@ -63,7 +64,7 @@ class ConservationNode(AnalysisNode):
     def has_phylop_46_way_mammalian(self) -> bool:
         return self.vav.has_phylop_46_way_mammalian
 
-    def _get_individual_fields(self) -> list[str]:
+    def get_individual_fields(self) -> list[str]:
         fields = [
             "gerp_pp_rs",
             "phylop_100_way_vertebrate",
@@ -85,7 +86,7 @@ class ConservationNode(AnalysisNode):
 
     def _get_individual_scores(self, include_zero=False) -> dict[str, float]:
         scores = {}
-        for f in self._get_individual_fields():
+        for f in self.get_individual_fields():
             score = getattr(self, f)
             if include_zero or score:
                 scores[f] = score
@@ -93,7 +94,7 @@ class ConservationNode(AnalysisNode):
 
     def _get_scaled_scores(self, fraction: int) -> dict[str, float]:
         scores = {}
-        for f in self._get_individual_fields():
+        for f in self.get_individual_fields():
             cons_stats = VariantAnnotation.CONSERVATION_SCORES
             min_score = cons_stats["min"]
             max_score = cons_stats["max"]
@@ -103,19 +104,19 @@ class ConservationNode(AnalysisNode):
         return scores
 
     def _get_scores(self):
-        if self.accordion_panel == 0:
-            score_dict = self._get_scaled_scores(self.any_scaled_min)
-        else:
+        if self.use_individual_sliders:
             score_dict = self._get_individual_scores(include_zero=False)
+        else:
+            score_dict = self._get_scaled_scores(self.any_scaled_min)
         return score_dict
 
     def modifies_parents(self):
-        if self.accordion_panel == 0:
-            return self.any_scaled_min > 0.0
-        else:
+        if self.use_individual_sliders:
             for _field, score in self._get_individual_scores():
                 if score > 0.0:
                     return True
+        else:
+            return self.any_scaled_min > 0.0
         return False
 
     def _get_node_q(self) -> Optional[Q]:
@@ -129,13 +130,13 @@ class ConservationNode(AnalysisNode):
 
     def _get_filtering_description(self):
         filtering = []
-        if self.accordion_panel == 0:
-            if self.any_scaled_min > 0.0:
-                filtering.append(f"any > {self.any_scaled_min}")
-        else:
+        if self.use_individual_sliders:
             scores = self._get_scores()
             for field, score in scores.items():
                 filtering.append(f"{field} >= {score}")
+        else:
+            if self.any_scaled_min > 0.0:
+                filtering.append(f"any > {self.any_scaled_min}")
         return filtering
 
     def _get_method_summary(self):
@@ -155,3 +156,6 @@ class ConservationNode(AnalysisNode):
     @staticmethod
     def get_node_class_label():
         return "Conservation"
+
+
+auditlog.register(ConservationNode)
