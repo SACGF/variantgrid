@@ -103,6 +103,10 @@ class SomalierSampleExtract(models.Model):
     hom_count = models.IntegerField(default=0)
     unk_count = models.IntegerField(default=0)
 
+    @property
+    def has_sufficient_data(self) -> bool:
+        return self.het_count >= 1000 and self.hom_count >= 1000
+
 
 class SomalierAncestryRun(AbstractSomalierModel):
     """ We do a run against a whole VCF """
