@@ -552,7 +552,7 @@ class EvidenceKeyAdmin(ModelAdminBasics):
     list_per_page = 500
     list_filter = (EvidenceKeySectionFilter, MaxShareLevelFilter)
     ordering = ('key',)
-    list_display = ('key', 'label', 'value_type', 'max_share_level', 'evidence_category', 'order')
+    list_display = ('key', 'label', 'value_type', 'max_share_level', 'evidence_category', 'order', 'hide', 'is_downloadable', 'created_detailed', 'modified_detailed')
     search_fields = ('key', 'label')
 
     fieldsets = (
@@ -564,6 +564,18 @@ class EvidenceKeyAdmin(ModelAdminBasics):
         ('Help', {'fields': ('description', 'examples', 'see')}),
         ('Admin', {'fields': ('max_share_level', 'copy_consensus', 'variantgrid_column', 'immutable')})
     )
+
+    @admin_list_column(short_description="Downloadable", is_boolean=True)
+    def is_downloadable(self, obj: EvidenceKey):
+        return obj.is_vital_key
+
+    @admin_list_column(short_description="Created", order_field="created")
+    def created_detailed(self, obj: EvidenceKey):
+        return self.format_datetime_seconds(obj.created)
+
+    @admin_list_column(short_description="Modified", order_field="modified")
+    def modified_detailed(self, obj: EvidenceKey):
+        return self.format_datetime_seconds(obj.modified)
 
     @admin_action("Validate key")
     def validate(self, request, queryset):

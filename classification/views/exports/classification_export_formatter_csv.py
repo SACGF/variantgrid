@@ -36,9 +36,6 @@ class FormatDetailsCSV:
     # format evidence keys to nice human labels or leave as raw codes easier handled by code
     pretty: bool = False
 
-    # include the explain keys (text that lets labs explain their process), notes (human entered text) are always included
-    include_explains: bool = False
-
     # exclude fields that change between environments, makes it easier to compare changes if the same data is in both environments
     exclude_transient: bool = False
 
@@ -47,22 +44,27 @@ class FormatDetailsCSV:
 
     html_handling: CSVCellFormatting = CSVCellFormatting.PURE_TEXT
 
+    full_detail: bool = False
+    """
+    Only to be set True to admins to get f
+    """
+
     @staticmethod
     def from_request(request: HttpRequest) -> 'FormatDetailsCSV':
         pretty = request.query_params.get('value_format') == 'labels'
-        include_explains = request.query_params.get('include_explains') == 'true'
         exclude_transient = request.query_params.get('exclude_transient') == 'true'
         exclude_discordances = request.query_params.get('exclude_discordances') == 'true'
+        full_detail = settings.CLASSIFICATION_DOWNLOADABLE_NOTES_AND_EXPLAINS or (request.query_params.get('full_detail') == 'true' and request.user.is_superuser)
         html_handling = CSVCellFormatting.PURE_TEXT
         if html_handling_str := request.query_params.get('html_handling'):
             html_handling = CSVCellFormatting(html_handling_str.upper())
 
         return FormatDetailsCSV(
             pretty=pretty,
-            include_explains=include_explains,
             exclude_transient=exclude_transient,
             exclude_discordances=exclude_discordances,
-            html_handling=html_handling
+            html_handling=html_handling,
+            full_detail=full_detail
         )
 
     @property
@@ -220,13 +222,18 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
     @cached_property
     def used_keys(self) -> UsedKeyTracker:
 
+        consider_only = None
+        if not self.format_details.full_detail:
+            consider_only = [e_key.key for e_key in self.e_keys.vital()]
+
         used_keys = UsedKeyTracker(
             self.classification_filter.user,
             self.e_keys, KeyValueFormatter(),
             pretty=self.format_details.pretty,
             cell_formatter=self.format_details.html_handling.format,
-            include_explains=self.format_details.include_explains,
-            ignore_evidence_keys=self.format_details.ignore_evidence_keys
+            ignore_evidence_keys=self.format_details.ignore_evidence_keys,
+            include_only_evidence_keys=consider_only,
+            include_explains_and_notes=self.format_details.full_detail
         )
         # apparently this is signficantly quicker than the attempt to use an aggregate
         for evidence in self.classification_filter.cms_qs.values_list('published_evidence', flat=True).iterator(chunk_size=1000):

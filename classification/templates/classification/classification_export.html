@@ -56,7 +56,13 @@
             params.row_limit = rowLimit;
         }
 
-        if (format === 'mvl') {
+        if (format === 'json') {
+            let fullDetail = $("input[name='json_full_detail']:checked");
+            if (fullDetail && fullDetail.length) {
+                params.full_detail = 'true'
+            }
+
+        } else if (format === 'mvl') {
             let mvlFileFormat = $("input[name='mvl_file_format']:checked").val();
             if (mvlFileFormat) {
                 params.file_format = mvlFileFormat;
@@ -96,14 +102,21 @@
                 params.html_handling = htmlHandling;
             }
 
+                {% comment %}
             let includeExplains = $("input[name='include_explains']:checked");
             if (includeExplains && includeExplains.length) {
                 params.include_explains = 'true';
             }
+                {% endcomment %}
 
             let excludeTransient = $("input[name='exclude_transient']:checked");
             if (excludeTransient && excludeTransient.length) {
                 params.exclude_transient = 'true';
+            }
+
+            let fullDetail = $("input[name='csv_full_detail']:checked");
+            if (fullDetail && fullDetail.length) {
+                params.full_detail = 'true'
             }
         }
 
@@ -393,6 +406,7 @@
                 </label>
             </div>
         {% endlabelled %}
+        {% comment %}
         {% labelled label="Include Explains" admin_only=True %}
              <div class="form-check">
                 <label class="form-check-label">
@@ -401,6 +415,7 @@
                 </label>
             </div>
         {% endlabelled %}
+        {% endcomment %}
         {% labelled label="Cross-Environment Comparison" admin_only=True %}
              <div class="form-check">
                 <label class="form-check-label">
@@ -409,6 +424,18 @@
                 </label>
             </div>
         {% endlabelled %}
+        {% if restricted_data %}
+            {% labelled label="Detail Level" admin_only=True %}
+                 <div class="form-check">
+                    <label class="form-check-label">
+                        <input id="csv_full_detail" name="csv_full_detail" value="true" type="checkbox" class="form-check-input" />
+                        Download all columns, notes, explain. If un-ticked a cut down version that normal users receive based on
+                        <span class="hover-help" title="{{ restricted_evidence_keys_comment }}">settings.CLASSIFICATION_DOWNLOADABLE_FIELDS</span> and
+                        <span class="hover-help" title="{{ restricted_notes_and_explains_comment }}">settings.CLASSIFICATION_DOWNLOADABLE_NOTES_AND_EXPLAINS</span>.
+                    </label>
+                </div>
+            {% endlabelled %}
+        {% endif %}
     </div>
     <div id="format-options">
         <div class="custom-option" data-format="mvl">
@@ -499,6 +526,20 @@
             {% endlabelled %}
         </div>
         <div class="custom-option" data-format="json">
+
+             {% if restricted_data %}
+                 {% labelled label="Detail Level" admin_only=True %}
+                     <div class="form-check">
+                        <label class="form-check-label">
+                            <input id="json_full_detail" name="json_full_detail" value="true" type="checkbox" class="form-check-input" />
+                            Download all columns, notes, explain. If un-ticked a cut down version that normal users receive based on
+                            <span class="hover-help" title="{{ restricted_evidence_keys_comment }}">settings.CLASSIFICATION_DOWNLOADABLE_FIELDS</span> and
+                            <span class="hover-help" title="{{ restricted_notes_and_explains_comment }}">settings.CLASSIFICATION_DOWNLOADABLE_NOTES_AND_EXPLAINS</span>.
+                        </label>
+                    </div>
+                {% endlabelled %}
+            {% endif %}
+
             {% labelled label="JSON Grouping" %}
                 The JSON file will have one object per variant classification.<br/>
                 Selecting different genome builds will not affect the JSON, it will include Shariant available data for each genome build in the allele section of the record.

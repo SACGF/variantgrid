@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from classification.enums import ShareLevel, EvidenceKeyValueType, SpecialEKeys
 from classification.models import Classification, ClassificationJsonParams, ClassificationModification, EvidenceKeyMap, \
     ImportedAlleleInfo
@@ -136,12 +138,13 @@ def populate_classification_json(classification: Classification, params: Classif
     include_lab_config = params.include_lab_config
     include_messages = params.include_messages
     strip_complicated = params.strip_complicated
+    strip_notes_and_explains = params.strip_notes_and_explains
     api_version = params.api_version
 
     if version and not isinstance(version, ClassificationModification):
         version = classification.modification_at_timestamp(version)
 
-    include_data_bool = include_data or flatten
+    include_data_bool = bool(include_data) or flatten
 
     title = classification.lab.group_name + '/' + classification.lab_record_id
     # have version and last_edited as separate as we might be looking at an older version
@@ -275,18 +278,35 @@ def populate_classification_json(classification: Classification, params: Classif
                 if isinstance(value, str):
                     blob['value'] = [s.strip() for s in value.split(',')]
 
-    for key, blob in data.items():
-        if strip_complicated:
-            remove_keys = set(blob.keys()) - {'value', 'note', 'explain', 'db_refs'}
-            for remove_key in remove_keys:
-                blob.pop(remove_key)
-        elif not include_messages:
-            blob.pop('validation', None)
-
-    if flatten:
-        data = Classification.flatten(data, ignore_none_values=True)
-
     if include_data_bool:
+        # Optionally filter the JSON attributes based on what was requested
+        # strip_notes_and_explains: strip everything but value and validation
+        # strip_complicated: strip everything but value, note, explain, db_refs and validation (e.g. strip immutable)
+        # include_messages: determines if validation messages will be included or not
+        if strip_notes_and_explains or strip_complicated or not include_messages:
+            keep_attributes = defaultdict(lambda: True)
+            if strip_notes_and_explains:
+                keep_attributes = {"value": True}
+            elif strip_complicated:
+                keep_attributes = {"value": True, "note": True, "explain": True, "db_refs": True}
+            keep_attributes["validation"] = include_messages
+
+            new_data = {}
+            for key, blob in data.items():
+                if blob:
+                    new_blob = {}
+                    for attribute_key, attribute_value in blob.items():
+                        if keep_attributes.get(attribute_key):
+                            new_blob[attribute_key] = attribute_value
+                    blob = new_blob
+                if blob:
+                    new_data[key] = blob
+            data = new_data
+        # End stripping attributes
+
+        if flatten:
+            data = Classification.flatten(data, ignore_none_values=True)
+
         content['data'] = data
     else:
         content.pop('data', None)

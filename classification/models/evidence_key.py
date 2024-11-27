@@ -8,6 +8,7 @@ from functools import cached_property
 from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set, TypedDict, cast
 
 import pydantic
+from django.conf import settings
 from django.db import models
 from django.db.models.deletion import SET_NULL
 from django_extensions.db.models import TimeStampedModel
@@ -487,6 +488,13 @@ class EvidenceKey(TimeStampedModel):
             name = self.key
         return name
 
+    @property
+    def is_vital_key(self) -> bool:
+        if settings.CLASSIFICATION_DOWNLOADABLE_FIELDS == "*":
+            return True
+        else:
+            return self.key in settings.CLASSIFICATION_DOWNLOADABLE_FIELDS
+
 
 class EvidenceKeyMap:
 
@@ -593,6 +601,9 @@ class EvidenceKeyMap:
         :return: A list of ALL criteria EvidenceKeys, includes standard ACMG and custom ones with namespaces
         """
         return [eKey for eKey in self.all_keys if eKey.value_type == EvidenceKeyValueType.CRITERIA]
+
+    def vital(self) -> List[EvidenceKey]:
+        return [e_key for e_key in self.all_keys if e_key.is_vital_key]
 
     def acmg_criteria(self) -> List[EvidenceKey]:
         """
