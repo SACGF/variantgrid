@@ -62,6 +62,8 @@
 
     function setupDamageNodeSlider(inputSelector, sliderSelector, enableInput) {
         setupSlider(inputSelector, sliderSelector);
+        let sliderVal = inputSelector.val();
+
         if (enableInput) {
             let row = enableInput.parents("tr");
             let filterRequired = $(".filter-required", row);
