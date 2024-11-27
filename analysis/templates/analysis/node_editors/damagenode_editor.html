@@ -59,29 +59,66 @@
         $("#show-individual-pathogenic-prediction").hide();
     }
 
+
+    function setupDamageNodeSlider(inputSelector, sliderSelector, enableInput) {
+        setupSlider(inputSelector, sliderSelector);
+        if (enableInput) {
+            let row = enableInput.parents("tr");
+            let filterRequired = $(".filter-required", row);
+            let frInputs = $("input", filterRequired);
+
+            enableInput.change(function () {
+                if ($(this).is(":checked")) {
+                    sliderSelector.slider("enable");
+                    frInputs.prop("disabled", false);
+                } else {
+                    setVisibleSliderValue(inputSelector, sliderSelector, "");
+                    sliderSelector.slider({value: 0})
+                    sliderSelector.slider("disable");
+                    inputSelector.val("");
+                    frInputs.prop("disabled", true);
+                }
+            });
+            if (sliderVal === '') {
+                enableInput.prop("checked", false);
+                frInputs.prop("disabled", true);
+            } else {
+                enableInput.prop("checked", true);
+                frInputs.prop("disabled", false);
+            }
+        }
+
+        if (sliderVal === '') {
+            sliderSelector.slider("disable");
+        } else {
+            sliderSelector.slider("enable");
+        }
+    }
+
+
     $(document).ready(function() {
         let damageForm = $("form#damage-filter");
         ajaxForm(damageForm);
         accordionForm(damageForm);
 
-        setupSlider($("#id_splice_min"), $("#splice-slider"), $("input#enable-splice"));
-        setupSlider($("#id_cosmic_count_min"), $("#cosmic-count-slider"), $("input#enable-cosmic-count"));
-        setupSlider($("#id_damage_predictions_min"), $("#damage-predictions-min-slider"), $("input#enable-damage-predictions"));
+        setupDamageNodeSlider($("#id_splice_min"), $("#splice-slider"), $("input#enable-splice"));
+        setupDamageNodeSlider($("#id_cosmic_count_min"), $("#cosmic-count-slider"), $("input#enable-cosmic-count"));
+        setupDamageNodeSlider($("#id_damage_predictions_min"), $("#damage-predictions-min-slider"), $("input#enable-damage-predictions"));
 
         {% if node.columns_version == 1 %}
-            setupSlider($("#id_cadd_score_min"), $("#cadd-slider"), $("input#enable-cadd"));
-            setupSlider($("#id_revel_score_min"), $("#revel-slider"), $("input#enable-revel"));
+            setupDamageNodeSlider($("#id_cadd_score_min"), $("#cadd-slider"), $("input#enable-cadd"));
+            setupDamageNodeSlider($("#id_revel_score_min"), $("#revel-slider"), $("input#enable-revel"));
         {% elif node.columns_version >= 2 %}
             {% if node.columns_version >= 3 %}
-                setupSlider($("#id_alphamissense_rankscore_min"), $("#alphamissense_rankscore-slider"), $("input#enable-alphamissense_rankscore"));
+                setupDamageNodeSlider($("#id_alphamissense_rankscore_min"), $("#alphamissense_rankscore-slider"), $("input#enable-alphamissense_rankscore"));
             {% endif %}
 
-            setupSlider($("#id_bayesdel_noaf_rankscore_min"), $("#bayesdel_noaf_rankscore-slider"), $("input#enable-bayesdel_noaf_rankscore"));
-            setupSlider($("#id_cadd_raw_rankscore_min"), $("#cadd_raw_rankscore-slider"), $("input#enable-cadd_raw_rankscore"));
-            setupSlider($("#id_clinpred_rankscore_min"), $("#clinpred_rankscore-slider"), $("input#enable-clinpred_rankscore"));
-            setupSlider($("#id_metalr_rankscore_min"), $("#metalr_rankscore-slider"), $("input#enable-metalr_rankscore"));
-            setupSlider($("#id_revel_rankscore_min"), $("#revel_rankscore-slider"), $("input#enable-revel_rankscore"));
-            setupSlider($("#id_vest4_rankscore_min"), $("#vest4_rankscore-slider"), $("input#enable-vest4_rankscore"));
+            setupDamageNodeSlider($("#id_bayesdel_noaf_rankscore_min"), $("#bayesdel_noaf_rankscore-slider"), $("input#enable-bayesdel_noaf_rankscore"));
+            setupDamageNodeSlider($("#id_cadd_raw_rankscore_min"), $("#cadd_raw_rankscore-slider"), $("input#enable-cadd_raw_rankscore"));
+            setupDamageNodeSlider($("#id_clinpred_rankscore_min"), $("#clinpred_rankscore-slider"), $("input#enable-clinpred_rankscore"));
+            setupDamageNodeSlider($("#id_metalr_rankscore_min"), $("#metalr_rankscore-slider"), $("input#enable-metalr_rankscore"));
+            setupDamageNodeSlider($("#id_revel_rankscore_min"), $("#revel_rankscore-slider"), $("input#enable-revel_rankscore"));
+            setupDamageNodeSlider($("#id_vest4_rankscore_min"), $("#vest4_rankscore-slider"), $("input#enable-vest4_rankscore"));
         {% endif %}
 
         if (showRequiredFilter) {

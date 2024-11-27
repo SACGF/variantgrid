@@ -10,6 +10,7 @@ from django_starfield import Stars
 from analysis import models
 from analysis.models import AnalysisNode, AnalysisTemplateType, Analysis, MOINode
 from analysis.models.nodes.analysis_node import NodeVCFFilter, NodeAlleleFrequencyFilter
+from analysis.models.nodes.filters.conservation_node import ConservationNode
 from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
 from analysis.models.nodes.filters.intersection_node import IntersectionNode
@@ -27,6 +28,7 @@ from analysis.models.nodes.sources.cohort_node import CohortNode, CohortNodeZygo
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.trio_node import TrioNode
+from annotation.models import VariantAnnotation
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.hgvs import get_hgvs_variant_coordinate, get_hgvs_variant, HGVSException
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAppPanel
@@ -286,6 +288,31 @@ class CohortNodeForm(VCFSourceNodeForm):
         if commit:
             node.save()
         return node
+
+
+class ConservationNodeForm(BaseNodeForm):
+    class Meta:
+        model = ConservationNode
+        exclude = ANALYSIS_NODE_FIELDS
+        widgets = {
+            "any_scaled_min": HiddenInput(attrs={"min": 0, "max": 1, "step": 0.05}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        num_steps = 20
+        for field_name, field in self.individual_conservation_score_fields.items():
+            data = VariantAnnotation.CONSERVATION_SCORES[field_name]
+            step = (data['max'] - data['min']) / num_steps
+            field.widget = HiddenInput(attrs={"min": data['min'], "max": data['max'], "step": step})
+
+    @property
+    def individual_conservation_score_fields(self) -> dict:
+        conservation_score_fields = {}
+        for field_name in self.instance.get_individual_field_names():
+            field = self.fields[field_name]
+            conservation_score_fields[field_name] = field
+        return conservation_score_fields
 
 
 class DamageNodeForm(BaseNodeForm):
