@@ -306,11 +306,10 @@ class ConservationNodeForm(BaseNodeForm):
             step = (data['max'] - data['min']) / num_steps
             field.widget = HiddenInput(attrs={"min": data['min'], "max": data['max'], "step": step})
 
-
     @property
     def individual_conservation_score_fields(self) -> dict:
         conservation_score_fields = {}
-        for field_name in self.instance.get_individual_fields():
+        for field_name in self.instance.get_individual_field_names():
             field = self.fields[field_name]
             conservation_score_fields[field_name] = field
         return conservation_score_fields

@@ -35,12 +35,13 @@ class ConservationNode(AnalysisNode):
 
     # Individual scores - minimums
     gerp_pp_rs = models.FloatField(default=0.0)
-    phylop_30_way_mammalian = models.FloatField(default=0.0)
-    phylop_46_way_mammalian = models.FloatField(default=0.0)
+    phylop_30_way_mammalian = models.FloatField(default=0.0, blank=True)  # 38 only
+    phylop_46_way_mammalian = models.FloatField(default=0.0, blank=True)  # 37 only
     phylop_100_way_vertebrate = models.FloatField(default=0.0)
-    phastcons_30_way_mammalian = models.FloatField(default=0.0)
-    phastcons_46_way_mammalian = models.FloatField(default=0.0)
+    phastcons_30_way_mammalian = models.FloatField(default=0.0, blank=True)  # 38 only
+    phastcons_46_way_mammalian = models.FloatField(default=0.0, blank=True)  # 37 only
     phastcons_100_way_vertebrate = models.FloatField(default=0.0)
+    allow_null = models.BooleanField(default=False, blank=True)
     use_individual_sliders = models.BooleanField(default=False, blank=True)
 
     # Need a way to work out what columns we have
@@ -64,79 +65,95 @@ class ConservationNode(AnalysisNode):
     def has_phylop_46_way_mammalian(self) -> bool:
         return self.vav.has_phylop_46_way_mammalian
 
-    def get_individual_fields(self) -> list[str]:
-        fields = [
-            "gerp_pp_rs",
-            "phylop_100_way_vertebrate",
-            "phastcons_100_way_vertebrate"
-        ]
+    def get_individual_field_names(self) -> list[str]:
+        return list(self.get_individual_field_names_allow_null().keys())
+
+    def get_individual_field_names_allow_null(self) -> dict[str, bool]:
+        fields = {
+            "gerp_pp_rs": False,  # Is in dbNSFP - so all intergenic will be NULL
+            "phylop_100_way_vertebrate": True,
+            "phastcons_100_way_vertebrate": True,
+        }
         if self.has_phastcons_30_way_mammalian:
-            fields.append("phastcons_30_way_mammalian")
+            fields["phastcons_30_way_mammalian"] = True
 
         if self.has_phastcons_46_way_mammalian:
-            fields.append("phastcons_46_way_mammalian")
+            fields["phastcons_46_way_mammalian"] = True
 
         if self.has_phylop_30_way_mammalian:
-            fields.append("phylop_30_way_mammalian")
+            fields["phylop_30_way_mammalian"] = True
 
         if self.has_phylop_46_way_mammalian:
-            fields.append("phylop_46_way_mammalian")
+            fields["phylop_46_way_mammalian"] = True
 
         return fields
 
-    def _get_individual_scores(self, include_zero=False) -> dict[str, float]:
+    def _get_individual_scores(self) -> dict[str, tuple[float, bool]]:
         scores = {}
-        for f in self.get_individual_fields():
-            score = getattr(self, f)
-            if include_zero or score:
-                scores[f] = score
+        for f, allow_null in self.get_individual_field_names_allow_null().items():
+            scores[f] = (getattr(self, f), allow_null)
         return scores
 
-    def _get_scaled_scores(self, fraction: int) -> dict[str, float]:
+    def _get_scaled_scores(self, fraction: int) -> dict[str, tuple[float, bool]]:
         scores = {}
-        for f in self.get_individual_fields():
-            cons_stats = VariantAnnotation.CONSERVATION_SCORES
+        for field_name, allow_null in self.get_individual_field_names_allow_null().items():
+            cons_stats = VariantAnnotation.CONSERVATION_SCORES[field_name]
             min_score = cons_stats["min"]
             max_score = cons_stats["max"]
             score_range = max_score - min_score
-            scores[f] = min_score + fraction * score_range
-
+            score = min_score + fraction * score_range
+            scores[field_name] = (score, allow_null)
         return scores
 
-    def _get_scores(self):
+    def _get_scores_and_allow_null(self):
         if self.use_individual_sliders:
-            score_dict = self._get_individual_scores(include_zero=False)
+            score_dict = self._get_individual_scores()
         else:
             score_dict = self._get_scaled_scores(self.any_scaled_min)
         return score_dict
 
     def modifies_parents(self):
         if self.use_individual_sliders:
-            for _field, score in self._get_individual_scores():
-                if score > 0.0:
+            for field_name, (score, _allow_null) in self._get_individual_scores().items():
+                cons_stats = VariantAnnotation.CONSERVATION_SCORES[field_name]
+                min_score = cons_stats["min"]
+                if score > min_score:
                     return True
         else:
             return self.any_scaled_min > 0.0
         return False
 
     def _get_node_q(self) -> Optional[Q]:
-        score_dict = self._get_scores()
+        score_dict = self._get_scores_and_allow_null()
 
         q_list = []
-        for field, score in score_dict.items():
-            q_list.append(Q(**{f"variantannotation__{field}__gte": score}))
-        q = reduce(operator.or_, q_list)
-        return q
+        for field, (score, allow_null) in score_dict.items():
+            field_q_list = [
+                Q(**{f"variantannotation__{field}__gte": score})
+            ]
+            if self.allow_null and allow_null:
+                # I think we always have conservation scores but might as do this in case we miss any
+                q_null = Q(**{f"variantannotation__{field}__isnull": True})
+                field_q_list.append(q_null)
+            q_field = reduce(operator.or_, field_q_list)
+            q_list.append(q_field)
+        return reduce(operator.or_, q_list)
 
     def _get_filtering_description(self):
         filtering = []
         if self.use_individual_sliders:
-            scores = self._get_scores()
-            for field, score in scores.items():
-                filtering.append(f"{field} >= {score}")
+            scores = self._get_scores_and_allow_null()
+            for field, (score, allow_null) in scores.items():
+                desc = f"{field} >= {score}"
+                if self.allow_null and allow_null:
+                    desc += " (or null)"
+                filtering.append(desc)
         else:
             if self.any_scaled_min > 0.0:
-                filtering.append(f"any > {self.any_scaled_min}")
+                desc = f"any > {self.any_scaled_min}"
+                if self.allow_null:
+                    desc += " (or null)"
+                filtering.append(desc)
         return filtering
 
     def _get_method_summary(self):

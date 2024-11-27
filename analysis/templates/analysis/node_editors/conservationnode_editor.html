@@ -109,6 +109,9 @@
 
         // after all setup, now set from initial master value if applicable
         setIndividualSlidersFromMaster(masterInput.val());
+        if (useIndividualSliders.is(":checked")) {
+            showIndividualConservationScores();
+        }
     });
 </script>
 <div>
@@ -135,6 +138,10 @@
                         </div>
                     </span>
                 </td>
+            </tr>
+            <tr>
+                <th>{{ form.allow_null.label }}</th>
+                <td>{{ form.allow_null }}</td>
             </tr>
             <tr id="show-individual-conservation-scores">
                 <td colspan="2">
