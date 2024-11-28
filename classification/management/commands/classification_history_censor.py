@@ -1,4 +1,6 @@
+import socket
 from dataclasses import dataclass
+import datetime
 from typing import Any, Optional
 
 from django.core.management import BaseCommand
@@ -8,13 +10,15 @@ from classification.models import Classification
 from snpdb.models import Lab
 
 
+VERSION = 2
+
 @dataclass
 class DataFix:
     field: str
-    suspect_value: str
+    suspect_values: list[str]
 
     def __str__(self):
-        return f"{self.field}: !{self.suspect_value}!"
+        return f"{self.field}: {', '.join(self.suspect_values)}"
 
 @dataclass
 class DataFixRun:
@@ -37,9 +41,21 @@ class DataFixer:
             if isinstance(blob, dict):
                 if text := blob.get("value"):
                     if isinstance(text, str):
-                        if matches := self.bad_pattern.findall(text):
-                            modifications.append(DataFix(key, ", ".join(matches)))
+                        suspect_values = []
+                        for match in self.bad_pattern.finditer(text):
+                            start = match.start()
+                            while start > 0 and text[start-1] not in {" ", "\t", "\n", ">"}:
+                                start -= 1
+                            end = match.end()
+                            while end < len(text) - 1 and text[end] not in {" ", "\t", "\n", ">"}:
+                                end += 1
+                            suspect_value = text[start:end]
+                            suspect_values.append(suspect_value)
+
+                        if suspect_values:
+                            modifications.append(DataFix(field=key, suspect_values=suspect_values))
                             blob["value"] = self.replacement
+
 
         if modifications:
             return DataFixRun(type=type, fixes=modifications)
@@ -55,24 +71,39 @@ class Command(BaseCommand):
         parser.add_argument('--replacement', type=str, required=True)
 
     def handle(self, *args, **options):
-        lab_id = options["lab"]
+        lab_id:str = options["lab"]
         pattern = options["pattern"]
         pattern_icase = options["pattern_icase"]
         apply_remaining = options["apply"]
         replacement = options["replacement"]
 
+        print(f"History Redactor v {VERSION}")
+        print(f"Server: {socket.gethostname()}")
+        print(f"Server Time: {datetime.datetime.now()}")
+
+        lab: Optional[Lab] = None
         if lab_id:
-            print(f"Lab = {str(Lab.objects.get(id=lab_id))}")
+            if lab_id.isnumeric():
+                lab = Lab.objects.get(id=lab_id)
+            else:
+                lab = Lab.objects.get(group_name=lab_id)
+            print(f"Lab = {str(lab)}")
+
         print(f"Pattern = {pattern}, icase = {pattern_icase}")
-        print(f"Apply to = {apply_remaining}")
+        if not apply_remaining:
+            print("Dry Run - NO UPDATES")
+        else:
+            print(f"Apply to = {apply_remaining}")
         print(f"Replacement = \"{replacement}\"")
+
+        print("")
 
         bad_pattern = re.compile(pattern, flags=re.IGNORECASE if pattern_icase else 0)
         data_fixer = DataFixer(bad_pattern, replacement)
 
         qs = Classification.objects.all()
-        if lab_id:
-            qs = qs.filter(lab_id=lab_id)
+        if lab:
+            qs = qs.filter(lab=lab)
 
         for classification in qs.iterator():
             changes = []
@@ -101,3 +132,5 @@ class Command(BaseCommand):
                 if apply_remaining:
                     print("UPDATED")
                     apply_remaining -= 1
+
+        print("FINISHED")
