@@ -171,6 +171,7 @@ class RichColumn:
             if key.startswith('-'):
                 key = key[1:]
                 use_desc = not use_desc
+
             if use_desc:
                 return F(key).desc(nulls_last=True)
             else:
