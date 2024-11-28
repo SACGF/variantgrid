@@ -10,6 +10,8 @@ from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, 
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
+from more_itertools import last
+
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
 from django.db import models, transaction
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
@@ -168,24 +170,24 @@ class AlleleOriginGrouping(TimeStampedModel):
         # TODO manage pending classifications
 
 
-@dataclass
-class ClassificationSubGrouping:
-    latest_modification: ClassificationModification
-    count: int
-
-    @staticmethod
-    def from_modifications(modifications: list[ClassificationModification]) -> list['ClassificationSubGrouping']:
-        # subgroup by classification value for germline and
-        by_status: dict[str, ClassificationSubGrouping] = {}
-        for mod in modifications:
-            key = str(mod.somatic_clinical_significance_value) + str(mod.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
-            if existing := by_status.get(key):
-                existing.count += 1
-                existing.latest_modification = max(mod, existing.latest_modification, key=lambda m: (m.curated_date_check, m.pk))
-            else:
-                by_status[key] = ClassificationSubGrouping(latest_modification=mod, count=1)
-        # FIXME sort
-        return list(by_status.values())
+# @dataclass
+# class ClassificationSubGrouping:
+#     latest_modification: ClassificationModification
+#     count: int
+#
+#     @staticmethod
+#     def from_modifications(modifications: list[ClassificationModification]) -> list['ClassificationSubGrouping']:
+#         # subgroup by classification value for germline and
+#         by_status: dict[str, ClassificationSubGrouping] = {}
+#         for mod in modifications:
+#             key = str(mod.somatic_clinical_significance_value) + str(mod.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
+#             if existing := by_status.get(key):
+#                 existing.count += 1
+#                 existing.latest_modification = max(mod, existing.latest_modification, key=lambda m: (m.curated_date_check, m.pk))
+#             else:
+#                 by_status[key] = ClassificationSubGrouping(latest_modification=mod, count=1)
+#         # FIXME sort
+#         return list(by_status.values())
 
 
 class ClassificationGroupingPathogenicDifference(IntegerChoices):
@@ -212,7 +214,7 @@ class ClassificationGrouping(TimeStampedModel):
         return ShareLevel(self.share_level)
 
     @staticmethod
-    def filter_for_user(user: User, qs: QuerySet[Self]) -> QuerySet[Self]:
+    def filter_for_user(user: User, qs: QuerySet['ClassificationGrouping']) -> QuerySet['ClassificationGrouping']:
         # TODO, consider making the groups GuardianPermission rather than this manual security check
         if not user.is_superuser:
             permission_q: list[Q] = []
@@ -237,8 +239,8 @@ class ClassificationGrouping(TimeStampedModel):
         self.allele_origin_grouping.dirty = True
         self.allele_origin_grouping.save(update_fields=["dirty"])
 
-    def sub_groupings(self) -> list[ClassificationSubGrouping]:
-        return ClassificationSubGrouping.from_modifications(self.classification_modifications)
+    # def sub_groupings(self) -> list[ClassificationSubGrouping]:
+    #     return ClassificationSubGrouping.from_modifications(self.classification_modifications)
 
     conditions = models.JSONField(null=True, blank=True)
 
@@ -345,7 +347,7 @@ class ClassificationGrouping(TimeStampedModel):
 
         if all_modifications := self.classification_modifications:
             # FIND THE MOST RECENT CLASSIFICATION
-            best_classification = first(all_modifications)
+            best_classification = last(all_modifications)
 
             self.latest_classification_modification = best_classification
             self.latest_allele_info = best_classification.classification.allele_info
@@ -383,7 +385,7 @@ class ClassificationGrouping(TimeStampedModel):
 
                 if bucket := pathogenicity_dict.get("bucket"):
                     all_buckets.add(bucket)
-                if path_val := pathogenicity_dict.get("value"):
+                if path_val := pathogenicity_dict.get("classification"):
                     all_pathogenic_values.add(path_val)
                 if tier := somatic_dict.get("clinical_significance"):
                     all_tiers.add(tier)
