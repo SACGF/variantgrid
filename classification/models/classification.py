@@ -377,8 +377,8 @@ class ConditionResolved:
         else:
             jsoned: ConditionResolvedDict = {
                 "plain_text_terms": self.plain_text_terms,
-                "display_text": self.plain_text,
-                "sort_text": self.plain_text
+                "display_text": ", ".join(pt.lower() for pt in self.plain_text) if self.plain_text else None,
+                "sort_text": ", ".join(pt.lower() for pt in self.plain_text) if self.plain_text else None
             }
         return jsoned
 
@@ -780,7 +780,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @staticmethod
     def to_date_str(datetime_value: datetime) -> str:
         return datetime_value.strftime('%Y-%m-%d')
-
 
     def set_withdrawn(self, user: User, withdraw: bool = False, reason: str = 'OTHER') -> bool:
         if not self.id and withdraw:
@@ -1723,7 +1722,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             # classification is stored on the classification record and on the classification modification
             # (not sure if we actually use it for anything on the modification)
 
-            # TODO this is int he wrong spot, it should be on publish
+            # TODO this is in the wrong spot, it should be on publish
             clinical_significance_choice = self.calc_clinical_significance_choice()
             self.clinical_significance = clinical_significance_choice
             pending_modification.clinical_significance = clinical_significance_choice
@@ -2144,7 +2143,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         cached_c_hgvs = self.get_c_hgvs(genome_build=genome_build)
         if not cached_c_hgvs:
             cached_c_hgvs = self.get(SpecialEKeys.C_HGVS)
-        parts.append(cached_c_hgvs)
+        parts.append(cached_c_hgvs or "No c.HGVS")
 
         clinical_significance = self.get_clinical_significance_display() or "No Data"
         parts.append(clinical_significance)
