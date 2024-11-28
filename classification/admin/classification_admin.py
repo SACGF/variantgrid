@@ -219,7 +219,8 @@ class ClassificationAdmin(ModelAdminBasics):
         'last_import_run',
         'last_source_id',
         'share_level',
-        'clinical_significance',
+        'classification',
+        'somatic_clin_sig',
         'allele_fallback',
         'grch37_c_hgvs',
         'grch38_c_hgvs',
@@ -245,6 +246,16 @@ class ClassificationAdmin(ModelAdminBasics):
     list_per_page = 50
     inlines = (ClassificationModificationAdmin,)
     list_select_related = ('lab', 'user', 'allele')
+
+    @admin_list_column(short_description="Classification", order_field="summary__pathogenicity__sort")
+    def classification(self, obj: Classification):
+        if cm := ClassificationModification.objects.filter(is_last_published=True, classification=obj).first():
+            return cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+
+    @admin_list_column(short_description="Somatic Clin Sig", order_field="summary__somatic__sort")
+    def somatic_clin_sig(self, obj: Classification):
+        if cm := ClassificationModification.objects.filter(is_last_published=True, classification=obj).first():
+            return cm.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
 
     @admin_list_column(short_description="c.hgvs (37)", order_field="allele_info__grch37__c_hgvs")
     def grch37_c_hgvs(self, obj: Classification):
