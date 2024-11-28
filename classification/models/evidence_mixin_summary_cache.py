@@ -137,7 +137,8 @@ class ClassificationSummaryCalculator:
             from classification.models import EvidenceKeyMap
             return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_indexes.get(classification_value, 0) + 1
         else:
-            return 0
+            # sort unclassified to the end
+            return None
 
     @cached_property
     def somatic_clinical_significance(self) -> Optional[str]:
