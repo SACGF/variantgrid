@@ -27,27 +27,9 @@ ALLELE_KNOWN_VALUES = ALLELE_GERMLINE_VALUES + ALLELE_SOMATIC_VALUES
 
 class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
-    def render_somatic_clinical_significance_combined(self, row: Dict[str, Any]) -> JsonDataType:
-        return {
-            SpecialEKeys.CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.CLINICAL_SIGNIFICANCE}__value"],
-            SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}__value"]
-        }
-
-    def render_somatic_clinical_significance(self, row: Dict[str, Any]) -> JsonDataType:
+    def render_somatic(self, row: Dict[str, Any]) -> JsonDataType:
         if row["classification__allele_origin_bucket"] != "G":
-
-            highest_level: Optional[str] = None
-            for level in ['a', 'b', 'c', 'd']:
-                if level_value := row.get(f"published_evidence__amp:level_{level}__value"):
-                    highest_level = level.upper()
-                    break
-
-            return {
-                SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}__value"],
-                "amp_level": highest_level
-            }
-        else:
-            return {}
+            return row["classification__summary__somatic"]
 
     def render_classification(self, row: Dict[str, Any]) -> JsonDataType:
         return {
@@ -190,24 +172,26 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 label='Classification',
                 renderer=self.render_classification,
                 client_renderer='VCTable.classification',
-                sort_keys=['clinical_significance', 'clin_sig_sort'],
+                sort_keys=[
+                    "classification__summary__pathogenicity__sort",
+                    "classification__summary__somatic__sort"
+                ],
                 orderable=True,
                 order_sequence=[SortOrder.DESC, SortOrder.ASC]
             ),
             RichColumn(
-                key='published_evidence__somatic:clinical_significance__value',
                 name='somatic_clinical_significance',
                 label='Somatic Clinical Significance',
-                renderer=self.render_somatic_clinical_significance,
+                renderer=self.render_somatic,
                 client_renderer='VCTable.somatic_clinical_significance',
                 extra_columns=[
+                    'classification__summary__somatic',
                     'classification__allele_origin_bucket',
-                    'published_evidence__amp:level_a__value',
-                    'published_evidence__amp:level_b__value',
-                    'published_evidence__amp:level_c__value',
-                    'published_evidence__amp:level_d__value'
                 ],
-                sort_keys=['somatic_clinical_significance_sort'],
+                sort_keys=[
+                    "classification__summary__somatic__sort",
+                    "classification__summary__pathogenicity__sort"
+                ],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 orderable=True
             ),
@@ -292,20 +276,6 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
         # takes too long to sort on variant
         # initial_qs = Classification.annotate_with_variant_sort(initial_qs, GenomeBuild.grch38())
-
-        # So VUS-A is actually VUS-Pathogenic, VUS-C is VUS-Benign
-        # so when sorting within VUS we want to do so in reverse alphabetical order
-        # but when sorting outside of VUS we want alphabetical order
-        # Note: Clinical Significance will first be sorted by the clinical significant int and then fall back to this
-        whens = [
-            When(published_evidence__clinical_significance__value='VUS_A', then=Value('VUS_3')),
-            When(published_evidence__clinical_significance__value='VUS_B', then=Value('VUS_2')),
-            When(published_evidence__clinical_significance__value='VUS', then=Value('VUS_1')),
-            When(published_evidence__clinical_significance__value='VUS_C', then=Value('VUS_0')),
-        ]
-        case = Case(*whens, default=KeyTextTransform('value', KeyTransform('clinical_significance', 'published_evidence')),
-                    output_field=TextField())
-        initial_qs = initial_qs.annotate(clin_sig_sort=case)
 
         whens = [
             When(classification__share_level=ShareLevel.LAB.value, then=Value(1)),
