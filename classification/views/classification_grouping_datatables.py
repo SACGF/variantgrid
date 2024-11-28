@@ -285,7 +285,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             ),
             RichColumn(
                 name="Classification",
-                sort_keys=["latest_classification_modification__classification__summary__classification_sort"],
+                sort_keys=["latest_classification_modification__classification__summary__pathogenicity__sort"],
                 client_renderer='VCTable.classification',
                 renderer=self.render_pathogenic,
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
@@ -298,7 +298,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 name='somatic_clinical_significances',
                 label='Somatic Clinical<br/>Significance',
                 client_renderer="VCTable.somatic_clinical_significance",
-                sort_keys=['latest_classification_modification__classification__summary__pathogenicity__sort'],
+                sort_keys=['latest_classification_modification__classification__summary__somatic__sort'],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 renderer=self.render_somatic,
                 extra_columns=[
@@ -331,6 +331,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 extra_columns=[
                     "latest_classification_modification__classification_id"
                 ],
+                order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 default_sort=SortOrder.DESC
             ),
             # RichColumn(
