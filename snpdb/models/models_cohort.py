@@ -12,7 +12,7 @@ from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, DO_NOTHING, PROTECT
 from django.db.models.expressions import F, Value
 from django.db.models.query_utils import Q, FilteredRelation
-from django.db.models.signals import pre_delete
+from django.db.models.signals import pre_delete, post_delete
 from django.dispatch.dispatcher import receiver
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
@@ -499,6 +499,12 @@ def cohort_genotype_collection_pre_delete_handler(sender, instance, **kwargs):  
         instance.delete_related_objects()
     except:
         pass
+
+@receiver(post_delete, sender=CohortGenotypeCollection)
+def cohort_genotype_collection_post_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    # Handled in post_delete as common_collection has on_delete=CASCADE which would delete instance...
+    if instance.common_collection:
+        instance.common_collection.delete()
 
 
 class SampleGenotype:

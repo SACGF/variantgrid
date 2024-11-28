@@ -551,59 +551,43 @@ function finishedLoadingEditor(node_id, version_id) {
 }
 
 
-function setupSlider(inputSelector, sliderSelector, enableInput) {
+function setVisibleSliderValue(inputSelector, sliderSelector, value) {
+    let container = sliderSelector.parents(".slider-container");
+    let sliderValue = $(".slider-value", container);
+    let decimalPlaces = inputSelector.attr("decimal_places");
+    if (typeof decimalPlaces == 'undefined') {
+        decimalPlaces = 2;
+    }
+    let floatVal = parseFloat(value);
+    if (!isNaN(floatVal)) {
+        value = floatVal.toFixed(decimalPlaces);
+    }
+    sliderValue.html(value)
+}
+
+function setupSlider(inputSelector, sliderSelector) {
+    // Returns sliderValue
     let sliderMinVal = Number(inputSelector.attr("min"));
     let sliderMaxVal = Number(inputSelector.attr("max"));
     let sliderVal = inputSelector.val();
     let container = sliderSelector.parents(".slider-container");
-    let sliderValue = $(".slider-value", container);
-    sliderValue.html(sliderVal); // set initial
+
+    setVisibleSliderValue(inputSelector, sliderSelector, sliderVal); // set initial
 
     sliderSelector.slider({
         min: sliderMinVal,
         max: sliderMaxVal,
         step: Number(inputSelector.attr("step") || 1),
         value: sliderVal,
-        change: function( event, ui ) {
+        change: function (event, ui) {
             inputSelector.val(ui.value);
         },
-        slide: function( event, ui ) {
-            sliderValue.html(ui.value);
+        slide: function (event, ui) {
+            inputSelector.val(ui.value);
+            setVisibleSliderValue(inputSelector, sliderSelector, ui.value);
         },
     });
 
     $(".min-value", container).html(sliderMinVal);
     $(".max-value", container).html(sliderMaxVal);
-
-    if (enableInput) {
-        let row = enableInput.parents("tr");
-        let filterRequired = $(".filter-required", row);
-        let frInputs = $("input", filterRequired);
-
-        enableInput.change(function () {
-            if ($(this).is(":checked")) {
-                sliderSelector.slider("enable");
-                frInputs.prop("disabled", false);
-            } else {
-                sliderValue.html("");
-                sliderSelector.slider({value: 0})
-                sliderSelector.slider("disable");
-                inputSelector.val("");
-                frInputs.prop("disabled", true);
-            }
-        });
-        if (sliderVal === '') {
-            enableInput.prop("checked", false);
-            frInputs.prop("disabled", true);
-        } else {
-            enableInput.prop("checked", true);
-            frInputs.prop("disabled", false);
-        }
-    }
-
-    if (sliderVal === '') {
-        sliderSelector.slider("disable");
-    } else {
-        sliderSelector.slider("enable");
-    }
 }

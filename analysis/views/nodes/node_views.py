@@ -8,11 +8,12 @@ from analysis.forms.forms_nodes import AllVariantsNodeForm, BuiltInFilterNodeFor
     ClassificationsNodeForm, DamageNodeForm, FilterNodeForm, IntersectionNodeForm, \
     PedigreeNodeForm, PhenotypeNodeForm, PopulationNodeForm, TagNodeForm, TissueNodeForm, TrioNodeForm, \
     VennNodeForm, ZygosityNodeForm, CohortNodeForm, AlleleFrequencyNodeForm, SelectedInParentNodeForm, MergeNodeForm, \
-    MOINodeForm
+    MOINodeForm, ConservationNodeForm
 from analysis.models import TagNode, OntologyTerm, MOINode
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
+from analysis.models.nodes.filters.conservation_node import ConservationNode
 from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.filter_node import FilterNode, FilterNodeItem
 from analysis.models.nodes.filters.intersection_node import IntersectionNode
@@ -116,6 +117,11 @@ class CohortNodeView(NodeView):
         form_kwargs = super().get_form_kwargs()
         form_kwargs["genome_build"] = self.object.analysis.genome_build
         return form_kwargs
+
+
+class ConservationNodeView(NodeView):
+    model = ConservationNode
+    form_class = ConservationNodeForm
 
 
 class DamageNodeView(NodeView):

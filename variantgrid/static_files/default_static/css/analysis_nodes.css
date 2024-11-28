@@ -150,7 +150,6 @@ ul.customicons .ui-icon {
     background-image: url(/static/images/node_icons/variant_allele_frequency.png);
 }
 
-
 .ui-icon.PedigreeNode {
     background-image: url(/static/images/node_icons/pedigree.png);
 }
@@ -179,8 +178,8 @@ ul.customicons .ui-icon {
     background-image: url(/static/images/node_icons/cohort.png);
 }
 
-.ui-icon.ExpressionNode { 
-    background-image: url(/static/images/node_icons/expression.png);
+.ui-icon.ConservationNode {
+    background-image: url(/static/images/node_icons/conservation_node.png);
 }
 
 .ui-icon.SelectedInParentNode {
@@ -324,8 +323,8 @@ ul.customicons .ui-icon {
 	background-image: url(/static/images/node_icons/cohort.png);
 }
 
-.node-overlay.ExpressionNode {
-	background-image: url(/static/images/node_icons/expression.png);
+.node-overlay.ConservationNode {
+	background-image: url(/static/images/node_icons/conservation_node.png);
 }
 
 .window.SelectedInParentNode {

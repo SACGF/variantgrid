@@ -1050,7 +1050,7 @@ class AbstractVariantAnnotation(models.Model):
     exon = models.TextField(null=True, blank=True)
     fathmm_pred_most_damaging = models.CharField(max_length=1, choices=FATHMMPrediction.CHOICES, null=True, blank=True)
     flags = models.TextField(null=True, blank=True)
-    gerp_pp_rs = models.FloatField(null=True, blank=True)
+    gerp_pp_rs = models.FloatField(null=True, blank=True)  # Genomic Evolutionary Rate Profiling (GERP++)
     grantham = models.IntegerField(null=True, blank=True)
     hgvs_c = models.TextField(null=True, blank=True)
     hgvs_p = models.TextField(null=True, blank=True)
@@ -1288,6 +1288,51 @@ class VariantAnnotation(AbstractVariantAnnotation):
         "AL": ("spliceai_pred_ds_al", "spliceai_pred_dp_al"),
         "DG": ("spliceai_pred_ds_dg", "spliceai_pred_dp_dg"),
         "DL": ("spliceai_pred_ds_dl", "spliceai_pred_dp_dl"),
+    }
+
+    CONSERVATION_SCORES = {
+        "gerp_pp_rs": {
+            # UCSC says RS scores range from a maximum of 6.18 down to a below-zero minimum, which we cap at -12.36
+            "min": -12.36,
+            "max": 6.18,
+        },
+        # BigWig stats obtained via kent-335 bigWigInfo
+        "phylop_30_way_mammalian": {
+            "mean": 0.097833,
+            "min": -20.0,
+            "max": 1.312,
+            "std": 0.727453,
+        },
+        "phylop_46_way_mammalian": {
+            "mean": 0.035934,
+            "min": -13.796,
+            "max": 2.941,
+            "std": 0.779426,
+        },
+        "phylop_100_way_vertebrate": {
+            "mean": 0.093059,
+            "min": -20.0,
+            "max": 10.003,
+            "std": 1.036944,
+        },
+        "phastcons_30_way_mammalian": {
+            "mean": 0.128025,
+            "min": 0.0,
+            "max": 1.0,
+            "std": 0.247422,
+        },
+        "phastcons_46_way_mammalian": {
+            "mean": 0.088576,
+            "min": 0.0,
+            "max": 1.0,
+            "std": 0.210242,
+        },
+        "phastcons_100_way_vertebrate": {
+            "mean": 0.101765,
+            "min": 0.0,
+            "max": 1.0,
+            "std": 0.237072,
+        }
     }
 
     # List of filters to describe variants that can be annotated

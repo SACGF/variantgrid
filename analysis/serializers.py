@@ -8,6 +8,7 @@ from analysis.models import AnalysisVariable, FilterNode, FilterNodeItem, Phenot
 from analysis.models.models_variant_tag import VariantTag
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyRange, NodeAlleleFrequencyFilter, AnalysisNode, \
     NodeWiki
+from analysis.models.nodes.filters.conservation_node import ConservationNode
 from genes.serializers import GeneListSerializer
 from library.django_utils import get_model_fields
 from library.django_utils.django_rest_utils import DynamicFieldsModelSerializer
@@ -123,6 +124,12 @@ class CohortNodeSerializer(AnalysisNodeSerializer):
 
     class Meta(AnalysisNodeSerializer.Meta):
         model = CohortNode
+        fields = _analysis_node_fields(model)
+
+
+class ConservationNodeSerializer(AnalysisNodeSerializer):
+    class Meta(AnalysisNodeSerializer.Meta):
+        model = ConservationNode
         fields = _analysis_node_fields(model)
 
 

@@ -354,6 +354,7 @@ class PhenotypeMatcher:
                 term = term.strip().lower().replace(",", "")
                 omim_pks_by_term[term] = pk
                 for split_term in term.split(";"):
+                    split_term = split_term.strip()
                     omim_pks_by_term[split_term] = pk
                     break_up_syndromes_and_disease(split_term, pk)
                     break_up_dashes(split_term, pk)

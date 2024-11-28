@@ -15,6 +15,10 @@ class Command(BaseCommand):
         parser.add_argument('--replace', default=False, action='store_true')
 
     def handle(self, *args, **options):
+        HIDDEN_TEMPLATES = [
+            settings.ANALYSIS_TEMPLATES_AUTO_SAMPLE,
+            settings.ANALYSIS_TEMPLATES_AUTO_COHORT_EXPORT,
+        ]
         ANALYSIS_TEMPLATES_DIR = os.path.join(settings.BASE_DIR, "analysis", "data", "analysis_templates")
 
         user = admin_bot()
@@ -43,9 +47,11 @@ class Command(BaseCommand):
             add_public_group_read_permission(analysis_snapshot)
 
             analysis_name_template = "%(template)s for %(input)s"
+            appears_in_autocomplete = analysis.name not in HIDDEN_TEMPLATES
             AnalysisTemplateVersion.objects.create(template=analysis_template,
                                                    version=1,
                                                    analysis_name_template=analysis_name_template,
-                                                   analysis_snapshot=analysis_snapshot)
+                                                   analysis_snapshot=analysis_snapshot,
+                                                   appears_in_autocomplete=appears_in_autocomplete)
 
             print(f"Created template: {analysis_template}")

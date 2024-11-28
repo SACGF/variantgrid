@@ -6,6 +6,7 @@ from analysis.models.models_variant_tag import VariantTagsImport, ImportedVarian
 from analysis.models.mutational_signatures import MutationalSignatureCalculator, MutationalSignature, MutationalSignatureMinimisationResult, MutationalSignatureMutationCount
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
+from analysis.models.nodes.filters.conservation_node import ConservationNode
 from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.filter_node import FilterNode, FilterNodeItem
 from analysis.models.nodes.filters.gene_list_node import GeneListNode, GeneListNodeGeneList, GeneListNodePanelAppPanel
