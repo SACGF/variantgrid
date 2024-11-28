@@ -90,9 +90,18 @@ def classification_changes(changes):
 
 
 @register.inclusion_tag("classification/tags/clinical_significance.html")
-def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE, show_if_none=True):
+def clinical_significance(value: Optional[Union[str | EvidenceMixin]], evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE, show_if_none=True):
+    is_somatic = evidence_key == SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE
+    suffix: Optional[str] = None
+
     if isinstance(value, EvidenceMixin):
-        value = value.get(evidence_key)
+        if is_somatic:
+            if somatic_value := value.somatic_clinical_significance_value:
+                value = somatic_value.tier_level
+                suffix = somatic_value.amp_level
+        else:
+            value = value.get(evidence_key)
+
     if value is None and not show_if_none:
         return {"skip": True}
 
@@ -110,7 +119,8 @@ def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE
         "css_class": css_class,
         "label": label,
         "prefix": "cs" if key.key == SpecialEKeys.CLINICAL_SIGNIFICANCE else "scs",
-        "title": title
+        "title": title,
+        "suffix": suffix
     }
 
 
@@ -129,6 +139,7 @@ def clinical_significance_inline(value):
         "color": colors.get(value) or "#aaa",
         "label": key.option_dictionary.get(value, value) or "Unclassified"
     }
+
 
 @register.inclusion_tag("classification/tags/lab.html")
 def lab(lab: Lab, your_lab: Optional[Lab] = None):
@@ -154,12 +165,12 @@ def clinical_context(context, cc: ClinicalContext, orientation: str = 'horizonta
 
 
 @register.inclusion_tag("classification/tags/classification_quick.html", takes_context=True)
-def classification_quick(context, vc: Union[Classification, ClassificationModification], show_clinical_grouping=True, mode: Optional[str] = "detailed", show_flags=False, record_count: Optional[int] = None):
+def classification_quick(context, vc: Union[Classification, ClassificationModification], mode: Optional[str] = "detailed", show_flags=False, record_count: Optional[int] = None):
     user = context.request.user
     vcm = vc
     if isinstance(vc, Classification):
         vcm = ClassificationModification.latest_for_user(user=user, classification=vc, published=True, exclude_withdrawn=False).first()
-    return {"vcm": vcm, "show_clinical_grouping": show_clinical_grouping, "mode": mode, "show_flags": show_flags, "record_count": record_count}
+    return {"vcm": vcm, "mode": mode, "show_flags": show_flags, "record_count": record_count}
 
 
 class ClinicalGrouping:
@@ -464,7 +475,7 @@ def criteria_strength(strength: CriteriaStrength):
 def criteria_strength_td(strength: Union[CriteriaStrength, Collection[CriteriaStrength]]):
     # going to display NM, NS, NA all the same
     if isinstance(strength, list):
-        all_met_strengths = [str for str in strength if str.is_met]
+        all_met_strengths = [strx for strx in strength if str.is_met]
         if len(all_met_strengths) > 1:
             return {
                 "strengths": all_met_strengths
@@ -523,7 +534,6 @@ def user_view_events(user: User, days: int = 1):
     return view_event_data
 
 
-
 @register.inclusion_tag("classification/tags/classification_group_row.html")
 def classification_group_row(group: ClassificationGroup, sub_row: Optional[int] = None, sub_index: Optional[int] = None, show_pending_changes: Optional[bool] = True):
     return {
@@ -557,8 +567,7 @@ def classification_groups(
     :param link_discordance_reports: Should link to discordance reports (if so will subdivide by clinical context)
     :param genome_build: Preferred genome build
     :param title: Heading to give the table
-    :param context_object: If all these records are from an allele, provide "allele" if from a discordance report provide "discordance_report" etc
-    :param old_classification_modifications: For showing what a discordance report used to be
+    :param context_object: If all these records are from an allele, provide "allele" if from a discordance report provide "discordance_report" etc.
     :param default_sort: The column to sort by default
     """
     if isinstance(classification_modifications, QuerySet):
@@ -619,7 +628,7 @@ def classification_groups(
 
     if link_discordance_reports:
         clinical_grouping_list = list({cm.classification.clinical_context for cm in ordered_classifications if cm.classification.clinical_context})
-        clinical_grouping_list.sort(key=lambda cg:(not cg.is_default if cg else False, cg.name if cg else 'No Allele'))
+        clinical_grouping_list.sort(key=lambda cg: (not cg.is_default if cg else False, cg.name if cg else 'No Allele'))
         tag_context["clinical_contexts"] = clinical_grouping_list
 
     tag_context["paging"] = len(groups) > 10
