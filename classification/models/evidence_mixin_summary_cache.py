@@ -3,6 +3,7 @@ from functools import cached_property
 from typing import TypedDict, Optional, Self
 from classification.criteria_strengths import CriteriaStrength
 from classification.enums import AlleleOriginBucket, SpecialEKeys, CriteriaEvaluation
+from library.utils import strip_json
 
 """
 return {
@@ -65,19 +66,20 @@ class SomaticClinicalSignificanceValue:
         elif self.amp_level:
             if sort_value := _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES.get(self.without_amp_level):
                 return sort_value
-        return None
+        # default to 1, so things which shouldn't even be considered somatic can be 0
+        return 1
 
 
 _SOMATIC_CLINICAL_SIGNIFICANCE_SORT_VALUES = {
-    SomaticClinicalSignificanceValue("tier_1", "A"): 9,
-    SomaticClinicalSignificanceValue("tier_1", "B"): 8,
-    SomaticClinicalSignificanceValue("tier_1"): 7,
-    SomaticClinicalSignificanceValue("tier_1_or_2"): 6,
-    SomaticClinicalSignificanceValue("tier_2", "C"): 5,
-    SomaticClinicalSignificanceValue("tier_2", "D"): 4,
-    SomaticClinicalSignificanceValue("tier_2"): 3,
-    SomaticClinicalSignificanceValue("tier_3"): 2,
-    SomaticClinicalSignificanceValue("tier_4"): 1
+    SomaticClinicalSignificanceValue("tier_1", "A"): 10,
+    SomaticClinicalSignificanceValue("tier_1", "B"): 9,
+    SomaticClinicalSignificanceValue("tier_1"): 8,
+    SomaticClinicalSignificanceValue("tier_1_or_2"): 7,
+    SomaticClinicalSignificanceValue("tier_2", "C"): 6,
+    SomaticClinicalSignificanceValue("tier_2", "D"): 5,
+    SomaticClinicalSignificanceValue("tier_2"): 4,
+    SomaticClinicalSignificanceValue("tier_3"): 3,
+    SomaticClinicalSignificanceValue("tier_4"): 2
 }
 
 
@@ -90,7 +92,8 @@ class ClassificationSummaryCalculator:
         from classification.models import CuratedDate
         curated_date = CuratedDate(self.cm).relevant_date
 
-        return {
+        # strip out None values as that makes sorting work more naturally
+        return strip_json({
             "criteria_labels": self.criteria_labels,
             "pathogenicity": {
                 "classification": self.classification_value,
@@ -106,7 +109,7 @@ class ClassificationSummaryCalculator:
                 "value": curated_date.date_str,
                 "type": curated_date.name
             }
-        }
+        })
 
     @cached_property
     def germline_bucket(self) -> Optional[int]:
