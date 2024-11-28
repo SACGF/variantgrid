@@ -17,7 +17,7 @@ from classification.models import Classification, ImportedAlleleInfo, EvidenceKe
 from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheDict, \
     ClassificationSummaryCacheDictPathogenicity, ClassificationSummaryCacheDictSomatic
 from genes.models import GeneSymbol
-from library.utils import first
+from library.utils import first, strip_json
 from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
 
@@ -399,10 +399,10 @@ class ClassificationGrouping(TimeStampedModel):
             all_zygosities = list(sorted(evidence_map[SpecialEKeys.ZYGOSITY].sort_values(all_zygosities)))
             self.zygosity_values = all_zygosities
 
-            self.conditions = ConditionResolved(
+            self.conditions = strip_json(ConditionResolved(
                 terms=list(sorted(all_terms)),
                 plain_text=list(sorted(all_free_text_conditions))
-            ).to_json(include_join=False)
+            ).to_json(include_join=False))
 
             self.classification_count = len(all_modifications)
 
