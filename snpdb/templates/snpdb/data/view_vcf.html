@@ -509,6 +509,15 @@ $(document).ready(function() {
                 </span>
             </p>
             <p>
+                <label>Common </label>
+                <span>
+                    {% with cgc=vcf.cohort.cohort_genotype_collection %}
+                        {{ cgc.get_common_filter_info }}
+                    {% endwith %}
+
+                </span>
+            </p>
+            <p>
                 <label>Variant Zygosity Count</label>
                 <span>
                     {% if vcf.has_genotype %}
