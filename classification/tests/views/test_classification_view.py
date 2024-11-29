@@ -73,8 +73,6 @@ class ClassificationTestCaseViews(TestCase):
             "can_write": True,
             "can_write_latest": True,
             "clinical_context": None,
-            "allele_origin_bucket": "U",
-            "condition_text_match": None,
             "data": {
                 "owner": {
                     "value": "joejoe"
@@ -109,6 +107,16 @@ class ClassificationTestCaseViews(TestCase):
                     "value": "GRCh37.p13",
                     "immutable": "variantgrid"
                 },
+                "allele_origin": {
+                    "immutable": "api",
+                    "validation": [
+                        {
+                            "code": "mandatory",
+                            "message": "Missing mandatory value",
+                            "severity": "error"
+                        }
+                    ]
+                },
                 "refseq_transcript_id": {
                     "value": "NM_000059.3",
                     "immutable": "variantgrid"
@@ -133,8 +141,16 @@ class ClassificationTestCaseViews(TestCase):
                 }
             },
             "withdrawn": False,
+            "allele_origin_bucket": "U",
+            "condition_text_match": None,
             "has_changes": False,
             "messages": [
+                {
+                    "code": "mandatory",
+                    "message": "Missing mandatory value",
+                    "severity": "error",
+                    "key": "allele_origin"
+                },
                 {
                     "code": "invalid_value",
                     "message": "Illegal value (oops)",
@@ -180,31 +196,58 @@ class ClassificationTestCaseViews(TestCase):
             response_json.pop(ignore)
 
         expected = {
-            'id': None,
-            'lab_record_id': 'test_123456',
-            'institution_name': 'InstX',
-            'lab_id': 'instx/labby',
-            'lab_name': 'Labby',
-            'org_name': 'InstX',
-            'title': 'instx/labby/test_123456',
-            'publish_level': 'lab',
-            'published_version': None,
-            'resolved_condition': None,
-            'version_is_published': None,
-            'version_publish_level': 'lab',
-            'is_last_published': None,
-            'can_write': False,
-            'can_write_latest': False,
-            'clinical_context': None,
-            'withdrawn': False,
+            "id": None,
+            "lab_record_id": "test_123456",
+            "institution_name": "InstX",
+            "lab_id": "instx/labby",
+            "org_name": "InstX",
+            "lab_name": "Labby",
+            "title": "instx/labby/test_123456",
+            "publish_level": "lab",
+            "version_publish_level": "lab",
+            "version_is_published": None,
+            "is_last_published": None,
+            "published_version": None,
+            "can_write": False,
+            "can_write_latest": False,
+            "clinical_context": None,
+            "resolved_condition": None,
+            "withdrawn": False,
             "allele_origin_bucket": "U",
             "condition_text_match": None,
-            'messages': [
-                {'severity': 'error', 'code': 'missing_significance', 'message': 'Classification requires a value', 'key': 'clinical_significance'},
-                {'severity': 'error', 'code': 'mandatory', 'message': 'Missing mandatory value', 'key': 'condition'},
-                {'severity': 'error', 'code': 'mandatory', 'message': 'Missing mandatory value', 'key': 'zygosity'}
+            "messages": [
+                {
+                    "severity": "error",
+                    "code": "mandatory",
+                    "message": "Missing mandatory value",
+                    "key": "allele_origin"
+                },
+                {
+                    "key": "clinical_significance",
+                    "severity": "error",
+                    "code": "missing_significance",
+                    "message": "Classification requires a value"
+                },
+                {
+                    "severity": "error",
+                    "code": "mandatory",
+                    "message": "Missing mandatory value",
+                    "key": "condition"
+                },
+                {
+                    "severity": "error",
+                    "code": "mandatory",
+                    "message": "Missing mandatory value",
+                    "key": "zygosity"
+                }
             ],
-            'patch_messages': [{'code': 'test_mode', 'message': 'Test mode on, no changes have been saved'}]}
+            "patch_messages": [
+                {
+                    "code": "test_mode",
+                    "message": "Test mode on, no changes have been saved"
+                }
+            ]
+        }
 
         diffs = DeepDiff(t1=expected, t2=response_json)
         if diffs:
