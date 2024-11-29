@@ -99,6 +99,8 @@ def clinical_significance(value: Optional[Union[str | EvidenceMixin]], evidence_
             if somatic_value := value.somatic_clinical_significance_value:
                 value = somatic_value.tier_level
                 suffix = somatic_value.amp_level
+            else:
+                value = None
         else:
             value = value.get(evidence_key)
 
