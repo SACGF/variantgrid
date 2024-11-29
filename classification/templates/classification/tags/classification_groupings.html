@@ -51,7 +51,7 @@
             <div class="mr-2 mt-1">Allele Origin</div>
             {% allele_origin_toggle show_label=False %}
         </div>
-        <table id="vc-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table"></table>
+        <table id="vc-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table" data-adjust-columns="false"></table>
         <div>
         Download as
             <a class='hover-link download-link' onclick="downloadAs('csv')">CSV</a>

@@ -50,6 +50,7 @@ let DataTableDefinition = (function() {
         this.data = params.data;
         this.filterCount = params.filterCount;
         this.waitOn = Promise.resolve();
+        this.adjustColumns = params.adjustColumns !== false;
 
         this.tableId = null;
         this.lengthKey = null;
@@ -344,7 +345,11 @@ let DataTableDefinition = (function() {
                     this.setupDom();
                     this.setupClientExpend();
                     this.setupResponsiveExpand();
-                    this.dataTable.columns.adjust().draw();
+                    // note the below causes the dataTable to re-download data from the server redundantly
+                    // not sure under what circumstances it's actually required
+                    if (this.adjustColumns) {
+                        this.dataTable.columns.adjust().draw(false);
+                    }
                 });
             });
         }
