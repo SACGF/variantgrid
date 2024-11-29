@@ -3095,10 +3095,11 @@ a .c-hgvs-body {
 		font-weight: bold;
 	}
 	.term-name {
-		color: #666;
+		color: #444;
 	}
-	.free-text {
-		color: #444;  // when the "ontology term" is just free text
+	&.free-text {
+		font-style: italic;
+		color: #666;  // when the "ontology term" is just free text
 	}
 }
 

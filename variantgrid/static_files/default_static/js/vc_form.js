@@ -2289,7 +2289,7 @@ VCForm.format_condition = function(condition_json) {
                 $('<br>').appendTo(dom);
             }
             first = false;
-            $('<span>', {
+            $('<div>', {
                 class: 'ontology-term',
                 html: [
                     $('<a>', {
@@ -2306,14 +2306,14 @@ VCForm.format_condition = function(condition_json) {
     if (condition_json.plain_text_terms) {
         for (let term of condition_json.plain_text_terms) {
             domUsed = true;
-            $('<span>', {text: term + "yy", class:'ontology-term free-text'}).appendTo(dom);
+            $('<div>', {text: term, class:'ontology-term free-text'}).appendTo(dom);
         }
     }
 
     if (!domUsed) {
         return $('<span>', {class: 'ontology-term free-text', text: condition_json.display_text});
     }
-    if (condition_json.resolved_terms.length > 1 && condition_json.resolved_join) {
+    if (condition_json.resolved_terms && condition_json.resolved_terms.length > 1 && condition_json.resolved_join) {
         $('<span>', {class: 'font-italic', text:condition_json.resolved_join === 'C' ? ' Co-occurring' : ' Uncertain'}).appendTo(dom);
     }
     return dom;

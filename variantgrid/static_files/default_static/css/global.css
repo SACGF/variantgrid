@@ -2673,10 +2673,11 @@ a .c-hgvs-body .c-hgvs-nomen {
   font-weight: bold;
 }
 .ontology-term .term-name {
-  color: #666;
-}
-.ontology-term .free-text {
   color: #444;
+}
+.ontology-term.free-text {
+  font-style: italic;
+  color: #666;
 }
 
 .screenshot-mode time.ago {

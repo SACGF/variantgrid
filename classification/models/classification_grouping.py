@@ -403,7 +403,7 @@ class ClassificationGrouping(TimeStampedModel):
 
             self.conditions = strip_json(ConditionResolved(
                 terms=list(sorted(all_terms)),
-                plain_text=list(sorted(all_free_text_conditions))
+                plain_text_terms=list(sorted(all_free_text_conditions))
             ).to_json(include_join=False))
 
             self.classification_count = len(all_modifications)
