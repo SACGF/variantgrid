@@ -593,7 +593,6 @@ class PhenotypeMatcher:
             "increased sweat": (load_hpo_by_name, "Hyperhidrosis"),
             "recurrent urtis": (load_hpo_by_name, "Recurrent upper respiratory tract infections"),
             "renal ca": (load_hpo_by_name, "Renal cell carcinoma"),
-            "severe fetal hydrops": (load_hpo_by_name, "Severe hydrops fetalis"),
             "spastic cp": (load_hpo_by_name, "Cerebral palsy"),
             "thyroid ca": (load_hpo_by_name, "Thyroid carcinoma"),
             "type 1 diabetes": DIBETES_TYPE_1,
