@@ -25,21 +25,16 @@ class Command(BaseCommand):
         before_counts = _get_ontology_text_match_counts()
 
         if options.get("clear"):
-            TextPhenotype.objects.all().delete()
-            TextPhenotypeMatch.objects.all().delete()  # This removes the cache
+            logging.info("Clearing historical matches and cache")
+            TextPhenotype.objects.all().delete()  # Cascade deletes TextPhenotypeMatch
             PatientTextPhenotype.objects.all().delete()
 
         bulk_patient_phenotype_matching()
-        after_counts = _get_ontology_text_match_counts()
-        if before_counts:
-            if before_counts == after_counts:
-                logging.info("No change")
-                for ontology_service, count in after_counts.items():
-                    print(f"{ontology_service}: {count:,}")
 
-            else:
-                all_services = set(before_counts.keys()) | set(after_counts.keys())
-                for ontology_service in sorted(all_services):
-                    before = before_counts.get(ontology_service, 0)
-                    after = after_counts.get(ontology_service, 0)
-                    print(f"{ontology_service}: {before:,} -> {after:,}")
+        # This is a very blunt count (ie individual stuff may have changed)
+        after_counts = _get_ontology_text_match_counts()
+        all_services = set(before_counts.keys()) | set(after_counts.keys())
+        for ontology_service in sorted(all_services):
+            before = before_counts.get(ontology_service, 0)
+            after = after_counts.get(ontology_service, 0)
+            print(f"{ontology_service}: {before:,} -> {after:,}")

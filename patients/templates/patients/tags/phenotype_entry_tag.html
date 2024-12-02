@@ -82,6 +82,7 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
             data: data,
             url: "{% url 'phenotypes_matches' %}",
             success: function(phenotypeMatches) {
+                console.log(phenotypeMatches);
                 displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches);
                 const gridData = phenotypeMatchesToJqGridData(phenotypeMatches);
                 if (gridData.length) {
