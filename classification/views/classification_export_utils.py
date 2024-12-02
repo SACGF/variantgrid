@@ -62,6 +62,10 @@ class KeyProperty:
     prop: str
 
     @property
+    def id(self):
+        return f"{self.key}.{self.prop}"
+
+    @property
     def field(self) -> str:
         return f"published_evidence__{self.key}__{self.prop}"
 
@@ -118,6 +122,7 @@ class UsedKeyTracker:
 
         return consider_keys
 
+    @cached_property
     def all_key_properties(self) -> list[KeyProperty]:
         all_props: list[KeyProperty] = []
         properties = ['value']
@@ -128,42 +133,39 @@ class UsedKeyTracker:
                 all_props.append(KeyProperty(key=e_key.key, prop=prop))
         return all_props
 
+    @cached_property
+    def key_property_map(self) -> dict[str, KeyProperty]:
+        key_prop_map: dict[str, KeyProperty] = {}
+        for key in self.all_key_properties:
+            key_prop_map[key.id] = key
+        return key_prop_map
+
     def check_evidence_qs(self, qs: QuerySet[ClassificationModification]):
         """
         By performing an aggregate over the entire queryset, work out which columns
         have values, the old way was to just review all the data twice.
         """
-        all_key_properties = self.all_key_properties()
-        aggregate_list = [kp.count_aggregate() for kp in all_key_properties]
+        aggregate_list = [kp.count_aggregate() for kp in self.all_key_properties]
         result_dict = qs.aggregate(*aggregate_list)
-        for kp in all_key_properties:
+        for kp in self.all_key_properties:
             if result_dict.get(kp.count_key):
                 kp.apply_to(self.calc_dict)
+
+    def check_evidence_enable_all_considered(self):
+        for kp in self.all_key_properties:
+            kp.apply_to(self.calc_dict)
 
     def check_record(self, vcm: ClassificationModification):
         self.check_evidence(vcm.evidence)
 
     def check_evidence(self, evidence: dict[str, Any]):
         clear_cached_property(self, "ordered_keys")
-
-        has_value = False
-        has_note = False
-        has_explain = False
         for key, valueObj in evidence.items():
             if isinstance(valueObj, Mapping):
-                has_value = valueObj.get('value') is not None
-                has_note = valueObj.get('note') is not None
-                has_explain = valueObj.get('explain') is not None
-
-            if has_value or (self.include_only_evidence_keys and (has_note or has_explain)):
-                used_key = self.calc_dict.get(key)
-                if not used_key:
-                    used_key = UsedKey()
-                    self.calc_dict[key] = used_key
-
-                used_key.has_value = used_key.has_value or has_value
-                used_key.has_note = used_key.has_note or has_note
-                used_key.has_explain = used_key.has_explain or has_explain
+                for prop in ["value", "note", "explain"]:
+                    if valueObj.get(prop) is not None:
+                        if key_prop := self.key_property_map.get(f"{key}.{prop}"):
+                            key_prop.apply_to(self.calc_dict)
 
     @cached_property
     def ordered_keys(self) -> list[UsedKey]:
@@ -180,9 +182,9 @@ class UsedKeyTracker:
         for used_key in self.ordered_keys:
             if used_key.has_value:
                 cols.append(self.key_value_formatter.header_for(used_key.ekey, pretty=self.pretty))
-            if self.include_explains_and_notes and used_key.has_note:
+            if used_key.has_note:
                 cols.append(self.key_value_formatter.header_for(used_key.ekey, is_note=True, pretty=self.pretty))
-            if self.include_explains_and_notes and used_key.has_explain:
+            if used_key.has_explain:
                 cols.append(self.key_value_formatter.header_for(used_key.ekey, pretty=self.pretty) + '.explain')
         return cols
 
@@ -205,12 +207,14 @@ class UsedKeyTracker:
                             value = str(points)
 
                     cols.append(self.key_value_formatter.value_for(used_key.ekey, value, pretty=self.pretty, cell_formatter=self.cell_formatter))
-            if self.include_explains_and_notes and used_key.has_note:
+
+            # an earlier check determines if we even think about adding has_note or has_explain
+            if used_key.has_note:
                 if not value_obj:
                     cols.append(None)
                 else:
                     cols.append(value_obj.get('note'))
-            if self.include_explains_and_notes and used_key.has_explain:
+            if used_key.has_explain:
                 if not value_obj:
                     cols.append(None)
                 else:
