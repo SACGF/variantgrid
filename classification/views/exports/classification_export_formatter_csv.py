@@ -235,9 +235,13 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
             include_only_evidence_keys=consider_only,
             include_explains_and_notes=self.format_details.full_detail
         )
-        # apparently this is signficantly quicker than the attempt to use an aggregate
-        for evidence in self.classification_filter.cms_qs.values_list('published_evidence', flat=True).iterator(chunk_size=1000):
-            used_keys.check_evidence(evidence)
+        if self.format_details.full_detail:
+            # apparently this is signficantly quicker than the attempt to use an aggregate
+            for evidence in self.classification_filter.cms_qs.values_list('published_evidence', flat=True).iterator(chunk_size=1000):
+                used_keys.check_evidence(evidence)
+        else:
+            used_keys.check_evidence_enable_all_considered()
+
         # below took up to 3 minutes in Shariant test, vs 7 seconds of just iterating through the evidence twice
         # used_keys.check_evidence_qs(self.classification_filter.cms_qs)
 
