@@ -413,13 +413,13 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
 
             common_filter_info = [
                 str(cc.common_filter),
-                f"default/rare: {default_or_rare}",
-                f"common: {common} ({common_percent})",
+                f"default/rare: {default_or_rare:,}",
+                f"common: {common:,} ({common_percent})",
             ]
         else:
             common_filter_info = [
                 "No filter applied",
-                f"total: {default_or_rare}",
+                f"total: {default_or_rare:,}",
             ]
         return " ".join(common_filter_info)
 
