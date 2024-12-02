@@ -483,6 +483,11 @@ def view_classification_diff(request):
         records = cc.classification_modifications
         records.sort(key=lambda cm: cm.curated_date_check, reverse=True)
 
+    elif discordance_report_str := request.GET.get('discordance_report'):
+        dr = DiscordanceReport.objects.get(pk=discordance_report_str)
+        dr.check_can_view(request.user)
+        records = dr.all_classification_modifications
+
     elif variant_id_str := request.GET.get('variant_compare'):
         ref = ClassificationRef.init_from_str(user=request.user, id_str=variant_id_str)
         compare_all = ClassificationModification.latest_for_user(user=request.user, allele=ref.record.variant.allele, published=True)

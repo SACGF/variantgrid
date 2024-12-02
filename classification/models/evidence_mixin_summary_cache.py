@@ -98,7 +98,8 @@ class ClassificationSummaryCalculator:
             "pathogenicity": {
                 "classification": self.classification_value,
                 "sort": self.classification_sort,
-                "bucket": self.germline_bucket
+                "bucket": self.germline_bucket,
+                "pending": self.pending_classification_value
             },
             "somatic": {
                 "clinical_significance": self.somatic_clinical_significance,
@@ -110,6 +111,17 @@ class ClassificationSummaryCalculator:
                 "type": curated_date.name
             }
         })
+
+    @cached_property
+    def pending_classification_value(self) -> Optional[str]:
+        from classification.models import classification_flag_types, ClassificationFlagTypes
+        from flags.models import Flag, FlagStatus
+        if flag := Flag.objects.filter(
+            flag_type=classification_flag_types.classification_pending_changes,
+            resolution__status=FlagStatus.OPEN,
+            collection_id=self.cm.classification.flag_collection_id
+        ).first():
+            return flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) if flag.data else 'Unknown'
 
     @cached_property
     def germline_bucket(self) -> Optional[int]:

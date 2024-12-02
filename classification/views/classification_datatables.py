@@ -10,7 +10,7 @@ from django.http import HttpRequest
 
 from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel, AlleleOriginBucket
 from classification.models import ClassificationModification, EvidenceKeyMap, \
-    ImportedAlleleInfo
+    ImportedAlleleInfo, DiscordanceReport
 from classification.models.classification_utils import classification_gene_symbol_filter
 from flags.models import FlagCollection, FlagStatus
 from genes.hgvs import CHGVS
@@ -344,6 +344,11 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 filters.append(gene_filter)
             else:
                 return qs.none()
+
+        if discordance_report := self.get_query_param("discordance_report"):
+            dr = DiscordanceReport.objects.get(pk=discordance_report)
+            dr.check_can_view(self.user)
+            return qs.filter(pk__in=[cm.pk for cm in dr.all_classification_modifications])
 
         if transcript_id := self.get_query_param("transcript_id"):
             q_transcript_37 = Q(classification__allele_info__grch37__transcript_version__transcript_id=transcript_id)

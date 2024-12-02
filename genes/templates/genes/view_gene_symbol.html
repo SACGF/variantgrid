@@ -521,6 +521,7 @@
             <script>
                 function geneListsDatatableFilter(data) {
                     data.gene_symbol = "{{ gene_symbol  }}";
+                    data.page_id = "gene_symbol";
                 }
             </script>
             <table id="gene-lists-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'gene_lists_datatable' %}" data-datatable-data="geneListsDatatableFilter"></table>

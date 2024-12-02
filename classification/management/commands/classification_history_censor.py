@@ -7,8 +7,7 @@ from django.core.management import BaseCommand
 import re
 
 from classification.models import Classification
-from snpdb.models import Lab
-
+from snpdb.models import Lab, Organization
 
 VERSION = 2
 
@@ -31,13 +30,16 @@ class DataFixRun:
 
 class DataFixer:
 
-    def __init__(self, bad_pattern: re.Pattern, replacement: Any):
+    def __init__(self, bad_pattern: re.Pattern, replacement: Any, keys: Optional[set[str]] = None):
         self.bad_pattern = bad_pattern
         self.replacement = replacement
+        self.keys = keys
 
     def fix_classification_data(self, type: str, data: dict) -> Optional[DataFixRun]:
         modifications = []
         for key, blob in data.items():
+            if self.keys and key not in self.keys:
+                continue
             if isinstance(blob, dict):
                 if text := blob.get("value"):
                     if isinstance(text, str):
@@ -65,13 +67,16 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--lab', type=str, required=False)
+        parser.add_argument('--org', type=str, required=False)
         parser.add_argument('--pattern', type=str, required=True)
         parser.add_argument('--pattern_icase', action='store_true')
         parser.add_argument('--apply', type=int, default=0)
+        parser.add_argument('--keys', type=str, default=None)
         parser.add_argument('--replacement', type=str, required=True)
 
     def handle(self, *args, **options):
         lab_id:str = options["lab"]
+        org_id: str = options["org"]
         pattern = options["pattern"]
         pattern_icase = options["pattern_icase"]
         apply_remaining = options["apply"]
@@ -82,12 +87,22 @@ class Command(BaseCommand):
         print(f"Server Time: {datetime.datetime.now()}")
 
         lab: Optional[Lab] = None
+        org: Optional[Organization] = None
+
         if lab_id:
             if lab_id.isnumeric():
                 lab = Lab.objects.get(id=lab_id)
             else:
                 lab = Lab.objects.get(group_name=lab_id)
             print(f"Lab = {str(lab)}")
+
+        if org_id:
+            if org_id.isnumeric():
+                org = Organization.objects.get(id=org_id)
+            else:
+                org = Organization.objects.get(group_name=org_id)
+            print(f"Org = {str(org)}")
+
 
         print(f"Pattern = {pattern}, icase = {pattern_icase}")
         if not apply_remaining:
@@ -97,13 +112,18 @@ class Command(BaseCommand):
         print(f"Replacement = \"{replacement}\"")
 
         print("")
+        keys = None
+        if keys_str := options["keys"]:
+            keys = set([key.strip() for key in keys_str.split(",")])
 
         bad_pattern = re.compile(pattern, flags=re.IGNORECASE if pattern_icase else 0)
-        data_fixer = DataFixer(bad_pattern, replacement)
+        data_fixer = DataFixer(bad_pattern, replacement, keys=keys)
 
         qs = Classification.objects.all()
         if lab:
             qs = qs.filter(lab=lab)
+        if org:
+            qs = qs.filter(lab__organization=org)
 
         for classification in qs.iterator():
             changes = []

@@ -639,5 +639,5 @@ def classification_groups(
 
 
 @register.inclusion_tag("classification/tags/classification_groupings.html", takes_context=True)
-def classification_groupings(context):
-    return {}
+def classification_groupings(context, show_allele_origin_filter=True):
+    return {"show_allele_origin_filter": show_allele_origin_filter}

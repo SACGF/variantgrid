@@ -2633,6 +2633,9 @@ a .c-hgvs-body .c-hgvs-nomen {
 .c-pill.cs-lb {
   background-color: #ddddff;
 }
+.c-pill.cs-r, .c-pill cs-dr {
+  background-color: #eeeeee;
+}
 .c-pill.cs-vus, .c-pill.cs-vus_a, .c-pill.cs-vus_b, .c-pill.cs-vus_c {
   background-color: #dddddd;
 }

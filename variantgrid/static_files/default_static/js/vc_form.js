@@ -2512,23 +2512,66 @@ VCTable.classification = (data, type, row) => {
         return "" // support for dirty groups still processing
     }
     let cs = data;
+    let csVal = cs;
     let diff = 0;
-    if (typeof(cs) !== "string") {
-        diff = cs["diff"];
-        cs = cs["classification"] || cs[SpecialEKeys.CLINICAL_SIGNIFICANCE];
-    }
+    let is_pending = false;
+    let old = null;
+    let oldLabel = null;
     let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
-    let label = csKey.prettyValue(cs);
-    let csClass = `cs-` + (cs || '').toLowerCase()
+
+    if (typeof(cs) !== "string") {
+        csVal = cs["classification"] || cs[SpecialEKeys.CLINICAL_SIGNIFICANCE];
+        let pending = cs["pending"];
+        if (pending) {
+            old = csVal;
+            csVal = pending;
+            is_pending = true;
+        } else {
+            old = cs["old"];
+        }
+        diff = cs["diff"];
+        if (old) {
+            oldLabel = csKey.prettyValue(old).val;
+        }
+    }
+
+    let label = csKey.prettyValue(csVal).val;
+    let csClass = `cs-` + (csVal || '').toLowerCase()
     let diffHtml = "";
     if (diff) {
         diffHtml = ' <i class="fa-solid fa-asterisk" title="Multiple values have been recorded - showing latest"></i>';
     }
-    if (cs && cs.length) {
-        return $('<span>', {class: `c-pill cs ${csClass}`, html:label.val + diffHtml});
-    } else {
-        return $('<span>', {class: 'c-pill cs-none no-value', html: 'No Data' + diffHtml});
+    let pendingHtml = "";
+    if (is_pending) {
+        pendingHtml = ' <i class="fa-solid fa-clock" title="Some or all of these classifications have been marked as having pending changes to classification"></i>';
     }
+
+    // {% if group.clinical_significance_old %}
+    //         <div><del>{% if group.clinical_significance_old %}{{ group.clinical_significance_old | ekey:"clinical_significance" }}{% else %}No Data{% endif %}</del></div>
+    //     {% endif %}
+    //     {% if group.clinical_significance_pending %}
+    //         <div title="Some or all of these classifications have been marked as having pending changes to classification" data-toggle="tooltip">
+    //             <div>
+    //                 <del>{% if group.clinical_significance %}{{ group.clinical_significance | ekey:"clinical_significance" }}{% else %}No Data{% endif %}</del>
+    //             </div>
+    //             <div class="c-pill cs cs-{{ group.clinical_significance }}">
+    //                 <div class="mb-1">{{ group.clinical_significance_pending | ekey:"clinical_significance" }}</div>
+    //                 <div class="flag flag-classification_pending_changes hover-detail mx-1"></div>
+    //             </div>
+    //         </div>
+    //     {% else %}
+
+    let fullDom = $('<div>');
+    if (old) {
+        fullDom.append($('<div>', {html: $('<del>', {text: oldLabel})}));
+    }
+
+    if (csVal && csVal.length) {
+        fullDom.append($('<span>', {class: `c-pill cs ${csClass}`, html:label + diffHtml + pendingHtml}));
+    } else {
+        fullDom.append($('<span>', {class: 'c-pill cs-none no-value', html: 'No Data' + diffHtml + pendingHtml}));
+    }
+    return fullDom;
 };
 
 VCTable.evidence_key = (key_name, data, type, row) => {

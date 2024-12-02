@@ -8,7 +8,7 @@ from more_itertools import first
 from classification.enums import ShareLevel, AlleleOriginBucket, EvidenceCategory, SpecialEKeys
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
     ClassificationGroupingSearchTermType, EvidenceKeyMap, ClassificationModification, ClassificationGroupingEntry, \
-    Classification
+    Classification, DiscordanceReport, DiscordanceReportClassification
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType
@@ -64,6 +64,13 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         diff_value = row["pathogenic_difference"]
         result_dict = row["latest_classification_modification__classification__summary__pathogenicity"] or {}
         result_dict["diff"] = diff_value
+
+        if dr := self.discordance_report:
+            if drc := DiscordanceReportClassification.objects.filter(report_id=dr.pk, classification_original__classification=row["latest_classification_modification__classification_id"]).first():
+                old_cs = drc.classification_original.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+                if result_dict and result_dict.get("classification") != old_cs:
+                    result_dict["old"] = old_cs
+
         return result_dict
 
     def _render_date(self, row: CellData) -> JsonDataType:
@@ -119,16 +126,45 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         return response
 
     def get_initial_queryset(self) -> QuerySet[DC]:
-        return ClassificationGrouping.filter_for_user(self.user, ClassificationGrouping.objects.all())
+        qs = ClassificationGrouping.filter_for_user(self.user, ClassificationGrouping.objects.all())
+
+        page = self.get_query_param('page_id')
+
+        filters: List[Q] = []
+
+        # run the filters that are perma-applied on certain pages
+
+        if allele_id := self.get_query_param('allele_id'):
+            filters.append(Q(allele_origin_grouping__allele_grouping__allele_id=int(allele_id)))
+
+        if condition := self.get_query_param('ontology_term_id'):
+            if c_filter := self.condition_filter(condition):
+                filters.append(c_filter)
+
+        if page == "gene_symbol":
+            if gene_symbol_str := self.get_query_param("gene_symbol"):
+                if gs_filter := self.gene_symbol_filter(gene_symbol_str):
+                    filters.append(gs_filter)
+
+        if dr := self.discordance_report:
+            classification_ids = [cm.classification_id for cm in dr.all_classification_modifications]
+            group_ids = ClassificationGroupingEntry.objects.filter(classification_id__in=classification_ids).values_list('grouping', flat=True)
+            filters.append(Q(pk__in=group_ids))
+
+        if filters:
+            return qs.filter(*filters)
+        else:
+            return qs
 
     def filter_queryset(self, qs: QuerySet[ClassificationGrouping]) -> QuerySet[ClassificationGrouping]:
+        page = self.get_query_param('page_id')
+
+        # run the filters that are optionally applied
+
         filters: List[Q] = []
         if lab_id := self.get_query_param('lab'):
             lab_list = lab_id.split(",")
             filters.append(Q(lab_id__in=lab_list))
-
-        if allele_id := self.get_query_param('allele_id'):
-            filters.append(Q(allele_origin_grouping__allele_grouping__allele_id=int(allele_id)))
 
         if allele_origin := self.get_query_param("allele_origin"):
             if allele_origin != "A":
@@ -143,13 +179,10 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             # Join through allele so it works across genome builds
             filters.append(Q(allele_origin_grouping__allele_grouing__allele__variantallele__variant__in=variant_qs))
 
-        if condition := self.get_query_param('ontology_term_id'):
-            if c_filter := self.condition_filter(condition):
-                filters.append(c_filter)
-
-        if gene_symbol_str := self.get_query_param("gene_symbol"):
-            if gs_filter := self.gene_symbol_filter(gene_symbol_str):
-                filters.append(gs_filter)
+        if page != "gene_symbol":
+            if gene_symbol_str := self.get_query_param("gene_symbol"):
+                if gs_filter := self.gene_symbol_filter(gene_symbol_str):
+                    filters.append(gs_filter)
 
         if settings.CLASSIFICATION_ID_FILTER:
             if filter_text := self.get_query_param("id_filter"):
@@ -160,6 +193,13 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 filters.append(self.classification_filter_to_grouping(Q(user__pk=user_id)))
 
         return qs.filter(*filters)
+
+    @cached_property
+    def discordance_report(self) -> Optional[DiscordanceReport]:
+        if discordance_report_id := self.get_query_param('discordance_report'):
+            dr = DiscordanceReport.objects.get(pk=discordance_report_id)
+            dr.check_can_view(self.user)
+            return dr
 
     @cached_property
     def id_columns(self) -> List[str]:
@@ -249,7 +289,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     'share_level'
                 ],
                 name='id',
-                label='ID',
+                label='Lab',
                 orderable=True,
                 renderer=self.render_row_header,
                 client_renderer='VCTable.groupIdentifier',
@@ -270,7 +310,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 sort_keys=[ImportedAlleleInfo.column_name_for_build(genome_build_preferred, "latest_allele_info",
                                                                     "genomic_sort")],
                 name='c_hgvs',
-                label=f'HGVS ({genome_build_preferred.name})',
+                label=f'HGVS <span class="text-secondary">{genome_build_preferred.name}</span>',
                 renderer=self.render_c_hgvs,
                 client_renderer='VCTable.hgvs',
                 orderable=True,
@@ -293,6 +333,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 renderer=self.render_pathogenic,
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 extra_columns=[
+                    "latest_classification_modification__classification_id",
                     "latest_classification_modification__classification__summary__pathogenicity",
                     "pathogenic_difference"
                 ]
@@ -316,7 +357,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             RichColumn(
                 key="latest_classification_modification__classification__summary__criteria_labels",
                 name="latest_criteria",
-                label="Latest Criteria",
+                label='<span class="text-secondary">Latest</span><br/>Criteria',
                 client_renderer='TableFormat.list_codes'
             ),
             RichColumn(
@@ -330,7 +371,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             RichColumn(
                 key="latest_classification_modification__classification__summary__date",
                 name="latest_curation_date",
-                label="Latest Curated",
+                label='<span class="text-secondary">Latest</span><br/>Curated',
                 sort_keys=["latest_classification_modification__classification__summary__date__value"],
                 client_renderer="VCTable.latest_curation_and_link",
                 renderer=self._render_date,

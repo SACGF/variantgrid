@@ -46,11 +46,13 @@
 </script>
 <div class="row">
     <div class="col">
-        <div class="text-right display-flex">
-            <div class="spacer"></div>
-            <div class="mr-2 mt-1">Allele Origin</div>
-            {% allele_origin_toggle show_label=False %}
-        </div>
+        {% if show_allele_origin_filter %}
+            <div class="text-right display-flex">
+                <div class="spacer"></div>
+                <div class="mr-2 mt-1">Allele Origin</div>
+                {% allele_origin_toggle show_label=False %}
+            </div>
+        {% endif %}
         <table id="vc-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table" data-adjust-columns="false"></table>
         <div>
         Download as
