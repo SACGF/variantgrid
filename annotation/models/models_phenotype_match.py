@@ -145,16 +145,6 @@ class PatientTextPhenotype(models.Model):
     def __str__(self):
         return f"{self.patient}: {self.phenotype_description}"
 
-    def get_ambiguity_warnings(self) -> list[str]:
-        ambiguity_warnings = []
-        tp_qs = TextPhenotype.objects.filter(textphenotypesentence__phenotype_description__patienttextphenotype=self)
-        for tp in tp_qs.distinct():
-            if ambiguous_matches := list(tp.get_ambiguous_matches()):
-                terms = ', '.join(sorted([str(tpm.ontology_term) for tpm in ambiguous_matches]))
-                msg = f"'Phenotype: {tp.text}' was ambiguous (matched >=2 times in the same ontology service): {terms}"
-                ambiguity_warnings.append(msg)
-        return ambiguity_warnings
-
 
 def patients_qs_for_ontology_term(user, ontology_term):
     return Patient.filter_for_user(user).filter(**{PATIENT_ONTOLOGY_TERM_PATH: ontology_term}).order_by("id")
