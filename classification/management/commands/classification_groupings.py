@@ -16,7 +16,7 @@ class Command(BaseCommand):
             raise ValueError("Must provide one or more of summary, all, dirty")
 
         if options.get("summary"):
-            for cm in ClassificationModification.objects.filter(is_last_published=True).select_related("classification"):
+            for cm in ClassificationModification.objects.filter(is_last_published=True).select_related("classification").iterator():
                 classification = cm.classification
                 classification.summary = ClassificationSummaryCalculator(cm).cache_dict()
                 classification.save(update_fields=["summary"])
