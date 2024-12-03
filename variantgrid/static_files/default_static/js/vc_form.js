@@ -2517,10 +2517,12 @@ VCTable.classification = (data, type, row) => {
     let is_pending = false;
     let old = null;
     let oldLabel = null;
+    let newValue = null;
     let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
 
     if (typeof(cs) !== "string") {
         csVal = cs["classification"] || cs[SpecialEKeys.CLINICAL_SIGNIFICANCE];
+        newValue = cs["new"]
         let pending = cs["pending"];
         if (pending) {
             old = csVal;
@@ -2545,6 +2547,7 @@ VCTable.classification = (data, type, row) => {
     if (is_pending) {
         pendingHtml = ' <i class="fa-solid fa-clock" title="Some or all of these classifications have been marked as having pending changes to classification"></i>';
     }
+    let newHtml = "";
 
     // {% if group.clinical_significance_old %}
     //         <div><del>{% if group.clinical_significance_old %}{{ group.clinical_significance_old | ekey:"clinical_significance" }}{% else %}No Data{% endif %}</del></div>
@@ -2563,14 +2566,21 @@ VCTable.classification = (data, type, row) => {
 
     let fullDom = $('<div>');
     if (old) {
-        fullDom.append($('<div>', {html: $('<del>', {text: oldLabel})}));
+        fullDom.append($('<div>', {html: $('<del>', {class: 'c-pill cs cs-none no-value', text: oldLabel})}));
     }
 
     if (csVal && csVal.length) {
-        fullDom.append($('<span>', {class: `c-pill cs ${csClass}`, html:label + diffHtml + pendingHtml}));
+        fullDom.append($('<span>', {class: `c-pill cs ${csClass}`, html:label + diffHtml + pendingHtml + newHtml}));
     } else {
-        fullDom.append($('<span>', {class: 'c-pill cs-none no-value', html: 'No Data' + diffHtml + pendingHtml}));
+        fullDom.append($('<span>', {class: 'c-pill cs-none no-value', html: 'No Data' + diffHtml + pendingHtml + newHtml}));
     }
+
+    if (newValue) {
+        let newLabel = csKey.prettyValue(newValue).val;
+        newHtml = `<span class="c-pill cs" title="This is the classification value at the time the discordance was resolved. This record is now ${newLabel}">Updated <i class="fa-solid fa-circle-exclamation"></i></span>`;
+        fullDom.append(newHtml);
+    }
+
     return fullDom;
 };
 

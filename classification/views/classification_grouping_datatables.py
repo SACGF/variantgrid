@@ -70,6 +70,11 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 old_cs = drc.classification_original.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
                 if result_dict and result_dict.get("classification") != old_cs:
                     result_dict["old"] = old_cs
+                if "pending" not in result_dict:
+                    effective_cs = drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+                    if effective_cs != result_dict.get("classification"):
+                        result_dict["new"] = result_dict.get("classification")
+                        result_dict["classification"] = effective_cs
 
         return result_dict
 
