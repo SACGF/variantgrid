@@ -33,16 +33,16 @@ def check_vep() -> dict:
         # Disable all the annoying VEP logging
         previous_level = logging.root.manager.disable
         logging.disable(logging.CRITICAL)
-        vav = None
-        try:
-            vav = VariantAnnotationVersion.latest(genome_build)
-        except:
-            pass
-
+        vav = VariantAnnotationVersion.latest(genome_build)
         create_vav_cmd = f"python3 manage.py create_new_variant_annotation_version --genome-build={genome_build}"
+        fix_vav = create_vav_cmd
+        if vav is None:
+            if vav_inactive := VariantAnnotationVersion.latest(genome_build, active=False):
+                fix_vav = f"Your systems admin needs to set VAV.pk={vav_inactive.pk} to active."
+
         vep_data[f"have_variant_annotation_version_{genome_build}"] = {
             "valid": vav is not None,
-            "fix": create_vav_cmd,
+            "fix": fix_vav,
         }
 
         try:

@@ -59,6 +59,10 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
         return cls.objects.get(pk='GRCh38')
 
     @classmethod
+    def t2tv2(cls) -> 'GenomeBuild':
+        return cls.objects.get(pk='T2T-CHM13v2.0')
+
+    @classmethod
     def legacy_build(cls) -> 'GenomeBuild':
         """ Use this for hacks - makes it easy to find / fix later """
         return cls.objects.get(pk='GRCh37')
@@ -177,8 +181,10 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
             chrom_contig_mappings[contig.ucsc_name] = contig
             chrom_contig_mappings[contig.genbank_accession] = contig
             chrom_contig_mappings[contig.refseq_accession] = contig
+
         # Map lowercase "mt" -> "MT"
-        chrom_contig_mappings["mt"] = chrom_contig_mappings["MT"]
+        if mt := chrom_contig_mappings.get("MT"):
+            chrom_contig_mappings["mt"] = mt
         return chrom_contig_mappings
 
     def get_chrom_contig_id_mappings(self) -> dict[str, int]:

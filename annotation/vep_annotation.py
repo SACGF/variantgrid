@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import uuid
+from copy import deepcopy
 from shlex import shlex
 
 from django.conf import settings
@@ -24,13 +25,21 @@ class VEPConfig:
     def __init__(self, genome_build: GenomeBuild):
         self.annotation_consortium = genome_build.annotation_consortium
         self.genome_build = genome_build
-        self.vep_data = genome_build.settings["vep_config"]
         self.vep_version = int(settings.ANNOTATION_VEP_VERSION)
+
+        # We'll strip out any config - anything left is files/data
+        vep_config = deepcopy(genome_build.settings["vep_config"])
+        self.use_sift = vep_config.pop("sift", False)
+        self.cache_version = vep_config.pop("cache_version", self.vep_version)
+
+        self.vep_data = vep_config
         self.columns_version = genome_build.settings["columns_version"]
 
     def __getitem__(self, key):
         """ Throws KeyError if missing """
         value = self.vep_data[key]  # All callers need to catch KeyError
+        if value is None:
+            raise KeyError(key)
         return os.path.join(settings.ANNOTATION_VEP_BASE_DIR, value)
 
 
@@ -117,6 +126,7 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         "-i", vcf_filename,
         "-o", output_filename,
         "--cache",
+        "--cache_version", str(vc.cache_version),
         "--dir_cache", settings.ANNOTATION_VEP_CACHE_DIR,
         "--dir_plugins", settings.ANNOTATION_VEP_PLUGINS_DIR,
         # Need to provide VEP a fasta rather than use the default - https://github.com/Ensembl/VEP_plugins/issues/708
@@ -128,7 +138,6 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         "--no_escape",  # Don't URI escape HGVS strings
 
         # flags for fields
-        "--sift", "b",
         "--hgvs",
         "--symbol",
         "--numbers",  # EXON/INTRON numbers
@@ -142,6 +151,9 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         "--pubmed",
         "--variant_class",
     ]
+
+    if vc.use_sift:
+        cmd.extend(["--sift", "b"])
 
     if settings.ANNOTATION_VEP_PICK_ORDER:
         # @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_pick_order
@@ -297,14 +309,15 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
 
     kwargs = {}
     for json_field, python_field in FIELD_LOOKUP.items():
-        value = vep_version_dict.get(json_field)
-        converter = FIELD_CONVERSION.get(python_field)
-        if converter:
-            value = converter(value)
-        kwargs[python_field] = value
+        if value := vep_version_dict.get(json_field):
+            converter = FIELD_CONVERSION.get(python_field)
+            if converter:
+                value = converter(value)
+            kwargs[python_field] = value
 
     genome_build = vep_config.genome_build
     kwargs["genome_build"] = genome_build
+    kwargs["vep_cache"] = vep_config.cache_version
     kwargs["annotation_consortium"] = vep_config.annotation_consortium
     kwargs["columns_version"] = vep_config.columns_version
     distance = getattr(settings, "ANNOTATION_VEP_DISTANCE", None)
@@ -321,7 +334,7 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
             msg = f"Couldn't determine dbNSFP version from file: {dbnsfp_path}"
             raise ValueError(msg)
     except KeyError:
-        kwargs["dbnsfp"] = 'n/a'
+        pass
 
     # we use our own gnomAD custom annotation, not the default VEP one
     q_cvf = ColumnVEPField.get_columns_version_q(vep_config.columns_version)
@@ -340,11 +353,15 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
         except KeyError:
             pass  # Will just use VEP values
 
-    cosmic_filename = vep_config["cosmic"]
-    if os.path.exists(cosmic_filename):
-        cosmic_basename = os.path.basename(cosmic_filename)
-        if m := re.match(r"^Cosmic.*_v(\d{2,})_.*.vcf.gz", cosmic_basename):
-            kwargs["cosmic"] = int(m.group(1))
+    try:
+        # COSMIC isn't in T2T
+        cosmic_filename = vep_config["cosmic"]
+        if os.path.exists(cosmic_filename):
+            cosmic_basename = os.path.basename(cosmic_filename)
+            if m := re.match(r"^Cosmic.*_v(\d{2,})_.*.vcf.gz", cosmic_basename):
+                kwargs["cosmic"] = int(m.group(1))
+    except KeyError:
+        pass
 
     return kwargs
 

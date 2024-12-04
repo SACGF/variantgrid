@@ -37,10 +37,10 @@ class ConservationNode(AnalysisNode):
     gerp_pp_rs = models.FloatField(default=0.0)
     phylop_30_way_mammalian = models.FloatField(default=0.0, blank=True)  # 38 only
     phylop_46_way_mammalian = models.FloatField(default=0.0, blank=True)  # 37 only
-    phylop_100_way_vertebrate = models.FloatField(default=0.0)
+    phylop_100_way_vertebrate = models.FloatField(default=0.0, blank=True)  # 37/38
     phastcons_30_way_mammalian = models.FloatField(default=0.0, blank=True)  # 38 only
     phastcons_46_way_mammalian = models.FloatField(default=0.0, blank=True)  # 37 only
-    phastcons_100_way_vertebrate = models.FloatField(default=0.0)
+    phastcons_100_way_vertebrate = models.FloatField(default=0.0, blank=True)  # 37/38
     allow_null = models.BooleanField(default=False, blank=True)
     use_individual_sliders = models.BooleanField(default=False, blank=True)
 

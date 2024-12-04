@@ -690,7 +690,8 @@ class VariantAnnotationVersion(SubVersionPartition):
     last_checked_date = models.DateTimeField(null=True)
     active = models.BooleanField(default=True)
 
-    vep = models.IntegerField()
+    vep = models.IntegerField()  # code version
+    vep_cache = models.IntegerField(null=True)  # May need to have diff code/cache versions eg T2T
     columns_version = models.IntegerField(default=1)
     ensembl = models.TextField()
     # can be eg: ensembl=97.378db18 ensembl-variation=97.26a059c ensembl-io=97.dc917e1 ensembl-funcgen=97.24f4d3c
@@ -698,17 +699,17 @@ class VariantAnnotationVersion(SubVersionPartition):
     ensembl_variation = models.TextField()
     ensembl_io = models.TextField()
     thousand_genomes = models.TextField()
-    cosmic = models.IntegerField()
-    hgmd = models.TextField()
+    cosmic = models.IntegerField(blank=True, null=True)  # 37/38 only
+    hgmd = models.TextField(blank=True, null=True)  # 37/38 only
     assembly = models.TextField()
-    dbsnp = models.IntegerField()
-    gencode = models.TextField()
+    dbsnp = models.IntegerField(blank=True, null=True)  # 37/38 only
+    gencode = models.TextField(blank=True, null=True)  # 37/38 only
     genebuild = models.TextField()
-    gnomad = models.TextField()
+    gnomad = models.TextField(blank=True, null=True)  # 37/38 only
     refseq = models.TextField(blank=True)
-    regbuild = models.TextField()
-    sift = models.TextField()
-    dbnsfp = models.TextField()
+    regbuild = models.TextField(blank=True, null=True)  # 37/38 only
+    sift = models.TextField(blank=True, null=True)  # 37/38 only
+    dbnsfp = models.TextField(blank=True, null=True)  # 37/38 only
     distance = models.IntegerField(default=5000)  # VEP --distance parameter
 
     @property
