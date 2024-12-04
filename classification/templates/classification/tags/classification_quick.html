@@ -9,6 +9,7 @@
         <span class="share-level-{{ vcm.share_level_enum.name }} sig-level-{{ vcm.evidence.clinical_significance.value}}">
 
             {% clinical_significance vcm %}
+
             {% if vcm.classification.allele_origin_bucket != "G" %}
                 {% clinical_significance vcm "somatic:clinical_significance" show_if_none=True %}
             {% else %}

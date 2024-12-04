@@ -1,1 +1,1 @@
-{% if skip %}{% else %}<span title="{{ title }}" class="d-inline-block c-pill {{css_class }}">{{ label }}{% if suffix %}{{ suffix }}{% endif %}</span>{% endif %}
+{% if skip %}{% else %}<span title="{{ title }}" class="d-inline-block c-pill {{css_class }}">{{ label }}{% if suffix %}{{ suffix }}{% endif %}{% if pending_from %} <i class="fa-solid fa-clock" title="This is a pending change, the classification is currently {{pending_from}}"></i>{% endif %}</span>{% endif %}

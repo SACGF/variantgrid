@@ -6,6 +6,7 @@ from typing import Optional, Set, Self
 import django
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
+from django.core.exceptions import PermissionDenied
 from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, QuerySet
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
@@ -212,6 +213,14 @@ class ClassificationGrouping(TimeStampedModel):
     @property
     def share_level_obj(self):
         return ShareLevel(self.share_level)
+
+    def can_view(self, user: User) -> bool:
+        # inefficient but doesn't duplicate code
+        return ClassificationGrouping.filter_for_user(user, ClassificationGrouping.objects.filter(pk=self.pk)).exists()
+
+    def check_can_view(self, user: User):
+        if not self.can_view(user):
+            raise PermissionDenied("You do not have permission to view this classification grouping.")
 
     @staticmethod
     def filter_for_user(user: User, qs: QuerySet['ClassificationGrouping']) -> QuerySet['ClassificationGrouping']:

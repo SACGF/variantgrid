@@ -3,6 +3,7 @@ from functools import cached_property
 from itertools import groupby
 from typing import Optional, Iterable, TypeVar, Generic
 
+import deprecation
 from django.contrib.auth.models import User
 from more_itertools import first
 
@@ -16,6 +17,13 @@ from genes.hgvs import CHGVS, PHGVS
 from genes.models import GeneSymbol
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, Lab
+
+#
+# DEPRECATED
+#
+# This is only used on the Discordance Report (soon to get rid of)
+# It has been replaced by ClassificationGroupingColumn - which is stored in the database
+
 
 # This is the primary way of displaying classifications (not count the big fat listing)
 # It has the advantage of consolidating records, so labs that provide 10 records for the same variant
@@ -102,6 +110,7 @@ class ClassificationGroupEntry:
             return True
 
 
+@deprecation.deprecated("Use ClassificationGrouping whenever possible")
 class ClassificationGroupUtils:
 
     def __init__(
@@ -161,6 +170,7 @@ class ClassificationGroupUtils:
         )
 
 
+@deprecation.deprecated("Use ClassificationGrouping whenever possible")
 class ClassificationGroup:
 
     def __init__(self,
@@ -432,6 +442,7 @@ class ClassificationGroup:
     #     return None
 
 
+@deprecation.deprecated("Use ClassificationGrouping whenever possible")
 class ClassificationGroups:
 
     def __init__(self,

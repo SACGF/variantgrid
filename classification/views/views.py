@@ -930,7 +930,7 @@ def allele_groupings(request, lab_id: Optional[Union[str, int]] = None):
 
 def view_classification_grouping_detail(request, classification_grouping_id: int):
     grouping = ClassificationGrouping.objects.get(pk=classification_grouping_id)
-    # FIXME add security
+    grouping.check_can_view(request.user)
     return render_ajax_view(request, 'classification/classification_grouping_detail.html', {
         "classification_grouping": grouping
     })

@@ -4,6 +4,7 @@ from datetime import timedelta
 from html import escape
 from typing import Union, Optional, Iterable, Any, Collection
 
+import deprecation
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Model
@@ -93,6 +94,8 @@ def classification_changes(changes):
 def clinical_significance(value: Optional[Union[str | EvidenceMixin]], evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE, show_if_none=True):
     is_somatic = evidence_key == SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE
     suffix: Optional[str] = None
+    pending_from: Optional[str] = None
+    key = EvidenceKeyMap.cached_key(evidence_key)
 
     if isinstance(value, EvidenceMixin):
         if is_somatic:
@@ -102,12 +105,24 @@ def clinical_significance(value: Optional[Union[str | EvidenceMixin]], evidence_
             else:
                 value = None
         else:
+            value_cs = value
             value = value.get(evidence_key)
+            summary = None
+            if evidence_key == SpecialEKeys.CLINICAL_SIGNIFICANCE:
+                if isinstance(value_cs, ClassificationModification):
+                    summary = value_cs.classification.summary
+                elif isinstance(value_cs, Classification):
+                    summary = value_cs.classification
+                if summary:
+                    if pending_val := summary.get("pathogenicity", {}).get("pending"):
+                        pending_from = key.option_dictionary.get(value, value) or "No Data"
+                        value = pending_val
+
 
     if value is None and not show_if_none:
         return {"skip": True}
 
-    key = EvidenceKeyMap.cached_key(evidence_key)
+
     label = key.option_dictionary.get(value, value) or "No Data"
     title = key.pretty_label
     if value == "withdrawn":
@@ -122,7 +137,8 @@ def clinical_significance(value: Optional[Union[str | EvidenceMixin]], evidence_
         "label": label,
         "prefix": "cs" if key.key == SpecialEKeys.CLINICAL_SIGNIFICANCE else "scs",
         "title": title,
-        "suffix": suffix
+        "suffix": suffix,
+        "pending_from": pending_from
     }
 
 
@@ -536,6 +552,7 @@ def user_view_events(user: User, days: int = 1):
     return view_event_data
 
 
+@deprecation.deprecated("Use classification_groupings whenever possible")
 @register.inclusion_tag("classification/tags/classification_group_row.html")
 def classification_group_row(group: ClassificationGroup, sub_row: Optional[int] = None, sub_index: Optional[int] = None, show_pending_changes: Optional[bool] = True):
     return {
@@ -545,6 +562,7 @@ def classification_group_row(group: ClassificationGroup, sub_row: Optional[int] 
     }
 
 
+@deprecation.deprecated("Use classification_groupings whenever possible")
 @register.inclusion_tag("classification/tags/classification_groups.html", takes_context=True)
 def classification_groups(
         context,
@@ -640,4 +658,13 @@ def classification_groups(
 
 @register.inclusion_tag("classification/tags/classification_groupings.html", takes_context=True)
 def classification_groupings(context, show_allele_origin_filter=True):
+    """
+    Shows the new database based classification grouping table. To filter the data implement a JavaScript method on the page
+    <script>
+        function classificationGroupingFilter(data) {
+            data.ontology_term_id = {{ term.id | jsonify }};
+        }
+    </script>
+    :param show_allele_origin_filter: True by default, set to False to hardcode the filtering to all records
+    """
     return {"show_allele_origin_filter": show_allele_origin_filter}

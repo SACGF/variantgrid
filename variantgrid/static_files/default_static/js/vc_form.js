@@ -2545,7 +2545,7 @@ VCTable.classification = (data, type, row) => {
     }
     let pendingHtml = "";
     if (is_pending) {
-        pendingHtml = ' <i class="fa-solid fa-clock" title="Some or all of these classifications have been marked as having pending changes to classification"></i>';
+        pendingHtml = ' <i class="fa-solid fa-clock" title="Some or all of these classifications have been marked as having pending changes to classification to the value shown"></i>';
     }
     let newHtml = "";
 
