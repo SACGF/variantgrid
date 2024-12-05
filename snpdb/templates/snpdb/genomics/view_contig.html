@@ -48,6 +48,7 @@
             </div>
         </div>
 
+        {% if has_annotation %}
         <div class="card">
             <div class="card-header">Genes on contig</div>
             <div class="card-body">
@@ -55,6 +56,9 @@
                 {% jqgrid 'genes_grid' 'gene-annotation-versions' genome_build_name=genome_build.name search=False delete=False jqgrid_config_get_parameters_func='getConfigUrl' %}
             </div>
         </div>
+        {% else %}
+            This build has no annotation, so we can't list genes
+        {% endif %}
 
     </div>
 

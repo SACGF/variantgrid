@@ -1651,8 +1651,10 @@ def view_contig(request, contig_accession):
     # Prefer builds with annotation
     builds_with_annotation = list(contig.get_genome_builds(require_annotation=True))
     if builds_with_annotation:
+        has_annotation = True
         builds = builds_with_annotation
     else:
+        has_annotation = False
         builds = list(contig.get_genome_builds(require_annotation=False))
 
     if builds:
@@ -1671,6 +1673,7 @@ def view_contig(request, contig_accession):
     context = {
         "contig": contig,
         "genome_build": genome_build,
+        "has_annotation" : has_annotation,
     }
     return render(request, "snpdb/genomics/view_contig.html", context)
 
