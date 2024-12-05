@@ -1,4 +1,6 @@
+import json
 from dataclasses import dataclass
+from datetime import timezone
 from enum import Enum
 from functools import cached_property
 from typing import Optional, Any
@@ -121,7 +123,7 @@ class RowID(ExportRow):
 
     @export_column(categories={"transient": True})
     def version(self):
-        return self.cm.created.timestamp()
+        return f"{self.vc.pk}.{self.cm.created.timestamp()}"
 
     @export_column()
     def liftover_error(self):
