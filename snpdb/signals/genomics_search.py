@@ -8,7 +8,7 @@ from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 
 @search_receiver(
     search_type=GenomeBuild,
-    pattern=re.compile("(GRCh37|GRCh38)", re.IGNORECASE),
+    pattern=re.compile("(GRCh37|GRCh38|T2T|CHM13)", re.IGNORECASE),
     sub_name="GenomeBuild",
     example=SearchExample(
         note="Genome Builds",

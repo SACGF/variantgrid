@@ -3,6 +3,7 @@ import logging
 from abc import abstractmethod
 
 import celery
+from django.conf import settings
 from django.contrib.auth.models import User
 
 from annotation.tasks.annotation_scheduler_task import annotation_scheduler
@@ -41,7 +42,12 @@ class PreprocessAndAnnotateVCFTask(ImportVCFStepTask):
     """ Same as PreprocessVCFTask but also annotated w/gnomAD """
 
     def process_items(self, upload_step):
-        preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=True)
+        if _common_settings := settings.VCF_IMPORT_COMMON_FILTERS.get(upload_step.genome_build.name):
+            annotate_gnomad_af = True
+        else:
+            annotate_gnomad_af = False
+
+        preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=annotate_gnomad_af)
 
         # Reload from DB - vcf_extract_unknown_and_split_file set items_processed in a different process
         upload_step = UploadStep.objects.get(pk=upload_step.pk)

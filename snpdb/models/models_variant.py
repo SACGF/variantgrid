@@ -277,8 +277,8 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         if genome_build:
             chrom = format_chrom(chrom, genome_build.reference_fasta_has_chr)
         position = int(match.group(2))
-        ref = match.group(3).strip().upper()
-        alt = match.group(4).strip().upper()
+        ref = match.group(3)
+        alt = match.group(4)
         vc = VariantCoordinate.from_explicit_no_svlen(chrom, position, ref, alt)
         return vc.as_symbolic_or_explicit_according_to_size(genome_build)
 
@@ -320,6 +320,8 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
     def from_explicit_no_svlen(chrom: str, position: int, ref: str, alt: str) -> 'VariantCoordinate':
         """ Initialise w/o providing an end """
 
+        ref = ref.strip().upper()
+        alt = alt.strip().upper()
         if Sequence.allele_is_symbolic(alt):
             raise ValueError("Must pass 'svlen' when using symbolic alt")
         return VariantCoordinate(chrom=chrom, position=position, ref=ref, alt=alt)

@@ -53,7 +53,17 @@ class VariantCoordinateAndDetails(FormerTuple):
 
 
 class ClinGenHGVSConverter(BioCommonsHGVSConverter):
+    SUPPORTED_BUILDS = [GenomeBuild.grch37(), GenomeBuild.grch38()]
+
+    @classmethod
+    def build_supported(cls, genome_build) -> bool:
+        return genome_build in cls.SUPPORTED_BUILDS
+
     def __init__(self, genome_build, local_resolution=False, clingen_resolution=True):
+        if not self.build_supported(genome_build):
+            supported_builds = ", ".join([str(gb) for gb in self.SUPPORTED_BUILDS])
+            raise ValueError(f"ClinGen: unsupported {genome_build=}, {supported_builds=}")
+
         super().__init__(genome_build,
                          local_resolution=local_resolution, clingen_resolution=clingen_resolution)
 
@@ -77,6 +87,10 @@ class HGVSConverterFactory:
             #     hgvs_converter_type = HGVSConverterType.COMBO
             # else:
             hgvs_converter_type = settings.HGVS_DEFAULT_METHOD
+
+        if clingen_resolution and not ClinGenHGVSConverter.build_supported(genome_build):
+            logging.warning("ClinGen does not support build %s", genome_build)
+            clingen_resolution = False
 
         if isinstance(hgvs_converter_type, str):
             hgvs_converter_type = HGVSConverterType[hgvs_converter_type.upper()]

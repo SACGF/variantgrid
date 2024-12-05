@@ -346,7 +346,7 @@ ANNOTATION = {
             'phylop100way': None,
             'phylop46way': None,
             'phylop30way': None,  # n/a for GRCh37
-            "repeatmasker": "annotation_data/T2T-CHM13v2.0/chm13v2.0_rmsk.bb",
+            "repeatmasker": None, # "annotation_data/T2T-CHM13v2.0/chm13v2.0_rmsk.bb",
             "spliceai_snv": None,
             "spliceai_indel": None,
             "topmed": None,

@@ -75,16 +75,22 @@ class ClinVarVersion(SubVersionPartition):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
 
     @staticmethod
-    def get_annotation_date_from_filename(filename):
+    def get_annotation_date_from_filename(filename) -> datetime:
         # file looks like: clinvar_20160302.vcf.gz
         base_name = os.path.basename(filename)
         # Allow a bit of lee-way as may want to call it e.g. clinvar_20190708_grch37.vcf.gz
-        CLINVAR_PATTERN = r"^clinvar_(\d{8}).*\.vcf"
-        if m := re.match(CLINVAR_PATTERN, base_name):
+        CLINVAR_PATTERN_37_38 = r"^clinvar_(\d{8}).*\.vcf"
+        if m := re.match(CLINVAR_PATTERN_37_38, base_name):
             date_time = m.group(1)
-            annotation_date = datetime.strptime(date_time, "%Y%m%d")
-            return annotation_date
-        msg = f"File name '{base_name}' didn't match pattern {CLINVAR_PATTERN}"
+            return datetime.strptime(date_time, "%Y%m%d")
+        CLINVAR_PATTERN_T2T = r"^Homo_sapiens-GCA_009914755.4-(20\d{2})_(10)-clinvar.vcf.gz"
+        if m := re.match(CLINVAR_PATTERN_T2T, base_name):
+            year = m.group(1)
+            month = m.group(0)
+            return datetime(int(year), int(month), 1)  # Just go with 1st of month
+
+        patterns = ", ".join([CLINVAR_PATTERN_37_38, CLINVAR_PATTERN_T2T])
+        msg = f"File name '{base_name}' didn't match {patterns=}"
         raise ValueError(msg)
 
     def __str__(self):
@@ -698,7 +704,7 @@ class VariantAnnotationVersion(SubVersionPartition):
     ensembl_funcgen = models.TextField()
     ensembl_variation = models.TextField()
     ensembl_io = models.TextField()
-    thousand_genomes = models.TextField()
+    thousand_genomes = models.TextField(blank=True, null=True)  # 37/38 only
     cosmic = models.IntegerField(blank=True, null=True)  # 37/38 only
     hgmd = models.TextField(blank=True, null=True)  # 37/38 only
     assembly = models.TextField()
