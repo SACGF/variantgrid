@@ -6,6 +6,7 @@ from classification.models import Classification, ClassificationJsonParams, Clas
 from classification.models.classification_json_definitions import ClassificationJsonAlleleDict, \
     ClassificationJsonAlleleRevolvedDict
 from genes.hgvs import CHGVS
+from library.django_utils import get_url_from_view_path
 
 
 def get_allele_info_dict(classification: Classification) -> ClassificationJsonAlleleDict:
@@ -48,83 +49,6 @@ def get_allele_info_dict(classification: Classification) -> ClassificationJsonAl
             allele_info_dict["genome_builds"] = genome_builds
 
     return allele_info_dict
-
-#
-# @dataclass(frozen=True)
-# class ClassificationVersions:
-#     version: ClassificationModification
-#     latest_modification: ClassificationModification
-#     latest_published: ClassificationModification
-#
-#     @staticmethod
-#     def instance_from(classification: Classification, params: ClassificationJsonParams):
-#         version = params.version
-#         latest_modification: Optional[ClassificationModification] = None
-#         last_published_version: Optional[ClassificationModification] = None
-#         if version and not isinstance(version, ClassificationModification):
-#             version = classification.modification_at_timestamp(version)
-#         if version:
-#             if version.is_last_published:
-#                 last_published_version = version
-#             if version.is_last_edited:
-#                 latest_modification = version
-#         if not latest_modification:
-#             latest_modification = classification.last_edited_version
-#         if not last_published_version:
-#             last_published_version = classification.last_published_version
-#
-#         return ClassificationVersions(
-#             version=version,
-#             latest_modification=latest_modification,
-#             latest_published=last_published_version
-#         )
-#
-#     def json_for_version(self, version: ClassificationModification, current_user: User) -> ClassificationJsonVersionDict:
-#         version_data: ClassificationJsonVersionDict = {
-#             "version": version.created.timestamp(),
-#             "publish_level": version.share_level_enum.value,
-#             "is_published": version.published,
-#             "can_write": version.is_last_edited and version.classification.can_write(user_or_group=current_user)
-#         }
-#         return version_data
-#
-# def populate_classification_json_v3(classification: Classification, params: ClassificationJsonParams) -> dict:
-#
-#     current_user = params.current_user
-#     include_data = params.include_data
-#     version = params.version
-#     flatten = params.flatten
-#     include_lab_config = params.include_lab_config
-#     include_messages = params.include_messages
-#     strip_complicated = params.strip_complicated
-#     api_version = params.api_version
-#     lowest_share_level = classification.lowest_share_level(current_user)
-#
-#     latest_version_mode = version is None
-#
-#     versions = ClassificationVersions.instance_from(classification, params)
-#
-#     content: ClassificationJsonDictv3 = {
-#         "id": classification.id,
-#         "lab_record_id": classification.lab_record_id,
-#         "cr_lab_id": classification.cr_lab_id,
-#     }
-#     version_data = versions.json_for_version(versions.version, current_user=params.current_user)
-#     published_data = version_data if versions.version == versions.latest_published else versions.json_for_version(versions.latest_published, current_user=params.current_user)
-#     last_edited_data = published_data if versions.latest_modification == versions.latest_published else versions.json_for_version(versions.latest_modification, current_user=params.current_user)
-#
-#     content["version"] = version_data
-#     content["version_published"] = published_data
-#     content["version_latest"] = last_edited_data
-#     content["flag_collection"] = classification.flag_collection_safe.pk if classification.id else None
-#
-#     use_evidence = classification.evidence if latest_version_mode else versions.version.evidence
-#     content["data"] = classification.get_visible_evidence(use_evidence, lowest_share_level)
-#
-#     if include_messages:
-#         content["messages"] = Classification.validate_evidence(use_evidence)
-#
-#     return content
 
 
 def populate_classification_json(classification: Classification, params: ClassificationJsonParams) -> dict:
@@ -303,6 +227,9 @@ def populate_classification_json(classification: Classification, params: Classif
                     new_data[key] = blob
             data = new_data
         # End stripping attributes
+
+        if params.inject_source_url:
+            data[SpecialEKeys.SOURCE_URL] = {"value": get_url_from_view_path(classification.get_absolute_url())}
 
         if flatten:
             data = Classification.flatten(data, ignore_none_values=True)

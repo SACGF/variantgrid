@@ -17,13 +17,16 @@ from classification.views.exports.classification_export_formatter import Classif
 class FormatDetailsJSON:
     # format evidence keys to nice human labels or leave as raw codes easier handled by code
     full_detail: bool = False
+    inject_source_url: bool = False
 
     @staticmethod
     def from_request(request: HttpRequest) -> 'FormatDetailsCSV':
         full_detail = settings.CLASSIFICATION_DOWNLOADABLE_NOTES_AND_EXPLAINS or (request.query_params.get('full_detail') == 'true' and request.user.is_superuser)
+        inject_source_url = request.query_params.get('inject_source_url') != 'false'
 
         return FormatDetailsJSON(
-            full_detail=full_detail
+            full_detail=full_detail,
+            inject_source_url=inject_source_url
         )
 
 
@@ -35,11 +38,8 @@ class ClassificationExportFormatterJSON(ClassificationExportFormatter):
         self.format_details = format_details
         super().__init__(classification_filter=classification_filter)
 
-
-
     @classmethod
     def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterJSON':
-
         return ClassificationExportFormatterJSON(
             classification_filter=ClassificationFilter.from_request(request),
             format_details=FormatDetailsJSON.from_request(request)
@@ -61,7 +61,8 @@ class ClassificationExportFormatterJSON(ClassificationExportFormatter):
                                         include_data=include_data,
                                         #include_data = True,
                                         # FIXME don't want this to be the default
-                                        remove_acmg_namespace=True)
+                                        remove_acmg_namespace=True,
+                                        inject_source_url=self.format_details.inject_source_url)
 
     @property
     def delimiter_for_row(self):

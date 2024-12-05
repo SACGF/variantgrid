@@ -204,7 +204,9 @@ class ClassificationJsonParams:
                  api_version=1,
                  hardcode_extra_data: Dict = None,
                  fix_data_types=False,
-                 remove_acmg_namespace: Optional[bool] = None):
+                 remove_acmg_namespace: Optional[bool] = None,
+                 inject_source_url: bool = False
+                 ):
         """
         :param current_user: The user who will be consuming this data
         :param include_data: Include all the evidence for this classification (typically True for a GET and False for a POST)
@@ -229,6 +231,7 @@ class ClassificationJsonParams:
         self.hardcode_extra_data = hardcode_extra_data
         self.fix_data_types = fix_data_types
         self.remove_acmg_namespace = remove_acmg_namespace
+        self.inject_source_url = inject_source_url
 
 
 class PatchMeta:
@@ -256,7 +259,6 @@ class PatchMeta:
                 if value is None:
                     return
                 self.patch[key] = {"value": value}
-
             self.patch[key]['value'] = value
         else:
             self.patch[key] = {'value': value}
