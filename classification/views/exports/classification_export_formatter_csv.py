@@ -15,6 +15,7 @@ from classification.views.exports.classification_export_filter import AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter, \
     ClassificationExportExtraData
 from classification.views.exports.classification_export_utils import CitationCounter
+from library.django_utils import get_url_from_view_path
 from library.utils import delimited_row, export_column, ExportRow, ExportDataType, html_to_text, ExportTweak
 from snpdb.models import GenomeBuild
 
@@ -87,6 +88,10 @@ class RowID(ExportRow):
         self.vc = cm.classification
         self.message = message
         self.allele_data = allele_data
+
+    @export_column()
+    def url(self) -> str:
+        return get_url_from_view_path(self.cm.classification.get_absolute_url())
 
     @property
     def genome_build(self) -> GenomeBuild:
