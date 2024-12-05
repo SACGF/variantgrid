@@ -295,7 +295,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 ],
                 name='id',
                 label='Lab',
-                orderable=True,
+                order_sequence=[SortOrder.ASC, SortOrder.DESC],
                 renderer=self.render_row_header,
                 client_renderer='VCTable.groupIdentifier',
                 extra_columns=[
@@ -318,7 +318,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 label=f'HGVS <span class="text-secondary">{genome_build_preferred.name}</span>',
                 renderer=self.render_c_hgvs,
                 client_renderer='VCTable.hgvs',
-                orderable=True,
+                order_sequence=[SortOrder.ASC, SortOrder.DESC],
                 extra_columns=[
                     "latest_allele_info__grch37__c_hgvs",
                     "latest_allele_info__grch38__c_hgvs",
@@ -371,7 +371,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 label='Conditions',
                 sort_keys=['conditions__sort_text'],
                 client_renderer='VCTable.condition',
-                orderable=True
+                order_sequence=[SortOrder.ASC, SortOrder.DESC],
             ),
             RichColumn(
                 key="latest_classification_modification__classification__summary__date",
@@ -385,96 +385,5 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 ],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 default_sort=SortOrder.DESC
-            ),
-            # RichColumn(
-            #     key='lab',
-            #     # share_level_sort annotated column
-            #     sort_keys=['lab__organization__name', 'lab__name'],
-            #     name='id',
-            #     label='ID',
-            #     orderable=True,
-            #     renderer=self.render_row_header,
-            #     client_renderer='VCTable.groupIdentifier',
-            #     extra_columns=[
-            #         'id',
-            #         'classification_count',
-            #         'lab__organization__short_name',
-            #         'lab__organization__name',
-            #         'lab__name',
-            #         'allele_origin_bucket',
-            #         'share_level',
-            #         'dirty'
-            #     ]
-            # ),
-            # RichColumn(
-            #     key=ImportedAlleleInfo.column_name_for_build(genome_build_preferred, "latest_allele_info"),
-            #     # sort_keys=['variant_sort', 'c_hgvs'],  # annotated column
-            #     sort_keys=[ImportedAlleleInfo.column_name_for_build(genome_build_preferred, "latest_allele_info", "genomic_sort")],
-            #     name='c_hgvs',
-            #     label=f'HGVS ({genome_build_preferred.name})',
-            #     renderer=self.render_c_hgvs,
-            #     client_renderer='VCTable.hgvs',
-            #     orderable=True,
-            #     extra_columns=[
-            #         "latest_allele_info__grch37__c_hgvs",
-            #         "latest_allele_info__grch38__c_hgvs",
-            #         #'published_evidence__c_hgvs__value',
-            #         #'published_evidence__p_hgvs__value',
-            #         #'published_evidence__genome_build__value',
-            #         'latest_allele_info__id',
-            #         'latest_allele_info__allele_id',
-            #         'latest_allele_info__latest_validation__include',
-            #         'latest_allele_info__status'
-            #     ]
-            # ),
-            #
-            # RichColumn(
-            #     key='classification_values',
-            #     name='classifications',
-            #     label='Classifications',
-            #     client_renderer=RichColumn.client_renderer_repeat({"formatter": 'VCTable.classification'}),
-            #     sort_keys=['classification_sort_value'], # FIXME add a sort column
-            #     order_sequence=[SortOrder.DESC, SortOrder.ASC]
-            # ),
-            #
-            # RichColumn(
-            #     key='somatic_clinical_significance_values',
-            #     name='somatic_clinical_significances',
-            #     label='Somatic Clinical<br/>Significance',
-            #     client_renderer=RichColumn.client_renderer_repeat({"formatter": 'VCTable.somatic_clinical_significance'}),
-            #     sort_keys=['somatic_clinical_significance_sort'],
-            #     order_sequence=[SortOrder.DESC, SortOrder.ASC]
-            # ),
-            #
-            # RichColumn(
-            #     key='conditions',
-            #     name='conditions',
-            #     label='Conditions',
-            #     sort_keys=['conditions__sort_text'],
-            #     client_renderer='VCTable.condition',
-            #     orderable=True
-            # ),
-            #
-            # RichColumn(
-            #     key='latest_criteria',
-            #     name='latest_criteria',
-            #     label='Latest Criteria',
-            #     client_renderer='TableFormat.list_codes',
-            #     sort_keys=['latest_criteria'],
-            #     orderable=True
-            # ),
-            #
-            # RichColumn(
-            #     key='latest_classification_modification__classification__summary__date_value',
-            #     name='latest_classification',
-            #     label="Last Curated",
-            #     renderer=self.render_lastest_curation_date,
-            #     client_renderer='VCTable.latest_curation_and_link',
-            #     extra_columns=[
-            #         "latest_classification_modification__classification_id",
-            #         "latest_classification_modification__classification__summary"
-            #     ],
-            #     sort_keys=["latest_classification_modification__classification__summary__"],
-            #     order_sequence=[SortOrder.DESC, SortOrder.ASC]
-            # )
+            )
         ]
