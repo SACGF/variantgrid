@@ -115,7 +115,7 @@ class VariantPKLookup:
     def get_variant_coordinate_hash(self, variant_coordinate: VariantCoordinate) -> VariantHash:
         """ For VCF records (needs GenomeBuild supplied) """
 
-        variant_coordinate = variant_coordinate.as_internal_symbolic(self.genome_build)
+        variant_coordinate = variant_coordinate.as_symbolic_or_explicit_according_to_size(self.genome_build)
         if self.chrom_contig_id_mappings is None:
             raise ValueError("Need to initialise w/GenomeBuild to call get_variant_coordinate_hash")
         contig_id = self.chrom_contig_id_mappings[variant_coordinate.chrom]
