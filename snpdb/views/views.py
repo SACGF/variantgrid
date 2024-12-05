@@ -1648,16 +1648,25 @@ def view_genome_build(request, genome_build_name):
 def view_contig(request, contig_accession):
     q = Contig.get_q(contig_accession)
     contig = get_object_or_404(Contig, q)
-    builds = list(contig.genome_builds)
-    genome_build = builds[0]
-    # If multiple builds (eg MT), we'll use user default if they have it, doesn't really matter
-    if len(builds) > 1:
-        try:
-            user_settings = UserSettings.get_for_user(request.user)
-            if user_settings.default_genome_build in builds:
-                genome_build = user_settings.default_genome_build
-        except:
-            pass
+    # Prefer builds with annotation
+    builds_with_annotation = list(contig.get_genome_builds(require_annotation=True))
+    if builds_with_annotation:
+        builds = builds_with_annotation
+    else:
+        builds = list(contig.get_genome_builds(require_annotation=False))
+
+    if builds:
+        # If multiple builds (eg MT), we'll use user default if they have it, doesn't really matter
+        genome_build = builds[0]
+        if len(builds) > 1:
+            try:
+                user_settings = UserSettings.get_for_user(request.user)
+                if user_settings.default_genome_build in builds:
+                    genome_build = user_settings.default_genome_build
+            except:
+                pass
+    else:
+        genome_build = None
 
     context = {
         "contig": contig,

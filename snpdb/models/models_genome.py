@@ -3,7 +3,7 @@ import operator
 import os
 import re
 from functools import cached_property, reduce
-from typing import Optional
+from typing import Optional, Iterable
 
 from django.conf import settings
 from django.db import models
@@ -357,10 +357,16 @@ class Contig(models.Model, PreviewModelMixin):
     def get_absolute_url(self):
         return reverse("view_contig", kwargs={"contig_accession": self.refseq_accession})
 
+    def get_genome_builds(self, require_annotation=True) -> Iterable[GenomeBuild]:
+        if require_annotation:
+            builds = GenomeBuild.builds_with_annotation()
+        else:
+            builds = GenomeBuild.objects.all()
+        return builds.filter(genomebuildcontig__contig=self, enabled=True).order_by("name")
+
     @property
     def genome_builds(self):
-        builds = GenomeBuild.builds_with_annotation()
-        return builds.filter(genomebuildcontig__contig=self, enabled=True).order_by("name")
+        return self.get_genome_builds(require_annotation=True)
 
     @staticmethod
     def get_q(accession: str, case_sensitive=True) -> Q:
