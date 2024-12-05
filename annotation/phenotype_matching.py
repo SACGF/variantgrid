@@ -3,7 +3,6 @@ import time
 from typing import Optional, Iterable
 
 import nltk
-from django.db.models import Count
 
 from annotation.models.models_phenotype_match import TextPhenotypeMatch, PhenotypeDescription, TextPhenotype, \
     TextPhenotypeSentence
@@ -326,7 +325,6 @@ def bulk_patient_phenotype_matching(patients=None):
     num_parsed_phenotypes = 0
     if num_patients:
         for i, p in enumerate(patients):
-
             parsed_phenotypes = p.process_phenotype_if_changed(phenotype_matcher=phenotype_matcher)
             num_parsed_phenotypes += parsed_phenotypes
             if not i % 50:
@@ -339,12 +337,5 @@ def bulk_patient_phenotype_matching(patients=None):
             pps = 1.0 / time_per_patient
             logging.info("%d parsed patient phenotypes - %.2f parsed per second/%.2f seconds per patient",
                          num_parsed_phenotypes, pps, time_per_patient)
-
-            total_matches = TextPhenotypeMatch.objects.count()
-            tpm_qs = TextPhenotypeMatch.objects.values("ontology_term__ontology_service")
-            tpm_qs = tpm_qs.annotate(count=Count("pk")).values_list("ontology_term__ontology_service", "count")
-            logging.info("%d match types:", total_matches)
-            for ontology_service, count in tpm_qs:
-                logging.info("%s: %d", ontology_service, count)
     else:
         logging.info("No patients")

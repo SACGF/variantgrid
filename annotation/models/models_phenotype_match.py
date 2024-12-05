@@ -1,7 +1,7 @@
 from cache_memoize import cache_memoize
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import QuerySet
+from django.db.models import QuerySet, OuterRef, Count, Subquery
 from django.db.models.deletion import CASCADE, SET_NULL
 
 from library.constants import DAY_SECS
@@ -69,6 +69,19 @@ class TextPhenotype(models.Model):
     def __str__(self):
         return f"{self.text} (processed: {self.processed})"
 
+    def get_ambiguous_matches(self):
+        """ Where an Ontology Service has multiple matches to the exact same text """
+
+        tpm_qs = self.textphenotypematch_set.all()
+        outer = {
+            "ontology_term__ontology_service": OuterRef('ontology_term__ontology_service'),
+            "offset_start": OuterRef('offset_start'),
+            "offset_end": OuterRef('offset_end'),
+        }
+        sub_query = tpm_qs.filter(**outer).values(*outer.keys()).annotate(num_terms=Count("pk")).filter(num_terms__gte=2)
+        return tpm_qs.annotate(num_terms=Subquery(sub_query.values("num_terms"))).filter(num_terms__gte=2)
+
+
 
 class TextPhenotypeSentence(models.Model):
     """ A description broken up into sentences which are represented by TextPhenotypes and matches """
@@ -79,11 +92,14 @@ class TextPhenotypeSentence(models.Model):
     def get_results(self):
         results = []
 
-        for r in self.text_phenotype.textphenotypematch_set.all():
-            r.offset_start += self.sentence_offset
-            r.offset_end += self.sentence_offset
-            results.append(r.to_dict())
-
+        ambiguous = set(self.text_phenotype.get_ambiguous_matches())
+        for tpm in self.text_phenotype.textphenotypematch_set.all():
+            tpm.offset_start += self.sentence_offset
+            tpm.offset_end += self.sentence_offset
+            data = tpm.to_dict()
+            if tpm in ambiguous:
+                data["ambiguous"] = tpm.match_text
+            results.append(data)
         return results
 
 
@@ -92,6 +108,11 @@ class TextPhenotypeMatch(models.Model):
     ontology_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE)
     offset_start = models.IntegerField()
     offset_end = models.IntegerField()
+
+    @property
+    def match_text(self) -> str:
+        txt = self.text_phenotype.text
+        return txt[self.offset_start:self.offset_end]
 
     def to_dict(self):
         """ This is what's sent as JSON back to client for highlighting and grids """

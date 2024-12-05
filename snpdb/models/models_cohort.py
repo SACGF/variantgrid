@@ -400,13 +400,28 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
             parts.append(str(self.common_filter))
         return " ".join(parts)
 
-    def percent_common(self) -> float:
-        common = self.common_collection.cohortgenotype_set.count()
-        rare = self.cohortgenotype_set.count()
-        total = rare + common
-        if total:
-            return 100 * common / (rare + common)
-        return 0
+    def get_common_filter_info(self) -> str:
+        default_or_rare = self.cohortgenotype_set.count()
+        if cc := self.common_collection:
+            common = self.common_collection.cohortgenotype_set.count()
+            total = default_or_rare + common
+            if total:
+                common_percent = 100 * common / (default_or_rare + common)
+                common_percent = f"{common_percent:.1f}%"
+            else:
+                common_percent = "n/a"
+
+            common_filter_info = [
+                str(cc.common_filter),
+                f"default/rare: {default_or_rare:,}",
+                f"common: {common:,} ({common_percent})",
+            ]
+        else:
+            common_filter_info = [
+                "No filter applied",
+                f"total: {default_or_rare:,}",
+            ]
+        return " ".join(common_filter_info)
 
     @property
     def cohortgenotype_alias(self):
@@ -503,8 +518,11 @@ def cohort_genotype_collection_pre_delete_handler(sender, instance, **kwargs):  
 @receiver(post_delete, sender=CohortGenotypeCollection)
 def cohort_genotype_collection_post_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     # Handled in post_delete as common_collection has on_delete=CASCADE which would delete instance...
-    if instance.common_collection:
-        instance.common_collection.delete()
+    try:
+        if instance.common_collection:
+            instance.common_collection.delete()
+    except CohortGenotypeCollection.DoesNotExist:
+        pass
 
 
 class SampleGenotype:

@@ -38,22 +38,15 @@ def get_assembly_report_df(build):
     if build in ["GRCh37", "hg19"]:
         df_grch38 = _get_assembly_report_df("GRCh38")
 
-        # GRCh37 assembly report doesn't have MT it's added after genome build
+        # The original GRCh37 didn't have MT added after genome build - but now it has it as we are using GRCh37.p13
+
+
         # hg19 is same as grch37 except for mitochondrion
         # (hg19 = NC_001807 and GRCh37 = NC_012920)
         mt_index = df_grch38["Sequence-Name"] == "MT"
         mt_grch38 = df_grch38[mt_index]
 
-        if build == "GRCh37":
-            # GRCh37:
-            # Our b37 fasta.fai MT has length 16569 which is the same as NC_012920 in hg38
-            # so just use that one. See https://www.ncbi.nlm.nih.gov/nuccore/251831106
-
-            mt_grch37 = mt_grch38.copy()
-            mt_grch37["UCSC-style-name"] = None  # GRCh37<->hg19 MT are different
-            df = pd.concat([df, mt_grch37])
-
-        elif build == "hg19":
+        if build == "hg19":
             # See http://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/
             # Note on chrM:
             # Since the release of the UCSC hg19 assembly, the Homo sapiens mitochondrion

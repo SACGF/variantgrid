@@ -75,13 +75,15 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
         const phenotypeText = getPhenotypeInput().val();
         const data = 'phenotype_text=' + encodeURIComponent(phenotypeText);
         const descriptionBox = $("#description-highlighted", phenotypeEditorTag);
-        descriptionBox.html('<img src="{% static 'icons/loading.gif' %}" /> Querying text for known terms');
+        descriptionBox.siblings(".phenotype-messages").remove();
+        descriptionBox.html('<i class="fa fa-spinner"></i>  Querying text for known terms');
     
         $.ajax({
             type: "POST",
             data: data,
             url: "{% url 'phenotypes_matches' %}",
             success: function(phenotypeMatches) {
+                console.log(phenotypeMatches);
                 displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches);
                 const gridData = phenotypeMatchesToJqGridData(phenotypeMatches);
                 if (gridData.length) {
@@ -311,6 +313,9 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
     <div class='hidden' id='phenotype-entry-terms-grid-container'>
         <table id='phenotype-entry-terms-grid'></table>
         <div id="phenotype-entry-terms-grid-pager-{{ flattened_uuid }}"></div> 
+    </div>
+    <div id="phenotype-message">
+
     </div>
 </div>
 </div> {# /flattened_uuid #}

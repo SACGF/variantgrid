@@ -118,9 +118,12 @@ class AnnotateImportedVCFTask(ImportVCFStepTask):
         gnomad_af_filename = common_settings["gnomad_af_filename"]
         if not gnomad_af_filename.startswith("/"):
             gnomad_af_filename = os.path.join(settings.ANNOTATION_VEP_BASE_DIR, gnomad_af_filename)
+
+        # Some VCFs come in with AF already populated, so we need to pick a unique INFO field
+        column = f"INFO/{settings.VCF_IMPORT_COMMON_FILTER_INFO}:=INFO/AF"
         cmd_annotate = [
             "bcftools", "annotate", "-force",
-            "--annotations", gnomad_af_filename, "--columns", "AF",
+            "--annotations", gnomad_af_filename, "--columns", column,
             "--output-type", "z", "--output", upload_step.output_filename,
             upload_step.input_filename
         ]

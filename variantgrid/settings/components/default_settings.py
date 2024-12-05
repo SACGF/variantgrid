@@ -386,6 +386,7 @@ VCF_IMPORT_SKIP_RECORD_REGEX = {
     "Fusion": "VARTYPE=fusion",
 }
 
+VCF_IMPORT_COMMON_FILTER_INFO = "VG_GNOMAD_AF"
 VCF_IMPORT_COMMON_FILTERS = {
     # If the filenames don't start with "/" they're relative to ANNOTATION_VEP_BASE_DIR
     "GRCh37": {

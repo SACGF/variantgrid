@@ -55,7 +55,8 @@ class BulkNoGenotypeVCFProcessor(BulkGenotypeVCFProcessor):
         self.variant_hashes.append(alt_hash)
         self.variant_filters.append(self.convert_filters(variant.FILTER))
         self.cohort_genotypes.append(self.EMPTY_COHORT_GT_DATA)
-        self.variant_gnomad_af.append(variant.INFO.get("AF"))  # gnomAD
+        gnomad_af = variant.INFO.get(settings.VCF_IMPORT_COMMON_FILTER_INFO)
+        self.variant_gnomad_af.append(gnomad_af)
 
         if self.preprocess_vcf_import_info:
             self.add_modified_imported_variant(variant, alt_hash)

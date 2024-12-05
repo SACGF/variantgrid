@@ -9,8 +9,9 @@ from library.log_utils import log_traceback
 from library.utils import is_not_none
 from ontology.models import OntologyTerm, OntologyService
 
+# There can be more than 1 term matching a string, eg OMIM has 1849 terms that match 2 or more IDs
 CodePK = Any
-CodePKLookups = dict[CodePK, str]
+CodePKLookups = dict[CodePK, set[str]]
 OntologyResults = tuple[str, list[CodePK]]
 
 HPO_PATTERN = re.compile(r"HP:(\d{7})$")
@@ -82,11 +83,11 @@ class PhenotypeMatcher:
             OntologyService.OMIM: self._get_omim_pks_by_term(),  # Special case
         }
         self.ontology = {}
-        for ontology_service, terms_by_pk in ONTOLOGY_PK.items():
-            self._break_up_terms(terms_by_pk)
-            word_lookup = self._create_word_lookups(terms_by_pk)
-            single_words_by_length = self._get_single_words_by_length(terms_by_pk, 5)
-            self.ontology[ontology_service] = (terms_by_pk, single_words_by_length, word_lookup)
+        for ontology_service, pks_by_term in ONTOLOGY_PK.items():
+            self._break_up_terms(pks_by_term)
+            word_lookup = self._create_word_lookups(pks_by_term)
+            single_words_by_length = self._get_single_words_by_length(pks_by_term, 5)
+            self.ontology[ontology_service] = (pks_by_term, single_words_by_length, word_lookup)
 
         hgnc_aliases = {}
         hgnc_names = {}
@@ -120,21 +121,21 @@ class PhenotypeMatcher:
                 return []
 
             for _, (term_pks, single_words_by_length, word_lookup) in self.ontology.items():
-                ontology_term_id = term_pks.get(lower_text)
-                if not ontology_term_id:
+                ontology_term_pks = term_pks.get(lower_text)
+                if not ontology_term_pks:
                     if len(words) == 1:
                         w = words[0]
                         if len(w) >= MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH:
-                            ontology_term_id = self.get_id_from_single_word_fuzzy_match(single_words_by_length,
-                                                                                        lower_text)
+                            ontology_term_pks = self.get_id_from_single_word_fuzzy_match(single_words_by_length,
+                                                                                         lower_text)
                     else:
                         lower_words = [w.lower() for w in words]
                         distance = self.calculate_match_distance(lower_words)
-                        ontology_term_id = self.get_id_from_multi_word_fuzzy_match(word_lookup, lower_words, lower_text,
-                                                                                   distance=distance)
+                        ontology_term_pks = self.get_id_from_multi_word_fuzzy_match(word_lookup, lower_words, lower_text,
+                                                                                    distance=distance)
 
-                if ontology_term_id:
-                    ontology_term_ids.append(ontology_term_id)
+                if ontology_term_pks:
+                    ontology_term_ids.extend(ontology_term_pks)
 
             if len(words) == 1:
                 # Don't do fuzzy for genes as likely to get false positives
@@ -215,13 +216,13 @@ class PhenotypeMatcher:
 
     @staticmethod
     def get_id_from_multi_word_fuzzy_match(lookup: CodePKLookups, words: list[str], text: str, distance: int = 1) -> Optional[CodePK]:
-        potentials: CodePKLookups = {}
+        potentials: CodePKLookups = defaultdict(set)
         min_length = len(text) - distance
         max_length = len(text) + distance
         for w in words:
-            for term, pk in lookup[w].items():
+            for term, pk_set in lookup[w].items():
                 if min_length <= len(term) <= max_length:
-                    potentials[term] = pk
+                    potentials[term].update(pk_set)
         if not potentials:
             return None
         return PhenotypeMatcher.get_id_from_fuzzy_match(potentials, text, distance)
@@ -238,13 +239,13 @@ class PhenotypeMatcher:
         return PhenotypeMatcher.get_id_from_fuzzy_match(potentials, text, distance)
 
     @staticmethod
-    def get_id_from_fuzzy_match(lookup: CodePKLookups, text: str, max_distance: int) -> Optional[CodePK]:
-        for description, pk in lookup.items():
+    def get_id_from_fuzzy_match(lookup: CodePKLookups, text: str, max_distance: int) -> set[CodePK]:
+        for description, pk_set in lookup.items():
             distance = Levenshtein.distance(description, text)  # @UndefinedVariable
             # print("'%s' <-> '%s' distance: %d" % (description, text, distance))
             if distance <= max_distance:
-                return pk
-        return None
+                return pk_set
+        return set()
 
     @staticmethod
     def _words_together(text, first_words, second_words):
@@ -283,8 +284,8 @@ class PhenotypeMatcher:
     def _break_up_terms(hpo_pks):
         """ or could be alias """
 
-        new_entries = {}
-        for name, hpo in hpo_pks.items():
+        new_entries = defaultdict(set)
+        for name, ontology_pk_set in hpo_pks.items():
             words = name.split()
             # Make dysplasia/disease synonyms
             if len(words) >= 2:
@@ -292,34 +293,35 @@ class PhenotypeMatcher:
                     words[-1] = 'disease'
                     text = ' '.join(words)
                     if text not in hpo_pks:
-                        new_entries[text] = hpo
+                        new_entries[text].update(ontology_pk_set)
 
                 if words[-1] in ['dysplasia', "disease", "syndrome"]:
                     before_disease_text = ' '.join(words[:-1])
                     if before_disease_text not in hpo_pks:
-                        new_entries[before_disease_text] = hpo
+                        new_entries[before_disease_text].update(ontology_pk_set)
 
                 # Vitamin B12 deficiency => B12 deficiency, B-12 deficiency
                 if len(words) == 3 and words[0] == 'vitamin' and words[2] == 'deficiency':
                     if words[1].startswith('b'):  # Only B12 etc not "C" or "D" (need vitamin for those)
                         no_vitamin = words[1:]
                         no_vitamin_text = ' '.join(no_vitamin)
-                        new_entries[no_vitamin_text] = hpo
+                        new_entries[no_vitamin_text].update(ontology_pk_set)
 
                         b_vitamin = words[1]
                         dash_text = f'b-{b_vitamin[1:]} deficiency'
-                        new_entries[dash_text] = hpo
+                        new_entries[dash_text].update(ontology_pk_set)
 
-        hpo_pks.update(new_entries)
+        for name, ontology_pk_set in new_entries.items():
+            hpo_pks[name].update(ontology_pk_set)
 
     @staticmethod
-    def _get_ontology_pks_by_term(ontology_service: OntologyService) -> dict[str, str]:
-        ot_pks = {}
+    def _get_ontology_pks_by_term(ontology_service: OntologyService) -> dict[str, set[str]]:
+        ot_pks = defaultdict(set)
         ontology_term_qs = OntologyTerm.objects.filter(ontology_service=ontology_service)
         for pk, name, aliases in ontology_term_qs.values_list('pk', 'name', "aliases"):
             for term in filter(is_not_none, aliases + [name]):
                 k = term.lower().replace(",", "")
-                ot_pks[k] = pk
+                ot_pks[k].add(pk)
         return ot_pks
 
     @staticmethod
@@ -328,12 +330,12 @@ class PhenotypeMatcher:
             ie "BECKWITH-WIEDEMANN SYNDROME; BWS" => "BECKWITH-WIEDEMANN" and "BECKWITH-WIEDEMANN SYNDROME" and "BWS" """
 
         omim_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.OMIM)
-        omim_pks_by_term = {}
+        omim_pks_by_term = defaultdict(set)
 
         def break_up_dashes(omim_description, pk):
             if '-' in omim_description:
                 cleaned_omim_description = omim_description.replace('-', ' ')
-                omim_pks_by_term[cleaned_omim_description] = pk
+                omim_pks_by_term[cleaned_omim_description].add(pk)
 
         def break_up_syndromes_and_disease(omim_description, pk):
             words = omim_description.split()
@@ -343,7 +345,7 @@ class PhenotypeMatcher:
                         i = words.index(t)
                         if i >= 2:
                             term_before_syndrome = ' '.join(words[:i])
-                            omim_pks_by_term[term_before_syndrome] = pk
+                            omim_pks_by_term[term_before_syndrome].add(pk)
                             break_up_dashes(term_before_syndrome, pk)
                     except ValueError:
                         pass
@@ -352,10 +354,10 @@ class PhenotypeMatcher:
             for term in filter(is_not_none, aliases + [name]):
                 # Remove commas, as phenotype to match will have that done also
                 term = term.strip().lower().replace(",", "")
-                omim_pks_by_term[term] = pk
+                omim_pks_by_term[term].add(pk)
                 for split_term in term.split(";"):
                     split_term = split_term.strip()
-                    omim_pks_by_term[split_term] = pk
+                    omim_pks_by_term[split_term].add(pk)
                     break_up_syndromes_and_disease(split_term, pk)
                     break_up_dashes(split_term, pk)
         return omim_pks_by_term
@@ -363,12 +365,10 @@ class PhenotypeMatcher:
     @staticmethod
     def _get_special_case_lookups(hpo_pks, omim_pks, gene_symbol_records) -> tuple[dict, dict, dict]:
         def load_omim_by_name(description: str) -> OntologyResults:
-            omim_pk = omim_pks[description.lower()]
-            return OntologyService.OMIM, [omim_pk]
+            return OntologyService.OMIM, omim_pks[description.lower()]
 
         def load_hpo_by_name(hpo_name) -> OntologyResults:
-            hpo_pk = hpo_pks[hpo_name.lower()]
-            return OntologyService.HPO, [hpo_pk]
+            return OntologyService.HPO, hpo_pks[hpo_name.lower()]
 
         def load_hpo_list_by_names(hpo_name_list) -> OntologyResults:
             hpo_list: list[CodePK] = []
@@ -593,7 +593,6 @@ class PhenotypeMatcher:
             "increased sweat": (load_hpo_by_name, "Hyperhidrosis"),
             "recurrent urtis": (load_hpo_by_name, "Recurrent upper respiratory tract infections"),
             "renal ca": (load_hpo_by_name, "Renal cell carcinoma"),
-            "severe fetal hydrops": (load_hpo_by_name, "Severe hydrops fetalis"),
             "spastic cp": (load_hpo_by_name, "Cerebral palsy"),
             "thyroid ca": (load_hpo_by_name, "Thyroid carcinoma"),
             "type 1 diabetes": DIBETES_TYPE_1,

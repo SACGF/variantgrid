@@ -203,11 +203,6 @@
                         {% if uploaded_vcf.vcf_importer %}
                             {% labelled label="Importer Version" %}{{ uploaded_vcf.vcf_importer }}{% endlabelled %}
                         {% endif %}
-                        {% with cgc=uploaded_vcf.vcf.cohort.cohort_genotype_collection %}
-                            {% if cgc.common_collection %}
-                                {% labelled label="gnomAD Common Filter" %}Rare: {{ cgc.percent_common|floatformat:2 }}% ({{ cgc.common_collection.common_filter }}){% endlabelled %}
-                            {% endif %}
-                        {% endwith %}
                         {% labelled label="VCF" %}
                             {% if uploaded_vcf.vcf %} <a class="hover-link" href="{% url 'view_vcf' uploaded_vcf.vcf.pk %}">{{ uploaded_vcf.vcf }}</a>{% else %}VCF is still being imported{% endif %}
                         {% endlabelled %}
