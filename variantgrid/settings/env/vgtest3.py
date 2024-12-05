@@ -41,6 +41,8 @@ ANNOTATION[BUILD_GRCH38].update({
     "enabled": True,
 })
 
+ANNOTATION[BUILD_T2TV2]["enabled"] = True
+
 PEDIGREE_MADELINE2_COMMAND='madeline2'
 LIFTOVER_BCFTOOLS_ENABLED = True
 
