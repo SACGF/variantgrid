@@ -100,10 +100,14 @@
 
 	   <div id="genotype-grid-container">
             <form id="genotype-grid-form">
-                <label>Ref ({{ vsi.visible_zygosity_counts.R }}):</label> <input checked type="checkbox" class="genotype-filter" data-field="zygosity" value="R"> <span class="separator">|</span>
-                <label>HET ({{ vsi.visible_zygosity_counts.E }}):</label> <input checked type="checkbox" class="genotype-filter" data-field="zygosity" value="E"> <span class="separator">|</span>
-                <label>HOM ({{ vsi.visible_zygosity_counts.O }}):</label> <input checked type="checkbox" class="genotype-filter" data-field="zygosity" value="O"> <span class="separator">|</span>
-                <label>unknown/? ({{ vsi.visible_zygosity_counts.U }}):</label> <input checked type="checkbox" class="genotype-filter" data-field="zygosity" value="U">
+                <b>Zygosity </b>
+                {% for gt, label_checked_count in vsi.visible_zygosity_counts.items %}
+                    {% with label=label_checked_count.0 checked=label_checked_count.1 count=label_checked_count.2 %}
+                        {% if count %}
+                            <label>{{ label }} ({{ count }}):</label> <input {% if checked %}checked{% endif %} type="checkbox" class="genotype-filter" data-field="zygosity" value="{{ gt }}"> <span class="separator">|</span>
+                        {% endif %}
+                    {% endwith %}
+                {% endfor %}
             </form>
 
            <table id="genotype-grid"></table>	       
@@ -198,27 +202,32 @@
 
         }
 
-        function filterGenotypes() {
+        function getGenotypeFilters() {
             let genotypes = [];
             console.log("filterGenotypes")
             $(".genotype-filter").each(function() {
                 if ($(this).is(":checked")) {
-                    genotypes.push($(this).attr("value"));
+                    let value = $(this).attr("value");
+                    genotypes.push(value);
                 }
             });
             console.log(genotypes);
 
-            const filters = {
+            return {
                 groupOp: "OR", // Match any of the conditions
                 rules: [
-                        {
-                            field: "zygosity",
-                            op: "in",
-                            data: genotypes
-                        }
+                    {
+                        field: "zygosity",
+                        op: "in",
+                        data: genotypes
+                    }
                 ]
             };
+        }
 
+
+        function filterGenotypes() {
+            let filters = getGenotypeFilters();
             $("#genotype-grid").jqGrid("setGridParam", {
                 search: true,
                 postData: {
@@ -258,6 +267,7 @@
                 sampleFormatFieldFormatter : sampleFormatFieldFormatter,
             });
 
+            let filters = getGenotypeFilters();
             jQuery("#genotype-grid").jqGrid({
                 datatype: "local",
                 data: visible_rows,
@@ -276,6 +286,10 @@
                 ],
                 caption: "Variant Genotypes",
                 autowidth: true,
+                search: true,
+                postData: {
+                    filters: JSON.stringify(filters)
+                },
                 rowNum: 20,
                 pager: 'genotype-grid-pager',
             });
