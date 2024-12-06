@@ -141,8 +141,7 @@
 
             {% if has_gene_coverage and url_name_visible.gene_symbol_coverage_collection_graphs %}
                 let gcContainer = $("#qc-gene-coverage-graph-container");
-                let loading_icon = $('<div>').attr({class : 'loading', style: 'margin-right:10px;'});
-                gcContainer.html(loading_icon);
+                gcContainer.html('<i class="fa fa-spinner"></i>');
                 gcContainer.load("{% url 'gene_symbol_coverage_collection_graphs' genome_build.name gene_symbol.pk %}");
             {% endif %}
 

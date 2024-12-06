@@ -9,8 +9,7 @@ $(document).ready(function() {
     const gcContainer = $("#cohort-gene-counts-graph-container");
 
     function load_graph(url) {
-        const loading_icon = $('<div>').attr({class: 'loading icon16', style: 'margin-right:10px;'});
-        gcContainer.html(loading_icon);
+        gcContainer.html('<i class="fa fa-spinner"></i>');
         gcContainer.load(url);
     }
 

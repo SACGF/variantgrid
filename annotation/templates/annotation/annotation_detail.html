@@ -163,7 +163,7 @@ ${VARIANTGRID_DIR}/scripts/install/get_somalier_release.sh
             {% labelled label=cwr.name %}
                 <div class='cached-web-resource-container'>
                 {% if cwr.import_status == 'I' %}
-                    <img src="{% static 'images/spinner.gif' %}" /> <b>Import started: </b>{{ cwr.import_date }}
+                    <i class="fa fa-spinner"></i> <b>Import started: </b>{{ cwr.import_date }}
                 {% else %}
                     {% if user.is_superuser %}
                         {% if cwr.import_status != 'S' %}
@@ -194,9 +194,8 @@ ${VARIANTGRID_DIR}/scripts/install/get_somalier_release.sh
             type: "POST",
             url: Urls.load_cached_web_resource(cwr_name),
             success: function(data) {
-                const img = $("<img />").attr("src", "{% static 'images/spinner.gif' %}");
                 const container = loadButton.parent(".cached-web-resource-container");
-                container.empty().append(img);
+                container.html('<i class="fa fa-spinner"></i>');
             }
         });
     });
