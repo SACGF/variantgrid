@@ -99,6 +99,13 @@
 	{% if not vsi.hidden_samples_details or vsi.hidden_samples_details.num_visible_observations %}
 
 	   <div id="genotype-grid-container">
+            <form id="genotype-grid-form">
+                <label>Ref ({{ vsi.visible_zygosity_counts.R }}):</label> <input checked type="checkbox" class="genotype-filter" data-field="zygosity" value="R"> <span class="separator">|</span>
+                <label>HET ({{ vsi.visible_zygosity_counts.E }}):</label> <input checked type="checkbox" class="genotype-filter" data-field="zygosity" value="E"> <span class="separator">|</span>
+                <label>HOM ({{ vsi.visible_zygosity_counts.O }}):</label> <input checked type="checkbox" class="genotype-filter" data-field="zygosity" value="O"> <span class="separator">|</span>
+                <label>unknown/? ({{ vsi.visible_zygosity_counts.U }}):</label> <input checked type="checkbox" class="genotype-filter" data-field="zygosity" value="U">
+            </form>
+
            <table id="genotype-grid"></table>	       
            <div id="genotype-grid-pager"></div> 
 	   </div>
@@ -191,9 +198,39 @@
 
         }
 
+        function filterGenotypes() {
+            let genotypes = [];
+            console.log("filterGenotypes")
+            $(".genotype-filter").each(function() {
+                if ($(this).is(":checked")) {
+                    genotypes.push($(this).attr("value"));
+                }
+            });
+            console.log(genotypes);
+
+            const filters = {
+                groupOp: "OR", // Match any of the conditions
+                rules: [
+                        {
+                            field: "zygosity",
+                            op: "in",
+                            data: genotypes
+                        }
+                ]
+            };
+
+            $("#genotype-grid").jqGrid("setGridParam", {
+                search: true,
+                postData: {
+                    filters: JSON.stringify(filters)
+                }
+            }).trigger("reloadGrid");
+
+        }
+
 
         $(document).ready(function() {
-            const visible_rows = {{ visible_rows | jsonify }};
+            const visible_rows = {{ vsi.visible_rows | jsonify }};
             const ZYGOSITY_DICT = {
                 'O': 'HOM_ALT',
                 'E': 'HET',
@@ -243,6 +280,8 @@
                 pager: 'genotype-grid-pager',
             });
 
+            $(".genotype-filter").change(filterGenotypes);
+
             plotSampleAlleleFrequencies(visible_rows);
         });
     
@@ -272,6 +311,10 @@
     
     td.no-word-wrap {
         white-space: normal !important;
+    }
+
+    .separator {
+        padding: 0 5 0 5;
     }
     </style>
     

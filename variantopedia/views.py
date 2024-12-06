@@ -640,7 +640,6 @@ def variant_sample_information(request, variant_id, genome_build_name):
     context = {
         "variant": variant,
         "vsi": vsi,
-        "visible_rows": vsi.visible_rows,
         "other_loci_variants_by_multiallelic": other_loci_variants_by_multiallelic,
         "has_samples_in_other_builds": Sample.objects.exclude(vcf__genome_build=genome_build).exists(),
     }
