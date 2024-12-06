@@ -1,0 +1,37 @@
+##fileformat=VCFv4.1
+##FILTER=<ID=PASS,Description="All filters passed">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##reference=T2T-CHM13v2.0
+##contig=<ID=1,length=248387328,assembly=CHM13.fa>
+##contig=<ID=10,length=134758134,assembly=CHM13.fa>
+##contig=<ID=11,length=135127769,assembly=CHM13.fa>
+##contig=<ID=12,length=133324548,assembly=CHM13.fa>
+##contig=<ID=13,length=113566686,assembly=CHM13.fa>
+##contig=<ID=14,length=101161492,assembly=CHM13.fa>
+##contig=<ID=15,length=99753195,assembly=CHM13.fa>
+##contig=<ID=16,length=96330374,assembly=CHM13.fa>
+##contig=<ID=17,length=84276897,assembly=CHM13.fa>
+##contig=<ID=18,length=80542538,assembly=CHM13.fa>
+##contig=<ID=19,length=61707364,assembly=CHM13.fa>
+##contig=<ID=2,length=242696752,assembly=CHM13.fa>
+##contig=<ID=20,length=66210255,assembly=CHM13.fa>
+##contig=<ID=21,length=45090682,assembly=CHM13.fa>
+##contig=<ID=22,length=51324926,assembly=CHM13.fa>
+##contig=<ID=3,length=201105948,assembly=CHM13.fa>
+##contig=<ID=4,length=193574945,assembly=CHM13.fa>
+##contig=<ID=5,length=182045439,assembly=CHM13.fa>
+##contig=<ID=6,length=172126628,assembly=CHM13.fa>
+##contig=<ID=7,length=160567428,assembly=CHM13.fa>
+##contig=<ID=8,length=146259331,assembly=CHM13.fa>
+##contig=<ID=9,length=150617247,assembly=CHM13.fa>
+##contig=<ID=X,length=154259566,assembly=CHM13.fa>
+##contig=<ID=Y,length=62460029,assembly=CHM13.fa>
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE1
+13	31532188	209597	A	G	.	.	.	GT	0/1
+13	31532471	209598	G	A	.	.	.	GT	0/1
+13	31532545	1168940	G	A	.	.	.	GT	1/1
+13	31532656	1166054	C	T	.	.	.	GT	1/1
+13	31532732	882070	G	T	.	.	.	GT	0/1
+13	31532742	311659	A	G	.	.	.	GT	0/0
+13	31532752	802915	C	G	.	.	.	GT	0/1
+13	31532755	802916	A	C	.	.	.	GT	1/1
