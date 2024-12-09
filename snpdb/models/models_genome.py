@@ -173,10 +173,9 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
             build_annotation_descriptions = ", ".join([f"{k}: {v}" for k, v in build_consortia.items()])
         return build_annotation_descriptions
 
-    @cached_property
-    def chrom_contig_mappings(self) -> dict[str, 'Contig']:
+    def _get_chrom_contig_mappings(self, contigs: Iterable['Contig']) -> dict[str, 'Contig']:
         chrom_contig_mappings = {}
-        for contig in self.contigs:
+        for contig in contigs:
             chrom_contig_mappings[contig.name] = contig
             chrom_contig_mappings[contig.ucsc_name] = contig
             chrom_contig_mappings[contig.genbank_accession] = contig
@@ -187,8 +186,20 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
             chrom_contig_mappings["mt"] = mt
         return chrom_contig_mappings
 
-    def get_chrom_contig_id_mappings(self) -> dict[str, int]:
-        return {k: v.pk for k, v in self.chrom_contig_mappings.items()}
+    @cached_property
+    def chrom_contig_mappings(self) -> dict[str, 'Contig']:
+        return self._get_chrom_contig_mappings(self.contigs)
+
+    @cached_property
+    def chrom_standard_contig_mappings(self) -> dict[str, 'Contig']:
+        return self._get_chrom_contig_mappings(self.standard_contigs)
+
+    def get_chrom_contig_id_mappings(self, standard_contigs_only=False) -> dict[str, int]:
+        if standard_contigs_only:
+            chrom_contig_mappings = self.chrom_standard_contig_mappings
+        else:
+            chrom_contig_mappings = self.chrom_contig_mappings
+        return {k: v.pk for k, v in chrom_contig_mappings.items()}
 
     def convert_chrom_to_contig_accession(self, chrom: str) -> str:
         """ chrom = ucsc_name/genbank_accession/refseq accession """

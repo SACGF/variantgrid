@@ -180,7 +180,7 @@ def get_contigs_header_lines(genome_build, standard_only=True, use_accession=Tru
 
 
 def write_cleaned_vcf_header(genome_build, source_vcf_filename: str, output_filename: str,
-                             new_info_lines: list[str] = None, standard_contigs_only=False):
+                             new_info_lines: list[str] = None, standard_contigs_only=True):
     contig_regex = re.compile(r"^##contig=<ID=(.+),length=(\d+)")
 
     header_lines = []
@@ -204,7 +204,7 @@ def write_cleaned_vcf_header(genome_build, source_vcf_filename: str, output_file
                 if new_info_lines:
                     for new_info_line in new_info_lines:
                         f.write(new_info_line + "\n")
-                for contig_line in get_contigs_header_lines(genome_build):
+                for contig_line in get_contigs_header_lines(genome_build, standard_only=standard_contigs_only):
                     f.write(contig_line + "\n")
 
             elif m := contig_regex.match(line):
@@ -213,7 +213,7 @@ def write_cleaned_vcf_header(genome_build, source_vcf_filename: str, output_file
                 if contig := genome_build.chrom_contig_mappings.get(contig_name):
                     if standard_contigs_only:
                         if contig.role != SequenceRole.ASSEMBLED_MOLECULE:
-                            continue
+                            continue  # No validation
 
                     if fasta_chrom := contig_to_fasta_names.get(contig.pk):
                         provided_contig_length = int(provided_contig_length)
@@ -222,6 +222,8 @@ def write_cleaned_vcf_header(genome_build, source_vcf_filename: str, output_file
                             msg = f"VCF header contig '{contig_name}' (length={provided_contig_length}) has " + \
                                 f"different length than ref contig {fasta_chrom} (length={ref_contig_length})"
                             raise ValueError(msg)
+                # Don't write any old contigs
+                continue
 
             f.write(line + "\n")
 
