@@ -5,6 +5,8 @@ import re
 import string
 from typing import Collection, Any, Optional, Callable
 
+from rich.text import Text
+
 
 def pretty_label(label: str) -> str:
     label = label.replace('_', ' ')
@@ -112,3 +114,15 @@ def clean_string(input_string: str) -> str:
         return ""
     """ Removes non-printable characters, strips whitespace """
     return re.sub(f'[^{re.escape(string.printable)}]', '', input_string.strip())
+
+
+def emoji_to_unicode(text_with_emojis) -> str:
+    _replace = {
+        ":male-doctor:": ":man_health_worker:",
+        ":female-doctor:": "woman_health_worker",
+    }
+    for old, new in _replace.items():
+        text_with_emojis = text_with_emojis.replace(old, new)
+
+    s = Text.from_markup(text_with_emojis)
+    return str(s)

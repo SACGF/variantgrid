@@ -127,7 +127,7 @@ def outstanding_import_check(sender, instance: ClassificationImportRun, **kwargs
         ongoing_imports = ClassificationImportRun.ongoing_imports()
 
         nb = NotificationBuilder("Import started")
-        emoji = ":golfer:" if instance.status == ClassificationImportRunStatus.COMPLETED else ":skunk:"
+        emoji = ":golf:" if instance.status == ClassificationImportRunStatus.COMPLETED else ":skunk:"
         ongoing_message = f" ongoing imports {ongoing_imports}" if ongoing_imports else ""
         nb.add_markdown(f"{emoji} Import {instance.get_status_display()} {instance.identifier} {instance.row_count} rows{ongoing_message if ongoing_imports else ''}")
         # provide full details of import numbers in notification
