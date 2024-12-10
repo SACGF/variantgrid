@@ -20,8 +20,10 @@ def annotation_data_exists(flat=False) -> dict:
     all_build_data = {}
     # We can sometimes use files twice, only report once
     unique_filenames = set()
+    active_builds = list(GenomeBuild.builds_with_annotation())
+    active_build_names = set(str(gb) for gb in active_builds)
 
-    for genome_build in GenomeBuild.builds_with_annotation():
+    for genome_build in active_builds:
         check_files = {}
         file_data = {}
         for key in ["reference_fasta", "cytoband"]:
@@ -37,8 +39,9 @@ def annotation_data_exists(flat=False) -> dict:
         if settings.LIFTOVER_BCFTOOLS_ENABLED:
             annotation_build_config = settings.ANNOTATION[genome_build.name]
             for dest_genome_build, chain_filename in annotation_build_config["liftover"].items():
-                key = f"bcftools_chain_{genome_build.name}_to_{dest_genome_build}"
-                check_files[key] = chain_filename
+                if dest_genome_build in active_build_names:
+                    key = f"bcftools_chain_{genome_build.name}_to_{dest_genome_build}"
+                    check_files[key] = chain_filename
 
         vep_config = VEPConfig(genome_build)
         for key, rel_path in vep_config.vep_data.items():

@@ -32,8 +32,7 @@
         const GENOME_BUILD = "{{ genome_build.name }}";
 
         function load_graph(url) {
-            const loading_icon = $('<label>').attr({class : 'loading icon32', style: 'margin-right:10px;'});
-            gcContainer.html(loading_icon);
+            gcContainer.html('<i class="fa fa-spinner"></i>');
             gcContainer.load(url);
         }
 

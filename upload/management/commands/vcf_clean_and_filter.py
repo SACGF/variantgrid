@@ -43,8 +43,8 @@ class Command(BaseCommand):
 
         genome_build = GenomeBuild.get_name_or_alias(build_name)
         genome_fasta = GenomeFasta.get_for_genome_build(genome_build)
-        chrom_to_contig_id = genome_build.get_chrom_contig_id_mappings()
-        contig_lengths = dict(genome_build.contigs.values_list("pk", "length"))
+        chrom_to_contig_id = genome_build.get_chrom_contig_id_mappings(standard_contigs_only=True)
+        contig_lengths = {contig_id: int(length) for contig_id, length in genome_build.contigs.values_list("pk", "length")}
         contig_to_fasta_names = genome_fasta.get_contig_id_to_name_mappings()
 
         if vcf_filename == '-':
@@ -57,7 +57,7 @@ class Command(BaseCommand):
         skipped_filters = Counter()
 
         ref_standard_bases_pattern = re.compile(r"[GATCN]")  # Reference can be N (and FreeBayes often writes these)
-        alt_standard_bases_pattern = re.compile(r"[GATC,\.]")  # Can be multi-alts, or "." for reference
+        alt_standard_bases_pattern = re.compile(r"[GATC,.]")  # Can be multi-alts, or "." for reference
 
         skip_patterns = {}
         if skip_regex := getattr(settings, "VCF_IMPORT_SKIP_RECORD_REGEX", {}):

@@ -85,7 +85,7 @@
                         <pre class="border border-info p-2">{{ av_data.0 }}</pre>
                     </div>
 
-                    <table id="vav-{{ build_name }}" data-datatable-url="{% url 'variant_annotation_version_datatable' build_name %}" class="sticky-header responsive"></table>
+                    <table id="vav-{{ build_name|slugify }}" data-datatable-url="{% url 'variant_annotation_version_datatable' build_name %}" class="sticky-header responsive"></table>
                 </div>
             {% end_ui_register_tab_embedded %}
         {% endfor %}

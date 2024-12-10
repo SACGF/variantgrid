@@ -81,7 +81,7 @@ $(document).ready(function() {
 
 <div id='wiki-{{ uuid }}'>
     <div class="hidden editSection"></div>
-    <span class='hidden saving-message'><img src="{% static 'images/spinner.gif' %}" /> Saving...</span>
+    <span class='hidden saving-message'><i class="fa fa-spinner"></i> Saving...</span>
     <span class="hidden saved-message"></span>
     <button class='btn btn-outline-primary hidden wiki-save'>save wiki</button>
     {% if has_write_permission %}

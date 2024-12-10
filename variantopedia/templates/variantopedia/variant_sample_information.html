@@ -99,6 +99,17 @@
 	{% if not vsi.hidden_samples_details or vsi.hidden_samples_details.num_visible_observations %}
 
 	   <div id="genotype-grid-container">
+            <form id="genotype-grid-form">
+                <b>Zygosity </b>
+                {% for gt, label_checked_count in vsi.visible_zygosity_counts.items %}
+                    {% with label=label_checked_count.0 checked=label_checked_count.1 count=label_checked_count.2 %}
+                        {% if count %}
+                            <label>{{ label }} ({{ count }}):</label> <input {% if checked %}checked{% endif %} type="checkbox" class="genotype-filter" data-field="zygosity" value="{{ gt }}"> <span class="separator">|</span>
+                        {% endif %}
+                    {% endwith %}
+                {% endfor %}
+            </form>
+
            <table id="genotype-grid"></table>	       
            <div id="genotype-grid-pager"></div> 
 	   </div>
@@ -191,9 +202,44 @@
 
         }
 
+        function getGenotypeFilters() {
+            let genotypes = [];
+            console.log("filterGenotypes")
+            $(".genotype-filter").each(function() {
+                if ($(this).is(":checked")) {
+                    let value = $(this).attr("value");
+                    genotypes.push(value);
+                }
+            });
+            console.log(genotypes);
+
+            return {
+                groupOp: "OR", // Match any of the conditions
+                rules: [
+                    {
+                        field: "zygosity",
+                        op: "in",
+                        data: genotypes
+                    }
+                ]
+            };
+        }
+
+
+        function filterGenotypes() {
+            let filters = getGenotypeFilters();
+            $("#genotype-grid").jqGrid("setGridParam", {
+                search: true,
+                postData: {
+                    filters: JSON.stringify(filters)
+                }
+            }).trigger("reloadGrid");
+
+        }
+
 
         $(document).ready(function() {
-            const visible_rows = {{ visible_rows | jsonify }};
+            const visible_rows = {{ vsi.visible_rows | jsonify }};
             const ZYGOSITY_DICT = {
                 'O': 'HOM_ALT',
                 'E': 'HET',
@@ -221,6 +267,7 @@
                 sampleFormatFieldFormatter : sampleFormatFieldFormatter,
             });
 
+            let filters = getGenotypeFilters();
             jQuery("#genotype-grid").jqGrid({
                 datatype: "local",
                 data: visible_rows,
@@ -239,9 +286,15 @@
                 ],
                 caption: "Variant Genotypes",
                 autowidth: true,
+                search: true,
+                postData: {
+                    filters: JSON.stringify(filters)
+                },
                 rowNum: 20,
                 pager: 'genotype-grid-pager',
             });
+
+            $(".genotype-filter").change(filterGenotypes);
 
             plotSampleAlleleFrequencies(visible_rows);
         });
@@ -272,6 +325,10 @@
     
     td.no-word-wrap {
         white-space: normal !important;
+    }
+
+    .separator {
+        padding: 0 5 0 5;
     }
     </style>
     

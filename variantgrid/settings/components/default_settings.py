@@ -220,6 +220,8 @@ _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "fasta")
 
 BUILD_GRCH37 = "GRCh37"
 BUILD_GRCH38 = "GRCh38"
+BUILD_T2TV2 = "T2T-CHM13v2.0"
+
 
 ANNOTATION = {
     # We need separate 'reference_fasta' as cdot requires a NCBI fasta with contig_ids as the names
@@ -233,13 +235,15 @@ ANNOTATION = {
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.25_GRCh37.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
         "liftover": {
-            "GRCh38": os.path.join(ANNOTATION_BASE_DIR,"liftover/GRCh37_to_GRCh38.chain.gz"),
+            BUILD_GRCH38: os.path.join(ANNOTATION_BASE_DIR,"liftover/GRCh37_to_GRCh38.chain.gz"),
+            BUILD_T2TV2: os.path.join(ANNOTATION_BASE_DIR, "liftover/hg19ToHs1.over.chain.gz"),
         },
 
         # VEP paths are relative to ANNOTATION_VEP_BASE_DIR - worked out at runtime
         # so you can change just that variable and have everything else work
         # The names correspond to VEPPlugin or VEPCustom entries (but lower case)
         "vep_config": {
+            "sift": True,
             "cosmic": "annotation_data/GRCh37/Cosmic_GenomeScreensMutant_v99_GRCh37.vcf.gz",
             "dbnsfp": "annotation_data/GRCh37/dbNSFP4.5a.grch37.stripped.gz",
             "dbscsnv": "annotation_data/GRCh37/dbscSNV1.1_GRCh37.txt.gz",
@@ -247,6 +251,7 @@ ANNOTATION = {
             # We use gnomAD SV VCF with --custom twice
             "gnomad_sv": "annotation_data/GRCh37/gnomad_v2.1_sv.sites.grch37.converted.no_filters.vcf.gz",
             "gnomad_sv_name": "annotation_data/GRCh37/gnomad_v2.1_sv.sites.grch37.converted.no_filters.vcf.gz",
+            # We use a VEP specific fasta due to bugs/workarounds, see https://github.com/Ensembl/ensembl-vep/issues/1635
             "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz"),
             "mastermind": "annotation_data/GRCh37/mastermind_cited_variants_reference-2023.10.02-grch37.vcf.gz",
             "mave": None,  # n/a for GRCh37
@@ -264,7 +269,7 @@ ANNOTATION = {
             "uk10k": "annotation_data/GRCh37/UK10K_COHORT.20160215.sites.vcf.gz",
         }
     },
-    # GRCh38 is NOT enabled by default - overwrite "enabled" in your server settings to use
+    # Only 37 is enabled by default - overwrite "enabled" in your server settings to use following builds
     BUILD_GRCH38: {
         "enabled": False,
         "annotation_consortium": "Ensembl",
@@ -273,16 +278,19 @@ ANNOTATION = {
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.39_GRCh38.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
         "liftover": {
-            "GRCh37": os.path.join(ANNOTATION_BASE_DIR, "liftover/GRCh38_to_GRCh37.chain.gz"),
+            BUILD_GRCH37: os.path.join(ANNOTATION_BASE_DIR, "liftover/GRCh38_to_GRCh37.chain.gz"),
+            BUILD_T2TV2: os.path.join(ANNOTATION_BASE_DIR, "liftover/hg38ToHs1.over.chain.gz"),
         },
 
         # VEP paths are relative to ANNOTATION_VEP_BASE_DIR - worked out at runtime
         # so you can change just that variable and have everything else work
         # The names correspond to VEPPlugin or VEPCustom entries (but lower case)
         "vep_config": {
+            "sift": True,
             "cosmic": "annotation_data/GRCh38/Cosmic_GenomeScreensMutant_v99_GRCh38.vcf.gz",
             "dbnsfp": "annotation_data/GRCh38/dbNSFP4.5a.grch38.stripped.gz",
             "dbscsnv": "annotation_data/GRCh38/dbscSNV1.1_GRCh38.txt.gz",
+            # We use a VEP specific fasta due to bugs/workarounds, see https://github.com/Ensembl/ensembl-vep/issues/1635
             "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens.GRCh38.dna.toplevel.fa.gz"),
             "gnomad2": "annotation_data/GRCh38/gnomad2.1.1_GRCh38_combined_af.vcf.bgz",
             "gnomad3": "annotation_data/GRCh38/gnomad3.1_GRCh38_merged.vcf.bgz",
@@ -304,6 +312,45 @@ ANNOTATION = {
             "spliceai_indel": "annotation_data/GRCh38/spliceai_scores.raw.indel.hg38.vcf.gz",
             "topmed": "annotation_data/GRCh38/TOPMED_GRCh38_20180418.vcf.gz",
             "uk10k": "annotation_data/GRCh38/UK10K_COHORT.20160215.sites.GRCh38.vcf.gz",
+        }
+    },
+    BUILD_T2TV2: {
+        "enabled": False,
+        "annotation_consortium": "Ensembl",
+        "columns_version": 3,
+        "cytoband": os.path.join(VG_REFERENCE_DIR, "t2tv2", "chm13v2.0_cytobands_allchrs.bed.gz"),
+        "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_009914755.1_T2T-CHM13v2.0_genomic.fna.gz"),
+        "reference_fasta_has_chr": False,
+        "liftover": {
+            BUILD_GRCH37: os.path.join(ANNOTATION_BASE_DIR, "liftover/hs1ToHg19.over.chain.gz"),
+            BUILD_GRCH38: os.path.join(ANNOTATION_BASE_DIR, "liftover/hs1ToHg38.over.chain.gz"),
+        },
+
+        "vep_config": {
+            "cache_version": 107,  # Otherwise defaults to VEP_ANNO
+            "sift": False,
+            "cosmic": None,  # N/A
+            "dbnsfp": None,
+            "dbscsnv": None,
+            "gnomad4": None, # TODO: Download from Ensembl and put in "annotation_data/T2T-CHM13v2.0/....",
+            "gnomad_sv": None,
+            "gnomad_sv_name": None,
+            # We use a VEP specific fasta due to bugs/workarounds, see https://github.com/Ensembl/ensembl-vep/issues/1635
+            "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens-GCA_009914755.4-softmasked.fa.gz"),
+            "mastermind": None,  # N/A
+            "mave": None,  # N/A
+            "maxentscan": "annotation_data/all_builds/maxentscan",
+            'phastcons100way': None,
+            'phastcons46way': None,
+            'phastcons30way': None,  # n/a for GRCh37
+            'phylop100way': None,
+            'phylop46way': None,
+            'phylop30way': None,  # n/a for GRCh37
+            "repeatmasker": "annotation_data/T2T-CHM13v2.0/chm13v2.0_rmsk.bed.gz",
+            "spliceai_snv": None,
+            "spliceai_indel": None,
+            "topmed": None,
+            "uk10k": None,
         }
     },
 }
@@ -945,6 +992,7 @@ SOMALIER = {
         "sites": {
             "GRCh37": "sites.GRCh37.vcf.gz",  # No chr prefix on chromosome names
             "GRCh38": "sites.hg38.nochr.vcf.gz",  # No chr prefix on chromosome names
+            "T2T-CHM13v2.0": "sites.chm13v2.T2T.vcf.gz",
         },
     },
     # Minimums for related samples to appear at bottom of view_sample page

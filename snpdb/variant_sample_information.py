@@ -28,6 +28,7 @@ class VariantSampleInformation:
         visible_samples_qs = Sample.filter_for_user(user).filter(vcf__genome_build=self.genome_build)
         self.user_sample_ids = set(visible_samples_qs.values_list("pk", flat=True))
         self.num_user_samples = len(self.user_sample_ids)
+        visible_zygosity_counts = Counter()
 
         locus_counter = defaultdict(Counter)
         locus_patients = defaultdict(set)
@@ -35,11 +36,8 @@ class VariantSampleInformation:
         self.visible_rows = []
         for row in values_qs:
             pk = row["variant"]
-            if zygosity := row.get("zygosity"):
-                locus_counter[pk][zygosity] += 1
-            else:
-                locus_counter[pk][Zygosity.UNKNOWN_ZYGOSITY] += 0  # Need an entry to make it show...
-
+            zygosity = row.get("zygosity", Zygosity.UNKNOWN_ZYGOSITY)
+            locus_counter[pk][zygosity] += 1
             if patient := row.get("sample__patient"):
                 locus_patients[pk].add(patient)
 
@@ -49,6 +47,15 @@ class VariantSampleInformation:
 
                     if sample_id in self.user_sample_ids:
                         self.visible_rows.append(row)
+                        visible_zygosity_counts[zygosity] += 1
+
+        # Make this easy to build a filter from
+        default_visible = {Zygosity.HET, Zygosity.HOM_ALT}
+        has_defaults = any(visible_zygosity_counts[gt] for gt in default_visible)
+        self.visible_zygosity_counts = {}
+        for gt, label in Zygosity.CHOICES:
+            checked = gt in default_visible or not has_defaults
+            self.visible_zygosity_counts[gt] = (label, checked, visible_zygosity_counts[gt])
 
         has_hidden_samples = self.num_samples > self.num_user_samples
         self.hidden_samples_details = {}

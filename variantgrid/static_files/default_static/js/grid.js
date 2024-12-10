@@ -30,7 +30,7 @@ function load_variant_details(variant_id) {
         }
     }
     let editorContainer = $("#node-editor-container");
-    editorContainer.html('<div class="editor-loading"><img src="/static/images/spinner.gif" /> Loading variant details...</div>');
+    editorContainer.html('<div class="editor-loading"><i class="fa fa-spinner"></i> Loading variant details...</div>');
     editorContainer.load(variant_details_url);
 }
 

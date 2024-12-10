@@ -323,7 +323,7 @@ function populateVariantAllele(data) {
     $("#variant-canonical-c-hgvs").text(data.link_data.canonical_c_hgvs);
 
     let clinGenId = $("#clingen-allele-id");
-    clinGenId.removeClass("loading");
+    clinGenId.empty(); // clear loading
     let clinGenDetails;
     if (data.error) {
         let error_message = `ClinGeneAllele API Error: ${data.error.errorType} (${data.error.description}) for input '${data.error.inputLine}'`;
@@ -881,8 +881,9 @@ function applyVariantValues() {
                 <div class="card">
                     <div class="card-header">External IDs</div>
                     <div class="card-body">
-                        <!-- note this used to have css class of "loading" -->
-                        {% labelled id="clingen-allele-id" label="ClinGen" help=annotation_description.clingen_allele hint="tiny" %}{% endlabelled %}
+                        {% labelled id="clingen-allele-id" label="ClinGen" help=annotation_description.clingen_allele hint="tiny" %}
+                            <i class="fa fa-spinner"></i>
+                        {% endlabelled %}
                     {% if variant_annotation.has_cosmic %}
                         {% labelled id='cosmic_id' label='COSMIC Genomic Mutation ID' help=annotation_description.cosmic_id hint="tiny" %}{{ variant_annotation.cosmic_id }}{% endlabelled %}
                         {% labelled id='cosmic_legacy_id' label='COSMIC Legacy ID' help=annotation_description.cosmic_legacy_id hint="tiny" %}{{ variant_annotation.cosmic_legacy_id }}{% endlabelled %}
@@ -927,7 +928,7 @@ function applyVariantValues() {
 
                         <div id='pubmed-citations' class="citations mb-4">
                             <div id='pubmed-loading'>
-                                <img src="{% static 'images/spinner.gif' %}" /> Loading citations...
+                                <i class="fa fa-spinner"></i> Loading citations...
                             </div>
                         </div>
 
@@ -975,7 +976,7 @@ function applyVariantValues() {
         {% if seqauto_enabled and show_gene_coverage %}
         <div id="gene_coverage">
             <!-- todo convert to bootstrap spinner -->
-            <img src="{% static 'images/spinner.gif' %}" /> Checking for gene coverage...
+            <i class="fa fa-spinner"></i> Checking for gene coverage...
         </div>
         {% endif %}
     
@@ -983,7 +984,7 @@ function applyVariantValues() {
 {% endif %}
 {% if show_samples %}
 <div id="variant_sample_information" class="container-table">
-	<img src="{% static 'images/spinner.gif' %}" /> Checking for sample information about this variant...
+    <i class="fa fa-spinner"></i> Checking for sample information about this variant...
 </div>
 {% endif %}
 

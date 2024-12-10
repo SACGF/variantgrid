@@ -124,7 +124,7 @@ class CalculateVCFStatsTask(ImportVCFStepTask):
         calculate_vcf_stats(vcf.pk, annotation_version.pk)
 
         if vcf_annotation_stats := VCFAnnotationStats.objects.filter(vcf=vcf, vep_skipped_count__gt=0).first():
-            message_string = f"Variant Effect Predictor (VEP) was unable to annotate {vcf_annotation_stats.vep_skipped_count} variants."
+            message_string = f"CalculateVCFStats may not be accurate as VEP was unable to annotate {vcf_annotation_stats.vep_skipped_count} variants."
             SimpleVCFImportInfo.objects.create(type=SimpleVCFImportInfo.ANNOTATION_SKIPPED, has_more_details=True,
                                                upload_step=upload_step, message_string=message_string)
 

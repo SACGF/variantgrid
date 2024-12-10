@@ -32,7 +32,7 @@
             <script>
             $(document).ready(function() {
                 var myCases = $("#my-cases");
-                myCases.html('<div class="cases-loading"><img src="{% static 'images/spinner.gif' %}" /> Loading cases...</div>');
+                myCases.html('<i class="fa fa-spinner"></i> Loading cases...');
                 myCases.load("{% url 'my_cases_tab' %}");
             });
             </script>

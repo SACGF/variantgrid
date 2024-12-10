@@ -35,8 +35,7 @@
 	function poll_pedigree_task(celery_task) {
 		$('#launch-task').hide();
 		var task_info = $('#task-info');
-		var loading_icon = $('<div>').attr({class : 'loading', style: 'margin-right:10px;'});
-		task_info.html(loading_icon);
+		task_info.html('<i class="fa fa-spinner"></i>');
 		task_info.append("Pedigree Inheritance task is running...");
 		
 		$('#task-info').show();

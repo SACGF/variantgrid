@@ -3,7 +3,7 @@ import operator
 import os
 import re
 from functools import cached_property, reduce
-from typing import Optional
+from typing import Optional, Iterable
 
 from django.conf import settings
 from django.db import models
@@ -57,6 +57,10 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
     @classmethod
     def grch38(cls) -> 'GenomeBuild':
         return cls.objects.get(pk='GRCh38')
+
+    @classmethod
+    def t2tv2(cls) -> 'GenomeBuild':
+        return cls.objects.get(pk='T2T-CHM13v2.0')
 
     @classmethod
     def legacy_build(cls) -> 'GenomeBuild':
@@ -169,20 +173,33 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
             build_annotation_descriptions = ", ".join([f"{k}: {v}" for k, v in build_consortia.items()])
         return build_annotation_descriptions
 
-    @cached_property
-    def chrom_contig_mappings(self) -> dict[str, 'Contig']:
+    def _get_chrom_contig_mappings(self, contigs: Iterable['Contig']) -> dict[str, 'Contig']:
         chrom_contig_mappings = {}
-        for contig in self.contigs:
+        for contig in contigs:
             chrom_contig_mappings[contig.name] = contig
             chrom_contig_mappings[contig.ucsc_name] = contig
             chrom_contig_mappings[contig.genbank_accession] = contig
             chrom_contig_mappings[contig.refseq_accession] = contig
+
         # Map lowercase "mt" -> "MT"
-        chrom_contig_mappings["mt"] = chrom_contig_mappings["MT"]
+        if mt := chrom_contig_mappings.get("MT"):
+            chrom_contig_mappings["mt"] = mt
         return chrom_contig_mappings
 
-    def get_chrom_contig_id_mappings(self) -> dict[str, int]:
-        return {k: v.pk for k, v in self.chrom_contig_mappings.items()}
+    @cached_property
+    def chrom_contig_mappings(self) -> dict[str, 'Contig']:
+        return self._get_chrom_contig_mappings(self.contigs)
+
+    @cached_property
+    def chrom_standard_contig_mappings(self) -> dict[str, 'Contig']:
+        return self._get_chrom_contig_mappings(self.standard_contigs)
+
+    def get_chrom_contig_id_mappings(self, standard_contigs_only=False) -> dict[str, int]:
+        if standard_contigs_only:
+            chrom_contig_mappings = self.chrom_standard_contig_mappings
+        else:
+            chrom_contig_mappings = self.chrom_contig_mappings
+        return {k: v.pk for k, v in chrom_contig_mappings.items()}
 
     def convert_chrom_to_contig_accession(self, chrom: str) -> str:
         """ chrom = ucsc_name/genbank_accession/refseq accession """
@@ -351,10 +368,16 @@ class Contig(models.Model, PreviewModelMixin):
     def get_absolute_url(self):
         return reverse("view_contig", kwargs={"contig_accession": self.refseq_accession})
 
+    def get_genome_builds(self, require_annotation=True) -> Iterable[GenomeBuild]:
+        if require_annotation:
+            builds = GenomeBuild.builds_with_annotation()
+        else:
+            builds = GenomeBuild.objects.all()
+        return builds.filter(genomebuildcontig__contig=self, enabled=True).order_by("name")
+
     @property
     def genome_builds(self):
-        builds = GenomeBuild.builds_with_annotation()
-        return builds.filter(genomebuildcontig__contig=self, enabled=True).order_by("name")
+        return self.get_genome_builds(require_annotation=True)
 
     @staticmethod
     def get_q(accession: str, case_sensitive=True) -> Q:

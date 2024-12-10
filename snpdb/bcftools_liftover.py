@@ -13,13 +13,12 @@ def bcftools_liftover(source_vcf: str, source_genome_build: GenomeBuild,
                       out_vcf: str, out_genome_build: GenomeBuild) -> tuple[str, int]:
     """ returns reject file and items to process if any failed """
 
-    VEP_CONFIG = {
-        "GRCh37": VEPConfig(GenomeBuild.grch37()),
-        "GRCh38": VEPConfig(GenomeBuild.grch38()),
-    }
+    vep_config_per_build = {}
+    for genome_build in GenomeBuild.builds_with_annotation():
+        vep_config_per_build[genome_build.name] = VEPConfig(genome_build)
 
-    source_vep_config = VEP_CONFIG[source_genome_build.name]
-    dest_vep_config = VEP_CONFIG[out_genome_build.name]
+    source_vep_config = vep_config_per_build[source_genome_build.name]
+    dest_vep_config = vep_config_per_build[out_genome_build.name]
 
     source_fasta_filename = source_vep_config["fasta"]
     dest_fasta_filename = dest_vep_config["fasta"]
