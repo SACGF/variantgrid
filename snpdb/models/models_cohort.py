@@ -496,7 +496,8 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
         # If regex string is all "." (ie everything) then can optimise away
         non_wildcard = regex_string.replace(".", "")
         if not non_wildcard:
-            q = Q(pk__isnull=False)
+            # Show everything in cohort
+            q = Q(**{f"{self.cohortgenotype_alias}__isnull": False})
         else:
             q = Q(**{f"{self.cohortgenotype_alias}__samples_zygosity__regex": regex_string})
         return q
