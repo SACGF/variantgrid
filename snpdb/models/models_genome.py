@@ -35,9 +35,9 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
     objects = ObjectManagerCachingImmutable()
 
     name = models.TextField(primary_key=True)
-    accession = models.TextField(null=True)
-    alias = models.TextField(null=True, unique=True)
-    enabled = models.BooleanField(default=True)
+    accession = models.TextField(null=True, blank=True)
+    alias = models.TextField(null=True, unique=True, blank=True)
+    enabled = models.BooleanField(default=True, blank=True)
     igv_genome = models.TextField(null=True, blank=True)
 
     class Meta:
