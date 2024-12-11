@@ -127,10 +127,16 @@ def get_rendering_dict(node):
     else:
         node_id = None
 
+    try:
+        node_class_label = node.get_node_class_label()
+        # This has happened a few times, help debug problem
+    except NotImplementedError as e:
+        raise NotImplementedError(f"Node {node_id=}: {e}")
+
     style = f"left: {node.x}px; top: {node.y}px"
     attributes = {
         "node_id": node_id,
-        "node_class": node.get_node_class_label(),
+        "node_class": node_class_label,
         "version_id": node.version,
         "appearance_version_id": node.appearance_version,
         "id": node.get_css_id(),

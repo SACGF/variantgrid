@@ -16,16 +16,54 @@ table.zygosity-filter-table tr.top-header th {
 </style>
 <script>
 function checkIfAllChecked(toggle, array) {
-	var numChecked = 0;
+	let numChecked = 0;
 	array.each(function() { numChecked += $(this).is(":checked"); });
-	var allChecked = numChecked == array.length;
+	const allChecked = numChecked == array.length;
 	$(toggle).prop('checked', allChecked);
+}
+
+
+function checkZygConfigWarning() {
+    const zygosityTable = $(".zygosity-filter-table");
+    let samplesWithAllZyg = 0;
+    let samplesWithSomeZyg = 0;
+    $(".cohort-node-zygosity-filter", zygosityTable).each(function() {
+        let zygFilters = $(".zygosity_ref, .zygosity_het, .zygosity_hom, .zygosity_none", this);
+        let numZyg = $("input:checked", zygFilters).length;
+        if (numZyg) {
+            if (numZyg === 4) {
+                samplesWithAllZyg += 1;
+            } else {
+                samplesWithSomeZyg += 1;
+            }
+        }
+    });
+
+    if (samplesWithAllZyg || samplesWithSomeZyg) {
+        $("#zyg-config-no-samples-warning").hide();
+        if (samplesWithAllZyg && !samplesWithSomeZyg) {
+            $("#zyg-config-unintuitive-no-zyg-call-warning").show();
+        } else {
+            $("#zyg-config-unintuitive-no-zyg-call-warning").hide();
+        }
+
+        let showInGrid = $(".show_in_grid", zygosityTable);
+        if (!$("input:checked", showInGrid).length) {
+            $("#zyg-config-no-visible-samples-warning").show();
+        } else {
+            $("#zyg-config-no-visible-samples-warning").hide();
+        }
+
+
+    } else {
+        $("#zyg-config-no-samples-warning").show();
+    }
 }
 
 function checkboxSetup(addClickHandler) {
 	$(".toggle-row").each(function() {
-		var rowInputs = $("input[type=checkbox][class!='toggle-row']", $(this).parents("tr"));
-		checkIfAllChecked(this, rowInputs);
+        const rowInputs = $("input[type=checkbox][class!='toggle-row']", $(this).parents("tr"));
+        checkIfAllChecked(this, rowInputs);
 		
 		if (addClickHandler) {
 			$(this).click(function() {
@@ -35,9 +73,9 @@ function checkboxSetup(addClickHandler) {
 	});
 
 	$(".toggle-column").each(function() {
-		var columnName = $(this).attr("column_name");
-		var columnInputs = $("input[type=checkbox]", "td." + columnName);
-		checkIfAllChecked(this, columnInputs);
+        const columnName = $(this).attr("column_name");
+        const columnInputs = $("input[type=checkbox]", "td." + columnName);
+        checkIfAllChecked(this, columnInputs);
 
 		if (addClickHandler) {
 			$(this).click(function() {
@@ -49,9 +87,11 @@ function checkboxSetup(addClickHandler) {
 
 $(document).ready(function() {
 	checkboxSetup(true);
-	
+    checkZygConfigWarning()
+
 	$("input[type=checkbox]", "table.zygosity-filter-table").click(function() {
 		checkboxSetup(false);
+        checkZygConfigWarning();
 	});
 });
 </script>
@@ -89,3 +129,17 @@ $(document).ready(function() {
 	<td></td>
 	</tr>
 </table>
+
+<ul class="messages">
+    <li id="zyg-config-unintuitive-no-zyg-call-warning" class="warning hidden">
+        Warning: You have checked all zygosity calls (including "No Zygosity call in sample")
+        for all samples with any ticked.
+        This will return all variants in the cohort which may be unintuitive behaviour.
+    </li>
+    <li id="zyg-config-no-samples-warning" class="warning hidden">
+        Warning: No zygosity calls for any sample selected - no variants will be returned.
+    </li>
+    <li id="zyg-config-no-visible-samples-warning" class="warning hidden">
+        Warning: No samples will be shown in grid.
+    </li>
+</ul>

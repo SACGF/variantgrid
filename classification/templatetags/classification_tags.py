@@ -4,7 +4,6 @@ from datetime import timedelta
 from html import escape
 from typing import Union, Optional, Iterable, Any, Collection
 
-import deprecation
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Model
@@ -50,6 +49,109 @@ def condition_match(condition_match: ConditionTextMatch, indent=0):
     }
 
 
+@register.inclusion_tag("classification/tags/classification_group_row.html")
+def classification_group_row(group: ClassificationGroup, sub_row: Optional[int] = None, sub_index: Optional[int] = None, show_pending_changes: Optional[bool] = True):
+    return {
+        "group": group,
+        "row_class": f"cc-{sub_row} collapse" if sub_row else "",
+        "sub_index": sub_index,
+    }
+
+
+@register.inclusion_tag("classification/tags/classification_groups.html", takes_context=True)
+def classification_groups(
+        context,
+        classification_modifications: Iterable[ClassificationModification],
+        show_diffs: bool = True,
+        download_link: Optional[str] = None,
+        history_link: Optional[str] = None,
+        link_discordance_reports: bool = False,
+        genome_build: Optional[GenomeBuild] = None,
+        title: Optional[str] = None,
+        context_object: Optional[Model] = None,
+        group_utils: Optional[ClassificationGroupUtils] = None,
+        default_sort: Optional[str] = 'c_hgvs',
+        allele_origin_filter_enabled: bool = True
+    ):
+    """
+    :param context: Auto included
+    :param classification_modifications: The classification modifications to render
+    :param show_diffs: Should a link to show diffs be shown
+    :param download_link: URL to download this data
+    :param history_link: URL to see the history of this data
+    :param link_discordance_reports: Should link to discordance reports (if so will subdivide by clinical context)
+    :param genome_build: Preferred genome build
+    :param title: Heading to give the table
+    :param context_object: If all these records are from an allele, provide "allele" if from a discordance report provide "discordance_report" etc
+    :param old_classification_modifications: For showing what a discordance report used to be
+    :param default_sort: The column to sort by default
+    """
+    if isinstance(classification_modifications, QuerySet):
+        classification_modifications = classification_modifications.select_related(
+            'classification',
+            'classification__clinical_context',
+            'classification__lab',
+            'classification__lab__organization'
+        )
+
+    sort_order_index = 1
+    if default_sort == 'clinical_significance':
+        sort_order_index = 2
+
+    if not group_utils:
+        group_utils = ClassificationGroupUtils(
+            modifications=classification_modifications,
+            calculate_pending=True
+        )
+    groups = ClassificationGroups(classification_modifications, genome_build=genome_build, group_utils=group_utils)
+
+    tag_context = {
+        "title": title,
+        "classification_groups": groups,
+        "user": context.request.user,
+        "genome_build": groups.genome_build,
+        "table_id": str(uuid.uuid4()).replace("-", "_"),
+        "sort_order_index": sort_order_index,
+        "allele_origin_filter_enabled": allele_origin_filter_enabled
+    }
+    ordered_classifications = list(groups.modifications)
+    # classifications are sorted by group, display them so they're sorted by date
+    ordered_classifications.sort(key=lambda cm: cm.curated_date_check, reverse=True)
+
+    if groups and download_link:
+        tag_context["download_link"] = download_link
+    if groups and history_link and context.request.user.is_superuser:
+        tag_context["history_link"] = history_link
+
+    if show_diffs:
+        if 1 < len(groups) <= 20 and len(groups) != len(ordered_classifications):
+            diff_latest = ",".join([str(group.most_recent.classification.id) for group in groups])
+            tag_context["diff_latest"] = diff_latest
+        if 1 < len(ordered_classifications) <= 20:
+            tag_context["diff_all"] = ",".join([str(cm.classification.id) for cm in ordered_classifications])
+
+    tag_context["logging_key"] = ""
+    if context_object:
+        # in some contexts we get a string instead of Gene Symbol
+        if isinstance(context_object, str):
+            if gene_symbol := GeneSymbol.objects.filter(symbol=context_object).first():
+                context_object = gene_symbol
+        try:
+            logging_key = context_object.metrics_logging_key
+            tag_context["logging_key"] = f"&{logging_key[0]}={logging_key[1]}"
+        except:
+            raise ValueError(f"Context Object {context_object} does not have metrics_logging_key property")
+
+    if link_discordance_reports:
+        clinical_grouping_list = list({cm.classification.clinical_context for cm in ordered_classifications if cm.classification.clinical_context})
+        clinical_grouping_list.sort(key=lambda cg:(not cg.is_default if cg else False, cg.name if cg else 'No Allele'))
+        tag_context["clinical_contexts"] = clinical_grouping_list
+
+    tag_context["paging"] = len(groups) > 10
+
+    return tag_context
+
+
 def render_ekey(val, key: Optional[str] = None, value_if_none: Optional[str] = None):
     if isinstance(val, ClassificationModification):
         val = val.get(key)
@@ -91,38 +193,13 @@ def classification_changes(changes):
 
 
 @register.inclusion_tag("classification/tags/clinical_significance.html")
-def clinical_significance(value: Optional[Union[str | EvidenceMixin]], evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE, show_if_none=True):
-    is_somatic = evidence_key == SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE
-    suffix: Optional[str] = None
-    pending_from: Optional[str] = None
-    key = EvidenceKeyMap.cached_key(evidence_key)
-
+def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE, show_if_none=True):
     if isinstance(value, EvidenceMixin):
-        if is_somatic:
-            if somatic_value := value.somatic_clinical_significance_value:
-                value = somatic_value.tier_level
-                suffix = somatic_value.amp_level
-            else:
-                value = None
-        else:
-            value_cs = value
-            value = value.get(evidence_key)
-            summary = None
-            if evidence_key == SpecialEKeys.CLINICAL_SIGNIFICANCE:
-                if isinstance(value_cs, ClassificationModification):
-                    summary = value_cs.classification.summary
-                elif isinstance(value_cs, Classification):
-                    summary = value_cs.classification
-                if summary:
-                    if pending_val := summary.get("pathogenicity", {}).get("pending"):
-                        pending_from = key.option_dictionary.get(value, value) or "No Data"
-                        value = pending_val
-
-
+        value = value.get(evidence_key)
     if value is None and not show_if_none:
         return {"skip": True}
 
-
+    key = EvidenceKeyMap.cached_key(evidence_key)
     label = key.option_dictionary.get(value, value) or "No Data"
     title = key.pretty_label
     if value == "withdrawn":
@@ -136,9 +213,7 @@ def clinical_significance(value: Optional[Union[str | EvidenceMixin]], evidence_
         "css_class": css_class,
         "label": label,
         "prefix": "cs" if key.key == SpecialEKeys.CLINICAL_SIGNIFICANCE else "scs",
-        "title": title,
-        "suffix": suffix,
-        "pending_from": pending_from
+        "title": title
     }
 
 
@@ -157,7 +232,6 @@ def clinical_significance_inline(value):
         "color": colors.get(value) or "#aaa",
         "label": key.option_dictionary.get(value, value) or "Unclassified"
     }
-
 
 @register.inclusion_tag("classification/tags/lab.html")
 def lab(lab: Lab, your_lab: Optional[Lab] = None):
@@ -183,12 +257,12 @@ def clinical_context(context, cc: ClinicalContext, orientation: str = 'horizonta
 
 
 @register.inclusion_tag("classification/tags/classification_quick.html", takes_context=True)
-def classification_quick(context, vc: Union[Classification, ClassificationModification], mode: Optional[str] = "detailed", show_flags=False, record_count: Optional[int] = None):
+def classification_quick(context, vc: Union[Classification, ClassificationModification], show_clinical_grouping=True, mode: Optional[str] = "detailed"):
     user = context.request.user
     vcm = vc
     if isinstance(vc, Classification):
         vcm = ClassificationModification.latest_for_user(user=user, classification=vc, published=True, exclude_withdrawn=False).first()
-    return {"vcm": vcm, "mode": mode, "show_flags": show_flags, "record_count": record_count}
+    return {"vcm": vcm, "show_clinical_grouping": show_clinical_grouping, "mode": mode}
 
 
 class ClinicalGrouping:
@@ -493,7 +567,7 @@ def criteria_strength(strength: CriteriaStrength):
 def criteria_strength_td(strength: Union[CriteriaStrength, Collection[CriteriaStrength]]):
     # going to display NM, NS, NA all the same
     if isinstance(strength, list):
-        all_met_strengths = [strx for strx in strength if strx.is_met]
+        all_met_strengths = [s for s in strength if s.is_met]
         if len(all_met_strengths) > 1:
             return {
                 "strengths": all_met_strengths
@@ -550,121 +624,3 @@ def user_view_events(user: User, days: int = 1):
             'args': json.dumps(event.args)
         })
     return view_event_data
-
-
-@deprecation.deprecated("Use classification_groupings whenever possible")
-@register.inclusion_tag("classification/tags/classification_group_row.html")
-def classification_group_row(group: ClassificationGroup, sub_row: Optional[int] = None, sub_index: Optional[int] = None, show_pending_changes: Optional[bool] = True):
-    return {
-        "group": group,
-        "row_class": f"cc-{sub_row} collapse" if sub_row else "",
-        "sub_index": sub_index,
-    }
-
-
-@deprecation.deprecated("Use classification_groupings whenever possible")
-@register.inclusion_tag("classification/tags/classification_groups.html", takes_context=True)
-def classification_groups(
-        context,
-        classification_modifications: Iterable[ClassificationModification],
-        show_diffs: bool = True,
-        download_link: Optional[str] = None,
-        history_link: Optional[str] = None,
-        link_discordance_reports: bool = False,
-        genome_build: Optional[GenomeBuild] = None,
-        title: Optional[str] = None,
-        context_object: Optional[Model] = None,
-        group_utils: Optional[ClassificationGroupUtils] = None,
-        default_sort: Optional[str] = 'c_hgvs',
-        allele_origin_filter_enabled: bool = True
-    ):
-    """
-    :param context: Auto included
-    :param classification_modifications: The classification modifications to render
-    :param show_diffs: Should a link to show diffs be shown
-    :param download_link: URL to download this data
-    :param history_link: URL to see the history of this data
-    :param link_discordance_reports: Should link to discordance reports (if so will subdivide by clinical context)
-    :param genome_build: Preferred genome build
-    :param title: Heading to give the table
-    :param context_object: If all these records are from an allele, provide "allele" if from a discordance report provide "discordance_report" etc.
-    :param default_sort: The column to sort by default
-    """
-    if isinstance(classification_modifications, QuerySet):
-        classification_modifications = classification_modifications.select_related(
-            'classification',
-            'classification__clinical_context',
-            'classification__lab',
-            'classification__lab__organization'
-        )
-
-    sort_order_index = 1
-    if default_sort == 'clinical_significance':
-        sort_order_index = 2
-
-    if not group_utils:
-        group_utils = ClassificationGroupUtils(
-            modifications=classification_modifications,
-            calculate_pending=True
-        )
-    groups = ClassificationGroups(classification_modifications, genome_build=genome_build, group_utils=group_utils)
-
-    tag_context = {
-        "title": title,
-        "classification_groups": groups,
-        "user": context.request.user,
-        "genome_build": groups.genome_build,
-        "table_id": str(uuid.uuid4()).replace("-", "_"),
-        "sort_order_index": sort_order_index,
-        "allele_origin_filter_enabled": allele_origin_filter_enabled
-    }
-    ordered_classifications = list(groups.modifications)
-    # classifications are sorted by group, display them so they're sorted by date
-    ordered_classifications.sort(key=lambda cm: cm.curated_date_check, reverse=True)
-
-    if groups and download_link:
-        tag_context["download_link"] = download_link
-    if groups and history_link and context.request.user.is_superuser:
-        tag_context["history_link"] = history_link
-
-    if show_diffs:
-        if 1 < len(groups) <= 20 and len(groups) != len(ordered_classifications):
-            diff_latest = ",".join([str(group.most_recent.classification.id) for group in groups])
-            tag_context["diff_latest"] = diff_latest
-        if 1 < len(ordered_classifications) <= 20:
-            tag_context["diff_all"] = ",".join([str(cm.classification.id) for cm in ordered_classifications])
-
-    tag_context["logging_key"] = ""
-    if context_object:
-        # in some contexts we get a string instead of Gene Symbol
-        if isinstance(context_object, str):
-            if gene_symbol := GeneSymbol.objects.filter(symbol=context_object).first():
-                context_object = gene_symbol
-        try:
-            logging_key = context_object.metrics_logging_key
-            tag_context["logging_key"] = f"&{logging_key[0]}={logging_key[1]}"
-        except:
-            raise ValueError(f"Context Object {context_object} does not have metrics_logging_key property")
-
-    if link_discordance_reports:
-        clinical_grouping_list = list({cm.classification.clinical_context for cm in ordered_classifications if cm.classification.clinical_context})
-        clinical_grouping_list.sort(key=lambda cg: (not cg.is_default if cg else False, cg.name if cg else 'No Allele'))
-        tag_context["clinical_contexts"] = clinical_grouping_list
-
-    tag_context["paging"] = len(groups) > 10
-
-    return tag_context
-
-
-@register.inclusion_tag("classification/tags/classification_groupings.html", takes_context=True)
-def classification_groupings(context, show_allele_origin_filter=True):
-    """
-    Shows the new database based classification grouping table. To filter the data implement a JavaScript method on the page
-    <script>
-        function classificationGroupingFilter(data) {
-            data.ontology_term_id = {{ term.id | jsonify }};
-        }
-    </script>
-    :param show_allele_origin_filter: True by default, set to False to hardcode the filtering to all records
-    """
-    return {"show_allele_origin_filter": show_allele_origin_filter}

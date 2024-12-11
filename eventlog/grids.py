@@ -2,10 +2,12 @@ from typing import Any
 
 from django.db.models import QuerySet
 from django.http import HttpRequest
+from rich.text import Text
 
 from eventlog.models import Event
 from library.enums.log_level import LogLevel
 from library.guardian_utils import bot_group
+from library.utils import emoji_to_unicode
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 
@@ -15,7 +17,8 @@ class EventColumns(DatatableConfig[Event]):
         if filename := row.get('filename'):
             return filename
         elif detail := row.get('details'):
-            return detail.split('\n', 1)[0]
+            d = detail.split('\n', 1)[0]
+            return emoji_to_unicode(d)
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)

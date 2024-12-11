@@ -108,16 +108,12 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
         for build_name, values in settings.ANNOTATION.items():
             if values.get("enabled"):
                 enabled_annotation.append(build_name)
-        return GenomeBuild.objects.filter(name__in=enabled_annotation).order_by('name')
+        return GenomeBuild.objects.filter(enabled=True, name__in=enabled_annotation).order_by('name')
 
     @staticmethod
     @timed_cache(ttl=60)
     def builds_with_annotation_cached() -> list['GenomeBuild']:
-        enabled_annotation = []
-        for build_name, values in settings.ANNOTATION.items():
-            if values.get("enabled"):
-                enabled_annotation.append(build_name)
-        return list(GenomeBuild.objects.filter(name__in=enabled_annotation))
+        return list(GenomeBuild.builds_with_annotation())
 
     @staticmethod
     def builds_with_annotation_priority(priority: 'GenomeBuild') -> list['GenomeBuild']:
@@ -281,6 +277,10 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
                 raise ValueError(f"{self} has no annotation versions")
 
         return annotation_version.variant_annotation_version.assembly
+
+    @staticmethod
+    def get_known_builds_comma_separated_string() -> str:
+        return ", ".join(GenomeBuild.objects.all().order_by("name").values_list("name", flat=True))
 
     def __str__(self):
         return self.name
