@@ -564,9 +564,29 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 # reference_message.append(SearchMessage(f'Using reference "{ref_base}" from our build', LogLevel.INFO))
                 pass
 
-    except (MissingTranscript, Contig.ContigNotInBuildError):
-        # contig triggered from g.HGVS from another genome build - can't do anything just return no results
+    except MissingTranscript:
         pass
+    except Contig.ContigNotInBuildError as e:
+        # HGVS is valid but g.HGVS contig from a different genome build than this one
+        # we don't want to throw an error for 37 contig not in 38 (if both enabled)
+        # but we do want to throw one if the contig is completely unrecognised
+        hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_string)
+        contig_accession = hgvs_variant.transcript
+        if contig := Contig.objects.filter(refseq_accession=contig_accession).first():
+            # Contig is known to system
+            contig_builds = contig.genomebuildcontig_set.all()
+            search_builds = GenomeBuild.builds_with_annotation()
+            if contig_builds.filter(genome_build__in=search_builds).exists():
+                pass  # skip silently - will get in other build
+            else:
+                build_names = ", ".join(contig_builds.order_by("genome_build__name").values_list("genome_build__name", flat=True))
+                msg = f"{contig_accession=} is from builds {build_names} which are not enabled/annotated."
+                yield SearchMessageOverall(msg, severity=LogLevel.WARNING)
+        else:
+            known_builds = GenomeBuild.get_known_builds_comma_separated_string()
+            msg = f"{contig_accession=} not in known_builds: {known_builds}"
+            yield SearchMessageOverall(msg, severity=LogLevel.WARNING)
+
     except (ValueError, NotImplementedError) as hgvs_error:
         if gene_symbol_str := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
             has_results = False
