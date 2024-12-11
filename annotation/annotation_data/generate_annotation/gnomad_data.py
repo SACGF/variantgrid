@@ -48,7 +48,10 @@ def get_infos_for_version(gnomad_version) -> tuple[list[str], list[str], list[st
     if gnomad_version in (GNOMAD_V_4_0, GNOMAD_V_4_1_T2T_LIFTOVER):
         popmax_fields = grpmax_fields
         chr_x_male = chr_x_xy
-        info_fields.extend(["faf95", "faf99", "fafmax_faf95_max", "fafmax_faf99_max"])
+        if gnomad_version == GNOMAD_V_4_0:
+            # Not in 4.1
+            info_fields.extend(["faf95", "faf99"])
+        info_fields.extend(["fafmax_faf95_max", "fafmax_faf99_max"])
         # Others are now called remaining
         sub_pops.remove("oth")
         sub_pops.append("remaining")  #
