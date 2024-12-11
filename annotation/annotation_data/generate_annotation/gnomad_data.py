@@ -17,21 +17,24 @@ from datetime import datetime
 GNOMAD_V_2_1 = "2.1.1"
 GNOMAD_V_3_1_2 = "3.1.2"
 GNOMAD_V_4_0 = "4.0"
+GNOMAD_V_4_1_T2T_LIFTOVER = "4.1.t2t_liftover"
 
 GNOMAD_VERSIONS = {
     GNOMAD_V_2_1,
     GNOMAD_V_3_1_2,
     GNOMAD_V_4_0,
+    GNOMAD_V_4_1_T2T_LIFTOVER,
 }
 
 FILENAMES = {
     GNOMAD_V_2_1: "gnomad.%(capture_type)s.r2.1.1.sites.%(chrom)s.vcf.bgz",
     GNOMAD_V_3_1_2: "gnomad.%(capture_type)s.v3.1.2.sites.chr{chrom}.vcf.bgz",
     GNOMAD_V_4_0: "gnomad.%(capture_type)s.v4.0.sites.chr%(chrom)s.vcf.bgz",
+    GNOMAD_V_4_1_T2T_LIFTOVER: "gnomad.%(capture_type)s.v4.1.sites.GCA_009914755.4.trimmed_liftover.vcf.gz",
 }
 
 
-GENOME_BUILDS = {"GRCh37", "GRCh38"}
+GENOME_BUILDS = {"GRCh37", "GRCh38", "T2T-CHM13v2.0"}
 
 def get_infos_for_version(gnomad_version) -> tuple[list[str], list[str], list[str], list[str]]:
     # We deliberately leave out AF and "grpmax" stuff as we recalculate that later in 'calculate_allele_frequency'
@@ -42,7 +45,7 @@ def get_infos_for_version(gnomad_version) -> tuple[list[str], list[str], list[st
     chr_x_male = ["AC_male", "AN_male", "AF_male"]
     chr_x_xy = ["AC_XY", "AN_XY", "AF_XY"]
 
-    if gnomad_version == GNOMAD_V_4_0:
+    if gnomad_version in (GNOMAD_V_4_0, GNOMAD_V_4_1_T2T_LIFTOVER):
         popmax_fields = grpmax_fields
         chr_x_male = chr_x_xy
         info_fields.extend(["faf95", "faf99", "fafmax_faf95_max", "fafmax_faf99_max"])
