@@ -471,7 +471,8 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
             for k, v in a_kwargs.items():
                 qs = qs.annotate(**{k: v})
-                for q in arg_q_dict.pop(k, {}).values():
+                if q_and_list := list(arg_q_dict.pop(k, {}).values()):
+                    q = reduce(operator.and_, q_and_list)
                     qs = qs.filter(q)
 
         q_list = []
