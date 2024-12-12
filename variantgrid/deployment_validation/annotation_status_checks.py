@@ -1,10 +1,24 @@
 from django.db.models import Count
 
-from annotation.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion
+from annotation.models import AnnotationRangeLock, AnnotationRun, VariantAnnotationVersion, AnnotationVersion
 from snpdb.models import GenomeBuild
 
 
-def check_annotation_status() -> dict:
+def check_annotation_versions() -> dict:
+    annotation_versions_checks = {}
+    for genome_build in GenomeBuild.builds_with_annotation():
+        build_av = {}
+        try:
+            annotation_version = AnnotationVersion.latest(genome_build, validate=True)
+            build_av["valid"] = True
+        except Exception as e:
+            build_av["valid"] = False
+            build_av["fix"] = f"{e}: See 'Annotation' web page for details"
+        annotation_versions_checks[f"Annotation Version for {genome_build=}"] = build_av
+    return annotation_versions_checks
+
+
+def check_variant_annotation_runs_status() -> dict:
     # I am going to make this a warning for a while - before making it an error
     ARL_DUPE_ERROR = False
     # see https://github.com/SACGF/variantgrid_shariant/issues/177

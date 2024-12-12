@@ -1,3 +1,4 @@
+import logging
 import re
 from collections import defaultdict
 from functools import cached_property
@@ -187,6 +188,7 @@ class ReleaseGeneMatcher:
                                   visited_symbols=visited_symbols)
 
     def _get_gene_id_and_match_info_for_symbol(self, gene_symbols) -> dict[str, list]:
+        logging.info("_get_gene_id_and_match_info_for_symbol")
         gene_symbol_gene_id_and_match_info = defaultdict(list)  # list items = (gene_id, match_info)
         for gene_symbol_id in gene_symbols:
             gene_name = clean_string(str(gene_symbol_id)).upper()
@@ -198,10 +200,12 @@ class ReleaseGeneMatcher:
                 for gene_id, match_info in alias_items.items():
                     gene_symbol_gene_id_and_match_info[gene_symbol_id].append((gene_id, match_info))
             # Else - no match?
-
+        logging.info("/_get_gene_id_and_match_info_for_symbol")
         return gene_symbol_gene_id_and_match_info
 
     def match_symbols_to_genes(self, release_gene_symbols):
+        logging.info("match_symbols_to_genes")
+
         gene_symbols = (rgs.gene_symbol_id for rgs in release_gene_symbols)
         gene_symbol_gene_id_and_match_info = self._get_gene_id_and_match_info_for_symbol(gene_symbols)
 
@@ -220,17 +224,22 @@ class ReleaseGeneMatcher:
     def match_gene_symbols(self, gene_symbols: Iterable[str]):
         """ gene_symbols must not have been matched  """
 
+        logging.info("match_gene_symbols")
         release_gene_symbols = [ReleaseGeneSymbol(release=self.release, gene_symbol_id=gene_symbol_id)
                                 for gene_symbol_id in gene_symbols]
         if release_gene_symbols:
+            logging.info("match_gene_symbols: creating release_gene_symbols size=%d", len(release_gene_symbols))
+
             # Need ignore_conflicts=False so we get back PKs
             release_gene_symbols = ReleaseGeneSymbol.objects.bulk_create(release_gene_symbols,
                                                                          batch_size=2000, ignore_conflicts=False)
+            logging.info("done creating release symbols!")
 
             self.match_symbols_to_genes(release_gene_symbols)
 
     def _match_unmatched_gene_symbol_qs(self, gene_symbol_qs):
         """ Match any matched symbols without matched genes """
+        logging.info("_match_unmatched_gene_symbol_qs - getting genes not in this release")
         unmatched_symbols_qs = gene_symbol_qs.exclude(releasegenesymbol__release=self.release)
         unmatched_symbols = list(unmatched_symbols_qs.values_list("symbol", flat=True).distinct())
         self.match_gene_symbols(unmatched_symbols)
