@@ -1,10 +1,9 @@
-import logging
 import re
 from collections import defaultdict
 from functools import cached_property
 from typing import Iterable
 
-from django.db.models import F, Q, Subquery, OuterRef
+from django.db.models import Q
 from django.db.models.functions import Upper
 
 from genes.models import GeneSymbol, GeneSymbolAlias, GeneListGeneSymbol, GeneAnnotationRelease, GeneVersion, \
@@ -108,17 +107,24 @@ class ReleaseGeneMatcher:
         return genes_dict
 
     def _get_genes_dict(self):
-        qs = GeneVersion.objects.filter(gene__in=self.release.get_genes())
-        release_symbol = GeneSymbol.objects.filter(geneversion__gene=OuterRef("gene"),
-                                                   geneversion__releasegeneversion__release=self.release)
-        diff_version_symbols = qs.annotate(release_symbol=Subquery(release_symbol.values("symbol")[:1])).filter(
-            ~Q(gene_symbol=F("release_symbol"))).annotate(symbol_upper=Upper("gene_symbol"))
+        """
+            We want to get all the ways a symbol can match a gene not through the release version
+        """
+        release_gene_version_symbols = defaultdict(set)
+        # All the gene versions corresponding to genes in release
+        release_gv_qs = GeneVersion.objects.filter(releasegeneversion__release=self.release)
+        for gene_id, gene_symbol_id in release_gv_qs.values_list("gene_id", "gene_symbol_id"):
+            release_gene_version_symbols[gene_id].add(gene_symbol_id)
 
-        values = diff_version_symbols.values_list("symbol_upper", "gene__identifier", "version", "genome_build__name")
+        gene_versions_qs = GeneVersion.objects.filter(gene__in=self.release.get_genes()).select_related("genome_build")
+        gene_versions_qs = gene_versions_qs.filter(gene_symbol__isnull=False)
+        values = gene_versions_qs.values_list("gene_symbol_id", "gene_id", "version", "genome_build__name")
         genes_dict = defaultdict(dict)
-        for symbol_upper, gene_id, version, genome_build_name in values:
-            match_info = f"Gene v{version}/{genome_build_name}"
-            genes_dict[symbol_upper][gene_id] = match_info
+        empty_set = set()
+        for gene_symbol_id, gene_id, version, genome_build_name in values:
+            if gene_symbol_id not in release_gene_version_symbols.get(gene_id, empty_set):
+                match_info = f"Gene v{version}/{genome_build_name}"
+                genes_dict[gene_symbol_id.upper()][gene_id] = match_info
         return genes_dict
 
     @cached_property
@@ -128,13 +134,14 @@ class ReleaseGeneMatcher:
 
         # Gene Symbol alias
         qs = GeneSymbolAlias.objects.filter(gene_symbol__releasegenesymbol__release=self.release)
-        qs = qs.exclude(alias=F("gene_symbol_id"))
+        gene_symboli_alias_list = [gsa for gsa in qs if gsa.alias != gsa.gene_symbol_id]
+
         alias_graph = defaultdict(list)
-        for gsa in qs:
+        for gsa in gene_symboli_alias_list:
             alias_graph[gsa.alias].append(gsa)
             alias_graph[gsa.gene_symbol_id].append(gsa)
 
-        for gene_symbol_alias in qs:
+        for gene_symbol_alias in gene_symboli_alias_list:
             for gene_symbol in [gene_symbol_alias.alias, gene_symbol_alias.gene_symbol_id]:
                 symbol_match_path = {gene_symbol: gene_symbol_alias.match_info}
 
@@ -188,7 +195,6 @@ class ReleaseGeneMatcher:
                                   visited_symbols=visited_symbols)
 
     def _get_gene_id_and_match_info_for_symbol(self, gene_symbols) -> dict[str, list]:
-        logging.info("_get_gene_id_and_match_info_for_symbol")
         gene_symbol_gene_id_and_match_info = defaultdict(list)  # list items = (gene_id, match_info)
         for gene_symbol_id in gene_symbols:
             gene_name = clean_string(str(gene_symbol_id)).upper()
@@ -200,12 +206,9 @@ class ReleaseGeneMatcher:
                 for gene_id, match_info in alias_items.items():
                     gene_symbol_gene_id_and_match_info[gene_symbol_id].append((gene_id, match_info))
             # Else - no match?
-        logging.info("/_get_gene_id_and_match_info_for_symbol")
         return gene_symbol_gene_id_and_match_info
 
     def match_symbols_to_genes(self, release_gene_symbols):
-        logging.info("match_symbols_to_genes")
-
         gene_symbols = (rgs.gene_symbol_id for rgs in release_gene_symbols)
         gene_symbol_gene_id_and_match_info = self._get_gene_id_and_match_info_for_symbol(gene_symbols)
 
@@ -223,23 +226,16 @@ class ReleaseGeneMatcher:
 
     def match_gene_symbols(self, gene_symbols: Iterable[str]):
         """ gene_symbols must not have been matched  """
-
-        logging.info("match_gene_symbols")
         release_gene_symbols = [ReleaseGeneSymbol(release=self.release, gene_symbol_id=gene_symbol_id)
                                 for gene_symbol_id in gene_symbols]
         if release_gene_symbols:
-            logging.info("match_gene_symbols: creating release_gene_symbols size=%d", len(release_gene_symbols))
-
             # Need ignore_conflicts=False so we get back PKs
             release_gene_symbols = ReleaseGeneSymbol.objects.bulk_create(release_gene_symbols,
                                                                          batch_size=2000, ignore_conflicts=False)
-            logging.info("done creating release symbols!")
-
             self.match_symbols_to_genes(release_gene_symbols)
 
     def _match_unmatched_gene_symbol_qs(self, gene_symbol_qs):
         """ Match any matched symbols without matched genes """
-        logging.info("_match_unmatched_gene_symbol_qs - getting genes not in this release")
         unmatched_symbols_qs = gene_symbol_qs.exclude(releasegenesymbol__release=self.release)
         unmatched_symbols = list(unmatched_symbols_qs.values_list("symbol", flat=True).distinct())
         self.match_gene_symbols(unmatched_symbols)
