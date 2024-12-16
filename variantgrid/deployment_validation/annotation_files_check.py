@@ -78,7 +78,16 @@ def annotation_data_exists(flat=False) -> dict:
 
 
 def check_cdot_data() -> dict:
+    cdot_checks = {}
+
+    for genome_build in GenomeBuild.builds_with_annotation():
+        cdot_checks[f"cdot_{genome_build}"] = {
+            "valid": TranscriptVersion.objects.filter(genome_build=genome_build).exists(),
+            "fix": f"python manage import_gene_annotation --genome-build={genome_build.name}",
+        }
+
     try:
+        # Check that latest exists
         from cdot.data_release import get_latest_data_release_tag_name, _get_version_from_tag_name
 
         tag_name = get_latest_data_release_tag_name()
@@ -92,9 +101,9 @@ def check_cdot_data() -> dict:
             "notes": f"data version = latest ({cdot_data_version})",
             "fix": "python3 manage.py import_cdot_latest"
         }
-        return {
-            "cdot_data": cdot_data,
-        }
+        cdot_checks["latest_cdot_data"] = cdot_data
     except ImportError:
         # Will already be covered in library version > 0.2.26
-        return {}
+        pass
+
+    return cdot_checks

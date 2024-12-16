@@ -1,8 +1,5 @@
 import logging
-import subprocess
 from collections import defaultdict, Counter
-from subprocess import check_output
-from typing import Optional
 
 import cdot
 from django.conf import settings
@@ -34,11 +31,11 @@ from genes.models import GeneListCategory, GeneAnnotationImport, GeneVersion, Tr
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import WEEK_SECS
 from library.django_utils import require_superuser, get_field_counts
-from library.log_utils import log_traceback
 from library.utils import first
 from ontology.models import OntologyTerm, OntologyService, OntologyImport, OntologyVersion
 from snpdb.models import VariantGridColumn, SomalierConfig, GenomeBuild, VCF, UserSettings, ColumnAnnotationLevel
 from variantgrid.celery import app
+from variantgrid.deployment_validation.somalier_check import verify_somalier_config
 
 
 def get_build_contigs():
@@ -231,7 +228,7 @@ def annotation_detail(request):
 
     somalier = None
     if somalier_enabled := settings.SOMALIER.get("enabled"):
-        somalier = _verify_somalier_config()
+        somalier = verify_somalier_config()
 
     # These are empty/None if not set.
     annotations_ok = [all_ontologies_accounted_for,
@@ -263,19 +260,6 @@ def annotation_detail(request):
         "somalier": somalier,
     }
     return render(request, "annotation/annotation_detail.html", context)
-
-
-def _verify_somalier_config() -> Optional[str]:
-    somalier_cfg = SomalierConfig()
-    somalier_bin = somalier_cfg.get_annotation("command")
-    somalier = None
-    try:
-        somalier_output = check_output([somalier_bin], stderr=subprocess.STDOUT)
-        somalier = somalier_output.decode().split("\n", 1)[0]
-    except:
-        log_traceback()
-
-    return somalier
 
 
 @require_POST
