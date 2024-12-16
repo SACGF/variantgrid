@@ -332,9 +332,9 @@ ANNOTATION = {
             "cosmic": None,  # N/A
             "dbnsfp": None,
             "dbscsnv": None,
-            "gnomad4": None, # TODO: Download from Ensembl and put in "annotation_data/T2T-CHM13v2.0/....",
-            "gnomad_sv": None,
-            "gnomad_sv_name": None,
+            "gnomad4": "annotation_data/T2T-CHM13v2.0/gnomad4.1.t2t_liftover_T2T-CHM13v2.0_combined_af.vcf.bgz",
+            "gnomad_sv": "annotation_data/T2T-CHM13v2.0/gnomad.v4.0.sv.merged_t2t.no_filters.vcf.gz",
+            "gnomad_sv_name": "annotation_data/T2T-CHM13v2.0/gnomad.v4.0.sv.merged_t2t.no_filters.vcf.gz",
             # We use a VEP specific fasta due to bugs/workarounds, see https://github.com/Ensembl/ensembl-vep/issues/1635
             "fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "Homo_sapiens-GCA_009914755.4-softmasked.fa.gz"),
             "mastermind": None,  # N/A
