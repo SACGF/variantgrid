@@ -1,7 +1,8 @@
 import os
 
 from variantgrid.settings.components.secret_settings import get_secret
-from variantgrid.settings.components.settings_paths import ANNOTATION_BASE_DIR, VARIANTGRID_REPO_REFERENCE_DIR
+from variantgrid.settings.components.settings_paths import ANNOTATION_BASE_DIR, VARIANTGRID_REPO_REFERENCE_DIR, \
+    PRIVATE_DATA_ROOT
 
 # GeneAnnotation is only in analyses, as an optimisation to stpre e.g. per-gene ontology records.
 ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED = True
@@ -179,6 +180,7 @@ ANNOTATION = {
     },
 }
 
+ANNOTATION_VCF_DUMP_DIR = os.path.join(PRIVATE_DATA_ROOT, 'annotation_dump')
 # Admin email used in PubMed queries to contact before throttling/banning
 ANNOTATION_ENTREZ_EMAIL = get_secret("ENTREZ.email")  # Automatically set in in annotation.apps.AnnotationConfig
 ANNOTATION_ENTREZ_API_KEY = get_secret("ENTREZ.api_key")
