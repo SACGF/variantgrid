@@ -50,7 +50,7 @@ def get_infos_for_version(gnomad_version) -> tuple[list[str], list[str], list[st
         chr_x_male = chr_x_xy
         if gnomad_version == GNOMAD_V_4_0:
             # Not in 4.1
-            info_fields.extend(["faf95", "faf99"])["faf95", "faf99"]["faf95", "faf99"]
+            info_fields.extend(["faf95", "faf99"])
         info_fields.extend(["fafmax_faf95_max", "fafmax_faf99_max"])
         # Others are now called remaining
         sub_pops.remove("oth")
