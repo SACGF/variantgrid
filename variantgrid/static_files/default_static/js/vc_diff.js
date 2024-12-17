@@ -408,7 +408,7 @@ const Diff = (function() {
                         let blankValues = {};
                         let hasBlank = 0;
                         let hasMultiValues = false;
-                        let isCriteria = show === 'value' && eKey.value_type === 'C' && eKey.namespace() === null;
+                        let isCriteria = show === 'value' && eKey.value_type === 'C' && eKey.namespace() === 'acmg';
                         if (eKey.value_type === 'T') {
                             row.addClass('textarea');
                         }
