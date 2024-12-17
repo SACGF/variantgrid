@@ -13,9 +13,13 @@ def _vep_gnomad_t2t(apps, _schema_editor):
     VEP_CUSTOM_GNOMAD_SV = 'S'
     VEP_CUSTOM_GNOMAD_SV_NAME = 'N'
 
+    skip_t2t = {"faf95", "faf99"}
+
     vep_custom = [VEP_CUSTOM_GNOMAD_4, VEP_CUSTOM_GNOMAD_SV, VEP_CUSTOM_GNOMAD_SV_NAME]
     new_records = []
     for cvf in ColumnVEPField.objects.filter(genome_build=grch38, vep_custom__in=vep_custom):
+        if cvf.source_field in skip_t2t:
+            continue
         cvf.pk = None
         column = cvf.column
         if column.endswith("_38"):
