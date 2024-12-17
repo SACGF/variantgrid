@@ -45,23 +45,25 @@ def check_vep() -> dict:
             "fix": fix_vav,
         }
 
+        run_vep_ok = False
         try:
-            vep_vav_kwargs = get_vep_variant_annotation_version_kwargs(genome_build)
-            run_vep_ok = True
-            if vav:
-                # we only bother reporting diff vs latest if we can even run VEP (as they have bigger problems then)
-                # This is only a warning as may not be an actual error - may want to just leave as old version
-                diff = vav_diff_vs_kwargs(vav, vep_vav_kwargs)
-                warning = None
-                if diff:
-                    warning = "Lastest VariantAnnotationVersion doesn't match current VEP settings " + \
-                              f"(warning only as this may be what you want). {diff=} Upgrade via '{create_vav_cmd}'"
-                vep_data[f"latest_variant_annotation_{genome_build}_matches_current_vep"] = {
-                    "valid": True,
-                    "warning": warning,
-                }
+            if vav.active:
+                vep_vav_kwargs = get_vep_variant_annotation_version_kwargs(genome_build)
+                run_vep_ok = True
+                if vav:
+                    # we only bother reporting diff vs latest if we can even run VEP (as they have bigger problems then)
+                    # This is only a warning as may not be an actual error - may want to just leave as old version
+                    diff = vav_diff_vs_kwargs(vav, vep_vav_kwargs)
+                    warning = None
+                    if diff:
+                        warning = "Lastest VariantAnnotationVersion doesn't match current VEP settings " + \
+                                  f"(warning only as this may be what you want). {diff=} Upgrade via '{create_vav_cmd}'"
+                    vep_data[f"latest_variant_annotation_{genome_build}_matches_current_vep"] = {
+                        "valid": True,
+                        "warning": warning,
+                    }
         except:
-            run_vep_ok = False
+            pass
 
         logging.disable(previous_level)
 
