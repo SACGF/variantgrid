@@ -193,7 +193,7 @@ def validate_variant_fields(sender, patch_meta: PatchMeta, key_map: EvidenceKeyM
 
                         variant_coordinate = hgvs_matcher.get_variant_coordinate(variant_value)
                     elif evidence_key == SpecialEKeys.VARIANT_COORDINATE:
-                        variant_coordinate = VariantCoordinate.from_string(variant_value)
+                        variant_coordinate = VariantCoordinate.from_string(variant_value, genome_build)
                     else:
                         raise ValueError(f'Unexpected evidence_key for variant matching {evidence_key}')
 
