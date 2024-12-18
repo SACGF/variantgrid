@@ -198,6 +198,7 @@ class BulkVEPVCFAnnotationInserter:
             "fathmm_pred_most_damaging": get_most_damaging_func(FATHMMPrediction),
             "gnomad2_liftover_af": format_pick_highest_float,
             "gnomad_popmax": str.upper,  # nfe -> NFE
+            "gnomad_non_par": format_empty_as_none,
             "hgnc_id": format_hgnc_id,
             "impact": get_choice_formatter_func(PathogenicityImpact.CHOICES),
             "interpro_domain": remove_empty_multiples,
@@ -436,8 +437,9 @@ class BulkVEPVCFAnnotationInserter:
             highest_af = sorted(gnomad_list, key=operator.itemgetter("gnomad_af"), reverse=True)[0]
             # Copy back overwriting old multi-value data with single values
             for k, v in highest_af.items():
+                if v == '.':
+                    v = None
                 transcript_data[k] = v
-
 
     def add_calculated_transcript_columns(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: TranscriptData):
         """ variant_coordinate - will only be set for symbolics """
@@ -469,8 +471,7 @@ class BulkVEPVCFAnnotationInserter:
 
     def _add_hemi_count(self, transcript_data: TranscriptData):
         """ gnomad_non_par=True means not on pseudoautosomal region on chrX, so XY count = hemizygous """
-        if non_par := transcript_data.get("gnomad_non_par"):
-            logging.info("NON PAR: %s", transcript_data)
+        if transcript_data.get("gnomad_non_par"):
             transcript_data["gnomad_hemi_count"] = transcript_data.get("gnomad_xy_ac")
 
     def _calculate_gnomad_sv_overlap_percentage(self, variant_coordinate: VariantCoordinate, transcript_data: TranscriptData):
