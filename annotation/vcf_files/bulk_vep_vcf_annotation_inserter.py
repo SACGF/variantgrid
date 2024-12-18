@@ -456,7 +456,8 @@ class BulkVEPVCFAnnotationInserter:
 
     def _add_hemi_count(self, transcript_data: TranscriptData):
         """ gnomad_non_par=True means not on pseudoautosomal region on chrX, so XY count = hemizygous """
-        if transcript_data.get("gnomad_non_par"):
+        if non_par := transcript_data.get("gnomad_non_par"):
+            logging.info("NON PAR: %s", transcript_data)
             transcript_data["gnomad_hemi_count"] = transcript_data.get("gnomad_xy_ac")
 
     def _calculate_gnomad_sv_overlap_percentage(self, variant_coordinate: VariantCoordinate, transcript_data: TranscriptData):
