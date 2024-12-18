@@ -79,6 +79,8 @@ class AnnotationRunColumns(DatatableConfig):
         if status_str := self.get_query_param("status"):
             if status_str == "outstanding":
                 qs = qs.exclude(status__in={AnnotationStatus.FINISHED})
+            elif status_str == 'errors':
+                qs = qs.filter(status=AnnotationStatus.ERROR)
         return qs
 
 
