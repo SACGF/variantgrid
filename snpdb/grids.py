@@ -28,7 +28,7 @@ from uicore.templatetags.js_tags import jsonify_for_js
 class VCFListGrid(JqGridUserRowConfig):
     model = VCF
     caption = 'VCFs'
-    fields = ["id", "name", "date", "import_status", "genome_build__name", "user__username", "source",
+    fields = ["id", "name", "vcf_url", "date", "import_status", "genome_build__name", "user__username", "source",
               "uploadedvcf__uploaded_file__import_source", "genotype_samples", "project__name", "cohort__import_status",
               "uploadedvcf__vcf_importer__name", 'uploadedvcf__vcf_importer__version']
     colmodel_overrides = {
@@ -38,6 +38,7 @@ class VCFListGrid(JqGridUserRowConfig):
                  'formatter_kwargs': {"icon_css_class": "vcf-icon",
                                       "url_name": "view_vcf",
                                       "url_object_column": "id"}},
+        "vcf_url": {'name': 'vcf_url', 'label': 'VCF URL', "model_field": False, 'hidden': True},
         'import_status': {'formatter': 'viewImportStatus'},
         "genome_build__name": {"label": "Genome Build"},
         'user__username': {'label': 'Uploaded by', 'width': 60},
@@ -62,6 +63,18 @@ class VCFListGrid(JqGridUserRowConfig):
                 genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
                 queryset = queryset.filter(genome_build=genome_build)
 
+        fake_number = "1234567890"
+        view_vcf_url = reverse('view_vcf', kwargs={"vcf_id": fake_number}).rstrip(fake_number)
+        view_vcf_url_prefix = get_url_from_view_path(view_vcf_url)
+        annotation_kwargs = {
+            "vcf_url": Func(
+                Value(view_vcf_url_prefix),
+                F("pk"),
+                function="CONCAT",
+                output_field=CharField(),
+            ),
+        }
+        queryset = queryset.annotate(**annotation_kwargs)
         self.queryset = queryset.order_by("-pk").values(*self.get_field_names())
         self.extra_config.update({'shrinkToFit': False,
                                   'sortname': 'id',
