@@ -301,7 +301,12 @@ class GenomeBuildPatchVersion(models.Model):
     patch_version = models.IntegerField(blank=True, null=True)
     """ The version of the patch, or None if the version is unknown, note this is different to an explicit patch_version of 0 """
 
-    GENOME_BUILD_VERSION_RE = re.compile(r"(?P<genome_build>[A-Za-z0-9]+)(?:[.]p(?P<patch_version>[0-9]+))?", re.IGNORECASE)
+    GENOME_BUILD_VERSION_REGEXES = [
+        # Standard eg GRCh37.p13 or GRCh38.p14
+        re.compile(r"(?P<genome_build>[A-Za-z0-9]+)(?:[.]p(?P<patch_version>[0-9]+))?", re.IGNORECASE),
+        # T2T-CHM13v2.0
+        re.compile(r"(?P<genome_build>[A-Za-z0-9-]+)(v(?P<patch_version>[0-9]+\.[0-9]+))", re.IGNORECASE),
+    ]
 
     class Meta:
         unique_together = ('genome_build', 'patch_version')
@@ -316,24 +321,25 @@ class GenomeBuildPatchVersion(models.Model):
 
     @staticmethod
     def get_or_create(name: str) -> 'GenomeBuildPatchVersion':
-        if match := GenomeBuildPatchVersion.GENOME_BUILD_VERSION_RE.match(name):
-            genome_build = GenomeBuild.get_name_or_alias(match.group('genome_build'))
-            patch_version: Optional[int] = None
-            normalized_name: str
-            if patch_version_str := match.group('patch_version'):
-                patch_version = int(patch_version_str)
-                normalized_name = f"{genome_build.name}.p{patch_version}"
-            else:
-                normalized_name = genome_build.name
+        for regex in GenomeBuildPatchVersion.GENOME_BUILD_VERSION_REGEXES:
+            if match := regex.match(name):
+                genome_build = GenomeBuild.get_name_or_alias(match.group('genome_build'))
+                patch_version: Optional[int] = None
+                normalized_name: str
+                if patch_version_str := match.group('patch_version'):
+                    patch_version = int(patch_version_str)
+                    normalized_name = f"{genome_build.name}.p{patch_version}"
+                else:
+                    normalized_name = genome_build.name
 
-            gbpv, _ = GenomeBuildPatchVersion.objects.get_or_create(
-                name=normalized_name,
-                genome_build=genome_build,
-                patch_version=patch_version
-            )
-            return gbpv
-        else:
-            raise ValueError(f"Invalid Genome Build Patch Version \"{name}\"")
+                gbpv, _ = GenomeBuildPatchVersion.objects.get_or_create(
+                    name=normalized_name,
+                    genome_build=genome_build,
+                    patch_version=patch_version
+                )
+                return gbpv
+
+        raise ValueError(f"Invalid Genome Build Patch Version '{name}'")
 
     @staticmethod
     def get_unspecified_patch_version_for(genome_build: GenomeBuild) -> 'GenomeBuildPatchVersion':
