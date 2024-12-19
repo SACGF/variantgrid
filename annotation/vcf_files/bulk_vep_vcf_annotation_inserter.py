@@ -431,15 +431,16 @@ class BulkVEPVCFAnnotationInserter:
         # T2T gnomad liftover has dupes, sometimes we get multiple entries in which case all will be dupes
         # We are going to pick the HIGHEST, as if there was a liftover error this will cause false positives after
         # gnomAD filter rather than false negatives (potentially throwing away real rare disease causing variants)
-        if "&" in transcript_data.get("gnomad_af", ""):
-            gnomad = {k: v for k, v in transcript_data.items() if k.startswith("gnomad")}
-            gnomad_list = split_dict_multi_values(gnomad, sep='&')
-            highest_af = sorted(gnomad_list, key=operator.itemgetter("gnomad_af"), reverse=True)[0]
-            # Copy back overwriting old multi-value data with single values
-            for k, v in highest_af.items():
-                if v == '.':
-                    v = None
-                transcript_data[k] = v
+        if gnomad_af := transcript_data.get("gnomad_af"):
+            if "&" in gnomad_af:
+                gnomad = {k: v for k, v in transcript_data.items() if k.startswith("gnomad")}
+                gnomad_list = split_dict_multi_values(gnomad, sep='&')
+                highest_af = sorted(gnomad_list, key=operator.itemgetter("gnomad_af"), reverse=True)[0]
+                # Copy back overwriting old multi-value data with single values
+                for k, v in highest_af.items():
+                    if v == '.':
+                        v = None
+                    transcript_data[k] = v
 
     def add_calculated_transcript_columns(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: TranscriptData):
         """ variant_coordinate - will only be set for symbolics """
