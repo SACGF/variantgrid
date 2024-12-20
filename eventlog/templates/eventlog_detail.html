@@ -2,5 +2,5 @@
 {% labelled label="ID" %}{{ event.pk }}{% endlabelled %}
 {% if event.filename %}{% labelled label="Filename" %}{{ event.filename }}{% endlabelled %}{% endif %}
 {% if event.details %}
-    <pre class="code">{{ event.details }}</pre>
+    <pre class="code">{{ event.details | emojify }}</pre>
 {% endif %}

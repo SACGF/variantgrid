@@ -127,9 +127,12 @@ def clean_string(input_string: str) -> str:
 
 
 def emoji_to_unicode(text_with_emojis) -> str:
+    # To see available emojis in Rich - python3 -m rich.emoji
     _replace = {
         ":male-doctor:": ":man_health_worker:",
-        ":female-doctor:": "woman_health_worker",
+        ":female-doctor:": ":woman_health_worker:",
+        ":face_with_cowboy_hat:": ":cowboy_hat_face:",
+        ":simple_smile:": ":smile:"
     }
     for old, new in _replace.items():
         text_with_emojis = text_with_emojis.replace(old, new)
