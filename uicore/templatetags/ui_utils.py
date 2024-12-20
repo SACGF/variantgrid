@@ -741,5 +741,5 @@ def _embed(context, embed: LazyRender, **kwargs):
 
 @register.filter(name='emojify')
 def emojify(text: str):
-    return SafeString(emoji_to_unicode(text))
+    return emoji_to_unicode(text)
 
