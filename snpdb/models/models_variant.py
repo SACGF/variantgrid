@@ -416,7 +416,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
 
         # Easiest way is to just convert to symbolic then check svlen
         vc_symbolic = self.as_internal_symbolic(genome_build)
-        if vc_symbolic.svlen and vc_symbolic.svlen >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
+        if vc_symbolic.svlen and abs(vc_symbolic.svlen) >= settings.VARIANT_SYMBOLIC_ALT_SIZE:
             vc = vc_symbolic
         elif self.is_symbolic():
             vc = self.as_external_explicit(genome_build)
