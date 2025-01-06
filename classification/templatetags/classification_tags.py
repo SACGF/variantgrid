@@ -152,6 +152,21 @@ def classification_groups(
     return tag_context
 
 
+@register.inclusion_tag("classification/tags/classification_groupings.html", takes_context=True)
+def classification_groupings(context, show_allele_origin_filter=True):
+    """
+    Shows the new database based classification grouping table. To filter the data implement a JavaScript method on the page
+    <script>
+        function classificationGroupingFilter(data) {
+            data.ontology_term_id = {{ term.id | jsonify }};
+        }
+    </script>
+    :param show_allele_origin_filter: True by default, set to False to hardcode the filtering to all records
+    """
+    return {"show_allele_origin_filter": show_allele_origin_filter}
+
+
+
 def render_ekey(val, key: Optional[str] = None, value_if_none: Optional[str] = None):
     if isinstance(val, ClassificationModification):
         val = val.get(key)
