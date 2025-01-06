@@ -6,7 +6,7 @@ from typing import Any, Optional
 from django.core.management import BaseCommand
 import re
 
-from classification.models import Classification
+from classification.models import Classification, EvidenceKeyMap
 from snpdb.models import Lab, Organization
 
 VERSION = 2
@@ -115,6 +115,10 @@ class Command(BaseCommand):
         keys = None
         if keys_str := options["keys"]:
             keys = set([key.strip() for key in keys_str.split(",")])
+            for key in keys:
+                if EvidenceKeyMap.cached_key(key).is_dummy:
+                    raise ValueError(f"Key {key} is not a valid evidence key")
+            print(f"Only on keys: {sorted(keys)}")
 
         bad_pattern = re.compile(pattern, flags=re.IGNORECASE if pattern_icase else 0)
         data_fixer = DataFixer(bad_pattern, replacement, keys=keys)
