@@ -187,9 +187,6 @@
             <h4>Classification Records</h4>
             Filtering on records with resolved conditions to <b>{{ term }}</b>, OMIM/MONDO equivalents and direct parent and children terms
             {% classification_groupings %}
-            {% comment %}
-            <table id="vc-grouping-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table"></table>
-            {% endcomment %}
         </div>
 
         {% if patients_qs.exists %}

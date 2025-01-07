@@ -30,7 +30,7 @@
 </style>
 <script>
     function filterGrid() {
-        $('#vc-grouping-datatable').DataTable().ajax.reload();
+        $('#vc-datatable').DataTable().ajax.reload();
     }
 
     function checkIfAllChecked(toggle, array) {
@@ -116,7 +116,7 @@
         data.allele_origin = blankToNull($("input[name='allele-origin-toggle']:checked").val());
         data.id_filter = blankToNull($('#id_filter').val());
         data.user = blankToNull($('#id_user').val());
-        let column = $('#vc-grouping-datatable').DataTable().column(3);
+        let column = $('#vc-datatable').DataTable().column(3);
         let germline_only = allele_origin_filter_value == "G";
         column.visible(!germline_only);
     }
@@ -240,7 +240,7 @@
                 {% endcomment %}
             </div>
 
-            <table id="vc-grouping-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table" data-adjust-columns="false"></table>
+            <table id="vc-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table" data-adjust-columns="false"></table>
             <div>
             Download as
                 <a class='hover-link download-link' onclick="downloadAs('csv')">CSV</a>
