@@ -3,12 +3,15 @@ from functools import reduce
 from typing import Optional, Any
 
 from django.conf import settings
-from django.db.models import F, QuerySet
+from django.db.models import F, QuerySet, Value, Func
 from django.db.models.aggregates import Count, Max
+from django.db.models.fields import CharField
 from django.db.models.query_utils import Q
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
+from library.django_utils import get_url_from_view_path
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import calculate_age, JsonDataType
@@ -25,7 +28,7 @@ from uicore.templatetags.js_tags import jsonify_for_js
 class VCFListGrid(JqGridUserRowConfig):
     model = VCF
     caption = 'VCFs'
-    fields = ["id", "name", "date", "import_status", "genome_build__name", "user__username", "source",
+    fields = ["id", "name", "vcf_url", "date", "import_status", "genome_build__name", "user__username", "source",
               "uploadedvcf__uploaded_file__import_source", "genotype_samples", "project__name", "cohort__import_status",
               "uploadedvcf__vcf_importer__name", 'uploadedvcf__vcf_importer__version']
     colmodel_overrides = {
@@ -35,6 +38,7 @@ class VCFListGrid(JqGridUserRowConfig):
                  'formatter_kwargs': {"icon_css_class": "vcf-icon",
                                       "url_name": "view_vcf",
                                       "url_object_column": "id"}},
+        "vcf_url": {'name': 'vcf_url', 'label': 'VCF URL', "model_field": False, 'hidden': True},
         'import_status': {'formatter': 'viewImportStatus'},
         "genome_build__name": {"label": "Genome Build"},
         'user__username': {'label': 'Uploaded by', 'width': 60},
@@ -59,6 +63,18 @@ class VCFListGrid(JqGridUserRowConfig):
                 genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
                 queryset = queryset.filter(genome_build=genome_build)
 
+        fake_number = "1234567890"
+        view_vcf_url = reverse('view_vcf', kwargs={"vcf_id": fake_number}).rstrip(fake_number)
+        view_vcf_url_prefix = get_url_from_view_path(view_vcf_url)
+        annotation_kwargs = {
+            "vcf_url": Func(
+                Value(view_vcf_url_prefix),
+                F("pk"),
+                function="CONCAT",
+                output_field=CharField(),
+            ),
+        }
+        queryset = queryset.annotate(**annotation_kwargs)
         self.queryset = queryset.order_by("-pk").values(*self.get_field_names())
         self.extra_config.update({'shrinkToFit': False,
                                   'sortname': 'id',
@@ -73,8 +89,9 @@ class VCFListGrid(JqGridUserRowConfig):
 class SamplesListGrid(JqGridUserRowConfig):
     model = Sample
     caption = 'Samples'
-    fields = ["id", "name", "het_hom_count", "vcf__date", "import_status", "vcf__genome_build__name", "variants_type",
-              "vcf__user__username", "vcf__source", "vcf__name", "vcf__project__name", "vcf__uploadedvcf__uploaded_file__import_source",
+    fields = ["id", "name", "sample_url", "het_hom_count", "vcf__date", "import_status",
+              "vcf__genome_build__name", "variants_type", "vcf__user__username", "vcf__source", "vcf__name", "vcf_url",
+              "vcf__project__name", "vcf__uploadedvcf__uploaded_file__import_source",
               "sample_gene_list_count", "activesamplegenelist__id",
               "mutationalsignature__id", "mutationalsignature__summary",
               "somaliersampleextract__somalierancestry__predicted_ancestry",
@@ -113,7 +130,10 @@ class SamplesListGrid(JqGridUserRowConfig):
         'patient__date_of_death': {'hidden': True},
         'het_hom_count': {'name': 'het_hom_count', "model_field": False, 'sorttype': 'int',
                           'label': 'Het/Hom Count'},
-        "specimen__reference_id": {'label': 'Specimen'}
+        "specimen__reference_id": {'label': 'Specimen'},
+        # These urls are only there for CSV export
+        "sample_url": {'name': 'sample_url', 'label': 'Sample URL', "model_field": False, 'hidden': True},
+        "vcf_url": {'name': 'vcf_url', 'label': 'VCF URL', "model_field": False, 'hidden': True},
     }
 
     def __init__(self, user, **kwargs):
@@ -159,9 +179,27 @@ class SamplesListGrid(JqGridUserRowConfig):
             sample_gene_list_count['hidden'] = True
             self._overrides['sample_gene_list_count'] = sample_gene_list_count
 
+        fake_number = "1234567890"
+        view_sample_url = reverse('view_sample', kwargs={"sample_id": fake_number}).rstrip(fake_number)
+        view_vcf_url = reverse('view_vcf', kwargs={"vcf_id": fake_number}).rstrip(fake_number)
+        view_sample_url_prefix = get_url_from_view_path(view_sample_url)
+        view_vcf_url_prefix = get_url_from_view_path(view_vcf_url)
+
         annotation_kwargs = {
             "sample_gene_list_count": Count("samplegenelist", distinct=True),
             "het_hom_count": F("samplestats__het_count") + F("samplestats__hom_count"),
+            "sample_url": Func(
+                Value(view_sample_url_prefix),
+                F("pk"),
+                function="CONCAT",
+                output_field=CharField(),
+            ),
+            "vcf_url": Func(
+                Value(view_vcf_url_prefix),
+                F("vcf_id"),
+                function="CONCAT",
+                output_field=CharField(),
+            ),
         }
         queryset = queryset.annotate(**annotation_kwargs)
         self.queryset = queryset.order_by("-pk").values(*self.get_field_names())

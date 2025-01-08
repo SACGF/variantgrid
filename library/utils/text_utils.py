@@ -34,6 +34,16 @@ def join_with_commas_and_ampersand(items: list[str], final_sep: str = "&") -> st
         return f" {final_sep} ".join([comma_sep, items[-1]])
 
 
+def split_dict_multi_values(data: dict[str, str], sep: str) -> list[dict[str, str]]:
+    any_value = next(iter(data.values()))
+    num_records = len(any_value.split(sep))
+    dict_list = [{} for _ in range(num_records)]
+    for k, v in data.items():
+        for i, v_part in enumerate(v.split(sep)):
+            dict_list[i][k] = v_part
+    return dict_list
+
+
 def limit_str(text: str, limit: int) -> str:
     if len(text) > limit:
         text = text[:limit] + "..."
@@ -117,9 +127,12 @@ def clean_string(input_string: str) -> str:
 
 
 def emoji_to_unicode(text_with_emojis) -> str:
+    # To see available emojis in Rich - python3 -m rich.emoji
     _replace = {
         ":male-doctor:": ":man_health_worker:",
-        ":female-doctor:": "woman_health_worker",
+        ":female-doctor:": ":woman_health_worker:",
+        ":face_with_cowboy_hat:": ":cowboy_hat_face:",
+        ":simple_smile:": ":smile:"
     }
     for old, new in _replace.items():
         text_with_emojis = text_with_emojis.replace(old, new)

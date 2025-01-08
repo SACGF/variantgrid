@@ -23,7 +23,7 @@ from library.django_utils import get_model_fields
 from library.django_utils.django_file_utils import get_import_processing_filename, get_import_processing_dir
 from library.genomics import overlap_fraction, Range, parse_gnomad_coord
 from library.log_utils import log_traceback
-from library.utils import invert_dict
+from library.utils import invert_dict, split_dict_multi_values
 from snpdb.models import GenomeBuild, VariantCoordinate
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
@@ -198,6 +198,7 @@ class BulkVEPVCFAnnotationInserter:
             "fathmm_pred_most_damaging": get_most_damaging_func(FATHMMPrediction),
             "gnomad2_liftover_af": format_pick_highest_float,
             "gnomad_popmax": str.upper,  # nfe -> NFE
+            "gnomad_non_par": format_empty_as_none,
             "hgnc_id": format_hgnc_id,
             "impact": get_choice_formatter_func(PathogenicityImpact.CHOICES),
             "interpro_domain": remove_empty_multiples,
@@ -426,6 +427,21 @@ class BulkVEPVCFAnnotationInserter:
                     logging.warning(f"Could not find transcript: '{t_id}'")
         return transcript_id, transcript_version_id
 
+    def _fix_multiple_values(self, transcript_data: TranscriptData):
+        # T2T gnomad liftover has dupes, sometimes we get multiple entries in which case all will be dupes
+        # We are going to pick the HIGHEST, as if there was a liftover error this will cause false positives after
+        # gnomAD filter rather than false negatives (potentially throwing away real rare disease causing variants)
+        if gnomad_af := transcript_data.get("gnomad_af"):
+            if "&" in gnomad_af:
+                gnomad = {k: v for k, v in transcript_data.items() if k.startswith("gnomad")}
+                gnomad_list = split_dict_multi_values(gnomad, sep='&')
+                highest_af = sorted(gnomad_list, key=operator.itemgetter("gnomad_af"), reverse=True)[0]
+                # Copy back overwriting old multi-value data with single values
+                for k, v in highest_af.items():
+                    if v == '.':
+                        v = None
+                    transcript_data[k] = v
+
     def add_calculated_transcript_columns(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: TranscriptData):
         """ variant_coordinate - will only be set for symbolics """
 
@@ -586,6 +602,7 @@ class BulkVEPVCFAnnotationInserter:
                 if representative_transcript:
                     variant_data = self.vep_to_db_dict(vep_transcript_data, self.variant_only_columns)
                     variant_data.update(transcript_data)
+                    self._fix_multiple_values(variant_data)
                     self.add_calculated_variant_annotation_columns(variant_coordinate, variant_data)
                     # If we're using custom COSMIC vcf, merge with those from VEP existing variation
                     if custom_vcf_cosmic_ids := vep_transcript_data.get("COSMIC"):

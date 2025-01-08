@@ -1,6 +1,7 @@
 """ variantgrid.com """
 
 # IMPORTANT : THE BELOW IMPORTS ARE USED TO APPLY THEIR RESPECTIVE SETTINGS VALUES
+from variantgrid.settings.components.annotation_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.celery_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.default_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.seqauto_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
@@ -12,7 +13,7 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 SITE_ID = 3  # vg.com
 
 WEB_HOSTNAME = 'variantgrid.com'
-WEB_IP = '54.253.175.206'
+WEB_IP = '3.27.144.228'
 
 DEBUG = False
 PYTHON_COMMAND = os.path.join(BASE_DIR, "env", "bin", "python3")
@@ -29,6 +30,7 @@ ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.expanduser("~/perlbrew_runner.sh
 _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "fasta")
 
 ANNOTATION[BUILD_GRCH38]["enabled"] = True
+ANNOTATION[BUILD_T2TV2]["enabled"] = True
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_BIG_DISK_BASE_DIR, 'annotation_scratch')
 
 GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID = 1  # MedEx

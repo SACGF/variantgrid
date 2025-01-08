@@ -84,6 +84,7 @@ def annotation_build_detail(request, genome_build_name):
         "annotation_consortium": genome_build.settings["annotation_consortium"],
     }
 
+    expected_somalier_sites_name = None
     reference_ok = False
     try:
         annotation_details["reference_fasta"] = genome_build.reference_fasta
@@ -145,7 +146,6 @@ def annotation_build_detail(request, genome_build_name):
         if settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED:
             annotation_sub_components.append(gene_annotation_counts)
 
-        expected_somalier_sites_name = None
         if settings.SOMALIER.get("enabled"):
             somalier_cfg = SomalierConfig()
             try:

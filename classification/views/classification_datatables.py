@@ -1,3 +1,4 @@
+import logging
 import operator
 from functools import cached_property, reduce
 from typing import Dict, Any, List, Optional
@@ -40,11 +41,14 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         def get_preferred_chgvs_json() -> Dict:
             nonlocal row
             for index, genome_build in enumerate(self.genome_build_prefs):
-                if c_hgvs_string := row.get(ClassificationModification.column_name_for_build(genome_build)):
-                    c_hgvs = CHGVS(c_hgvs_string)
-                    c_hgvs.genome_build = genome_build
-                    c_hgvs.is_desired_build = index == 0
-                    return c_hgvs.to_json()
+                try:
+                    if c_hgvs_string := row.get(ClassificationModification.column_name_for_build(genome_build)):
+                        c_hgvs = CHGVS(c_hgvs_string)
+                        c_hgvs.genome_build = genome_build
+                        c_hgvs.is_desired_build = index == 0
+                        return c_hgvs.to_json()
+                except ValueError:
+                    pass
 
             c_hgvs = CHGVS(row.get('published_evidence__c_hgvs__value'))
             c_hgvs.is_normalised = False
@@ -115,7 +119,18 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         super().__init__(request)
 
         user_settings = UserSettings.get_for_user(self.user)
-        genome_build_preferred = self.genome_build_prefs[0]
+        # Only GRCh37 and GRCh38 are currently supported. If user has T2T we are going to fall back
+        c_hgvs = None
+        genomic_sort = None
+        for genome_build in self.genome_build_prefs:
+            try:
+                c_hgvs = ClassificationModification.column_name_for_build(genome_build)
+                genomic_sort = ClassificationModification.column_name_for_build(genome_build, 'genomic_sort')
+            except ValueError:
+                pass
+        if not (c_hgvs and genomic_sort):
+            possible_builds = ', '.join((str(gb) for gb in self.genome_build_prefs))
+            raise ValueError(f"Couldn't find c_hgvs and genomic_sort in builds: {possible_builds}")
 
         self.rich_columns = [
             RichColumn(
@@ -146,9 +161,8 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 orderable=True
             ),
             RichColumn(
-                key=ClassificationModification.column_name_for_build(genome_build_preferred),
-                # sort_keys=['variant_sort', 'c_hgvs'],  # annotated column
-                sort_keys=[ClassificationModification.column_name_for_build(genome_build_preferred, 'genomic_sort'), 'c_hgvs'],
+                key=c_hgvs,
+                sort_keys=[genomic_sort, 'c_hgvs'],
                 name='c_hgvs',
                 label=f'HGVS ({genome_build_preferred.name})',
                 renderer=self.render_c_hgvs,
@@ -268,8 +282,11 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         # user's normalised preference (e.g. 37), the alternative normalised (e.g. 38) the imported c.hgvs
         whens = []
         for genome_build in self.genome_build_prefs:
-            column_name = ClassificationModification.column_name_for_build(genome_build)
-            whens.append(When(**{f'{column_name}__isnull': False, 'then': column_name}))
+            try:
+                column_name = ClassificationModification.column_name_for_build(genome_build)
+                whens.append(When(**{f'{column_name}__isnull': False, 'then': column_name}))
+            except ValueError as ve:
+                logging.warning(ve)
         case = Case(*whens, default=KeyTextTransform('value', KeyTransform('c_hgvs', 'published_evidence')),
                     output_field=TextField())
         initial_qs = initial_qs.annotate(c_hgvs=case)

@@ -690,10 +690,16 @@ class ImportedAlleleInfo(TimeStampedModel):
         return [build for build in GenomeBuild.builds_with_annotation() if build in [GenomeBuild.grch37(), GenomeBuild.grch38()]]
 
     def __getitem__(self, item: GenomeBuild) -> Optional[ResolvedVariantInfo]:
-        return getattr(self, ImportedAlleleInfo.__genome_build_to_attr(item))
+        try:
+            return getattr(self, ImportedAlleleInfo.__genome_build_to_attr(item))
+        except ValueError:
+            return None
 
     def __setitem__(self, key: GenomeBuild, value: Optional[ResolvedVariantInfo]):
-        setattr(self, ImportedAlleleInfo.__genome_build_to_attr(key), value)
+        try:
+            setattr(self, ImportedAlleleInfo.__genome_build_to_attr(key), value)
+        except ValueError:
+            return None
 
     @property
     def resolved_builds(self) -> list[ResolvedVariantInfo]:
@@ -789,7 +795,11 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     @property
     def variant_info_for_imported_genome_build(self) -> Optional[ResolvedVariantInfo]:
-        return self[self.imported_genome_build_patch_version.genome_build]
+        try:
+            vi = self[self.imported_genome_build_patch_version.genome_build]
+        except ValueError:
+            vi = None
+        return vi
 
     @property
     def variant_info_for_lifted_over_genome_build(self) -> Optional[ResolvedVariantInfo]:

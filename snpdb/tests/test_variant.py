@@ -102,3 +102,12 @@ class VariantTestCase(TestCase):
                                svlen=settings.VARIANT_SYMBOLIC_ALT_SIZE-1)
         vc = vc.as_symbolic_or_explicit_according_to_size(self.grch37)
         self.assertIsNone(vc.svlen)
+
+    def test_as_symbolic_or_explicit_according_to_size(self):
+        # test for issue #1214 - however we get there, it should end up the same
+        vc_symbolic = VariantCoordinate(chrom='1', position=1000000, ref='T', alt='<DUP>', svlen=999)
+        vc_explicit = vc_symbolic.as_external_explicit(self.grch37)
+
+        vc_from_symbolic = vc_symbolic.as_symbolic_or_explicit_according_to_size(self.grch37)
+        vc_from_explicit = vc_explicit.as_symbolic_or_explicit_according_to_size(self.grch37)
+        self.assertEqual(vc_from_symbolic, vc_from_explicit)

@@ -75,14 +75,14 @@
 
         {% for genome_build in genome_builds %}
             <script>
-                function datatableFilter{{ genome_build.name }}(data) {
+                function datatableFilter{{ genome_build.name|js_symbol }}(data) {
                     data.genome_build_name = "{{ genome_build.name }}";
                 }
             </script>
 
             <div style="margin-top: 60px">
                 <h4>Failed Liftover to {{ genome_build }}</h4>
-                <table data-datatable-url="{% url 'allele_liftover_failures_datatable' %}" data-datatable-data='datatableFilter{{ genome_build.name }}' class="import-table sticky-header" responsive="true"></table>
+                <table data-datatable-url="{% url 'allele_liftover_failures_datatable' %}" data-datatable-data='datatableFilter{{ genome_build.name|js_symbol }}' class="import-table sticky-header" responsive="true"></table>
             </div>
         {% endfor %}
     </div>

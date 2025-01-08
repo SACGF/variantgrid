@@ -411,6 +411,11 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
 def get_clingen_allele_for_variant_coordinate(genome_build: GenomeBuild, variant_coordinate: VariantCoordinate,
                                               hgvs_matcher, clingen_api: ClinGenAlleleRegistryAPI = None) -> ClinGenAllele:
     """ hgvs_converter_func - only used if we need it - to reduce circular dependencies on HGVS """
+
+    if variant_coordinate.max_sequence_length >= settings.CLINGEN_ALLELE_REGISTRY_MAX_ALLELE_SIZE:
+        msg = f"No ClinGenAllele possible for {variant_coordinate=}"
+        raise ClinGenAlleleTooLargeException(msg)
+
     try:
         # Use variant if we have it in the system so we can lookup cache, or store result
         variant = Variant.get_from_variant_coordinate(variant_coordinate, genome_build)

@@ -32,7 +32,9 @@ def cyvcf2_header_get(cyvcf2_reader, key, default=None):
 
 def cyvcf2_get_contig_lengths_dict(cyvcf2_reader):
     try:
-        return dict(zip(cyvcf2_reader.seqnames, cyvcf2_reader.seqlens))
+        # For some versions of HTSLib it seems that if the VCF has eg contigs as "chr1" and records as "1" it will
+        # add in fake contigs into the header - so skip those
+        return {k: v for k,v in zip(cyvcf2_reader.seqnames, cyvcf2_reader.seqlens) if v != -1}
     except AttributeError:
         return {}
 

@@ -60,6 +60,16 @@ def jsstring(text):
         return mark_safe(text)
     return ''
 
+@register.filter
+def js_symbol(value):
+    """ Used for making a valid symbol (eg function name out of T2T-CHM13v2.0) """
+    # Replace invalid characters with underscores
+    name = re.sub(r'[^a-zA-Z0-9_$]', '_', value)
+    # Ensure it starts with a valid character
+    if not re.match(r'^[a-zA-Z_$]', name):
+        name = f'_{name}'
+    return name
+
 
 @register.filter
 def limit_length(text, limit=100):

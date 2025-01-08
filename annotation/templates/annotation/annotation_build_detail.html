@@ -22,7 +22,7 @@
                     </code>
                 {% endif %}
                 {% install-instructions "Sync with current VEP" installed=details.sync_with_current_vep %}
-                    <code>{{ python_command }} manage.py create_new_variant_annotation_version --genome_build={{ build_name }}</code>
+                    <code>{{ python_command }} manage.py create_new_variant_annotation_version --genome-build={{ build_name }}</code>
                 {% endinstall-instructions %}
             {% endlabelled %}
             {% labelled label="Genome Fasta" %}

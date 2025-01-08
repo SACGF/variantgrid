@@ -82,10 +82,20 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
     def get_name_or_alias(build_name) -> 'GenomeBuild':
         """ Get by insensitive name or alias """
 
-        build_no_patch = build_name.split(".", 1)[0]
-        q = Q(name__iexact=build_name) | Q(alias__iexact=build_name)
-        q_no_patch = Q(name__iexact=build_no_patch) | Q(alias__iexact=build_no_patch)
-        return GenomeBuild.objects.get(q | q_no_patch, enabled=True)
+        q_or_list = [
+            Q(name__iexact=build_name),
+            Q(alias__iexact=build_name)
+        ]
+        try:
+            build_no_patch = GenomeBuildPatchVersion.get_build_no_patch(build_name)
+            q_or_list.extend([
+                Q(name__iexact=build_no_patch),
+                Q(alias__iexact=build_no_patch),
+            ])
+        except ValueError:
+            pass
+        q = reduce(operator.or_, q_or_list)
+        return GenomeBuild.objects.get(q, enabled=True)
 
     @staticmethod
     def detect_from_filename(filename) -> Optional['GenomeBuild']:
@@ -301,7 +311,13 @@ class GenomeBuildPatchVersion(models.Model):
     patch_version = models.IntegerField(blank=True, null=True)
     """ The version of the patch, or None if the version is unknown, note this is different to an explicit patch_version of 0 """
 
-    GENOME_BUILD_VERSION_RE = re.compile(r"(?P<genome_build>[A-Za-z0-9]+)(?:[.]p(?P<patch_version>[0-9]+))?", re.IGNORECASE)
+    # Standard eg GRCh37.p13 (build=GRCh37, patch=13) or GRCh38.p14 (build=GRCh38, patch=14
+    GRCH_WITH_PATCH_REGEX = re.compile(r"(?P<genome_build>GRCh[0-9]+)(?:[.]p(?P<patch_version>[0-9]+))?", re.IGNORECASE)
+    GENOME_BUILD_VERSION_REGEXES = [
+        GRCH_WITH_PATCH_REGEX,
+        # T2T-CHM13v2.0 is ALL BUILD, v2.0 is not a patch
+        re.compile(r"(?P<genome_build>T2T-CHM[0-9]+v[0-9]+\.[0-9]+)", re.IGNORECASE),
+    ]
 
     class Meta:
         unique_together = ('genome_build', 'patch_version')
@@ -315,25 +331,33 @@ class GenomeBuildPatchVersion(models.Model):
         return sort_key(self) < sort_key(other)
 
     @staticmethod
-    def get_or_create(name: str) -> 'GenomeBuildPatchVersion':
-        if match := GenomeBuildPatchVersion.GENOME_BUILD_VERSION_RE.match(name):
-            genome_build = GenomeBuild.get_name_or_alias(match.group('genome_build'))
-            patch_version: Optional[int] = None
-            normalized_name: str
-            if patch_version_str := match.group('patch_version'):
-                patch_version = int(patch_version_str)
-                normalized_name = f"{genome_build.name}.p{patch_version}"
-            else:
-                normalized_name = genome_build.name
+    def get_build_no_patch(build_name: str) -> str:
+        for regex in GenomeBuildPatchVersion.GENOME_BUILD_VERSION_REGEXES:
+            if match := regex.match(build_name):
+                return match.group("genome_build")
+        raise ValueError(f"Invalid Genome Build (with optional patch) '{build_name}'")
 
-            gbpv, _ = GenomeBuildPatchVersion.objects.get_or_create(
-                name=normalized_name,
-                genome_build=genome_build,
-                patch_version=patch_version
-            )
-            return gbpv
-        else:
-            raise ValueError(f"Invalid Genome Build Patch Version \"{name}\"")
+    @staticmethod
+    def get_or_create(name: str) -> 'GenomeBuildPatchVersion':
+        for regex in GenomeBuildPatchVersion.GENOME_BUILD_VERSION_REGEXES:
+            if match := regex.match(name):
+                genome_build = GenomeBuild.get_name_or_alias(match.group('genome_build'))
+                patch_version: Optional[int] = None
+                normalized_name: str
+                if patch_version_str := match.groupdict().get('patch_version'):
+                    patch_version = int(patch_version_str)
+                    normalized_name = f"{genome_build.name}.p{patch_version}"
+                else:
+                    normalized_name = genome_build.name
+
+                gbpv, _ = GenomeBuildPatchVersion.objects.get_or_create(
+                    name=normalized_name,
+                    genome_build=genome_build,
+                    patch_version=patch_version
+                )
+                return gbpv
+
+        raise ValueError(f"Invalid Genome Build Patch Version '{name}'")
 
     @staticmethod
     def get_unspecified_patch_version_for(genome_build: GenomeBuild) -> 'GenomeBuildPatchVersion':

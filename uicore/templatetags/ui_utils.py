@@ -15,7 +15,7 @@ from django.utils.safestring import SafeString
 from library.enums.log_level import LogLevel
 from library.log_utils import log_level_to_bootstrap
 from library.preview_request import PreviewModelMixin
-from library.utils import diff_text, html_id_safe
+from library.utils import diff_text, html_id_safe, emoji_to_unicode
 from snpdb.admin_utils import get_admin_url
 from uicore.views.ajax_form_view import LazyRender
 from variantgrid.perm_path import get_visible_url_names
@@ -739,3 +739,9 @@ class IfCanEditTag(template.Node):
 @register.simple_tag(name="embed", takes_context=True)
 def _embed(context, embed: LazyRender, **kwargs):
     return embed.embed(context.request, **kwargs)
+
+
+@register.filter(name='emojify')
+def emojify(text: str):
+    return emoji_to_unicode(text)
+

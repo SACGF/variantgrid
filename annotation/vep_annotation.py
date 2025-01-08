@@ -345,7 +345,7 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
             gnomad_filename = vep_config[cvf.get_vep_custom_display().lower()]
             if os.path.exists(gnomad_filename):
                 gnomad_basename = os.path.basename(gnomad_filename)
-                if m := re.match(r"^gnomad(.*?)_(GRCh37|GRCh38|hg19|hg38)", gnomad_basename, flags=re.IGNORECASE):
+                if m := re.match(r"^gnomad(.*?)_(GRCh37|GRCh38|hg19|hg38|T2T-CHM13v2.0)", gnomad_basename, flags=re.IGNORECASE):
                     kwargs["gnomad"] = m.group(1)
                 else:
                     msg = f"Couldn't determine gnomAD version from file: {gnomad_basename}"

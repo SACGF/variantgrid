@@ -25,5 +25,5 @@ $(document).ready(function() {
 
 <div>
 {% user_data_grid_filter 'vcf' 'VCFs' %}
-{% jqgrid 'vcfs_grid' 'vcf' search=False delete=True template_name='snpdb/grids/vcfs_grid.html' init_func='vcfInitFunc' %}
+{% jqgrid 'vcfs_grid' 'vcf' search=False delete=True download_grid_json_as_csv=True template_name='snpdb/grids/vcfs_grid.html' init_func='vcfInitFunc' %}
 </div>
