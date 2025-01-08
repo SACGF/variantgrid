@@ -15,7 +15,7 @@ from django.utils.safestring import SafeString
 from library.enums.log_level import LogLevel
 from library.log_utils import log_level_to_bootstrap
 from library.preview_request import PreviewModelMixin
-from library.utils import diff_text, html_id_safe, emoji_to_unicode
+from library.utils import diff_text, html_id_safe, emoji_to_unicode, format_diff_text
 from snpdb.admin_utils import get_admin_url
 from uicore.views.ajax_form_view import LazyRender
 from variantgrid.perm_path import get_visible_url_names
@@ -632,7 +632,7 @@ def bytes(bytes: Optional[int]):
 
 @register.inclusion_tag(name="diff_text", filename="uicore/tags/diff_text.html")
 def diff_text_html(a: str, b: str):
-    return {"diffs": diff_text(a, b), "before": a, "after": b}
+    return {"diffs": diff_text(a, b), "before": format_diff_text(a), "after": format_diff_text(b)}
 
 
 @register.inclusion_tag(takes_context=True, name="admin_link", filename="uicore/tags/admin_link.html")
