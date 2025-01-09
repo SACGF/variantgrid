@@ -21,7 +21,6 @@ from annotation.models import Citation
 from annotation.models.models import AnnotationVersion, DBNSFPGeneAnnotationVersion, DBNSFPGeneAnnotation
 from classification.models import ClassificationModification
 from classification.models.classification_utils import classification_gene_symbol_filter
-from classification.views.classification_datatables import ClassificationColumns
 from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
@@ -384,7 +383,6 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
     )
     context["show_wiki"] = settings.VIEW_GENE_WIKI
     context["show_annotation"] = settings.VARIANT_DETAILS_SHOW_ANNOTATION
-    context["datatable_config"] = ClassificationColumns(request)
 
     return render(request, "genes/view_gene_symbol.html", context)
 
