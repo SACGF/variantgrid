@@ -114,6 +114,10 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         user_settings = UserSettings.get_for_user(self.user)
         return GenomeBuild.builds_with_annotation_priority(user_settings.default_genome_build)
 
+    @cached_property
+    def genome_build_preferred(self) -> GenomeBuild:
+        return self.genome_build_prefs[0]
+
     def __init__(self, request: HttpRequest):
         self.term_cache: Dict[str, OntologyTerm] = {}
         super().__init__(request)
@@ -164,7 +168,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 key=c_hgvs,
                 sort_keys=[genomic_sort, 'c_hgvs'],
                 name='c_hgvs',
-                label=f'HGVS ({genome_build_preferred.name})',
+                label=f'HGVS ({self.genome_build_preferred.name})',
                 renderer=self.render_c_hgvs,
                 client_renderer='VCTable.hgvs',
                 orderable=True,
