@@ -959,7 +959,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return ', '.join(evidence_strings)
 
     @staticmethod
-    def create(user: User,
+    def create_with_response(user: User,
                lab: Lab,
                lab_record_id: Optional[str] = None,
                data: Optional[Dict[str, Any]] = None,
@@ -967,7 +967,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                source: SubmissionSource = SubmissionSource.VARIANT_GRID,
                make_fields_immutable=False,
                populate_with_defaults=False,
-               **kwargs) -> 'Classification':
+               **kwargs) -> Tuple['Classification', ClassificationPatchResponse]:
         """
             :param user: The user creating this Classification
             :param lab: The lab the recod will be created under
@@ -995,7 +995,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if e_key.default_value is not None and e_key.key not in data:
                     data[e_key.key] = e_key.default_value
 
-        record.patch_value(data,
+        response = record.patch_value(data,
                            user=user,
                            clear_all_fields=True,
                            source=source,
@@ -1015,7 +1015,32 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 pass
                 # in case of collision, leave the uuid
 
-        return record
+        return record, response
+
+    @staticmethod
+    def create(user: User,
+               lab: Lab,
+               lab_record_id: Optional[str] = None,
+               data: Optional[Dict[str, Any]] = None,
+               save: bool = True,
+               source: SubmissionSource = SubmissionSource.VARIANT_GRID,
+               make_fields_immutable=False,
+               populate_with_defaults=False,
+               **kwargs) -> 'Classification':
+        """
+        Deprecated use create_with_response instead as otherwise so
+        """
+        return Classification.create_with_response(
+            user=user,
+            lab=lab,
+            lab_record_id=lab_record_id,
+            data=data,
+            save=save,
+            source=source,
+            make_fields_immutable=make_fields_immutable,
+            populate_with_defaults=populate_with_defaults,
+            **kwargs
+        )[0]
 
     def save(self, **kwargs):
         """ The post_save event is fired after save(), for other logic that depends on Classifications
@@ -1471,7 +1496,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     remove_api_immutable=False,
                     initial_data=False,
                     revalidate_all=False,
-                    ignore_if_only_patching: Optional[Set[str]] = None) -> ClassificationPatchResponse:
+                    ignore_if_only_patching: Optional[Set[str]] = None,
+                    patch_known_keys_only=True) -> ClassificationPatchResponse:
         """
             Creates a new ClassificationModification if the patch values are different to the current values
             Patching a value with the same value has no effect
@@ -1498,8 +1524,20 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         use_evidence = VCDataDict(copy.deepcopy(self.evidence),
                                   evidence_keys=self.evidence_keys)  # deep copy so don't accidentally mutate the data
+
         patch = VCDataDict(data=EvidenceMixin.to_patch(patch),
                            evidence_keys=self.evidence_keys)  # the patch we're going to apply on-top of the evidence
+
+        if patch_known_keys_only:
+            unrecognised_keys: set[str] = set()
+            for key in patch.data.keys():
+                if self.evidence_keys.get(key).is_dummy:
+                    unrecognised_keys.add(key)
+            if unrecognised_keys:
+                for key in unrecognised_keys:
+                    del patch.data[key]
+                sorted_bad_keys = ", ".join(sorted(unrecognised_keys))
+                patch_response.append_warning("unrecognised_key", f"The following keys are not valid ({sorted_bad_keys})")
 
         # make sure gene symbol is uppercase
         # need to do it here because it might get used in c.hgvs
