@@ -2,7 +2,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Union, Optional
+from typing import Union, Optional, Any
 
 from django.conf import settings
 from django.db import transaction
@@ -18,7 +18,7 @@ from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDa
 
 # increment if you change the logic of parsing ontology terms from PanelApp
 # which will then effectively nullify the cache so the new logic is run
-PANEL_APP_API_PROCESSOR_VERSION = 10
+PANEL_APP_API_PROCESSOR_VERSION = 11
 # with look ahead and behind to make sure we're not in a 7-digit number
 ABANDONED_OMIM_RE = re.compile('(?<![0-9])([0-9]{6})(?![0-9])')
 
@@ -38,7 +38,7 @@ class PanelAppResult:
     hash_str: str
 
     @staticmethod
-    def parse_data(raw_data: dict):
+    def parse_data(raw_data: dict) -> 'PanelAppResult':
         phenotypes = raw_data.get('phenotypes', [])
         evidences = raw_data.get('evidence', [])
         hash_str = ""
@@ -84,6 +84,9 @@ def _update_gene_relations(gene_symbol: str):
     if not settings.GENE_RELATION_PANEL_APP_LIVE_UPDATE:
         return
 
+    def is_empty_results(data: Any):
+        return isinstance(data, list) and len(data) == 0
+
     # note that we only check PanelApp here, as other imports are done by file
     try:
         hgnc_term = OntologyTerm.get_gene_symbol(gene_symbol)
@@ -98,7 +101,24 @@ def _update_gene_relations(gene_symbol: str):
             if ontology_builder.versioned:
                 raise ValueError("Can't do PanelAppAU with a versioned OntologyBuilder")
 
+            alias_symbol: Optional[str] = None
             results_json = get_panel_app_results_by_gene_symbol_json(server=panel_app, gene_symbol=gene_symbol)
+            if is_empty_results(results_json):
+                # try aliases see if any of those work
+                try:
+                    gene_symbol_obj = GeneSymbol.objects.get(symbol=gene_symbol)
+                    for alias in gene_symbol_obj.alias_meta.aliases_in:
+                        if alias.other_symbol_in_database and not alias.different_genes:
+                            alias_results_json = get_panel_app_results_by_gene_symbol_json(server=panel_app,
+                                                                                     gene_symbol=alias.other_symbol)
+                            if not is_empty_results(alias_results_json):
+                                alias_symbol = alias.other_symbol
+                                report_message(message=f"PanelAppAU no results for {gene_symbol}, substituting alias {alias.other_symbol}")
+                                results_json = alias_results_json
+                                break
+                except GeneSymbol.DoesNotExist:
+                    pass
+
             response_hash = md5sum_str(str(results_json))
             ontology_builder.ensure_hash_changed(data_hash=response_hash)
 
@@ -139,14 +159,19 @@ def _update_gene_relations(gene_symbol: str):
                             all_data.append(parsed_result.raw_data)
                             unique_raw_data.add(parsed_result.hash_str)
 
+                    extra = {
+                        "strongest_classification": max_strength.label,
+                        "phenotypes_and_evidence": all_data
+                    }
+                    if alias_symbol:
+                        extra["using_alias"] = alias_symbol
+
                     ontology_builder.add_ontology_relation(
                         source_term_id=term.id,
                         dest_term_id=hgnc_term.id,
                         relation=OntologyRelation.PANEL_APP_AU,
-                        extra={
-                            "strongest_classification": max_strength.label,
-                            "phenotypes_and_evidence": all_data
-                        })
+                        extra=extra
+                    )
                 ontology_builder.complete(verbose=False)
 
         except OntologyBuilderDataUpToDateException:
