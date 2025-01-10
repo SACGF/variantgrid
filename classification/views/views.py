@@ -929,7 +929,7 @@ def allele_groupings(request, lab_id: Optional[Union[str, int]] = None):
 
 
 def view_classification_grouping_detail(request, classification_grouping_id: int):
-    grouping = ClassificationGrouping.objects.get(pk=classification_grouping_id)
+    grouping = ClassificationGrouping.objects.select_related('latest_allele_info').get(pk=classification_grouping_id)
     grouping.check_can_view(request.user)
     return render_ajax_view(request, 'classification/classification_grouping_detail.html', {
         "classification_grouping": grouping

@@ -488,7 +488,6 @@ class ImportedAlleleInfo(TimeStampedModel):
             raise ValueError(f'No cached column for genome build {genome_build.pk}')
         return f'{prefix}__{build_str}__{suffix}'
 
-
     @property
     def variant_coordinates_imported_and_resolved(self) -> tuple[VariantCoordinate, VariantCoordinate]:
         imported_vc: Optional[VariantCoordinate] = self.variant_coordinate_obj
@@ -690,16 +689,22 @@ class ImportedAlleleInfo(TimeStampedModel):
         return [build for build in GenomeBuild.builds_with_annotation() if build in [GenomeBuild.grch37(), GenomeBuild.grch38()]]
 
     def __getitem__(self, item: GenomeBuild) -> Optional[ResolvedVariantInfo]:
-        try:
-            return getattr(self, ImportedAlleleInfo.__genome_build_to_attr(item))
-        except ValueError:
-            return None
+        if isinstance(item, GenomeBuild):
+            try:
+                return getattr(self, ImportedAlleleInfo.__genome_build_to_attr(item))
+            except ValueError:
+                return None
+        else:
+            raise ValueError("Can only getitem with GenomeBuild")
 
     def __setitem__(self, key: GenomeBuild, value: Optional[ResolvedVariantInfo]):
-        try:
-            setattr(self, ImportedAlleleInfo.__genome_build_to_attr(key), value)
-        except ValueError:
-            return None
+        if isinstance(key, GenomeBuild):
+            try:
+                setattr(self, ImportedAlleleInfo.__genome_build_to_attr(key), value)
+            except ValueError:
+                return None
+        else:
+            raise ValueError("Can only setitem with GenomeBuild")
 
     @property
     def resolved_builds(self) -> list[ResolvedVariantInfo]:

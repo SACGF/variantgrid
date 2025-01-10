@@ -745,3 +745,15 @@ def _embed(context, embed: LazyRender, **kwargs):
 def emojify(text: str):
     return emoji_to_unicode(text)
 
+
+@register.filter(name='debug')
+def debug(obj: Any):
+    if obj is None:
+        return "None"
+    else:
+        response = []
+        response.append(obj.__class__.__name__)
+        response.append(str(obj))
+        if isinstance(obj, Model):
+            response.append(f"PK = {obj.pk}")
+        return " ".join(response)
