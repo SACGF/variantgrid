@@ -2420,6 +2420,7 @@ VCTable.format_hgvs = (parts) => {
     }
 
     if (pHgvs) {
+        console.log(`p.HGVS = ${pHgvs}`);
         $('<span>', {class: 'd-block mt-1 text-secondary', text: limitLength(pHgvs)}).appendTo(dom);
     }
     return outterDom;

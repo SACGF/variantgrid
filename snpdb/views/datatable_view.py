@@ -92,7 +92,7 @@ class RichColumn:
                  css_class: str = None,
                  extra_columns: Optional[list[str]] = None):
         """
-        #TODO consolodate, orderable, default_sort, sort_order_sequence
+        #TODO consolidate, orderable, default_sort, sort_order_sequence
         :param key: A column name to be retrieved and returned and sorted on
         :param name: A name to be shared between both client and server for this value
         :param sort_keys: If provided, use this array to order_by when ordering by this column
@@ -164,7 +164,7 @@ class RichColumn:
             key = f'-{key}'
         return key
 
-    ## the below seems to break special sort keys
+    # the below seems to break special sort keys
     def sort_string(self, desc: bool) -> list[OrderBy]:
         def as_order_by(key: str):
             use_desc = desc
@@ -337,7 +337,7 @@ class DatatableConfig(Generic[DC]):
         """
         pass
 
-    def view_primary_key(self, row: dict[str, Any]) -> JsonDataType:
+    def view_primary_key(self, row: CellData) -> JsonDataType:
         """ Relies on being 'id' and object defining get_absolute_url  """
         qs = self.get_initial_queryset()
         primary_key_name = qs.model._meta.pk.name
@@ -388,7 +388,7 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
         return value
 
     def render_cell(self, row: dict, column: RichColumn) -> JsonDataType:
-        """ Renders a column on a row. column can be given in a module notation eg. document.invoice.type """
+        """ Renders a column on a row. column can be given in a module notation e.g. document.invoice.type """
         if column.renderer:
             render_data = CellData(all_data=row, key=column.key)
             return column.renderer(render_data)

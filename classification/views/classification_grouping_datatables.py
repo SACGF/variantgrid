@@ -18,8 +18,19 @@ from snpdb.views.datatable_view import DatatableConfig, RichColumn, DC, SortOrde
 
 
 class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
+    """
+    File to display the ClassificationGrouping as data tables.
+    This is taking over from ClassificationGroup (in memory merging of rows that then have to be all rendered client side)
+    ClassificationColumns - the one classification per row
 
-    def render_row_header(self, row: Dict[str, Any]) -> JsonDataType:
+    Filters are done between a combination of get_initial_query (when on the gene symbol page and we want the maximum
+    number of results to be how many groupings for that gene symbol, rather than presenting the user with
+    showing 6 out of 30,000 records)
+    and then on filter_query_set when it's a filter that the user can do above and beyond what the page initially loads
+    e.g. allele origin filter
+    """
+
+    def render_row_header(self, row: CellData) -> JsonDataType:
 
         matches: Optional[Dict[str, str]] = None
         search: Optional[str] = None
@@ -47,11 +58,11 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             "search": search
         }
 
-    def render_lastest_curation_date(self, row: Dict[str, Any]) -> JsonDataType:
-        return {
-            "curation_date": row["latest_curation_date"],
-            "classification_id": row["latest_classification_modification__classification_id"]
-        }
+    # def render_latest_curation_date(self, row: CellData) -> JsonDataType:
+    #     return {
+    #         "curation_date": row["latest_curation_date"],
+    #         "classification_id": row["latest_classification_modification__classification_id"]
+    #     }
 
     def render_somatic(self, row: CellData) -> JsonDataType:
         if row["allele_origin_bucket"] != "G":
@@ -81,7 +92,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         return result_dict
 
     def _render_date(self, row: CellData) -> JsonDataType:
-        # TODO list date type
         return {
             "classification_id": row["latest_classification_modification__classification_id"],
             "curation_date": row.get_nested_json("latest_classification_modification__classification__summary__date",
@@ -95,7 +105,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         user_settings = UserSettings.get_for_user(self.user)
         return GenomeBuild.builds_with_annotation_priority(user_settings.default_genome_build)
 
-    def render_c_hgvs(self, row: Dict[str, Any]) -> JsonDataType:
+    def render_c_hgvs(self, row: CellData) -> JsonDataType:
         def get_preferred_chgvs_json() -> Dict:
             nonlocal row
             for index, genome_build in enumerate(self.genome_build_prefs):
@@ -106,29 +116,22 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     c_hgvs.is_desired_build = index == 0
                     return c_hgvs.to_json()
 
-            # FIXME need to fallback onto a plain text condition with genome build
+            # ClassificationGroupings don't exist unless they've matched an allele, so no need to fallback
+            # to imported c.HGVS
             return {}
 
-            # TODO - is there a need for the imported c.HGVS? (Yes but in edge cases)
-            # c_hgvs = CHGVS(row.get('published_evidence__c_hgvs__value'))
-            # c_hgvs.is_normalised = False
-            # json_data = c_hgvs.to_json()
-            # # use this rather than genome build object so we can get a patch version
-            # json_data['genome_build'] = row.get('published_evidence__genome_build__value')
-            # return json_data
-
         response = get_preferred_chgvs_json()
-        # if settings.CLASSIFICATION_GRID_SHOW_PHGVS:
-        #     if p_hgvs := row.get('published_evidence__p_hgvs__value'):
-        #         p_dot = p_hgvs.find('p.')
-        #         if p_dot != -1:
-        #             p_hgvs = p_hgvs[p_dot::]
-        #     response['p_hgvs'] = p_hgvs
+        if settings.CLASSIFICATION_GRID_SHOW_PHGVS:
+            if p_hgvs := row['latest_classification_modification__published_evidence__p_hgvs__value']:
+                p_dot = p_hgvs.find('p.')
+                if p_dot != -1:
+                    p_hgvs = p_hgvs[p_dot::]
+            response['p_hgvs'] = p_hgvs
 
         response['allele_id'] = row.get('latest_allele_info__allele_id')
         response['allele_info_id'] = row.get('latest_allele_info__allele_info__id')
         if warning_icon := ImportedAlleleInfo.icon_for(
-                status=row.get('latest_allele_infoo__status'),
+                status=row.get('latest_allele_info__status'),
                 include=row.get('latest_allele_info__latest_validation__include')
         ):
             response.update(warning_icon.as_json())
@@ -332,7 +335,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     'latest_allele_info__id',
                     'latest_allele_info__allele_id',
                     'latest_allele_info__latest_validation__include',
-                    'latest_allele_info__status'
+                    'latest_allele_info__status',
+                    'latest_classification_modification__published_evidence__p_hgvs__value'  # TODO move this to allele info
                 ]
             ),
             RichColumn(
