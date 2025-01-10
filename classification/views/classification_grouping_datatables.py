@@ -5,7 +5,7 @@ from django.conf import settings
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from more_itertools import first
-from classification.enums import ShareLevel, AlleleOriginBucket, EvidenceCategory, SpecialEKeys
+from classification.enums import AlleleOriginBucket, EvidenceCategory, SpecialEKeys
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
     ClassificationGroupingSearchTermType, EvidenceKeyMap, ClassificationModification, ClassificationGroupingEntry, \
     Classification, DiscordanceReport, DiscordanceReportClassification
@@ -13,7 +13,7 @@ from genes.hgvs import CHGVS
 from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType
 from ontology.models import OntologyTerm, OntologyTermRelation, OntologySnake
-from snpdb.models import UserSettings, GenomeBuild, Lab, Variant
+from snpdb.models import UserSettings, GenomeBuild, Variant
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, DC, SortOrder, CellData
 
 
@@ -66,7 +66,9 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         result_dict["diff"] = diff_value
 
         if dr := self.discordance_report:
-            if drc := DiscordanceReportClassification.objects.filter(report_id=dr.pk, classification_original__classification=row["latest_classification_modification__classification_id"]).first():
+            if drc := DiscordanceReportClassification.objects.filter(report_id=dr.pk,
+                                                                     classification_original__classification=row[
+                                                                         "latest_classification_modification__classification_id"]).first():
                 old_cs = drc.classification_original.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
                 if result_dict and result_dict.get("classification") != old_cs:
                     result_dict["old"] = old_cs
@@ -82,8 +84,10 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         # TODO list date type
         return {
             "classification_id": row["latest_classification_modification__classification_id"],
-            "curation_date": row.get_nested_json("latest_classification_modification__classification__summary__date", "value"),
-            "date_type": row.get_nested_json("latest_classification_modification__classification__summary__date", "type")
+            "curation_date": row.get_nested_json("latest_classification_modification__classification__summary__date",
+                                                 "value"),
+            "date_type": row.get_nested_json("latest_classification_modification__classification__summary__date",
+                                             "type")
         }
 
     @cached_property
@@ -95,7 +99,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         def get_preferred_chgvs_json() -> Dict:
             nonlocal row
             for index, genome_build in enumerate(self.genome_build_prefs):
-                if c_hgvs_string := row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info")):
+                if c_hgvs_string := row.get(
+                        ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info")):
                     c_hgvs = CHGVS(c_hgvs_string)
                     c_hgvs.genome_build = genome_build
                     c_hgvs.is_desired_build = index == 0
@@ -123,8 +128,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         response['allele_id'] = row.get('latest_allele_info__allele_id')
         response['allele_info_id'] = row.get('latest_allele_info__allele_info__id')
         if warning_icon := ImportedAlleleInfo.icon_for(
-            status=row.get('latest_allele_infoo__status'),
-            include=row.get('latest_allele_info__latest_validation__include')
+                status=row.get('latest_allele_infoo__status'),
+                include=row.get('latest_allele_info__latest_validation__include')
         ):
             response.update(warning_icon.as_json())
 
@@ -153,7 +158,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
         if dr := self.discordance_report:
             classification_ids = [cm.classification_id for cm in dr.all_classification_modifications]
-            group_ids = ClassificationGroupingEntry.objects.filter(classification_id__in=classification_ids).values_list('grouping', flat=True)
+            group_ids = ClassificationGroupingEntry.objects.filter(
+                classification_id__in=classification_ids).values_list('grouping', flat=True)
             filters.append(Q(pk__in=group_ids))
 
         if filters:
@@ -210,20 +216,20 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
     def id_columns(self) -> List[str]:
         keys = EvidenceKeyMap.instance()
         return [e_key.key for e_key in keys.all_keys if '_id' in e_key.key and
-                e_key.evidence_category in (EvidenceCategory.HEADER_PATIENT, EvidenceCategory.HEADER_TEST, EvidenceCategory.SIGN_OFF)]
+                e_key.evidence_category in (
+                    EvidenceCategory.HEADER_PATIENT, EvidenceCategory.HEADER_TEST, EvidenceCategory.SIGN_OFF)]
 
     def classification_modification_filter_to_grouping(self, cm_q: Q) -> Q:
         return Q(
-            pk__in=\
-                ClassificationGroupingEntry.objects.filter(
-                    classification__in=ClassificationModification.objects.filter(is_last_published=True).filter(cm_q).values_list('classification_id', flat=True)
+            pk__in=ClassificationGroupingEntry.objects.filter(
+                    classification__in=ClassificationModification.objects.filter(is_last_published=True).filter(
+                        cm_q).values_list('classification_id', flat=True)
                 ).values_list('grouping_id', flat=True)
         )
 
     def classification_filter_to_grouping(self, cm_q: Q) -> Q:
         return Q(
-            pk__in=\
-                ClassificationGroupingEntry.objects.filter(
+            pk__in=ClassificationGroupingEntry.objects.filter(
                     classification__in=Classification.objects.filter(cm_q).values_list('pk', flat=True)
                 ).values_list('grouping_id', flat=True)
         )
@@ -234,9 +240,9 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             ids_contain_q_list.append(Q(**{f'published_evidence__{id_key}__value__icontains': text}))
         id_filter_q = reduce(operator.or_, ids_contain_q_list)
         return Q(
-            pk__in=\
-                ClassificationGroupingEntry.objects.filter(
-                    classification__in=ClassificationModification.objects.filter(is_last_published=True).filter(id_filter_q).values_list('classification_id', flat=True)
+            pk__in=ClassificationGroupingEntry.objects.filter(
+                    classification__in=ClassificationModification.objects.filter(is_last_published=True).filter(
+                        id_filter_q).values_list('classification_id', flat=True)
                 ).values_list('grouping_id', flat=True)
         )
 
@@ -257,12 +263,12 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             if must_exist and term.is_stub:
                 return False
 
-            all_terms = set([term])
+            all_terms = {term}
             if mondo_term := OntologyTermRelation.as_mondo(term):
                 # if we have (or can translate) into a mondo term
                 # get all the direct parent and all the direct children terms
                 # and then the OMIM equiv of them
-                mondo_terms = set([mondo_term])
+                mondo_terms = {mondo_term}
                 mondo_terms |= OntologySnake.get_children(mondo_term)
                 mondo_terms |= OntologySnake.get_parents(mondo_term)
                 all_terms |= mondo_terms
@@ -271,7 +277,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                         all_terms.add(omim_term)
 
             all_strs = [term.id.upper() for term in all_terms]
-            return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.CONDITION_ID, all_strs)
+            return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.CONDITION_ID,
+                                                             all_strs)
         except ValueError:
             pass
 
