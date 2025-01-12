@@ -1,5 +1,4 @@
 import copy
-import json
 import re
 import uuid
 from collections import Counter, namedtuple
@@ -26,7 +25,6 @@ from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
-from unidecode import unidecode
 
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
 from annotation.regexes import db_ref_regexes, DbRegexes
@@ -241,7 +239,7 @@ class ConditionResolved:
         if terms := self.terms:
             for t in terms:
                 hash_total += hash(t)
-        hash_total += hash(self.join,)
+        hash_total += hash(self.join, )
         hash_total += hash(self.plain_text)
         return hash_total
 
@@ -304,14 +302,16 @@ class ConditionResolved:
         else:
             if other_mondo := other.mondo_term:
                 if self_mondo := self.mondo_term:
-                    descendant_relationships = OntologySnake.check_if_ancestor(descendant=self_mondo, ancestor=other_mondo)
+                    descendant_relationships = OntologySnake.check_if_ancestor(descendant=self_mondo,
+                                                                               ancestor=other_mondo)
                     return bool(descendant_relationships)
 
             # terms cant be converted to MONDO and not exact match, just return False
             return False
 
     @staticmethod
-    def more_general_term_if_related(resolved_1: 'ConditionResolved', resolved_2: 'ConditionResolved') -> Optional['ConditionResolved']:
+    def more_general_term_if_related(resolved_1: 'ConditionResolved', resolved_2: 'ConditionResolved') -> Optional[
+        'ConditionResolved']:
         more_general: Optional[ConditionResolved] = None
         if resolved_1.is_same_or_more_specific(resolved_2):
             more_general = resolved_2
@@ -498,7 +498,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     clinical_significance = models.CharField(max_length=1, choices=ClinicalSignificance.CHOICES, null=True, blank=True)
     """ Used as an optimisation for queries, is relatively out of date now """
 
-    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, default=AlleleOriginBucket.GERMLINE)
+    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices,
+                                            default=AlleleOriginBucket.GERMLINE)
     """ Used to cache if we consider this classification germline or somatic """
 
     condition_resolution = models.JSONField(null=True, blank=True)  # of type ConditionProcessedDict
@@ -827,7 +828,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def ensure_allele_info(self) -> Optional[ImportedAlleleInfo]:
         return self.ensure_allele_info_with_created()[0]
 
-    def ensure_allele_info_with_created(self, force_allele_info_update_check: bool = False) -> Tuple[Optional[ImportedAlleleInfo], bool]:
+    def ensure_allele_info_with_created(self, force_allele_info_update_check: bool = False) -> Tuple[
+        Optional[ImportedAlleleInfo], bool]:
         created = False
         if not self.allele_info or force_allele_info_update_check:
             try:
@@ -960,17 +962,17 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @staticmethod
     def create_with_response(user: User,
-               lab: Lab,
-               lab_record_id: Optional[str] = None,
-               data: Optional[Dict[str, Any]] = None,
-               save: bool = True,
-               source: SubmissionSource = SubmissionSource.VARIANT_GRID,
-               make_fields_immutable=False,
-               populate_with_defaults=False,
-               **kwargs) -> Tuple['Classification', ClassificationPatchResponse]:
+                             lab: Lab,
+                             lab_record_id: Optional[str] = None,
+                             data: Optional[Dict[str, Any]] = None,
+                             save: bool = True,
+                             source: SubmissionSource = SubmissionSource.VARIANT_GRID,
+                             make_fields_immutable=False,
+                             populate_with_defaults=False,
+                             **kwargs) -> Tuple['Classification', ClassificationPatchResponse]:
         """
             :param user: The user creating this Classification
-            :param lab: The lab the recod will be created under
+            :param lab: The lab the record will be created under
             :param lab_record_id: The lab specific id for this record, will be auto-generated if not provided
             :param data: Initial data to populate with
             :param save: Should be True unless we're in test mode
@@ -996,16 +998,16 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     data[e_key.key] = e_key.default_value
 
         response = record.patch_value(data,
-                           user=user,
-                           clear_all_fields=True,
-                           source=source,
-                           save=save,
-                           make_patch_fields_immutable=make_fields_immutable,
-                           initial_data=True,
-                           # revalidate all - so validations that only occur when specific fields change will still fire
-                           # even if no values are provided for that field, handy if there's validation that requires
-                           # at least 1 of 2 fields to be present for example
-                           revalidate_all=True)
+                                      user=user,
+                                      clear_all_fields=True,
+                                      source=source,
+                                      save=save,
+                                      make_patch_fields_immutable=make_fields_immutable,
+                                      initial_data=True,
+                                      # revalidate all - so validations that only occur when specific fields change will still fire
+                                      # even if no values are provided for that field, handy if there's validation that requires
+                                      # at least 1 of 2 fields to be present for example
+                                      revalidate_all=True)
         if save:
             try:
                 if making_new_id:
@@ -1509,10 +1511,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             :param save: saves to the database (leave as False if test mode or going to do other changes)
             :param make_patch_fields_immutable: Make all fields updated in this patch immutable.
             :param remove_api_immutable: If True, immutability level (under variantgrid) is removed from all fields.
-                                         Requires source: SubissionSource.VariantGrid
+                                         Requires source: SubmissionSource.VariantGrid
             :param initial_data: if True, divides c.hgvs to
             :param revalidate_all: if True, runs validation over all fields we have, otherwise only the values being patched
             :param ignore_if_only_patching: if provided, if only these fields are different in the patch, don't both to patch anything
+            :param patch_known_keys_only: If true, data that doesn't match up with evidence keys will be ignored (e.g. {"acmg:bp34": "BM"} will do nothing)
             :returns: A dict with "messages" (validation errors, warnings etc.) and "modified" (fields that actually changed value)
         """
         source = source or SubmissionSource.API
@@ -1537,7 +1540,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 for key in unrecognised_keys:
                     del patch.data[key]
                 sorted_bad_keys = ", ".join(sorted(unrecognised_keys))
-                patch_response.append_warning("unrecognised_key", f"The following keys are not valid ({sorted_bad_keys})")
+                patch_response.append_warning("unrecognised_key",
+                                              f"The following keys are not valid ({sorted_bad_keys})")
 
         # make sure gene symbol is uppercase
         # need to do it here because it might get used in c.hgvs
@@ -1820,8 +1824,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @property
     def last_published_version(self) -> 'ClassificationModification':
-        return ClassificationModification.objects.filter(classification=self, is_last_published=True)\
-            .select_related('classification', 'classification__lab', 'classification__lab__organization')\
+        return ClassificationModification.objects.filter(classification=self, is_last_published=True) \
+            .select_related('classification', 'classification__lab', 'classification__lab__organization') \
             .first()
 
     @property
@@ -1920,7 +1924,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         namespaces = set()
         for namespace_key in [SpecialEKeys.ASSERTION_METHOD, SpecialEKeys.ALLELE_ORIGIN]:
             for value in self.get_value_list(namespace_key):
-                if namespaces_key_found := EvidenceKeyMap.cached_key(namespace_key).option_dictionary_property("namespaces").get(value):
+                if namespaces_key_found := EvidenceKeyMap.cached_key(namespace_key).option_dictionary_property(
+                        "namespaces").get(value):
                     namespaces |= set(namespaces_key_found)
 
         return EvidenceKeyOverrides(
@@ -2072,8 +2077,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             variant_qs = Variant.objects.filter(variantallele__allele=OuterRef("variant__variantallele__allele"),
                                                 variantallele__genome_build=genome_build)
         else:
-            variant_qs = Variant.objects.filter(variantallele__allele=OuterRef("classification__variant__variantallele__allele"),
-                                                variantallele__genome_build=genome_build)
+            variant_qs = Variant.objects.filter(
+                variantallele__allele=OuterRef("classification__variant__variantallele__allele"),
+                variantallele__genome_build=genome_build)
 
         variant_qs = variant_qs.annotate(
             padded_contig=LPad("locus__contig__name", 2, Value("0")),
@@ -2109,7 +2115,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return self.variant.allele.variant_for_build_optional(genome_build)
         return None
 
-    def get_variant_annotation(self, variant_annotation_version: VariantAnnotationVersion) -> Optional[VariantAnnotation]:
+    def get_variant_annotation(self, variant_annotation_version: VariantAnnotationVersion) -> Optional[
+        VariantAnnotation]:
         if variant := self.get_variant_for_build(variant_annotation_version.genome_build):
             return variant.variantannotation_set.filter(version=variant_annotation_version).first()
 
@@ -2337,7 +2344,8 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         :param kwargs: Any other parameters will be used for filtering
         :return:
         """
-        qs: QuerySet[ClassificationModification] = get_objects_for_user(user, cls.get_read_perm(), klass=cls, accept_global_perms=True)
+        qs: QuerySet[ClassificationModification] = get_objects_for_user(user, cls.get_read_perm(), klass=cls,
+                                                                        accept_global_perms=True)
         qs = qs.order_by('-created', 'classification')
         if kwargs:
             qs = qs.filter(**kwargs)
@@ -2394,10 +2402,10 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         edit_window = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(minutes=1)
 
         return \
-            self.source_enum == source \
-            and self.created >= edit_window \
-            and self.user == user \
-            and not self.published
+                self.source_enum == source \
+                and self.created >= edit_window \
+                and self.user == user \
+                and not self.published
 
     @transaction.atomic()
     def publish(self, share_level: Union[ShareLevel, str, int], user: User, vc: 'Classification',
@@ -2593,11 +2601,15 @@ class ClassificationConsensus:
             default_allele_origin_bucket = AlleleOriginBucket(default_allele_origin_filter.value)
 
         results = []
-        for identifier, allele_origin_bucket in [("Latest Germline", AlleleOriginBucket.GERMLINE), ("Latest Somatic", AlleleOriginBucket.SOMATIC)]:
-            if candidates := list(ClassificationModification.latest_for_user(user=user, allele=allele, published=True, exclude_external_labs=True, allele_origin_bucket=allele_origin_bucket).all()):
+        for identifier, allele_origin_bucket in [("Latest Germline", AlleleOriginBucket.GERMLINE),
+                                                 ("Latest Somatic", AlleleOriginBucket.SOMATIC)]:
+            if candidates := list(ClassificationModification.latest_for_user(user=user, allele=allele, published=True,
+                                                                             exclude_external_labs=True,
+                                                                             allele_origin_bucket=allele_origin_bucket).all()):
                 candidates.sort(key=lambda vcm: vcm.curated_date_check, reverse=True)
                 default_suggestion = allele_origin_bucket == default_allele_origin_bucket
-                results.append(ClassificationConsensus(modification=candidates[0], label=identifier, default_suggestion=default_suggestion))
+                results.append(ClassificationConsensus(modification=candidates[0], label=identifier,
+                                                       default_suggestion=default_suggestion))
         return results
 
     @cached_property
