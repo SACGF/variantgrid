@@ -31,7 +31,6 @@ def update_gene_relations(gene_symbol: Union[GeneSymbol, str]):
 
 @dataclass(frozen=True)
 class PanelAppResult:
-
     ontology_ids: set[str]
     max_panel_app_strength: Optional[PanelAppClassification]
     raw_data: dict
@@ -104,18 +103,19 @@ def _update_gene_relations(gene_symbol: str):
             alias_symbol: Optional[str] = None
             results_json = get_panel_app_results_by_gene_symbol_json(server=panel_app, gene_symbol=gene_symbol)
             if is_empty_results(results_json):
-                # try aliases see if any of those work
+                # If we get a complete blank for the gene symbol we ask for (as in PanelApp has no record of it)
+                # try looking at equivalent gene symbols
                 try:
                     gene_symbol_obj = GeneSymbol.objects.get(symbol=gene_symbol)
-                    for alias in gene_symbol_obj.alias_meta.aliases_in:
-                        if alias.other_symbol_in_database and not alias.different_genes:
-                            alias_results_json = get_panel_app_results_by_gene_symbol_json(server=panel_app,
-                                                                                     gene_symbol=alias.other_symbol)
-                            if not is_empty_results(alias_results_json):
-                                alias_symbol = alias.other_symbol
-                                report_message(message=f"PanelAppAU no results for {gene_symbol}, substituting alias {alias.other_symbol}")
-                                results_json = alias_results_json
-                                break
+                    for alias in gene_symbol_obj.alias_meta.alias_symbols_in_db:
+                        alias_results_json = get_panel_app_results_by_gene_symbol_json(server=panel_app,
+                                                                                       gene_symbol=alias.other_symbol)
+                        if not is_empty_results(alias_results_json):
+                            alias_symbol = alias.other_symbol
+                            report_message(message=f"PanelAppAU no results for gene symbol, making substitution",
+                                           extra_data={"target": f"{gene_symbol} -> {alias.other_symbol}"})
+                            results_json = alias_results_json
+                            break
                 except GeneSymbol.DoesNotExist:
                     pass
 
