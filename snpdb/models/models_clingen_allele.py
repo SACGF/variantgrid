@@ -62,6 +62,7 @@ class ClinGenAllele(TimeStampedModel):
         url_id = api_response["@id"]
         if m := ClinGenAllele.CLINGEN_ALLELE_URL_PATTERN.match(url_id):
             return int(m.group(1))
+        logging.error("Bad @id in ClinGen response:\n%s", api_response)
         raise ClinGenAllele.ClinGenMissingAlleleID(f"Couldn't retrieve ClinGen AlleleID from @id '{url_id}'")
 
     @staticmethod
