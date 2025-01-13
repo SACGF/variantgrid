@@ -387,19 +387,37 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
             value = value.timestamp()
         return value
 
+    @staticmethod
+    def limit_value_size(value: Any) -> Any:
+        """
+        Limits the amount of data that can be returned in one cell
+        Will duplicate dicts into dicts with limited text
+        """
+        LIMIT = 100000
+        if isinstance(value, str):
+            if (value_len := len(value)) and value_len > LIMIT:
+                return value[:LIMIT] + f"... (data is too large to display, full data is {value_len} characters long)"
+        elif isinstance(value, dict):
+            cloned = value.copy()
+            for key, sub_value in value.items():
+                cloned[key] = DatabaseTableView.limit_value_size(sub_value)
+            value = cloned
+        return value
+
     def render_cell(self, row: dict, column: RichColumn) -> JsonDataType:
         """ Renders a column on a row. column can be given in a module notation e.g. document.invoice.type """
+        data: Any
         if column.renderer:
             render_data = CellData(all_data=row, key=column.key)
-            return column.renderer(render_data)
-        if column.extra_columns:
+            return DatabaseTableView.limit_value_size(column.renderer(render_data))
+        elif column.extra_columns:
             data_dict = {}
             for col in column.value_columns:
-                data_dict[col] = DatabaseTableView.sanitize_value(row.get(col))
+                data_dict[col] = DatabaseTableView.limit_value_size(DatabaseTableView.sanitize_value(row.get(col)))
             return data_dict
 
         elif column.key:
-            return DatabaseTableView.sanitize_value(row.get(column.key))
+            return DatabaseTableView.limit_value_size(DatabaseTableView.sanitize_value(row.get(column.key)))
         else:
             return None
 
