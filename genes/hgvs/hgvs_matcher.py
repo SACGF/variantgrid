@@ -307,12 +307,6 @@ class HGVSMatcher:
             raise HGVSNomenclatureException(f"Error parsing transcript version from \"{transcript_accession}\"")
 
         tv_qs = TranscriptVersion.objects.filter(genome_build=self.genome_build, transcript_id=transcript_id)
-        if not self.allow_alternative_transcript_version:
-            if version:
-                tv_qs = tv_qs.filter(version=version)
-            else:
-                raise HGVSNomenclatureException(f"{transcript_accession=} must have version when allow_alternative_transcript_version=False")
-
         tv_by_version = {tv.version: tv for tv in tv_qs}
         if not tv_by_version:
             # If we don't have any in DB - we should check that it's actually real
@@ -334,8 +328,14 @@ class HGVSMatcher:
         min_versions = [v for v in [version_if_no_local, data.get("min_tv"), data.get("min_tvsi")] if v is not None]
         max_versions = [v for v in [version_if_no_local, data.get("max_tv"), data.get("max_tvsi")] if v is not None]
 
-        min_version = min(min_versions)
-        max_version = max(max_versions)
+        if self.allow_alternative_transcript_version:
+            min_version = min(min_versions)
+            max_version = max(max_versions)
+        else:
+            if not version:
+                raise HGVSNomenclatureException(f"{transcript_accession=} must have version when allow_alternative_transcript_version=False")
+            min_version = version
+            max_version = version
 
         local_converter_type = self.hgvs_converter.get_hgvs_converter_type()
         tv_and_converter_type = []

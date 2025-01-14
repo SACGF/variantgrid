@@ -352,7 +352,7 @@ def _check_clingen_variant_length(rep: str, variant_length: int, is_dup: bool = 
     if is_dup:
         clingen_length *= 2
         variant_length_desc += f" ({clingen_length=} for dups)"
-    if variant_length > ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE:
+    if clingen_length > ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE:
         msg = f"No ClinGenAllele possible for {rep} as {variant_length_desc} > {ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE=}"
         raise ClinGenAlleleTooLargeException(msg)
 
