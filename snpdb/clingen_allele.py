@@ -345,8 +345,14 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
 
 
 
+def _clingen_check_variant_coordinate_length(rep: str, genome_build: GenomeBuild, variant_coordinate: VariantCoordinate):
+    # Force to symbolic so we can check for "dup"
+    vc_symbolic = variant_coordinate.as_internal_symbolic(genome_build)
+    is_dup = vc_symbolic.alt == VCFSymbolicAllele.DUP  # ClinGen uses 2x SVLEN
+    clingen_check_variant_length(rep, variant_coordinate.max_sequence_length, is_dup=is_dup)
 
-def _check_clingen_variant_length(rep: str, variant_length: int, is_dup: bool = False):
+
+def clingen_check_variant_length(rep: str, variant_length: int, is_dup: bool = False):
     clingen_length = variant_length
     variant_length_desc = f"{variant_length=}"
     if is_dup:
@@ -367,8 +373,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
         clingen_api = ClinGenAlleleRegistryAPI()
 
     variant_coordinate = variant.coordinate
-    is_dup = variant_coordinate.alt == VCFSymbolicAllele.DUP
-    _check_clingen_variant_length(str(variant), variant_coordinate.length, is_dup=is_dup)
+    _clingen_check_variant_coordinate_length(str(variant), genome_build, variant_coordinate)
 
     g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
     try:
@@ -431,8 +436,7 @@ def get_clingen_allele_for_variant_coordinate(genome_build: GenomeBuild, variant
     """
 
     rep = f"{variant_coordinate=}"
-    is_dup = variant_coordinate.alt == VCFSymbolicAllele.DUP
-    _check_clingen_variant_length(rep, variant_coordinate.length, is_dup=is_dup)
+    _clingen_check_variant_coordinate_length(rep, genome_build, variant_coordinate)
 
     try:
         # Use variant if we have it in the system so we can lookup cache, or store result

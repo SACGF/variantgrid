@@ -21,7 +21,7 @@ from library.log_utils import report_exc_info
 from library.utils import clean_string, FormerTuple
 from snpdb.clingen_allele import get_clingen_allele_from_hgvs, \
     ClinGenAlleleServerException, ClinGenAlleleAPIException, get_clingen_allele_for_variant_coordinate, \
-    _check_clingen_variant_length
+    clingen_check_variant_length
 from snpdb.models import Variant, ClinGenAllele
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantCoordinate
@@ -162,7 +162,7 @@ class HGVSMatcher:
     def _clingen_get_variant_coordinate_and_matches_reference(self, hgvs_string: str, match_ref_allele=None) -> tuple[VariantCoordinate, bool]:
         hgvs_name = self.create_hgvs_variant(hgvs_string)
         if hgvs_name.kind == 'g':
-            _check_clingen_variant_length(hgvs_string, hgvs_name.length, is_dup=hgvs_name.mutation_type == 'dup')
+            clingen_check_variant_length(hgvs_string, hgvs_name.length, is_dup=hgvs_name.mutation_type == 'dup')
 
         cleaned_hgvs = self.hgvs_converter.c_hgvs_remove_gene_symbol(hgvs_string)
 
