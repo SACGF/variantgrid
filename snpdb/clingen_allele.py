@@ -146,6 +146,11 @@ class ClinGenAlleleRegistryAPI:
 
     @classmethod
     def get_hgvs(cls, hgvs_string: str):
+        if len(hgvs_string) > settings.CLINGEN_ALLELE_REGISTRY_MAX_ALLELE_SIZE:
+            length = len(hgvs_string)
+            msg = f"No ClinGenAllele possible for {hgvs_string=} as {length=} > {settings.CLINGEN_ALLELE_REGISTRY_MAX_ALLELE_SIZE=}"
+            raise ClinGenAlleleTooLargeException(msg)
+
         suffix = f"/allele?hgvs={hgvs_string}"
         url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + suffix
         return cls.get(url)
@@ -422,10 +427,6 @@ def get_clingen_allele_for_variant_coordinate(genome_build: GenomeBuild, variant
         ca = get_clingen_allele_for_variant(genome_build, variant, clingen_api=clingen_api)
     except Variant.DoesNotExist:
         g_hgvs_string = hgvs_matcher.variant_coordinate_to_g_hgvs(variant_coordinate).format()
-        if len(g_hgvs_string) > settings.CLINGEN_ALLELE_REGISTRY_MAX_ALLELE_SIZE:
-            msg = f"No ClinGenAllele possible for {variant_coordinate=} as g.HGVS='{g_hgvs_string}' ({len(g_hgvs_string)}) too long"
-            raise ClinGenAlleleTooLargeException(msg)
-
         # We'll be retrieving ClinGen via GET so can sometimes allele ID won't be there
         ca = get_clingen_allele_from_hgvs(g_hgvs_string, require_allele_id=require_allele_id, clingen_api=clingen_api)
     return ca
