@@ -77,6 +77,14 @@ table.diff {
                 text-align: center;
             }
         }
+        tr.option-row {
+            th {
+                color: gray;
+            }
+            th, td {
+                border-top-style: dashed;
+            }
+        }
         tr {
             background-color:white;
             &.differences {
@@ -90,17 +98,6 @@ table.diff {
             td {
                 position: relative;
             }
-            /*
-            .explained:after {
-                content: "\f05a";
-                font-family: "FontAwesome";
-                opacity: 0.5;
-                margin-left: 8px;
-                position: absolute;
-                right: 6px;
-                bottom: 4px;
-            }
-             */
             .explain-icon {
                 position: absolute;
                 right: 0px;

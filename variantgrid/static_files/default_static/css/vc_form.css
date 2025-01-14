@@ -72,6 +72,12 @@ table.diff tbody tr.row.note th, table.diff tbody tr.row.note td, table.diff tbo
 table.diff tbody tr.option-row td, table.diff tbody tr.citation-row td {
   text-align: center;
 }
+table.diff tbody tr.option-row th {
+  color: gray;
+}
+table.diff tbody tr.option-row th, table.diff tbody tr.option-row td {
+  border-top-style: dashed;
+}
 table.diff tbody tr {
   background-color: white;
 }
@@ -80,19 +86,6 @@ table.diff tbody tr.differences {
 }
 table.diff tbody tr.blanks {
   background-color: #f6f6f8;
-}
-table.diff tbody tr {
-  /*
-  .explained:after {
-      content: "\f05a";
-      font-family: "FontAwesome";
-      opacity: 0.5;
-      margin-left: 8px;
-      position: absolute;
-      right: 6px;
-      bottom: 4px;
-  }
-   */
 }
 table.diff tbody tr td {
   position: relative;

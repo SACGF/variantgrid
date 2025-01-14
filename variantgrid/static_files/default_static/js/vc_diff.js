@@ -232,7 +232,7 @@ const Diff = (function() {
                         icon = $('<i class="fas fa-check-square" style="color:#6d6"></i>');
                     }
 
-                    let th = $('<th>', {class: `citation-row`, html: [icon, heading]}).appendTo(row);
+                    let th = $('<th>', {html: [icon, heading]}).appendTo(row);
 
                     let hasCount = 0;
                     let hasNotCount = 0;
