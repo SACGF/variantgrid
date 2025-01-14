@@ -367,7 +367,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
         clingen_api = ClinGenAlleleRegistryAPI()
 
     variant_coordinate = variant.coordinate
-    is_dup = variant_coordinate.alt == VCFSymbolicAllele.DUPLICATE
+    is_dup = variant_coordinate.alt == VCFSymbolicAllele.DUP
     _check_clingen_variant_length(str(variant), variant_coordinate.length, is_dup=is_dup)
 
     g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
