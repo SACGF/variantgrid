@@ -180,8 +180,6 @@ MUTATIONAL_SIGNATURE_INFO_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "si
 
 
 VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES = ['lrg_identifier', 'refseq_transcript_accession', 'ensembl_transcript_accession']
-# If true, then if we don't have a specific transcript version, we'll match it to the closest one we can
-VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT = True
 # Use highest TranscriptVersion canonical, set False to use representative transcript (ie VEP pick = variant annotation)
 VARIANT_TRANSCRIPT_USE_TRANSCRIPT_CANONICAL = True
 

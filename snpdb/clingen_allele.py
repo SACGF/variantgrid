@@ -409,12 +409,16 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
 
 
 def get_clingen_allele_for_variant_coordinate(genome_build: GenomeBuild, variant_coordinate: VariantCoordinate,
-                                              hgvs_matcher, clingen_api: ClinGenAlleleRegistryAPI = None) -> ClinGenAllele:
-    """ hgvs_converter_func - only used if we need it - to reduce circular dependencies on HGVS """
+                                              hgvs_matcher, require_allele_id=True,
+                                              clingen_api: ClinGenAlleleRegistryAPI = None) -> ClinGenAllele:
+    """ hgvs_converter_func - only used if we need it - to reduce circular dependencies on HGVS
+        require_allele_id - set to False if you don't need ClinGen Allele ID (only using for HGVS)
+    """
 
     try:
         # Use variant if we have it in the system so we can lookup cache, or store result
         variant = Variant.get_from_variant_coordinate(variant_coordinate, genome_build)
+        # This will create ClinGen allele ID if not present (sends via PUT)
         ca = get_clingen_allele_for_variant(genome_build, variant, clingen_api=clingen_api)
     except Variant.DoesNotExist:
         g_hgvs_string = hgvs_matcher.variant_coordinate_to_g_hgvs(variant_coordinate).format()
@@ -422,7 +426,8 @@ def get_clingen_allele_for_variant_coordinate(genome_build: GenomeBuild, variant
             msg = f"No ClinGenAllele possible for {variant_coordinate=} as g.HGVS='{g_hgvs_string}' ({len(g_hgvs_string)}) too long"
             raise ClinGenAlleleTooLargeException(msg)
 
-        ca = get_clingen_allele_from_hgvs(g_hgvs_string, clingen_api=clingen_api)
+        # We'll be retrieving ClinGen via GET so can sometimes allele ID won't be there
+        ca = get_clingen_allele_from_hgvs(g_hgvs_string, require_allele_id=require_allele_id, clingen_api=clingen_api)
     return ca
 
 

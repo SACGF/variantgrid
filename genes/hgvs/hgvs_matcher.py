@@ -150,9 +150,10 @@ class HGVSMatcher:
         pass
 
     def __init__(self, genome_build: GenomeBuild, hgvs_converter_type=None,
-                 local_resolution=True, clingen_resolution=True):
+                 local_resolution=True, clingen_resolution=True, allow_alternative_transcript_version=True):
         self.genome_build = genome_build
-        self.attempt_clingen = True  # Stop on any non-recoverable error - keep going if unknown reference
+        self.allow_alternative_transcript_version = allow_alternative_transcript_version
+        self.attempt_clingen = True  # Set to False if server issues
         self.hgvs_converter = HGVSConverterFactory.factory(genome_build, hgvs_converter_type,
                                                            local_resolution=local_resolution,
                                                            clingen_resolution=clingen_resolution)
@@ -165,11 +166,10 @@ class HGVSMatcher:
             variant_coord = ca.get_variant_coordinate(self.genome_build)
             # Was converted to internal, need to return raw strings so standard base validation is OK
             if variant_coord.alt == Variant.REFERENCE_ALT:
-                variant_coord = VariantCoordinate(
-                    chrom=variant_coord.chrom,
-                    start=variant_coord.start,
-                    ref=variant_coord.ref,
-                    alt=variant_coord.ref)  # ref == alt
+                variant_coord = VariantCoordinate(chrom=variant_coord.chrom,
+                                                  start=variant_coord.start,
+                                                  ref=variant_coord.ref,
+                                                  alt=variant_coord.ref)  # ref == alt
             if match_ref_allele is None:
                 match_ref_allele = True
             return variant_coord, match_ref_allele
@@ -302,11 +302,11 @@ class HGVSMatcher:
             raise HGVSNomenclatureException(f"Error parsing transcript version from \"{transcript_accession}\"")
 
         tv_qs = TranscriptVersion.objects.filter(genome_build=self.genome_build, transcript_id=transcript_id)
-        if not settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT:
+        if not self.allow_alternative_transcript_version:
             if version:
-                return tv_qs.get(version=version)
+                tv_qs = tv_qs.filter(version=version)
             else:
-                raise HGVSNomenclatureException("Transcript version must be provided")  #  if settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT=False
+                raise HGVSNomenclatureException(f"{transcript_accession=} must have version when allow_alternative_transcript_version=False")
 
         tv_by_version = {tv.version: tv for tv in tv_qs}
         if not tv_by_version:
@@ -457,7 +457,7 @@ class HGVSMatcher:
         problems = ["No transcript via LRGRefSeqGene"]
 
         # Use ClinGen - will raise exception if it can't get it
-        if ca := get_clingen_allele_for_variant_coordinate(self.genome_build, variant_coordinate, self):
+        if ca := get_clingen_allele_for_variant_coordinate(self.genome_build, variant_coordinate, self, require_allele_id=False):
             if hgvs_variant := ca.get_c_hgvs_variant(self.hgvs_converter, lrg_identifier):
                 return hgvs_variant, HGVSConverterType.CLINGEN_ALLELE_REGISTRY, self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
             else:
@@ -500,7 +500,7 @@ class HGVSMatcher:
                         error_message = f"Could not convert '{variant_coordinate}' ({transcript_version}) using {potential_converter_type}: %s"
                         # TODO: We could also use VEP then add reference bases on our HGVSs
                         try:
-                            if ca := get_clingen_allele_for_variant_coordinate(self.genome_build, variant_coordinate, self):
+                            if ca := get_clingen_allele_for_variant_coordinate(self.genome_build, variant_coordinate, self, require_allele_id=False):
                                 if hgvs_variant := ca.get_c_hgvs_variant(self.hgvs_converter, transcript_version.accession):
                                     # Use our latest symbol as ClinGen can be out of date, and this keeps it consistent
                                     # regardless of whether we use PyHGVS or ClinGen to resolve

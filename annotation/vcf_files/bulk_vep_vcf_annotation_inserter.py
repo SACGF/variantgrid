@@ -134,7 +134,9 @@ class BulkVEPVCFAnnotationInserter:
                                        self.annotation_run.pipeline_type)
 
         self._setup_vep_fields_and_db_columns(validate_columns, cvf_qs)
-        self.hgvs_matcher = HGVSMatcher(annotation_run.genome_build)
+        self.hgvs_matcher = HGVSMatcher(annotation_run.genome_build,
+                                        # We only want exact transcript version for annotation
+                                        allow_alternative_transcript_version=False)
 
         sv_overlap_processor = None
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
