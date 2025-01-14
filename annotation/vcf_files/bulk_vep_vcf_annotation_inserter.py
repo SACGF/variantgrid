@@ -1,7 +1,7 @@
 import logging
 import operator
 import shutil
-from collections import defaultdict
+from collections import defaultdict, Counter
 from functools import cached_property
 from typing import Optional, Iterable, TypeAlias
 
@@ -142,6 +142,7 @@ class BulkVEPVCFAnnotationInserter:
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
             sv_overlap_processor = SVOverlapProcessor(cvf_qs)
         self.sv_overlap_processor = sv_overlap_processor
+        self._generated_hgvs_c = Counter()
 
     @property
     def description(self) -> str:
@@ -411,22 +412,29 @@ class BulkVEPVCFAnnotationInserter:
                 logging.warning(f"Could not find gene_id: '{vep_gene}'")
         return gene_id
 
-    def _get_transcript_id_and_version(self, vep_transcript_data: TranscriptData) -> tuple[Optional[str], Optional[str]]:
+    def _get_transcript_accession(self, vep_transcript_data: TranscriptData) -> Optional[str]:
+        # We pass in --transcript_version so Ensembl IDs will have version
+        vep_feature_type = vep_transcript_data[VEPColumns.FEATURE_TYPE]
+        transcript_accession = None
+        if vep_feature_type == "Transcript":
+            transcript_accession = vep_transcript_data[VEPColumns.FEATURE]
+        return transcript_accession
+
+
+    def _get_transcript_id_and_transcript_version_id(self, transcript_accession: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+        """ Returns Transcript.pk and TranscriptVersion.pk for linking records """
         transcript_id: Optional[str] = None
         transcript_version_id: Optional[str] = None
-        vep_feature_type = vep_transcript_data[VEPColumns.FEATURE_TYPE]
-        if vep_feature_type == "Transcript":
-            if transcript_accession := vep_transcript_data[VEPColumns.FEATURE]:
-                # We pass in --transcript_version so Ensembl IDs will have version
-                t_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
-                transcript_versions = self.transcript_versions_by_id.get(t_id)
-                if transcript_versions:
-                    transcript_id = t_id  # Know it's valid to link
-                    transcript_version_id = transcript_versions.get(version)
-                    if transcript_version_id is None:
-                        logging.warning(f"Have transcript '{transcript_id}' but no version: '{version}'")
-                else:
-                    logging.warning(f"Could not find transcript: '{t_id}'")
+        if transcript_accession:
+            t_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+            transcript_versions = self.transcript_versions_by_id.get(t_id)
+            if transcript_versions:
+                transcript_id = t_id  # Know it's valid to link
+                transcript_version_id = transcript_versions.get(version)
+                if transcript_version_id is None:
+                    logging.warning(f"Have transcript '{transcript_id}' but no version: '{version}'")
+            else:
+                logging.warning(f"Could not find transcript: '{t_id}'")
         return transcript_id, transcript_version_id
 
     def _fix_multiple_values(self, transcript_data: TranscriptData):
@@ -444,13 +452,15 @@ class BulkVEPVCFAnnotationInserter:
                         v = None
                     transcript_data[k] = v
 
-    def add_calculated_transcript_columns(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: TranscriptData):
+    def add_calculated_transcript_columns(self, variant_coordinate: Optional[VariantCoordinate],
+                                          transcript_accession: Optional[str],
+                                          transcript_data: TranscriptData):
         """ variant_coordinate - will only be set for symbolics """
 
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STANDARD:
             self._add_calculated_maxentscan(transcript_data)
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
-            self._add_hgvs_c(variant_coordinate, transcript_data)
+            self._add_hgvs_c(variant_coordinate, transcript_accession, transcript_data)
 
     def add_calculated_variant_annotation_columns(self, variant_coordinate: VariantCoordinate, transcript_data: TranscriptData):
         self._add_hemi_count(transcript_data)
@@ -511,7 +521,8 @@ class BulkVEPVCFAnnotationInserter:
             cosmic_ids.update(existing_cosmic_id.split(VEP_SEPARATOR))
         transcript_data["cosmic_id"] = VEP_SEPARATOR.join(sorted(cosmic_ids))
 
-    def _add_hgvs_c(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: dict):
+    def _add_hgvs_c(self, variant_coordinate: Optional[VariantCoordinate], transcript_accession: Optional[str],
+                    transcript_data: dict):
         # VEP will have already done for non-symbolics, may do them in future version
         if transcript_data.get('hgvs_c'):
             return
@@ -524,21 +535,23 @@ class BulkVEPVCFAnnotationInserter:
         # Only calculate very long HGVS for representative transcripts
         if variant_coordinate.max_sequence_length > max_length:
             transcript_data['hgvs_c'] = VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
+            self._generated_hgvs_c["too_long"] += 1
             return
 
-        transcript_id = transcript_data.get("transcript_id")
-        version = transcript_data.get("version_id")
-        if transcript_id and version:
-            transcript_accession = TranscriptVersion.get_accession(transcript_id, version)
+        if transcript_accession:
             try:
                 hgvs_c = self.hgvs_matcher.variant_coordinate_to_hgvs_variant(variant_coordinate, transcript_accession)
+                self._generated_hgvs_c["OK"] += 1
                 # TODO: Protein?? hgvs_p
             except Exception as e:
                 logging.error("Error calculating c.HGVS for '%s'/'%s': %s",
                               variant_coordinate, transcript_accession, e)
                 hgvs_c = VariantAnnotation.SV_HGVS_ERROR_MESSAGE
+                self._generated_hgvs_c["error"] += 1
 
             transcript_data['hgvs_c'] = hgvs_c
+            logging.info("transcript_accession=%s, hgvs_c=%s", transcript_accession, hgvs_c)
+
 
     def _add_hgvs_g(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: TranscriptData):
         # VEP110 has a bug with --hgvsg but we hope to introduce in VEP111+
@@ -585,19 +598,20 @@ class BulkVEPVCFAnnotationInserter:
                     raise ValueError(msg)
 
                 vep_transcript_data = dict(zip(self.vep_columns, vep_transcript_columns))
+                transcript_accession = self._get_transcript_accession(vep_transcript_data)
                 gene_id = self.get_gene_id(vep_transcript_data)
                 transcript_data = self.vep_to_db_dict(vep_transcript_data, self.transcript_columns)
                 transcript_data.update(self.constant_data)
                 transcript_data["variant_id"] = variant_id
                 transcript_data["gene_id"] = gene_id
-                transcript_id, transcript_version_id = self._get_transcript_id_and_version(vep_transcript_data)
+                transcript_id, transcript_version_id = self._get_transcript_id_and_transcript_version_id(transcript_accession)
                 transcript_data["transcript_id"] = transcript_id
                 transcript_data["transcript_version_id"] = transcript_version_id
                 if symbol := transcript_data.get("symbol"):
                     overlapping_symbols.add(symbol)
                 if gene_id:
                     overlapping_gene_ids.add(gene_id)
-                self.add_calculated_transcript_columns(variant_coordinate, transcript_data)
+                self.add_calculated_transcript_columns(variant_coordinate, transcript_accession, transcript_data)
                 self.variant_transcript_annotation_list.append(transcript_data)
 
                 representative_transcript = vep_transcript_data.get(VEPColumns.PICK, False)
@@ -635,6 +649,8 @@ class BulkVEPVCFAnnotationInserter:
 
     def finish(self):
         self.bulk_insert()
+        if self._generated_hgvs_c:
+            logging.info("Generated HGVS C results: %s" % self._generated_hgvs_c)
 
     def bulk_insert(self):
         ANNOTATION_TYPE = {
