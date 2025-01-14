@@ -5,11 +5,11 @@ class MockServerErrorClinGenAlleleRegistryAPI(ClinGenAlleleRegistryAPI):
     """ This always throws ClinGenAlleleServerException """
 
     def _put(self, url, data, chunk_size=None):
-        raise ClinGenAlleleServerException("PUT", 502, {"description": "Bad Gateway"})
+        raise ClinGenAlleleServerException(url,"PUT", 502, {"description": "Bad Gateway"})
 
     @classmethod
     def get(cls, url):
-        raise ClinGenAlleleServerException("GET", 502, {"description": "Bad Gateway"})
+        raise ClinGenAlleleServerException(url,"GET", 502, {"description": "Bad Gateway"})
 
 
 class MockClinGenAlleleRegistryAPI(ClinGenAlleleRegistryAPI):

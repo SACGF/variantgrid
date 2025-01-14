@@ -21,6 +21,7 @@ import json
 import logging
 import time
 import uuid
+from functools import lru_cache
 from typing import Optional
 
 import requests
@@ -29,6 +30,7 @@ from django.conf import settings
 from library.constants import MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.django_file_utils import get_import_processing_filename
+from library.log_utils import log_traceback
 from library.utils import iter_fixed_chunks, get_single_element
 from snpdb.models import Allele, ClinGenAllele, GenomeBuild, Variant, VariantAllele, Contig, GenomeFasta, \
     VariantCoordinate
@@ -37,10 +39,10 @@ from snpdb.models.models_enums import AlleleOrigin, AlleleConversionTool, ClinGe
 
 class ClinGenAlleleServerException(ClinGenAllele.ClinGenAlleleRegistryException):
     """ Could not contact server, or response != 200 """
-    def __init__(self, method, status_code, response_json):
+    def __init__(self, url, method, status_code, response_json):
         print(f"{response_json=}")
         json_str = ", ".join([f"{k}: {v}" for k, v in response_json.items()])
-        msg = f"Error contacting ClinGen Allele Registry. Method: '{method}', Response: {status_code}, JSON: {json_str}"
+        msg = f"Error contacting ClinGen Allele Registry. {url=}, {method=}, {status_code=}. JSON: {json_str}"
         super().__init__(msg)
         self.status_code = status_code
         self.response_json = response_json
@@ -96,7 +98,9 @@ class ClinGenAlleleRegistryAPI:
     def _check_response(response: requests.Response):
         """ Throws Exception if response status code is not 200 OK """
         if response.status_code != 200:
-            raise ClinGenAlleleServerException(response.request.method, response.status_code, response.json())
+            log_traceback()
+            raise ClinGenAlleleServerException(response.url, response.request.method,
+                                               response.status_code, response.json())
 
     def _put(self, url, data, chunk_size=None):
         if chunk_size > settings.CLINGEN_ALLELE_REGISTRY_MAX_RECORDS:
@@ -145,6 +149,7 @@ class ClinGenAlleleRegistryAPI:
         return cls.get(url)
 
     @classmethod
+    @lru_cache(maxsize=1000)
     def get_hgvs(cls, hgvs_string: str):
         suffix = f"/allele?hgvs={hgvs_string}"
         url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + suffix
@@ -340,6 +345,12 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
     return va
 
 
+def _check_variant_coordinate_length(rep, variant_coordinate):
+    if variant_coordinate.length > ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE:
+        msg = f"No ClinGenAllele possible for {rep} as {variant_coordinate.length=} > {ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE=}"
+        raise ClinGenAlleleTooLargeException(msg)
+
+
 def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
                            clingen_api: ClinGenAlleleRegistryAPI = None) -> VariantAllele:
     """ Call ClinGen and setup VariantAllele - use existing if provided, otherwise create """
@@ -349,13 +360,8 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
     if clingen_api is None:
         clingen_api = ClinGenAlleleRegistryAPI()
 
+    _check_variant_coordinate_length(str(variant), variant.coordinate)
     g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
-    ca_rep_size = len(g_hgvs)
-    max_size = ClinGenAllele.CLINGEN_ALLELE_MAX_REPRESENTATION_SIZE
-    if ca_rep_size > max_size:
-        msg = f"Representation has size {ca_rep_size} which exceeds ClinGen max of {max_size}"
-        raise ClinGenAlleleTooLargeException(msg)
-
     try:
         api_response = get_single_element(list(clingen_api.hgvs_put([g_hgvs])))
     except ClinGenAlleleServerException as cgse:
@@ -415,9 +421,8 @@ def get_clingen_allele_for_variant_coordinate(genome_build: GenomeBuild, variant
         require_allele_id - set to False if you don't need ClinGen Allele ID (only using for HGVS)
     """
 
-    if variant_coordinate.length > settings.CLINGEN_ALLELE_REGISTRY_MAX_ALLELE_SIZE:
-        msg = f"No ClinGenAllele possible for {variant_coordinate=} as {variant_coordinate.length=} > {settings.CLINGEN_ALLELE_REGISTRY_MAX_ALLELE_SIZE=}"
-        raise ClinGenAlleleTooLargeException(msg)
+    rep = f"{variant_coordinate=}"
+    _check_variant_coordinate_length(rep, variant_coordinate)
 
     try:
         # Use variant if we have it in the system so we can lookup cache, or store result

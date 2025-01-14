@@ -20,7 +20,7 @@ class ClinGenAllele(TimeStampedModel):
     CLINGEN_ALLELE_SERVER_ERROR_TYPE = "ServerError"  # Set fake API response of errorType to indicate server error
     CLINGEN_ALLELE_URL_PATTERN = re.compile(r"http.*/allele/CA(\d+)$")
     CLINGEN_ALLELE_CODE_PATTERN = re.compile(r"^CA(\d+)", re.IGNORECASE)
-    CLINGEN_ALLELE_MAX_REPRESENTATION_SIZE = 10000
+    CLINGEN_ALLELE_MAX_ALLELE_SIZE = 10_000
 
     class ClinGenAlleleRegistryException(ValueError):
         """ Base exception """
