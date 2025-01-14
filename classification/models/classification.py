@@ -1,4 +1,5 @@
 import copy
+import json
 import re
 import uuid
 from collections import Counter, namedtuple
@@ -25,6 +26,7 @@ from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
+from unidecode import unidecode
 
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
 from annotation.regexes import db_ref_regexes, DbRegexes

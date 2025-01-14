@@ -43,6 +43,9 @@ class BioCommonsHGVSVariant(HGVSVariant):
     def __init__(self, sequence_variant: SequenceVariant):
         self._sequence_variant = sequence_variant
 
+    def _get_length(self) -> int:
+        return self._sequence_variant.posedit.length_change()
+
     def _get_contig_accession(self) -> str:
         return self._sequence_variant.ac
 

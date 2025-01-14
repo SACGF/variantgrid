@@ -180,8 +180,6 @@ MUTATIONAL_SIGNATURE_INFO_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "si
 
 
 VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES = ['lrg_identifier', 'refseq_transcript_accession', 'ensembl_transcript_accession']
-# If true, then if we don't have a specific transcript version, we'll match it to the closest one we can
-VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT = True
 # Use highest TranscriptVersion canonical, set False to use representative transcript (ie VEP pick = variant annotation)
 VARIANT_TRANSCRIPT_USE_TRANSCRIPT_CANONICAL = True
 
@@ -194,7 +192,6 @@ CLINGEN_ALLELE_REGISTRY_DOMAIN = "http://reg.genome.network"
 CLINGEN_ALLELE_REGISTRY_BATCH_SIZE = 1000
 CLINGEN_ALLELE_REGISTRY_MAX_RECORDS = 2000
 # From paper: The maximal nucleotide (transcript or genomic) allele size is 10,000 bp
-CLINGEN_ALLELE_REGISTRY_MAX_ALLELE_SIZE = 10_000
 CLINGEN_ALLELE_REGISTRY_LOGIN = get_secret("CLINGEN_ALLELE_REGISTRY.login")
 CLINGEN_ALLELE_REGISTRY_PASSWORD = get_secret("CLINGEN_ALLELE_REGISTRY.password")
 CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS = 10_000  # On nodes and VCFs

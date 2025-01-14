@@ -690,7 +690,8 @@ class Variant(PreviewModelMixin, models.Model):
 
     @property
     def can_have_clingen_allele(self) -> bool:
-        return self._clingen_allele_size <= settings.CLINGEN_ALLELE_REGISTRY_MAX_ALLELE_SIZE and self.can_make_g_hgvs
+        from snpdb.models.models_clingen_allele import ClinGenAllele
+        return self._clingen_allele_size <= ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE and self.can_make_g_hgvs
 
     @property
     def can_have_annotation(self) -> bool:
