@@ -129,32 +129,33 @@ const Diff = (function() {
             let modalContent = createModalShell('configureColumnsModal', 'Choose which columns to compare');
             let content = modalContent.find('.modal-body');
 
-            let compareBox = $('<table>').appendTo(content);
+            let compareBox = $('<div>').appendTo(content);
             this.versions.forEach((v, index) => {
-                let tr = $('<tr>').appendTo(compareBox);
-                let ctd = $('<td>').appendTo(tr);
                 let uniqueId = `${v.id}`;
                 if (v.version) {
                     uniqueId += `.${v.version}`;
                 }
                 
-                let checkbox = $('<input>', {type:'checkbox', id:`ch-${uniqueId}`, change:event => {
+                let checkbox = $('<input>', {type:'checkbox', class:"form-check-input", id:`ch-${uniqueId}`, click:event => {
                     let checked = $(event.target).prop('checked');
                     this.excluded[uniqueId] = !checked;
                     this.render();
-                    
-                }}).appendTo(ctd);
+                }});
                 if (!this.excluded[uniqueId]) {
                     checkbox.prop('checked', true);
                 }
-                
-                let ltd = $('<td>').appendTo(tr);
-                let label = $('<label>', {for: `ch-${uniqueId}`, text: `${v.org_name} / ${v.lab_name} / ${v.cr_lab_id}`}).appendTo(ltd);
-            });
-            modalContent.on('');
-            modalContent.modal({
+                let label = $('<label>', {class:'form', for:`ch-${uniqueId}`,  text: `${v.org_name} / ${v.lab_name} / ${v.cr_lab_id}`});
 
+                compareBox.append($('<div>', {
+                    class: 'form-group form-check',
+                    html: [checkbox, label]
+                }))
             });
+            modalContent.on('hidden.bs.modal', function() {
+                modalContent.modal('dispose');
+                modalContent.remove();
+            });
+            modalContent.modal('show');
         },
                
         dbRefCompare(versionDbRefs, source) {
