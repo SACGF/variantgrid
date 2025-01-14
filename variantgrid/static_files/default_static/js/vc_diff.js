@@ -360,7 +360,7 @@ const Diff = (function() {
             });
 
             let rowLabRecordId = $('<tr>', {class: 'group no-compare'}).appendTo(table);
-            $('<th>', {text: "Lab Id", style: 'font-weight:normal'}).appendTo(rowLabRecordId);
+            $('<th>', {text: "Lab ID", style: 'font-weight:normal'}).appendTo(rowLabRecordId);
             includedVersions.forEach(v => {
                 $('<td>', {text: v.lab_record_id}).appendTo(rowLabRecordId);
             });
