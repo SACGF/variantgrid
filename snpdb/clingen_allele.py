@@ -431,7 +431,7 @@ def get_clingen_allele_for_variant_coordinate(genome_build: GenomeBuild, variant
     """
 
     rep = f"{variant_coordinate=}"
-    is_dup = variant_coordinate.alt == VCFSymbolicAllele.DUPLICATE
+    is_dup = variant_coordinate.alt == VCFSymbolicAllele.DUP
     _check_clingen_variant_length(rep, variant_coordinate.length, is_dup=is_dup)
 
     try:
