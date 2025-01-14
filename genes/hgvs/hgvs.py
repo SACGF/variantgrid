@@ -436,6 +436,14 @@ class HGVSVariant(abc.ABC):
         pass
 
     @property
+    def length(self) -> int:
+        return self._get_length()
+
+    @abc.abstractmethod
+    def _get_length(self) -> int:
+        pass
+
+    @property
     def transcript(self) -> str:
         return self._get_transcript()
 

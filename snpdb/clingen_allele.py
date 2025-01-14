@@ -30,7 +30,7 @@ from django.conf import settings
 from library.constants import MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.django_file_utils import get_import_processing_filename
-from library.log_utils import log_traceback
+from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.utils import iter_fixed_chunks, get_single_element
 from snpdb.models import Allele, ClinGenAllele, GenomeBuild, Variant, VariantAllele, Contig, GenomeFasta, \
     VariantCoordinate
@@ -98,7 +98,6 @@ class ClinGenAlleleRegistryAPI:
     def _check_response(response: requests.Response):
         """ Throws Exception if response status code is not 200 OK """
         if response.status_code != 200:
-            log_traceback()
             raise ClinGenAlleleServerException(response.url, response.request.method,
                                                response.status_code, response.json())
 
@@ -345,9 +344,16 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
     return va
 
 
-def _check_variant_coordinate_length(rep, variant_coordinate):
-    if variant_coordinate.length > ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE:
-        msg = f"No ClinGenAllele possible for {rep} as {variant_coordinate.length=} > {ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE=}"
+
+
+def _check_clingen_variant_length(rep: str, variant_length: int, is_dup: bool = False):
+    clingen_length = variant_length
+    variant_length_desc = f"{variant_length=}"
+    if is_dup:
+        clingen_length *= 2
+        variant_length_desc += f" ({clingen_length=} for dups)"
+    if variant_length > ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE:
+        msg = f"No ClinGenAllele possible for {rep} as {variant_length_desc} > {ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE=}"
         raise ClinGenAlleleTooLargeException(msg)
 
 
@@ -360,7 +366,10 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
     if clingen_api is None:
         clingen_api = ClinGenAlleleRegistryAPI()
 
-    _check_variant_coordinate_length(str(variant), variant.coordinate)
+    variant_coordinate = variant.coordinate
+    is_dup = variant_coordinate.alt == VCFSymbolicAllele.DUPLICATE
+    _check_clingen_variant_length(str(variant), variant_coordinate.length, is_dup=is_dup)
+
     g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
     try:
         api_response = get_single_element(list(clingen_api.hgvs_put([g_hgvs])))
@@ -422,7 +431,8 @@ def get_clingen_allele_for_variant_coordinate(genome_build: GenomeBuild, variant
     """
 
     rep = f"{variant_coordinate=}"
-    _check_variant_coordinate_length(rep, variant_coordinate)
+    is_dup = variant_coordinate.alt == VCFSymbolicAllele.DUPLICATE
+    _check_clingen_variant_length(rep, variant_coordinate.length, is_dup=is_dup)
 
     try:
         # Use variant if we have it in the system so we can lookup cache, or store result

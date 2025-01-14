@@ -19,6 +19,9 @@ class PyHGVSVariant(HGVSVariant):
             raise ValueError("Double extra!")
         self._hgvs_name = hgvs_name
 
+    def _get_length(self) -> int:
+        return self._hgvs_name.end + 1 - self._hgvs_name.start
+
     def _get_contig_accession(self) -> str:
         return self._hgvs_name.chrom
 
