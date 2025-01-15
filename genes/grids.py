@@ -1,4 +1,5 @@
 import operator
+import os
 from functools import reduce
 from typing import Any, Optional
 
@@ -231,6 +232,7 @@ class CanonicalTranscriptCollectionColumns(DatatableConfig[CanonicalTranscriptCo
             RichColumn('id',
                        renderer=self.view_primary_key,
                        client_renderer='TableFormat.linkUrl'),
+            RichColumn('filename', renderer=self.render_filename),
             RichColumn('description'),
             RichColumn('annotation_consortium', orderable=True, renderer=self.render_annotation_consortium),
             RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True),
@@ -239,6 +241,11 @@ class CanonicalTranscriptCollectionColumns(DatatableConfig[CanonicalTranscriptCo
             RichColumn('enrichment_kits'),
             RichColumn('num_transcripts'),
         ]
+
+    @staticmethod
+    def render_filename(row: dict[str, Any]):
+        filename = row["filename"]
+        return os.path.basename(filename)
 
     @staticmethod
     def render_annotation_consortium(row: dict[str, Any]):
