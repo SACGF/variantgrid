@@ -1,3 +1,6 @@
+import re
+
+from bs4 import BeautifulSoup
 from django.contrib.auth.models import User
 from django.http import HttpResponse
 from django.template import engines
@@ -19,19 +22,16 @@ class ClassificationReport:
         self.classification = classification
         self.user = user
 
-    def serve(self):
-        row_datas = []
-        # only support 1 record for now
-        vcm = self.classification
-        row_data = self.row_data(vcm)
-        row_datas.append(row_data)
-
-        report = ClassificationReportTemplate.preferred_template_for(vcm)
+    def get_template(self):
+        report = ClassificationReportTemplate.preferred_template_for(self.classification)
         template_str = report.template or 'No report template has been configured'
         django_engine = engines['django']
-        template = django_engine.from_string(template_str)
-        content = template.render({'record': row_datas[0]})
+        return django_engine.from_string(template_str)
 
+    def serve(self):
+        row_data = self.row_data(self.classification)
+        template = self.get_template()
+        content = template.render({'record': row_data})
         response = HttpResponse(content=content, content_type='text/html')
         return response
 
@@ -68,3 +68,23 @@ class ClassificationReport:
         context['acmg_criteria'] = record.criteria_strength_summary(e_keys)
         context['editable'] = record.classification.can_write(self.user)
         return context
+
+    def get_unknown_evidence(self) -> set[str]:
+        row_data = self.row_data(self.classification)
+        template = self.get_template()
+        content = template.render({'record': row_data})
+        return self._get_unknown_evidence(content, row_data)
+
+    @staticmethod
+    def _get_unknown_evidence(content, row_data) -> set[str]:
+        soup = BeautifulSoup(content, "html.parser")
+        unknown_evidence = set()
+        for tag in soup.find_all(attrs={":evidence": True}):
+            evidence = tag[":evidence"]
+            if re.match(r"[{(.]", evidence):
+                continue
+            if evidence not in row_data:
+                unknown_evidence.add(evidence)
+        return unknown_evidence
+
+
