@@ -18,7 +18,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         for genome_build in GenomeBuild.builds_with_annotation():
-            hgvs_matcher = HGVSMatcher(genome_build, allow_alternative_transcript_version=False)
+            # We should have all the transcripts locally, don't fall back on ClinGen if we error as it'll
+            # probably just error there too
+            hgvs_matcher = HGVSMatcher(genome_build, clingen_resolution=False, allow_alternative_transcript_version=False)
 
             run_qs = AnnotationRun.objects.filter(pipeline_type=VariantAnnotationPipelineType.STRUCTURAL_VARIANT,
                                                   status=AnnotationStatus.FINISHED)
