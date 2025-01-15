@@ -550,8 +550,6 @@ class BulkVEPVCFAnnotationInserter:
                 self._generated_hgvs_c["error"] += 1
 
             transcript_data['hgvs_c'] = hgvs_c
-            logging.info("transcript_accession=%s, hgvs_c=%s", transcript_accession, hgvs_c)
-
 
     def _add_hgvs_g(self, variant_coordinate: Optional[VariantCoordinate], transcript_data: TranscriptData):
         # VEP110 has a bug with --hgvsg but we hope to introduce in VEP111+
