@@ -10,8 +10,21 @@ def check_classification_reports() -> dict:
         unknown_evidence = classification_report.get_unknown_evidence()
         valid = not unknown_evidence
         if unknown_evidence:
-            unknown_evidence = ", ".join(sorted(unknown_evidence))
-            fix = f"Modify ClassificationReportTemplate and fix {unknown_evidence=}"
+            unknown = []
+            colons = []
+            for k in unknown_evidence:
+                if ":" in k:
+                    colons.append(k)
+                else:
+                    unknown.append(k)
+            unknown = ",".join(unknown)
+            colons = ",".join(colons)
+            fixes = []
+            if unknown:
+                fixes.append(f"modify {unknown=}")
+            if colons:
+                fixes.append(f"change colon (':') to underscore ('_') for: {colons=}")
+            fix = f"Modify ClassificationReportTemplate: " + " and ".join(fixes)
         else:
             fix = ""
 
