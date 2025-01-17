@@ -118,7 +118,7 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
         # We don't remove duplicates due to:
         # * https://github.com/samtools/bcftools/issues/2225 - rmdup removes --old-rec-tag so lose normalize info
         # "--rm-dup=exact",
-        "--check-ref=w",
+        "--check-ref=s",  # Set ref (ie replace N with actual ref base)
         f"--old-rec-tag={ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG}",
         f"--fasta-ref={genome_build.reference_fasta}", "-",
     ]
