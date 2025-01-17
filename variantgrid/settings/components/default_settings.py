@@ -1044,6 +1044,10 @@ BASH_ZCAT = 'zcat'
 # otherwise will pipe each command into the next more safely with Shell=False
 VCF_IMPORT_PREPROCESS_POPEN_SHELL = True  # For vcf split
 
+CLASSIFICATION_DOWNLOADABLE_JSON_LITERATURE_CITATIONS = False
+CLASSIFICATION_DOWNLOADABLE_NOTES_AND_EXPLAINS = True
+CLASSIFICATION_DOWNLOADABLE_FIELDS = "*"
+
 # Bootstrapped themed messages
 from django.contrib.messages import constants as messages
 

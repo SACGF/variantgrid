@@ -6,6 +6,7 @@ from classification.models import Classification, ClassificationJsonParams, Clas
 from classification.models.classification_json_definitions import ClassificationJsonAlleleDict, \
     ClassificationJsonAlleleRevolvedDict
 from genes.hgvs import CHGVS
+from library.django_utils import get_url_from_view_path
 
 
 def get_allele_info_dict(classification: Classification) -> ClassificationJsonAlleleDict:
@@ -303,6 +304,12 @@ def populate_classification_json(classification: Classification, params: Classif
                     new_data[key] = blob
             data = new_data
         # End stripping attributes
+
+        if params.inject_source_url:
+            data[SpecialEKeys.SOURCE_URL] = {"value": get_url_from_view_path(classification.get_absolute_url())}
+
+        if params.populate_literature_with_citations:
+            data[SpecialEKeys.LITERATURE] = "\n".join(f"{citation}" for citation in classification.loaded_citations().all_citations)
 
         if flatten:
             data = Classification.flatten(data, ignore_none_values=True)

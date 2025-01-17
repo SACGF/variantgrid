@@ -205,6 +205,9 @@ class ClassificationJsonParams:
                  hardcode_extra_data: Dict = None,
                  fix_data_types=False,
                  remove_acmg_namespace: Optional[bool] = None):
+                 inject_source_url: bool = False,
+                 populate_literature_with_citations: bool = False
+                 ):
         """
         :param current_user: The user who will be consuming this data
         :param include_data: Include all the evidence for this classification (typically True for a GET and False for a POST)
@@ -216,6 +219,9 @@ class ClassificationJsonParams:
         :param api_version: 1 (typically for our own forms that haven't upgraded) 2 where the format of the data more closely mimics what you upload in a VC import
         :param hardcode_extra_data: if provided, will inject itself into the resulting JSON
         :param fix_data_types: if an evidence key has changed to/from a multiselect
+        :param remove_acmg_namespace: if True, change "acmg:bp2" to "bp2" etc for backwards compatibility
+        :param inject_source_url: if True, sets evidence key source_url to be the URL that the classification can be accessed at
+        :param populate_literature_with_citations: if True, sets evidence key literature to be a list of citations found in the classification (assumes you're not exporting literature as a raw evidence)
         """
         self.current_user = current_user
         self.include_data = include_data
@@ -229,6 +235,8 @@ class ClassificationJsonParams:
         self.hardcode_extra_data = hardcode_extra_data
         self.fix_data_types = fix_data_types
         self.remove_acmg_namespace = remove_acmg_namespace
+        self.inject_source_url = inject_source_url
+        self.populate_literature_with_citations = populate_literature_with_citations
 
 
 class PatchMeta:

@@ -128,6 +128,17 @@ class Citation(TimeStampedModel, PreviewModelMixin):
     authors_short = models.TextField(null=True, blank=True)
     abstract = models.TextField(null=True, blank=True)
 
+    def __format__(self, fmt):
+        if fmt == 'id':
+            return self.id_pretty
+        else:
+            return " ".join([p for p in [
+                self.id_pretty,
+                self.first_author,
+                self.year,
+                self.title
+            ] if p is not None])
+
     @property
     def id_pretty(self):
         return self.id.replace(":", ": ")
