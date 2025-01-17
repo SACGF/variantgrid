@@ -231,6 +231,9 @@ def populate_classification_json(classification: Classification, params: Classif
         if params.inject_source_url:
             data[SpecialEKeys.SOURCE_URL] = {"value": get_url_from_view_path(classification.get_absolute_url())}
 
+        if params.populate_literature_with_citations:
+            data[SpecialEKeys.LITERATURE] = "\n".join(f"{citation}" for citation in classification.loaded_citations().all_citations)
+
         if flatten:
             data = Classification.flatten(data, ignore_none_values=True)
 
