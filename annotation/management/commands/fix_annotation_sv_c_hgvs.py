@@ -4,10 +4,9 @@ import logging
 from collections import Counter
 
 from django.core.management.base import BaseCommand
-from django.db.models import Q, Func, Value, F
 
-from annotation.models import VariantAnnotation, VariantTranscriptAnnotation, VariantAnnotationVersion, \
-    TranscriptVersion, defaultdict, AnnotationRun, VariantAnnotationPipelineType, AnnotationStatus
+from annotation.models import VariantAnnotation, VariantTranscriptAnnotation, \
+    TranscriptVersion, AnnotationRun, VariantAnnotationPipelineType, AnnotationStatus
 from genes.hgvs import HGVSMatcher
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
@@ -57,7 +56,7 @@ class Command(BaseCommand):
                                                                                      transcript_accession)
                             hgvs_c_results["ok"] += 1
                         except Exception as e:
-                            hgvs_c = VariantAnnotation.SV_HGVS_ERROR_MESSAGE
+                            hgvs_c = None  # c.HGVS is ok to be blank
                             hgvs_c_results["error"] += 1
 
                         record.hgvs_c = hgvs_c

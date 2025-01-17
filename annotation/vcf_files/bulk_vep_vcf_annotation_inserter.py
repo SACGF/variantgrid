@@ -539,6 +539,7 @@ class BulkVEPVCFAnnotationInserter:
             return
 
         if transcript_accession:
+
             try:
                 hgvs_c = self.hgvs_matcher.variant_coordinate_to_hgvs_variant(variant_coordinate, transcript_accession)
                 self._generated_hgvs_c["OK"] += 1
@@ -546,7 +547,7 @@ class BulkVEPVCFAnnotationInserter:
             except Exception as e:
                 logging.error("Error calculating c.HGVS for '%s'/'%s': %s",
                               variant_coordinate, transcript_accession, e)
-                hgvs_c = VariantAnnotation.SV_HGVS_ERROR_MESSAGE
+                hgvs_c = None  # For c.HGVS - it's ok to be blank
                 self._generated_hgvs_c["error"] += 1
 
             transcript_data['hgvs_c'] = hgvs_c
