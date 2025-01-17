@@ -163,7 +163,8 @@ class SomalierVCFTask(ImportVCFStepTask):
         vcf = uploaded_vcf.vcf
         if vcf.has_genotype:
             somalier_vcf_id(vcf.pk)
-            somalier_all_samples()
+            # Disabled at end of VCF - see https://github.com/SACGF/variantgrid/issues/393
+            # somalier_all_samples()
 
 
 class ImportGenotypeVCFSuccessTask(ImportVCFStepTask):

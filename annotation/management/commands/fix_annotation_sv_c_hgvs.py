@@ -18,10 +18,23 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         for genome_build in GenomeBuild.builds_with_annotation():
+<<<<<<< HEAD
             hgvs_matcher = HGVSMatcher(genome_build, allow_alternative_transcript_version=False)
 
             run_qs = AnnotationRun.objects.filter(pipeline_type=VariantAnnotationPipelineType.STRUCTURAL_VARIANT,
                                                   status=AnnotationStatus.FINISHED)
+=======
+            logging.info("Fixing annotation for genome build: %s", genome_build)
+            # We should have all the transcripts locally, don't fall back on ClinGen if we error as it'll
+            # probably just error there too
+            hgvs_matcher = HGVSMatcher(genome_build, clingen_resolution=False, allow_alternative_transcript_version=False)
+
+            # In latest systems, we'll set run to 'skipped' if it didn't dump anything
+            # But historical ones will be finished with annotated count = 0 - so skip those
+            run_qs = AnnotationRun.objects.filter(pipeline_type=VariantAnnotationPipelineType.STRUCTURAL_VARIANT,
+                                                  status=AnnotationStatus.FINISHED,
+                                                  annotated_count__gt=0)
+>>>>>>> refs/heads/master
             total = run_qs.count()
             # Pull down the
             for i, ar in enumerate(run_qs):
