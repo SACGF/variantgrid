@@ -23,6 +23,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation(task_id=ManualOperation.task_id_manage(["fix_annotation_sv_c_hgvs"]),
-                        test=_check_has_sv_annotation)
+        # ManualOperation(task_id=ManualOperation.task_id_manage(["fix_annotation_sv_c_hgvs"]),
+        #                 test=_check_has_sv_annotation)
     ]
