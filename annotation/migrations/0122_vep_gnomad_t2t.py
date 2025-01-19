@@ -37,6 +37,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("annotation", "0121_vep_columns_37_38_only"),
+        ('snpdb', '0155_create_t2t_genome_build_and_contigs'),  # Where T2T GenomeBuild inserted
     ]
 
     operations = [

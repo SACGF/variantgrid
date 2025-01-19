@@ -4,10 +4,9 @@ import logging
 from collections import Counter
 
 from django.core.management.base import BaseCommand
-from django.db.models import Q, Func, Value, F
 
-from annotation.models import VariantAnnotation, VariantTranscriptAnnotation, VariantAnnotationVersion, \
-    TranscriptVersion, defaultdict, AnnotationRun, VariantAnnotationPipelineType, AnnotationStatus
+from annotation.models import VariantAnnotation, VariantTranscriptAnnotation, \
+    TranscriptVersion, AnnotationRun, VariantAnnotationPipelineType, AnnotationStatus
 from genes.hgvs import HGVSMatcher
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
@@ -17,13 +16,9 @@ class Command(BaseCommand):
     """ Only needs to be run on legacy systems that imported SV annotations before 2025-01-14 """
 
     def handle(self, *args, **options):
-        for genome_build in GenomeBuild.builds_with_annotation():
-<<<<<<< HEAD
-            hgvs_matcher = HGVSMatcher(genome_build, allow_alternative_transcript_version=False)
+        raise ValueError("Script disabled - it is not enough to change locus/ref as variants may require normalization")
 
-            run_qs = AnnotationRun.objects.filter(pipeline_type=VariantAnnotationPipelineType.STRUCTURAL_VARIANT,
-                                                  status=AnnotationStatus.FINISHED)
-=======
+        for genome_build in GenomeBuild.builds_with_annotation():
             logging.info("Fixing annotation for genome build: %s", genome_build)
             # We should have all the transcripts locally, don't fall back on ClinGen if we error as it'll
             # probably just error there too
@@ -34,7 +29,6 @@ class Command(BaseCommand):
             run_qs = AnnotationRun.objects.filter(pipeline_type=VariantAnnotationPipelineType.STRUCTURAL_VARIANT,
                                                   status=AnnotationStatus.FINISHED,
                                                   annotated_count__gt=0)
->>>>>>> refs/heads/master
             total = run_qs.count()
             # Pull down the
             for i, ar in enumerate(run_qs):
@@ -64,7 +58,7 @@ class Command(BaseCommand):
                                                                                      transcript_accession)
                             hgvs_c_results["ok"] += 1
                         except Exception as e:
-                            hgvs_c = VariantAnnotation.SV_HGVS_ERROR_MESSAGE
+                            hgvs_c = None  # c.HGVS is ok to be blank
                             hgvs_c_results["error"] += 1
 
                         record.hgvs_c = hgvs_c
