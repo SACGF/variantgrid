@@ -82,7 +82,7 @@ class Command(BaseCommand):
                 logging.info("Wrote normalized VCF: %s", vcf_output_filename)
 
                 reader = cyvcf2.Reader(vcf_output_filename)
-                variant_new_locus = []
+                modified_imported_variants = []
                 loci_update_ref = []
                 loci_old_new = {}
 
@@ -120,6 +120,13 @@ class Command(BaseCommand):
                             locus.ref = ref
                             loci_update_ref.append(locus)
                     else:
+                        bcftools_old_variant = variant.INFO[ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG]
+                        for ov in ModifiedImportedVariant.bcftools_format_old_variant(bcftools_old_variant, svlen, genome_build):
+                            miv = ModifiedImportedVariant(variant=variant,
+                                                          old_variant=bcftools_old_variant,
+                                                          old_variant_formatted=ov)
+                            modified_imported_variants.append(miv)
+
                         # Shifted position
                         new_locus, existing = Locus.objects.get_or_create(contig_id=contig_id, position=normalized_vc.position, ref=ref)
                         loci_old_new[locus] = new_locus
@@ -162,11 +169,16 @@ class Command(BaseCommand):
                         if not dry_run:
                             Variant.objects.bulk_update(variant_update_locus, ['locus'], batch_size=256)
 
-                        # TODO: Delete unused loci now (new QS so it isn't cached)
+                        if modified_imported_variants:
+                            logging.info("Inserting MIV for normalized variants: %d", len(modified_imported_variants))
+                            ModifiedImportedVariant.objects.bulk_create(modified_imported_variants)
+
                         if not dry_run:
                             logging.info("Deleting unused loci")
                             q_locus_contig = Q(contig__genomebuildcontig__genome_build=genome_build)
                             Locus.objects.filter(q_locus_contig, ref=seq_n, variant__isnull=True).delete()
+
+
 
                     if variant_not_updated:
                         logging.info("%s: Variants that could not be updated due to dupes: %d", genome_build, len(variant_not_updated))
