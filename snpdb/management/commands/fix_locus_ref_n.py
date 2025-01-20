@@ -22,6 +22,8 @@ class Command(BaseCommand):
 
     """
     def handle(self, *args, **options):
+        raise ValueError("Script disabled - it is not enough to change locus/ref as variants may require normalization")
+
         seq_n = Sequence.objects.filter(seq='N').first()
         single_base_seq = {seq.seq: seq for seq in Sequence.objects.filter(seq__in='GATC')}
 
