@@ -81,8 +81,8 @@ class VariantTestCase(TestCase):
         vc = VariantCoordinate(chrom='10', position=89714001, ref=ref, alt=long_alt)
         vc_s = vc.as_internal_symbolic(self.grch37)
         # This is not symbolic, it's a multi-alt
-        self.assertEquals(vc.ref, vc_s.ref)
-        self.assertEquals(vc.alt, vc_s.alt)
+        self.assertEqual(vc.ref, vc_s.ref)
+        self.assertEqual(vc.alt, vc_s.alt)
 
     def test_delins(self):
         # clinvar variation 869248
