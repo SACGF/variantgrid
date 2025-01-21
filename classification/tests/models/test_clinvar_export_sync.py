@@ -32,4 +32,4 @@ class TestClinVarExportSync(TestCase):
         )
 
         status = ClinVarExportSync()._handle_polling(request)
-        self.assertEquals(status, ClinVarResponseOutcome.ASK_AGAIN_LATER)
+        self.assertEqual(status, ClinVarResponseOutcome.ASK_AGAIN_LATER)

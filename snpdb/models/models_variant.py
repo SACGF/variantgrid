@@ -424,6 +424,13 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             vc = self
         return vc
 
+    def as_contig_accession(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
+        contig = genome_build.chrom_contig_mappings[self.chrom]
+        return VariantCoordinate(chrom=contig.refseq_accession,
+                                 position=self.position, ref=self.ref, alt=self.alt, svlen=self.svlen)
+
+
+
 
 class Sequence(models.Model):
     """

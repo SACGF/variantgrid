@@ -16,8 +16,6 @@ class Command(BaseCommand):
     """ Only needs to be run on legacy systems that imported SV annotations before 2025-01-14 """
 
     def handle(self, *args, **options):
-        raise ValueError("Script disabled - it is not enough to change locus/ref as variants may require normalization")
-
         for genome_build in GenomeBuild.builds_with_annotation():
             logging.info("Fixing annotation for genome build: %s", genome_build)
             # We should have all the transcripts locally, don't fall back on ClinGen if we error as it'll
