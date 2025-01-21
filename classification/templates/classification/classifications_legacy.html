@@ -192,6 +192,9 @@
                     </p>
                 {% endif %}
                 <p>
+                This is the one classification per row view, This view is useful if you are editing the classifications directly and want to find a specific record rather than the consensus.
+                </p>
+                <p>
                 Export the grid below by clicking the CSV {% if CLASSIFICATION_REDCAP_EXPORT %} or REDCap {% endif %}buttons on the bottom left of the grid.<br/>
                 The export will be using your default genome build.<br/>
                 </p>
@@ -248,6 +251,10 @@
                         </table>
                         <div class="clear"></div>
                     </div>
+                </div>
+
+                <div class="col-md-2 mt-2">
+                    <a class="hover-link font-italic" href="?legacy=false">Switch to grouped record mode</a>
                 </div>
             </div>
 

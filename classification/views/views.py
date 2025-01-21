@@ -130,7 +130,7 @@ def classifications(request):
     Classification listing page
     """
 
-    legacy = bool(request.GET.get("legacy"))
+    legacy = request.GET.get("legacy") == "true"
 
     # is cached on the request
     user_settings = UserSettingsManager.get_user_settings()
