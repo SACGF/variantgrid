@@ -113,37 +113,41 @@ class Command(BaseCommand):
                         "new_coordinate": str(normalized_vc),
                     }
 
-                    locus = variant.locus
-                    ref = single_base_seq[normalized_vc.ref.upper()]
-                    contig_id = chrom_contig_id_mappings[normalized_vc.chrom]
-
-                    # if contig/position is the same - can update locus
-                    if (vc.chrom, vc.position) == (normalized_vc.chrom, normalized_vc.position):
-                        if existing_locus := Locus.objects.filter(contig_id=contig_id,
-                                                                  position=normalized_vc.position,
-                                                                  ref=ref).first():
-                            operation = "change to existing locus"
-                            loci_old_new[locus] = existing_locus
-                        else:
-                            operation = "replace locus ref"
-                            # Update this locus to be the new one
-                            locus.ref = ref
-                            loci_update_ref.append(locus)
+                    if normalized_vc.ref == 'N':
+                        operation = "n/a - actually ref=N"
                     else:
-                        bcftools_old_variant = record.INFO[ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG]
-                        for ov in ModifiedImportedVariant.bcftools_format_old_variant(bcftools_old_variant, svlen, genome_build):
-                            miv = ModifiedImportedVariant(variant=variant,
-                                                          old_variant=bcftools_old_variant,
-                                                          old_variant_formatted=ov)
-                            modified_imported_variants.append(miv)
+                        locus = variant.locus
+                        ref = single_base_seq[normalized_vc.ref.upper()]
+                        contig_id = chrom_contig_id_mappings[normalized_vc.chrom]
 
-                        # Shifted position
-                        new_locus, existing = Locus.objects.get_or_create(contig_id=contig_id, position=normalized_vc.position, ref=ref)
-                        loci_old_new[locus] = new_locus
-                        if existing:
-                            operation = "shift to existing locus"
+                        # if contig/position is the same - can update locus
+                        if (vc.chrom, vc.position) == (normalized_vc.chrom, normalized_vc.position):
+                            if existing_locus := Locus.objects.filter(contig_id=contig_id,
+                                                                      position=normalized_vc.position,
+                                                                      ref=ref).first():
+                                operation = "change to existing locus"
+                                loci_old_new[locus] = existing_locus
+                            else:
+                                operation = "replace locus ref"
+                                # Update this locus to be the new one
+                                locus.ref = ref
+                                loci_update_ref.append(locus)
                         else:
-                            operation = "shift to new locus"
+                            bcftools_old_variant = record.INFO[ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG]
+                            for ov in ModifiedImportedVariant.bcftools_format_old_variant(bcftools_old_variant, svlen, genome_build):
+                                miv = ModifiedImportedVariant(variant=variant,
+                                                              old_variant=bcftools_old_variant,
+                                                              old_variant_formatted=ov)
+                                modified_imported_variants.append(miv)
+
+                            # Shifted position
+                            new_locus, existing = Locus.objects.get_or_create(contig_id=contig_id, position=normalized_vc.position, ref=ref)
+                            loci_old_new[locus] = new_locus
+                            if existing:
+                                operation = "shift to existing locus"
+                            else:
+                                operation = "shift to new locus"
+
                     change_count[operation] += 1
                     modification_data["operation"] = operation
                     modification_log_records.append(modification_data)
