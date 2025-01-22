@@ -35,8 +35,6 @@ class Command(BaseCommand):
         dry_run = options["dry_run"]
         date_iso = datetime.now().isoformat()
         processing_dir = os.path.join(settings.PRIVATE_DATA_ROOT, 'fix_variant_ref_n')
-        modification_log_csv = os.path.join(processing_dir, f"update_log_{date_iso}.csv")
-        modification_log_records = []
 
         seq_n = Sequence.objects.filter(seq='N').first()
         single_base_seq = {seq.seq: seq for seq in Sequence.objects.filter(seq__in='GATC')}
@@ -87,6 +85,8 @@ class Command(BaseCommand):
                 logging.info("Wrote normalized VCF: %s", vcf_output_filename)
 
                 reader = cyvcf2.Reader(vcf_output_filename)
+                modification_log_csv = os.path.join(processing_dir, f"update_log_{genome_build.name}_{date_iso}.csv")
+                modification_log_records = []
                 modified_imported_variants = []
                 loci_update_ref = []
                 loci_old_new = {}
@@ -153,6 +153,13 @@ class Command(BaseCommand):
                     modification_log_records.append(modification_data)
 
                 logging.info("Updates: %s", change_count)
+
+                if modification_log_records:
+                    # Write this out first, per build, in case things crash
+                    logging.info(f"Writing {len(modification_log_records)} records to {modification_log_csv=}")
+                    df = pd.DataFrame.from_records(modification_log_records)
+                    df.to_csv(modification_log_csv, index=False)
+
                 if loci_update_ref:
                     logging.info("%s: Updating %d ref sequences", genome_build, len(loci_update_ref))
                     if not dry_run:
@@ -211,8 +218,3 @@ class Command(BaseCommand):
                         df = pd.DataFrame.from_records(records)
                         logging.error(f"Could not modify {len(variant_conflicts)} variants due to conflicts. Wrote to '{variant_conflict_log_csv}'")
                         df.to_csv(variant_conflict_log_csv, index=False)
-
-        logging.info(f"Writing {len(modification_log_records)} records to {modification_log_csv=}")
-        df = pd.DataFrame.from_records(modification_log_records)
-        df.to_csv(modification_log_csv, index=False)
-
