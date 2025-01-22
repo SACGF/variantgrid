@@ -15,7 +15,7 @@ _INSTALL_PED_PARSER_MADELINE2 = "https://github.com/SACGF/variantgrid/wiki/Insta
 
 def _check_bcftools_version():
     tv = get_bcftools_tool_version(settings.BCFTOOLS_COMMAND)
-    if m := re.match("^bcftools (\d+)\.(\d+).*?,", tv.version):
+    if m := re.match(r"^bcftools (\d+)\.(\d+).*?,", tv.version):
         major_version, minor_version = m.groups()
         return (int(major_version), int(minor_version)) >= _REQUIRED_BCFTOOLS_VERSION
     return False
