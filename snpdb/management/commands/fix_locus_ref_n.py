@@ -108,7 +108,6 @@ class Command(BaseCommand):
 
                     modification_data = {
                         "variant_id": record.ID,
-                        "genome_build": genome_build.name,
                         "old_coordinate": str(vc),
                         "new_coordinate": str(normalized_vc),
                     }
