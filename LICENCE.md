@@ -2,7 +2,7 @@ Business Source License 1.1
 
 Parameters
 
-Licensor:             SA Pathology and The University of South Australia
+Licensor:             SA Pathology on behalf of Central Adelaide Local Health Network Incorporated (ABN: 96 269 526 412), a division of SA Health.
 
 Licensed Work:        VariantGrid
 
