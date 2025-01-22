@@ -15,8 +15,7 @@ Change Date:          4 years from the commit date in source control
 Change License:       GNU Affero General Public License v3
 
 For information about alternative licensing arrangements for the Software,
-please visit: http://variantgrid.com or contact UniSA ventures at 
-unisaventures@unisa.edu.au
+please visit: http://variantgrid.com or contact David Lawrence at david.lawrence@sa.gov.au
 
 Notice
 
