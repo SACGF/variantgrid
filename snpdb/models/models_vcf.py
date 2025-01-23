@@ -26,7 +26,7 @@ from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from patients.models import FakeData, Patient, Specimen
 from patients.models_enums import Sex
 from snpdb.models.models import Tag, LabProject
-from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus, SampleFileType
+from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus, SampleFileType, VCFInfoTypes
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
 from snpdb.models.models_variant import Variant, VariantCollection, AlleleSource
@@ -230,6 +230,26 @@ def vcf_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unuse
         pass
 
 
+class AbstractVCFField(models.Model):
+    """ Base class of INFO/FORMAT read from VCF Header """
+    vcf = models.ForeignKey(VCF, on_delete=CASCADE)
+    identifier = models.CharField(max_length=20, unique=True)  # ID
+    number = models.CharField(max_length=10)  # not int so as to allow values like "." or "A"
+    data_type = models.CharField(max_length=1, choices=VCFInfoTypes.choices)
+    description = models.TextField()
+
+    class Meta:
+        abstract = True
+        unique_together = ('vcf', 'identifier')
+
+
+class VCFInfo(AbstractVCFField):
+    COHORT_GENOTYPE_FIELD = "info"
+
+class VCFFormat(AbstractVCFField):
+    COHORT_GENOTYPE_FIELD = "format"
+
+
 # These are VCF Filters (which are per-row - hence per-locus)
 # We read them from the VCF header, and assign each filter to a character code.
 # This is then stored (in alphabetical order) for each locus with filters.
@@ -263,6 +283,7 @@ class VCFFilter(models.Model):
 
 
 class VCFTag(models.Model):
+    # Is this being used?
     tag = models.ForeignKey(Tag, on_delete=CASCADE)
     vcf = models.ForeignKey(VCF, on_delete=CASCADE)
 
