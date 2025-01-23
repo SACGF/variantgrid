@@ -114,7 +114,7 @@ class GeneSymbolAutocompleteView(AutocompleteView):
             qs = qs.filter(geneversion__gene__annotation_consortium=annotation_consortium)
         if self.q:
             # Make it start with the query not just contain it
-            qs = qs.filter(symbol_deterministic__startswith=self.q)
+            qs = qs.filter(symbol_deterministic__istartswith=self.q)
         return qs.distinct()
 
 
