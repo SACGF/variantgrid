@@ -1,5 +1,7 @@
 from collections import defaultdict
 
+from django.conf import settings
+
 from classification.enums import ShareLevel, EvidenceKeyValueType, SpecialEKeys
 from classification.models import Classification, ClassificationJsonParams, ClassificationModification, EvidenceKeyMap, \
     ImportedAlleleInfo
@@ -309,7 +311,10 @@ def populate_classification_json(classification: Classification, params: Classif
             data[SpecialEKeys.SOURCE_URL] = {"value": get_url_from_view_path(classification.get_absolute_url())}
 
         if params.populate_literature_with_citations:
-            data[SpecialEKeys.LITERATURE] = "\n".join(f"{citation}" for citation in classification.loaded_citations().all_citations)
+            if citations := classification.loaded_citations().all_citations:
+                data[SpecialEKeys.LITERATURE] = f"Citations scanned from this classification by {settings.SITE_NAME}\n" + "\n".join(f"{citation}" for citation in citations)
+            else:
+                data[SpecialEKeys.LITERATURE] = None
 
         if flatten:
             data = Classification.flatten(data, ignore_none_values=True)
