@@ -1083,7 +1083,7 @@ class ResolvedVariantInfoAdmin(ModelAdminBasics):
         if c_hgvs == c_hgvs_compatible:
             return c_hgvs
         else:
-            return SafeString(f"<em>coninical</em><br/>{c_hgvs}<br/><em>c_hgvs_compatible</em><br/>{c_hgvs_compatible}")
+            return SafeString(f"<em>canonical</em><br/>{c_hgvs}<br/><em>c_hgvs_compatible</em><br/>{c_hgvs_compatible}")
 
     def has_add_permission(self, request):
         return False
