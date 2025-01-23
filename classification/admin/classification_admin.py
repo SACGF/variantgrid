@@ -1064,12 +1064,26 @@ class ResolvedVariantInfoAdmin(ModelAdminBasics):
         'allele_info',
         'genome_build',
         'variant',
-        'c_hgvs',
+        'c_hgvs_both',
         'gene_symbol',
         'transcript_version',
         'genomic_sort',
         'error'
     )
+
+    search_fields = (
+        'c_hgvs',
+        'c_hgvs_compat'
+    )
+
+    @admin_list_column(short_description="c.HGVS", order_field="c_hgvs")
+    def c_hgvs_both(self, obj: ResolvedVariantInfo):
+        c_hgvs = obj.c_hgvs
+        c_hgvs_compatible = obj.c_hgvs_compat
+        if c_hgvs == c_hgvs_compatible:
+            return c_hgvs
+        else:
+            return SafeString(f"<em>coninical</em><br/>{c_hgvs}<br/><em>c_hgvs_compatible</em><br/>{c_hgvs_compatible}")
 
     def has_add_permission(self, request):
         return False
