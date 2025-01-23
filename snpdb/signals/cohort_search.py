@@ -9,4 +9,8 @@ from snpdb.search import search_receiver, SearchInputInstance, SearchExample
     )
 )
 def search_cohort(search_input: SearchInputInstance):
-    yield Cohort.filter_for_user(search_input.user).filter(genome_build__in=search_input.genome_builds).filter(search_input.q_words())
+    q = search_input.q_words()
+    qs = Cohort.filter_for_user(search_input.user).filter(q,
+                                                          genome_build__in=search_input.genome_builds,
+                                                          vcf__isnull=True)  # These will show up in VCF search
+    yield qs
