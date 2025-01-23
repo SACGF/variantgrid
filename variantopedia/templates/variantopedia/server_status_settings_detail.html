@@ -1,5 +1,10 @@
 {% load js_tags %}
 {% load ui_utils %}
+<style>
+    .disabled-function {
+        opacity: 0.5;
+    }
+</style>
 <div class="container">
 
     <h4>Debug</h4>
@@ -15,19 +20,19 @@
     </form>
 
     <div class="row equal">
-        <div class="col-6">
+        <div class="col-12 col-md-6">
             <div class="card mb-4">
                 <div class="card-header">Basics</div>
                 <div class="card-body">
                     {% labelled hint="tiny" label="Site Name" %}{{ site_name }}{% endlabelled %}
-                    {% labelled hint="tiny" label="Debug" %}{{ settings.DEBUG }}{% endlabelled %}
-                    {% labelled hint="tiny" label="Send Emails" %}{{ settings.SEND_EMAILS }}{% endlabelled %}
+                    {% labelled hint="tiny" label="Debug" %}{{ settings.DEBUG | boolean }}{% endlabelled %}
+                    {% labelled hint="tiny" label="Send Emails" %}{{ settings.SEND_EMAILS | boolean }}{% endlabelled %}
                 </div>
             </div>
         </div>
-        <div class="col-6">
-            <div class="card mb-4">
-                <div class="card-header">ClinVar</div>
+        <div class="col-12 col-md-6">
+            <div class="card mb-4 {% if not settings.CLINVAR_EXPORT.mode %}disabled-function{% endif %}">
+                <div class="card-header"><i class="fa-solid fa-earth-americas"></i> ClinVar</div>
                 <div class="card-body">
                     {% labelled hint="tiny" label="Mode" %}{{ settings.CLINVAR_EXPORT.mode }}{% endlabelled %}
                     {% labelled hint="tiny" label="Org ID" %}{{ settings.CLINVAR_EXPORT.org_id }}{% endlabelled %}
@@ -35,31 +40,31 @@
                 </div>
             </div>
         </div>
-        <div class="col-6">
+        <div class="col-12 col-md-6">
             <div class="card mb-4">
-                <div class="card-header">Slack</div>
+                <div class="card-header"><i class="fa-brands fa-slack"></i> Slack</div>
                 <div class="card-body">
-                    {% labelled hint="tiny" label="Enabled" %}{{ settings.SLACK.enabled }}{% endlabelled %}
+                    {% labelled hint="tiny" label="Enabled" %}{{ settings.SLACK.enabled | boolean }}{% endlabelled %}
                     {% labelled hint="tiny" label="SlackBot Username" %}{{ slack_bot_username }}{% endlabelled %}
                     {% labelled hint="tiny" label="Callback URL" %}{{ settings.SLACK.admin_callback_url|secret:-4 }}{% endlabelled %}
-                    {% labelled hint="tiny" label="Auto Health Check" %}{{ settings.HEALTH_CHECK_ENABLED }}{% endlabelled %}
+                    {% labelled hint="tiny" label="Auto Health Check" %}{{ settings.HEALTH_CHECK_ENABLED | boolean }}{% endlabelled %}
                 </div>
             </div>
         </div>
-        <div class="col-6">
-            <div class="card mb-4">
-                <div class="card-header">Rollbar</div>
+        <div class="col-12 col-md-6">
+            <div class="card mb-4 {% if not settings.ROLLBAR.enabled %}disabled-function{% endif %}">
+                <div class="card-header"><i class="fa-solid fa-bug"></i> Rollbar</div>
                 <div class="card-body">
-                    {% labelled hint="tiny" label="Enabled" %}{{ settings.ROLLBAR.enabled }}{% endlabelled %}
+                    {% labelled hint="tiny" label="Enabled" %}{{ settings.ROLLBAR.enabled | boolean }}{% endlabelled %}
                     {% labelled hint="tiny" label="Access Token" %}{{ settings.ROLLBAR.access_token|secret }}{% endlabelled %}
                 </div>
             </div>
         </div>
-        <div class="col-6">
-            <div class="card mb-4">
-                <div class="card-header">Discordance</div>
+        <div class="col-12 col-md-6">
+            <div class="card mb-4 {% if not settings.DISCORDANCE_ENABLED %}disabled-function{% endif %}">
+                <div class="card-header"><i class="fa-solid fa-code-fork"></i> Discordance</div>
                 <div class="card-body">
-                    {% labelled hint="tiny" label="Enabled" %}{{ settings.DISCORDANCE_ENABLED }}{% endlabelled %}
+                    {% labelled hint="tiny" label="Enabled" %}{{ settings.DISCORDANCE_ENABLED | boolean }}{% endlabelled %}
                     {% if settings.DISCORDANCE_ENABLED %}
                         {% labelled hint="tiny" label="Discordance Email" %}{{ settings.DISCORDANCE_EMAIL }}{% endlabelled %}
                         {% labelled hint="tiny" label="Ongoing Imports" %}{{ ongoing_imports | default_if_none:'None' }}{% endlabelled %}
@@ -68,33 +73,34 @@
             </div>
         </div>
 
-        <div class="col-6">
+        <div class="col-12 col-md-6">
             <div class="card mb-4">
-                <div class="card-header">Variant Matching</div>
+                <div class="card-header"><i class="fa-solid fa-magnifying-glass-location"></i> Variant Matching</div>
                 <div class="card-body">
                     {% labelled hint="tiny" label="Variant Matching Method" %}{{ settings.HGVS_DEFAULT_METHOD }}{% endlabelled %}
-                    {% labelled hint="tiny" label="Matcher Version" %}{{ hgvs_matcher.hgvs_converter.description }}{% endlabelled %}
-                    {% labelled hint="tiny" label="Attempt ClinGen" %}{{ hgvs_matcher.attempt_clingen }}{% endlabelled %}
+                    {% labelled hint="tiny" label="Symbolic Variant Resolution Enabled" %}{{ settings.VARIANT_SYMBOLIC_ALT_ENABLED | boolean }}{% endlabelled %}
+                    {% labelled hint="tiny" label="Attempt ClinGen" %}{{ hgvs_matcher.attempt_clingen | boolean }}{% endlabelled %}
+                    {% labelled hint="chunky" label="Matcher Version" value_css="text-secondary" %}{{ hgvs_matcher.hgvs_converter.description }}{% endlabelled %}
                 </div>
             </div>
         </div>
 
-        <div class="col-6">
+        <div class="col-12 col-md-6">
             <div class="card mb-4">
-                <div class="card-header">VEP</div>
+                <div class="card-header"><i class="fa-solid fa-list-check"></i> VEP</div>
                 <div class="card-body">
                     {% labelled hint="tiny" label="VEP Version" %}{{ settings.ANNOTATION_VEP_VERSION }}{% endlabelled %}
-                    {% labelled hint="tiny" label="VEP Base Directory" %}{{ settings.ANNOTATION_VEP_VERSION_DIR }}{% endlabelled %}
+                    {% labelled hint="chunky" label="VEP Base Directory" value_css="text-secondary" %}{{ settings.ANNOTATION_VEP_VERSION_DIR }}{% endlabelled %}
                 </div>
             </div>
         </div>
 
-        <div class="col-6">
-            <div class="card mb-4">
-                <div class="card-header">BCFtools Liftover</div>
+        <div class="col-12 col-md-6">
+            <div class="card mb-4 {% if not settings.LIFTOVER_BCFTOOLS_ENABLED %}disabled-function{% endif %}">
+                <div class="card-header"><i class="fa-solid fa-elevator"></i> BCFtools Liftover</div>
                 <div class="card-body">
-                    {% labelled hint="tiny" label="BCFtools Liftover Enabled" %}{{ settings.LIFTOVER_BCFTOOLS_ENABLED }}{% endlabelled %}
-                    {% labelled hint="tiny" label="BCF Plugin Directory" %}{{ settings.LIFTOVER_BCFTOOLS_PLUGIN_DIR }}{% endlabelled %}
+                    {% labelled hint="tiny" label="BCFtools Liftover Enabled" %}{{ settings.LIFTOVER_BCFTOOLS_ENABLED | boolean }}{% endlabelled %}
+                    {% labelled hint="chunky" label="BCF Plugin Directory" value_css="text-secondary" %}{{ settings.LIFTOVER_BCFTOOLS_PLUGIN_DIR }}{% endlabelled %}
                 </div>
             </div>
         </div>
