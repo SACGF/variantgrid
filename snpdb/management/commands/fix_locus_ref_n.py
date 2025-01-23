@@ -32,6 +32,7 @@ class Command(BaseCommand):
         parser.add_argument('--dry-run', action='store_true')
 
     def handle(self, *args, **options):
+        raise ValueError("Don't run this - I think it's better to just re-import variants")
         dry_run = options["dry_run"]
         date_iso = datetime.now().isoformat()
         processing_dir = os.path.join(settings.PRIVATE_DATA_ROOT, 'fix_variant_ref_n')

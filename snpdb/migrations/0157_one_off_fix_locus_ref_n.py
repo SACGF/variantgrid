@@ -17,6 +17,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation(task_id=ManualOperation.task_id_manage(["fix_locus_ref_n"]),
-                        test=_check_locus_ref_n)
+        # ManualOperation(task_id=ManualOperation.task_id_manage(["fix_locus_ref_n"]),
+        #                 test=_check_locus_ref_n)
     ]
