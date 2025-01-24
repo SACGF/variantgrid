@@ -56,7 +56,7 @@ def check_vep() -> dict:
                     diff = vav_diff_vs_kwargs(vav, vep_vav_kwargs)
                     warning = None
                     if diff:
-                        warning = "Lastest VariantAnnotationVersion doesn't match current VEP settings " + \
+                        warning = "Latest VariantAnnotationVersion doesn't match current VEP settings " + \
                                   f"(warning only as this may be what you want). {diff=} Upgrade via '{create_vav_cmd}'"
                     vep_data[f"latest_variant_annotation_{genome_build}_matches_current_vep"] = {
                         "valid": True,
