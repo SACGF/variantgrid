@@ -4,6 +4,7 @@ from tempfile import NamedTemporaryFile
 
 from cyvcf2 import Reader
 from django.core.management.base import BaseCommand
+from django.db.models import QuerySet
 from django.db.models.query_utils import Q
 
 from library.genomics.vcf_utils import cyvcf2_header_types
@@ -20,23 +21,29 @@ class Command(BaseCommand):
         So 21-24 we can just re-read the header and make these models. Prior to 21 we'll have to reload the VCF
         completely
     """
+    importer_name = "PythonKnownVariantsImporter"
+    v_info_format_min = 21
+    v_info_format_max = 24
+    q_header_has_info_or_format = Q(header__icontains='INFO') | Q(header__icontains='INFO')
+
+    @classmethod
+    def get_historical_vcf_qs_total_and_not_updated(cls, VCF: type) -> tuple[QuerySet]:
+        qs_old_version = VCF.objects.filter(cls.q_header_has_info_or_format,
+                                            uploadedvcf__vcf_importer__name=cls.importer_name,
+                                            uploadedvcf__vcf_importer__version__gte=cls.v_info_format_min,
+                                            uploadedvcf__vcf_importer__version__lte=cls.v_info_format_max)
+
+        not_updated_qs = qs_old_version.filter(vcfinfo__isnull=True, vcfformat__isnull=True)
+        return qs_old_version, not_updated_qs
+
+
     def handle(self, *args, **options):
-        importer_name = "PythonKnownVariantsImporter"
-        v_info_format_min = 21
-        v_info_format_max = 24
-
-        q_header_has_info_or_format = Q(header__icontains='INFO') | Q(header__icontains='INFO')
-        qs_old_version = VCF.objects.filter(q_header_has_info_or_format,
-                                            uploadedvcf__vcf_importer__name=importer_name,
-                                            uploadedvcf__vcf_importer__version__gte=v_info_format_min,
-                                            uploadedvcf__vcf_importer__version__lte=v_info_format_max)
-
+        qs_old_version, not_updated_qs = self.get_historical_vcf_qs_total_and_not_updated(VCF)
         logging.info("VCFs v%d - v%d with INFO/FORMAT header we can reprocess header only: %d",
-                     v_info_format_min, v_info_format_max, qs_old_version.count())
+                     self.v_info_format_min, self.v_info_format_max, qs_old_version.count())
 
-        qs_can_add_models = qs_old_version.filter(vcfinfo__isnull=True, vcfformat__isnull=True)
-        logging.info("Number without models: %d", qs_can_add_models.count())
-        for vcf in qs_can_add_models:
+        logging.info("Number without models: %d", not_updated_qs.count())
+        for vcf in not_updated_qs:
             header_types = self.get_header_types(vcf)
             create_vcf_info(vcf, header_types.get("INFO", {}))
             create_vcf_format(vcf, header_types.get("FORMAT", {}))
@@ -45,9 +52,9 @@ class Command(BaseCommand):
             logging.info("%s: INFO: %s, FORMAT: %s", vcf, ','.join(info_vals), ','.join(format_vals))
 
 
-        qs_need_reload = VCF.objects.filter(q_header_has_info_or_format,
-                                            uploadedvcf__vcf_importer__name=importer_name,
-                                            uploadedvcf__vcf_importer__version__lt=v_info_format_min)
+        qs_need_reload = VCF.objects.filter(self.q_header_has_info_or_format,
+                                            uploadedvcf__vcf_importer__name=self.importer_name,
+                                            uploadedvcf__vcf_importer__version__lt=self.v_info_format_min)
         if num_vcfs_need_reload := qs_need_reload.count():
             print(f"VCFs with INFO/FORMAT header that need to be reloaded {num_vcfs_need_reload}")
 
