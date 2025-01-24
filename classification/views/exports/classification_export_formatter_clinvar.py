@@ -134,7 +134,7 @@ class ClinVarCompareRow(ClinVarCompareRowAbstract):
     def _allele_url(self) -> str:
         return self.allele_url
 
-    @export_column("Clinvar URL")
+    @export_column("ClinVar URL")
     def _clinvar_url(self) -> str:
         return self.clinvar_url
 
