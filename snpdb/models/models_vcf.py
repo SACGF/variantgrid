@@ -233,8 +233,8 @@ def vcf_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unuse
 class AbstractVCFField(models.Model):
     """ Base class of INFO/FORMAT read from VCF Header """
     vcf = models.ForeignKey(VCF, on_delete=CASCADE)
-    identifier = models.CharField(max_length=20, unique=True)  # ID
-    number = models.CharField(max_length=10)  # not int so as to allow values like "." or "A"
+    identifier = models.TextField()  # ID
+    number = models.TextField()  # not int so as to allow values like "." or "A"
     data_type = models.CharField(max_length=1, choices=VCFInfoTypes.choices)
     description = models.TextField()
 
