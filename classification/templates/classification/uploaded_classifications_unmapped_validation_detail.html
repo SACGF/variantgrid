@@ -21,7 +21,7 @@
                     <tr>
                         <td>{{ validation_row.filename_line_number }}</td>
                         <td>{{ validation_row.severity | severity_icon}} {{ validation_row.category }}</td>
-                        <td><span class="formatted-text-new-lines">{{ validation_row.message }}</span></td>
+                        <td>{{ validation_row.message_html }}</td>
                     </tr>
                 {% endfor %}
             </tbody>
