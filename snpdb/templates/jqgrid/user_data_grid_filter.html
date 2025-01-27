@@ -1,36 +1,36 @@
 <div class='user-data-grid-filter-panel'>
 <script>
 	$(document).ready(function() {
-		var grid_id = "{{ grid_id }}";
-		var grid_name =  '{{ caption }}';
-		
-		function send_user_data_update(extra_data) {
-            var data = 'grid_name=' + grid_name + extra_data;
+        const grid_id = "{{ grid_id }}";
+        const grid_name = '{{ caption }}';
+
+        function send_user_data_update(extra_data) {
+            const data = 'grid_name=' + grid_name + extra_data;
             console.log(data);
             $.ajax({
                 type: "POST",
                 data: data,
                 url: '{% url 'set_user_data_grid_config' %}',
                 success: function(data) {
-                    var grid = $("#" + grid_id).trigger("reloadGrid");
+                    const grid = $("#" + grid_id).trigger("reloadGrid");
                 },
             });
 		}
-		
-		
-		var form = $('#user-data-grid-filter-form-{{ grid_id }}');
-		
-		$("input[type='checkbox']", form).change(function() {
+
+
+        const form = $('#user-data-grid-filter-form-{{ grid_id }}');
+
+        $("input[type='checkbox']", form).change(function() {
 			//console.log("checkbox changed!");
-			var checked = $(this).is(":checked");
-			var filter_level = $(this).attr('filter-level');
-			
-			var extra_data = '&filter_level=' + filter_level + '&checked=' + checked;
-			send_user_data_update(extra_data)
+            const checked = $(this).is(":checked");
+            const filter_level = $(this).attr('filter-level');
+
+            const extra_data = '&filter_level=' + filter_level + '&checked=' + checked;
+            send_user_data_update(extra_data)
 		});
 		
 		$(".user-data-filter-name-choice-select", form).change(function () {
-            var extra_data = '&filter_name=' + $(this).val();
+            const extra_data = '&filter_name=' + $(this).val();
             send_user_data_update(extra_data)
 		});
 		

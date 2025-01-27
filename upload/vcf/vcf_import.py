@@ -15,12 +15,13 @@ from django_messages.models import Message
 from library.genomics.vcf_enums import VCFConstant
 from library.genomics.vcf_utils import cyvcf2_header_types, cyvcf2_header_get, cyvcf2_get_contig_lengths_dict
 from library.guardian_utils import assign_permission_to_user_and_groups
+from library.utils import invert_dict
 from seqauto.models import SampleSheetCombinedVCFFile, VCFFile, VCFFromSequencingRun, \
     SampleFromSequencingSample, QCGeneList
 from seqauto.signals.signals_list import backend_vcf_import_start_signal
 from snpdb.models import VCF, ImportStatus, Sample, VCFFilter, \
-    Cohort, CohortSample, UserSettings, VCFSourceSettings, SampleFilePath
-from snpdb.models.models_enums import ImportSource, VariantsType, SampleFileType
+    Cohort, CohortSample, UserSettings, VCFSourceSettings, SampleFilePath, VCFInfo, AbstractVCFField, VCFFormat
+from snpdb.models.models_enums import ImportSource, VariantsType, SampleFileType, VCFInfoTypes
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
 from upload.models import UploadedVCF, PipelineFailedJobTerminateEarlyException, \
@@ -70,9 +71,34 @@ def get_phred_likelihood_field(vcf_formats, vcf_source, default_phred_likelihood
     return pl
 
 
-def create_vcf_filters(vcf, header_types):
+def _create_vcf_field(klass: type[AbstractVCFField], vcf, header_data: dict):
+    type_lookup = invert_dict(dict(VCFInfoTypes.choices))
+    records = []
+    for identifier, field_data in header_data.items():
+        raw_data_type = field_data['Type']
+        data_type = type_lookup.get(raw_data_type)
+        if raw_data_type is None:
+            raise ValueError(f"Unknown VCFInfoTypes: {raw_data_type} (valid={','.join(type_lookup)}")
+
+        record = klass(vcf=vcf,
+                       identifier=identifier,
+                       number=field_data["Number"],
+                       data_type=data_type,
+                       description=field_data['Description'])
+        records.append(record)
+
+    if records:
+        klass.objects.bulk_create(records)
+
+
+def create_vcf_info(vcf, info: dict):
+    _create_vcf_field(VCFInfo, vcf, info)
+
+def create_vcf_format(vcf, format: dict):
+    _create_vcf_field(VCFFormat, vcf, format)
+
+def create_vcf_filters(vcf, filters: dict):
     filter_code_id = VCFFilter.ASCII_MIN
-    filters = header_types.get("FILTER", {})
     for filter_id, filter_dict in filters.items():
         if filter_code_id > VCFFilter.ASCII_MAX:
             num_filters = VCFFilter.ASCII_MAX - VCFFilter.ASCII_MIN
@@ -180,7 +206,9 @@ def configure_vcf_from_header(vcf, vcf_reader):
     """ Needs to have UploadedVCF saved against VCF
         Can also be called on an existing VCF during reload """
     header_types = cyvcf2_header_types(vcf_reader)
-    create_vcf_filters(vcf, header_types)
+    create_vcf_info(vcf, header_types.get("INFO", {}))
+    create_vcf_filters(vcf, header_types.get("FILTER", {}))
+    create_vcf_format(vcf, header_types.get("FORMAT", {}))
     vcf_formats = set(header_types["FORMAT"])
     source = cyvcf2_header_get(vcf_reader, "source", "")
     vcf.source = source

@@ -52,7 +52,9 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # v21. Support CNV, store unknown format/info fields
     # v22. Normalize SVLEN based on settings, change gnomAD preprocessing INFO to avoid collisions
     # v23. Fixes to clean_and_filter - Standard chromosomes only
-    VCF_IMPORTER_VERSION = 22  # Change this if you make a major change to the code.
+    # v24. Split multi-allelics first, replace reference base (ie swap out N), pick explicit/symbolic alt based on size
+    # v25. Store VCFInfo/VCFFilter based on header to represent json field schema (stored since v21)
+    VCF_IMPORTER_VERSION = 25  # Change this if you make a major change to the code.
     # Need to distinguish between no entry and 0, can't use None w/postgres command line inserts
     DEFAULT_AD_FIELD = 'AD'  # What CyVCF2 uses
     # GL = Genotype Likelihood - used by freeBayes v1.2.0: log10-scaled likelihoods of the data given the called

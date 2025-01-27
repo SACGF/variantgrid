@@ -40,6 +40,10 @@ class PhenotypeNode(AnalysisNode):
 
         return Patient.filter_for_user(self.analysis.user).filter(sample__in=samples)
 
+    @property
+    def has_sample_inputs_with_patient(self) -> bool:
+        return self.get_patients_qs().exists()
+
     def handle_ancestor_input_samples_changed(self):
         """ Auto-set to single patient ancestor (or remove if no longer ancestor) """
 

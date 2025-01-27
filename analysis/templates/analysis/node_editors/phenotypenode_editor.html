@@ -75,41 +75,45 @@
 			<li>
 	        <h3>From Patient</h3>
 	        <div>
-				Patient: {{ form.patient }}
-		        {% if node.patient %}
-		        	<div id='patient-details'>
-					{% if patient_hpo %}
-						<p>
-						<b>HPO:</b>
-						{% for hpo in patient_hpo %}
-							{{ hpo }}
-						{% endfor %}
-						</p>
-					{% else %}
-						This patient has no HPO terms
-					{% endif %}
-					{% if patient_omim %}
-						<p>
-						<b>OMIM:</b>
-						{% for omim in patient_omim %}
-							{{ omim }}
-						{% endfor %}
-						</p>
-					{% else %}
-						This patient has no OMIM terms
-					{% endif %}
-					{% if patient_mondo %}
-						<p>
-						<b>MONDO:</b>
-						{% for mondo in patient_mondo %}
-							{{ mondo }}
-						{% endfor %}
-						</p>
-					{% else %}
-						This patient has no MONDO terms
-					{% endif %}
-					</div>
-		        {% endif %}
+                {% if node.has_sample_inputs_with_patient %}
+    				Patient: {{ form.patient }}
+                    {% if node.patient %}
+                        <div id='patient-details'>
+                        {% if patient_hpo %}
+                            <p>
+                            <b>HPO:</b>
+                            {% for hpo in patient_hpo %}
+                                {{ hpo }}
+                            {% endfor %}
+                            </p>
+                        {% else %}
+                            This patient has no HPO terms
+                        {% endif %}
+                        {% if patient_omim %}
+                            <p>
+                            <b>OMIM:</b>
+                            {% for omim in patient_omim %}
+                                {{ omim }}
+                            {% endfor %}
+                            </p>
+                        {% else %}
+                            This patient has no OMIM terms
+                        {% endif %}
+                        {% if patient_mondo %}
+                            <p>
+                            <b>MONDO:</b>
+                            {% for mondo in patient_mondo %}
+                                {{ mondo }}
+                            {% endfor %}
+                            </p>
+                        {% else %}
+                            This patient has no MONDO terms
+                        {% endif %}
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <i>There are no patients assigned to samples above this node.</i>
+                {% endif %}
 	        </div>
 	        </li>
 		</ul>

@@ -5,8 +5,10 @@ import logging
 import os
 import subprocess
 from collections import defaultdict, Counter
+from datetime import datetime
 
 import cyvcf2
+import pandas as pd
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models.query_utils import Q
@@ -30,7 +32,10 @@ class Command(BaseCommand):
         parser.add_argument('--dry-run', action='store_true')
 
     def handle(self, *args, **options):
+        raise ValueError("Don't run this - I think it's better to just re-import variants")
         dry_run = options["dry_run"]
+        date_iso = datetime.now().isoformat()
+        processing_dir = os.path.join(settings.PRIVATE_DATA_ROOT, 'fix_variant_ref_n')
 
         seq_n = Sequence.objects.filter(seq='N').first()
         single_base_seq = {seq.seq: seq for seq in Sequence.objects.filter(seq__in='GATC')}
@@ -57,7 +62,6 @@ class Command(BaseCommand):
             # Write out
             change_count = Counter()
             if vcf_ids:
-                processing_dir = os.path.join(settings.PRIVATE_DATA_ROOT, 'fix_variant_ref_n')
                 mk_path(processing_dir)
                 vcf_input_filename = os.path.join(processing_dir, f"old_variants_ref_n_{genome_build.name}.vcf")
                 used_chroms = set((vc.chrom for vc in variant_coordinates))
@@ -82,12 +86,14 @@ class Command(BaseCommand):
                 logging.info("Wrote normalized VCF: %s", vcf_output_filename)
 
                 reader = cyvcf2.Reader(vcf_output_filename)
+                modification_log_csv = os.path.join(processing_dir, f"update_log_{genome_build.name}_{date_iso}.csv")
+                modification_log_records = []
                 modified_imported_variants = []
                 loci_update_ref = []
                 loci_old_new = {}
 
                 for record in reader:
-                    logging.info("alt: %s", record.ALT)
+                    # logging.info("alt: %s", record.ALT)
                     variant, vc = variant_and_coordinate_by_id[int(record.ID)]
                     svlen = record.INFO.get("SVLEN")
                     normalized_vc = VariantCoordinate(chrom=record.CHROM, position=record.POS,
@@ -101,41 +107,59 @@ class Command(BaseCommand):
                         if old_val != new_val:
                             raise ValueError(f"{record.ID=}: {field} changed after normalization from {old_val=} to {new_val=}")
 
-                    logging.info("old: %s", vc)
-                    logging.info("new: %s", normalized_vc)
-                    locus = variant.locus
-                    ref = single_base_seq[normalized_vc.ref.upper()]
-                    contig_id = chrom_contig_id_mappings[normalized_vc.chrom]
+                    modification_data = {
+                        "variant_id": record.ID,
+                        "old_coordinate": str(vc),
+                        "new_coordinate": str(normalized_vc),
+                    }
 
-                    # if contig/position is the same - can update locus
-                    if (vc.chrom, vc.position) == (normalized_vc.chrom, normalized_vc.position):
-                        if existing_locus := Locus.objects.filter(contig_id=contig_id,
-                                                                  position=normalized_vc.position,
-                                                                  ref=ref).first():
-                            change_count["change to existing locus"] += 1
-                            loci_old_new[locus] = existing_locus
-                        else:
-                            change_count["replace locus ref"] += 1
-                            # Update this locus to be the new one
-                            locus.ref = ref
-                            loci_update_ref.append(locus)
+                    if normalized_vc.ref == 'N':
+                        operation = "n/a - actually ref=N"
                     else:
-                        bcftools_old_variant = variant.INFO[ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG]
-                        for ov in ModifiedImportedVariant.bcftools_format_old_variant(bcftools_old_variant, svlen, genome_build):
-                            miv = ModifiedImportedVariant(variant=variant,
-                                                          old_variant=bcftools_old_variant,
-                                                          old_variant_formatted=ov)
-                            modified_imported_variants.append(miv)
+                        locus = variant.locus
+                        ref = single_base_seq[normalized_vc.ref.upper()]
+                        contig_id = chrom_contig_id_mappings[normalized_vc.chrom]
 
-                        # Shifted position
-                        new_locus, existing = Locus.objects.get_or_create(contig_id=contig_id, position=normalized_vc.position, ref=ref)
-                        loci_old_new[locus] = new_locus
-                        if existing:
-                            change_count["shift to existing locus"] += 1
+                        # if contig/position is the same - can update locus
+                        if (vc.chrom, vc.position) == (normalized_vc.chrom, normalized_vc.position):
+                            if existing_locus := Locus.objects.filter(contig_id=contig_id,
+                                                                      position=normalized_vc.position,
+                                                                      ref=ref).first():
+                                operation = "change to existing locus"
+                                loci_old_new[locus] = existing_locus
+                            else:
+                                operation = "replace locus ref"
+                                # Update this locus to be the new one
+                                locus.ref = ref
+                                loci_update_ref.append(locus)
                         else:
-                            change_count["shift to new locus"] += 1
+                            bcftools_old_variant = record.INFO[ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG]
+                            for ov in ModifiedImportedVariant.bcftools_format_old_variant(bcftools_old_variant, svlen, genome_build):
+                                miv = ModifiedImportedVariant(variant=variant,
+                                                              old_variant=bcftools_old_variant,
+                                                              old_variant_formatted=ov)
+                                modified_imported_variants.append(miv)
+
+                            # Shifted position
+                            new_locus, existing = Locus.objects.get_or_create(contig_id=contig_id, position=normalized_vc.position, ref=ref)
+                            loci_old_new[locus] = new_locus
+                            if existing:
+                                operation = "shift to existing locus"
+                            else:
+                                operation = "shift to new locus"
+
+                    change_count[operation] += 1
+                    modification_data["operation"] = operation
+                    modification_log_records.append(modification_data)
 
                 logging.info("Updates: %s", change_count)
+
+                if modification_log_records:
+                    # Write this out first, per build, in case things crash
+                    logging.info(f"Writing {len(modification_log_records)} records to {modification_log_csv=}")
+                    df = pd.DataFrame.from_records(modification_log_records)
+                    df.to_csv(modification_log_csv, index=False)
+
                 if loci_update_ref:
                     logging.info("%s: Updating %d ref sequences", genome_build, len(loci_update_ref))
                     if not dry_run:
@@ -149,7 +173,7 @@ class Command(BaseCommand):
                     for v in Variant.objects.filter(locus__in=loci_old_new.values()):
                         new_loci_variants[v.locus].add(v)
 
-                    variant_not_updated = []
+                    variant_conflicts = {}
                     variant_update_locus = []
                     for variant in Variant.objects.filter(locus__in=loci_old_new.keys()):
                         new_locus = loci_old_new[variant.locus]
@@ -160,7 +184,7 @@ class Command(BaseCommand):
                                 break
 
                         if conflicted_variant:
-                            variant_not_updated.append(variant)
+                            variant_conflicts[variant] = conflicted_variant
                         else:
                             variant.locus = new_locus
                             variant_update_locus.append(variant)
@@ -180,12 +204,17 @@ class Command(BaseCommand):
 
 
 
-                    if variant_not_updated:
-                        logging.info("%s: Variants that could not be updated due to dupes: %d", genome_build, len(variant_not_updated))
-                        logging.info("%s: It may be easiest to re-import variants that caused these.", genome_build)
-                        if len(variant_not_updated) < 50:
-                            variants_str = ",".join([str(v.pk) for v in variant_not_updated])
-                            logging.info("%s: %s",genome_build, variants_str)
-
-
-
+                    if variant_conflicts:
+                        variant_conflict_log_csv = os.path.join(processing_dir, f"variant_conflicts_{genome_build}_{date_iso}.csv")
+                        records = []
+                        for variant, conflict_variant in variant_conflicts.items():
+                            data = {
+                                "variant_id": variant.pk,
+                                "variant_coordinate": variant.coordinate,
+                                "conflicted_variant_id": conflict_variant.pk,
+                                "conflicted_variant_coordinate": conflict_variant.coordinate,
+                            }
+                            records.append(data)
+                        df = pd.DataFrame.from_records(records)
+                        logging.error(f"Could not modify {len(variant_conflicts)} variants due to conflicts. Wrote to '{variant_conflict_log_csv}'")
+                        df.to_csv(variant_conflict_log_csv, index=False)
