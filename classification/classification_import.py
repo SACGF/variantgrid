@@ -10,7 +10,7 @@ from classification.models.classification import ClassificationImport
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.tasks.classification_import_process_variants_task import ClassificationImportProcessVariantsTask
 from library.django_utils.django_file_utils import get_import_processing_dir
-from library.genomics.vcf_utils import write_vcf_from_variant_coordinates
+from library.genomics.vcf_utils import write_vcf_from_variant_coordinates, get_contigs_header_lines
 from library.utils import full_class_name
 from snpdb.models import Variant, ImportSource
 from snpdb.models.models_variant import VariantCoordinate
@@ -93,7 +93,10 @@ def _classification_upload_pipeline(
     if unknown_variant_coordinates:
         working_dir = get_import_processing_dir(classification_import.pk, "classification_import")
         vcf_filename = os.path.join(working_dir, "classification_import.vcf")
-        write_vcf_from_variant_coordinates(vcf_filename, unknown_variant_coordinates)
+        used_chroms = set((vc.chrom for vc in unknown_variant_coordinates))
+        header_lines = get_contigs_header_lines(classification_import.genome_build, use_accession=False,
+                                                contig_allow_list=used_chroms)
+        write_vcf_from_variant_coordinates(vcf_filename, unknown_variant_coordinates, header_lines=header_lines)
     else:
         vcf_filename = None
 
