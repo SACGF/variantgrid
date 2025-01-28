@@ -411,6 +411,10 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     imported_g_hgvs = TextField(null=True, blank=True)
 
+    @property
+    def imported_hgvs(self) -> str:
+        return self.imported_c_hgvs or self.imported_g_hgvs
+
     hgvs_converter_version = ForeignKey(HGVSConverterVersion, null=True, blank=True, on_delete=PROTECT)
     """ Tool used to resolve hgvs  """
 
