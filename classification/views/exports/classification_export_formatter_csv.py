@@ -172,7 +172,7 @@ class ClassificationMeta(ExportRow):
     def vc(self) -> Classification:
         return self.cm.classification
 
-    @export_column(categories={"transient": True})
+    @export_column()
     def resolved_condition(self):
         return (self.vc.condition_resolution_dict or {}).get('display_text')
 
