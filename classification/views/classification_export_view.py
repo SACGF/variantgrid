@@ -335,7 +335,7 @@ def internal_lab_download(request):
 
         response = ClassificationExportFormatterCSV(
             filter_data,
-            FormatDetailsCSV(exclude_discordances=True, exclude_transient=True, full_detail=True)
+            FormatDetailsCSV(exclude_discordances=True, exclude_transient=True, exclude_resolved_condition=False, full_detail=True)
         ).serve()
         return response
     else:

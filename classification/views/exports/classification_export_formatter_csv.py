@@ -1,6 +1,4 @@
-import json
 from dataclasses import dataclass
-from datetime import timezone
 from enum import Enum
 from functools import cached_property
 from typing import Optional, Any
@@ -42,6 +40,9 @@ class FormatDetailsCSV:
     # exclude fields that change between environments, makes it easier to compare changes if the same data is in both environments
     exclude_transient: bool = False
 
+    # exclude resolved condition
+    exclude_resolved_condition: bool = False
+
     # exclude discordance information or something that could leak data to other labs
     exclude_discordances: bool = False
 
@@ -65,6 +66,7 @@ class FormatDetailsCSV:
         return FormatDetailsCSV(
             pretty=pretty,
             exclude_transient=exclude_transient,
+            exclude_resolved_condition=exclude_transient,
             exclude_discordances=exclude_discordances,
             html_handling=html_handling,
             full_detail=full_detail
@@ -172,7 +174,7 @@ class ClassificationMeta(ExportRow):
     def vc(self) -> Classification:
         return self.cm.classification
 
-    @export_column()
+    @export_column(categories={"resolved_condition": True})
     def resolved_condition(self):
         return (self.vc.condition_resolution_dict or {}).get('display_text')
 
@@ -243,7 +245,7 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
             include_explains_and_notes=self.format_details.full_detail
         )
         if self.format_details.full_detail:
-            # apparently this is signficantly quicker than the attempt to use an aggregate
+            # apparently this is significantly quicker than the attempt to use an aggregate
             for evidence in self.classification_filter.cms_qs.values_list('published_evidence', flat=True).iterator(chunk_size=1000):
                 used_keys.check_evidence(evidence)
         else:
@@ -293,6 +295,8 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
         categories = {}
         if self.format_details.exclude_transient:
             categories["transient"] = None
+        if self.format_details.exclude_resolved_condition:
+            categories["resolved_condition"] = None
         if not self.grouping_utils.any_pending_changes:
             categories["pending_changes"] = None
         if self.format_details.exclude_discordances:
