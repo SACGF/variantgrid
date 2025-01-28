@@ -615,6 +615,9 @@ class CohortGenotype(models.Model):
             sample_genotypes.append(SampleGenotype(self, sample, i))
         return sample_genotypes
 
+    class Meta:
+        unique_together = ("collection", "variant")
+
 
 class Trio(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedModel):
     """ A simple pedigree used frequently for Mendellian disease (TrioNode in analysis)
