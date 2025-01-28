@@ -1,7 +1,6 @@
 import glob
 import logging
 import os
-from collections import OrderedDict
 from subprocess import Popen, PIPE, CalledProcessError
 
 import pandas as pd
@@ -69,6 +68,7 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     MAX_STDERR_OUTPUT = 5000  # How much stderr output per process to store in DB
 
     VCF_CLEAN_AND_FILTER_SUB_STEP = "vcf_clean_and_filter"
+    VCF_REMOVE_NON_STANDARD_ALTS_SUB_STEP = "vcf_remove_non_standard_alts"
     REMOVE_HEADER_SUB_STEP = "remove_header"
     SPLIT_VCF_SUB_STEP = "split_vcf"
 
@@ -81,18 +81,18 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
 
     pipe_commands = {}  # Use dict order to decide pipeline order
     sub_steps = {}
+    if vcf_filename.endswith(".gz"):
+        pipe_commands["zcat"] = [settings.BASH_ZCAT, vcf_filename]
+    else:
+        pipe_commands["cat"] = ["cat", vcf_filename]
 
-    # Perform multi-allelic splitting first, so that we can filter out allele at a time in 'vcf_clean_and_filter'
-    pipe_commands["split_multiallelics"] = [
-        settings.BCFTOOLS_COMMAND, "norm",
-        "--multiallelics=-", vcf_filename,
-    ]
     upload_pipeline = upload_step.upload_pipeline
     vcf_name = name_from_filename(vcf_filename, remove_gz=True)
 
     skipped_contigs_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_contigs.tsv")
     skipped_records_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_records.tsv")
     skipped_filters_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_filters.tsv")
+    skipped_alts_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_alts.tsv")
 
     cleaned_vcf_header_filename = _write_cleaned_header(genome_build, upload_pipeline, vcf_filename)
 
@@ -115,6 +115,7 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
 
     pipe_commands[UploadStep.NORMALIZE_SUB_STEP] = [
         settings.BCFTOOLS_COMMAND, "norm",
+        "--multiallelics=-",
         # We don't remove duplicates due to:
         # * https://github.com/samtools/bcftools/issues/2225 - rmdup removes --old-rec-tag so lose normalize info
         # "--rm-dup=exact",
@@ -123,6 +124,14 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
         f"--fasta-ref={genome_build.reference_fasta}", "-",
     ]
     pipe_commands[REMOVE_HEADER_SUB_STEP] = [settings.BCFTOOLS_COMMAND, "view", "--no-header", "-"]
+
+    # We have performed multi-allelic splitting above, so that we can now filter out bad alts (but leave rest of record)
+    pipe_commands[VCF_REMOVE_NON_STANDARD_ALTS_SUB_STEP] = manage_command + [
+         "vcf_remove_non_standard_alts",
+         "--skipped-records-stats-file",
+         skipped_alts_stats_file,
+    ]
+
     norm_substep_names = [UploadStep.NORMALIZE_SUB_STEP]
 
     # Split up the VCF
@@ -214,6 +223,7 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
 
     _store_vcf_skip_stats(skipped_records_stats_file, clean_sub_step, "records")
     _store_vcf_skip_stats(skipped_filters_stats_file, clean_sub_step, "FILTER")
+    _store_vcf_skip_stats(skipped_alts_stats_file, clean_sub_step, "ALTs")
 
     # Create this here so downstream tasks (running in parallel) can all link against the same one
     ModifiedImportedVariants.get_for_pipeline(upload_pipeline)
