@@ -16,7 +16,14 @@ ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = None  # os.path.join(BASE_DIR, "scripts"
 # You may want to reduce ANNOTATION_VEP_BUFFER_SIZE below
 # @see https://github.com/Ensembl/ensembl-vep/issues/150
 ANNOTATION_VEP_FORK = 1
-ANNOTATION_VEP_BUFFER_SIZE = 2000  # Default VEP is 5k but this has crashed out a 16G machine...
+_VARIANT_ANNOTATION_PIPELINE_STANDARD = "S"
+_VARIANT_ANNOTATION_PIPELINE_STRUCTURAL_VARIANT = "C"
+
+ANNOTATION_VEP_BUFFER_SIZE = {
+    # Default VEP is 5k but this has crashed out a 16G machine...
+    _VARIANT_ANNOTATION_PIPELINE_STANDARD: 2000,
+    _VARIANT_ANNOTATION_PIPELINE_STRUCTURAL_VARIANT: 1000,
+}
 # get_unannotated_count_min_max does quick queries to try and get VEP batch sizes within a range
 # If it gets below min, it does a slower query to get range lock.
 # The variant table is usually ~55% alt variants but may be different due to data or if you've deleted records
