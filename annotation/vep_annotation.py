@@ -66,6 +66,8 @@ def _get_custom_params_list(cvf_list: list[ColumnVEPField], prefix, data_path) -
         "type": "overlap",
         "num_records": "all",  # Display all (defaults to 50 then "...")
     }
+    if prefix == "RepeatMasker":
+        params["num_records"] = "10000"  # repeat masker can get ridiculous - truncates with "..."
 
     if extension == 'vcf':
         field_delimiter = "%"
@@ -162,6 +164,11 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     if settings.ANNOTATION_VEP_DISTANCE is not None:
         cmd.extend(["--distance", str(settings.ANNOTATION_VEP_DISTANCE)])
 
+    if max_sv_size := settings.ANNOTATION_VEP_SV_MAX_SIZE:
+        vep_default_max_sv_size = 10_000_000
+        if max_sv_size != vep_default_max_sv_size:
+            cmd.extend(["--max_sv_size", str(max_sv_size)])
+
     if annotation_consortium == AnnotationConsortium.REFSEQ:
         cmd.append("--refseq")
 
@@ -171,8 +178,8 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     if settings.ANNOTATION_VEP_FORK and settings.ANNOTATION_VEP_FORK > 1:
         cmd.extend(["--fork", str(settings.ANNOTATION_VEP_FORK)])
 
-    if settings.ANNOTATION_VEP_BUFFER_SIZE:
-        cmd.extend(["--buffer_size", str(settings.ANNOTATION_VEP_BUFFER_SIZE)])
+    if buffer_size := settings.ANNOTATION_VEP_BUFFER_SIZE.get(pipeline_type):
+        cmd.extend(["--buffer_size", str(buffer_size)])
 
     if settings.ANNOTATION_VEP_ARGS:
         cmd.extend(settings.ANNOTATION_VEP_ARGS)

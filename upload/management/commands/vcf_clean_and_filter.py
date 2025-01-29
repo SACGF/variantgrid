@@ -57,7 +57,6 @@ class Command(BaseCommand):
         skipped_filters = Counter()
 
         ref_standard_bases_pattern = re.compile(r"[GATCN]")  # Reference can be N (and FreeBayes often writes these)
-        alt_standard_bases_pattern = re.compile(r"[GATC,.]")  # Can be multi-alts, or "." for reference
 
         skip_patterns = {}
         if skip_regex := getattr(settings, "VCF_IMPORT_SKIP_RECORD_REGEX", {}):
@@ -110,9 +109,9 @@ class Command(BaseCommand):
                         skipped_records[skip_reason] += 1
                         continue
 
-                # Check ref / alt bases are ok
+                # Check ref bases are ok
+                # Alts are checked in 'vcf_remove_non_standard_alts', which happens after split multi-allelic
                 ref = columns[VCFColumns.REF]
-                alt = columns[VCFColumns.ALT]
                 if ref_standard_bases_pattern.sub("", ref):
                     if ref.startswith("<") and ref.endswith(">"):
                         skip_reason = f"REF = {ref}"
@@ -120,20 +119,6 @@ class Command(BaseCommand):
                         skip_reason = "non-standard bases in REF sequence"
                     skipped_records[skip_reason] += 1
                     continue
-
-                if alt_standard_bases_pattern.sub("", alt):
-                    skip_reason = None
-                    if alt.startswith("<") and alt.endswith(">"):
-                        if settings.VARIANT_SYMBOLIC_ALT_ENABLED:
-                            if alt not in settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES:
-                                skip_reason = f"ALT = {alt}"
-                        else:
-                            skip_reason = "Symbolic variants disabled via settings."
-                    else:
-                        skip_reason = "non-standard bases in ALT sequence"
-                    if skip_reason:
-                        skipped_records[skip_reason] += 1
-                        continue
 
                 # Remove filters not in header
                 filter_column = columns[VCFColumns.FILTER]

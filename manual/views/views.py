@@ -22,6 +22,13 @@ from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 
 class MigrationAttemptColumns(DatatableConfig[ManualMigrationAttempt]):
+    STANDARD_TASKS = [
+        "git*pull",
+        "manage*deployment_check",
+        "manage*migrate",
+        "manage*collectstatic",
+        "manage*collectstatic_js_reverse",
+    ]
 
     def render_task(self, row: dict[str, Any]) -> str:
         task_id = row["task_id"]
@@ -48,7 +55,7 @@ class MigrationAttemptColumns(DatatableConfig[ManualMigrationAttempt]):
 
     def filter_queryset(self, qs: QuerySet[ManualMigrationAttempt]) -> QuerySet[ManualMigrationAttempt]:
         if self.get_query_param("exclude_standard") == "true":
-            qs = qs.exclude(task_id__in=["git*pull", "manage*migrate", "manage*collectstatic", "manage*collectstatic_js_reverse"])
+            qs = qs.exclude(task_id__in=self.STANDARD_TASKS)
         return qs
 
 
