@@ -101,6 +101,7 @@ def _get_custom_params_list(cvf_list: list[ColumnVEPField], prefix, data_path) -
             params["short_name"] = cvf.source_field
 
         if extension == 'bed':
+            params["num_records"] = "10000"  # repeat masker can get ridiculous - truncates with "..."
             fmt = "bed"
         elif extension == 'bw':
             fmt = "bigwig"
