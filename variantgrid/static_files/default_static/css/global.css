@@ -1008,12 +1008,25 @@ div.dataTables_wrapper div.dataTables_filter label {
 .admin-only,
 li.admin a,
 h3.admin {
+  /*
   background-image: url("/static/icons/admin.svg");
   min-height: 16px;
   background-size: 16px 16px;
   background-position: 8px 50%;
   background-repeat: no-repeat;
   padding-left: 28px !important;
+   */
+}
+.admin-only:before,
+li.admin a:before,
+h3.admin:before {
+  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-size: 0.98rem;
+  content: "\f084";
+  right: 1rem;
+  top: .5rem;
+  color: #555;
+  margin-right: 4px;
 }
 
 .box {
