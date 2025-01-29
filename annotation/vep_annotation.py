@@ -66,7 +66,7 @@ def _get_custom_params_list(cvf_list: list[ColumnVEPField], prefix, data_path) -
         "type": "overlap",
         "num_records": "all",  # Display all (defaults to 50 then "...")
     }
-    if prefix == "REPEAT_MASKER":
+    if prefix == "RepeatMasker":
         params["num_records"] = "10000"  # repeat masker can get ridiculous - truncates with "..."
 
     if extension == 'vcf':
