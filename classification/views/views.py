@@ -2,7 +2,7 @@ import json
 import mimetypes
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Any, Union
 
 import rest_framework
@@ -38,7 +38,8 @@ from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel, Wit
 from classification.forms import ClassificationAlleleOriginForm
 from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
-    ConditionResolvedDict, DiscordanceReport, ClassificationGrouping, AlleleGrouping, AlleleOriginGrouping
+    ConditionResolvedDict, DiscordanceReport, ClassificationGrouping, AlleleGrouping, AlleleOriginGrouping, \
+    ImportedAlleleInfo, ImportedAlleleInfoStatus
 from classification.models.classification import ClassificationModification
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.discordance_models_utils import DiscordanceReportRowData
@@ -162,7 +163,16 @@ def classifications(request):
         "user_settings": user_settings,
     }
     template = 'classification/classifications.html'
-    if legacy:
+
+    if not legacy:
+        if request.user.is_superuser:
+            processing_count = ImportedAlleleInfo.objects.filter(status__in={ImportedAlleleInfoStatus.PROCESSING, ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD}).count()
+            context["iai_processing_count"] = processing_count
+
+            failed_last_week_count = ImportedAlleleInfo.objects.filter(status=ImportedAlleleInfoStatus.FAILED).filter(modified__gt=now() - timedelta(days=7)).count()
+            context["iai_failed_last_week_count"] = failed_last_week_count
+
+    else:
         template = 'classification/classifications_legacy.html'
         flag_types = FlagType.objects.filter(context=classification_flag_types.classification_flag_context) \
             .exclude(pk__in=[
@@ -175,55 +185,55 @@ def classifications(request):
         context["flag_types"] = flag_type_json
 
 
-    return render(
-        request, template, context)
+
+    return render(request, template, context)
 
 
-def classifications_legacy(request):
-    """
-        Classification listing page
-        """
-
-    # is cached on the request
-    user_settings = UserSettingsManager.get_user_settings()
-
-    initial = {'classify': True}
-    search_and_classify_form = SearchAndClassifyForm(initial=initial)
-    search_and_classify_form.fields['search'].label = "HGVS / dbSNP / VCF coordinate"
-    helper = form_helper_horizontal()
-    helper.layout = Layout(
-        FieldWithButtons(Field('search', placeholder=""), Submit(name="action", value="Go"))
-    )
-    search_and_classify_form.helper = helper
-
-    flag_types = FlagType.objects.filter(context=classification_flag_types.classification_flag_context) \
-        .exclude(pk__in=[
-        'classification_withdrawn',
-        'classification_submitted',
-        'classification_clinical_context_change']).order_by('label')
-    flag_type_json = []
-    for ft in flag_types:
-        flag_type_json.append({'id': ft.pk, 'label': ft.label, 'description': ft.description})
-
-    if settings.CLASSIFICATION_GRID_MULTI_LAB_FILTER:
-        lab_form = LabMultiSelectForm()
-    else:
-        lab_form = LabSelectForm()
-
-    context = {
-        "can_create_classification": Classification.can_create_via_web_form(request.user),
-        "flag_types": flag_type_json,
-        "gene_form": GeneSymbolForm(),
-        "user_form": UserSelectForm(),
-        "lab_form": lab_form,
-        "allele_origin_form": ClassificationAlleleOriginForm(),
-        "labs": Lab.valid_labs_qs(request.user),
-        "search_and_classify_form": search_and_classify_form,
-        "genome_build": user_settings.default_genome_build,
-        "user_settings": user_settings,
-    }
-    return render(request, 'classification/classifications.html', context)
-
+# def classifications_legacy(request):
+#     """
+#         Classification listing page
+#         """
+#
+#     # is cached on the request
+#     user_settings = UserSettingsManager.get_user_settings()
+#
+#     initial = {'classify': True}
+#     search_and_classify_form = SearchAndClassifyForm(initial=initial)
+#     search_and_classify_form.fields['search'].label = "HGVS / dbSNP / VCF coordinate"
+#     helper = form_helper_horizontal()
+#     helper.layout = Layout(
+#         FieldWithButtons(Field('search', placeholder=""), Submit(name="action", value="Go"))
+#     )
+#     search_and_classify_form.helper = helper
+#
+#     flag_types = FlagType.objects.filter(context=classification_flag_types.classification_flag_context) \
+#         .exclude(pk__in=[
+#         'classification_withdrawn',
+#         'classification_submitted',
+#         'classification_clinical_context_change']).order_by('label')
+#     flag_type_json = []
+#     for ft in flag_types:
+#         flag_type_json.append({'id': ft.pk, 'label': ft.label, 'description': ft.description})
+#
+#     if settings.CLASSIFICATION_GRID_MULTI_LAB_FILTER:
+#         lab_form = LabMultiSelectForm()
+#     else:
+#         lab_form = LabSelectForm()
+#
+#     context = {
+#         "can_create_classification": Classification.can_create_via_web_form(request.user),
+#         "flag_types": flag_type_json,
+#         "gene_form": GeneSymbolForm(),
+#         "user_form": UserSelectForm(),
+#         "lab_form": lab_form,
+#         "allele_origin_form": ClassificationAlleleOriginForm(),
+#         "labs": Lab.valid_labs_qs(request.user),
+#         "search_and_classify_form": search_and_classify_form,
+#         "genome_build": user_settings.default_genome_build,
+#         "user_settings": user_settings,
+#     }
+#     return render(request, 'classification/classifications.html', context)
+#
 
 def classification_groupings(request):
     user_settings = UserSettingsManager.get_user_settings()

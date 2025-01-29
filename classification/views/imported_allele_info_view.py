@@ -193,7 +193,8 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
 
 @require_superuser
 def view_imported_allele_info(request: HttpRequest) -> Response:
-    return render(request, "classification/imported_allele_info.html", {})
+    status = request.GET.get("status")
+    return render(request, "classification/imported_allele_info.html", {"status": status})
 
 
 def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):

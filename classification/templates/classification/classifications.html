@@ -3,6 +3,7 @@
 {% load static %}
 {% load js_tags %}
 {% load compress %}
+{% load ui_utils %}
 {% load ui_help %}
 {% load ui_menu_bars %}
 {% load settings_tags %}
@@ -197,6 +198,18 @@
             {% end_page_help_embedded %}
         </div>
         <div class="container">
+            {% if user.is_superuser %}
+                {% if iai_processing_count or iai_failed_last_week_count %}
+                    <div class="admin-only display-flex my-2">
+                        {% if iai_processing_count %}
+                            <div class="mx-2"><i class="fa-solid fa-hourglass"></i> <a class="hover-link" href="{% url 'view_imported_allele_info' %}?status=in_progress">Alleles in Processing</a>: {{ iai_processing_count | number }}</div>
+                        {% endif %}
+                        {% if iai_failed_last_week_count %}
+                            <div class="mx-2"><i class="fa-solid fa-circle-exclamation"></i> <a class="hover-link" href="{% url 'view_imported_allele_info' %}?status=failure">Alleles Failed this Week</a>: {{ iai_failed_last_week_count | number }}</div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            {% endif %}
             <div class="row filter-row">
                 <div class="col-md-4 col-lg-2">
                     <br/>
