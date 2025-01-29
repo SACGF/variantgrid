@@ -158,6 +158,7 @@ class VEPSkippedReason(models.TextChoices):
     UNKNOWN_CONTIG = 'c', "Unknown Contig"
     INCOMPLETE = 'i', "Incomplete"
     UNKNOWN = 'u', "Unknown"
+    TOO_LONG = 'l', "Too Long"
 
 
 class ClinVarReviewStatus(models.TextChoices):

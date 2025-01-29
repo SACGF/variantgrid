@@ -162,6 +162,11 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     if settings.ANNOTATION_VEP_DISTANCE is not None:
         cmd.extend(["--distance", str(settings.ANNOTATION_VEP_DISTANCE)])
 
+    if max_sv_size := settings.ANNOTATION_VEP_SV_MAX_SIZE:
+        vep_default_max_sv_size = 10_000_000
+        if max_sv_size != vep_default_max_sv_size:
+            cmd.extend(["--max_sv_size", str(max_sv_size)])
+
     if annotation_consortium == AnnotationConsortium.REFSEQ:
         cmd.append("--refseq")
 

@@ -84,6 +84,7 @@ def handle_vep_warnings(annotation_run: AnnotationRun, bulk_inserter):
 
         version = annotation_run.annotation_range_lock.version
         annotation_version = version.get_any_annotation_version()
+        # This pulls down any un-annotated variants (which after running VEP + inserting means were skipped)
         for v in get_variants_qs_for_annotation(annotation_version,
                                                 pipeline_type=annotation_run.pipeline_type,
                                                 min_variant_id=annotation_run.annotation_range_lock.min_variant_id,
@@ -92,6 +93,8 @@ def handle_vep_warnings(annotation_run: AnnotationRun, bulk_inserter):
                 reason = VEPSkippedReason.UNKNOWN_CONTIG
             elif v.pk in incomplete_variant_ids:
                 reason = VEPSkippedReason.INCOMPLETE
+            elif v.length > settings.ANNOTATION_VEP_SV_MAX_SIZE:
+                reason = VEPSkippedReason.TOO_LONG
             else:
                 reason = VEPSkippedReason.UNKNOWN
 
