@@ -361,6 +361,7 @@ Is a hard-delete offered to classification owners (if false admins will have to 
 """
 
 ONTOLOGY_EXTERNAL_LINKS = False  # Generate external or internal links for ontology terms
+ONTOLOGY_HGNC_REDIRECT_TO_GENE_SYMBOL = False
 
 PATHOLOGY_TESTS_ENABLED = False
 PATHOLOGY_TEST_REQUESTS_REDIRECT_URL = None

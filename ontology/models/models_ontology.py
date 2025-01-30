@@ -529,7 +529,18 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
     def external_url(self):
         return OntologyService.URLS[self.ontology_service].replace("${1}", self.padded_index)
 
+    def gene_symbol_url(self) -> Optional[str]:
+        """ Only for HGNC, get link to gene_symbol """
+        url = None
+        if self.ontology_service == OntologyService.HGNC:
+            if gene_symbol := GeneSymbol.cast(self.name):
+                url = gene_symbol.get_absolute_url()
+        return url
+
     def get_absolute_url(self):
+        if settings.ONTOLOGY_HGNC_REDIRECT_TO_GENE_SYMBOL:
+            if url := self.gene_symbol_url():
+                return url
         return reverse('ontology_term', kwargs={"term": self.url_safe_id})
 
     @property

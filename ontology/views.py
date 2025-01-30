@@ -47,8 +47,7 @@ class OntologyTermView(TemplateView):
             term_link = None
 
             if is_gene:
-                if gene_symbol := GeneSymbol.cast(term.name):
-                    term_link = gene_symbol.get_absolute_url()
+                term_link = term.gene_symbol_url()
             else:
                 regular_relationships = []
                 all_relationships: list[OntologyTermRelation] = OntologyTermRelation.relations_of(term)
