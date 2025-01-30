@@ -59,8 +59,8 @@ def ontology_search_id(search_input: SearchInputInstance):
     sub_name="Gene Disease Relationships",
     admin_only=True,
     example=SearchExample(
-        note="HGNC: followed by a gene symbol",
-        examples=["HGNC:BRCA1"]
+        note="HGNC: followed by an ID or gene symbol",
+        examples=["HGNC:BRCA1", "HGNC:4171"]
     ),
     match_strength=SearchResultMatchStrength.STRONG_MATCH
 )
