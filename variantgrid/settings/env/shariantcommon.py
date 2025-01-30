@@ -129,8 +129,6 @@ ANNOTATION[BUILD_GRCH38].update({
 LOGIN_REDIRECT_URL = '/classification/dashboard'
 LOGO_VIEW_NAME = "classification_dashboard"
 
-ONTOLOGY_HGNC_REDIRECT_TO_GENE_SYMBOL = True
-
 SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
 STATICFILES_DIRS = (SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
 

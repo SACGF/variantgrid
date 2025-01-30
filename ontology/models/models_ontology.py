@@ -538,9 +538,8 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
         return url
 
     def get_absolute_url(self):
-        if settings.ONTOLOGY_HGNC_REDIRECT_TO_GENE_SYMBOL:
-            if url := self.gene_symbol_url():
-                return url
+        if url := self.gene_symbol_url():
+            return url
         return reverse('ontology_term', kwargs={"term": self.url_safe_id})
 
     @property
