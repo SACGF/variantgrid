@@ -40,7 +40,7 @@
                 <div class="card-header">Slack</div>
                 <div class="card-body">
                     {% labelled hint="tiny" label="Enabled" %}{{ settings.SLACK.enabled }}{% endlabelled %}
-                    {% labelled hint="tiny" label="SlackBot Username" %}{{ slack_bot_username }}{% endlabelled %}
+                    {% labelled hint="tiny" label="SlackBot Username" %}{{ slack_bot_username|emojify }}{% endlabelled %}
                     {% labelled hint="tiny" label="Callback URL" %}{{ settings.SLACK.admin_callback_url|secret:-4 }}{% endlabelled %}
                     {% labelled hint="tiny" label="Auto Health Check" %}{{ settings.HEALTH_CHECK_ENABLED }}{% endlabelled %}
                 </div>
