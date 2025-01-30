@@ -1,8 +1,10 @@
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect
+from django.urls.base import reverse
 from django.views.generic import TemplateView
 
 from annotation.models import patients_qs_for_ontology_term
+from genes.models import GeneSymbol
 from library.utils import LimitedCollection
 from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService, OntologySnake, OntologyRelation, \
     ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER
@@ -42,8 +44,12 @@ class OntologyTermView(TemplateView):
             parent_relationships = []
             child_relationships = []
             relationship_count = 0
+            term_link = None
 
-            if not is_gene:
+            if is_gene:
+                if gene_symbol := GeneSymbol.cast(term.name):
+                    term_link = gene_symbol.get_absolute_url()
+            else:
                 regular_relationships = []
                 all_relationships: list[OntologyTermRelation] = OntologyTermRelation.relations_of(term)
                 relationship_count = len(all_relationships)
@@ -63,6 +69,7 @@ class OntologyTermView(TemplateView):
             has_hierarchy = term.ontology_service in {OntologyService.MONDO, OntologyService.HPO}
             return {
                 "term": term,
+                "term_link": term_link,
                 "is_ontology": not is_gene,
                 "gene_relationship_count": len(gene_relationships) if gene_relationships else 0,
                 "gene_relationships": gene_relationships,

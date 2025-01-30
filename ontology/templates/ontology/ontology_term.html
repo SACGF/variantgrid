@@ -41,7 +41,13 @@
         <div class="card">
             <div class="card-header">{{ term.id }} {% admin_link term %}</div>
             <div class="card-body">
-                {% labelled label="Name" %}{{ term.name }}{% endlabelled %}
+                {% labelled label="Name" %}
+                    {% if term_link %}
+                        <a href="{{ term_link }}">{{ term.name }}</a>
+                    {% else %}
+                        {{ term.name }}
+                    {% endif %}
+                {% endlabelled %}
                 {% if term.status == 'D' %}
                     {% labelled label="Warning" %}{{ 'W' | severity_icon }} This term has been deprecated{% endlabelled %}
                 {% elif term.status == 'N' %}
