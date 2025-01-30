@@ -952,8 +952,8 @@ class AnnotationRun(TimeStampedModel):
         # For newly created variants, there will only be one per build for latest annotation version
         ar: Optional[AnnotationRun]
         ar = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=genome_build,
-                                          annotation_range_lock__min_variant__gte=variant.pk,
-                                          annotation_range_lock__max_variant__lte=variant.pk,
+                                          annotation_range_lock__min_variant__lte=variant.pk,
+                                          annotation_range_lock__max_variant__gte=variant.pk,
                                           pipeline_type=pipeline_type).first()
         return ar
 
