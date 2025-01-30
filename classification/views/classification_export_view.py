@@ -24,7 +24,7 @@ from classification.models.classification_ref import ClassificationRef
 from classification.views.classification_export_report import ClassificationReport
 from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter, \
-    classification_export_user_string_to_q
+    classification_export_user_strings_to_q
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
 from classification.views.exports.classification_export_formatter_redcap import export_redcap_definition
 from classification.views.exports.classification_export_view import serve_export
@@ -290,45 +290,13 @@ def internal_lab_download(request):
 
         extra_filter_qs: Optional[Q] = None
         if record_filter_str:
-            all_qs: list[Q] = []
-            has_errors = False
-            all_parts = [p for p in [p.strip() for p in re.split('[;,\n\t]', record_filter_str)] if p]
-            check_has_parts = len(all_parts) <= 10
-            for part in all_parts:
-                # handle each part here so we can validate that there's 1+ record found for each filter
-                if part := part.strip():
-                    try:
-                        part_q = classification_export_user_string_to_q(part, genome_build)
-
-                        # only check we have records if we're searching for 10 things or less
-                        if check_has_parts:
-                            filter_data = ClassificationFilter(
-                                user=user,
-                                genome_build=genome_build,
-                                allele_origin_filter=allele_origin,
-                                min_share_level=share_level,
-                                file_prefix=f"Internal_lab_report",
-                                include_sources=user_labs,
-                                extra_filter=part_q
-                            )
-                            if not filter_data.cms_qs.exists():
-                                messages.error(request, f"\"{part}\" - no results found")
-                                has_errors = True
-                            else:
-                                all_qs.append(part_q)
-                        else:
-                            all_qs.append(part_q)
-
-                    except ValueError as ve:
-                        report_exc_info(extra_data={"target": part, "exception_message": str(ve)})
-                        has_errors = True
-                        messages.error(request, f"\"{part}\" - could not be turned into a classification filter")
-
-            if has_errors:
-                return render(request, 'classification/classification_export.html', context)
-
-            if all_qs:
-                extra_filter_qs = reduce(operator.or_, all_qs)
+            if all_parts := [p for p in [p.strip() for p in re.split('[;,\n\t]', record_filter_str)] if p]:
+                try:
+                    extra_filter_qs = classification_export_user_strings_to_q(all_parts, genome_build)
+                except ValueError as ve:
+                    report_exc_info(extra_data={"exception_message": str(ve)})
+                    messages.error(request, str(ve))
+                    return render(request, 'classification/classification_export.html', context)
 
         filter_data = ClassificationFilter(
             user=user,
