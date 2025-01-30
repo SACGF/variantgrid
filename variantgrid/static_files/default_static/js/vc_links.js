@@ -295,7 +295,9 @@ let VCLinks = (function() {
                         range = `chr${parts[1]}%3A${coordinate - 20}-${coordinate + 20}`;
                     } else if (this.variant_coordinate_symbolic_parts) {
                         let parts = this.variant_coordinate_symbolic_parts;
-                        range = `chr${parts[1]}%3A${parts[2] - 20}-${parts[3] + 20}`;
+                        let start = parseInt(parts[2]);
+                        let end = parseInt(parts[3]);
+                        range = `chr${parts[1]}%3A${start - 20}-${end + 20}`;
                     } else {
                         return new VCLink({
                             text: 'UCSC',
