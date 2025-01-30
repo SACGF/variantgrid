@@ -242,7 +242,10 @@
                     <div class="card-header">Summary</div>
                     <div class="card-body">
                         {% labelled label="Approved Name" help=annotation_description.hgnc_name %}{{ hgnc.approved_name }}{% endlabelled %}
-                        {% labelled label="HGNC ID" help=annotation_description.hgnc_id %}<a href="{{ hgnc.url }}">HGNC:{{ hgnc.pk }}</a> ({{ hgnc.get_status_display }}){% endlabelled %}
+                        {% labelled label="HGNC ID" help=annotation_description.hgnc_id %}
+                            <a href="{{ hgnc.get_absolute_url }}">HGNC:{{ hgnc.pk }}</a> ({{ hgnc.get_status_display }})
+                            <a href="{{ hgnc.url }}">HGNC site</a>
+                        {% endlabelled %}
                         {% labelled label="Location" help=annotation_description.band %}{{ hgnc.location }}{% endlabelled %}
                         {% labelled label="Gene Groups" help=annotation_description.gene_family_description %}
                             {{ hgnc.gene_groups }}
@@ -411,7 +414,10 @@
                 <div class="card-header">Summary</div>
                 <div class="card-body">
                     {% labelled label="Approved Name" help=annotation_description.hgnc_name %}{{ hgnc.approved_name }}{% endlabelled %}
-                    {% labelled label="HGNC ID" help=annotation_description.hgnc_id %}<a href="{{ hgnc.url }}">HGNC:{{ hgnc.pk }}</a> ({{ hgnc.get_status_display }}){% endlabelled %}
+                    {% labelled label="HGNC ID" help=annotation_description.hgnc_id %}
+                            <a href="{{ hgnc.get_absolute_url }}">HGNC:{{ hgnc.pk }}</a> ({{ hgnc.get_status_display }})
+                            <a href="{{ hgnc.url }}">HGNC site</a>
+                    {% endlabelled %}
                 </div>
             </div>
         {% endif %}
