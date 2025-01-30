@@ -4,10 +4,12 @@ import os
 import celery
 from celery import chain
 from django.conf import settings
+from django.db.models.functions.math import Abs
+from django.db.models.query_utils import Q
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
-from annotation.models import AnnotationStatus, GenomeBuild
+from annotation.models import AnnotationStatus, GenomeBuild, VariantAnnotationPipelineType
 from annotation.models.models import AnnotationRun, InvalidAnnotationVersionError
 from annotation.signals.manual_signals import annotation_run_complete_signal
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
@@ -184,7 +186,7 @@ def annotation_run_retry(annotation_run: AnnotationRun, upload_only=False) -> An
 
 
 def _unannotated_variants_to_vcf(genome_build: GenomeBuild, vcf_filename,
-                                 annotation_range_lock, pipeline_type):
+                                 annotation_range_lock, pipeline_type) -> int:
     logging.info("unannotated_variants_to_vcf()")
     if os.path.exists(vcf_filename):
         raise ValueError(f"Don't want to overwrite '{vcf_filename}' which already exists!")
@@ -196,6 +198,13 @@ def _unannotated_variants_to_vcf(genome_build: GenomeBuild, vcf_filename,
 
     annotation_version = annotation_range_lock.version.get_any_annotation_version()
     qs = get_variants_qs_for_annotation(annotation_version, pipeline_type=pipeline_type, **kwargs)
+
+    if pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
+        if settings.ANNOTATION_VEP_SV_MAX_SIZE:
+            # VEP will skip variants above a certain size and fill up the logs with 'too long to annotate'
+            # So just skip these. I don't think it makes much difference in memory usage
+            q_not_too_long = Q(svlen__isnull=True) | Q(abs_svlen__lte=settings.ANNOTATION_VEP_SV_MAX_SIZE)
+            qs = qs.annotate(abs_svlen=Abs("svlen")).filter(q_not_too_long)
     return write_qs_to_vcf(vcf_filename, genome_build, qs)
 
 
