@@ -45,7 +45,7 @@ def qs_info_dict_field_values(qs, info_dict):
     return qs.values(*args)
 
 
-def write_qs_to_vcf_file_sort_alphabetically(qs, f, info_dict=None):
+def write_qs_to_vcf_file_sort_alphabetically(qs, f, info_dict=None) -> int:
     if info_dict is None:
         info_dict = VARIANT_GRID_INFO_DICT
     header_lines = get_vcf_header_lines(info_dict=info_dict)
@@ -55,7 +55,10 @@ def write_qs_to_vcf_file_sort_alphabetically(qs, f, info_dict=None):
     return _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict=info_dict)
 
 
-def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict, use_accession=False):
+def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict, use_accession=False) -> int:
+    """
+    :return: number of lines written
+    """
     if use_accession:
         chrom_key = "locus__contig__refseq_accession"
     else:
@@ -99,7 +102,7 @@ def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict, 
     return i
 
 
-def write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict, use_accession=False):
+def write_contig_sorted_values_to_vcf_file(genome_build, sorted_values, f, info_dict, use_accession=False) -> int:
     header_lines = get_vcf_header_from_contigs(genome_build, info_dict=info_dict, use_accession=use_accession)
     return _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict=info_dict, use_accession=use_accession)
 

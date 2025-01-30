@@ -199,7 +199,7 @@ def _unannotated_variants_to_vcf(genome_build: GenomeBuild, vcf_filename,
     return write_qs_to_vcf(vcf_filename, genome_build, qs)
 
 
-def write_qs_to_vcf(vcf_filename, genome_build, qs, info_dict=VARIANT_GRID_INFO_DICT, use_accession=False):
+def write_qs_to_vcf(vcf_filename, genome_build, qs, info_dict=VARIANT_GRID_INFO_DICT, use_accession=False) -> int:
     # We had an issue with writing accessions in VEP, so use chrom names and the default VEP fasta instead
     # @see https://github.com/Ensembl/ensembl-vep/issues/1635
     qs = qs.order_by("locus__contig__genomebuildcontig__order", "locus__position")
