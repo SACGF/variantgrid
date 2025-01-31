@@ -472,18 +472,18 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             if len(array) != num_variants:
                 raise ValueError(f"Number of variant ids ({num_variants}) != num {name} ({len(array)})")
 
-        # If you add any columns here, need to adjust COHORT_GT_NUM_ADDED_FIELDS
-        last_variant_id = None
+        seen_variant_ids = set()
         for variant_hash, variant_id, filters, cohort_gt, gnomad_af in zip(variant_hashes, variant_ids,
                                                                            self.variant_filters,
                                                                            self.cohort_genotypes, self.variant_gnomad_af):
-            # File is sorted, so dupes will be next to each other. Remove and make ModifiedImportedVariant
-            if variant_id == last_variant_id:
+            # Remove duplicates and add ModifiedImportedVariant
+            # dupes may not be on subsequent lines due to normalization/multi-allelic so need check all in hash
+            if variant_id in seen_variant_ids:
                 self.modified_imported_variant_hashes.append(variant_hash)
                 self.modified_imported_variants.append((ModifiedImportedVariantOperation.RMDUP, None, None, None))
                 continue
 
-            last_variant_id = variant_id
+            seen_variant_ids.add(variant_id)
             common = gnomad_af and variant_id not in self.uncommon_variant_ids
             if common:
                 cgc_id = self.cohort_genotype_collection.common_collection_id
@@ -491,6 +491,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             else:  # Rare
                 cgc_id = self.cohort_genotype_collection.pk
                 cohort_genotypes = cohort_genotypes_rare
+            # If you add any columns here, need to adjust COHORT_GT_NUM_ADDED_FIELDS
             cohort_genotypes.append([cgc_id, variant_id, filters] + cohort_gt)
 
         cg_destinations = {

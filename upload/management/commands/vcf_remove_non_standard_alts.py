@@ -31,6 +31,7 @@ class Command(BaseCommand):
 
         skipped_records = Counter()
         alt_standard_bases_pattern = re.compile(r"[GATC,.]")  # Can "." for reference
+        skipped_alt_first_examples = None
 
         for line in f:
             if line[0] == '#':
@@ -48,7 +49,10 @@ class Command(BaseCommand):
                         else:
                             skip_reason = "Symbolic variants disabled via settings."
                     else:
-                        skip_reason = f"non-standard bases in ALT sequence: {alt}"
+                        if not skipped_alt_first_examples:
+                            skipped_alt_first_examples = f"non-standard bases in ALT sequence. First example: '{alt}'"
+                        skip_reason = skipped_alt_first_examples
+
                     if skip_reason:
                         skipped_records[skip_reason] += 1
                         continue
