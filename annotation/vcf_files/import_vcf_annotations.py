@@ -40,7 +40,7 @@ def import_vcf_annotations(
         bulk_inserter.finish()  # Any leftovers
         annotation_run.annotated_count = bulk_inserter.rows_processed
 
-        handle_vep_warnings(annotation_run, bulk_inserter)
+        handle_vep_skipped(annotation_run, bulk_inserter)
 
         if delete_temp_files:
             bulk_inserter.remove_processing_files()
@@ -53,7 +53,7 @@ def import_vcf_annotations(
         raise
 
 
-def handle_vep_warnings(annotation_run: AnnotationRun, bulk_inserter):
+def handle_vep_skipped(annotation_run: AnnotationRun, bulk_inserter):
     """ set annotation_run fields 'vep_warnings' and 'vep_skipped_count'
         Create VariantAnnotation entries for any skipped variants, filling in vep_skipped_reason
 
@@ -61,6 +61,7 @@ def handle_vep_warnings(annotation_run: AnnotationRun, bulk_inserter):
 
     annotation_run.vep_skipped_count = annotation_run.annotation_range_lock.count - annotation_run.annotated_count
     if annotation_run.vep_skipped_count:
+        # These will be skipped by VEP (but also we don't write out ones we know will be skipped (eg too long)
         vep_warning_filename = annotation_run.vcf_annotated_filename + "_warnings.txt"
         print(f"Looking for '{vep_warning_filename}'")
         if os.path.exists(vep_warning_filename):

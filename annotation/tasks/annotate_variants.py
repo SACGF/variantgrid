@@ -113,16 +113,16 @@ def dump_and_annotate_variants(annotation_run, vep_version_check=True):
 
     genome_build = annotation_run.genome_build
     annotation_consortium = annotation_run.annotation_consortium
-    variants_to_annotate = _unannotated_variants_to_vcf(genome_build, vcf_dump_filename,
-                                                        annotation_run.annotation_range_lock,
-                                                        annotation_run.pipeline_type)
+    vcf_dump_count = _unannotated_variants_to_vcf(genome_build, vcf_dump_filename,
+                                                  annotation_run.annotation_range_lock,
+                                                  annotation_run.pipeline_type)
 
-    annotation_run.dump_count = variants_to_annotate
+    annotation_run.dump_count = vcf_dump_count
     annotation_run.dump_end = timezone.now()
     annotation_run.save()
 
-    logging.info("Annotating %d variants", variants_to_annotate)
-    if variants_to_annotate:
+    logging.info("Annotating %d variants", vcf_dump_count)
+    if vcf_dump_count:
         name = name_from_filename(vcf_dump_filename)
         vcf_annotated_basename = f"{name}.vep_annotated_{genome_build.name}.vcf.gz"
         vcf_annotated_filename = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, vcf_annotated_basename)
