@@ -56,9 +56,8 @@ def deleting_classification(sender, instance: Classification, **kwargs):  # pyli
 @receiver(classification_withdraw_signal, sender=Classification)
 def withdraw_changed(sender, classification: Classification, **kwargs):  # pylint: disable=unused-argument
     # WITHDRAW
-    if entry := ClassificationGroupingEntry.objects.filter(classification=classification).first():
-        entry.dirty_up()
-        _instant_undirty_check()
+    ClassificationGrouping.assign_grouping_for_classification(classification)
+    _instant_undirty_check()
 
 
 @receiver(allele_info_changed_signal, sender=ImportedAlleleInfo)
