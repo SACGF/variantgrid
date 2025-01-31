@@ -22,7 +22,7 @@ from snpdb.common_variants import get_classified_high_frequency_variants_qs
 from snpdb.models import CohortGenotype, VariantCoordinate, VCFFilter
 from snpdb.models.models_enums import ProcessingStatus
 from upload.models import UploadPipeline, PipelineFailedJobTerminateEarlyException, \
-    VCFImporter, UploadStep, UploadStepTaskType, VCFPipelineStage
+    VCFImporter, UploadStep, UploadStepTaskType, VCFPipelineStage, ModifiedImportedVariantOperation
 from upload.tasks.vcf.import_sql_copy_task import ImportCohortGenotypeSQLCopyTask
 from upload.vcf.abstract_bulk_vcf_processor import AbstractBulkVCFProcessor
 from upload.vcf.sql_copy_files import write_sql_copy_csv, COHORT_GENOTYPE_HEADER
@@ -451,13 +451,16 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             variant_ids = self.variant_pk_lookup.get_variant_ids(self.variant_hashes)
             self.set_max_variant(self.variant_hashes, variant_ids)
 
+            # this can create MIVs (rmdupes)
+            self.process_cohort_genotypes(self.variant_hashes, variant_ids)
+
             if self.modified_imported_variants:
                 variant_ids_by_hash = dict(zip(self.variant_hashes, variant_ids))
                 self.process_modified_imported_variants(variant_ids_by_hash)
 
-            self.process_cohort_genotypes(variant_ids)
+            self.variant_hashes = []
 
-    def process_cohort_genotypes(self, variant_ids):
+    def process_cohort_genotypes(self, variant_hashes, variant_ids):
         cohort_genotypes_common = []
         cohort_genotypes_rare = []
 
@@ -470,8 +473,17 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 raise ValueError(f"Number of variant ids ({num_variants}) != num {name} ({len(array)})")
 
         # If you add any columns here, need to adjust COHORT_GT_NUM_ADDED_FIELDS
-        for variant_id, filters, cohort_gt, gnomad_af in zip(variant_ids, self.variant_filters,
-                                                             self.cohort_genotypes, self.variant_gnomad_af):
+        last_variant_id = None
+        for variant_hash, variant_id, filters, cohort_gt, gnomad_af in zip(variant_hashes, variant_ids,
+                                                                           self.variant_filters,
+                                                                           self.cohort_genotypes, self.variant_gnomad_af):
+            # File is sorted, so dupes will be next to each other. Remove and make ModifiedImportedVariant
+            if variant_id == last_variant_id:
+                self.modified_imported_variant_hashes.append(variant_hash)
+                self.modified_imported_variants.append((ModifiedImportedVariantOperation.RMDUP, None, None, None))
+                continue
+
+            last_variant_id = variant_id
             common = gnomad_af and variant_id not in self.uncommon_variant_ids
             if common:
                 cgc_id = self.cohort_genotype_collection.common_collection_id
@@ -500,7 +512,6 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             self.create_cohort_genotype_job(table_name, num_cohort_genotypes, cohort_genotypes_filename)
             self.cohort_genotype_file_id += 1
 
-        self.variant_hashes = []
         self.cohort_genotypes = []
         self.variant_gnomad_af = []
         self.check_pipeline_for_failures()  # Need to do this every so often

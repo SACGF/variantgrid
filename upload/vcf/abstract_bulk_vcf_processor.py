@@ -10,7 +10,8 @@ from library.django_utils.django_file_utils import get_import_processing_filenam
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.genomics.vcf_utils import vcf_get_ref_alt_svlen_and_modification
 from snpdb.variant_pk_lookup import VariantPKLookup
-from upload.models import UploadStep, ModifiedImportedVariant, UploadStepTaskType, VCFPipelineStage, SimpleVCFImportInfo
+from upload.models import UploadStep, ModifiedImportedVariant, UploadStepTaskType, VCFPipelineStage, \
+    SimpleVCFImportInfo, ModifiedImportedVariantOperation
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
 from upload.vcf.sql_copy_files import write_sql_copy_csv
 
@@ -108,7 +109,7 @@ class AbstractBulkVCFProcessor(abc.ABC):
             for ov in ModifiedImportedVariant.bcftools_format_old_variant(bcftools_old_variant, svlen, self.genome_build):
                 # These 2 need to be in sync
                 miv_hash_list.append(variant_hash)
-                miv_list.append((old_multiallelic, old_variant, ov))
+                miv_list.append((ModifiedImportedVariantOperation.NORMALIZATION, old_multiallelic, old_variant, ov))
 
     def process_modified_imported_variants(self, variant_ids_by_hash):
         modified_imported_variants = []

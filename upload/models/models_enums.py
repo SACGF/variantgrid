@@ -46,3 +46,8 @@ class VCFImportInfoSeverity(models.TextChoices):
 class UploadStepOrigin(models.TextChoices):
     USER_ADDITION = 'A', "User Addition"
     IMPORT_TASK_FACTORY = 'I', "Import Task Factory"
+
+
+class ModifiedImportedVariantOperation(models.TextChoices):
+    NORMALIZATION = 'N', "Normalization"
+    RMDUP = 'R', "Removed Duplicate"

@@ -38,7 +38,7 @@ class Command(BaseCommand):
             else:
                 columns = line.split("\t")
                 # Check alt is ok
-                alt = columns[VCFColumns.ALT]
+                alt = columns[VCFColumns.ALT].upper()
                 if alt_standard_bases_pattern.sub("", alt):
                     skip_reason = None
                     if alt.startswith("<") and alt.endswith(">"):
@@ -48,7 +48,7 @@ class Command(BaseCommand):
                         else:
                             skip_reason = "Symbolic variants disabled via settings."
                     else:
-                        skip_reason = "non-standard bases in ALT sequence"
+                        skip_reason = f"non-standard bases in ALT sequence: {alt}"
                     if skip_reason:
                         skipped_records[skip_reason] += 1
                         continue

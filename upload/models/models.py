@@ -11,6 +11,7 @@ from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models, transaction
+from django.db.models import Func, F, Value, CharField
 from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query import QuerySet
@@ -35,7 +36,7 @@ from snpdb.models.models_enums import ImportSource, ProcessingStatus, ImportStat
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.user_settings_manager import UserSettingsManager
 from upload.models.models_enums import UploadedFileTypes, VCFPipelineStage, \
-    UploadStepTaskType, TimeFilterMethod, VCFImportInfoSeverity, UploadStepOrigin
+    UploadStepTaskType, TimeFilterMethod, VCFImportInfoSeverity, UploadStepOrigin, ModifiedImportedVariantOperation
 from variantgrid.celery import app
 
 
@@ -241,8 +242,7 @@ class UploadPipeline(models.Model):
             kwargs["accepted_date__isnull"] = True
         vcf_import_info = []
         for import_info in VCFImportInfo.objects.filter(**kwargs).select_subclasses():
-            msg = import_info.message
-            if msg:
+            if import_info.message or import_info.has_more_details:
                 vcf_import_info.append(import_info)
         return vcf_import_info
 
@@ -576,13 +576,32 @@ class ModifiedImportedVariants(VCFImportInfo):
 
     @property
     def message(self):
-        qs = self.modifiedimportedvariant_set.filter(old_variant__isnull=False)
-        num_normalised = qs.count()
-        if num_normalised:
-            msg = f"{num_normalised} variants normalised during import."
-        else:
-            msg = None
-        return msg
+        messages = []
+        miv_qs = self.modifiedimportedvariant_set.all()
+        if num_normalised := miv_qs.filter(operation=ModifiedImportedVariantOperation.NORMALIZATION,
+                                           old_variant__isnull=False).count():
+            messages.append(f"{num_normalised} normalised")
+
+        multi_allelics_qs = miv_qs.filter(operation=ModifiedImportedVariantOperation.NORMALIZATION,
+                                          old_multiallelic__isnull=False)
+        # The field has a unique id at the end, eg 1 or 2 below:
+        #
+        # NC_000001.10|145016034|A|AA,AC|1
+        # NC_000001.10|145016034|A|AA,AC|2
+        num_multiallelic = multi_allelics_qs.annotate(stripped_multiallelic=Func(
+            F('old_multiallelic'),
+            Value(r'(.*)\|\d+$'),
+            Value(r'\1'),
+            function='regexp_replace',
+            output_field=CharField(),
+        )).values_list('stripped_multiallelic', flat=True).distinct().count()
+        if num_multiallelic:
+            messages.append(f"{num_multiallelic} multi-allelic split")
+
+        if num_rmdup := miv_qs.filter(operation=ModifiedImportedVariantOperation.RMDUP).count():
+            messages.append(f"{num_rmdup} duplicates removed")
+
+        return ", ".join(messages)
 
 
 class ModifiedImportedVariant(models.Model):
@@ -595,6 +614,8 @@ class ModifiedImportedVariant(models.Model):
 
     import_info = models.ForeignKey(ModifiedImportedVariants, on_delete=CASCADE, null=True)
     variant = models.ForeignKey(Variant, on_delete=CASCADE)
+    operation = models.CharField(max_length=1, choices=ModifiedImportedVariantOperation.choices,
+                                 default=ModifiedImportedVariantOperation.NORMALIZATION)
     # OLD_MULTIALLELIC from vt: @see https://genome.sph.umich.edu/wiki/Vt#Decompose
     old_multiallelic = models.TextField(null=True)
     # OLD_VARIANT from vt: @see https://genome.sph.umich.edu/wiki/Vt#Normalization
