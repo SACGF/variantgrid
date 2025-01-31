@@ -219,7 +219,8 @@ def classification_export_user_strings_to_q(filter_str_list: list[str], genome_b
     :param genome_build: The genome build for Variant Coordiantes
     :return: A Q to filter the results
     """
-    filter_set = set(filter_str_list)
+    filter_set: set[str] = set(filter_str_list)
+    error_set: set[str] = set()
 
     gene_symbols: set[GeneSymbol] = set()
     if possible_gene_symbols := [filter_str for filter_str in filter_set if GENE_SYMBOL_PATTERN.match(filter_str)]:
@@ -248,7 +249,10 @@ def classification_export_user_strings_to_q(filter_str_list: list[str], genome_b
             # TODO can change this to bulk
             for clingen_allele_str in clingen_allele_strs:
                 filter_set.remove(clingen_allele_str)
-                clingen_alleles.add(get_clingen_allele(clingen_allele_str))
+                try:
+                    clingen_alleles.add(get_clingen_allele(clingen_allele_str))
+                except ValueError:
+                    error_set.add(clingen_allele_str)
 
     variant_coordinates: set[VariantCoordinate] = set()
     if filter_set:
@@ -258,8 +262,9 @@ def classification_export_user_strings_to_q(filter_str_list: list[str], genome_b
                     variant_coordinates.add(vc)
                     filter_set.remove(filter_str)
 
-    if filter_set:
-        unmatched_str = ", ".join(f'"{filter_str}"' for filter_str in sorted(filter_set))
+    error_set.update(filter_set)
+    if error_set:
+        unmatched_str = ", ".join(f'"{filter_str}"' for filter_str in sorted(error_set))
         raise ValueError(f"Can't match {unmatched_str} to ClinGen Allele, Gene Symbol or Variant Coordinate")
 
     queries: list[Q] = []
