@@ -1,12 +1,16 @@
 import abc
 import os
+from collections import Counter
+from typing import Optional
 
 import cyvcf2
 from django.conf import settings
 
 from library.django_utils.django_file_utils import get_import_processing_filename
+from library.genomics.vcf_enums import VCFSymbolicAllele
+from library.genomics.vcf_utils import vcf_get_ref_alt_svlen_and_modification
 from snpdb.variant_pk_lookup import VariantPKLookup
-from upload.models import UploadStep, ModifiedImportedVariant, UploadStepTaskType, VCFPipelineStage
+from upload.models import UploadStep, ModifiedImportedVariant, UploadStepTaskType, VCFPipelineStage, SimpleVCFImportInfo
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
 from upload.vcf.sql_copy_files import write_sql_copy_csv
 
@@ -29,18 +33,36 @@ class AbstractBulkVCFProcessor(abc.ABC):
         self.modified_imported_variant_hashes = []
         self.modified_imported_variants = []
         self.variant_pk_lookup = VariantPKLookup(upload_step.genome_build)
+        self.svlen_modifications = Counter()
 
     @abc.abstractmethod
     def process_entry(self, variant: cyvcf2.Variant):
         pass
 
     @abc.abstractmethod
-    def finish(self):
+    def _finish(self):
         pass
+
+    def finish(self):
+        self._finish()
+        if self.svlen_modifications:
+            for modification, count in self.svlen_modifications.items():
+                message_string = f"{modification}: {count}"
+                SimpleVCFImportInfo.objects.create(type=SimpleVCFImportInfo.SVLEN_MODIFIED, has_more_details=True,
+                                                   upload_step=self.upload_step, message_string=message_string)
 
     @property
     def genome_build(self):
         return self.upload_pipeline.genome_build
+
+    def get_ref_alt_svlen(self, variant) -> tuple[str, str, Optional[int]]:
+        """ Ensures SVLEN fits symbolic alt, some callers eg Manta (non-Dragen) write positive SVLEN for dels
+            We don't do this in vcf_clean_and_filter as we don't pull apart the INFO there
+        """
+        ref, alt, svlen, modification = vcf_get_ref_alt_svlen_and_modification(variant)
+        if modification:
+            self.svlen_modifications[modification] += 1
+        return ref, alt, svlen
 
     def set_max_variant(self, variant_hashes, variant_ids):
         # Keep track of max annotated variant (only non-reference are annotated)

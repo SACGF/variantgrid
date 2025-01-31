@@ -64,7 +64,7 @@ def _write_cleaned_header(genome_build, upload_pipeline, vcf_filename) -> str:
     return cleaned_vcf_header_filename
 
 
-def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
+def preprocess_vcf(upload_step, annotate_gnomad_af=False):
     MAX_STDERR_OUTPUT = 5000  # How much stderr output per process to store in DB
 
     VCF_CLEAN_AND_FILTER_SUB_STEP = "vcf_clean_and_filter"
@@ -108,8 +108,6 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
                                           skipped_records_stats_file,
                                           "--skipped-filters-stats-file",
                                           skipped_filters_stats_file]
-    if remove_info:
-        read_variants_cmd.append("--remove-info")
     pipe_commands[VCF_CLEAN_AND_FILTER_SUB_STEP] = read_variants_cmd
     sub_steps[VCF_CLEAN_AND_FILTER_SUB_STEP] = create_sub_step(upload_step, VCF_CLEAN_AND_FILTER_SUB_STEP, read_variants_cmd)
 

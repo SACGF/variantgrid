@@ -47,7 +47,7 @@ class PreprocessAndAnnotateVCFTask(ImportVCFStepTask):
         else:
             annotate_gnomad_af = False
 
-        preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=annotate_gnomad_af)
+        preprocess_vcf(upload_step, annotate_gnomad_af=annotate_gnomad_af)
 
         # Reload from DB - vcf_extract_unknown_and_split_file set items_processed in a different process
         upload_step = UploadStep.objects.get(pk=upload_step.pk)

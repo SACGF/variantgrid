@@ -14,7 +14,6 @@ from django.db.models import Max
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.genomics.vcf_enums import VCFConstant
-from library.genomics.vcf_utils import vcf_get_ref_alt_svlen
 from library.git import Git
 from library.utils import double_quote, json_default_converter, AsciiValue
 from library.utils.database_utils import postgres_arrays
@@ -54,7 +53,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # v23. Fixes to clean_and_filter - Standard chromosomes only
     # v24. Split multi-allelics first, replace reference base (ie swap out N), pick explicit/symbolic alt based on size
     # v25. Store VCFInfo/VCFFilter based on header to represent json field schema (stored since v21)
-    VCF_IMPORTER_VERSION = 25  # Change this if you make a major change to the code.
+    # v26. Make sure SVLEN is negative for <DEL>, write warning message
+    VCF_IMPORTER_VERSION = 26  # Change this if you make a major change to the code.
     # Need to distinguish between no entry and 0, can't use None w/postgres command line inserts
     DEFAULT_AD_FIELD = 'AD'  # What CyVCF2 uses
     # GL = Genotype Likelihood - used by freeBayes v1.2.0: log10-scaled likelihoods of the data given the called
@@ -134,7 +134,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             uncommon_variant_ids.update(uncommon_qs.values_list("pk", flat=True))
         return uncommon_variant_ids
 
-    def finish(self):
+    def _finish(self):
         """ This is called at the very end so we can collect any remaining items to process """
 
         logging.debug("VCFSplitToTableCSVs - finish")
@@ -337,7 +337,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
     def process_entry(self, variant: cyvcf2.Variant):
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
-        ref, alt, svlen = vcf_get_ref_alt_svlen(variant)
+        ref, alt, svlen = self.get_ref_alt_svlen(variant)
         locus_tuple = (variant.CHROM, variant.POS, ref)
         if self.last_locus_tuple:
             if self.last_locus_tuple != locus_tuple:
