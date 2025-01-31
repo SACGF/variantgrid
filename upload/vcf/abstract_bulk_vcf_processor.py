@@ -1,3 +1,4 @@
+import abc
 import os
 
 import cyvcf2
@@ -10,7 +11,7 @@ from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantS
 from upload.vcf.sql_copy_files import write_sql_copy_csv
 
 
-class AbstractBulkVCFProcessor:
+class AbstractBulkVCFProcessor(abc.ABC):
     """ The minimum a VCF processor needs to do is
         set max_variant_id and insert multi-allelics so we know what was normalised """
 
@@ -28,6 +29,14 @@ class AbstractBulkVCFProcessor:
         self.modified_imported_variant_hashes = []
         self.modified_imported_variants = []
         self.variant_pk_lookup = VariantPKLookup(upload_step.genome_build)
+
+    @abc.abstractmethod
+    def process_entry(self, variant: cyvcf2.Variant):
+        pass
+
+    @abc.abstractmethod
+    def finish(self):
+        pass
 
     @property
     def genome_build(self):

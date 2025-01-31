@@ -26,7 +26,7 @@ class BulkMinimalVCFProcessor(AbstractBulkVCFProcessor):
                                                             code_git_hash=Git(settings.BASE_DIR).hash)
         return vcf_importer
 
-    def process_entry(self, variant):
+    def process_entry(self, variant: cyvcf2.Variant):
         ref, alt, svlen = vcf_get_ref_alt_svlen(variant)
         variant_coordinate = VariantCoordinate(chrom=variant.CHROM, position=variant.POS, ref=ref, alt=alt, svlen=svlen)
         variant_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant_coordinate)
