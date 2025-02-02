@@ -13,6 +13,7 @@ from genes.hgvs import CHGVS
 from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType
 from ontology.models import OntologyTerm, OntologyTermRelation, OntologySnake
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import UserSettings, GenomeBuild, Variant
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, DC, SortOrder, CellData
 
@@ -102,8 +103,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
     @cached_property
     def genome_build_prefs(self) -> List[GenomeBuild]:
-        user_settings = UserSettings.get_for_user(self.user)
-        return GenomeBuild.builds_with_annotation_priority(user_settings.default_genome_build)
+        return GenomeBuild.builds_with_annotation_priority(GenomeBuildManager.get_current_genome_build())
 
     def render_c_hgvs(self, row: CellData) -> JsonDataType:
         def get_preferred_chgvs_json() -> Dict:

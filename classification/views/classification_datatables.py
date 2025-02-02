@@ -18,6 +18,7 @@ from genes.hgvs import CHGVS
 from genes.models import TranscriptVersion
 from library.utils import JsonDataType
 from ontology.models import OntologyTerm
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import UserSettings, GenomeBuild, Variant, Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
@@ -111,8 +112,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
     @cached_property
     def genome_build_prefs(self) -> List[GenomeBuild]:
-        user_settings = UserSettings.get_for_user(self.user)
-        return GenomeBuild.builds_with_annotation_priority(user_settings.default_genome_build)
+        return GenomeBuild.builds_with_annotation_priority(GenomeBuildManager.get_current_genome_build())
 
     @cached_property
     def genome_build_preferred(self) -> GenomeBuild:
