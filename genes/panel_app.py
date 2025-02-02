@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Optional, Union
 
 import requests
 from rest_framework.exceptions import NotFound
@@ -16,7 +16,7 @@ PANEL_APP_LIST_PANELS_PATH = "/api/v1/panels/"
 PANEL_APP_SEARCH_BY_GENES_BASE_PATH = "/api/v1/genes/"
 
 
-def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbol) -> Optional[dict]:
+def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbol: Union[str, GeneSymbol]) -> Optional[dict]:
     url = server.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + str(gene_symbol)
     r = requests.get(url, timeout=MINUTE_SECS)
     results = None

@@ -286,6 +286,10 @@ class ModelAdminBasics(admin.ModelAdmin):
         default_timezoned = datetime.astimezone(self.tz)
         return f"{default_timezoned.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}"
 
+    def format_datetime_seconds(self, datetime) -> str:
+        default_timezoned = datetime.astimezone(self.tz)
+        return default_timezoned.strftime('%Y-%m-%d %H:%M:%S')
+
     def is_readonly_field(self, f) -> bool:
         # override to make fields editable
         if not f.editable:

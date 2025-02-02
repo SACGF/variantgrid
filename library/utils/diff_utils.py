@@ -10,6 +10,10 @@ from django.utils.safestring import SafeString
 from library.utils import first
 
 
+def format_diff_text(text: str) -> SafeString:
+    return SafeString(escape(text).replace("\n", "<span style='font-size:x-small;opacity:0.5'>&#8726;n</span><br/>"))
+
+
 @dataclass
 class DiffTextSegment:
     operation: str
@@ -17,7 +21,7 @@ class DiffTextSegment:
 
     @property
     def effective_text(self):
-        return SafeString(escape(self.text).replace("\n", "<span style='font-size:x-small;opacity:0.5'>&#8726;n</span><br/>"))
+        return format_diff_text(self.text)
 
     @property
     def operation_name(self):

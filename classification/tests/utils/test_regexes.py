@@ -1,5 +1,4 @@
 from django.test.testcases import TestCase
-
 from annotation.regexes import db_ref_regexes, DbRegexes, db_citation_regexes
 
 
@@ -152,3 +151,9 @@ class RegexTests(TestCase):
         results = db_ref_regexes.search(text)
         self.assertEqual(len(results), 1)
         self.assertEqual(str(results[0]), 'MONDO:0000001')
+
+    def test_false_positive_pmd(self):
+        # FIXME TODO per variantgrid_private#3700
+        text = "PMCC_12M2976"
+        results = db_ref_regexes.search(text)
+        self.assertEqual(len(results), 0)

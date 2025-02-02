@@ -128,6 +128,17 @@ class Citation(TimeStampedModel, PreviewModelMixin):
     authors_short = models.TextField(null=True, blank=True)
     abstract = models.TextField(null=True, blank=True)
 
+    def __format__(self, fmt):
+        if fmt == 'id':
+            return self.id_pretty
+        else:
+            return " ".join([p for p in [
+                self.id_pretty,
+                self.first_author,
+                self.year,
+                self.title
+            ] if p is not None])
+
     @property
     def id_pretty(self):
         return self.id.replace(":", ": ")
@@ -274,7 +285,7 @@ class CitationIdNormalized:
     Used to split citation strings into parts, e.g. PMCID: PMC32432232 prefix=PMCID, semicolon=: number_prefix=PMC, number=32432232
     """
 
-    NUMER_STRIP_RE = re.compile(r"(?P<number_prefix>[a-z]+)?(?P<number>[0-9]+)", re.IGNORECASE)
+    NUMER_STRIP_RE = re.compile(r"(?P<number_prefix>[a-z_]+)?(?P<number>[0-9]+)", re.IGNORECASE)
     """
     Extract the pure number from index, e.g. PMC32432232 gives you PMC and 32432232
     """

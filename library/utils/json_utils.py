@@ -59,6 +59,7 @@ def strip_json(json_values: JsonDataType) -> JsonDataType:
     Remove null, empty strings and false and empty lists from JSON values
     (contents of arrays won't be affected).
     Can optimise exports of json data when fields are often blank
+    Also good for when saving JSON to the database as an absent value is
     """
     if isinstance(json_values, Mapping):
         ret_value = {}

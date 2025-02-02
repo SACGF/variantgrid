@@ -1,0 +1,46 @@
+{% load ui_utils %}
+{% load classification_tags %}
+<div id="ag-{{ allele_grouping.id }}">
+    {% if render_mode == "embedded" %}
+        <div class="mb-4">{% preview allele_grouping.allele %}</div>
+    {% endif %}
+
+    {% for grouping in groupings %}
+        {% if not forloop.first %}<hr class="dashed"/>{% endif %}
+        <div>
+            <div class="display-flex">
+                <div class="allele-origin-box horizontal allele-origin-{{ grouping.allele_origin_grouping.allele_origin_bucket }}">
+                    <div class="allele-origin-text">{{ grouping.allele_origin_grouping.allele_origin_bucket_obj.label }}</div>
+                </div>
+                <div>{% admin_link grouping.allele_origin_grouping %}</div>
+            </div>
+            {% for classification_grouping in grouping.classification_groupings %}
+                <div class="mt-2">
+
+                {% for sub in classification_grouping.sub_groupings %}
+                    <div>{% classification_quick sub.latest_modification record_count=sub.count %}</div>
+                {% endfor %}
+
+                {% comment %}
+                {% if classification_grouping.classification_count > 10 %}
+                    <div>Total of {{ classification_grouping.classification_count }} records from {{ classification_grouping.lab }}, showing most recent 10</div>
+                {% endif %}
+                {% for record in classification_grouping.classification_modifications|slice:"-10:" %}
+                    <div class="mt-1">{% classification_quick record show_flags=True %}</div>
+                {% endfor %}
+                {% endcomment %}
+                </div>
+            {% endfor %}
+            {% if grouping.discordance_reports %}
+                <div class="mt-4">
+                {% for dr in grouping.discordance_reports %}
+                    <div class="my-2">{% discordance_report dr %}</div>
+                {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+    {% endfor %}
+</div>
+<script>
+    Flags.instance.init({userId: '{{user.id}}', forceRender: true, filter:"#ag-{{ allele_grouping.id }}", flagGroup:'classifications'});
+</script>

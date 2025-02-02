@@ -44,6 +44,10 @@ class CellData:
     def __getitem__(self, item):
         return self.all_data[item]
 
+    def get_nested_json(self, key, sub_key):
+        if data := self.all_data.get(key):
+            return data.get(sub_key)
+
     def get(self, key: Any, default: Optional[Any] = None) -> Any:
         return self.all_data.get(key, default)
 
@@ -52,6 +56,15 @@ class RichColumn:
     """
     A column to be presented on a DataTable
     """
+
+    @staticmethod
+    def client_renderer_combine(formatters: list[str]) -> str:
+        json_str = json.dumps(formatters)
+        return f'TableFormat.combine.bind(null, {json_str}, null)'  # 2nd null is settings
+
+    @staticmethod
+    def client_renderer_repeat(settings: Optional[dict[str, Any]]) -> str:
+        return f'TableFormat.repeat.bind(null, {settings})'
 
     @staticmethod
     def choices_client_renderer(choices):
@@ -71,7 +84,7 @@ class RichColumn:
                  enabled: bool = True,
                  renderer: Optional[Callable[[CellData], JsonDataType]] = None,
                  default_sort: Optional[SortOrder] = None,
-                 order_sequence: List[SortOrder] = [SortOrder.ASC, SortOrder.DESC],
+                 order_sequence: Optional[List[SortOrder]] = None,
                  client_renderer: Optional[str] = None,
                  client_renderer_td: Optional[str] = None,
                  visible: bool = True,
@@ -79,7 +92,7 @@ class RichColumn:
                  css_class: str = None,
                  extra_columns: Optional[list[str]] = None):
         """
-        #TODO consolodate, orderable, default_sort, sort_order_sequence
+        #TODO consolidate, orderable, default_sort, sort_order_sequence
         :param key: A column name to be retrieved and returned and sorted on
         :param name: A name to be shared between both client and server for this value
         :param sort_keys: If provided, use this array to order_by when ordering by this column
@@ -100,7 +113,9 @@ class RichColumn:
         self.key = key
         self.sort_keys = sort_keys
         if orderable is None:
-            orderable = bool(sort_keys)
+            orderable = bool(sort_keys) or bool(order_sequence) or bool(default_sort)
+        if not order_sequence:
+            order_sequence = [SortOrder.ASC, SortOrder.DESC]
         self.search = []
         if (search is None or search is True) and key:
             self.search = [key]
@@ -149,13 +164,14 @@ class RichColumn:
             key = f'-{key}'
         return key
 
-    ## the below seems to break special sort keys
+    # the below seems to break special sort keys
     def sort_string(self, desc: bool) -> list[OrderBy]:
         def as_order_by(key: str):
             use_desc = desc
             if key.startswith('-'):
                 key = key[1:]
                 use_desc = not use_desc
+
             if use_desc:
                 return F(key).desc(nulls_last=True)
             else:
@@ -321,7 +337,7 @@ class DatatableConfig(Generic[DC]):
         """
         pass
 
-    def view_primary_key(self, row: dict[str, Any]) -> JsonDataType:
+    def view_primary_key(self, row: CellData) -> JsonDataType:
         """ Relies on being 'id' and object defining get_absolute_url  """
         qs = self.get_initial_queryset()
         primary_key_name = qs.model._meta.pk.name
@@ -371,19 +387,37 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
             value = value.timestamp()
         return value
 
+    @staticmethod
+    def limit_value_size(value: Any) -> Any:
+        """
+        Limits the amount of data that can be returned in one cell
+        Will duplicate dicts into dicts with limited text
+        """
+        LIMIT = 100000
+        if isinstance(value, str):
+            if (value_len := len(value)) and value_len > LIMIT:
+                return value[:LIMIT] + f"... (data is too large to display, full data is {value_len} characters long)"
+        elif isinstance(value, dict):
+            cloned = value.copy()
+            for key, sub_value in value.items():
+                cloned[key] = DatabaseTableView.limit_value_size(sub_value)
+            value = cloned
+        return value
+
     def render_cell(self, row: dict, column: RichColumn) -> JsonDataType:
-        """ Renders a column on a row. column can be given in a module notation eg. document.invoice.type """
+        """ Renders a column on a row. column can be given in a module notation e.g. document.invoice.type """
+        data: Any
         if column.renderer:
             render_data = CellData(all_data=row, key=column.key)
-            return column.renderer(render_data)
-        if column.extra_columns:
+            return DatabaseTableView.limit_value_size(column.renderer(render_data))
+        elif column.extra_columns:
             data_dict = {}
             for col in column.value_columns:
-                data_dict[col] = DatabaseTableView.sanitize_value(row.get(col))
+                data_dict[col] = DatabaseTableView.limit_value_size(DatabaseTableView.sanitize_value(row.get(col)))
             return data_dict
 
         elif column.key:
-            return DatabaseTableView.sanitize_value(row.get(column.key))
+            return DatabaseTableView.limit_value_size(DatabaseTableView.sanitize_value(row.get(column.key)))
         else:
             return None
 

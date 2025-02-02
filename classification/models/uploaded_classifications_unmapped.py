@@ -1,9 +1,11 @@
+import html
 from functools import cached_property
 from typing import Union, Optional, Any
 
 from django.contrib.auth.models import User
 from django.db import models
 from django.urls import reverse
+from django.utils.safestring import SafeString
 from model_utils.models import TimeStampedModel
 
 from classification.models.uploaded_file_types import FileHandle, resolve_uploaded_url_to_handle
@@ -53,6 +55,10 @@ class UploadedClassificationsUnmappedValidationRow(ExportRow):
     @export_column("message")
     def message(self):
         return self._row.get('message')
+
+    @property
+    def message_html(self):
+        return SafeString(html.escape(self._row.get('message') or '').replace('\n', '<br>'))
 
 
 class UploadedClassificationsUnmapped(TimeStampedModel):

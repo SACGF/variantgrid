@@ -1,7 +1,7 @@
 import re
 from datetime import datetime, timezone
 from functools import cached_property
-from typing import Optional
+from typing import Optional, Tuple
 
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -9,7 +9,7 @@ from django.db.models import QuerySet
 from django.http.response import Http404
 
 from classification.enums import SubmissionSource
-from classification.models import ClassificationJsonParams
+from classification.models import ClassificationJsonParams, ClassificationPatchResponse
 from classification.models.classification import Classification, \
     ClassificationProcessError, ClassificationModification
 from library.utils import empty_to_none
@@ -116,11 +116,11 @@ class ClassificationRef:
     def exists(self) -> bool:
         return self.record is not None
 
-    def create(self,
+    def create_with_response(self,
                source: SubmissionSource,
                data: dict = None,
                save: bool = True,
-               make_fields_immutable=False):
+               make_fields_immutable=False) -> Tuple[Classification, ClassificationPatchResponse]:
         if not self.lab:
             raise ValueError('Cannot create record without a lab')
         if self.exists():
@@ -130,7 +130,7 @@ class ClassificationRef:
         if not ClassificationRef.ALLOWED_LAB_ID_RE.match(self.lab_record_id):
             raise ClassificationProcessError(f"lab_id \"{self.lab_record_id}\" contains illegal characters - only letters, numbers, underscores and dashes allowed")
 
-        self.cached_record = Classification.create(
+        record, response = Classification.create_with_response(
             user=self.user,
             lab=self.lab,
             lab_record_id=self.lab_record_id,
@@ -139,7 +139,15 @@ class ClassificationRef:
             source=source,
             make_fields_immutable=make_fields_immutable,
         )
-        return self.cached_record
+        self.cached_record = record
+        return self.cached_record, response
+
+    def create(self,
+               source: SubmissionSource,
+               data: dict = None,
+               save: bool = True,
+               make_fields_immutable=False):
+        return self.create_with_response(source=source, data=data, save=save, make_fields_immutable=make_fields_immutable)[0]
 
     def as_json(self,
                 params: ClassificationJsonParams) -> dict:

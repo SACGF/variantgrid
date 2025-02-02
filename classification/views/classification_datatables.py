@@ -11,13 +11,14 @@ from django.http import HttpRequest
 
 from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel, AlleleOriginBucket
 from classification.models import ClassificationModification, EvidenceKeyMap, \
-    ImportedAlleleInfo
+    ImportedAlleleInfo, DiscordanceReport
 from classification.models.classification_utils import classification_gene_symbol_filter
 from flags.models import FlagCollection, FlagStatus
 from genes.hgvs import CHGVS
 from genes.models import TranscriptVersion
 from library.utils import JsonDataType
 from ontology.models import OntologyTerm
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import UserSettings, GenomeBuild, Variant, Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
@@ -28,27 +29,9 @@ ALLELE_KNOWN_VALUES = ALLELE_GERMLINE_VALUES + ALLELE_SOMATIC_VALUES
 
 class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
-    def render_somatic_clinical_significance_combined(self, row: Dict[str, Any]) -> JsonDataType:
-        return {
-            SpecialEKeys.CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.CLINICAL_SIGNIFICANCE}__value"],
-            SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}__value"]
-        }
-
-    def render_somatic_clinical_significance(self, row: Dict[str, Any]) -> JsonDataType:
+    def render_somatic(self, row: Dict[str, Any]) -> JsonDataType:
         if row["classification__allele_origin_bucket"] != "G":
-
-            highest_level: Optional[str] = None
-            for level in ['a', 'b', 'c', 'd']:
-                if level_value := row.get(f"published_evidence__amp:level_{level}__value"):
-                    highest_level = level.upper()
-                    break
-
-            return {
-                SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE: row[f"published_evidence__{SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE}__value"],
-                "highest_level": highest_level
-            }
-        else:
-            return {}
+            return row["classification__summary__somatic"]
 
     def render_classification(self, row: Dict[str, Any]) -> JsonDataType:
         return {
@@ -129,8 +112,11 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
     @cached_property
     def genome_build_prefs(self) -> List[GenomeBuild]:
-        user_settings = UserSettings.get_for_user(self.user)
-        return GenomeBuild.builds_with_annotation_priority(user_settings.default_genome_build)
+        return GenomeBuild.builds_with_annotation_priority(GenomeBuildManager.get_current_genome_build())
+
+    @cached_property
+    def genome_build_preferred(self) -> GenomeBuild:
+        return self.genome_build_prefs[0]
 
     def __init__(self, request: HttpRequest):
         self.term_cache: Dict[str, OntologyTerm] = {}
@@ -182,7 +168,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 key=c_hgvs,
                 sort_keys=[genomic_sort, 'c_hgvs'],
                 name='c_hgvs',
-                label=f'HGVS ({user_settings.default_genome_build.name})',
+                label=f'HGVS ({self.genome_build_preferred.name})',
                 renderer=self.render_c_hgvs,
                 client_renderer='VCTable.hgvs',
                 orderable=True,
@@ -204,24 +190,26 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 label='Classification',
                 renderer=self.render_classification,
                 client_renderer='VCTable.classification',
-                sort_keys=['clinical_significance', 'clin_sig_sort'],
+                sort_keys=[
+                    "classification__summary__pathogenicity__sort",
+                    "classification__summary__somatic__sort"
+                ],
                 orderable=True,
                 order_sequence=[SortOrder.DESC, SortOrder.ASC]
             ),
             RichColumn(
-                key='published_evidence__somatic:clinical_significance__value',
                 name='somatic_clinical_significance',
-                label='Clinical Significance',
-                renderer=self.render_somatic_clinical_significance,
+                label='Somatic Clinical Significance',
+                renderer=self.render_somatic,
                 client_renderer='VCTable.somatic_clinical_significance',
                 extra_columns=[
+                    'classification__summary__somatic',
                     'classification__allele_origin_bucket',
-                    'published_evidence__amp:level_a__value',
-                    'published_evidence__amp:level_b__value',
-                    'published_evidence__amp:level_c__value',
-                    'published_evidence__amp:level_d__value'
                 ],
-                sort_keys=['somatic_clinical_significance_sort'],
+                sort_keys=[
+                    "classification__summary__somatic__sort",
+                    "classification__summary__pathogenicity__sort"
+                ],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 orderable=True
             ),
@@ -310,20 +298,6 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         # takes too long to sort on variant
         # initial_qs = Classification.annotate_with_variant_sort(initial_qs, GenomeBuild.grch38())
 
-        # So VUS-A is actually VUS-Pathogenic, VUS-C is VUS-Benign
-        # so when sorting within VUS we want to do so in reverse alphabetical order
-        # but when sorting outside of VUS we want alphabetical order
-        # Note: Clinical Significance will first be sorted by the clinical significant int and then fall back to this
-        whens = [
-            When(published_evidence__clinical_significance__value='VUS_A', then=Value('VUS_3')),
-            When(published_evidence__clinical_significance__value='VUS_B', then=Value('VUS_2')),
-            When(published_evidence__clinical_significance__value='VUS', then=Value('VUS_1')),
-            When(published_evidence__clinical_significance__value='VUS_C', then=Value('VUS_0')),
-        ]
-        case = Case(*whens, default=KeyTextTransform('value', KeyTransform('clinical_significance', 'published_evidence')),
-                    output_field=TextField())
-        initial_qs = initial_qs.annotate(clin_sig_sort=case)
-
         whens = [
             When(classification__share_level=ShareLevel.LAB.value, then=Value(1)),
             When(classification__share_level=ShareLevel.INSTITUTION.value, then=Value(2)),
@@ -375,6 +349,9 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                                                              flag__resolution__status=FlagStatus.OPEN)
             filters.append(Q(classification__flag_collection__in=flag_collections))
 
+        if allele_id := self.get_query_param("allele_id"):
+            filters.append(Q(classification__allele_info__allele_id=int(allele_id)))
+
         if id_filter := self.get_query_param("id_filter"):
             id_keys = self.id_columns
             ids_contain_q_list: List[Q] = []
@@ -388,6 +365,11 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 filters.append(gene_filter)
             else:
                 return qs.none()
+
+        if discordance_report := self.get_query_param("discordance_report"):
+            dr = DiscordanceReport.objects.get(pk=discordance_report)
+            dr.check_can_view(self.user)
+            return qs.filter(pk__in=[cm.pk for cm in dr.all_classification_modifications])
 
         if transcript_id := self.get_query_param("transcript_id"):
             q_transcript_37 = Q(classification__allele_info__grch37__transcript_version__transcript_id=transcript_id)
@@ -429,6 +411,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             filters.append(Q(classification__sample__in=sample_ids))
 
         if protein_position := self.get_query_param("protein_position"):
+
             protein_position_transcript_version_id = self.get_query_param("protein_position_transcript_version_id")
             transcript_version = TranscriptVersion.objects.get(pk=protein_position_transcript_version_id)
             variant_qs = Variant.objects.filter(varianttranscriptannotation__transcript_version=transcript_version,

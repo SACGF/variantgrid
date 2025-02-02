@@ -520,6 +520,19 @@ function applyVariantValues() {
         </div>
     </div>
 
+    {% if variant.allele %}
+        <script>
+            function classificationGroupingFilterExtra(data) {
+                data.allele_id = {{ variant.allele.pk }};
+            }
+        </script>
+        <div class="container mt-4">
+            <h4>Classifications</h4>
+            {% classification_groupings %}
+        </div>
+    {% endif %}
+
+    {% comment %}
     {% if classifications_new_grouping %}
         <div class="container mt-4">
             <h4>Classification Records</h4>
@@ -544,6 +557,7 @@ function applyVariantValues() {
             </div>
         {% endif %}
     {% endif %}
+    {% endcomment %}
 
     {% if url_name_visible.variant_tags %}
     <div class="container mt-4">

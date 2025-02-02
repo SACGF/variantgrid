@@ -13,9 +13,11 @@
                 <div class="card-body">
                     {{ page_help_html | safe }}
                 </div>
+                {% if help_url %}
                 <div class="card-footer text-muted">
                     <div class="help-footer"><a href="{{help_url}}" target="_blank" class="hover-link external-link">Click here for full product documentation.</a></div>
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>

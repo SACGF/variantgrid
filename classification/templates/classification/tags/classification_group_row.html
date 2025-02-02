@@ -67,18 +67,18 @@
             <span class="c-pill scs scs-none no-value">No Data</span>
         {% endif %}
     </td>
+    <td style="width:155px;">
+        {% for acmg in group.acmg_criteria %}{% if not forloop.first %}, {% endif %}<span class="text-monospace text-secondary">{{ acmg }}</span>{% empty %}
+            <div class="d-inline-block no-value">-</div>
+        {% endfor %}
+        {% if not group.acmg_criteria.uniform %}&nbsp;<i class="fas fa-exchange-alt text-danger hover-detail" title="ACMG values differ between records within this row<br/>Only showing latest" data-toggle="tooltip"></i>{% endif %}
+    </td>
     <td style="width:186px;">
         {% if group.conditions %}
             <div class="mb-1">{% condition group.conditions %}</div>
         {% else %}
             <div class="no-value">-</div>
         {% endif %}
-    </td>
-    <td style="width:155px;">
-        {% for acmg in group.acmg_criteria %}{% if not forloop.first %}, {% endif %}<span class="text-monospace text-secondary">{{ acmg }}</span>{% empty %}
-            <div class="d-inline-block no-value">-</div>
-        {% endfor %}
-        {% if not group.acmg_criteria.uniform %}&nbsp;<i class="fas fa-exchange-alt text-danger hover-detail" title="ACMG values differ between records within this row<br/>Only showing latest" data-toggle="tooltip"></i>{% endif %}
     </td>
     {% with curated_date=group.most_recent_curated %}
     <td style="width:100px" data-order="{{ group.date_sort_order_str }}">

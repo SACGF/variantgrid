@@ -1259,12 +1259,12 @@ class OntologySnake:
             return None
 
     @staticmethod
-    def get_children(term: OntologyTerm):
+    def get_children(term: OntologyTerm) -> set[OntologyTerm]:
         relationships = OntologyVersion.get_latest_and_live_ontology_qs().filter(dest_term=term, relation=OntologyRelation.IS_A).select_related("source_term")
         return set(relationship.source_term for relationship in relationships)
 
     @staticmethod
-    def get_parents(term: OntologyTerm):
+    def get_parents(term: OntologyTerm) -> set[OntologyTerm]:
         relationships = OntologyVersion.get_latest_and_live_ontology_qs().filter(source_term=term, relation=OntologyRelation.IS_A).select_related("dest_term")
         return set(relationship.dest_term for relationship in relationships)
 

@@ -152,6 +152,21 @@ def classification_groups(
     return tag_context
 
 
+@register.inclusion_tag("classification/tags/classification_groupings.html", takes_context=True)
+def classification_groupings(context, show_allele_origin_filter=True):
+    """
+    Shows the new database based classification grouping table. To filter the data implement a JavaScript method on the page
+    <script>
+        function classificationGroupingFilter(data) {
+            data.ontology_term_id = {{ term.id | jsonify }};
+        }
+    </script>
+    :param show_allele_origin_filter: True by default, set to False to hardcode the filtering to all records
+    """
+    return {"show_allele_origin_filter": show_allele_origin_filter}
+
+
+
 def render_ekey(val, key: Optional[str] = None, value_if_none: Optional[str] = None):
     if isinstance(val, ClassificationModification):
         val = val.get(key)
@@ -257,12 +272,18 @@ def clinical_context(context, cc: ClinicalContext, orientation: str = 'horizonta
 
 
 @register.inclusion_tag("classification/tags/classification_quick.html", takes_context=True)
-def classification_quick(context, vc: Union[Classification, ClassificationModification], show_clinical_grouping=True, mode: Optional[str] = "detailed"):
+def classification_quick(context, vc: Union[Classification, ClassificationModification], show_clinical_grouping=True, show_flags=False, record_count: Optional[int] = None, mode: Optional[str] = "detailed"):
     user = context.request.user
     vcm = vc
     if isinstance(vc, Classification):
         vcm = ClassificationModification.latest_for_user(user=user, classification=vc, published=True, exclude_withdrawn=False).first()
-    return {"vcm": vcm, "show_clinical_grouping": show_clinical_grouping, "mode": mode}
+    return {
+        "vcm": vcm,
+        "show_clinical_grouping": show_clinical_grouping,
+        "mode": mode,
+        "show_flags": show_flags,
+        "record_count": record_count
+    }
 
 
 class ClinicalGrouping:

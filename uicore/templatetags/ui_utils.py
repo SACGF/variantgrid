@@ -15,7 +15,7 @@ from django.utils.safestring import SafeString
 from library.enums.log_level import LogLevel
 from library.log_utils import log_level_to_bootstrap
 from library.preview_request import PreviewModelMixin
-from library.utils import diff_text, html_id_safe, emoji_to_unicode
+from library.utils import diff_text, html_id_safe, emoji_to_unicode, format_diff_text
 from snpdb.admin_utils import get_admin_url
 from uicore.views.ajax_form_view import LazyRender
 from variantgrid.perm_path import get_visible_url_names
@@ -401,31 +401,33 @@ def severity_icon(severity: str, title: Optional[str] = None) -> str:
         title_html = f' title="{title}"'
 
     def severity_for(severity_part: str) -> Optional[list[str]]:
-        # TODO make the below more robust
-        if severity_part == "CREATED":
-            return ['fa-solid fa-clock']
-        elif severity_part == "PROCESSING":
-            return ['fa-solid fa-person-running']
-        elif severity_part == "SKIPPED":
-            return ['fa-solid fa-forward text-muted']
-        elif severity_part == "TERMINATED EARLY":
-            return ['fa-solid fa-circle-xmark text-danger']
-        elif severity_part == "TIMED OUT":
-            return ['fa-solid fa-clock text-danger']
-        elif severity_part.startswith('C'):  # critical
-            return ['fa-bomb', 'text-danger']
-        elif severity_part.startswith('E') or severity_part == 'DANGER':  # error
-            return ['fa-exclamation-circle', 'text-danger']
-        elif severity_part.startswith('W'):  # warning
-            return ['fa-exclamation-triangle', 'text-warning']
-        elif severity_part.startswith('I'):  # info
-            return ['fa-info-circle', 'text-info']
-        elif severity_part.startswith('D'):  # debug
-            return ['fa-key', 'text-info']
-        elif severity_part.startswith('S'):  # success
-            return ['fa-check-circle', 'text-success']
-        else:
-            return None
+        match severity_part:
+            case "CREATED" | "CREATE":
+                return ['fa-solid fa-clock']
+            case "PROCESSING" | "PROCESS":
+                return ['fa-solid fa-person-running']
+            case "SKIPPED" | "SKIP":
+                return ['fa-solid fa-forward text-muted']
+            case "TERMINATED EARLY":
+                return ['fa-solid fa-circle-xmark text-danger']
+            case "TIMED OUT":
+                return ['fa-solid fa-clock text-danger']
+            case "DANGER":
+                return ['fa-exclamation-circle', 'text-danger']
+            case _:
+                match severity_part[0]:
+                    case "C":  # critical
+                        return ['fa-bomb', 'text-danger']
+                    case "E":
+                        return ['fa-exclamation-circle', 'text-danger']
+                    case "W":
+                        return ['fa-exclamation-triangle', 'text-warning']
+                    case "I":
+                        return ['fa-info-circle', 'text-info']
+                    case "D": # debug
+                        return ['fa-key', 'text-info']
+                    case "S":
+                        return ['fa-check-circle', 'text-success']
 
     found_extra_classes = False
     for part in [s for s in severity.upper().split(" ") if s]:
@@ -630,7 +632,7 @@ def bytes(bytes: Optional[int]):
 
 @register.inclusion_tag(name="diff_text", filename="uicore/tags/diff_text.html")
 def diff_text_html(a: str, b: str):
-    return {"diffs": diff_text(a, b), "before": a, "after": b}
+    return {"diffs": diff_text(a, b), "before": format_diff_text(a), "after": format_diff_text(b)}
 
 
 @register.inclusion_tag(takes_context=True, name="admin_link", filename="uicore/tags/admin_link.html")
@@ -640,7 +642,7 @@ def admin_link(context, object: Model):
     url: Optional[str] = None
     if isinstance(object, Model):
         url = get_admin_url(object)
-    return {"url": url}
+    return {"url": url, "is_admin": True, "object": object}
 
 
 @register.inclusion_tag(name="value_with_icon", filename="uicore/tags/value_with_icon.html")
@@ -743,3 +745,15 @@ def _embed(context, embed: LazyRender, **kwargs):
 def emojify(text: str):
     return emoji_to_unicode(text)
 
+
+@register.filter(name='debug')
+def debug(obj: Any):
+    if obj is None:
+        return "None"
+    else:
+        response = []
+        response.append(obj.__class__.__name__)
+        response.append(str(obj))
+        if isinstance(obj, Model):
+            response.append(f"PK = {obj.pk}")
+        return " ".join(response)

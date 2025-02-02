@@ -166,12 +166,13 @@ class BulkClassificationInserter:
                     debug_timer.tick("Preparing to Insert")
 
                     patch_response.status = ClassificationPatchStatus.NEW
-                    record = record_ref.create(
+                    record, create_response = record_ref.create_with_response(
                         source=source,
                         data=operation_data,
                         save=save,
                         make_fields_immutable=immutable)
 
+                    patch_response += create_response
                     debug_timer.tick("Inserted")
 
                     # We only want to link the variant on initial create - as patching may cause issues

@@ -15,6 +15,7 @@ from classification.views.exports.classification_export_filter import AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter, \
     ClassificationExportExtraData
 from classification.views.exports.classification_export_utils import CitationCounter
+from library.django_utils import get_url_from_view_path
 from library.utils import delimited_row, export_column, ExportRow, ExportDataType, html_to_text, ExportTweak
 from snpdb.models import GenomeBuild
 
@@ -36,33 +37,39 @@ class FormatDetailsCSV:
     # format evidence keys to nice human labels or leave as raw codes easier handled by code
     pretty: bool = False
 
-    # include the explain keys (text that lets labs explain their process), notes (human entered text) are always included
-    include_explains: bool = False
-
     # exclude fields that change between environments, makes it easier to compare changes if the same data is in both environments
     exclude_transient: bool = False
+
+    # exclude resolved condition
+    exclude_resolved_condition: bool = False
 
     # exclude discordance information or something that could leak data to other labs
     exclude_discordances: bool = False
 
     html_handling: CSVCellFormatting = CSVCellFormatting.PURE_TEXT
 
+    full_detail: bool = False
+    """
+    Only to be set True to admins to get f
+    """
+
     @staticmethod
     def from_request(request: HttpRequest) -> 'FormatDetailsCSV':
         pretty = request.query_params.get('value_format') == 'labels'
-        include_explains = request.query_params.get('include_explains') == 'true'
         exclude_transient = request.query_params.get('exclude_transient') == 'true'
         exclude_discordances = request.query_params.get('exclude_discordances') == 'true'
+        full_detail = settings.CLASSIFICATION_DOWNLOADABLE_NOTES_AND_EXPLAINS or (request.query_params.get('full_detail') == 'true' and request.user.is_superuser)
         html_handling = CSVCellFormatting.PURE_TEXT
         if html_handling_str := request.query_params.get('html_handling'):
             html_handling = CSVCellFormatting(html_handling_str.upper())
 
         return FormatDetailsCSV(
             pretty=pretty,
-            include_explains=include_explains,
             exclude_transient=exclude_transient,
+            exclude_resolved_condition=exclude_transient,
             exclude_discordances=exclude_discordances,
-            html_handling=html_handling
+            html_handling=html_handling,
+            full_detail=full_detail
         )
 
     @property
@@ -85,6 +92,10 @@ class RowID(ExportRow):
         self.vc = cm.classification
         self.message = message
         self.allele_data = allele_data
+
+    @export_column()
+    def url(self) -> str:
+        return get_url_from_view_path(self.cm.classification.get_absolute_url())
 
     @property
     def genome_build(self) -> GenomeBuild:
@@ -114,7 +125,7 @@ class RowID(ExportRow):
 
     @export_column(categories={"transient": True})
     def version(self):
-        return self.cm.created.timestamp()
+        return f"{self.vc.pk}.{self.cm.created.timestamp()}"
 
     @export_column()
     def liftover_error(self):
@@ -163,7 +174,7 @@ class ClassificationMeta(ExportRow):
     def vc(self) -> Classification:
         return self.cm.classification
 
-    @export_column(categories={"transient": True})
+    @export_column(categories={"resolved_condition": True})
     def resolved_condition(self):
         return (self.vc.condition_resolution_dict or {}).get('display_text')
 
@@ -220,17 +231,26 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
     @cached_property
     def used_keys(self) -> UsedKeyTracker:
 
+        consider_only = None
+        if not self.format_details.full_detail:
+            consider_only = [e_key.key for e_key in self.e_keys.vital()]
+
         used_keys = UsedKeyTracker(
             self.classification_filter.user,
             self.e_keys, KeyValueFormatter(),
             pretty=self.format_details.pretty,
             cell_formatter=self.format_details.html_handling.format,
-            include_explains=self.format_details.include_explains,
-            ignore_evidence_keys=self.format_details.ignore_evidence_keys
+            ignore_evidence_keys=self.format_details.ignore_evidence_keys,
+            include_only_evidence_keys=consider_only,
+            include_explains_and_notes=self.format_details.full_detail
         )
-        # apparently this is signficantly quicker than the attempt to use an aggregate
-        for evidence in self.classification_filter.cms_qs.values_list('published_evidence', flat=True).iterator(chunk_size=1000):
-            used_keys.check_evidence(evidence)
+        if self.format_details.full_detail:
+            # apparently this is significantly quicker than the attempt to use an aggregate
+            for evidence in self.classification_filter.cms_qs.values_list('published_evidence', flat=True).iterator(chunk_size=1000):
+                used_keys.check_evidence(evidence)
+        else:
+            used_keys.check_evidence_enable_all_considered()
+
         # below took up to 3 minutes in Shariant test, vs 7 seconds of just iterating through the evidence twice
         # used_keys.check_evidence_qs(self.classification_filter.cms_qs)
 
@@ -275,6 +295,8 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
         categories = {}
         if self.format_details.exclude_transient:
             categories["transient"] = None
+        if self.format_details.exclude_resolved_condition:
+            categories["resolved_condition"] = None
         if not self.grouping_utils.any_pending_changes:
             categories["pending_changes"] = None
         if self.format_details.exclude_discordances:

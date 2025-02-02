@@ -41,20 +41,20 @@ class AnnotationRunColumns(DatatableConfig):
         preview_columns = ["error_exception", "pipeline_stdout", "pipeline_stderr"]
 
         self.rich_columns = [
-            RichColumn(key="id", label='ID', orderable=True, client_renderer='idRenderer', default_sort=SortOrder.DESC),
+            RichColumn(key="id", label='ID', order_sequence=[SortOrder.DESC, SortOrder.ASC], client_renderer='idRenderer', default_sort=SortOrder.DESC),
             RichColumn(key="status", orderable=True, renderer=self.status),
             RichColumn(key="pipeline_type", orderable=True, renderer=self.pipeline_type),
             RichColumn(key="annotation_range_lock__version__genome_build__name", label='Build', orderable=True, client_renderer='TableFormat.number'),
             RichColumn(key="annotation_range_lock__version__id", label='Version', orderable=True, client_renderer='TableFormat.number'),
-            RichColumn(key="dump_count", label='VCF Count', orderable=True, client_renderer='TableFormat.number'),
+            RichColumn(key="dump_count", label='VCF Count', order_sequence=[SortOrder.DESC, SortOrder.ASC], client_renderer='TableFormat.number'),
             RichColumn(key="vep_skipped_count", label="VEP Skipped", orderable=True, client_renderer='TableFormat.number'),
-            RichColumn(key="annotation_range_lock__min_variant__id", label="Min Var", orderable=True, client_renderer='TableFormat.number'),
-            RichColumn(key="annotation_range_lock__max_variant__id", label="Max Var", orderable=True, client_renderer='TableFormat.number'),
+            RichColumn(key="annotation_range_lock__min_variant__id", label="Min Var", order_sequence=[SortOrder.DESC, SortOrder.ASC], client_renderer='TableFormat.number'),
+            RichColumn(key="annotation_range_lock__max_variant__id", label="Max Var", order_sequence=[SortOrder.DESC, SortOrder.ASC], client_renderer='TableFormat.number'),
 
             RichColumn(key="created", client_renderer='TableFormat.timestamp', orderable=True),
-            RichColumn(key="dump_duration", renderer=self.format_timedelta, orderable=True),
-            RichColumn(key="annotation_duration", renderer=self.format_timedelta, orderable=True),
-            RichColumn(key="upload_duration", renderer=self.format_timedelta, orderable=True),
+            RichColumn(key="dump_duration", renderer=self.format_timedelta, order_sequence=[SortOrder.DESC, SortOrder.ASC]),
+            RichColumn(key="annotation_duration", renderer=self.format_timedelta, order_sequence=[SortOrder.DESC, SortOrder.ASC]),
+            RichColumn(key="upload_duration", renderer=self.format_timedelta, order_sequence=[SortOrder.DESC, SortOrder.ASC]),
 
             RichColumn(key=None, name='preview', label='Data',
                        renderer=lambda x: {key: x[key] for key in preview_columns},

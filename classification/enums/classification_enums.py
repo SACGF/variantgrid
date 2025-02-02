@@ -112,6 +112,7 @@ class SpecialEKeys:
     ORIGIN = 'origin'
     OWNER = 'owner'
     SOURCE_ID = 'source_id'
+    SOURCE_URL = 'source_url'
 
     INTERPRETATION_SUMMARY = 'interpretation_summary'
 

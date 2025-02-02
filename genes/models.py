@@ -389,6 +389,10 @@ class GeneSymbolAliasesMeta:
         return list(sorted(gene_symbol_strs))
 
     @cached_property
+    def alias_symbols_in_db(self) -> list[GeneSymbolAlias]:
+        return list(sorted([alias for alias in self.alias_list if not alias.different_genes and alias.other_symbol_in_database]))
+
+    @cached_property
     def aliases_out(self) -> list[GeneSymbolAliasSummary]:
         return list(sorted([alias for alias in self.alias_list if not alias.my_symbol_is_main]))
 
