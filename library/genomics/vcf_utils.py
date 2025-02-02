@@ -8,6 +8,7 @@ from typing import Optional, Iterable, IO, Union
 import cyvcf2
 import vcf
 
+from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.utils import open_handle_gzip, open_file_or_filename
 from snpdb.models import Variant, Sequence, GenomeFasta, SequenceRole, VariantCoordinate
 
@@ -125,24 +126,28 @@ def vcf_allele_is_symbolic(allele: str) -> bool:
     return allele.startswith("<") and allele.endswith(">")
 
 
-def vcf_get_ref_alt_svlen(variant: cyvcf2.Variant):
+def vcf_get_ref_alt_svlen_and_modification(variant: cyvcf2.Variant) -> tuple[str, str, Optional[int], Optional[str]]:
     ref = variant.REF.strip().upper()
     if variant.ALT:
         alt = variant.ALT[0].strip().upper()
     else:
         alt = Variant.REFERENCE_ALT
 
+    modification = None
     if Sequence.allele_is_symbolic(ref) or Sequence.allele_is_symbolic(alt):
         # Need to provide END or SVLEN
         if svlen_info := variant.INFO.get('SVLEN'):
             svlen = int(svlen_info)
+            if alt == VCFSymbolicAllele.DEL and svlen > 0:
+                svlen = -svlen
+                modification = f"SVLEN - inverted positive value for {alt=}"
         elif end_info := variant.INFO.get('END'):
             svlen = int(end_info) - variant.POS
         else:
             raise ValueError(f"SVLEN or END info field MUST be provided for symbolic (ie '<x>') {ref=},{alt=}")
     else:
         svlen = None
-    return ref, alt, svlen
+    return ref, alt, svlen, modification
 
 
 def get_vcf_header_contig_lines(contigs: list[tuple]) -> list[str]:

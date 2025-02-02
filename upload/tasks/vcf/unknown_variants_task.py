@@ -7,7 +7,7 @@ import cyvcf2
 from django.conf import settings
 from django.core.cache import cache
 
-from library.genomics.vcf_utils import vcf_get_ref_alt_svlen
+from library.genomics.vcf_utils import vcf_get_ref_alt_svlen_and_modification
 from library.utils.file_utils import name_from_filename, mk_path
 from snpdb import variant_collection
 from snpdb.models import VariantCoordinate
@@ -49,7 +49,7 @@ class BulkUnknownVariantInserter:
     def process_vcf_record(self, variant):
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
         # This has been decomposed (only be 1 alt per line)
-        ref, alt, svlen = vcf_get_ref_alt_svlen(variant)
+        ref, alt, svlen, _ = vcf_get_ref_alt_svlen_and_modification(variant)
         variant_coordinate = VariantCoordinate(chrom=variant.CHROM, position=variant.POS, ref=ref, alt=alt, svlen=svlen)
         self.variant_pk_lookup.add(variant_coordinate)
         self.batch_process_check()

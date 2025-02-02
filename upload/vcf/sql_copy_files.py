@@ -13,7 +13,7 @@ COHORT_GENOTYPE_HEADER = ['collection_id', 'variant_id', "filters",
                           'samples_allele_depth', 'samples_allele_frequency', 'samples_read_depth',
                           'samples_genotype_quality', 'samples_phred_likelihood', 'samples_filters',
                           'format', 'info']
-MODIFIED_IMPORTED_VARIANT_HEADER = ['import_info_id', 'variant_id',
+MODIFIED_IMPORTED_VARIANT_HEADER = ['import_info_id', 'variant_id', 'operation',
                                     'old_multiallelic', 'old_variant', 'old_variant_formatted']
 
 GENE_COVERAGE_HEADER = [

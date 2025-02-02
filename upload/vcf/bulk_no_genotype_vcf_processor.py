@@ -7,7 +7,6 @@ No point complicating BulkGenotypeVCFProcessor with lots of if statements etc
 import cyvcf2
 from django.conf import settings
 
-from library.genomics.vcf_utils import vcf_get_ref_alt_svlen
 from library.git import Git
 from patients.models_enums import Zygosity
 from snpdb.models import VariantCoordinate
@@ -47,7 +46,7 @@ class BulkNoGenotypeVCFProcessor(BulkGenotypeVCFProcessor):
 
     def process_entry(self, variant):
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
-        ref, alt, svlen = vcf_get_ref_alt_svlen(variant)
+        ref, alt, svlen = self.get_ref_alt_svlen(variant)
         variant_coordinate = VariantCoordinate(chrom=variant.CHROM, position=variant.POS, ref=ref, alt=alt, svlen=svlen)
         alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant_coordinate)
 

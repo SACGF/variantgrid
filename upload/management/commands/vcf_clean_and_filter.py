@@ -26,7 +26,6 @@ class Command(BaseCommand):
         parser.add_argument('--vcf', help='VCF file, default: - (stdin)', default="-")
         parser.add_argument('--replace-header', help='VCF header file', required=False)
         parser.add_argument('--genome-build', help='GenomeBuild name', required=True)
-        parser.add_argument('--remove-info', action='store_true', help='clear INFO field')
         parser.add_argument('--skipped-contigs-stats-file', help='File name')
         parser.add_argument('--skipped-records-stats-file', help='File name')
         parser.add_argument('--skipped-filters-stats-file', help='File name')
@@ -35,7 +34,6 @@ class Command(BaseCommand):
         QUICK_ACCEPT_FILTERS = {".", "PASS"}
         vcf_filename = options["vcf"]
         build_name = options["genome_build"]
-        remove_info = options["remove_info"]
         replace_header = options["replace_header"]
         skipped_contigs_stats_file = options.get("skipped_contigs_stats_file")
         skipped_records_stats_file = options.get("skipped_records_stats_file")
@@ -136,12 +134,6 @@ class Command(BaseCommand):
                         filter_column = "."
                     columns[VCFColumns.FILTER] = filter_column
 
-                if remove_info:
-                    # Zero out INFO (makes file size smaller and causes bcftools issues)
-                    columns[VCFColumns.INFO] = "."
-                    # If (7) INFO was the last column, we just stripped the newline - might need to add it back
-                    if len(columns) == 8:
-                        columns[VCFColumns.INFO] += "\n"
                 sys.stdout.write("\t".join(columns))
 
         self._write_skip_counts(skipped_contigs, skipped_contigs_stats_file)

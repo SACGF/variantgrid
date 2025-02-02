@@ -88,7 +88,8 @@ def _create_vcf_field(klass: type[AbstractVCFField], vcf, header_data: dict):
         records.append(record)
 
     if records:
-        klass.objects.bulk_create(records)
+        # These may already exist if we're reloading VCF
+        klass.objects.bulk_create(records, ignore_conflicts=True)
 
 
 def create_vcf_info(vcf, info: dict):

@@ -86,7 +86,7 @@ class UploadPipelineSkippedAnnotationGrid(JqGridUserRowConfig):
 class UploadPipelineModifiedVariantsGrid(JqGridUserRowConfig):
     model = ModifiedImportedVariant
     caption = 'Modified Imported Variant'
-    fields = ["variant__variantannotation__transcript_version__gene_version__gene__identifier", "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol",
+    fields = ["operation", "variant__variantannotation__transcript_version__gene_version__gene__identifier", "variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol",
               'old_multiallelic', 'old_variant']
 
     colmodel_overrides = {"variant__variantannotation__transcript_version__gene_version__gene__identifier": {"hidden": True},

@@ -14,7 +14,6 @@ from django.db.models import Max
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.genomics.vcf_enums import VCFConstant
-from library.genomics.vcf_utils import vcf_get_ref_alt_svlen
 from library.git import Git
 from library.utils import double_quote, json_default_converter, AsciiValue
 from library.utils.database_utils import postgres_arrays
@@ -23,7 +22,7 @@ from snpdb.common_variants import get_classified_high_frequency_variants_qs
 from snpdb.models import CohortGenotype, VariantCoordinate, VCFFilter
 from snpdb.models.models_enums import ProcessingStatus
 from upload.models import UploadPipeline, PipelineFailedJobTerminateEarlyException, \
-    VCFImporter, UploadStep, UploadStepTaskType, VCFPipelineStage
+    VCFImporter, UploadStep, UploadStepTaskType, VCFPipelineStage, ModifiedImportedVariantOperation
 from upload.tasks.vcf.import_sql_copy_task import ImportCohortGenotypeSQLCopyTask
 from upload.vcf.abstract_bulk_vcf_processor import AbstractBulkVCFProcessor
 from upload.vcf.sql_copy_files import write_sql_copy_csv, COHORT_GENOTYPE_HEADER
@@ -54,7 +53,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # v23. Fixes to clean_and_filter - Standard chromosomes only
     # v24. Split multi-allelics first, replace reference base (ie swap out N), pick explicit/symbolic alt based on size
     # v25. Store VCFInfo/VCFFilter based on header to represent json field schema (stored since v21)
-    VCF_IMPORTER_VERSION = 25  # Change this if you make a major change to the code.
+    # v26. Make sure SVLEN is negative for <DEL>, write warning message
+    VCF_IMPORTER_VERSION = 26  # Change this if you make a major change to the code.
     # Need to distinguish between no entry and 0, can't use None w/postgres command line inserts
     DEFAULT_AD_FIELD = 'AD'  # What CyVCF2 uses
     # GL = Genotype Likelihood - used by freeBayes v1.2.0: log10-scaled likelihoods of the data given the called
@@ -134,7 +134,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             uncommon_variant_ids.update(uncommon_qs.values_list("pk", flat=True))
         return uncommon_variant_ids
 
-    def finish(self):
+    def _finish(self):
         """ This is called at the very end so we can collect any remaining items to process """
 
         logging.debug("VCFSplitToTableCSVs - finish")
@@ -337,7 +337,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
     def process_entry(self, variant: cyvcf2.Variant):
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
-        ref, alt, svlen = vcf_get_ref_alt_svlen(variant)
+        ref, alt, svlen = self.get_ref_alt_svlen(variant)
         locus_tuple = (variant.CHROM, variant.POS, ref)
         if self.last_locus_tuple:
             if self.last_locus_tuple != locus_tuple:
@@ -451,13 +451,16 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             variant_ids = self.variant_pk_lookup.get_variant_ids(self.variant_hashes)
             self.set_max_variant(self.variant_hashes, variant_ids)
 
+            # this can create MIVs (rmdupes)
+            self.process_cohort_genotypes(self.variant_hashes, variant_ids)
+
             if self.modified_imported_variants:
                 variant_ids_by_hash = dict(zip(self.variant_hashes, variant_ids))
                 self.process_modified_imported_variants(variant_ids_by_hash)
 
-            self.process_cohort_genotypes(variant_ids)
+            self.variant_hashes = []
 
-    def process_cohort_genotypes(self, variant_ids):
+    def process_cohort_genotypes(self, variant_hashes, variant_ids):
         cohort_genotypes_common = []
         cohort_genotypes_rare = []
 
@@ -469,9 +472,18 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             if len(array) != num_variants:
                 raise ValueError(f"Number of variant ids ({num_variants}) != num {name} ({len(array)})")
 
-        # If you add any columns here, need to adjust COHORT_GT_NUM_ADDED_FIELDS
-        for variant_id, filters, cohort_gt, gnomad_af in zip(variant_ids, self.variant_filters,
-                                                             self.cohort_genotypes, self.variant_gnomad_af):
+        seen_variant_ids = set()
+        for variant_hash, variant_id, filters, cohort_gt, gnomad_af in zip(variant_hashes, variant_ids,
+                                                                           self.variant_filters,
+                                                                           self.cohort_genotypes, self.variant_gnomad_af):
+            # Remove duplicates and add ModifiedImportedVariant
+            # dupes may not be on subsequent lines due to normalization/multi-allelic so need check all in hash
+            if variant_id in seen_variant_ids:
+                self.modified_imported_variant_hashes.append(variant_hash)
+                self.modified_imported_variants.append((ModifiedImportedVariantOperation.RMDUP, None, None, None))
+                continue
+
+            seen_variant_ids.add(variant_id)
             common = gnomad_af and variant_id not in self.uncommon_variant_ids
             if common:
                 cgc_id = self.cohort_genotype_collection.common_collection_id
@@ -479,6 +491,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             else:  # Rare
                 cgc_id = self.cohort_genotype_collection.pk
                 cohort_genotypes = cohort_genotypes_rare
+            # If you add any columns here, need to adjust COHORT_GT_NUM_ADDED_FIELDS
             cohort_genotypes.append([cgc_id, variant_id, filters] + cohort_gt)
 
         cg_destinations = {
@@ -500,7 +513,6 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             self.create_cohort_genotype_job(table_name, num_cohort_genotypes, cohort_genotypes_filename)
             self.cohort_genotype_file_id += 1
 
-        self.variant_hashes = []
         self.cohort_genotypes = []
         self.variant_gnomad_af = []
         self.check_pipeline_for_failures()  # Need to do this every so often
