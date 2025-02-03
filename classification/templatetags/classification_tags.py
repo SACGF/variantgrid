@@ -163,7 +163,7 @@ def classification_groupings(context, show_allele_origin_filter=True):
     </script>
     :param show_allele_origin_filter: True by default, set to False to hardcode the filtering to all records
     """
-    return {"show_allele_origin_filter": show_allele_origin_filter}
+    return {"show_allele_origin_filter": show_allele_origin_filter, "genome_build": GenomeBuildManager.get_current_genome_build()}
 
 
 

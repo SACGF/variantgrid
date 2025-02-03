@@ -69,11 +69,12 @@ let DataTableDefinition = (function() {
     DataTableDefinition.prototype = {
 
         ensureState: function() {
+            // this seems to happen after convertDefinition, so it's relatively useless
             if (!this.dom) {
-                throw "DatatTableDefinition missing parameter `dom`";
+                throw new Error("DatatTableDefinition missing parameter `dom`");
             }
             if (!this.url) {
-                throw "DatatTableDefinition missing parameter `url`";
+                throw new Error("DatatTableDefinition missing parameter `url`");
             }
 
             let tableId = this.dom.attr('id');
@@ -94,7 +95,11 @@ let DataTableDefinition = (function() {
         loadDefinition: function() {
             let definitionData = DataTableDefinition.definitions[this.url];
             if (!definitionData) {
-                definitionData = $.getJSON(this.url + '?dataTableDefinition=1');
+                let sep = '?';
+                if (this.url.indexOf('?') !== -1) {
+                    sep = '&';
+                }
+                definitionData = $.getJSON(this.url + sep + 'dataTableDefinition=1');
                 DataTableDefinition.definitions[this.url] = definitionData;
             }
             return definitionData.then(data => {this.serverParams = data});
@@ -168,6 +173,12 @@ let DataTableDefinition = (function() {
             dtParams.columnDefs = columnDefs;
 
             let waitOnEKeys = null;
+
+            if (!Array.isArray(defn.columns)) {
+                console.log("Invalid TableDefinition")
+                console.log(defn);
+                throw new Error("Received invalid datatable definition");
+            }
 
             // GENERATE COLUMNS
             for (let col of defn.columns) {

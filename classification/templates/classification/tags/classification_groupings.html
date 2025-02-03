@@ -33,6 +33,7 @@
     function downloadAs(mode) {
         let data = {};
         classificationGroupingFilter(data);
+        data["genome_build"] = "{{ genome_build }}";
         let querystring = EncodeQueryData(data, true);
 		let url = null;
 		if (mode === 'redcap') {
@@ -53,7 +54,7 @@
                 {% allele_origin_toggle show_label=False %}
             </div>
         {% endif %}
-        <table id="vc-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table" data-adjust-columns="false"></table>
+        <table id="vc-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}?genome_build={{ genome_build.pk }}" class="sticky-header classification-table" data-adjust-columns="false"></table>
         <div>
         Download as
             <a class='hover-link download-link' onclick="downloadAs('csv')">CSV</a>
