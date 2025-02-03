@@ -2945,6 +2945,17 @@ a .c-hgvs-body {
 	}
 }
 
+#vc-datatable {
+	.dt-c_hgvs {
+		.c-hgvs-body {
+			.colon::after {
+				content: "\a";
+				white-space: pre;
+			}
+		}
+	}
+}
+
 .c-hgvs-body {
 	.bracket {
 		margin-left: 2pt;

@@ -2567,6 +2567,11 @@ a .c-hgvs-body .c-hgvs-nomen {
   color: #444488 !important;
 }
 
+#vc-datatable .dt-c_hgvs .c-hgvs-body .colon::after {
+  content: "\a";
+  white-space: pre;
+}
+
 .c-hgvs-body .bracket {
   margin-left: 2pt;
   margin-right: 2pt;
