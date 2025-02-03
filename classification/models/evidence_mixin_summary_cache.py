@@ -147,7 +147,7 @@ class ClassificationSummaryCalculator:
     def classification_sort(self) -> int:
         if classification_value := self.classification_value:
             from classification.models import EvidenceKeyMap
-            return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_indexes.get(classification_value, 0) + 1
+            return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("sort_order").get(classification_value, 0)
         else:
             # sort unclassified to the end
             return None
