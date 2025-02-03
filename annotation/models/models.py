@@ -29,7 +29,7 @@ from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
 from annotation.models.models_enums import AnnotationStatus, \
-    VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
+    ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
     ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, \
     EssentialGeneGeneTrap, VariantAnnotationPipelineType
 from annotation.utils.clinvar_constants import CLINVAR_REVIEW_EXPERT_PANEL_STARS_VALUE
@@ -39,6 +39,7 @@ from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import parse_gnomad_coord
+from library.genomics.vcf_enums import VariantClass
 from library.utils import invert_dict, name_from_filename, first, all_equal
 from ontology.models import OntologyVersion
 from patients.models_enums import GnomADPopulation

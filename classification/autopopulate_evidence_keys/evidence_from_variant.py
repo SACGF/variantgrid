@@ -12,7 +12,7 @@ from annotation.models.damage_enums import FATHMMPrediction, \
     MutationTasterPrediction, Polyphen2Prediction, SIFTPrediction, \
     MutationAssessorPrediction, ALoFTPrediction
 from annotation.models.models import VariantAnnotation, AnnotationVersion, GeneSymbolPubMedCount
-from annotation.models.models_enums import VariantClass, ClinVarReviewStatus
+from annotation.models.models_enums import ClinVarReviewStatus
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import VEP_SEPARATOR
 from classification.enums import SubmissionSource, \
@@ -22,6 +22,7 @@ from genes.hgvs import HGVSMatcher
 from genes.models import TranscriptVersion, GnomADGeneConstraint
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import get_choices_formatter
+from library.genomics.vcf_enums import VariantClass
 from library.log_utils import log_traceback
 from seqauto.models import get_20x_gene_coverage
 from snpdb.clingen_allele import get_clingen_allele_for_variant, ClinGenAlleleAPIException

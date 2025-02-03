@@ -6,12 +6,13 @@ from django.test.utils import override_settings
 
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
 from annotation.fake_annotation import get_fake_annotation_settings_dict
-from annotation.models import VariantAnnotation, VariantClass, VariantAnnotationPipelineType
+from annotation.models import VariantAnnotation, VariantAnnotationPipelineType
 from annotation.models.damage_enums import PathogenicityImpact
 from annotation.models.models import AnnotationRun, VariantAnnotationVersion
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import get_vep_version_from_vcf, vep_dict_to_variant_annotation_version_kwargs, \
     VEPConfig
+from library.genomics.vcf_enums import VariantClass
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf

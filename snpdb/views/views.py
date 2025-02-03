@@ -5,6 +5,7 @@ import os
 from collections import OrderedDict, defaultdict
 from typing import Iterable
 
+import numpy as np
 import pandas as pd
 from celery.result import AsyncResult
 from django.conf import settings
@@ -75,7 +76,7 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
     VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, SampleStats, \
-    SampleStatsPassingFilter, TagColorsCollection, Contig, LiftoverRun, Allele, AlleleLiftover
+    SampleStatsPassingFilter, TagColorsCollection, Contig, LiftoverRun, Allele, AlleleLiftover, VCFLengthStatsCollection
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters, AlleleConversionTool
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.tasks.liftover_tasks import liftover_alleles
@@ -219,6 +220,23 @@ def _get_vcf_sample_stats(vcf, klass):
     return sample_stats_het_hom_count, sample_names, tuple(sample_zygosities.items())
 
 
+def _get_vcf_length_stats(vcf: VCF) -> dict:
+    vcf_length_stats = {}
+    try:
+        for vcf_ls in vcf.vcflengthstatscollection.vcflengthstats_set.all():
+            variant_class = vcf_ls.get_variant_class_display()
+            bin_edges = np.array(vcf_ls.histogram_bin_edges)
+            bin_centers = [edge / 2 for edge in (bin_edges[:-1] + bin_edges[1:])]
+            vcf_length_stats[variant_class] = {
+                "is_log": vcf_ls.is_log,
+                "bin_centers": bin_centers,
+                "counts": vcf_ls.histogram_counts,
+                # "width": np.diff(bin_edges),
+            }
+    except VCFLengthStatsCollection.DoesNotExist:
+        pass
+    return vcf_length_stats
+
 def view_vcf(request, vcf_id):
     vcf = VCF.get_for_user(request.user, vcf_id)
     # I couldn't get prefetch_related_objects([vcf], "sample_set__samplestats") to work - so storing in a dict
@@ -287,6 +305,8 @@ def view_vcf(request, vcf_id):
         if vcf.import_status == ImportStatus.SUCCESS and cohort_id:
             annotated_download_files = get_annotated_download_files_cgf("export_cohort_to_downloadable_file", cohort_id)
 
+    vcf_length_stats = _get_vcf_length_stats(vcf)
+
     context = {
         'vcf': vcf,
         'sample_stats_het_hom_count': sample_stats_het_hom_count,
@@ -300,6 +320,7 @@ def view_vcf(request, vcf_id):
         'can_view_upload_pipeline': can_view_upload_pipeline,
         'annotated_download_files': annotated_download_files,
         "variant_zygosity_count_collections": variant_zygosity_count_collections,
+        "vcf_length_stats": vcf_length_stats,
     }
     return render(request, 'snpdb/data/view_vcf.html', context)
 

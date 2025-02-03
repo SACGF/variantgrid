@@ -213,11 +213,55 @@ function hideVCFHeader() {
     $("#vcf-header").hide();
 }
 
+function drawStatsGraphs() {
+    drawZygosityGraphs();
+    drawLengthHistograms();
+}
+
 function drawZygosityGraphs() {
     const sample_zygosities = {{ sample_zygosities | jsonify }};
     const sample_names = {{ sample_names | jsonify }};
     showStackedBar('sample-zygosities-graph', 'Sample Zygosities', 500, 500, sample_zygosities, sample_names);
 }
+
+function drawLengthHistograms() {
+        const histoData = {{ vcf_length_stats | jsonify }};
+        let container = $("#vcf-length-stats-graph-container");
+
+        for(const [variant_class, data] of Object.entries(histoData)) {
+            console.log(variant_class, data);
+            let identifier = "vcf-length-graph-" + variant_class;
+            let graphContainer = $("<div />", {"id": identifier});
+            container.append(graphContainer);
+            if (data.is_log) {
+                console.log("is log");
+            }
+
+            let title = variant_class + " lengths"
+            var trace = {x: data.bin_centers, y: data.counts, type: 'bar'};
+            var layout = {
+                title: title,
+                xaxis: {title: data.is_log ? 'Log10(length)' : 'length'},
+                yaxis: {title: 'Frequency'}
+            };
+            if (data.is_log) {
+              var minTick = Math.floor(Math.min(...data.bin_centers));
+              var maxTick = Math.ceil(Math.max(...data.bin_centers));
+              var tickvals = [];
+              for (var i = minTick; i <= maxTick; i++) tickvals.push(i);
+              var ticktext = tickvals.map(val => {
+                var orig = Math.pow(10, val);
+                return orig >= 1e6 ? (orig / 1e6) + "M" : orig >= 1000 ? (orig / 1000) + "k" : orig.toFixed(0);
+              });
+              layout.xaxis.tickmode = 'array';
+              layout.xaxis.tickvals = tickvals;
+              layout.xaxis.ticktext = ticktext;
+            }
+            Plotly.newPlot(identifier, [trace], layout);
+            // plotBarArrays(identifier, variant_class + " lengths", data.bin_centers, data.counts);
+        }
+}
+
 
 $(document).ready(function() {
     $("div#bulk-set-form-container").hide();
@@ -241,8 +285,7 @@ $(document).ready(function() {
     });
 {% endif %}
 
-    drawZygosityGraphs();
-
+    drawStatsGraphs();
 
     $("button#vcf-populate-clingen-alleles").click(function () {
         let btn = $(this);
@@ -446,6 +489,7 @@ $(document).ready(function() {
     </div>
     <div id="vcf-stats">
         <div id="sample-zygosities-graph"></div>
+        <div id="vcf-length-stats-graph-container"></div>
     </div>
     <div id="vcf-info">
         <fieldset class="form-fields">

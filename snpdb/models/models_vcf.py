@@ -6,6 +6,7 @@ from typing import Optional, Union
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group
+from django.contrib.postgres.fields.array import ArrayField
 from django.core.exceptions import PermissionDenied, ObjectDoesNotExist
 from django.db import models
 from django.db.models import Lookup, Field
@@ -20,6 +21,7 @@ from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
 
 from library.django_utils import SortByPKMixin
+from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import DjangoPermission
 from library.log_utils import log_traceback, report_event
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
@@ -651,6 +653,23 @@ class SampleStats(AbstractSampleStats):
 
 class SampleStatsPassingFilter(AbstractSampleStats):
     pass
+
+
+class VCFLengthStatsCollection(TimeStampedModel):
+    vcf = models.OneToOneField(VCF, on_delete=CASCADE)
+    code_version = models.ForeignKey(SampleStatsCodeVersion, on_delete=CASCADE)
+
+
+class VCFLengthStats(TimeStampedModel):
+    collection = models.ForeignKey(VCFLengthStatsCollection, on_delete=CASCADE)
+    variant_class = models.CharField(max_length=2, choices=VariantClass.choices, null=True)  # Null = unknown type
+    is_log = models.BooleanField(default=False)
+    histogram_counts = ArrayField(models.IntegerField())
+    histogram_bin_edges = ArrayField(models.FloatField())
+
+    class Meta:
+        unique_together = ("collection", "variant_class")
+
 
 
 class SampleLocusCount(models.Model):
