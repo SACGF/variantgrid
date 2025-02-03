@@ -204,10 +204,9 @@ class ClassificationJsonParams:
                  api_version=1,
                  hardcode_extra_data: Dict = None,
                  fix_data_types=False,
-                 remove_acmg_namespace: Optional[bool] = None):
+                 remove_acmg_namespace: Optional[bool] = None,
                  inject_source_url: bool = False,
-                 populate_literature_with_citations: bool = False
-                 ):
+                 populate_literature_with_citations: bool = False):
         """
         :param current_user: The user who will be consuming this data
         :param include_data: Include all the evidence for this classification (typically True for a GET and False for a POST)

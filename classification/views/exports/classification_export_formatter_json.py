@@ -28,7 +28,7 @@ class FormatDetailsJSON:
         inject_source_url = request.query_params.get('inject_source_url') != 'false'
 
         return FormatDetailsJSON(
-            full_detail=full_detail
+            full_detail=full_detail,
             inject_source_url=inject_source_url,
             populate_literature_with_citations=populate_literature_with_citations
         )
@@ -70,7 +70,7 @@ class ClassificationExportFormatterJSON(ClassificationExportFormatter):
                                         include_data=include_data,
                                         #include_data = True,
                                         # FIXME don't want this to be the default
-                                        remove_acmg_namespace=True)
+                                        remove_acmg_namespace=True,
                                         inject_source_url=self.format_details.inject_source_url,
                                         populate_literature_with_citations=populate_literature_with_citations)
 
