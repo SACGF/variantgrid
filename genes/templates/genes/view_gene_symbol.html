@@ -145,7 +145,9 @@
 {% block content %}
 	<div class="container">
         {% load genome_build_tags %}
-        {% genome_build_url_arg genome_build 'view_gene_symbol_genome_build' gene_symbol=gene_symbol %}
+        {% if show_annotation %}
+            {% genome_build_url_arg genome_build 'view_gene_symbol_genome_build' gene_symbol=gene_symbol %}
+        {% endif %}
 
         <h3>Gene Symbol : {{ gene_symbol }}</h3>
         {% page_help_embedded page_id='genes/view_gene_symbol_help' title='Gene Symbol' %}
@@ -518,7 +520,7 @@
         {% endif %}
 
         {% if gene_in_gene_lists %}
-            <h4>Gene Lists containing {{ gene_symbol }}</h4>
+            <h4 class="mt-4">Gene Lists containing {{ gene_symbol }}</h4>
 
             <script>
                 function geneListsDatatableFilter(data) {
