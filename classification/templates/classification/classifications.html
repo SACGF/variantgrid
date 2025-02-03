@@ -199,13 +199,17 @@
         </div>
         <div class="container">
             {% if user.is_superuser %}
-                {% if iai_processing_count or iai_failed_last_week_count %}
+                {% if iai_processing.iai_processing_count or iai_processing.iai_failed_last_week_count %}
                     <div class="admin-only display-flex my-2">
-                        {% if iai_processing_count %}
-                            <div class="mx-2"><i class="fa-solid fa-hourglass"></i> <a class="hover-link" href="{% url 'view_imported_allele_info' %}?status=in_progress">Alleles in Processing</a>: {{ iai_processing_count | number }}</div>
-                        {% endif %}
-                        {% if iai_failed_last_week_count %}
-                            <div class="mx-2"><i class="fa-solid fa-circle-exclamation"></i> <a class="hover-link" href="{% url 'view_imported_allele_info' %}?status=failure">Alleles Failed this Week</a>: {{ iai_failed_last_week_count | number }}</div>
+                        {% if iai_processing %}
+                            {% if iai_processing.iai_processing_count %}
+                                <div class="mx-2"><i class="fa-solid fa-hourglass"></i> <a class="hover-link" href="{% url 'view_imported_allele_info' %}?status=in_progress">Alleles in Processing</a>: {{ iai_processing.iai_processing_count | number }}
+                                    <span class="text-secondary">{% if iai_processing.iai_processing_recent %}Most recent: {% timestamp iai_processing.iai_processing_recent time_ago=True %}</span>{% endif %}
+                                </div>
+                            {% endif %}
+                            {% if iai_processing.iai_failed_last_week_count %}
+                                <div class="mx-2"><i class="fa-solid fa-circle-exclamation"></i> <a class="hover-link" href="{% url 'view_imported_allele_info' %}?status=failure">Alleles Failed this Week</a>: {{ iai_processing.iai_failed_last_week_count | number }}</div>
+                            {% endif %}
                         {% endif %}
                     </div>
                 {% endif %}

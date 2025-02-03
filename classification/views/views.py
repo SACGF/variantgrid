@@ -166,11 +166,16 @@ def classifications(request):
 
     if not legacy:
         if request.user.is_superuser:
+            iai_processing = {}
+            context["iai_processing"] = iai_processing
+
             processing_count = ImportedAlleleInfo.objects.filter(status__in={ImportedAlleleInfoStatus.PROCESSING, ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD}).count()
-            context["iai_processing_count"] = processing_count
+            iai_processing["iai_processing_count"] = processing_count
+            if processing_count:
+                iai_processing["iai_processing_recent"] = ImportedAlleleInfo.objects.filter(status__in={ImportedAlleleInfoStatus.PROCESSING, ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD}).order_by("-modified").values_list("modified", flat=True).first().timestamp()
 
             failed_last_week_count = ImportedAlleleInfo.objects.filter(status=ImportedAlleleInfoStatus.FAILED).filter(modified__gt=now() - timedelta(days=7)).count()
-            context["iai_failed_last_week_count"] = failed_last_week_count
+            iai_processing["iai_failed_last_week_count"] = failed_last_week_count
 
     else:
         template = 'classification/classifications_legacy.html'
@@ -183,7 +188,6 @@ def classifications(request):
         for ft in flag_types:
             flag_type_json.append({'id': ft.pk, 'label': ft.label, 'description': ft.description})
         context["flag_types"] = flag_type_json
-
 
 
     return render(request, template, context)
