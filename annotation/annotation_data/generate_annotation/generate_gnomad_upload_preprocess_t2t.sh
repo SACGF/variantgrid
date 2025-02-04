@@ -21,7 +21,7 @@ CHROM_MAPPING=${CHROM_MAPPING_DIR}/chrom_mapping_${GENOME_BUILD}.map
 GNOMAD_VCF=${ANNOTATION_DATA_DIR}/gnomad4.1.t2t_liftover_T2T-CHM13v2.0_combined_af.vcf.bgz
 OUTPUT_NAME=gnomad${GNOMAD_VERSION_T2T}_${GENOME_BUILD}_af_greater_than_5
 OUTPUT_AF=${ANNOTATION_DATA_DIR}/${OUTPUT_NAME}.vcf.gz
-OUTPUT_STRIPPED=${GRCH38_DIR}/${OUTPUT_NAME}.stripped.vcf.gz
+OUTPUT_STRIPPED=${ANNOTATION_DATA_DIR}/${OUTPUT_NAME}.stripped.vcf.gz
 if [[ ! -e ${OUTPUT_STRIPPED} ]]; then
   echo "Generating ${OUTPUT_STRIPPED}..."
   if [[ ! -e ${OUTPUT_AF} ]]; then
