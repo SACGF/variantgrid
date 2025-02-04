@@ -300,16 +300,24 @@ def _get_variant_class(alt: str, hgvs_g: str) -> Optional[VariantClass]:
     """ The VEP VariantClass is not always accurate so basically DIY here """
 
     variant_type = None
-    if "delins" in hgvs_g:
-        variant_type = VariantClass.INDEL
-    elif alt == VCFSymbolicAllele.INV or "inv" in hgvs_g:
-        variant_type = VariantClass.INVERSION
-    elif "ins" in hgvs_g:
-        variant_type = VariantClass.INSERTION
-    elif alt == VCFSymbolicAllele.DEL or "del" in hgvs_g:
-        variant_type = VariantClass.DELETION
-    elif alt == VCFSymbolicAllele.DUP or "dup" in hgvs_g:
-        variant_type = VariantClass.DUPLICATION
+    if Sequence.allele_is_symbolic(alt):
+        if alt == VCFSymbolicAllele.INV:
+            variant_type = VariantClass.INVERSION
+        elif alt == VCFSymbolicAllele.DEL:
+            variant_type = VariantClass.DELETION
+        elif alt == VCFSymbolicAllele.DUP:
+            variant_type = VariantClass.DUPLICATION
+    elif hgvs_g:
+        if "delins" in hgvs_g:
+            variant_type = VariantClass.INDEL
+        elif "inv" in hgvs_g:
+            variant_type = VariantClass.INVERSION
+        elif "ins" in hgvs_g:
+            variant_type = VariantClass.INSERTION
+        elif "del" in hgvs_g:
+            variant_type = VariantClass.DELETION
+        elif "dup" in hgvs_g:
+            variant_type = VariantClass.DUPLICATION
     return variant_type
 
 
