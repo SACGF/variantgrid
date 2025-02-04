@@ -178,7 +178,7 @@ class VariantTagsGrid(JqGridUserRowConfig):
         queryset = queryset.filter(allele__variantallele__genome_build=genome_build)
         queryset = Variant.annotate_variant_string(queryset,
                                                    path_to_variant="allele__variantallele__variant__")
-        queryset = queryset.annotate(view_genome_build=Value(genome_build_name, output_field=TextField()))
+        queryset = queryset.annotate(view_genome_build=Value(genome_build.name, output_field=TextField()))
         field_names = self.get_field_names() + ["variant_string", "view_genome_build"]
         self.queryset = queryset.values(*field_names)
         self.extra_config.update({'sortname': 'variant_string',
