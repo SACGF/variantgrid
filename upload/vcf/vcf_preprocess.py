@@ -68,7 +68,7 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False):
     MAX_STDERR_OUTPUT = 5000  # How much stderr output per process to store in DB
 
     VCF_CLEAN_AND_FILTER_SUB_STEP = "vcf_clean_and_filter"
-    VCF_REMOVE_NON_STANDARD_ALTS_SUB_STEP = "vcf_remove_non_standard_alts"
+    VCF_CLEAN_ALTS_SUB_STEP = "vcf_clean_alts"
     REMOVE_HEADER_SUB_STEP = "remove_header"
     SPLIT_VCF_SUB_STEP = "split_vcf"
 
@@ -93,6 +93,7 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False):
     skipped_records_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_records.tsv")
     skipped_filters_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_filters.tsv")
     skipped_alts_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_alts.tsv")
+    converted_alts_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.converted_alts.tsv")
 
     cleaned_vcf_header_filename = _write_cleaned_header(genome_build, upload_pipeline, vcf_filename)
 
@@ -124,10 +125,12 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False):
     pipe_commands[REMOVE_HEADER_SUB_STEP] = [settings.BCFTOOLS_COMMAND, "view", "--no-header", "-"]
 
     # We have performed multi-allelic splitting above, so that we can now filter out bad alts (but leave rest of record)
-    pipe_commands[VCF_REMOVE_NON_STANDARD_ALTS_SUB_STEP] = manage_command + [
-         "vcf_remove_non_standard_alts",
+    pipe_commands[VCF_CLEAN_ALTS_SUB_STEP] = manage_command + [
+         "vcf_clean_alts",
          "--skipped-records-stats-file",
          skipped_alts_stats_file,
+        "--converted-records-stats-file",
+        converted_alts_stats_file,
     ]
 
     norm_substep_names = [UploadStep.NORMALIZE_SUB_STEP]
@@ -219,9 +222,10 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False):
                                                 contig=contig,
                                                 num_skipped=count)
 
-    _store_vcf_skip_stats(skipped_records_stats_file, clean_sub_step, "records")
-    _store_vcf_skip_stats(skipped_filters_stats_file, clean_sub_step, "FILTER")
-    _store_vcf_skip_stats(skipped_alts_stats_file, clean_sub_step, "ALTs")
+    _store_vcf_stats(skipped_records_stats_file, clean_sub_step, "records")
+    _store_vcf_stats(skipped_filters_stats_file, clean_sub_step, "FILTER")
+    _store_vcf_stats(skipped_alts_stats_file, clean_sub_step, "ALTs")
+    _store_vcf_stats(converted_alts_stats_file, clean_sub_step, "ALTs", operation='Converted')
 
     # Create this here so downstream tasks (running in parallel) can all link against the same one
     ModifiedImportedVariants.get_for_pipeline(upload_pipeline)
@@ -257,10 +261,10 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False):
                                                  output_filename=output_filename)
 
 
-def _store_vcf_skip_stats(filename, upload_set, description):
+def _store_vcf_stats(filename, upload_set, description, operation='Skipped'):
     if os.path.exists(filename):
         df = pd.read_csv(filename, header=None, sep='\t', index_col=0)
         if not df.empty:
             for name, count in df.iloc[:, 0].items():
-                message_string = f"Skipped {count} '{name}' {description}"
+                message_string = f"{operation} {count} '{name}' {description}"
                 SimpleVCFImportInfo.objects.create(upload_step=upload_set, message_string=message_string)
