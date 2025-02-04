@@ -13,7 +13,7 @@ from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     PathogenicityImpact, ALoFTPrediction, AlphaMissensePrediction
 from annotation.models.models import ColumnVEPField, VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap, AnnotationRun
-from annotation.models.models_enums import VariantClass, VariantAnnotationPipelineType, VEPCustom
+from annotation.models.models_enums import VariantAnnotationPipelineType, VEPCustom
 from annotation.vcf_files.vcf_types import VCFVariant
 from annotation.vep_annotation import VEPConfig
 from genes.hgvs import HGVSMatcher
@@ -22,6 +22,7 @@ from genes.models_enums import AnnotationConsortium
 from library.django_utils import get_model_fields
 from library.django_utils.django_file_utils import get_import_processing_filename, get_import_processing_dir
 from library.genomics import overlap_fraction, Range, parse_gnomad_coord
+from library.genomics.vcf_enums import VariantClass
 from library.log_utils import log_traceback
 from library.utils import invert_dict, split_dict_multi_values
 from snpdb.models import GenomeBuild, VariantCoordinate

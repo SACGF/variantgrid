@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models.query_utils import Q
 
-from annotation.models.models_enums import VariantClass
+from library.genomics.vcf_enums import VariantClass
 
 
 class AbstractPathogenicity:

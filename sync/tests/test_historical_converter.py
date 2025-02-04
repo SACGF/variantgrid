@@ -11,8 +11,8 @@ from unittest import skip
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from annotation.models.models_enums import VariantClass
 from classification.models.evidence_key import EvidenceKey, EvidenceCategory, EvidenceKeyValueType
+from library.genomics.vcf_enums import VariantClass
 from sync.shariant.historical_ekey_converter import HistoricalEKeyConverter
 
 
