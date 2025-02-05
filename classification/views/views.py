@@ -513,9 +513,19 @@ def view_classification_diff(request):
 
     elif allele_id_str := request.GET.get('allele'):
         allele_id = int(allele_id_str)
-        compare_all = list(ClassificationModification.latest_for_user(user=request.user, allele=Allele.objects.get(pk=allele_id), published=True))
-        compare_all.sort(key=lambda cm: cm.curated_date_check, reverse=True)
-        records = compare_all
+        if request.GET.get('latest'):
+            allele_origin_grouping = ClassificationGrouping.objects.filter(allele_origin_grouping__allele_grouping__allele=allele_id)
+            allele_origin_grouping = ClassificationGrouping.filter_for_user(user=request.user, qs=allele_origin_grouping)
+            record_ids = allele_origin_grouping.values_list(
+                "latest_classification_modification", flat=True
+            )
+            records = list(ClassificationModification.objects.filter(pk__in=record_ids))
+            records.sort(key=lambda cm: cm.curated_date_check, reverse=True)  # probably sorting by lab or allele origin makes more sense here
+
+        else:
+            compare_all = list(ClassificationModification.latest_for_user(user=request.user, allele=Allele.objects.get(pk=allele_id), published=True))
+            compare_all.sort(key=lambda cm: cm.curated_date_check, reverse=True)
+            records = compare_all
 
     elif allele_origin_grouping_str := request.GET.get("allele_origin_grouping"):
         allele_origin_grouping = AlleleOriginGrouping.objects.get(pk=int(allele_origin_grouping_str))

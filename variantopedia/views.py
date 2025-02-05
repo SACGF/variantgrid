@@ -570,8 +570,11 @@ def view_allele(request, allele_id: int):
     )
     aogs = [AlleleOriginGroupingDescription.describe(aog, request.user) for aog in sorted(aog_qs.all())]
 
+    show_overall_diff = len(aogs) > 1
+
     context = {
         "allele_origin_groupings_desc": aogs,
+        "show_overall_diff": show_overall_diff,
         "allele_card": AlleleCard(user=request.user, allele=allele),
         "allele": allele,
         "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True'

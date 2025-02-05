@@ -2887,6 +2887,10 @@ a.clinical-context {
 	background-color: #999;
 	border-radius: 8px;
 
+	&.allele-origin-A {
+		background-color: #aaaabb;
+	}
+
 	&.allele-origin-G {
 		background-color: #88cc88;
 	}

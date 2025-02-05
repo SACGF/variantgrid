@@ -273,7 +273,6 @@
             <span class="allele-origin-box horizontal allele-origin-{{ allele_origin_grouping_desc.allele_origin_grouping.allele_origin_bucket }}">
                 <div class="allele-origin-text">
                     {{ allele_origin_grouping_desc.allele_origin_grouping.get_allele_origin_bucket_display }}
-
                 </div>
             </span>
             {% if allele_origin_grouping_desc.discordance_report %}
@@ -289,13 +288,20 @@
             {% endif %}
             {% if allele_origin_grouping_desc.should_show_diffs %}
                 <span class="pipe-sep">
-                    <a class="hover-link" href="{% url 'classification_diff' %}?allele_origin_grouping={{ allele_origin_grouping_desc.allele_origin_grouping.pk }}">
-                        show diffs
+                    <a class="hover-link" href="{% url 'classification_diff' %}?allele_origin_grouping={{ allele_origin_grouping_desc.allele_origin_grouping.pk }}" title="Show differences between labs latest {{ allele_origin_grouping_desc.allele_origin_grouping.get_allele_origin_bucket_display }} classification records">
+                        Show Diffs
                     </a>
                 </span>
             {% endif %}
         </div>
     {% endfor %}
+    {% if show_overall_diff %}
+        <div>
+            <span class="allele-origin-box horizontal allele-origin-A">
+                <div class="allele-origin-text">All</div>
+            </span>
+            <a class="hover-link" href="{% url 'classification_diff' %}?allele={{ allele.id }}&latest=true" title="Show differences between labs latest classifications across all allele origins">Show Diffs</a></div>
+    {% endif %}
     {% classification_groupings %}
 
     <div class="mt-4">
