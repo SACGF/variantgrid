@@ -40,7 +40,7 @@
                 $('<div>', {text: tag.label, style: 'font-weight: bold', class: 'mt-1 ' + color}).appendTo(dom);
             }
             if (data.message) {
-                $('<div>', {text: data.message, class: 'text-secondary'}).appendTo(dom);
+                $('<div>', {html: limitLengthSpan(data.message, 100), class: 'text-secondary'}).appendTo(dom);
             }
             return dom.prop('outerHTML');
         }

@@ -1046,8 +1046,8 @@ function blankToNull(val) {
 
 function limitLengthSpan(text, limit) {
     if (text && text.length > limit) {
-        show_text = text.substring(0, limit) + '...';
-        return $('<span>', {text: show_text, title: text});
+        let show_text = text.substring(0, limit-3) + '...';
+        return $('<span>', {text: show_text, title: text, class:'hover-detail'});
     } else {
         return $('<span>', {text: text});
     }
