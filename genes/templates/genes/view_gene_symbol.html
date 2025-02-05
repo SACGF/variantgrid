@@ -15,6 +15,7 @@
 {% load panel_app_tags %}
 {% load gnomad_gene_constraint_tags %}
 {% load settings_tags %}
+{% load classification_tags %}
 {% block title %}{{ gene_symbol }}{% endblock title %}
 {% block submenu %}{% menu_bar_data %}{% endblock %}
 
@@ -104,21 +105,11 @@
             $("#gene-classifications-grid-filtering-message").empty().html("Filtering to " + text).parent().show();
             geneClassificationsGridParams["protein_position"] = protein_position;
             geneClassificationsGridParams["protein_position_transcript_version_id"] = transcript_version_id;
-            {% if not classifications_new_grouping %}
-            $('#vc-datatable').DataTable().ajax.reload();
-            {% endif %}
+            classificationGroupingRedraw();
         }
 
         $(document).ready(() => {
             EKeys.load().then(eKeys => {
-                {% if not classifications_new_grouping %}
-                    {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='classification_datatables' data='classificationFilter' hide_filter_count=True %};
-                    let vcDatatable = $('#vc-datatable');
-                    vcDatatable.on('draw.dt', () => {
-                        Flags.instance.init({userId: '{{user.id}}'});
-                    });
-                {% endif %}
-
                 {% settings_value 'VARIANT_DETAILS_QUICK_LINKS_ALLOW_LIST' as quick_links_allow_list %}
                 {% settings_value 'VARIANT_DETAILS_QUICK_LINKS_BLOCK_LIST' as quick_links_block_list %}
                 const allowList = {{ quick_links_allow_list | jsonify }};
@@ -154,7 +145,9 @@
 {% block content %}
 	<div class="container">
         {% load genome_build_tags %}
-        {% genome_build_url_arg genome_build 'view_gene_symbol_genome_build' gene_symbol=gene_symbol %}
+        {% if show_annotation %}
+            {% genome_build_url_arg genome_build 'view_gene_symbol_genome_build' gene_symbol=gene_symbol %}
+        {% endif %}
 
         <h3>Gene Symbol : {{ gene_symbol }}</h3>
         {% page_help_embedded page_id='genes/view_gene_symbol_help' title='Gene Symbol' %}
@@ -414,10 +407,7 @@
                 <div class="card-header">Summary</div>
                 <div class="card-body">
                     {% labelled label="Approved Name" help=annotation_description.hgnc_name %}{{ hgnc.approved_name }}{% endlabelled %}
-                    {% labelled label="HGNC ID" help=annotation_description.hgnc_id %}
-                            <a href="{{ hgnc.get_absolute_url }}">HGNC:{{ hgnc.pk }}</a> ({{ hgnc.get_status_display }})
-                            <a href="{{ hgnc.url }}">HGNC site</a>
-                    {% endlabelled %}
+                    {% labelled label="HGNC ID" help=annotation_description.hgnc_id %}<a href="{{ hgnc.url }}">HGNC:{{ hgnc.pk }}</a> ({{ hgnc.get_status_display }}){% endlabelled %}
                 </div>
             </div>
         {% endif %}
@@ -439,39 +429,33 @@
             {% endif %}
         {% endif %}
     </div>
-    <div class="{% if classifications_new_grouping %}container{% else %}container-table{% endif %} mt-4">
+    <div class="container mt-4">
         <h4>Classification Records</h4>
         <p>Filtering on gene symbols : <span class="text-monospace">{% for symbol in gene_symbol.alias_meta.alias_symbol_strs %}{% if not forloop.first %}, {% endif %}{{ symbol }}{% endfor %}</span> and associated alleles and transcripts.</p>
 
         <script>
-        function classificationFilter(data, type) {
+        function classificationGroupingFilterExtra(data, type) {
             data.gene_symbol = "{{ gene_symbol }}";
             Object.assign(data, geneClassificationsGridParams);
         }
 
         function clearGeneClassificationsGrid() {
             geneClassificationsGridParams = {};
-            {% if not classifications_new_grouping %}$('#vc-datatable').DataTable().ajax.reload();{% endif %}
+            classificationGroupingRedraw();
             $("#gene-classifications-grid-filtering-message").empty().parent().hide();
         }
-
         </script>
 
         {% if show_classifications_hotspot_graph %}
             <div id='classifications-hotspot-graph-container'></div>
         {% endif %}
 
-        {% if classifications_new_grouping %}
-            <div data-toggle="ajax" href="{% url 'view_gene_symbol_classifications' gene_symbol.symbol genome_build.name %}">Loading...</div>
-        {% endif %}
-
         <span class="hidden">
             <span class="filter-message" id="gene-classifications-grid-filtering-message"></span>
-            <a class='hover-link' href="javascript:clearGeneClassificationsGrid()">Show all...</a>
+            <a class='hover-link' onclick="clearGeneClassificationsGrid()">Show all...</a>
         </span>
-        {% if not classifications_new_grouping %}
-            {% datatable datatable_config 'vc-datatable' class_name='classification-table' %}
-        {% endif %}
+
+        {% classification_groupings %}
     </div>
     <div class="container">
         {% if show_annotation %}
@@ -536,11 +520,12 @@
         {% endif %}
 
         {% if gene_in_gene_lists %}
-            <h4>Gene Lists containing {{ gene_symbol }}</h4>
+            <h4 class="mt-4">Gene Lists containing {{ gene_symbol }}</h4>
 
             <script>
                 function geneListsDatatableFilter(data) {
                     data.gene_symbol = "{{ gene_symbol  }}";
+                    data.page_id = "gene_symbol";
                 }
             </script>
             <table id="gene-lists-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'gene_lists_datatable' %}" data-datatable-data="geneListsDatatableFilter"></table>

@@ -23,12 +23,12 @@
         </div>
 
         {% if user.is_superuser %}
-            <h3>Library Versions</h3>
+            <h4 class="admin-only">Library Versions</h4>
 
             <div id="library-version-details" class="mt-4">
                 <form>
                     {% for k, v in versions.items %}
-                        {% labelled label=k admin_only="true" %}{{ v }}{% endlabelled %}
+                        {% labelled label=k %}{{ v }}{% endlabelled %}
                     {% endfor %}
                 </form>
             </div>

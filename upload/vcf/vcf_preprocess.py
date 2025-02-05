@@ -81,11 +81,12 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False):
 
     pipe_commands = {}  # Use dict order to decide pipeline order
     sub_steps = {}
-    if vcf_filename.endswith(".gz"):
-        pipe_commands["zcat"] = [settings.BASH_ZCAT, vcf_filename]
-    else:
-        pipe_commands["cat"] = ["cat", vcf_filename]
 
+    # Perform multi-allelic splitting first, so that we can filter out allele at a time in 'vcf_clean_and_filter'
+    pipe_commands["split_multiallelics"] = [
+        settings.BCFTOOLS_COMMAND, "norm",
+        "--multiallelics=-", vcf_filename,
+    ]
     upload_pipeline = upload_step.upload_pipeline
     vcf_name = name_from_filename(vcf_filename, remove_gz=True)
 
@@ -114,7 +115,6 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False):
 
     pipe_commands[UploadStep.NORMALIZE_SUB_STEP] = [
         settings.BCFTOOLS_COMMAND, "norm",
-        "--multiallelics=-",
         # We don't remove duplicates due to:
         # * https://github.com/samtools/bcftools/issues/2225 - rmdup removes --old-rec-tag so lose normalize info
         # "--rm-dup=exact",

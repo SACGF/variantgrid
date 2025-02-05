@@ -1,0 +1,63 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load compress %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% load settings_tags %}
+{% load classification_tags %}
+{% load lab_tags %}
+{% block title %}Classifications{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <style>
+        th.dt-allele {
+            width: 27%;
+        }
+        th.dt-germline_overlap, th.dt-somatic_overlap {
+            width: 27%;
+        }
+        /*
+        labs is the left over 100 - 27*3 = 19
+         */
+
+        td.dt-germline_overlap .val-0, td.dt-somatic_overlap .val-0 {
+            color: #BBBBBB !important;
+            font-style: italic;
+        }
+        td.dt-germline_overlap .val-10, td.dt-somatic_overlap .val-10 {
+            color: #666;
+        }
+        td.dt-germline_overlap .val-50, td.dt-somatic_overlap .val-50 {
+            font-weight: bold;
+            color: #bb8888;
+        }
+        td.dt-germline_overlap .val-60, td.dt-somatic_overlap .val-60 {
+            font-weight: bold;
+            color: #bb4444;
+        }
+        td.dt-germline_overlap .val-60::before, td.dt-somatic_overlap .val-60::before {
+            position: relative;
+            content: '\f479';
+            margin-right: 4px;
+            font-family: 'Font Awesome 6 Free', 'FontAwesome';
+            font-weight: 900;
+        }
+    </style>
+{% endblock %}
+{% block content %}
+    {% lab_picker data=dlab.lab_picker %}
+
+    <div id="classifications-page">
+        <div class="container">
+            <h3>Allele Groupings</h3>
+
+            <div class="row">
+                <div class="col">
+                    <table id="vc-datatable" data-datatable-url="{% url 'allele_grouping_datatables' lab_id=dlab.lab_picker.selection %}" class="sticky-header classification-table"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

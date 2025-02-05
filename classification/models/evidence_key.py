@@ -8,6 +8,7 @@ from functools import cached_property
 from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set, TypedDict, cast
 
 import pydantic
+from django.conf import settings
 from django.db import models
 from django.db.models.deletion import SET_NULL
 from django_extensions.db.models import TimeStampedModel
@@ -312,7 +313,7 @@ class EvidenceKey(TimeStampedModel):
         return None
 
     @cached_property
-    def _option_indexes(self) -> Optional[Dict[str, int]]:
+    def option_indexes(self) -> Optional[Dict[str, int]]:
         index_map: Optional[Dict[str, int]] = None
         if options := self.virtual_options:
             index_map = {}
@@ -321,11 +322,11 @@ class EvidenceKey(TimeStampedModel):
         return index_map
 
     def classification_sorter_value(self, val: Any) -> Union[int, Any]:
-        if index_map := self._option_indexes:
+        if index_map := self.option_indexes:
             return index_map.get(val, 0)
         return val
 
-    def sort_values(self, values: Iterable) -> List:
+    def sort_values(self, values: Iterable) -> list:
         sorter = self.classification_sorter_value
         sorted_list = sorted(values, key=lambda x: (sorter(x), x))
         return sorted_list
@@ -487,6 +488,13 @@ class EvidenceKey(TimeStampedModel):
             name = self.key
         return name
 
+    @property
+    def is_vital_key(self) -> bool:
+        if settings.CLASSIFICATION_DOWNLOADABLE_FIELDS == "*":
+            return True
+        else:
+            return self.key in settings.CLASSIFICATION_DOWNLOADABLE_FIELDS
+
 
 class EvidenceKeyMap:
 
@@ -555,8 +563,19 @@ class EvidenceKeyMap:
             self.all_keys.append(key)
 
     def with_namespace_if_required(self, key: str):
+        """
+        This is primarily to prefix "acmg:" to evidence keys where the ACMG codes didn't use to have a prefix
+        """
         if key not in self.key_dict and key in self.un_namespaced:
             key = first(self.un_namespaced.get(key)).key
+        return key
+
+    def without_namespace_if_required(self, key: str):
+        """
+        This is for the few instances where a prefix has been removed, e.g. "somatic:testing_context" going to "testing_con
+        """
+        if key not in self.key_dict and ":" in key and key.split(":")[1] in self.key_dict:
+            key = key.split(":")[1]
         return key
 
     def with_overrides(self, config: EvidenceKeyOverrides) -> 'EvidenceKeyMap':
@@ -570,7 +589,7 @@ class EvidenceKeyMap:
             return self.key_dict[key]
         return EvidenceKey.dummy_key(key)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item) -> EvidenceKey:
         return self.get(item)
 
     def __contains__(self, item):
@@ -594,6 +613,9 @@ class EvidenceKeyMap:
         """
         return [eKey for eKey in self.all_keys if eKey.value_type == EvidenceKeyValueType.CRITERIA]
 
+    def vital(self) -> List[EvidenceKey]:
+        return [e_key for e_key in self.all_keys if e_key.is_vital_key]
+
     def acmg_criteria(self) -> List[EvidenceKey]:
         """
         :return: A list of STANDARD ACMG criteria EvidenceKeys
@@ -607,7 +629,7 @@ class EvidenceKeyMap:
 
     @staticmethod
     @timed_cache(ttl=60)
-    def clinical_significance_to_bucket():
+    def clinical_significance_to_bucket() -> dict[str, int]:
         return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
 
 

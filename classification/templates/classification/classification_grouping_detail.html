@@ -1,0 +1,39 @@
+{% load ui_utils %}
+{% load classification_tags %}
+
+{% if user.is_superuser %}
+    {% labelled label="Admin" %}{% admin_link classification_grouping %}{% endlabelled %}
+{% endif %}
+{% labelled row_id="allele-imported-as" label="Imported As" %}
+    {% imported_allele_info classification_grouping.latest_allele_info %}
+{% endlabelled %}
+{% labelled label="Gene Symbol" %}
+    {% for gene_symbol in classification_grouping.gene_symbols %}{% if not forloop.first %}, {% endif %}<a class="hover-link" href="{{ gene_symbol.get_absolute_url }}">{{ gene_symbol }}</a>{% endfor %}
+{% endlabelled %}
+{% labelled label="Zygosities" %}
+    {% for zygosity in classification_grouping.zygosity_values %}{% if not forloop.first %}, {% endif %}{{ zygosity|ekey:"zygosity" }}{% endfor %}
+{% endlabelled %}
+{% with "grouping_records_"|append:classification_grouping.pk as expand_id %}
+    {% labelled label="Records" row_id=expand_id %}
+        {% if classification_grouping.classification_count > 10 %}
+            <div>Total of {{ classification_grouping.classification_count }} records, showing most recent 10</div>
+        {% endif %}
+        {% for record in classification_grouping.classification_modifications|slice:":10" reversed %}
+            {% if forloop.counter == 2 %}<hr/>{% endif %}
+            {% if forloop.counter == 1 and classification_grouping.classification_modifications|length > 1 %}
+                <label>Latest</label>
+            {% endif %}
+            <div>{% classification_quick record show_lab=False show_condition=True show_flags=True %}</div>
+            {% comment %}
+            <div class="mt-2 d-flex" style="align-items:center;position:relative;top:5px">
+                <a class="hover-link" style="font-weight:bold" href="{% url 'view_classification' record.classification_id %}">{{ record.classification.cr_lab_id}}</a>
+                {{ record.classification.allele_info.issue_icon|default_if_none:'' }}
+                <div class="flags d-inline-block" style="margin-left:12px" data-flags="{{ record.classification.flag_collection_id }}">...</div>
+            </div>
+            {% endcomment %}
+        {% endfor %}
+        <script>
+            Flags.instance.init({userId: '{{user.id}}', forceRender: true, filter:"#{{ expand_id }}", flagGroup:'classifications'});
+        </script>
+    {% endlabelled %}
+{% endwith %}

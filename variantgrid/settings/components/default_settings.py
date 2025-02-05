@@ -326,7 +326,7 @@ CLASSIFICATION_OMNI_IMPORTER_DATA_DIR = os.path.join(PRIVATE_DATA_ROOT, "lab_cla
 CLASSIFICATION_OMNI_IMPORTER_PUBLISH_LEVEL = "lab"  # change this to logged_in_users for prod environments
 CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE = False  # change this to True for dev environments (too dangerous to set to True by default)
 CLASSIFICATION_OMNI_IMPORTER_PYTHON_COMMAND = PYTHON_COMMAND
-CLASSIFICATION_OMNI_IMPORTER_PARSERS = ["vg_tags", "mvl_patch"]
+CLASSIFICATION_OMNI_IMPORTER_PARSERS = ["vg_tags", "mvl_patch", "curio"]
 
 CLASSIFICATION_SUPPORTED_TRANSCRIPTS = {"NR", "NM", "NC", "ENST", "LRG_", "XR"}
 CLASSIFICATION_MATCH_VARIANTS = True  # exists only so we can turn it off during testing
@@ -365,6 +365,7 @@ CLASSIFICATION_ALLOW_DELETE = True
 """
 Is a hard-delete offered to classification owners (if false admins will have to delete from admin screen)
 """
+CLASSIFICATION_ALLOW_UNKNOWN_KEYS = True  # default to true for the sake of environments syncing from other environments
 
 ONTOLOGY_EXTERNAL_LINKS = False  # Generate external or internal links for ontology terms
 
@@ -885,6 +886,10 @@ BASH_ZCAT = 'zcat'
 # If True, will run a series of bash commands as one long string with Shell=True
 # otherwise will pipe each command into the next more safely with Shell=False
 VCF_IMPORT_PREPROCESS_POPEN_SHELL = True  # For vcf split
+
+CLASSIFICATION_DOWNLOADABLE_JSON_LITERATURE_CITATIONS = False
+CLASSIFICATION_DOWNLOADABLE_NOTES_AND_EXPLAINS = True
+CLASSIFICATION_DOWNLOADABLE_FIELDS = "*"
 
 # Bootstrapped themed messages
 from django.contrib.messages import constants as messages

@@ -134,7 +134,7 @@ class ClinVarCompareRow(ClinVarCompareRowAbstract):
     def _allele_url(self) -> str:
         return self.allele_url
 
-    @export_column("Clinvar URL")
+    @export_column("ClinVar URL")
     def _clinvar_url(self) -> str:
         return self.clinvar_url
 
@@ -212,16 +212,19 @@ class ClinVarCompareRow(ClinVarCompareRowAbstract):
     def clinvar_germline_stars(self) -> str:
         clinvar: ClinVar
         if clinvar := self.clinvar:
-            if germline_stars := clinvar.germline_stars:
-                return germline_stars
+            if clinvar.review_status:
+                germline_stars = clinvar.germline_stars
+                if germline_stars is not None:
+                    return germline_stars
 
     @export_column("ClinVar Somatic Stars", categories={"somatic": True})
     def clinvar_somatic_oncogenic_stars(self) -> str:
         clinvar: ClinVar
         if clinvar := self.clinvar:
-            if max_stars := max(clinvar.somatic_stars, clinvar.oncogenic_stars):
-                # don't want to return 0
-                return max_stars
+            if clinvar.somatic_review_status or clinvar.oncogenic_review_status:
+                max_stars = max(clinvar.somatic_stars, clinvar.oncogenic_stars)
+                if max_stars is not None:
+                    return max_stars
 
     @export_column("Comparison")
     def diff_value(self) -> ClinVarCompareValue:

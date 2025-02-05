@@ -3,7 +3,7 @@ from datetime import timedelta
 from typing import Union, Optional
 
 from django.contrib import admin, messages
-from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter, DateFieldListFilter
+from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter, DateFieldListFilter, TabularInline
 from django.db.models import QuerySet
 from django.forms import Widget
 from django.utils import timezone
@@ -18,7 +18,8 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
-    DiscordanceReportTriageStatus
+    DiscordanceReportTriageStatus, ClassificationGrouping, ClassificationGroupingEntry, \
+    AlleleOriginGrouping, AlleleGrouping, ClassificationGroupingSearchTerm
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -218,7 +219,8 @@ class ClassificationAdmin(ModelAdminBasics):
         'last_import_run',
         'last_source_id',
         'share_level',
-        'clinical_significance',
+        'classification',
+        'somatic_clin_sig',
         'allele_fallback',
         'grch37_c_hgvs',
         'grch38_c_hgvs',
@@ -244,6 +246,16 @@ class ClassificationAdmin(ModelAdminBasics):
     list_per_page = 50
     inlines = (ClassificationModificationAdmin,)
     list_select_related = ('lab', 'user', 'allele')
+
+    @admin_list_column(short_description="Classification", order_field="summary__pathogenicity__sort")
+    def classification(self, obj: Classification):
+        if cm := ClassificationModification.objects.filter(is_last_published=True, classification=obj).first():
+            return cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+
+    @admin_list_column(short_description="Somatic Clin Sig", order_field="summary__somatic__sort")
+    def somatic_clin_sig(self, obj: Classification):
+        if cm := ClassificationModification.objects.filter(is_last_published=True, classification=obj).first():
+            return cm.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
 
     @admin_list_column(short_description="c.hgvs (37)", order_field="allele_info__grch37__c_hgvs")
     def grch37_c_hgvs(self, obj: Classification):
@@ -552,7 +564,7 @@ class EvidenceKeyAdmin(ModelAdminBasics):
     list_per_page = 500
     list_filter = (EvidenceKeySectionFilter, MaxShareLevelFilter)
     ordering = ('key',)
-    list_display = ('key', 'label', 'value_type', 'max_share_level', 'evidence_category', 'order')
+    list_display = ('key', 'label', 'value_type', 'max_share_level', 'evidence_category', 'order', 'hide', 'is_downloadable', 'created_detailed', 'modified_detailed')
     search_fields = ('key', 'label')
 
     fieldsets = (
@@ -562,8 +574,21 @@ class EvidenceKeyAdmin(ModelAdminBasics):
                              'crit_allows_override_strengths', 'crit_uses_points')}),
         ('Overrides', {'fields': ('namespace_overrides',)}),
         ('Help', {'fields': ('description', 'examples', 'see')}),
-        ('Admin', {'fields': ('max_share_level', 'copy_consensus', 'variantgrid_column', 'immutable')})
+        ('Admin', {'fields': ('max_share_level', 'copy_consensus', 'variantgrid_column', 'immutable')}),
+        ('History', {'fields': ('created', 'modified')})
     )
+
+    @admin_list_column(short_description="Downloadable", is_boolean=True)
+    def is_downloadable(self, obj: EvidenceKey):
+        return obj.is_vital_key
+
+    @admin_list_column(short_description="Created", order_field="created")
+    def created_detailed(self, obj: EvidenceKey):
+        return self.format_datetime_seconds(obj.created)
+
+    @admin_list_column(short_description="Modified", order_field="modified")
+    def modified_detailed(self, obj: EvidenceKey):
+        return self.format_datetime_seconds(obj.modified)
 
     @admin_action("Validate key")
     def validate(self, request, queryset):
@@ -1039,12 +1064,26 @@ class ResolvedVariantInfoAdmin(ModelAdminBasics):
         'allele_info',
         'genome_build',
         'variant',
-        'c_hgvs',
+        'c_hgvs_both',
         'gene_symbol',
         'transcript_version',
         'genomic_sort',
         'error'
     )
+
+    search_fields = (
+        'c_hgvs',
+        'c_hgvs_compat'
+    )
+
+    @admin_list_column(short_description="c.HGVS", order_field="c_hgvs")
+    def c_hgvs_both(self, obj: ResolvedVariantInfo):
+        c_hgvs = obj.c_hgvs
+        c_hgvs_compatible = obj.c_hgvs_compat
+        if c_hgvs == c_hgvs_compatible:
+            return c_hgvs
+        else:
+            return SafeString(f"<em>canonical</em><br/>{c_hgvs}<br/><em>c_hgvs_compatible</em><br/>{c_hgvs_compatible}")
 
     def has_add_permission(self, request):
         return False
@@ -1281,3 +1320,102 @@ class ImportedAlleleInfoValidationAdmin(ModelAdminBasics):
         if f.name == 'confirmed_by_note':
             return False
         return True
+
+
+class ClassificationGroupingEntryAdmin(admin.TabularInline):
+    model = ClassificationGroupingEntry
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class ClassificationGroupingSearchTermAdmin(admin.TabularInline):
+    model = ClassificationGroupingSearchTerm
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ClassificationGrouping)
+class ClassificationGroupingAdmin(ModelAdminBasics):
+    inlines = (ClassificationGroupingEntryAdmin, ClassificationGroupingSearchTermAdmin)
+    list_display = ("pk", "classification_count", "allele", "lab", "allele_origin_bucket", "pathogenic_difference", "somatic_difference", "dirty")
+    list_filter = ("lab", "allele_origin_bucket", "pathogenic_difference", "somatic_difference", "dirty")
+
+    # @admin_list_column("gene_symbols")
+    # def gene_symbols(self, obj: ClassificationGrouping):
+    #     return ", ".join(obj.classificationgroupinggenesymbol_set.values_list("gene_symbol", flat=True))
+
+    @admin_action("Refresh")
+    def refresh(self, request, queryset: QuerySet[ClassificationGrouping]):
+        queryset.update(dirty=True)
+        for cg in queryset:
+            cg.update()
+
+    @admin_model_action(url_slug="refresh_all/", short_description="Refresh All", icon="fa-solid fa-arrows-rotate")
+    def refresh_all(self, request):
+        # ClassificationGrouping.objects.all().delete()
+        for classification in Classification.objects.iterator():
+            ClassificationGrouping.assign_grouping_for_classification(classification)
+
+        ClassificationGrouping.objects.update(dirty=True)
+        ClassificationGrouping.update_all_dirty()
+
+    @admin_model_action(url_slug="refresh_all/", short_description="Refresh Dirty", icon="fa-solid fa-splotch")
+    def refresh_dirty(self, request):
+        ClassificationGrouping.update_all_dirty()
+
+
+class ClassificationGroupingTabularAdmin(TabularInline):
+    model = ClassificationGrouping
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(AlleleOriginGrouping)
+class AlleleOriginGroupingAdmin(ModelAdminBasics):
+    list_display = ("allele_grouping", "dirty")
+    inlines = (ClassificationGroupingTabularAdmin,)
+
+    @admin_model_action(url_slug="refresh_all/", short_description="Refresh All", icon="fa-solid fa-arrows-rotate")
+    def refresh_all(self, request):
+        AlleleOriginGrouping.objects.update(dirty=True)
+        ClassificationGrouping.update_all_dirty()
+
+
+class AlleleOriginGroupingTabularAdmin(TabularInline):
+    model = AlleleOriginGrouping
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(AlleleGrouping)
+class AlleleGroupingAdmin(ModelAdminBasics):
+    inlines = (AlleleOriginGroupingTabularAdmin,)
+    pass

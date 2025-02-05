@@ -50,6 +50,7 @@ let DataTableDefinition = (function() {
         this.data = params.data;
         this.filterCount = params.filterCount;
         this.waitOn = Promise.resolve();
+        this.adjustColumns = params.adjustColumns !== false;
 
         this.tableId = null;
         this.lengthKey = null;
@@ -68,11 +69,12 @@ let DataTableDefinition = (function() {
     DataTableDefinition.prototype = {
 
         ensureState: function() {
+            // this seems to happen after convertDefinition, so it's relatively useless
             if (!this.dom) {
-                throw "DatatTableDefinition missing parameter `dom`";
+                throw new Error("DatatTableDefinition missing parameter `dom`");
             }
             if (!this.url) {
-                throw "DatatTableDefinition missing parameter `url`";
+                throw new Error("DatatTableDefinition missing parameter `url`");
             }
 
             let tableId = this.dom.attr('id');
@@ -93,7 +95,11 @@ let DataTableDefinition = (function() {
         loadDefinition: function() {
             let definitionData = DataTableDefinition.definitions[this.url];
             if (!definitionData) {
-                definitionData = $.getJSON(this.url + '?dataTableDefinition=1');
+                let sep = '?';
+                if (this.url.indexOf('?') !== -1) {
+                    sep = '&';
+                }
+                definitionData = $.getJSON(this.url + sep + 'dataTableDefinition=1');
                 DataTableDefinition.definitions[this.url] = definitionData;
             }
             return definitionData.then(data => {this.serverParams = data});
@@ -117,6 +123,7 @@ let DataTableDefinition = (function() {
                 pageLength: lengthValue,
                 dom: domString,
                 order: defn.order,
+                fixedOrder: defn.order,
                 pagingType: "input",
                 classes: {
                     'sPageButton': 'btn btn-outline-primary btn-rnd-rect',
@@ -166,6 +173,12 @@ let DataTableDefinition = (function() {
             dtParams.columnDefs = columnDefs;
 
             let waitOnEKeys = null;
+
+            if (!Array.isArray(defn.columns)) {
+                console.log("Invalid TableDefinition")
+                console.log(defn);
+                throw new Error("Received invalid datatable definition");
+            }
 
             // GENERATE COLUMNS
             for (let col of defn.columns) {
@@ -343,7 +356,11 @@ let DataTableDefinition = (function() {
                     this.setupDom();
                     this.setupClientExpend();
                     this.setupResponsiveExpand();
-                    this.dataTable.columns.adjust().draw();
+                    // note the below causes the dataTable to re-download data from the server redundantly
+                    // not sure under what circumstances it's actually required
+                    if (this.adjustColumns) {
+                        this.dataTable.columns.adjust().draw(false);
+                    }
                 });
             });
         }
@@ -400,6 +417,22 @@ TableFormat.timestampMilliseconds = (data, type, row) => {
     }
 };
 
+TableFormat.list_codes = (data, type, row) => {
+    if (!data) {
+        return $("<span>", {text: "-"});
+    }
+    let elements = [];
+    let isFirst = true;
+    for (value of data) {
+        if (!isFirst) {
+            elements.push(", ");
+        }
+        isFirst = false;
+        elements.push($('<span>', {class: 'text-monospace text-secondary', text: value}));
+    }
+    return $('<div>', {html: elements});
+}
+
 TableFormat.sizeBytes = (data, type, row) => {
     if (data) {
         let unit = 'bytes';
@@ -452,6 +485,11 @@ TableFormat.text = (data, type, row) => {
         return data;
     }
 };
+
+TableFormat.plain = (data, type, row) => {
+    return data;
+}
+
 TableFormat.number = (data, type, row) => {
     if (data === '' || data === null) {
         return $('<span/>', {class:'no-value', text:'-'}).prop('outerHTML');
@@ -518,6 +556,53 @@ TableFormat.severeNumber = function(severity, data, type, columns) {
     }
 };
 
+TableFormat.combine = function(formatters, settings, data, type, columns) {
+    if (settings === null) {
+        settings = {};
+    }
+    let dom = $('<div>');
+    formatters.forEach((formatter, index) => {
+        let part;
+        if (settings.dataMode === "combined") {
+            part = eval(formatter)(data, type, columns);
+        } else {
+            part = eval(formatter)(data[index], type, columns);
+        }
+        if (settings.separator) {
+            dom.append($(separator));
+            dom.append(part);
+        } else {
+            dom.append($('<div>', {'html': part}));
+        }
+    });
+    return dom;
+};
+
+TableFormat.repeat = function(settings, data, type, columns) {
+    if (settings === null) {
+        settings = {};
+    }
+    if (data === null) {
+        return "";
+    }
+    let subFormatter = eval(settings.formatter);
+    let cssClass = "repeat";
+    if (settings.groupCSS) {
+        cssClass = settings.groupCSS;
+    }
+    let dom = $('<div>', {"class": cssClass});
+    data.forEach((subData, index) => {
+        let subDom = subFormatter(subData, type, columns);
+        dom.append(subDom);
+    });
+    return dom;
+};
+
+TableFormat.json = function(data, type, columns) {
+    // TODO format JSON
+    return JSON.stringify(data);
+};
+
 TableFormat.expandAjax = function(url_or_method, param, expectedHeight, data) {
     if (data) {
         let dataId = data[param];
@@ -530,7 +615,7 @@ TableFormat.expandAjax = function(url_or_method, param, expectedHeight, data) {
         let reverseUrl = window[url_or_method] || Urls[url_or_method];
         if (!reverseUrl) {
             return `<i class="fas fa-bomb text-danger"></i> Method or URL not configured for "${url_or_method} : Developer may need to run<br/>
-            <div class="code">manage.py collectstatic_js_reverse</div>`;
+            <div class="code">python3 manage.py collectstatic_js_reverse</div>`;
         }
         if (param) {
             reverseUrl = reverseUrl(dataId);

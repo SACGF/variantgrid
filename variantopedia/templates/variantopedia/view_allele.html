@@ -7,6 +7,7 @@
 {% load ui_menu_bars %}
 {% load settings_tags %}
 {% load clinvar_tags %}
+{% load english_tags %}
 {% block submenu %}{% menu_bar_data %}{% endblock submenu %}
 {% block head %}
 <script>
@@ -261,25 +262,43 @@
             </tbody>
         </table>
 
-    {% if classifications_new_grouping and not edit_clinical_groupings %}
-        <div class="container mt-4" id="view-allele-classification-records">
-            <h4>Classification Records</h4>
-            {% url 'allele_classifications_download' allele.id as download_link %}
-            {% classification_groups classifications link_discordance_reports=discordance_enabled download_link=download_link context_object=allele %}
-        </div>
-    {% else %}
-        <div class="container-table mt-4" id="view-allele-classification-records">
-            <h4 style="margin-bottom:0">Classification Records</h4>
-            {% if classifications %}
-                {% classification_table classifications show_clinical_context=True allele=allele edit_clinical_groupings=edit_clinical_groupings %}
+    <h4>Classification Records</h4>
+    <script>
+        function classificationGroupingFilterExtra(data) {
+            data.allele_id = {{ allele.pk }};
+        }
+    </script>
+    {% for allele_origin_grouping_desc in allele_origin_groupings_desc %}
+        <div>
+            <span class="allele-origin-box horizontal allele-origin-{{ allele_origin_grouping_desc.allele_origin_grouping.allele_origin_bucket }}">
+                <div class="allele-origin-text">
+                    {{ allele_origin_grouping_desc.allele_origin_grouping.get_allele_origin_bucket_display }}
+
+                </div>
+            </span>
+            {% if allele_origin_grouping_desc.discordance_report %}
+                <span class="pipe-sep">{% discordance_report allele_origin_grouping_desc.discordance_report %}</span>
             {% else %}
-                <p>
-                No internal classifications.
+                <span class="pipe-sep" title="Overlap Status">{{ allele_origin_grouping_desc.get_overlap_status_display }}</span>
+            {% endif %}
+            {% if allele_origin_grouping_desc.shared_counts > 1 %}
+                <span class="pipe-sep">&nbsp;<strong>{{ allele_origin_grouping_desc.shared_counts }}</strong> Sharing Lab{% plural allele_origin_grouping_desc.shared_counts %}</span>
+            {% endif %}
+            {% if allele_origin_grouping_desc.unshared_counts %}
+                <span class="pipe-sep" style="opacity:0.7">includes unshared records</span>
+            {% endif %}
+            {% if allele_origin_grouping_desc.should_show_diffs %}
+                <span class="pipe-sep">
+                    <a class="hover-link" href="{% url 'classification_diff' %}?allele_origin_grouping={{ allele_origin_grouping_desc.allele_origin_grouping.pk }}">
+                        show diffs
+                    </a>
+                </span>
             {% endif %}
         </div>
-    {% endif %}
+    {% endfor %}
+    {% classification_groupings %}
 
-    <div class="container mt-4">
+    <div class="mt-4">
         {% clinvar allele=allele expert_panel_only=True %}
     </div>
 

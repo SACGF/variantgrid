@@ -1,3 +1,25 @@
 {% load classification_tags %}
+
+<script>
+    function classificationGroupingFilter(data) {
+        data.gene_symbol = "{{ gene_symbol }}";
+    }
+</script>
+
+{% comment %}
+<div class="row">
+    <div class="col">
+        <table id="vc-grouping-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table"></table>
+        <div>
+        Download as
+            <a class='hover-link download-link' href="javascript:downloadAs('csv')">CSV</a>
+            {% if CLASSIFICATION_REDCAP_EXPORT %},
+            <a class='hover-link download-link' href="javascript:downloadAs('redcap')">REDCap</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endcomment %}
+
 {% url 'view_gene_symbol_classifications_download' gene_symbol.symbol genome_build.name as download_link %}
 {% classification_groups classifications show_diffs=False genome_build=genome_build download_link=download_link context_object=gene_symbol %}

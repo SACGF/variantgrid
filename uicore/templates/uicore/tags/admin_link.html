@@ -1,1 +1,1 @@
-{% if url %}<a href="{{ url }}" target="_blank" class="admin-link">manage</a>{% endif %}
+{% if url %}<a href="{{ url }}" target="_blank" class="admin-link">manage</a>{% elif is_admin %}WARNING: No admin link found for this object "{{ object }}"{% endif %}

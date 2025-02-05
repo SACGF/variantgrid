@@ -1,0 +1,165 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load compress %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% load settings_tags %}
+{% load classification_tags %}
+{% block title %}Classifications{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+<style>
+    #classify-container label, #gene-form-container label, #user-form-container label, #lab-form-container label {
+        display: none;
+    }
+
+    .select2-selection__rendered {
+       margin-top: -5px;
+    }
+
+    #flag-filter td {
+        text-align: center;
+        padding: 2px;
+    }
+
+    .filter-row>div {
+        z-index: 1000;
+    }
+</style>
+<script>
+    function filterGrid() {
+        $('#vc-datatable').DataTable().ajax.reload();
+    }
+
+    function alleleOriginToggle() {
+        filterGrid();
+    }
+
+    function filterDefaultLab() {
+        {% if user_settings.default_lab %}
+            setAutocompleteValue('#id_lab', '{{ user_settings.default_lab.id }}', '{{ user_settings.default_lab.organization.name }} / {{ user_settings.default_lab.name }}');
+        {% endif %}
+    }
+
+    function filterDefaultUser() {
+        setAutocompleteValue('#id_user', '{{ user.id }}', '{{ user.username }}');
+    }
+
+    function getLabValue() {
+        // Lab select can use settings to be normal autocomplete (string) or multi-select autocomplete (array)
+        let labVal = $('#id_lab').val();
+        if (Array.isArray(labVal)) {
+            labVal = labVal.join(',');
+        }
+        return labVal;
+    }
+
+    function classificationFilter(data, type) {
+        data.gene_symbol = blankToNull($('#id_gene_symbol').val());
+        data.lab = blankToNull(getLabValue());
+        data.user = blankToNull($('#id_user').val());
+
+        let allele_origin_filter_value = $("input[name='allele-origin-toggle']:checked").val();
+        data.allele_origin = blankToNull(allele_origin_filter_value);
+        data.id_filter = blankToNull($('#id_filter').val());
+
+        let column = $('#vc-datatable').DataTable().column(3);
+        let germline_only = allele_origin_filter_value == "G";
+
+        column.visible(!germline_only);
+    }
+    function downloadAs(mode) {
+        let data = {};
+        classificationFilter(data);
+        let querystring = EncodeQueryData(data, true);
+		let url = null;
+		if (mode === 'redcap') {
+		  url = "{% url 'export_classifications_grid_redcap' %}" + "?" + querystring;
+		} else {
+		  url = "{% url 'export_classifications_grid' %}" + "?" + querystring;
+		}
+		window.location = url;
+		return false;
+    }
+
+    $(document).ready(() => {
+        $('#id_gene_symbol, #id_lab, #id_user, #id_allele_origin').on("change", function() {
+            filterGrid();
+        });
+
+        debouncedFilterGrid = debounce(filterGrid);
+
+        let vcDatatable = $('#vc-datatable');
+        vcDatatable.on('draw.dt', () => {
+            Flags.instance.init({userId: '{{user.id}}'});
+        });
+    });
+</script>
+{% endblock %}
+{% block content %}
+    {% settings_value 'CLASSIFICATION_GRID_SHOW_USERNAME' as CLASSIFICATION_GRID_SHOW_USERNAME %}
+    {% settings_value 'CLASSIFICATION_ID_FILTER' as CLASSIFICATION_ID_FILTER %}
+    {% settings_value 'CLASSIFICATION_REDCAP_EXPORT' as CLASSIFICATION_REDCAP_EXPORT %}
+    <div id="classifications-page">
+        <div class="container">
+
+            {% comment %}
+            {% page_help_embedded title="Classification Record Listing" %}
+                {% if labs.count > 0 and can_create_classification %}
+                    <p>
+                    Create a new Classification Record by entering a HGVS sequence in the box below, on the variant details page or inside an analysis by tagging it as RequiresClassification.
+                    </p>
+                {% endif %}
+                <p>
+                Export the grid below by clicking the CSV {% if CLASSIFICATION_REDCAP_EXPORT %} or REDCap {% endif %}buttons on the bottom left of the grid.<br/>
+                The export will be using your default genome build.<br/>
+                </p>
+                {% if CLASSIFICATION_REDCAP_EXPORT %}
+                    <p>
+                    You can import into REDCap using this  <a href="/classification/redcap_data_dictionary.csv">data definition</a>.<br/>
+                    Records will only be included in REDCap downloads if they have a value for <b>redcap_record_id</b>.
+                    </p>
+                {% endif %}
+            {% end_page_help_embedded %}
+            {% endcomment %}
+
+        </div>
+        <div class="container-table">
+            <h3>Classification Grouped Listing</h3>
+            <div class="row">
+                <div class="col-md-4 col-lg-2">
+                    <br/>
+                    {% crispy gene_form form_helper.horizontal_no_labels %}
+                </div>
+
+                <div class="col-md-4 col-lg-2">
+                    {% if user_settings.default_lab %}
+                    <a class="hover-link" onclick="filterDefaultLab()">Filter : {{ user_settings.default_lab.name }}</a>
+                    {% else %}<span style="visibility: hidden">.</span>{% endif %}
+                    {% crispy lab_form form_helper.horizontal_no_labels %}
+                </div>
+
+                <div class="col-md-4 col-lg-2" style="width: 160px" class="mx-3">
+                    Allele Origin<br/>
+                    {% allele_origin_toggle show_label=False %}
+                </div>
+            </div>
+
+
+            <div class="row">
+                <div class="col">
+                    <table id="vc-datatable" data-datatable-data='classificationFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table"></table>
+                    <div>
+                    Download as
+                        <a class='hover-link download-link' href="javascript:downloadAs('csv')">CSV</a>
+                        {% if CLASSIFICATION_REDCAP_EXPORT %},
+                        <a class='hover-link download-link' href="javascript:downloadAs('redcap')">REDCap</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

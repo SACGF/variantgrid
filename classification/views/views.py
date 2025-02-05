@@ -1,8 +1,9 @@
 import json
 import mimetypes
 import re
-from datetime import datetime
-from typing import Optional, Any
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Optional, Any, Union
 
 import rest_framework
 from crispy_forms.bootstrap import FieldWithButtons
@@ -37,11 +38,14 @@ from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel, Wit
 from classification.forms import ClassificationAlleleOriginForm
 from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
-    ConditionResolvedDict, DiscordanceReport
+    ConditionResolvedDict, DiscordanceReport, ClassificationGrouping, AlleleGrouping, AlleleOriginGrouping, \
+    ImportedAlleleInfo, ImportedAlleleInfoStatus
 from classification.models.classification import ClassificationModification
 from classification.models.clinical_context_models import ClinicalContext
+from classification.models.discordance_models_utils import DiscordanceReportRowData
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
+from classification.views.classification_dashboard_view import ClassificationDashboard
 from classification.views.classification_datatables import ClassificationColumns
 from classification.views.exports import ClassificationExportFormatterCSV, ClassificationExportFormatterRedCap
 from classification.views.exports.classification_export_filter import ClassificationFilter
@@ -53,9 +57,11 @@ from genes.hgvs import HGVSMatcher
 from library.django_utils import require_superuser, get_url_from_view_path
 from library.log_utils import log_traceback
 from library.utils import delimited_row
+from library.utils.django_utils import render_ajax_view
 from library.utils.file_utils import rm_if_exists
 from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm, LabMultiSelectForm
 from snpdb.genome_build_manager import GenomeBuildManager
+from snpdb.lab_picker import LabPickerData
 from snpdb.models import Variant, UserSettings, Sample, Lab, Allele
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.user_settings_manager import UserSettingsManager
@@ -125,6 +131,8 @@ def classifications(request):
     Classification listing page
     """
 
+    legacy = request.GET.get("legacy") == "true"
+
     # is cached on the request
     user_settings = UserSettingsManager.get_user_settings()
 
@@ -137,14 +145,6 @@ def classifications(request):
     )
     search_and_classify_form.helper = helper
 
-    flag_types = FlagType.objects.filter(context=classification_flag_types.classification_flag_context)\
-        .exclude(pk__in=[
-            'classification_withdrawn',
-            'classification_submitted',
-            'classification_clinical_context_change']).order_by('label')
-    flag_type_json = []
-    for ft in flag_types:
-        flag_type_json.append({'id': ft.pk, 'label': ft.label, 'description': ft.description})
 
     if settings.CLASSIFICATION_GRID_MULTI_LAB_FILTER:
         lab_form = LabMultiSelectForm()
@@ -153,7 +153,6 @@ def classifications(request):
 
     context = {
         "can_create_classification": Classification.can_create_via_web_form(request.user),
-        "flag_types": flag_type_json,
         "gene_form": GeneSymbolForm(),
         "user_form": UserSelectForm(),
         "lab_form": lab_form,
@@ -163,7 +162,101 @@ def classifications(request):
         "genome_build": user_settings.default_genome_build,
         "user_settings": user_settings,
     }
-    return render(request, 'classification/classifications.html', context)
+    template = 'classification/classifications.html'
+
+    if not legacy:
+        if request.user.is_superuser:
+            iai_processing = {}
+            context["iai_processing"] = iai_processing
+
+            processing_count = ImportedAlleleInfo.objects.filter(status__in={ImportedAlleleInfoStatus.PROCESSING, ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD}).count()
+            iai_processing["iai_processing_count"] = processing_count
+            if processing_count:
+                iai_processing["iai_processing_recent"] = ImportedAlleleInfo.objects.filter(status__in={ImportedAlleleInfoStatus.PROCESSING, ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD}).order_by("-modified").values_list("modified", flat=True).first().timestamp()
+
+            failed_last_week_count = ImportedAlleleInfo.objects.filter(status=ImportedAlleleInfoStatus.FAILED).filter(modified__gt=now() - timedelta(days=7)).count()
+            iai_processing["iai_failed_last_week_count"] = failed_last_week_count
+
+    else:
+        template = 'classification/classifications_legacy.html'
+        flag_types = FlagType.objects.filter(context=classification_flag_types.classification_flag_context) \
+            .exclude(pk__in=[
+            'classification_withdrawn',
+            'classification_submitted',
+            'classification_clinical_context_change']).order_by('label')
+        flag_type_json = []
+        for ft in flag_types:
+            flag_type_json.append({'id': ft.pk, 'label': ft.label, 'description': ft.description})
+        context["flag_types"] = flag_type_json
+
+
+    return render(request, template, context)
+
+
+# def classifications_legacy(request):
+#     """
+#         Classification listing page
+#         """
+#
+#     # is cached on the request
+#     user_settings = UserSettingsManager.get_user_settings()
+#
+#     initial = {'classify': True}
+#     search_and_classify_form = SearchAndClassifyForm(initial=initial)
+#     search_and_classify_form.fields['search'].label = "HGVS / dbSNP / VCF coordinate"
+#     helper = form_helper_horizontal()
+#     helper.layout = Layout(
+#         FieldWithButtons(Field('search', placeholder=""), Submit(name="action", value="Go"))
+#     )
+#     search_and_classify_form.helper = helper
+#
+#     flag_types = FlagType.objects.filter(context=classification_flag_types.classification_flag_context) \
+#         .exclude(pk__in=[
+#         'classification_withdrawn',
+#         'classification_submitted',
+#         'classification_clinical_context_change']).order_by('label')
+#     flag_type_json = []
+#     for ft in flag_types:
+#         flag_type_json.append({'id': ft.pk, 'label': ft.label, 'description': ft.description})
+#
+#     if settings.CLASSIFICATION_GRID_MULTI_LAB_FILTER:
+#         lab_form = LabMultiSelectForm()
+#     else:
+#         lab_form = LabSelectForm()
+#
+#     context = {
+#         "can_create_classification": Classification.can_create_via_web_form(request.user),
+#         "flag_types": flag_type_json,
+#         "gene_form": GeneSymbolForm(),
+#         "user_form": UserSelectForm(),
+#         "lab_form": lab_form,
+#         "allele_origin_form": ClassificationAlleleOriginForm(),
+#         "labs": Lab.valid_labs_qs(request.user),
+#         "search_and_classify_form": search_and_classify_form,
+#         "genome_build": user_settings.default_genome_build,
+#         "user_settings": user_settings,
+#     }
+#     return render(request, 'classification/classifications.html', context)
+#
+
+def classification_groupings(request):
+    user_settings = UserSettingsManager.get_user_settings()
+    if settings.CLASSIFICATION_GRID_MULTI_LAB_FILTER:
+        lab_form = LabMultiSelectForm()
+    else:
+        lab_form = LabSelectForm()
+
+    context = {
+        "can_create_classification": Classification.can_create_via_web_form(request.user),
+        "gene_form": GeneSymbolForm(),
+        "user_form": UserSelectForm(),
+        "lab_form": lab_form,
+        "allele_origin_form": ClassificationAlleleOriginForm(),
+        "labs": Lab.valid_labs_qs(request.user),
+        "genome_build": user_settings.default_genome_build,
+        "user_settings": user_settings,
+    }
+    return render(request, 'classification/classification_groupings.html', context)
 
 
 class AutopopulateView(APIView):
@@ -404,6 +497,11 @@ def view_classification_diff(request):
         records = cc.classification_modifications
         records.sort(key=lambda cm: cm.curated_date_check, reverse=True)
 
+    elif discordance_report_str := request.GET.get('discordance_report'):
+        dr = DiscordanceReport.objects.get(pk=discordance_report_str)
+        dr.check_can_view(request.user)
+        records = dr.all_classification_modifications
+
     elif variant_id_str := request.GET.get('variant_compare'):
         ref = ClassificationRef.init_from_str(user=request.user, id_str=variant_id_str)
         compare_all = ClassificationModification.latest_for_user(user=request.user, allele=ref.record.variant.allele, published=True)
@@ -418,6 +516,15 @@ def view_classification_diff(request):
         compare_all = list(ClassificationModification.latest_for_user(user=request.user, allele=Allele.objects.get(pk=allele_id), published=True))
         compare_all.sort(key=lambda cm: cm.curated_date_check, reverse=True)
         records = compare_all
+
+    elif allele_origin_grouping_str := request.GET.get("allele_origin_grouping"):
+        allele_origin_grouping = AlleleOriginGrouping.objects.get(pk=int(allele_origin_grouping_str))
+        record_qs = ClassificationGrouping.objects.filter(allele_origin_grouping=allele_origin_grouping)
+        record_qs = ClassificationGrouping.filter_for_user(user=request.user, qs=record_qs)
+        record_ids = record_qs.values_list(
+            "latest_classification_modification", flat=True
+        )
+        records = ClassificationModification.objects.filter(pk__in=record_ids)
 
     elif cids := request.GET.get('cids'):
         records = [ClassificationModification.latest_for_user(user=request.user, classification=cid, published=True).first() for cid in [cid.strip() for cid in cids.split(',')]]
@@ -826,3 +933,58 @@ def clin_sig_change_data(request):
     # response['Last-Modified'] = modified_str
     response['Content-Disposition'] = f'attachment; filename="clin_sig_changes.tsv"'
     return response
+
+
+def allele_groupings(request, lab_id: Optional[Union[str, int]] = None):
+    lab_picker = LabPickerData.from_request(request, lab_id, 'allele_groupings_lab')
+    return render(request, 'classification/allele_groupings.html', {
+        "dlab": ClassificationDashboard(lab_picker=lab_picker)
+    })
+
+
+def view_classification_grouping_detail(request, classification_grouping_id: int):
+    grouping = ClassificationGrouping.objects.select_related('latest_allele_info').get(pk=classification_grouping_id)
+    grouping.check_can_view(request.user)
+    return render_ajax_view(request, 'classification/classification_grouping_detail.html', {
+        "classification_grouping": grouping
+    })
+
+
+@dataclass(frozen=True)
+class AlleleOriginGroupingVisible:
+    allele_origin_grouping: list[AlleleOriginGrouping]
+    classification_groupings: list[ClassificationGrouping]
+    discordance_reports: list[DiscordanceReport]
+
+    @staticmethod
+    def from_grouping(allele_grouping: AlleleGrouping, user: User) -> list['AlleleOriginGroupingVisible']:
+        # FIXME add security checks to filter out
+
+        visible_groups: list[AlleleOriginGroupingVisible] = []
+        for bucket in [AlleleOriginBucket.GERMLINE, AlleleOriginBucket.SOMATIC, AlleleOriginBucket.UNKNOWN]:
+            if allele_origin_grouping := allele_grouping.allele_origin_dict.get(bucket):
+
+                discordance_reports = list(DiscordanceReport.objects.filter(
+                    clinical_context__in=ClinicalContext.objects.filter(allele=allele_grouping.allele,
+                                                                        allele_origin_bucket=bucket)
+                ).order_by('-report_started_date'))
+
+
+
+                visible_groups.append(
+                    AlleleOriginGroupingVisible(
+                        allele_origin_grouping=allele_origin_grouping,
+                        classification_groupings=list(sorted(allele_origin_grouping.classificationgrouping_set.all())),
+                        discordance_reports=discordance_reports
+                    )
+                )
+        return visible_groups
+
+
+def view_allele_grouping_detail(request, allele_grouping_id: int):
+    allele_grouping = AlleleGrouping.objects.get(pk=allele_grouping_id)
+
+    return render_ajax_view(request, 'classification/allele_grouping_detail.html', {
+        "allele_grouping": allele_grouping,
+        "groupings": AlleleOriginGroupingVisible.from_grouping(allele_grouping=allele_grouping, user=request.user)
+    })

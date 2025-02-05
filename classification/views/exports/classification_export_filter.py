@@ -1,8 +1,8 @@
+import operator
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from functools import cached_property, reduce
-from operator import __or__
 from typing import List, Type, Union, Set, Optional, Dict, Iterator, Any, Callable
 
 from django.conf import settings
@@ -17,14 +17,13 @@ from classification.enums import ShareLevel, ClinicalContextStatus, AlleleOrigin
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
     DiscordanceReport, ClinicalContext, ImportedAlleleInfo, ClinVarExport
-from classification.models.classification_utils import classification_gene_symbol_filter
 from flags.models import FlagsMixin, Flag, FlagComment
-from genes.models import GeneSymbolAlias
+from genes.models import GeneSymbolAlias, GeneSymbol
 from genes.signals.gene_symbol_search import GENE_SYMBOL_PATTERN
 from library.utils import batch_iterator, local_date_string, http_header_date_now
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import GenomeBuild, Lab, Organization, Allele, Variant, AlleleOriginFilterDefault, ClinGenAllele, \
-    VariantCoordinate
+    VariantCoordinate, VARIANT_PATTERN, VARIANT_SYMBOLIC_PATTERN
 from snpdb.signals.variant_search import get_results_from_variant_coordinate
 
 
@@ -211,33 +210,123 @@ class DiscordanceReportStatus(str, Enum):
     PENDING_CONCORDANCE = 'pending'
 
 
-def classification_export_user_string_to_q(user_input: str, genome_build: GenomeBuild) -> Q:
-    if ClinGenAllele.CLINGEN_ALLELE_CODE_PATTERN.match(user_input):
-        clingen_allele = get_clingen_allele(user_input)
-        return Q(classification__allele_info__allele__clingen_allele=clingen_allele)
-    elif GENE_SYMBOL_PATTERN.match(user_input):
-        gene_symbol = user_input
-        if gene_symbol_alias := GeneSymbolAlias.objects.filter(alias=user_input).first():
-            gene_symbol = gene_symbol_alias.gene_symbol
-        if gene_match := classification_gene_symbol_filter(gene_symbol):
-            return gene_match
-    if vc := VariantCoordinate.from_string(user_input, genome_build):
+def classification_export_user_strings_to_q(filter_str_list: list[str], genome_build: GenomeBuild) -> Q:
+    """
+    Bulk converts strings into gene symbol, clingen allele or variant coordinate filters.
+    Note it does take a shortcut on gene symbol matching as the traditional way takes way too long.
+    Throws a ValueError if any of the filter_str_list doesn't appear to be a valid gene symbol, clingen allele or variant coordinate
+    :param filter_str_list: User input
+    :param genome_build: The genome build for Variant Coordiantes
+    :return: A Q to filter the results
+    """
+    filter_set: set[str] = set(filter_str_list)
+    error_set: set[str] = set()
+
+    gene_symbols: set[GeneSymbol] = set()
+    if possible_gene_symbols := [filter_str for filter_str in filter_set if GENE_SYMBOL_PATTERN.match(filter_str)]:
+        possible_gene_symbols_set = set(possible_gene_symbols)
+        if gene_symbols_matched := list(GeneSymbol.objects.filter(symbol__in=possible_gene_symbols)):
+            # we will have found the case insensitive values, need to get them back out of the set
+            gene_symbols_upper = {gene_symbol.symbol.upper(): gene_symbol for gene_symbol in gene_symbols_matched}
+            for filter_str in possible_gene_symbols:
+                if gene_symbol := gene_symbols_upper.get(filter_str.upper()):
+                    filter_set.remove(filter_str)
+                    possible_gene_symbols_set.remove(filter_str)
+                    gene_symbols.add(gene_symbol)
+
+        if possible_gene_symbols_set:
+            # check aliases
+            if aliases := list(GeneSymbolAlias.objects.filter(alias__in=filter_set).select_related('gene_symbol')):
+                gene_symbol_alias_upper = {alias.alias.upper(): alias.gene_symbol for alias in aliases}
+                for filter_str in possible_gene_symbols_set:
+                    if gene_symbol := gene_symbol_alias_upper.get(filter_str.upper()):
+                        filter_set.remove(filter_str)
+                        gene_symbols.add(gene_symbol)
+
+    clingen_alleles: set[ClinGenAllele] = set()
+    if filter_set:
+        if clingen_allele_strs := [filter_str for filter_str in filter_set if ClinGenAllele.CLINGEN_ALLELE_CODE_PATTERN.match(filter_str)]:
+            # TODO can change this to bulk
+            for clingen_allele_str in clingen_allele_strs:
+                filter_set.remove(clingen_allele_str)
+                try:
+                    clingen_alleles.add(get_clingen_allele(clingen_allele_str))
+                except ValueError:
+                    error_set.add(clingen_allele_str)
+
+    variant_coordinates: set[VariantCoordinate] = set()
+    if filter_set:
+        if variant_coordinate_strs := [filter_str for filter_str in filter_set if VARIANT_PATTERN.match(filter_str) or VARIANT_SYMBOLIC_PATTERN.match(filter_str)]:
+            for filter_str in variant_coordinate_strs:
+                if vc := VariantCoordinate.from_string(filter_str, genome_build):
+                    variant_coordinates.add(vc)
+                    filter_set.remove(filter_str)
+
+    error_set.update(filter_set)
+    if error_set:
+        unmatched_str = ", ".join(f'"{filter_str}"' for filter_str in sorted(error_set))
+        raise ValueError(f"Can't match {unmatched_str} to ClinGen Allele, Gene Symbol or Variant Coordinate")
+
+    queries: list[Q] = []
+    if gene_symbols:
+        # TODO change this to handle only supported genome builds, maybe even the genome build
+        queries.append(
+            Q(classification__allele_info__grch37__gene_symbol__in=gene_symbols) |
+            Q(classification__allele_info__grch38__gene_symbol__in=gene_symbols)
+        )
+    if clingen_alleles:
+        queries.append(Q(classification__allele_info__allele__clingen_allele__in=clingen_alleles))
+
+    if variant_coordinates:
         variant_qs = get_variant_queryset_for_latest_annotation_version(genome_build)
         variant_qs = variant_qs.filter(Variant.get_contigs_q(genome_build))  # restrict to build
 
-        variant_coordinate = vc.as_internal_symbolic(genome_build)
-        variants = get_results_from_variant_coordinate(genome_build, variant_qs, variant_coordinate)
+        all_variants: set[Variant] = set()
         all_alleles: set[Allele] = set()
-        for v in variants:
+        for vc in variant_coordinates:
+            variant_coordinate = vc.as_internal_symbolic(genome_build)
+            all_variants.update(set(get_results_from_variant_coordinate(genome_build, variant_qs, variant_coordinate)))
+
+        for v in all_variants:
             if allele := v.allele:
                 all_alleles.add(allele)
         if all_alleles:
-            return Q(classification__allele_info__allele__in=all_alleles)
-        else:
-            return Q(pk=None)
-            # no variants match this search, return a Q that will result in no records being returned, so we can complain
-            # that there are no matches for this user string
-    raise ValueError(f"Can't match \"{user_input}\" to ClinGen Allele, Gene Symbol or Variant Coordinate")
+            queries.append(Q(classification__allele_info__allele__in=all_alleles))
+
+    if queries:
+        return reduce(operator.or_, queries)
+    else:
+        # might not have any queries if asked for variant coordinates that we don't have
+        return Q(pk=None)
+
+
+# def classification_export_user_string_to_q(user_input: str, genome_build: GenomeBuild) -> Q:
+#     if ClinGenAllele.CLINGEN_ALLELE_CODE_PATTERN.match(user_input):
+#         clingen_allele = get_clingen_allele(user_input)
+#         return Q(classification__allele_info__allele__clingen_allele=clingen_allele)
+#     elif GENE_SYMBOL_PATTERN.match(user_input):
+#         gene_symbol = user_input
+#         if gene_symbol_alias := GeneSymbolAlias.objects.filter(alias=user_input).first():
+#             gene_symbol = gene_symbol_alias.gene_symbol
+#         if gene_match := classification_gene_symbol_filter(gene_symbol):
+#             return gene_match
+#     if vc := VariantCoordinate.from_string(user_input, genome_build):
+#         variant_qs = get_variant_queryset_for_latest_annotation_version(genome_build)
+#         variant_qs = variant_qs.filter(Variant.get_contigs_q(genome_build))  # restrict to build
+#
+#         variant_coordinate = vc.as_internal_symbolic(genome_build)
+#         variants = get_results_from_variant_coordinate(genome_build, variant_qs, variant_coordinate)
+#         all_alleles: set[Allele] = set()
+#         for v in variants:
+#             if allele := v.allele:
+#                 all_alleles.add(allele)
+#         if all_alleles:
+#             return Q(classification__allele_info__allele__in=all_alleles)
+#         else:
+#             return Q(pk=None)
+#             # no variants match this search, return a Q that will result in no records being returned, so we can complain
+#             # that there are no matches for this user string
+#     raise ValueError(f"Can't match \"{user_input}\" to ClinGen Allele, Gene Symbol or Variant Coordinate")
 
 
 @dataclass
@@ -589,7 +678,7 @@ class ClassificationFilter:
             acceptable_transcripts: List[Q] = [
                 Q(**{f'{self.c_hgvs_col}__startswith': tran}) for tran in ALISSA_ACCEPTED_TRANSCRIPTS
             ]
-            cms = cms.filter(reduce(__or__, acceptable_transcripts))
+            cms = cms.filter(reduce(operator.or_, acceptable_transcripts))
 
         return cms
 

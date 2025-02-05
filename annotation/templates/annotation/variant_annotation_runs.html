@@ -171,7 +171,7 @@
                 </select>
             {% endlabelled %}
         </div>
-        <table id="annotation-runs-table" data-datatable-url="{% url 'annotation_run_datatable' %}" data-datatable-data='datatableFilter' class="sticky-header"></table>
+        <table id="annotation-runs-table" data-datatable-url="{% url 'annotation_run_datatable' %}" data-datatable-data='datatableFilter' data-adjust-columns="false" class="sticky-header"></table>
     </div>
 
 {% endblock content %}

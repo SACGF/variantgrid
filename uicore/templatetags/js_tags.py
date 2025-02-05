@@ -12,7 +12,7 @@ from django import template
 from django.db.models import TextChoices
 from django.utils.safestring import mark_safe, SafeString
 
-from library.utils import format_significant_digits, JsonDataType
+from library.utils import format_significant_digits, JsonDataType, format_diff_text
 from snpdb.user_settings_manager import UserSettingsManager
 from uicore.json.validated_json import ValidatedJson
 
@@ -78,6 +78,22 @@ def limit_length(text, limit=100):
     return text
 
 
+@register.inclusion_tag("uicore/tags/limit_length_with_tooltip.html")
+def limit_length_with_tooltip(text, limit=100):
+    tooltip = ""
+    if len(text) > limit:
+        tooltip = text
+        text = text[0:(limit-3)] + '...'
+    return {"tooltip": tooltip, "text": text}
+
+
+@register.filter(is_safe=True)
+def format_value_show_invisible(val):
+    if isinstance(val, str):
+        return format_diff_text(val)
+    return format_value(val)
+
+
 @register.filter(is_safe=True)
 def format_value(val, limit=0):
     if val is None:
@@ -95,6 +111,7 @@ def format_value(val, limit=0):
         if val == 0:
             return mark_safe('<span class="no-value">0</span>')
         return mark_safe(f'<span class="number">{val}</span>')
+
     if isinstance(val, SafeString):
         return val
 

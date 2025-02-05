@@ -2276,32 +2276,44 @@ const VCForm = (function() {
 
 VCForm.format_condition = function(condition_json) {
     if (!condition_json) {
-        return $('<span>');
+        return $('<span>', {text: "-", class:'no-value'});
     }
-    if (!condition_json.resolved_terms) {
-        return $('<span>', {class: 'ontology-term', html: {class:'free-text', text: condition_json.display_text}});
+    let dom = $('<span>');
+    let domUsed = false;
+    if (condition_json.resolved_terms) {
+
+        let first = true;
+        for (let term of condition_json.resolved_terms) {
+            domUsed = true;
+            if (!first) {
+                $('<br>').appendTo(dom);
+            }
+            first = false;
+            $('<div>', {
+                class: 'ontology-term',
+                html: [
+                    $('<a>', {
+                        class: 'hover-link',
+                        html: $('<span>', {class: 'term-id', text: term.term_id}),
+                        href: Urls.ontology_term(term.term_id.replace(':', '_'))
+                    }),
+                    " ",
+                    $('<span>', {text: term.name, class: 'term-name'})
+                ]
+            }).appendTo(dom);
+        }
+    }
+    if (condition_json.plain_text_terms) {
+        for (let term of condition_json.plain_text_terms) {
+            domUsed = true;
+            $('<div>', {text: term, class:'ontology-term free-text'}).appendTo(dom);
+        }
     }
 
-    let dom = $('<span>');
-    let first = true;
-    for (let term of condition_json.resolved_terms) {
-        if (!first) {
-            $('<br>').appendTo(dom);
-        }
-        first = false;
-        $('<span>', {
-            class: 'ontology-term',
-            html: [
-            $('<a>', {
-                class: 'hover-link',
-                html: $('<span>', {class: 'term-id', text: term.term_id}),
-                href: Urls.ontology_term(term.term_id.replace(':','_'))
-            }),
-            " ",
-            $('<span>', {text: term.name, class: 'term-name'})
-        ]}).appendTo(dom);
+    if (!domUsed) {
+        return $('<span>', {class: 'ontology-term free-text', text: condition_json.display_text});
     }
-    if (condition_json.resolved_terms.length > 1 && condition_json.resolved_join) {
+    if (condition_json.resolved_terms && condition_json.resolved_terms.length > 1 && condition_json.resolved_join) {
         $('<span>', {class: 'font-italic', text:condition_json.resolved_join === 'C' ? ' Co-occurring' : ' Uncertain'}).appendTo(dom);
     }
     return dom;
@@ -2350,7 +2362,7 @@ VCTable.format_hgvs = (parts) => {
     }
     // also turn into a link
 
-    let outterDom = $('<div>');
+    let outterDom = $('<div>').css("display", "inline-block");
     let dom = $('<div>').appendTo(outterDom);
 
     if (allele) {
@@ -2414,52 +2426,162 @@ VCTable.format_hgvs = (parts) => {
 };
 
 VCTable.hgvs = (data, type, row) => {
-    return VCTable.format_hgvs(data).prop('outerHTML');
+    return VCTable.format_hgvs(data);
 }
 
 VCTable.condition = (data, type, row) => {
-    if (data.resolved_terms) {
-        return VCForm.format_condition(data).prop('outerHTML');
-    } else {
-        return data.display_text;
-    }
+    return VCForm.format_condition(data);
 };
 
-VCTable.somatic_clinical_significance = (data, type, row) => {
-    if (SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE in data) {
-        let scs = data[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE];
-        let dom;
-        if (scs) {
-            let scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
-            let scsLabel = scsKey.prettyValue(scs);
-            dom = $('<span>', {text: scsLabel.val, 'class': `c-pill scs scs-${scs}`});
+VCTable.latest_curation_and_link = (data, type, row) => {
+    let lastCurated = data["curation_date"];
+    if (lastCurated) {
+        let dom = $("<div>")
+        let curatedMoment = convertTimestampToMoment(lastCurated);
+        let timestampStr = curatedMoment.format(JS_DATE_ONLY_FORMAT);
 
-            let highest_level = data["highest_level"];
-            if (highest_level) {
-                dom.append(` <span class="amp-level">${highest_level}</span>`);
-            }
+        // if we do time ago
+        let timeAgoText = jQuery.timeago(curatedMoment.valueOf());
+        let content = $('<time>', {class: 'ago', datetime: curatedMoment.toISOString(), text: timeAgoText, title: timestampStr});
 
-        } else {
-            dom = $('<span>', {class: 'c-pill scs-none no-value', text: 'No Data'});
+        // if we jsut want the date
+        //let content = $('<span>', {class: 'timestamp', text: timestampStr});
+
+        let classificationId = data["classification_id"];
+        if (classificationId) {
+            content = $('<a>', {
+                href: Urls.view_classification(classificationId),
+                class: 'hover-link',
+                html: content
+            });
         }
-        return dom.prop('outerHTML');
+        dom.append(content);
+
+        let dateType = data["date_type"];
+        if (dateType) {
+            dom.append($("<div>", {text: dateType}));
+        }
+
+        return dom;
     } else {
+        return $("<span>", {text:"-", class: "no-value"})
+    }
+}
+
+VCTable.somatic_clinical_significance = (data, type, row) => {
+    let value = null;
+    if (data === null) {
         return "";
+    }
+    if (typeof(data) === "string") {
+        let parts = data.split("|");
+        value = {};
+        value[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE] = parts[0];
+        if (parts.length > 1) {
+            value["amp_level"] = parts[1];
+        }
+    } else {
+        value = data;
+    }
+
+    let scs = value["clinical_significance"];
+    let diff = value["diff"];
+    let diffHtml = "";
+    if (diff) {
+        diffHtml = ' <i class="fa-solid fa-asterisk" title="Multiple values have been recorded - showing latest"></i>';
+    }
+
+    if (scs) {
+        let scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
+        let scsLabel = scsKey.prettyValue(scs);
+        let dom = ($('<span>', {text: scsLabel.val, 'class': `c-pill scs scs-${scs}`}));
+
+        let highest_level = value["amp_level"];
+        if (highest_level) {
+            dom.append(`<span class="amp-level">${highest_level}</span>`);
+        }
+        dom.append(diffHtml);
+        return dom;
+    } else {
+        return $('<div>', {class: 'c-pill scs-none no-value', html: 'No Data' + diffHtml});
     }
 }
 
 VCTable.classification = (data, type, row) => {
-    let dom;
-    let cs = data[SpecialEKeys.CLINICAL_SIGNIFICANCE];
-    let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
-    let label = csKey.prettyValue(cs);
-    let csClass =  `cs-` + (cs || '').toLowerCase()
-    if (cs && cs.length) {
-        dom = $('<span>', {class: `c-pill cs ${csClass}`, text: label.val});
-    } else {
-        dom = $('<span>', {class: 'c-pill cs-none no-value', text: 'No Data'});
+    if (data === null) {
+        return "" // support for dirty groups still processing
     }
-    return dom.prop('outerHTML');
+    let cs = data;
+    let csVal = cs;
+    let diff = 0;
+    let is_pending = false;
+    let old = null;
+    let oldLabel = null;
+    let newValue = null;
+    let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
+
+    if (typeof(cs) !== "string") {
+        csVal = cs["classification"] || cs[SpecialEKeys.CLINICAL_SIGNIFICANCE];
+        newValue = cs["new"]
+        let pending = cs["pending"];
+        if (pending) {
+            old = csVal;
+            csVal = pending;
+            is_pending = true;
+        } else {
+            old = cs["old"];
+        }
+        diff = cs["diff"];
+        if (old) {
+            oldLabel = csKey.prettyValue(old).val;
+        }
+    }
+
+    let label = csKey.prettyValue(csVal).val;
+    let csClass = `cs-` + (csVal || '').toLowerCase()
+    let diffHtml = "";
+    if (diff) {
+        diffHtml = ' <i class="fa-solid fa-asterisk" title="Multiple values have been recorded - showing latest"></i>';
+    }
+    let pendingHtml = "";
+    if (is_pending) {
+        pendingHtml = ' <i class="fa-solid fa-clock" title="Some or all of these classifications have been marked as having pending changes to classification to the value shown"></i>';
+    }
+    let newHtml = "";
+
+    // {% if group.clinical_significance_old %}
+    //         <div><del>{% if group.clinical_significance_old %}{{ group.clinical_significance_old | ekey:"clinical_significance" }}{% else %}No Data{% endif %}</del></div>
+    //     {% endif %}
+    //     {% if group.clinical_significance_pending %}
+    //         <div title="Some or all of these classifications have been marked as having pending changes to classification" data-toggle="tooltip">
+    //             <div>
+    //                 <del>{% if group.clinical_significance %}{{ group.clinical_significance | ekey:"clinical_significance" }}{% else %}No Data{% endif %}</del>
+    //             </div>
+    //             <div class="c-pill cs cs-{{ group.clinical_significance }}">
+    //                 <div class="mb-1">{{ group.clinical_significance_pending | ekey:"clinical_significance" }}</div>
+    //                 <div class="flag flag-classification_pending_changes hover-detail mx-1"></div>
+    //             </div>
+    //         </div>
+    //     {% else %}
+
+    let fullDom = $('<div>');
+    if (old) {
+        fullDom.append($('<div>', {html: $('<del>', {class: 'c-pill cs cs-none no-value', text: oldLabel})}));
+    }
+
+    if (csVal && csVal.length) {
+        fullDom.append($('<span>', {class: `c-pill cs ${csClass}`, html:label + diffHtml + pendingHtml + newHtml}));
+    } else {
+        fullDom.append($('<span>', {class: 'c-pill cs-none no-value', html: 'No Data' + diffHtml + pendingHtml + newHtml}));
+    }
+
+    if (newValue) {
+        let newLabel = csKey.prettyValue(newValue).val;
+        newHtml = `<span class="c-pill cs" title="This is the classification value at the time the discordance was resolved. This record is now ${newLabel}">Updated <i class="fa-solid fa-circle-exclamation"></i></span>`;
+        fullDom.append(newHtml);
+    }
+
+    return fullDom;
 };
 
 VCTable.evidence_key = (key_name, data, type, row) => {
@@ -2471,7 +2593,7 @@ VCTable.evidence_key = (key_name, data, type, row) => {
         span = $('<span>');
         csKey.formatValue(data, span);
     }
-    return span.prop('outerHTML');
+    return span;
 };
 
 VCTable.allele_origin_bucket_label = (allele_origin_bucket, override_text = "", alignment="vertical") => {
@@ -2498,6 +2620,70 @@ VCTable.allele_origin_bucket_label = (allele_origin_bucket, override_text = "", 
     });
 }
 
+VCTable.alleleGroupingIdentifier = (data, type, row) => {
+    let dom = $("div");
+    for (let allele of data.alleles) {
+        dom.append(VCTable.format_hgvs(allele))
+    }
+    return dom;
+}
+
+VCTable.groupIdentifier = (data, type, row) => {
+    let id = data.id;
+    let dirty = data.dirty;
+    let org_name = data.org_name;
+    let lab_name = data.lab_name;
+    let shareLevel = data.share_level;
+    let allele_origin_bucket = data.allele_origin_bucket;
+
+    let alleleOriginDiv = VCTable.allele_origin_bucket_label(allele_origin_bucket);
+
+    let shareInfo = EKeys.shareLevelInfo(shareLevel);
+    let icon = $('<img>', {src: shareInfo.icon, class:'share-icon'});
+
+    let classification_count = data.classification_count;
+
+    let dom = $('<div>', {html: [
+        icon,
+        $('<span>', {text: `${org_name} / ${lab_name}`})
+    ]});
+
+    if (dirty) {
+        dom.append($("<div class='mt-2'><i class=\"fa-solid fa-clock\"></i> Data is currently being updated</div>"))
+    } else if (classification_count === 0) {
+        dom.append("-Invalid Record - no Classifications")
+    } else if (classification_count > 1) {
+        dom.append($('<div>', {class:'text-muted text-small', text: `${classification_count} records`}));
+    }
+
+    // matches
+    if (data.matches) {
+        let searchTerm = data.search;
+        let match_doms = [];
+        let ekeys = EKeys.cachedKeys;
+        for (let [key, value] of Object.entries(data.matches)) {
+            match_doms.push($('<div>', {class: 'search-result', html:[
+                $('<span>', { text: ekeys.key(key).label + ' : '}),
+                    highlightTextAsDom(searchTerm, value)
+                ]
+            }));
+        }
+        dom.append($('<div>', {html: match_doms}));
+    }
+
+    let indicatorClassName = `allele-origin-indicator allele-origin-horizontal allele-origin-${allele_origin_bucket}`;
+    let fullDom = $('<div>', {style: 'margin-left: 5px; margin-top: -10px; display:flex; flex-direction:row', html:[
+        alleleOriginDiv,
+        dom
+    ]});
+
+    if (data.share_level == "lab" || data.share_level == "institution") {
+        fullDom.css({"opacity": 0.5});
+    }
+
+    return fullDom;
+}
+
 VCTable.identifier = (data, type, row) => {
     let id = data.id;
     let org_name = data.org_name;
@@ -2511,15 +2697,18 @@ VCTable.identifier = (data, type, row) => {
     let shareInfo = EKeys.shareLevelInfo(shareLevel);
     let icon = $('<img>', {src: shareInfo.icon, class:'share-icon'});
 
+    let classification_count = data.classification_count;
+
+    let content = [
+        icon,
+        $('<span>', {text: `${org_name} / ${lab_name}`}),
+        '<br/>',
+        limitLengthSpan(lab_record_id, 30)
+    ];
     let link = $('<a>', {
         href: Urls.view_classification(id),
         class: 'hover-link',
-        html: [
-            icon,
-            $('<span>', {text: `${org_name} / ${lab_name}`}),
-            '<br/>',
-            limitLengthSpan(lab_record_id, 30)
-        ]
+        html: content
     });
 
     let dom;
@@ -2535,15 +2724,18 @@ VCTable.identifier = (data, type, row) => {
             }));
         }
         dom = $('<div>', {html: match_doms});
-    } else {
+    } else if (link) {
         dom = link;
+    } else {
+        dom = $('<div>', {html: content})
     }
+
     let indicatorClassName = `allele-origin-indicator allele-origin-horizontal allele-origin-${allele_origin_bucket}`;
     let fullDom = $('<div>', {style: 'display:flex; flex-direction:row', html:[
         alleleOriginDiv,
         dom
     ]});
-    return fullDom.prop('outerHTML');
+    return fullDom;
 };
 
 VCTable.sample = (sample_name, type, row) => {
@@ -2558,5 +2750,6 @@ VCTable.sample = (sample_name, type, row) => {
         });
         dom = link;
     }
-    return dom.prop('outerHTML');
+    return dom;
 };
+

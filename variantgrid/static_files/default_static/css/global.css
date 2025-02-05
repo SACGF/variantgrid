@@ -1008,12 +1008,25 @@ div.dataTables_wrapper div.dataTables_filter label {
 .admin-only,
 li.admin a,
 h3.admin {
+  /*
   background-image: url("/static/icons/admin.svg");
   min-height: 16px;
   background-size: 16px 16px;
   background-position: 8px 50%;
   background-repeat: no-repeat;
   padding-left: 28px !important;
+   */
+}
+.admin-only:before,
+li.admin a:before,
+h3.admin:before {
+  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-size: 0.98rem;
+  content: "\f084";
+  right: 1rem;
+  top: .5rem;
+  color: #555;
+  margin-right: 4px;
 }
 
 .box {
@@ -1124,6 +1137,11 @@ select[disabled] {
 
 .comma-sep + .comma-sep:before {
   content: ", ";
+}
+
+.pipe-sep + .pipe-sep:before {
+  content: "| ";
+  color: #888;
 }
 
 .error-value {
@@ -2549,6 +2567,11 @@ a .c-hgvs-body .c-hgvs-nomen {
   color: #444488 !important;
 }
 
+#vc-datatable .dt-c_hgvs .c-hgvs-body .colon::after {
+  content: "\a";
+  white-space: pre;
+}
+
 .c-hgvs-body .bracket {
   margin-left: 2pt;
   margin-right: 2pt;
@@ -2592,10 +2615,6 @@ a .c-hgvs-body .c-hgvs-nomen {
   opacity: 0.4;
 }
 
-.dt-classification, .dt-somatic_clinical_significance {
-  width: 135px;
-}
-
 .c-pill {
   font-weight: bold;
   display: inline-block;
@@ -2631,6 +2650,9 @@ a .c-hgvs-body .c-hgvs-nomen {
 }
 .c-pill.cs-lb {
   background-color: #ddddff;
+}
+.c-pill.cs-r, .c-pill cs-dr {
+  background-color: #eeeeee;
 }
 .c-pill.cs-vus, .c-pill.cs-vus_a, .c-pill.cs-vus_b, .c-pill.cs-vus_c {
   background-color: #dddddd;
@@ -2672,10 +2694,11 @@ a .c-hgvs-body .c-hgvs-nomen {
   font-weight: bold;
 }
 .ontology-term .term-name {
-  color: #666;
-}
-.ontology-term .free-text {
   color: #444;
+}
+.ontology-term.free-text {
+  font-style: italic;
+  color: #666;
 }
 
 .screenshot-mode time.ago {

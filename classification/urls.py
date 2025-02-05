@@ -5,11 +5,13 @@ from classification.views import clinvar_export_view, search_view_metrics
 from classification.views import views, classification_dashboard_view, \
     classification_export_view, views_autocomplete, \
     classification_accumulation_graph
+from classification.views.allele_grouping_datatables import AlleleGroupingColumns
 from classification.views.classification_dashboard_view import issues_download
 from classification.views.classification_datatables import ClassificationColumns
 from classification.views.classification_email_view import summary_email_preview_html, \
     summary_email_preview_text
 from classification.views.classification_export_view import ClassificationApiExportView
+from classification.views.classification_grouping_datatables import ClassificationGroupingColumns
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context, view_overlaps_detail
 from classification.views.classification_overlaps_vus_view import view_overlaps_vus, view_overlaps_vus_detail
@@ -46,6 +48,13 @@ urlpatterns = [
     path('activity/user/<int:user_id>', views.activity, name='activity_user'),
     path('activity/report/<int:discordance_report_id>', views.activity, name='activity_discordance'),
     path('classifications', views.classifications, name='classifications'),
+
+    path('groupings', views.classification_groupings, name='classification_groupings'),
+    path('groupings/<classification_grouping_id>', views.view_classification_grouping_detail, name='classification_grouping_detail'),
+    path('allele_groupings', views.allele_groupings, name='allele_groupings'),
+    path('allele_groupings/<str:lab_id>', views.allele_groupings, name='allele_groupings_lab'),
+    path('allele_grouping/<allele_grouping_id>', views.view_allele_grouping_detail, name='allele_grouping_detail'),
+
     path('create_for_variant/<int:variant_id>/<genome_build_name>', views.CreateClassificationForVariantView.as_view(),
          name='create_classification_for_variant'),
 
@@ -195,6 +204,8 @@ rest_urlpatterns = [
 
     path('api/classifications/export', ClassificationApiExportView.as_view(), name='classification_export_api'),
     path('api/classifications/datatables/', DatabaseTableView.as_view(column_class=ClassificationColumns), name='classification_datatables'),
+    path('api/classification/groups/datatables/', DatabaseTableView.as_view(column_class=ClassificationGroupingColumns), name='classification_grouping_datatables'),
+    path('api/classification/allele_groups/datatables/<str:lab_id>', DatabaseTableView.as_view(column_class=AlleleGroupingColumns), name='allele_grouping_datatables'),
 
     path('api/classifications/gene_counts/<lab_id>', LabGeneClassificationCountsView.as_view(),
          name='lab_gene_classification_counts_api'),

@@ -17,6 +17,10 @@
     function reopenWarning() {
         return window.confirm("This will re-open this Discordance, with the intent of having the involved labs re-discuss and come to a consensus. Are you sure you wish to re-open?");
     }
+
+    function classificationGroupingFilterExtra(data) {
+        data.discordance_report = {{ data.report.id }};
+    }
 </script>
 {% endblock %}
 {% block content %}
@@ -116,6 +120,18 @@
                     {% url 'discordance_export' data.report.id as download_link %}
                     {% url 'activity_discordance' discordance_report_id=report.id as history_link %}
 
+                    {% comment %}
+                    <div data-toolbar="#vc-datatable" class="data-toolbar" style="display:flex">
+                        <span class="pipe-sep">
+                            <a class="hover-link" href="{% url 'classification_diff' %}?discordance_report={{ data.report.id }}">
+                                show diffs
+                            </a>
+                        </span>
+                    </div>
+                    {% classification_groupings show_allele_origin_filter=False %}
+                    {% endcomment %}
+
+                    {% comment %}THE LAST USE OF CLASSIFICATION GROUPS{% endcomment %}
                     {% classification_groups data.effective_classifications group_utils=data.group_utils title="Classifications Records Considered" download_link=download_link history_link=history_link context_object=data.report default_sort='clinical_significance' allele_origin_filter_enabled=False %}
 
                     {% for nlc in data.no_longer_considered %}

@@ -1,6 +1,6 @@
 import re
 from enum import Enum
-from re import RegexFlag
+from re import RegexFlag, Pattern
 from typing import Union, Match, Optional
 
 from annotation.models.models_citations import CitationIdNormalized
@@ -25,7 +25,8 @@ class DbRefRegex:
                  link: str,
                  match_type: MatchType = MatchType.NUMERIC,
                  min_length: int = 3,
-                 expected_length: Optional[int] = None):
+                 expected_length: Optional[int] = None,
+                 id_regex_confirm: Optional[re.Pattern] = None):
         """
         Creates an instance of a external id/link detection and automatically registers it with the complete collection.
         The end result allowing us to scan text for any number of kinds of links.
@@ -44,6 +45,7 @@ class DbRefRegex:
         self.min_length = min_length or 1
         self.expected_length = expected_length
         self._all_db_ref_regexes.append(self)
+        self.id_regex_confirm = id_regex_confirm
 
     def link_for(self, idx: int) -> str:
         id_str = self.fix_id(str(idx))
@@ -77,7 +79,7 @@ class DbRegexes:
     # smallest OMIM starts with a 1, so there's no 0 padding there, expect min length
     OMIM = DbRefRegex(db="OMIM", prefixes=["OMIM", "MIM"], link=OntologyService.URLS[OntologyService.OMIM], min_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM])
     ORPHA = DbRefRegex(db="ORPHA", prefixes=["ORPHANET", "ORPHA"], link=OntologyService.URLS[OntologyService.ORPHANET], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.ORPHANET])
-    PUBMED_CENTRAL = DbRefRegex(db="PMCID", prefixes=["PMCID", "PubMedCentral", "PMC"], link="https://www.ncbi.nlm.nih.gov/pmc/articles/${1}", match_type=MatchType.OPT_ALPHA_MAN_NUMERIC)
+    PUBMED_CENTRAL = DbRefRegex(db="PMCID", prefixes=["PMCID", "PubMedCentral", "PMC"], link="https://www.ncbi.nlm.nih.gov/pmc/articles/${1}", match_type=MatchType.OPT_ALPHA_MAN_NUMERIC, id_regex_confirm=re.compile("(PMC)?[0-9]+"))
     PUBMED = DbRefRegex(db="PMID", prefixes=["PubMed", "PMID"], link="https://www.ncbi.nlm.nih.gov/pubmed/${1}")
     SNP = DbRefRegex(db="SNP", prefixes="rs", link="https://www.ncbi.nlm.nih.gov/snp/${1}", match_type=MatchType.SIMPLE_NUMBERS)
     SNOMEDCT = DbRefRegex(db="SNOMED-CT", prefixes=["SNOMED-CT", "SNOMEDCT"], link="https://snomedbrowser.com/Codes/Details/${1}")
@@ -199,6 +201,11 @@ class DbRefRegexes:
             if not match:
                 return False
             id_group = match.group(1)
+
+            if confirm_pattern := db_regex.id_regex_confirm:
+                if not confirm_pattern.match(id_group):
+                    return False
+
             if len(id_group) < db_regex.min_length:
                 return False
             if must_end_in_number and not id_group[-1].isnumeric():

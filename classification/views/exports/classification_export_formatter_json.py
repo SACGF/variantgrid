@@ -1,37 +1,75 @@
 import json
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional
 
+from django.conf import settings
 from django.http import HttpRequest
 
-from classification.models import ClassificationJsonParams, ClassificationModification
+from classification.models import ClassificationJsonParams, ClassificationModification, EvidenceKeyMap
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData, \
     DiscordanceReportStatus
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
 
 
+@dataclass(frozen=True)
+class FormatDetailsJSON:
+    # format evidence keys to nice human labels or leave as raw codes easier handled by code
+    full_detail: bool = False
+    inject_source_url: bool = False
+    populate_literature_with_citations: bool = False
+
+    @staticmethod
+    def from_request(request: HttpRequest) -> 'FormatDetailsCSV':
+        force_full_detail = request.query_params.get('full_detail') == 'true' and request.user.is_superuser
+        full_detail = settings.CLASSIFICATION_DOWNLOADABLE_NOTES_AND_EXPLAINS or force_full_detail
+        populate_literature_with_citations = settings.CLASSIFICATION_DOWNLOADABLE_JSON_LITERATURE_CITATIONS and not force_full_detail
+        inject_source_url = request.query_params.get('inject_source_url') != 'false'
+
+        return FormatDetailsJSON(
+            full_detail=full_detail,
+            inject_source_url=inject_source_url,
+            populate_literature_with_citations=populate_literature_with_citations
+        )
+
+
 @register_classification_exporter("json")
 class ClassificationExportFormatterJSON(ClassificationExportFormatter):
 
-    def __init__(self, classification_filter: ClassificationFilter):
+    def __init__(self, classification_filter: ClassificationFilter, format_details: FormatDetailsJSON):
+        self.e_keys = EvidenceKeyMap.cached()
+        self.format_details = format_details
         super().__init__(classification_filter=classification_filter)
 
     @classmethod
     def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterJSON':
         return ClassificationExportFormatterJSON(
-            classification_filter=ClassificationFilter.from_request(request)
+            classification_filter=ClassificationFilter.from_request(request),
+            format_details=FormatDetailsJSON.from_request(request)
         )
 
     @cached_property
     def json_params(self) -> ClassificationJsonParams:
+        include_data: tuple[bool, set[str]]
+        populate_literature_with_citations = False
+        if self.format_details.full_detail:
+            include_data = True
+        else:
+            include_data = [e_key.key for e_key in self.e_keys.all_keys if e_key.is_vital_key]
+            populate_literature_with_citations = settings.CLASSIFICATION_DOWNLOADABLE_JSON_LITERATURE_CITATIONS
+
         return ClassificationJsonParams(current_user=self.classification_filter.user,
-                                        include_data=True,
                                         api_version=2,
                                         strip_complicated=True,
+                                        strip_notes_and_explains=not self.format_details.full_detail,
                                         include_messages=False,
+                                        include_data=include_data,
+                                        #include_data = True,
                                         # FIXME don't want this to be the default
-                                        remove_acmg_namespace=True)
+                                        remove_acmg_namespace=True,
+                                        inject_source_url=self.format_details.inject_source_url,
+                                        populate_literature_with_citations=populate_literature_with_citations)
 
     @property
     def delimiter_for_row(self):

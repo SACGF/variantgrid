@@ -1193,12 +1193,25 @@ div.dataTables_wrapper div.dataTables_filter label {
 .admin-only,
 li.admin a,
 h3.admin {
+	// f084
+	&:before {
+		font-family: 'Font Awesome 6 Free', 'FontAwesome';
+		font-size: 0.98rem;
+		content: "\f084";
+		//position: absolute;
+		right: 1rem;
+		top: .5rem;
+		color: #555;
+		margin-right: 4px;
+	}
+	/*
 	background-image: url("/static/icons/admin.svg");
 	min-height: 16px;
 	background-size: 16px 16px;
 	background-position: 8px 50%;
 	background-repeat: no-repeat;
 	padding-left: 28px !important;
+	 */
 }
 
 .box {
@@ -1314,6 +1327,11 @@ select[disabled] {
 
 .comma-sep+.comma-sep:before {
 	content: ", ";
+}
+
+.pipe-sep+.pipe-sep:before {
+	content: "| ";
+	color: #888;
 }
 
 .error-value {
@@ -2927,6 +2945,17 @@ a .c-hgvs-body {
 	}
 }
 
+#vc-datatable {
+	.dt-c_hgvs {
+		.c-hgvs-body {
+			.colon::after {
+				content: "\a";
+				white-space: pre;
+			}
+		}
+	}
+}
+
 .c-hgvs-body {
 	.bracket {
 		margin-left: 2pt;
@@ -2976,10 +3005,6 @@ a .c-hgvs-body {
 .share-level-LAB,
 .share-level-INSTITUTION {
 	opacity: 0.4;
-}
-
-.dt-classification, .dt-somatic_clinical_significance {
-	width: 135px;
 }
 
 .c-pill {
@@ -3032,6 +3057,10 @@ a .c-hgvs-body {
 
 	&.cs-lb {
 		background-color: #ddddff;
+	}
+
+	&.cs-r, cs-dr {
+		background-color: #eeeeee;
 	}
 
 	&.cs-vus,
@@ -3094,10 +3123,11 @@ a .c-hgvs-body {
 		font-weight: bold;
 	}
 	.term-name {
-		color: #666;
+		color: #444;
 	}
-	.free-text {
-		color: #444;  // when the "ontology term" is just free text
+	&.free-text {
+		font-style: italic;
+		color: #666;  // when the "ontology term" is just free text
 	}
 }
 

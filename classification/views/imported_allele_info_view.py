@@ -91,7 +91,8 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
             RichColumn(
                 key='pk',
                 orderable=True,
-                default_sort=SortOrder.DESC
+                default_sort=SortOrder.DESC,
+                order_sequence=[SortOrder.DESC, SortOrder.ASC]
             ),
             RichColumn(
                 key='imported_genome_build_patch_version',
@@ -122,13 +123,6 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 renderer=ImportedAlleleInfoColumns.render_c_hgvs,
                 client_renderer='VCTable.hgvs'
             ),
-            # RichColumn(
-            #     key='allele',
-            #     label='Allele',
-            #     orderable=True,
-            #     renderer=ImportedAlleleInfoColumns.render_allele,
-            #     client_renderer='TableFormat.linkUrl'
-            # ),
             RichColumn(
                 key='latest_validation__include',
                 label="Include",
@@ -140,7 +134,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
             RichColumn(
                 key='classification_count',
                 label="<span style=\"font-size:10px\">Classification<br/>Record Count</span>",
-                orderable=True
+                order_sequence=[SortOrder.DESC, SortOrder.ASC]
             ),
             RichColumn('id', visible=False)  # just used for the expand
         ]
@@ -199,7 +193,8 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
 
 @require_superuser
 def view_imported_allele_info(request: HttpRequest) -> Response:
-    return render(request, "classification/imported_allele_info.html", {})
+    status = request.GET.get("status")
+    return render(request, "classification/imported_allele_info.html", {"status": status})
 
 
 def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):

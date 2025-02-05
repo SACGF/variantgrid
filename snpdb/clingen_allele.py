@@ -472,14 +472,13 @@ def get_clingen_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
 
 
 def get_clingen_allele(code: str, clingen_api: ClinGenAlleleRegistryAPI = None) -> ClinGenAllele:
-    """ Retrieves from DB or calls API then caches in DB   """
-    if clingen_api is None:
-        clingen_api = ClinGenAlleleRegistryAPI()
-
     clingen_allele_id = ClinGenAllele.get_id_from_code(code)
     try:
         clingen_allele = ClinGenAllele.objects.get(pk=clingen_allele_id)
     except ClinGenAllele.DoesNotExist:
+        """ Retrieves from DB or calls API then caches in DB   """
+        if clingen_api is None:
+            clingen_api = ClinGenAlleleRegistryAPI()
         api_response = clingen_api.get_code(code)
         clingen_api.check_api_response(api_response)
         clingen_allele, _ = thread_safe_unique_together_get_or_create(ClinGenAllele, pk=clingen_allele_id,

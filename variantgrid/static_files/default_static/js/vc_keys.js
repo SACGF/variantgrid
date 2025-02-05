@@ -233,7 +233,7 @@ let EKey = (function() {
     
 })();
 
-EKey.HTML_WHITE_LIST = new Set(['BR','B','I','OL','UL','LI','U','SUP','SUB', 'SPAN', 'DIV']);
+EKey.HTML_WHITE_LIST = new Set(['BR','B','I','OL','UL','LI','U','SUP','SUB','SPAN','DIV','P','STRONG','EM']);
 
 // UNSPECIFIED STRENGTH HANDLING
 EKey.critValues = {

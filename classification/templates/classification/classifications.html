@@ -3,6 +3,7 @@
 {% load static %}
 {% load js_tags %}
 {% load compress %}
+{% load ui_utils %}
 {% load ui_help %}
 {% load ui_menu_bars %}
 {% load settings_tags %}
@@ -109,33 +110,21 @@
         return labVal;
     }
 
-    function classificationFilter(data, type) {
+    function classificationGroupingFilter(data, type) {
         data.gene_symbol = blankToNull($('#id_gene_symbol').val());
         data.lab = blankToNull(getLabValue());
-        data.user = blankToNull($('#id_user').val());
-
-        let flags = [];
-        $('input[flagtypeid]').each((index, dom) => {
-            let input = $(dom);
-            let isChecked = input.is(":checked");
-            if (isChecked) {
-                flags.push(input.attr("flagTypeId"));
-            }
-        });
-        if (flags.length) {
-            data.flags = JSON.stringify(flags);
-        }
-        let allele_origin_filter_value = $("input[name='allele-origin-toggle']:checked").val();
-        data.allele_origin = blankToNull(allele_origin_filter_value);
+        let allele_origin_filter_value = blankToNull($("input[name='allele-origin-toggle']:checked").val());
+        data.allele_origin = blankToNull($("input[name='allele-origin-toggle']:checked").val());
         data.id_filter = blankToNull($('#id_filter').val());
-
+        data.user = blankToNull($('#id_user').val());
         let column = $('#vc-datatable').DataTable().column(3);
         let germline_only = allele_origin_filter_value == "G";
         column.visible(!germline_only);
     }
+
     function downloadAs(mode) {
         let data = {};
-        classificationFilter(data);
+        classificationGroupingFilter(data);
         let querystring = EncodeQueryData(data, true);
 		let url = null;
 		if (mode === 'redcap') {
@@ -156,11 +145,6 @@
 
         $('#id_filter').keyup(function() {
             debouncedFilterGrid();
-        });
-
-        let vcDatatable = $('#vc-datatable');
-        vcDatatable.on('draw.dt', () => {
-            Flags.instance.init({userId: '{{user.id}}'});
         });
     });
 </script>
@@ -192,6 +176,16 @@
                     </p>
                 {% endif %}
                 <p>
+                This is the grouped view, where records for the same Lab, Allele Origin and Allele will be grouped into 1 record. This is useful so that labs which provide multiple classifications
+                for the same allele aren't over represented compared to labs that alter a single classification.
+                </p>
+                <p>
+                Click on the last curated date to go to the most up to date record for the group.<br/>
+                Click on the HGVS value to go to the allele.<br/>
+                Click anywhere else on the row to see the gene symbol, zygosities and individual classifications.
+                </p>
+
+                <p>
                 Export the grid below by clicking the CSV {% if CLASSIFICATION_REDCAP_EXPORT %} or REDCap {% endif %}buttons on the bottom left of the grid.<br/>
                 The export will be using your default genome build.<br/>
                 </p>
@@ -203,7 +197,23 @@
                 {% endif %}
             {% end_page_help_embedded %}
         </div>
-        <div class="container-table">
+        <div class="container">
+            {% if user.is_superuser %}
+                {% if iai_processing.iai_processing_count or iai_processing.iai_failed_last_week_count %}
+                    <div class="admin-only display-flex my-2">
+                        {% if iai_processing %}
+                            {% if iai_processing.iai_processing_count %}
+                                <div class="mx-2"><i class="fa-solid fa-hourglass"></i> <a class="hover-link" href="{% url 'view_imported_allele_info' %}?status=in_progress">Alleles in Processing</a>: {{ iai_processing.iai_processing_count | number }}
+                                    <span class="text-secondary">{% if iai_processing.iai_processing_recent %}Most recent: {% timestamp iai_processing.iai_processing_recent time_ago=True %}</span>{% endif %}
+                                </div>
+                            {% endif %}
+                            {% if iai_processing.iai_failed_last_week_count %}
+                                <div class="mx-2"><i class="fa-solid fa-circle-exclamation"></i> <a class="hover-link" href="{% url 'view_imported_allele_info' %}?status=failure">Alleles Failed this Week</a>: {{ iai_processing.iai_failed_last_week_count | number }}</div>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                {% endif %}
+            {% endif %}
             <div class="row filter-row">
                 <div class="col-md-4 col-lg-2">
                     <br/>
@@ -211,13 +221,13 @@
                 </div>
                 <div class="col-md-4 col-lg-2">
                     {% if user_settings.default_lab %}
-                    <a class="hover-link" onclick="filterDefaultLab()">Filter : {{ user_settings.default_lab.name }}</a>
+                    <a class="hover-link" onclick="filterDefaultLab()" title="{{ user_settings.default_lab.name }}">Filter : My Lab</a>
                     {% else %}<span style="visibility: hidden">.</span>{% endif %}
                     {% crispy lab_form form_helper.horizontal_no_labels %}
                 </div>
                 {% if CLASSIFICATION_GRID_SHOW_USERNAME %}
                 <div class="col-md-4 col-lg-2">
-                    <a class="hover-link" onclick="filterDefaultUser()">Filter : My Classification Records</a>
+                    <a class="hover-link" onclick="filterDefaultUser()">Filter : My Records</a>
                     {% crispy user_form form_helper.horizontal_no_labels %}
                 </div>
                 {% endif %}
@@ -230,9 +240,14 @@
                 {% if CLASSIFICATION_ID_FILTER %}
                 <div class="col-md-4 col-lg-2">
                     <br/>
-                    <input type="text" id="id_filter" placeholder="IDs filter" class="form-control" title="Filters on various ID evidence fields" />
+                    <input style="position:relative; bottom:4px" type="text" id="id_filter" placeholder="IDs filter" class="form-control" title="Filters on various ID evidence fields" />
                 </div>
                 {% endif %}
+
+                <div class="col-md-2 mt-2">
+                    <a class="hover-link font-italic" href="?legacy=true">Switch to single record mode</a>
+                </div>
+                {% comment %}
                 <div class="col-md-4 col-lg-2">
                     <br/>
                     <div id='show-flag-filter-container' style="display:flex">
@@ -249,19 +264,18 @@
                         <div class="clear"></div>
                     </div>
                 </div>
+                {% endcomment %}
             </div>
-            <div class="row">
-                <div class="col">
-                    <table id="vc-datatable" data-datatable-url="{% url 'classification_datatables' %}" data-datatable-data='classificationFilter' class="sticky-header classification-table"></table>
-                    <div>
-                    Download as
-                        <a class='hover-link download-link' href="javascript:downloadAs('csv')">CSV</a>
-                        {% if CLASSIFICATION_REDCAP_EXPORT %},
-                        <a class='hover-link download-link' href="javascript:downloadAs('redcap')">REDCap</a>
-                        {% endif %}
-                    </div>
-                </div>
+
+            <table id="vc-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table" data-adjust-columns="false"></table>
+            <div>
+            Download as
+                <a class='hover-link download-link' onclick="downloadAs('csv')">CSV</a>
+                {% if CLASSIFICATION_REDCAP_EXPORT %},
+                <a class='hover-link download-link' onclick="downloadAs('redcap')">REDCap</a>
+                {% endif %}
             </div>
+
         </div>
     </div>
 {% endblock %}

@@ -129,32 +129,33 @@ const Diff = (function() {
             let modalContent = createModalShell('configureColumnsModal', 'Choose which columns to compare');
             let content = modalContent.find('.modal-body');
 
-            let compareBox = $('<table>').appendTo(content);
+            let compareBox = $('<div>').appendTo(content);
             this.versions.forEach((v, index) => {
-                let tr = $('<tr>').appendTo(compareBox);
-                let ctd = $('<td>').appendTo(tr);
                 let uniqueId = `${v.id}`;
                 if (v.version) {
                     uniqueId += `.${v.version}`;
                 }
                 
-                let checkbox = $('<input>', {type:'checkbox', id:`ch-${uniqueId}`, change:event => {
+                let checkbox = $('<input>', {type:'checkbox', class:"form-check-input", id:`ch-${uniqueId}`, click:event => {
                     let checked = $(event.target).prop('checked');
                     this.excluded[uniqueId] = !checked;
                     this.render();
-                    
-                }}).appendTo(ctd);
+                }});
                 if (!this.excluded[uniqueId]) {
                     checkbox.prop('checked', true);
                 }
-                
-                let ltd = $('<td>').appendTo(tr);
-                let label = $('<label>', {for: `ch-${uniqueId}`, text: `${v.org_name} / ${v.lab_name} / ${v.cr_lab_id}`}).appendTo(ltd);
-            });
-            modalContent.on('');
-            modalContent.modal({
+                let label = $('<label>', {class:'form', for:`ch-${uniqueId}`,  text: `${v.org_name} / ${v.lab_name} / ${v.cr_lab_id}`});
 
+                compareBox.append($('<div>', {
+                    class: 'form-group form-check',
+                    html: [checkbox, label]
+                }))
             });
+            modalContent.on('hidden.bs.modal', function() {
+                modalContent.modal('dispose');
+                modalContent.remove();
+            });
+            modalContent.modal('show');
         },
                
         dbRefCompare(versionDbRefs, source) {
@@ -210,27 +211,31 @@ const Diff = (function() {
                 dbRefCompared.forEach(dbRefC => {
                     let dbRef = dbRefC.dbRef;
                     let whoHas = dbRefC.whoHas;
-                    let rowClass = dbRef.label ? 'option-row' : 'citation-row';
+
+                    let rowClass;
+                    let icon;
+                    let heading;
+                    if (dbRef.label) {
+                        rowClass = 'option-row';
+                        heading = dbRef.label;
+                    } else {
+                        rowClass = 'citation-row';
+                        heading = CitationsManager.defaultManager.citationDomFor(dbRef, true)
+                    }
+
                     let row = $('<tr>', {class: `${rowClass}`}).appendTo(tbody);
 
-                    let icon;
                     if (!dbRefC.everyoneHas) {
                         row.addClass('blanks');
                         icon = $('<i class="fas fa-not-equal" style="color:#b88"></i>');
                     } else {
                         icon = $('<i class="fas fa-check-square" style="color:#6d6"></i>');
                     }
-                    // let effectiveId = Citations.effectiveId(dbRef);
-                    // let isDetailed = !!effectiveId;
-                    let th;
-                    // if (dbRef.label) {
-                    //     th = $('<th>', {html: [icon, dbRef.label]}).appendTo(row);
-                    // } else {
-                    // th = $('<th>', {class: isDetailed ? `citation-row` : `simple-citation`, html: [icon, CitationsManager.citationDomFor(dbRef, true)]}).appendTo(row);
-                    th = $('<th>', {class: `citation-row`, html: [icon, CitationsManager.defaultManager.citationDomFor(dbRef, true)]}).appendTo(row);
-                    //}
+
+                    let th = $('<th>', {html: [icon, heading]}).appendTo(row);
+
                     let hasCount = 0;
-                    let hasnotCount = 0;
+                    let hasNotCount = 0;
                     includedVersions.filter(v => this.isIncluded(v)).forEach((v, index) => {
                         let uniqueId = `${v.id}`;
                         if (v.version) {
@@ -249,7 +254,7 @@ const Diff = (function() {
                             }).appendTo(row);
                            //$('<td>', {text: 'included', class: primeInclusion ? '' : 'addition'}).appendTo(row);
                        } else {
-                            hasnotCount++;
+                            hasNotCount++;
                             $('<td>', {html: '<i class="far fa-square" style="opacity:0.2""></i>'}).appendTo(row);
                         }
                     });
@@ -259,9 +264,9 @@ const Diff = (function() {
                         let verb = hasCount === 1 ? 'record has this' : 'records have this';
                         tooltip.push(`${hasCount} <span style="color:#444;font-size:smaller">x</span> ${verb} ${referenceType}`);
                     }
-                    if (hasnotCount) {
-                        let verb = hasnotCount === 1 ? 'record does not have this' : 'records do not have this';
-                        tooltip.push(`${hasnotCount} <span style="color:#444;font-size:smaller">x</span> ${verb} ${referenceType}`);
+                    if (hasNotCount) {
+                        let verb = hasNotCount === 1 ? 'record does not have this' : 'records do not have this';
+                        tooltip.push(`${hasNotCount} <span style="color:#444;font-size:smaller">x</span> ${verb} ${referenceType}`);
                     }
                     th.attr('title', dbRef.label || dbRef.id);
                     th.attr('data-content', tooltip.join('<br>'));
@@ -355,7 +360,7 @@ const Diff = (function() {
             });
 
             let rowLabRecordId = $('<tr>', {class: 'group no-compare'}).appendTo(table);
-            $('<th>', {text: "Lab Id", style: 'font-weight:normal'}).appendTo(rowLabRecordId);
+            $('<th>', {text: "Lab ID", style: 'font-weight:normal'}).appendTo(rowLabRecordId);
             includedVersions.forEach(v => {
                 $('<td>', {text: v.lab_record_id}).appendTo(rowLabRecordId);
             });
@@ -408,7 +413,7 @@ const Diff = (function() {
                         let blankValues = {};
                         let hasBlank = 0;
                         let hasMultiValues = false;
-                        let isCriteria = show === 'value' && eKey.value_type === 'C' && eKey.namespace() === null;
+                        let isCriteria = show === 'value' && eKey.value_type === 'C' && eKey.namespace() === 'acmg';
                         if (eKey.value_type === 'T') {
                             row.addClass('textarea');
                         }

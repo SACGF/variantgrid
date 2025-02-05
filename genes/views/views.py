@@ -21,7 +21,6 @@ from annotation.models import Citation
 from annotation.models.models import AnnotationVersion, DBNSFPGeneAnnotationVersion, DBNSFPGeneAnnotation
 from classification.models import ClassificationModification
 from classification.models.classification_utils import classification_gene_symbol_filter
-from classification.views.classification_datatables import ClassificationColumns
 from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
@@ -40,6 +39,7 @@ from library.django_utils import get_field_counts, add_save_message
 from library.utils import defaultdict_to_dict, LazyAttribute
 from ontology.models import OntologySnake, OntologyService, OntologyTerm
 from seqauto.models import EnrichmentKit
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import VariantZygosityCountCollection, Sample, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
@@ -351,7 +351,7 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
 
     view_info = GeneSymbolViewInfo(
         gene_symbol=get_object_or_404(GeneSymbol, pk=gene_symbol),
-        desired_genome_build=UserSettings.get_genome_build_or_default(request.user, genome_build_name),
+        desired_genome_build=GenomeBuildManager.get_current_genome_build(),
         user=request.user)
 
     for warning in view_info.warnings():
@@ -384,7 +384,6 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
     )
     context["show_wiki"] = settings.VIEW_GENE_WIKI
     context["show_annotation"] = settings.VARIANT_DETAILS_SHOW_ANNOTATION
-    context["datatable_config"] = ClassificationColumns(request)
 
     return render(request, "genes/view_gene_symbol.html", context)
 
