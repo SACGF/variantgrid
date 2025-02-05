@@ -2242,6 +2242,15 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             display_text=self.get(SpecialEKeys.CONDITION)
         )
 
+    @cached_property
+    def condition_resolution_obj_fallback(self) -> ConditionResolved:
+        # Would rather replace condition_resolution_obj with this
+        # but don't know if that would break anything
+        if cr_obj := self.classification.condition_resolution_obj:
+            return cr_obj
+        else:
+            return ConditionResolved(terms=[], plain_text=self.get(SpecialEKeys.CONDITION))
+
     @staticmethod
     def column_name_for_build(genome_build: GenomeBuild, suffix: str = 'c_hgvs'):
         return ImportedAlleleInfo.column_name_for_build(genome_build, "classification__allele_info", suffix)

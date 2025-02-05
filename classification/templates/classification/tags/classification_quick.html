@@ -26,7 +26,7 @@
                 </span>
             </a>
             {% if show_condition %}
-                - <span style="opacity:0.75">{% condition vcm.classification.condition_resolution_obj limit=50 no_condition_message=True %}</span>
+                - <span style="opacity:0.75">{% condition vcm.condition_resolution_obj_fallback limit=50 no_condition_message=True %}</span>
             {% endif %}
             : {% timestamp vcm.curated_date time_ago=True %}
     {% endif %}
