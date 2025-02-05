@@ -22,9 +22,9 @@ def _ekey_allele_origin_germline_somatic_only(apps, _schema_editor):
     option_updator.set_attributes("VUS_B", sort_order=7)
     option_updator.set_attributes("VUS_A", sort_order=8)
     option_updator.set_attributes("LO", sort_order=9)
-    option_updator.set_attributes("LP", sort_order=10)
-    option_updator.set_attributes("O", sort_order=11)
-    option_updator.set_attributes("P", sort_order=12)
+    option_updator.set_attributes("LP", sort_order=9)
+    option_updator.set_attributes("O", sort_order=10)
+    option_updator.set_attributes("P", sort_order=10)
     option_updator.save()
 
 
