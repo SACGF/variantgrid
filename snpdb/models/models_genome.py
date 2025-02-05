@@ -11,6 +11,7 @@ from django.db.models import QuerySet
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
 from django.urls import reverse
+from django.utils.text import slugify
 
 from genes.models_enums import AnnotationConsortium
 from library.cache import timed_cache
@@ -37,6 +38,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
     name = models.TextField(primary_key=True)
     accession = models.TextField(null=True, blank=True)
     alias = models.TextField(null=True, unique=True, blank=True)
+    slug = models.TextField(null=True, unique=True, blank=True)  # We need to slugify T2T-CHMv2.0
     enabled = models.BooleanField(default=True, blank=True)
     igv_genome = models.TextField(null=True, blank=True)
 
@@ -81,16 +83,17 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
     @timed_cache(ttl=60)
     def get_name_or_alias(build_name) -> 'GenomeBuild':
         """ Get by insensitive name or alias """
-
         q_or_list = [
             Q(name__iexact=build_name),
-            Q(alias__iexact=build_name)
+            Q(alias__iexact=build_name),
+            Q(slug=slugify(build_name)),
         ]
         try:
             build_no_patch = GenomeBuildPatchVersion.get_build_no_patch(build_name)
             q_or_list.extend([
                 Q(name__iexact=build_no_patch),
                 Q(alias__iexact=build_no_patch),
+                Q(slug=slugify(build_no_patch)),
             ])
         except ValueError:
             pass

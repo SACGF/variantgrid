@@ -16,20 +16,29 @@ from snpdb.models import GenomeBuild, GenomeFasta
 
 
 class Command(BaseCommand):
+    ALT_CONVERSION = {
+        # This should all be in upper case
+        "<DUP:TANDEM>": "<DUP>",
+    }
 
     def add_arguments(self, parser):
         parser.add_argument('--vcf', help='VCF file, default: - (stdin)', default="-")
         parser.add_argument('--skipped-records-stats-file', help='File name')
+        parser.add_argument('--converted-records-stats-file', help='File name')
 
     def handle(self, *args, **options):
         vcf_filename = options["vcf"]
         skipped_records_stats_file = options.get("skipped_records_stats_file")
+        converted_records_stats_file = options.get("converted_records_stats_file")
+
         if vcf_filename == '-':
             f = sys.stdin
         else:
             f = open(vcf_filename)
 
         skipped_records = Counter()
+        converted_records = Counter()
+
         alt_standard_bases_pattern = re.compile(r"[GATC,.]")  # Can "." for reference
         skipped_alt_first_examples = None
 
@@ -37,10 +46,14 @@ class Command(BaseCommand):
             if line[0] == '#':
                 sys.stdout.write(line)
             else:
-                columns = line.split("\t")
+                columns: list[str] = line.split("\t")
                 # Check alt is ok
                 alt = columns[VCFColumns.ALT].upper()
-                if alt_standard_bases_pattern.sub("", alt):
+                if to_value := self.ALT_CONVERSION.get(alt):
+                    converted_msg = f"'{alt=}' to '{to_value}'"
+                    converted_records[converted_msg] += 1
+                    columns[VCFColumns.ALT] = to_value
+                elif alt_standard_bases_pattern.sub("", alt):
                     skip_reason = None
                     if alt.startswith("<") and alt.endswith(">"):
                         if settings.VARIANT_SYMBOLIC_ALT_ENABLED:
@@ -59,10 +72,12 @@ class Command(BaseCommand):
 
                 sys.stdout.write("\t".join(columns))
 
-        self._write_skip_counts(skipped_records, skipped_records_stats_file)
+        self._write_vcf_stats(skipped_records, skipped_records_stats_file)
+        self._write_vcf_stats(converted_records, converted_records_stats_file)
+
 
     @staticmethod
-    def _write_skip_counts(counts, filename):
+    def _write_vcf_stats(counts, filename):
         if counts and filename:
             with open(filename, "w") as f:
                 for name, count in counts.items():

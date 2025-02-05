@@ -16,6 +16,7 @@ import os
 
 import pandas as pd
 from django.conf import settings
+from django.utils.text import slugify
 
 from library.pandas_utils import read_csv_skip_header
 from snpdb.models import SequenceRole, AssemblyMoleculeType
@@ -96,6 +97,10 @@ def create_build_and_contigs(get_model: callable, build_name, alias=None, igv_ge
             f"GenomeBuild {build_name} already exists. Use --clear if you want to delete (will delete all variants!)")
 
     kwargs = {"name": build_name}
+    # This is so that if we create new builds, or squish migrations, we don't need the 1 off script to populate slug
+    if hasattr(GenomeBuild, "slug"):
+        kwargs["slug"] = slugify(build_name)
+
     if alias:
         kwargs["alias"] = alias
     if igv_genome:

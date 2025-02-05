@@ -48,9 +48,8 @@ class AbstractBulkVCFProcessor(abc.ABC):
         self._finish()
         if self.svlen_modifications:
             for modification, count in self.svlen_modifications.items():
-                message_string = f"{modification}: {count}"
-                SimpleVCFImportInfo.objects.create(type=SimpleVCFImportInfo.SVLEN_MODIFIED, has_more_details=True,
-                                                   upload_step=self.upload_step, message_string=message_string)
+                SimpleVCFImportInfo.add_message_count(count, message_string=modification, upload_step=self.upload_step,
+                                                      type=SimpleVCFImportInfo.SVLEN_MODIFIED, has_more_details=True)
 
     @property
     def genome_build(self):

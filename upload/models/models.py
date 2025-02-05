@@ -559,15 +559,32 @@ class SimpleVCFImportInfo(VCFImportInfo):
     type = models.TextField()
     has_more_details = models.BooleanField(default=False)
     message_string = models.TextField()
+    count = models.IntegerField(default=0)  # Historical ones will have count=0
 
     @property
     def message(self):
-        return self.message_string
+        msg = self.message_string
+        if self.count:
+            msg = f"{msg}: {self.count}"
+        return msg
+
+    @staticmethod
+    def add_message_count(count: int, message_string: str, upload_step: UploadStep, **kwargs):
+        """ Updates count for message (useful for parallel processing tasks to only write 1 message between them) """
+        obj, created = SimpleVCFImportInfo.objects.get_or_create(message_string=message_string,
+                                                                 upload_step=upload_step,
+                                                                 **kwargs,
+                                                                 defaults={'count': count})
+        if not created:
+            SimpleVCFImportInfo.objects.filter(pk=obj.pk).update(count=F('count') + count)
 
 
 class ModifiedImportedVariants(VCFImportInfo):
     LINKED_SUB_STEP_NAME = UploadStep.NORMALIZE_SUB_STEP
-    has_more_details = True
+
+    @property
+    def has_more_details(self) -> bool:
+        return self.modifiedimportedvariant_set.exists()
 
     @staticmethod
     def get_for_pipeline(upload_pipeline) -> 'ModifiedImportedVariants':
