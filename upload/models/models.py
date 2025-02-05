@@ -570,13 +570,18 @@ class SimpleVCFImportInfo(VCFImportInfo):
 
     @staticmethod
     def add_message_count(count: int, message_string: str, upload_step: UploadStep, **kwargs):
-        """ Updates count for message (useful for parallel processing tasks to only write 1 message between them) """
-        obj, created = SimpleVCFImportInfo.objects.get_or_create(message_string=message_string,
-                                                                 upload_step=upload_step,
-                                                                 **kwargs,
-                                                                 defaults={'count': count})
-        if not created:
-            SimpleVCFImportInfo.objects.filter(pk=obj.pk).update(count=F('count') + count)
+        """ Updates count for message (useful for parallel processing tasks to only write 1 message between them)
+
+            We'll look up via upload pipeline rather than step, so they are merged together
+        """
+        if existing_info := SimpleVCFImportInfo.objects.filter(message_string=message_string,
+                                                               upload_step__upload_pipeline=upload_step).first():
+            SimpleVCFImportInfo.objects.filter(pk=existing_info.pk).update(count=F('count') + count)
+        else:
+            SimpleVCFImportInfo.objects.create(message_string=message_string,
+                                               upload_step=upload_step,
+                                               count=count,
+                                               **kwargs)
 
 
 class ModifiedImportedVariants(VCFImportInfo):
