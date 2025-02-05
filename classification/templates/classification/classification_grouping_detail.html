@@ -18,7 +18,8 @@
         {% if classification_grouping.classification_count > 10 %}
             <div>Total of {{ classification_grouping.classification_count }} records, showing most recent 10</div>
         {% endif %}
-        {% for record in classification_grouping.classification_modifications|slice:"-10:" %}
+        {% for record in classification_grouping.classification_modifications|slice:":10" reversed %}
+            {% if forloop.counter == 2 %}<hr/>{% endif %}
             <div>{% classification_quick record show_flags=True %}</div>
             {% comment %}
             <div class="mt-2 d-flex" style="align-items:center;position:relative;top:5px">
