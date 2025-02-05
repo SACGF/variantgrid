@@ -16,7 +16,8 @@ def do_sample_locus_count_for_vcf_id(vcf_id):
     total_sample_locus_count = [Counter()] * cohort.sample_count
     sample_locus_count = [0] * cohort.sample_count
     last_locus_id = 0
-    for locus_id, samples_zygosity in qs.values_list("locus_id", f"{cgc.cohortgenotype_alias}__samples_zygosity"):
+    values_qs = qs.values_list("locus_id", f"{cgc.cohortgenotype_alias}__samples_zygosity")
+    for locus_id, samples_zygosity in values_qs.iterator():
         if last_locus_id != locus_id:
             for i, count in enumerate(sample_locus_count):
                 total_sample_locus_count[i][count] += 1
