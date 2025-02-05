@@ -272,7 +272,13 @@ def clinical_context(context, cc: ClinicalContext, orientation: str = 'horizonta
 
 
 @register.inclusion_tag("classification/tags/classification_quick.html", takes_context=True)
-def classification_quick(context, vc: Union[Classification, ClassificationModification], show_clinical_grouping=True, show_flags=False, record_count: Optional[int] = None, mode: Optional[str] = "detailed"):
+def classification_quick(context,
+                         vc: Union[Classification, ClassificationModification],
+                         show_clinical_grouping=True,
+                         show_lab=True,
+                         show_condition=False,
+                         show_flags=False,
+                         record_count: Optional[int] = None, mode: Optional[str] = "detailed"):
     user = context.request.user
     vcm = vc
     if isinstance(vc, Classification):
@@ -281,6 +287,8 @@ def classification_quick(context, vc: Union[Classification, ClassificationModifi
         "vcm": vcm,
         "show_clinical_grouping": show_clinical_grouping,
         "mode": mode,
+        "show_lab": show_lab,
+        "show_condition": show_condition,
         "show_flags": show_flags,
         "record_count": record_count
     }
@@ -527,10 +535,13 @@ def db_ref(data: VCDbRefDict, css: Optional[str] = ''):
 
 
 @register.inclusion_tag("classification/tags/condition.html")
-def condition(condition_obj: Union[OntologyTerm, ConditionResolved], limit: Optional[int] = 100, show_link: Optional[bool] = True):
+def condition(condition_obj: Union[OntologyTerm, ConditionResolved],
+              limit: Optional[int] = 100,
+              show_link: Optional[bool] = True,
+              no_condition_message: bool = False):
     if isinstance(condition_obj, OntologyTerm):
         condition_obj = ConditionResolved(terms=[condition_obj])
-    return {"condition": condition_obj, "limit": limit, "show_link": show_link}
+    return {"condition": condition_obj, "limit": limit, "show_link": show_link, "no_condition_message": no_condition_message}
 
 
 # look at removing this

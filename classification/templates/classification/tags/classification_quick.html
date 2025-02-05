@@ -19,15 +19,15 @@
                 x {{ record_count }}
             {% endif %}
 
-            <a class="hover-link" href="{% url 'view_classification' vcm.classification.id %}">
-                &nbsp;
-            <img src="{% static vcm.share_level_enum.icon %}" width="12px" height="12px" style="margin-right:4px;" />
-            {% if vcm.vc.withdrawn %}
-                <span style="text-decoration: line-through">{{vcm.classification.lab.name}} / {{vcm.cr_lab_id }}</span>
-            {% else %}
-            {{vcm.classification.lab.name}} / {{vcm.cr_lab_id }}
-            {% endif %}
+            <a class="hover-link" href="{% url 'view_classification' vcm.classification.id %}">&nbsp;
+                <img src="{% static vcm.share_level_enum.icon %}" width="12px" height="12px" style="margin-right:4px;" />
+                <span {% if vcm.vc.withdrawn %}style="text-decoration: line-through"{% endif %}>
+                    {% if show_lab %}{{vcm.classification.lab.name}} / {% endif %}{{vcm.cr_lab_id }}
+                </span>
             </a>
+            {% if show_condition %}
+                - <span style="opacity:0.75">{% condition vcm.classification.condition_resolution_obj limit=50 no_condition_message=True %}</span>
+            {% endif %}
             : {% timestamp vcm.curated_date time_ago=True %}
     {% endif %}
     {% if show_flags %}<div class="flags d-inline-block" style="margin-left:12px; position: relative; bottom: -4px;" data-flags="{{ vcm.classification.flag_collection_id }}">...</div>{% endif %}
