@@ -87,15 +87,16 @@ class FormatDetailsCSV:
 
 class RowID(ExportRow):
 
-    def __init__(self, cm: ClassificationModification, allele_data: AlleleData, message: Optional[str] = None):
+    def __init__(self, cm: ClassificationModification, allele_data: AlleleData, date_str: str, message: Optional[str] = None):
         self.cm = cm
         self.vc = cm.classification
-        self.message = message
         self.allele_data = allele_data
+        self.date_str = date_str
+        self.message = message
 
     @export_column()
     def url(self) -> str:
-        return get_url_from_view_path(self.cm.classification.get_absolute_url())
+        return get_url_from_view_path(self.cm.classification.get_absolute_url()) + "?refer=csv&seen=" + self.date_str
 
     @property
     def genome_build(self) -> GenomeBuild:
@@ -305,7 +306,7 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
 
     def to_row(self, vcm: ClassificationModification, allele_data: AlleleData, message=None) -> str:
         row_data = \
-            RowID(cm=vcm, allele_data=allele_data, message=message).to_csv(export_tweak=self._export_tweak) + \
+            RowID(cm=vcm, allele_data=allele_data, date_str=self.classification_filter.date_str, message=message).to_csv(export_tweak=self._export_tweak) + \
             ClassificationMeta(
                 cm=vcm,
                 discordance_status=self.classification_filter.is_discordant(vcm),
