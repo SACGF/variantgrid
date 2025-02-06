@@ -50,7 +50,9 @@ urlpatterns = [
     path('classifications', views.classifications, name='classifications'),
 
     path('groupings', views.classification_groupings, name='classification_groupings'),
-    path('groupings/<classification_grouping_id>', views.view_classification_grouping_detail, name='classification_grouping_detail'),
+    path('groupings/<int:classification_grouping_id>', views.view_classification_grouping_detail, name='classification_grouping_detail'),
+    path('groupings/<int:classification_grouping_id>/records', views.view_classification_grouping_records_detail,
+         name='classification_grouping_records_detail'),
     path('allele_groupings', views.allele_groupings, name='allele_groupings'),
     path('allele_groupings/<str:lab_id>', views.allele_groupings, name='allele_groupings_lab'),
     path('allele_grouping/<allele_grouping_id>', views.view_allele_grouping_detail, name='allele_grouping_detail'),

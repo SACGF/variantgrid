@@ -28,6 +28,9 @@
             {% if show_condition %}
                 - <span style="opacity:0.75">{% condition vcm.condition_resolution_obj_fallback limit=50 no_condition_message=True %}</span>
             {% endif %}
+            {% if show_criteria and vcm.classification.summary.criteria_labels %}
+                - <span class="text-monospace text-secondary">{% for crit in vcm.classification.summary.criteria_labels %}{% if not forloop.first %},{% endif %}{{ crit }}{% endfor %}</span>
+            {% endif %}
             : {% timestamp vcm.curated_date time_ago=True %}
     {% endif %}
     {% if show_flags %}<div class="flags d-inline-block" style="margin-left:12px; position: relative; bottom: -4px;" data-flags="{{ vcm.classification.flag_collection_id }}">...</div>{% endif %}

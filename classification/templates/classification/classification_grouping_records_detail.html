@@ -1,0 +1,21 @@
+{% load classification_tags %}
+{% load ui_utils %}
+<h5>Grouping</h5>
+{% labelled label="Lab" %}{% lab classification_grouping.lab %}{% endlabelled %}
+{% with allele=classification_grouping.allele_origin_grouping.allele_grouping.allele %}
+    {% labelled label="Internal Allele ID" %}{{ allele.pk }}{% endlabelled %}
+    {% labelled label="ClinGen Canonical Allele ID" %}
+        {% if allele.clingen_allele %}
+            <a class="hover-link" href="{{ allele.clingen_allele.human_url }}">{{ allele.clingen_allele }}</a>
+        {% else %}<span class="no-value">-</span>{% endif %}
+    {% endlabelled %}
+{% endwith %}
+{% labelled label="Allele Origin" %}
+    <span class="allele-origin-box horizontal allele-origin-{{ classification_grouping.allele_origin_grouping.allele_origin_bucket }}">
+        <div class="allele-origin-text">{{ classification_grouping.allele_origin_grouping.get_allele_origin_bucket_display }}</div>
+    </span>
+{% endlabelled %}
+<h5>Classification Records</h5>
+{% for record in classification_grouping.classification_modifications reversed %}
+    <div class="mt-1">{% classification_quick record show_lab=False show_condition=True show_criteria=True show_flags=False %}</div>
+{% endfor %}

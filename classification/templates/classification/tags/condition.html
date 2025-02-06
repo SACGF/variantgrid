@@ -12,7 +12,6 @@
         </span>
     {% endfor %}
     {% if condition.join_text %}&#32;<span style="font-style: italic">{{ condition.join_text }}</span>{% endif %}
-{% else %}<span class="ontology-term"><span class="free-text">{{ condition.plain_text | limit_length:limit }}</span></span>{% endif %}
-{% if not condition.terms and not condition.plain_text %}
-    <span class="no-value">No condition provided</span>
+{% elif condition.plain_text %}<span class="ontology-term"><span class="free-text">{% limit_length_with_tooltip condition.plain_text limit=limit %}</span>
+{% else %}<span class="no-value">No condition provided</span>
 {% endif %}
