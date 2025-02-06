@@ -277,6 +277,7 @@ def classification_quick(context,
                          show_clinical_grouping=True,
                          show_lab=True,
                          show_condition=False,
+                         show_criteria=False,
                          show_flags=False,
                          record_count: Optional[int] = None, mode: Optional[str] = "detailed"):
     user = context.request.user
@@ -289,6 +290,7 @@ def classification_quick(context,
         "mode": mode,
         "show_lab": show_lab,
         "show_condition": show_condition,
+        "show_criteria": show_criteria,
         "show_flags": show_flags,
         "record_count": record_count
     }
