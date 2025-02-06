@@ -308,7 +308,7 @@ def populate_classification_json(classification: Classification, params: Classif
         # End stripping attributes
 
         if params.inject_source_url:
-            data[SpecialEKeys.SOURCE_URL] = {"value": get_url_from_view_path(classification.get_absolute_url())}
+            data[SpecialEKeys.SOURCE_URL] = {"value": get_url_from_view_path(classification.get_absolute_url()) + "?refer=json&seen=" + params.date_str}
 
         if params.populate_literature_with_citations:
             if citations := classification.loaded_citations().all_citations:

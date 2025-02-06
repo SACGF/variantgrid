@@ -3,7 +3,7 @@ import operator
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from functools import reduce
+from functools import reduce, cached_property
 from typing import List, Set, Optional, Union, Any, Dict, Iterable
 
 from django.contrib.auth.models import User
@@ -13,7 +13,7 @@ from classification.models.evidence_mixin import VCPatch, VCStore
 from flags.models import FlagCollection
 from genes.models import GeneSymbol, Transcript
 from library.log_utils import NotificationBuilder
-from library.utils import VarsDict
+from library.utils import VarsDict, local_date_string
 from snpdb.models import Allele, Lab
 
 
@@ -236,6 +236,10 @@ class ClassificationJsonParams:
         self.remove_acmg_namespace = remove_acmg_namespace
         self.inject_source_url = inject_source_url
         self.populate_literature_with_citations = populate_literature_with_citations
+
+    @cached_property
+    def date_str(self) -> str:
+        return local_date_string()
 
 
 class PatchMeta:
