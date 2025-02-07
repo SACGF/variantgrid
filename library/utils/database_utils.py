@@ -107,8 +107,7 @@ def iter_db_results(cursor, array_size=1000):
         results = cursor.fetchmany(array_size)
         if not results:
             break
-        for tup in results:
-            yield tup
+        yield from results
 
 
 def iter_dictfetchall(cursor, column_names: Optional[Iterable[str]] = None) -> dict:

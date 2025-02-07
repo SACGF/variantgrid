@@ -81,9 +81,6 @@ class ClinVarXmlParserViaVCV(ClinVarXmlParser):
         self.latest.allele_origin_bucket = AlleleOriginBucket.UNKNOWN
         self.latest.submitter_date = ClinVarXmlParser.parse_xml_date(elem.get("SubmissionDate"))
 
-    def reset(self):
-        super().reset()
-
     @parser_path("ObservedInList", "ObservedIn", "Sample", "Origin")
     def allele_origin(self, elem):
         self.allele_origin_set.add(elem.text)

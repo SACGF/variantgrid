@@ -295,8 +295,7 @@ def flatten_nested_lists(iterable) -> list:
     def _flatten_generator(flatten_me):
         for item in flatten_me:
             if isinstance(item, list):
-                for sub_item in _flatten_generator(item):
-                    yield sub_item
+                yield from _flatten_generator(item)
             elif item is not None:
                 yield item
 

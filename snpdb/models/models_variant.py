@@ -231,7 +231,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
     svlen: Optional[int] = None
 
     @field_validator('svlen')
-    def validate_svlen(cls, value):
+    def validate_svlen(self, value):
         if value is not None and settings.VARIANT_SYMBOLIC_ALT_ENABLED is False:
             raise ValueError('Symbolic variants disabled via settings.')
         return value
@@ -379,7 +379,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         ref = self.ref
         alt = self.alt  # default, only change if symbolic
         svlen = None
-        if self.alt == Variant.REFERENCE_ALT or self.alt == self.ref:
+        if self.alt in (Variant.REFERENCE_ALT, self.ref):
             alt = Variant.REFERENCE_ALT
         else:
             # Could be symbolic

@@ -63,9 +63,11 @@ class VariantCard:
             ).all())
 
     @property
-    def g_hgvs(self):
+    def g_hgvs(self) -> Optional[str]:
+        hgvs_g = None
         if variant := self.variant:
-            return VariantAnnotation.get_hgvs_g(variant)
+            hgvs_g = VariantAnnotation.get_hgvs_g(variant)
+        return hgvs_g
 
     @property
     def is_imported_directly(self):

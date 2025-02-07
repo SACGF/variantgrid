@@ -1,4 +1,5 @@
 from datetime import timedelta, datetime
+from typing import Optional
 
 from django.contrib import admin, messages
 from django.contrib.admin import TabularInline
@@ -44,10 +45,12 @@ class ClinVarAdmin(ModelAdminBasics):
         return obj.version.pk
 
     @admin_list_column("Variant")
-    def variant_link(self, obj: ClinVar):
+    def variant_link(self, obj: ClinVar) -> Optional[SafeString]:
+        link = None
         if variant := obj.variant:
             href = variant.get_absolute_url()
-            return SafeString(f"<a href=\"{href}\">{variant}</a>")
+            link = SafeString(f"<a href=\"{href}\">{variant}</a>")
+        return link
 
     def has_change_permission(self, request, obj=None):
         return False
@@ -112,12 +115,13 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
         except Exception as ex:
             return str(ex)
     """
-
     @admin_list_column("allele", limit=0)
-    def allele_link(self, obj: ClinVarRecordCollection):
+    def allele_link(self, obj: ClinVarRecordCollection) -> Optional[SafeString]:
+        link = None
         if allele := obj.allele:
             href = get_admin_url(allele)
-            return SafeString(f"<a href=\"{href}\">{allele}</a>")
+            link = SafeString(f"<a href=\"{href}\">{allele}</a>")
+        return link
 
     def has_change_permission(self, request, obj=None):
         return False

@@ -8,7 +8,7 @@ from manual.operations.manual_operations import ManualOperation
 def _check_needs_hemi_count(apps):
     # This will have only happened on dev versions
     if not settings.DEBUG:
-        return
+        return False
 
     VariantAnnotation = apps.get_model("annotation", "VariantAnnotation")
     VariantAnnotationVersion = apps.get_model("annotation", "VariantAnnotationVersion")

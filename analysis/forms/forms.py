@@ -50,9 +50,10 @@ def get_analysis_template_form_for_variables_only_of_class(class_name, autocompl
     else:
         widget = forms.HiddenInput()
 
-    class AnalysisTemplateForm(forms.Form):
+    class _AnalysisTemplateForm(forms.Form):
         analysis_template = forms.ModelChoiceField(queryset=AnalysisTemplate.objects.all(), widget=widget)
-    return AnalysisTemplateForm
+
+    return _AnalysisTemplateForm
 
 
 class AnalysisNodeClassesForm(forms.Form):
@@ -343,7 +344,7 @@ class KaryomappingGeneForm(forms.ModelForm):
         if commit:
             # We don't want to keep creating the same genes again and again, so reuse
             cleaned_data = self.cleaned_data
-            obj, created = KaryomappingGene.objects.get_or_create(
+            obj, _ = KaryomappingGene.objects.get_or_create(
                 karyomapping_analysis=self.karyomapping_analysis,
                 gene_symbol=cleaned_data["gene_symbol"],
                 upstream_kb=cleaned_data["upstream_kb"],

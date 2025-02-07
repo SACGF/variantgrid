@@ -51,9 +51,8 @@ def annotation_data_exists(flat=False) -> dict:
         for base_key, base_filename in check_files.items():
             if base_filename in unique_filenames:
                 continue
-            else:
-                unique_filenames.add(base_filename)
 
+            unique_filenames.add(base_filename)
             files = {base_key: base_filename}
             if ".vcf" in base_filename:
                 files[f"{base_key}_tbi"] = base_filename + ".tbi"

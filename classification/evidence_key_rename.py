@@ -73,7 +73,7 @@ class OptionUpdator:
             else:
                 return (e_key_options.get("label") or e_key_options.get("key")).lower()
 
-        self.options = list(sorted(self.options, key=lambda x: sort_value(x)))
+        self.options = list(sorted(self.options, key=sort_value))
         self.e_key.options = self.options
 
     def save(self):

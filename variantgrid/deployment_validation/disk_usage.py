@@ -35,12 +35,10 @@ def get_disk_usage_objects(directories_list: Optional[list[str]] = None) -> list
         directories_list = [settings.BASE_DIR, settings.UPLOAD_DIR, settings.ANNOTATION_VCF_DUMP_DIR]
 
     minimum_gigs = settings.SERVER_MIN_DISK_WARNING_GIGS
-    minimum_kb = minimum_gigs * 1000000
 
     disk_usage = get_disk_usage()
     nice_disk_usage = get_disk_usage(human_readable=True)
     handled_mount_points = set()
-    low_disk_messages = []
     disk_usages: list[DiskUsage] = []
     for mount_point, data in disk_usage.items():
         for d in directories_list:

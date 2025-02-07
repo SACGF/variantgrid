@@ -341,7 +341,7 @@ def populate_health_check(notification: NotificationBuilder, since: Optional[dat
 
     recent_lines = []
     overall_lines = []
-    for check_type, checks_typed in itertools.groupby(checks, key=lambda hc: type(hc)):
+    for check_type, checks_typed in itertools.groupby(checks, key=type):
         checks_typed_list = list(checks_typed)
 
         if issubclass(check_type, HealthCheckAge):
