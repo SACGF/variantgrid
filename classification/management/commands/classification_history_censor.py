@@ -58,7 +58,6 @@ class DataFixer:
                             modifications.append(DataFix(field=key, suspect_values=suspect_values))
                             blob["value"] = self.replacement
 
-
         if modifications:
             return DataFixRun(type=type, fixes=modifications)
 
@@ -102,7 +101,6 @@ class Command(BaseCommand):
             else:
                 org = Organization.objects.get(group_name=org_id)
             print(f"Org = {str(org)}")
-
 
         print(f"Pattern = {pattern}, icase = {pattern_icase}")
         if not apply_remaining:

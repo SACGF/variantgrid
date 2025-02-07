@@ -439,7 +439,6 @@ class SampleSheetCombinedVCFFileSerializer(serializers.ModelSerializer):
         model = SampleSheetCombinedVCFFile
         fields = ("path", "sample_sheet", "variant_caller")
 
-
     def create(self, validated_data):
         sample_sheet = SampleSheetLookupSerializer.get_object(validated_data.pop('sample_sheet'))
         variant_caller = VariantCallerSerializer().create(validated_data.pop('variant_caller'))
@@ -450,5 +449,3 @@ class SampleSheetCombinedVCFFileSerializer(serializers.ModelSerializer):
                                                                         path=validated_data["path"],
                                                                         defaults=defaults)
         return sscvcf
-
-

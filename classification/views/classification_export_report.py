@@ -88,5 +88,3 @@ class ClassificationReport:
             if evidence not in row_data:
                 unknown_evidence.add(evidence)
         return list(sorted(unknown_evidence))
-
-

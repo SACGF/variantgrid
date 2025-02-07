@@ -671,7 +671,6 @@ class VCFLengthStats(TimeStampedModel):
         unique_together = ("collection", "variant_class")
 
 
-
 class SampleLocusCount(models.Model):
     """ Count of variants at a locus for a sample """
     sample = models.ForeignKey(Sample, on_delete=CASCADE)

@@ -49,7 +49,6 @@ def get_assembly_report_df(build):
 
         # The original GRCh37 didn't have MT added after genome build - but now it has it as we are using GRCh37.p13
 
-
         # hg19 is same as grch37 except for mitochondrion
         # (hg19 = NC_001807 and GRCh37 = NC_012920)
         mt_index = df_grch38["Sequence-Name"] == "MT"

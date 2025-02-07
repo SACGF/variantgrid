@@ -142,7 +142,6 @@ def _colmodels_to_vcf_header(genome_build, info_dict, samples, use_accession=Tru
     return StringIO('\n'.join(header_lines))
 
 
-
 def _grid_item_to_vcf_record(info_dict, obj, sample_ids, sample_names, use_accession=True):
     if use_accession:
         CHROM = obj.get("locus__contig__refseq_accession", ".")

@@ -424,7 +424,7 @@ def severity_icon(severity: str, title: Optional[str] = None) -> str:
                         return ['fa-exclamation-triangle', 'text-warning']
                     case "I":
                         return ['fa-info-circle', 'text-info']
-                    case "D": # debug
+                    case "D":  # debug
                         return ['fa-key', 'text-info']
                     case "S":
                         return ['fa-check-circle', 'text-success']

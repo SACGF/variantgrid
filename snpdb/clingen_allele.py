@@ -344,7 +344,6 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
     return va
 
 
-
 def _clingen_check_variant_coordinate_length(rep: str, genome_build: GenomeBuild, variant_coordinate: VariantCoordinate):
     # Force to symbolic so we can check for "dup"
     vc_symbolic = variant_coordinate.as_internal_symbolic(genome_build)

@@ -21,7 +21,6 @@ def _ekey_allele_origin_germline_somatic_only(apps, _schema_editor):
     )
 
 
-
 class Migration(migrations.Migration):
 
     dependencies = [

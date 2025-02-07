@@ -322,7 +322,6 @@ class BioCommonsHGVSConverter(HGVSConverter):
             matches_reference = HgvsMatchRefAllele(provided_ref='', calculated_ref=ref)
         return var_g, matches_reference
 
-
     @staticmethod
     def _get_exception_class(hgvs_error: HGVSError) -> type:
         """ Convert from HGVS to our generic errors """
@@ -348,9 +347,3 @@ class BioCommonsHGVSConverter(HGVSConverter):
                 if isinstance(hgvs_error, hgvs_ex):
                     return our_ex
         return HGVSException  # General one...
-
-
-
-
-
-

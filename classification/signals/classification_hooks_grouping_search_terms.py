@@ -111,4 +111,3 @@ def _clinvar_scv(grouping: ClassificationGrouping, **kwargs) -> Optional[Iterabl
                 term=scv
             ))
     return stubs
-

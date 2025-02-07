@@ -403,7 +403,6 @@ class HGVSImplementationException(HGVSException):
     pass
 
 
-
 class HGVSVariant(abc.ABC):
     """ This class wraps pyhgvs HGVSName and BioCommons SequenceVariant functionality,
         to allow library independent code """

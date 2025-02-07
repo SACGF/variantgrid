@@ -45,7 +45,6 @@ class OptionUpdator:
                 filtered_options.append(e_key)
         self.options = filtered_options
 
-
     def preferred_order(self, option_keys: list[str]):
         known_options = set(option_keys)
 

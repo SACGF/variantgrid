@@ -273,7 +273,6 @@ class VariantGrid(AbstractVariantGrid):
         return super()._sort_items(items, sidx, sord)
 
 
-
 class ExportVariantGrid(VariantGrid):
     """ This is for exporting into VCF/CSV - ie not using any paging """
 

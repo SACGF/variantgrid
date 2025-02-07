@@ -1694,7 +1694,7 @@ def view_contig(request, contig_accession):
     context = {
         "contig": contig,
         "genome_build": genome_build,
-        "has_annotation" : has_annotation,
+        "has_annotation": has_annotation,
     }
     return render(request, "snpdb/genomics/view_contig.html", context)
 

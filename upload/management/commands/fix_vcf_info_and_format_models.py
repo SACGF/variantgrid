@@ -36,7 +36,6 @@ class Command(BaseCommand):
         not_updated_qs = qs_old_version.filter(vcfinfo__isnull=True, vcfformat__isnull=True)
         return qs_old_version, not_updated_qs
 
-
     def handle(self, *args, **options):
         qs_old_version, not_updated_qs = self.get_historical_vcf_qs_total_and_not_updated(VCF)
         logging.info("VCFs v%d - v%d with INFO/FORMAT header we can reprocess header only: %d",
@@ -50,7 +49,6 @@ class Command(BaseCommand):
             info_vals = vcf.vcfinfo_set.all().values_list("identifier", flat=True)
             format_vals = vcf.vcfformat_set.all().values_list("identifier", flat=True)
             logging.info("%s: INFO: %s, FORMAT: %s", vcf, ','.join(info_vals), ','.join(format_vals))
-
 
         qs_need_reload = VCF.objects.filter(self.q_header_has_info_or_format,
                                             uploadedvcf__vcf_importer__name=self.importer_name,

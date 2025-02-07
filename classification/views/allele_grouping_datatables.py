@@ -119,7 +119,6 @@ class AlleleGroupingColumns(DatatableConfig[AlleleGrouping]):
             classification_values = somatic.somatic_clinical_significance_values
         return [somatic_status, classification_values]
 
-
     # def render_details(self, row: CellData) -> JsonDataType:
     #     cgs = _allele_group(row.get("id"))
     #     return json.dumps([cg.to_json() for cg in cgs])

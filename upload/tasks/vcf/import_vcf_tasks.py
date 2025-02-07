@@ -111,7 +111,6 @@ class AbstractProcessVCFTask(abc.ABC, ImportVCFStepTask):
         return items_processed
 
 
-
 class ProcessVCFSetMaxVariantTask(AbstractProcessVCFTask):
     """ Finds highest variant_id in VCF so we can tell whether we're done annotating or not
         Can run in parallel on split VCFs """
@@ -134,7 +133,6 @@ class ProcessVCFClinGenAlleleTask(AbstractProcessVCFTask):
 
     def _get_vcf_processor(self, upload_step, preprocess_vcf_import_info):
         return BulkClinGenAlleleVCFProcessor(upload_step, preprocess_vcf_import_info)
-
 
 
 class DoNothingVCFTask(ImportVCFStepTask):

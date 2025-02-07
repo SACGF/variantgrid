@@ -262,7 +262,6 @@ class VariantGridAPI:
         return self._post("seqauto/api/v1/qc_gene_list/",
                           json_data)
 
-
     def create_multiple_qc_gene_lists(self, qc_gene_lists: List[QCGeneList]):
         json_data = {
             "records": [

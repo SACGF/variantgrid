@@ -13,4 +13,3 @@ VARIANTGRID_REPO_APP_DIR = os.path.join(BASE_DIR, "variantgrid")
 VARIANTGRID_REPO_REFERENCE_DIR = os.path.join(VARIANTGRID_REPO_APP_DIR, "data", "reference")
 
 ANNOTATION_BASE_DIR = "/data/annotation"
-

@@ -86,4 +86,3 @@ class Command(BaseCommand):
                     cdot_data = json.load(fz)
                     cdot_version = cdot_data.get("cdot_version")
                     GeneAnnotationCommand.import_cdot_data(genome_build, annotation_consortium, cdot_data, cdot_version)
-

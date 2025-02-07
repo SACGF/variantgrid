@@ -127,7 +127,6 @@ def grid_export_request(request, grid, basename):
     return response
 
 
-
 def grid_export_csv(colmodels, items) -> Iterator[str]:
     # If you make the first letters “ID” of a text file
     # Excel incorrectly assumes you are trying to open an SYLK file.

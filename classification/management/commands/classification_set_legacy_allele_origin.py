@@ -39,7 +39,6 @@ class Command(BaseCommand):
             print(f"Updated allele_origin from {old_value} => {allele_origin_value}")
             print(", ".join(classification_ids))
 
-
     def handle(self, *args, **options):
         raise ValueError("Don't run this - haven't confirmed it's the right thing to do yet. "
                          "See https://github.com/SACGF/variantgrid_private/issues/2926")
@@ -64,4 +63,3 @@ class Command(BaseCommand):
                                        old_value=old_value,
                                        allele_origin_value=allele_origin_value,
                                        allele_origin_confirmation_value="unconfirmed")
-

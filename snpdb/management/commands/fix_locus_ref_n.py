@@ -202,8 +202,6 @@ class Command(BaseCommand):
                             q_locus_contig = Q(contig__genomebuildcontig__genome_build=genome_build)
                             Locus.objects.filter(q_locus_contig, ref=seq_n, variant__isnull=True).delete()
 
-
-
                     if variant_conflicts:
                         variant_conflict_log_csv = os.path.join(processing_dir, f"variant_conflicts_{genome_build}_{date_iso}.csv")
                         records = []

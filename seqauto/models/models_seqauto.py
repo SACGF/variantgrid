@@ -400,7 +400,6 @@ class SampleSheet(SeqAutoRecord):
                                                                         sample_sheet=self)
             logging.info("Created new SequencingRunCurrentSampleSheet: %s", current_ss)
 
-
     def __str__(self):
         return self.path
 
@@ -1084,7 +1083,6 @@ class QCGeneList(SeqAutoRecord):
         if force_active:
             ActiveSampleGeneList.objects.update_or_create(sample=sample,
                                                           defaults={'sample_gene_list': self.sample_gene_list})
-
 
 
 class QCExecSummary(SeqAutoRecord):

@@ -1,4 +1,3 @@
 # File for PyCharm DJango Structure plugin
 # noinspection PyUnresolvedReferences
 from classification.admin import ClassificationImportRunAdmin, ClassificationAdmin, ClassificationImportAdmin, ClinicalContextAdmin, EvidenceKeyAdmin, ClassificationReportTemplateAdmin, DiscordanceReportAdmin, DiscordanceReportTriageAdmin, DiscordanceNotificationAdmin, UploadedClassificationsUnmappedAdmin, ResolvedVariantInfoAdmin, ImportedAlleleInfoAdmin, ImportedAlleleInfoValidationAdmin, ClinVarExportAdmin, ClinVarAlleleAdmin, ClinVarExportBatchAdmin, ConditionTextAdmin, ClassificationGroupingAdmin
-

@@ -421,7 +421,6 @@ class BulkVEPVCFAnnotationInserter:
             transcript_accession = vep_transcript_data[VEPColumns.FEATURE]
         return transcript_accession
 
-
     def _get_transcript_id_and_transcript_version_id(self, transcript_accession: Optional[str]) -> tuple[Optional[str], Optional[str]]:
         """ Returns Transcript.pk and TranscriptVersion.pk for linking records """
         transcript_id: Optional[str] = None

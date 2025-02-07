@@ -155,7 +155,6 @@ class QCGeneCoverageSerializer(serializers.ModelSerializer):
         return instance
 
 
-
 class QCExecSummarySerializer(serializers.ModelSerializer):
     qc = QCSerializer()
     data_state = serializers.CharField(read_only=True)
@@ -201,4 +200,3 @@ class QCGeneCoverageBulkCreateSerializer(serializers.Serializer):
         return {
             "records": created_records,
         }
-

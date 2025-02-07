@@ -148,7 +148,6 @@ class QCGeneCoverageBulkCreateView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-
 class QCGeneCoverageViewSet(ModelViewSet):
     queryset = QCGeneCoverage.objects.all()
     serializer_class = QCGeneCoverageSerializer
@@ -157,7 +156,6 @@ class QCGeneCoverageViewSet(ModelViewSet):
 class QCExecSummaryViewSet(ModelViewSet):
     queryset = QCExecSummary.objects.all()
     serializer_class = QCExecSummarySerializer
-
 
 
 class EnrichmentKitGeneCoverageView(APIView):

@@ -166,7 +166,6 @@ def classification_groupings(context, show_allele_origin_filter=True):
     return {"show_allele_origin_filter": show_allele_origin_filter, "genome_build": GenomeBuildManager.get_current_genome_build()}
 
 
-
 def render_ekey(val, key: Optional[str] = None, value_if_none: Optional[str] = None):
     if isinstance(val, ClassificationModification):
         val = val.get(key)

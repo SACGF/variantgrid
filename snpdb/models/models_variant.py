@@ -430,8 +430,6 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
                                  position=self.position, ref=self.ref, alt=self.alt, svlen=self.svlen)
 
 
-
-
 class Sequence(models.Model):
     """
         We want to guarantee seq is unique (so Locus/Variant can have unique constraints)

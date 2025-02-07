@@ -317,7 +317,6 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
             break  # Just want 1st one
 
 
-
 def allele_can_attempt_liftover(allele, genome_build) -> bool:
     conversion_tool, variant = _liftover_using_existing_contig(allele, genome_build)
     if conversion_tool and variant:

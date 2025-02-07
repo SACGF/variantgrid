@@ -127,7 +127,6 @@ def _one_off_vep_112_summary_stats_fields(apps, schema_editor):
     bulk_insert_class_data(apps, "annotation", [("ColumnVEPField", _new_columns)])
 
 
-
 class Migration(migrations.Migration):
 
     dependencies = [

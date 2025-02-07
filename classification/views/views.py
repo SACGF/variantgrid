@@ -145,7 +145,6 @@ def classifications(request):
     )
     search_and_classify_form.helper = helper
 
-
     if settings.CLASSIFICATION_GRID_MULTI_LAB_FILTER:
         lab_form = LabMultiSelectForm()
     else:
@@ -188,7 +187,6 @@ def classifications(request):
         for ft in flag_types:
             flag_type_json.append({'id': ft.pk, 'label': ft.label, 'description': ft.description})
         context["flag_types"] = flag_type_json
-
 
     return render(request, template, context)
 
@@ -986,8 +984,6 @@ class AlleleOriginGroupingVisible:
                     clinical_context__in=ClinicalContext.objects.filter(allele=allele_grouping.allele,
                                                                         allele_origin_bucket=bucket)
                 ).order_by('-report_started_date'))
-
-
 
                 visible_groups.append(
                     AlleleOriginGroupingVisible(

@@ -75,7 +75,6 @@ class Command(BaseCommand):
         self._write_vcf_stats(skipped_records, skipped_records_stats_file)
         self._write_vcf_stats(converted_records, converted_records_stats_file)
 
-
     @staticmethod
     def _write_vcf_stats(counts, filename):
         if counts and filename:

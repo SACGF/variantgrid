@@ -73,8 +73,6 @@ class HGVSConverter(abc.ABC):
             if re.match(".*ins$", hgvs_string):
                 raise HGVSNomenclatureException("Insertions require inserted sequence")
 
-
-
     @abc.abstractmethod
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
         pass

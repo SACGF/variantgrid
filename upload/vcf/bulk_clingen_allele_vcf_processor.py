@@ -11,4 +11,3 @@ class BulkClinGenAlleleVCFProcessor(BulkMinimalVCFProcessor):
 
         variants_qs = Variant.objects.filter(pk__in=variant_ids)
         populate_clingen_alleles_for_variants(self.genome_build, variants_qs)
-

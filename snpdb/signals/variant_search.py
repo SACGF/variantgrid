@@ -444,7 +444,6 @@ def _search_hgvs_using_gene_symbol(
             preview.annotation_consortia = unique_annotation_consortia
         yield SearchResult(preview=preview, messages=search_messages)
 
-
     if transcript_accessions_by_exception:
         resolution_errors = []
         for exception_msg, tv_message_list in transcript_accessions_by_exception.items():

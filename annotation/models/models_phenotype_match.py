@@ -82,7 +82,6 @@ class TextPhenotype(models.Model):
         return tpm_qs.annotate(num_terms=Subquery(sub_query.values("num_terms"))).filter(num_terms__gte=2)
 
 
-
 class TextPhenotypeSentence(models.Model):
     """ A description broken up into sentences which are represented by TextPhenotypes and matches """
     phenotype_description = models.ForeignKey(PhenotypeDescription, on_delete=CASCADE)

@@ -38,7 +38,7 @@ def contig_search(search_input: SearchInputInstance):
     if contigs := list(all_contigs.filter(q_search_build)):
         yield contigs
     else:
-        if other_contig := all_contigs.exclude(q_search_build).first(): #
+        if other_contig := all_contigs.exclude(q_search_build).first():
             contig_builds = other_contig.genomebuildcontig_set.all()
             build_names = ", ".join(contig_builds.order_by("genome_build__name").values_list("genome_build__name", flat=True))
             msg = f"contig={other_contig.refseq_accession} is from builds {build_names} which are not enabled/annotated."

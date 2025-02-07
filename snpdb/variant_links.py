@@ -22,7 +22,6 @@ def variant_link_info(variant: Variant, genome_build: GenomeBuild) -> dict[str, 
         except HGVSException:
             pass
 
-
     # If we can include these in link_data we'll get more links
     #
     # SpecialEKeys.REFSEQ_TRANSCRIPT_ID,

@@ -4,7 +4,6 @@ from genes.serializers import GeneListSerializer
 from seqauto.models import EnrichmentKit
 
 
-
 class EnrichmentKitSerializer(serializers.ModelSerializer):
     gene_list = GeneListSerializer(read_only=True)
     enrichment_kit_type = serializers.SerializerMethodField(read_only=True)

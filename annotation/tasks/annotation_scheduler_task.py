@@ -124,4 +124,3 @@ def subdivide_annotation_range_lock(arl: AnnotationRangeLock, minimum_size=1000)
 
     logging.info("Shifted old lock down: %s", arl)
     logging.info("New lock created: %s", new_lock)
-

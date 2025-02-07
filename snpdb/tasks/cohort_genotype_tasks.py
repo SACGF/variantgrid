@@ -189,7 +189,6 @@ WHERE
     # Though we are already calculating the columns in the select, so probably best to leave as it
     # Doesn't seem to have performance hit
 
-
     return insert_sql
 
 
