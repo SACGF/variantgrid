@@ -5,7 +5,6 @@ import zipfile
 from typing import Optional
 
 import celery
-
 from django.conf import settings
 from django.utils import timezone
 

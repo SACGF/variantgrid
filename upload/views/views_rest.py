@@ -3,7 +3,6 @@ from http import HTTPStatus
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-
 from rest_framework.views import APIView
 
 from upload.views.views import handle_file_upload

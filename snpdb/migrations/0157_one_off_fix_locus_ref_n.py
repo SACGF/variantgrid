@@ -2,8 +2,6 @@
 
 from django.db import migrations
 
-from manual.operations.manual_operations import ManualOperation
-
 
 def _check_locus_ref_n(apps):
     Locus = apps.get_model("snpdb", "Locus")

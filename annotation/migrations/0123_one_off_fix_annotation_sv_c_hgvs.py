@@ -4,6 +4,7 @@ from django.db import migrations
 
 from manual.operations.manual_operations import ManualOperation
 
+
 def _check_has_sv_annotation(apps):
     AnnotationRun = apps.get_model("annotation", "AnnotationRun")
 

@@ -3,7 +3,6 @@ import logging
 from django.core.management.base import BaseCommand
 
 from annotation.annotation_versions import get_or_create_variant_annotation_version_from_current_vep
-from annotation.vep_annotation import get_vep_version, VEPConfig, vep_dict_to_variant_annotation_version_kwargs
 from snpdb.models.models_genome import GenomeBuild
 
 

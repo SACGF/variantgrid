@@ -3,8 +3,8 @@ import json
 import logging
 
 import requests
-from django.core.management import BaseCommand
 from cdot.data_release import get_latest_combo_file_urls, get_latest_data_release_tag_name, _get_version_from_tag_name
+from django.core.management import BaseCommand
 
 from genes.management.commands.import_gene_annotation import Command as GeneAnnotationCommand
 from genes.models import TranscriptVersion

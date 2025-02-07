@@ -2,7 +2,7 @@ import abc
 import re
 from enum import Enum
 
-from genes.hgvs import HGVSVariant, HGVSException, HGVSNomenclatureException
+from genes.hgvs import HGVSVariant, HGVSNomenclatureException
 from snpdb.models import GenomeBuild, VariantCoordinate
 
 

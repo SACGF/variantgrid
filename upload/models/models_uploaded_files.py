@@ -13,7 +13,7 @@ from genes.models import GeneList, GeneCoverageCollection
 from library.utils.file_utils import name_from_filename
 from patients.models import PatientRecords
 from pedigree.models import PedFile
-from snpdb.models import GenomicIntervalsCollection, ImportStatus, Sample, ImportedWikiCollection, ImportSource
+from snpdb.models import GenomicIntervalsCollection, ImportStatus, Sample, ImportedWikiCollection
 from snpdb.models.models_variant import LiftoverRun
 from upload.bed_file_processing import process_bed_file
 from upload.models import UploadedFile

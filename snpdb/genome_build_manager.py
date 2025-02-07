@@ -1,9 +1,10 @@
+import re
 from typing import Optional
+
 from django.core.handlers.wsgi import WSGIRequest
 from threadlocals.threadlocals import get_current_user, get_request_variable, set_request_variable, get_current_request
-from snpdb.models import UserSettings, GenomeBuild
-import re
 
+from snpdb.models import UserSettings, GenomeBuild
 
 # hardcoded to look for 37 or 38, needs support for other genome builds
 GENOME_BUILD_RE = re.compile(r"(?:^|/)(GRCh3[78])(?:\?|$|/)")

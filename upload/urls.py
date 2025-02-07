@@ -1,5 +1,3 @@
-from django.urls import path
-
 from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
 from upload.grids import UploadPipelineModifiedVariantsGrid, UploadPipelineSkippedAnnotationGrid, \

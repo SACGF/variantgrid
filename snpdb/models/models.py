@@ -12,7 +12,6 @@ import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from fileinput import filename
 from functools import cached_property, total_ordering
 from html import escape
 from re import RegexFlag

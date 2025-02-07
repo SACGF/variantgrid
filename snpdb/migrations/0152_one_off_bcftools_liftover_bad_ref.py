@@ -4,6 +4,7 @@ from django.db import migrations
 
 from manual.operations.manual_operations import ManualOperation
 
+
 def _get_failed_allele_liftover_bad_ref_qs(apps):
     AlleleLiftover = apps.get_model('snpdb', 'AlleleLiftover')
     return AlleleLiftover.objects.filter(error__icontains="not equal to calculated ref from genome")

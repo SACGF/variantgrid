@@ -4,6 +4,7 @@ import re
 from collections import Counter
 from io import StringIO
 from typing import Iterator, Optional
+
 from vcf import Writer, Reader
 from vcf.model import _Substitution, _Record, make_calldata_tuple, _Call
 

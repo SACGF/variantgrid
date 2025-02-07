@@ -1,5 +1,4 @@
 import logging
-import time
 from collections import defaultdict
 
 import pandas as pd

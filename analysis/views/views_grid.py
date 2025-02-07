@@ -14,7 +14,8 @@ from django.views.decorators.vary import vary_on_cookie
 from analysis import grids
 from analysis.grid_export import node_grid_get_export_iterator
 from analysis.models import AnalysisNode
-from analysis.tasks.analysis_grid_export_tasks import export_cohort_to_downloadable_file, export_sample_to_downloadable_file, get_grid_downloadable_file_params_hash
+from analysis.tasks.analysis_grid_export_tasks import export_cohort_to_downloadable_file, \
+    export_sample_to_downloadable_file, get_grid_downloadable_file_params_hash
 from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
 from analysis.views.node_json_view import NodeJSONGetView, NodeJSONViewMixin
 from library.constants import WEEK_SECS

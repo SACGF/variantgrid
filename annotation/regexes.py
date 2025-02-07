@@ -1,6 +1,6 @@
 import re
 from enum import Enum
-from re import RegexFlag, Pattern
+from re import RegexFlag
 from typing import Union, Match, Optional
 
 from annotation.models.models_citations import CitationIdNormalized

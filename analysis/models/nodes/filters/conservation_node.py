@@ -3,11 +3,10 @@ from functools import cached_property, reduce
 from typing import Optional
 
 from auditlog.registry import auditlog
-
-from analysis.models import AnalysisNode
 from django.db import models
 from django.db.models.query_utils import Q
 
+from analysis.models import AnalysisNode
 from annotation.models import VariantAnnotation
 
 

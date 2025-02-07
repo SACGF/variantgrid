@@ -14,7 +14,7 @@ from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF
 from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus
 from snpdb.tasks.sample_locus_count_task import do_sample_locus_count_for_vcf_id
-from snpdb.tasks.somalier_tasks import somalier_vcf_id, somalier_all_samples
+from snpdb.tasks.somalier_tasks import somalier_vcf_id
 from snpdb.variant_zygosity_count import update_all_variant_zygosity_counts_for_vcf, \
     create_variant_zygosity_counts
 from upload.models import VCFPipelineStage, UploadStep, UploadStepTaskType, UploadedVCFPendingAnnotation, \

@@ -10,7 +10,7 @@ from pyhgvs.utils import make_transcript
 from genes.hgvs import HGVSVariant, HGVSException
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele, HGVSConverterType
 from genes.transcripts_utils import transcript_is_lrg
-from snpdb.models import GenomeBuild, VariantCoordinate
+from snpdb.models import VariantCoordinate
 
 
 class PyHGVSVariant(HGVSVariant):

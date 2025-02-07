@@ -19,7 +19,7 @@ from library.django_utils.autocomplete_utils import ModelSelect2
 from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin, UserSettingsGenomeBuildMixin
-from snpdb.models import CustomColumnsCollection, Sample, VariantGridColumn, Trio, UserSettings
+from snpdb.models import CustomColumnsCollection, VariantGridColumn, Trio, UserSettings
 from uicore.utils.form_helpers import form_helper_horizontal
 
 

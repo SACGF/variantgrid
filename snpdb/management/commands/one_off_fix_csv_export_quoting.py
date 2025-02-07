@@ -2,9 +2,9 @@ import csv
 import logging
 import os
 import zipfile
-from zipfile import ZipFile
 
 from django.core.management.base import BaseCommand
+
 from snpdb.models import CachedGeneratedFile
 
 
