@@ -1,4 +1,5 @@
 # This file exists for PyCharm's Django Structure plugin
+# pylint: disable=unused-import
 from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_variant_info_models import HGVSConverterVersion, ResolvedVariantInfo, ImportedAlleleInfoValidation, ImportedAlleleInfo
@@ -10,3 +11,4 @@ from classification.models.variant_models import ClassificationAttachment
 from classification.models.condition_text_matching import ConditionText, ConditionTextMatch
 from classification.models.clinvar_export_models import ClinVarAllele, ClinVarExport, ClinVarExportBatch, ClinVarExportSubmission, ClinVarExportRequest
 from classification.models.classification_report_models import ClassificationReportTemplate
+# pylint: enable=unused-import

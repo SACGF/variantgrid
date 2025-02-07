@@ -1,4 +1,5 @@
 # This file exists for PyCharm's Django Structure plugin
+# pylint: disable=unused-import
 from annotation.models.models import ClinVarVersion, ClinVar, ClinVarRecordCollection, ClinVarRecord, \
     ClinVarCitationsCollection, ClinVarCitation, DBNSFPGeneAnnotationVersion, DBNSFPGeneAnnotation, \
     GeneAnnotationVersion, GeneAnnotation, HumanProteinAtlasAnnotationVersion, HumanProteinAtlasTissueSample, \
@@ -16,3 +17,4 @@ from annotation.models.models_sample_stats import SampleVariantAnnotationStats, 
     SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter
 from annotation.models.models_version_diff import VersionDiff, VersionDiffFromToResult, VersionDiffChangeCountResult, \
     VariantAnnotationVersionDiff
+# pylint: enable=unused-import

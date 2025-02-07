@@ -1,4 +1,5 @@
 # This file exists for PyCharm's Django Structure plugin
+# pylint: disable=unused-import
 from analysis.models.gene_counts import NodeGenesCountCollection, NodeGenesCount
 from analysis.models.models_analysis import Analysis, AnalysisLock, AnalysisNodeCountConfiguration, \
     AnalysisNodeCountConfigRecord, AnalysisVariable, AnalysisTemplate, AnalysisTemplateVersion, AnalysisTemplateRun, \
@@ -24,3 +25,4 @@ from analysis.models.nodes.sources.all_variants_node import AllVariantsNode
 from analysis.models.nodes.sources.classifications_node import ClassificationsNodeLab
 from analysis.models.nodes.sources.cohort_node import CohortNode, CohortNodeZygosityFiltersCollection, \
     CohortNodeZygosityFilter
+# pylint: enable=unused-import

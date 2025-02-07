@@ -63,7 +63,7 @@ class NodeInheritanceManager(InheritanceManager):
 class NodeAuditLogMixin:
     @abc.abstractmethod
     def _get_node(self):
-        self.node
+        pass
 
     def get_additional_data(self):
         """ For django-audit-log """

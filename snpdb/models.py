@@ -1,4 +1,5 @@
 # This file exists for PyCharm's Django Structure plugin
+# pylint: disable=unused-import
 from snpdb.models.models import Tag, CachedGeneratedFile, Company, Manufacturer, Wiki, ImportedWikiCollection, \
     ImportedWiki, Organization, ClinVarKey, ClinVarKeyExcludePattern, Country, State, Lab, LabHead, UserAward, \
     LabProject, SiteMessage
@@ -23,3 +24,4 @@ from snpdb.models.models_vcf import Project, VCF, VCFFilter, VCFTag, Sample, Sam
     VCFSourceSettings, VCFBedIntersection
 from snpdb.models.models_zygosity_counts import VariantZygosityCountCollection, VariantZygosityCount, \
     VariantZygosityCountForVCF, VariantZygosityCountForSample
+# pylint: enable=unused-import
