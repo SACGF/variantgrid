@@ -390,17 +390,14 @@ class CHGVS:
 
 class HGVSException(Exception):
     """ A wrapper for pyhgvs and Biocommons HGVS Exceptions to allow library independent code """
-    pass
 
 
 class HGVSNomenclatureException(HGVSException):
     """ HGVSException subclass for when problem is with HGVS string (users can fix) """
-    pass
 
 
 class HGVSImplementationException(HGVSException):
     """ HGVSException subclass for when problem is with the library (users can NOT fix) """
-    pass
 
 
 class HGVSVariant(abc.ABC):

@@ -158,7 +158,6 @@ class AlissaUploadSyncer(SyncRunner):
                                 notify.send()
                 except:
                     report_exc_info()
-                    pass
 
         since_timestamp = None
         if since:

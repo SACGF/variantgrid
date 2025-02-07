@@ -1418,4 +1418,3 @@ class AlleleOriginGroupingTabularAdmin(TabularInline):
 @admin.register(AlleleGrouping)
 class AlleleGroupingAdmin(ModelAdminBasics):
     inlines = (AlleleOriginGroupingTabularAdmin,)
-    pass

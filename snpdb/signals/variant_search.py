@@ -653,7 +653,6 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 except HGVSException as e:
                     logging.error(e)
                     # might just not be a HGVS name at all
-                    pass
             else:
                 yield SearchMessageOverall("HGVS search requires a transcript")
 

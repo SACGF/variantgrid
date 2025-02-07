@@ -359,7 +359,6 @@ class UploadStep(models.Model):
             self.error_message += "\n" + str(traceback.format_exc())
         except:
             self.error_message += "\nUnable to load traceback"
-            pass
         self.upload_pipeline.error(self.error_message)
 
     @transaction.atomic()
