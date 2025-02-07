@@ -1332,7 +1332,7 @@ class AncestorCalculator:
                 raise ValueError(f"Can only find common ancestor of MONDO & HPO, not {ontology_service}")
 
         self.base_terms = terms
-        self.term_hs: dict[OntologyTerm, SingleTermH] = dict()
+        self.term_hs: dict[OntologyTerm, SingleTermH] = {}
         for term in terms:
             self.get_term(term)
         self.processed = False

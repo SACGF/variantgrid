@@ -96,7 +96,7 @@ class FlagDatabase:
     @cached_property
     def flag_collection_to_identifier(self) -> dict[int, AlleleIdentifier]:
         # flag collection to identifier
-        flag_collection_to_allele_identifier = dict()
+        flag_collection_to_allele_identifier = {}
 
         # map classification flags to identifiers
         for classification_data in Classification.objects.values_list('flag_collection__id', 'allele_id',

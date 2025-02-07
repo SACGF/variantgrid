@@ -216,7 +216,7 @@ class ClinvarExportPrepare:
         # so we can check all other alleles to make sure they haven't lost candidates
         valid_allele_origin_buckets = (AlleleOriginBucket.GERMLINE, AlleleOriginBucket.SOMATIC)
 
-        allele_origin_clinvar_key_processed_alleles = dict()
+        allele_origin_clinvar_key_processed_alleles = {}
         for allele_origin_bucket in valid_allele_origin_buckets:
             allele_origin_clinvar_key_processed_alleles[allele_origin_bucket] = defaultdict(list)
 

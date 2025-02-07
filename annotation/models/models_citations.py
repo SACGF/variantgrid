@@ -440,7 +440,7 @@ class CitationFetchResponse:
 
     def __init__(self, entries: list[CitationFetchEntry]):
         self.all_entries = entries
-        requested_to_fetch: dict[Any, CitationFetchEntry] = dict()
+        requested_to_fetch: dict[Any, CitationFetchEntry] = {}
         for fetch in entries:
             for requested_id in fetch.requested_ids:
                 requested_to_fetch[requested_id] = fetch
@@ -482,7 +482,7 @@ class CitationFetchRequest:
     """
 
     def __init__(self, cache_age: Optional[timedelta] = None):
-        self.id_to_fetch: dict[CitationIdNormalized, CitationFetchEntry] = dict()
+        self.id_to_fetch: dict[CitationIdNormalized, CitationFetchEntry] = {}
         """
         Keeps a dict of all normalized IDs to FetchEntries but only for records
         """
