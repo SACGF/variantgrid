@@ -146,7 +146,7 @@ _points_to_criteria = {
 }
 
 
-def _install_horak_evidence_keys(apps, schema_editor):
+def _install_horak_evidence_keys(apps, _schema_editor):
     EvidenceKey = apps.get_model('classification', 'EvidenceKey')
 
     for entry_dict in _horak_data:
@@ -171,7 +171,7 @@ def _install_horak_evidence_keys(apps, schema_editor):
         )
 
 
-def _update_assertion_methods(apps, schema_editor):
+def _update_assertion_methods(apps, _schema_editor):
     EvidenceKey = apps.get_model('classification', 'EvidenceKey')
     assertion_method = EvidenceKey.objects.get(key="assertion_method")
     options: list[dict[str, Any]] = assertion_method.options
@@ -194,12 +194,12 @@ def _update_assertion_methods(apps, schema_editor):
     assertion_method.save()
 
 
-def _remove_horak_evidence_keys(apps, schema_editor):
+def _remove_horak_evidence_keys(apps, _schema_editor):
     EvidenceKey = apps.get_model('classification', 'EvidenceKey')
     EvidenceKey.objects.filter(key__startswith="horak:").delete()
 
 
-def _reverse_update_assertion_methods(apps, schema_editor):
+def _reverse_update_assertion_methods(apps, _schema_editor):
     EvidenceKey = apps.get_model('classification', 'EvidenceKey')
     assertion_method = EvidenceKey.objects.get(key="assertion_method")
     options: list[dict[str, Any]] = assertion_method.options

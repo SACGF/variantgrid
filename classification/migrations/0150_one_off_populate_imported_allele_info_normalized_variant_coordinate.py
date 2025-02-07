@@ -4,7 +4,7 @@ from django.db import migrations
 from django.db.models import F
 
 
-def _one_off_populate_imported_allele_info_normalized_variant_coordinate(apps, schema_editor):
+def _one_off_populate_imported_allele_info_normalized_variant_coordinate(apps, _schema_editor):
     """ https://github.com/SACGF/variantgrid_private/issues/3670 - normalization used to not work
         So anything that has gone through historically was not changed by normalization - thus we can just assign
         the un-normalized variant """

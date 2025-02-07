@@ -6,7 +6,7 @@ from django.db.models import F, Q, Min
 from genes.hgvs import HGVSConverterType
 
 
-def _one_off_populate_hgvsconverterversion_used_converter_type(apps, schema_editor):
+def _one_off_populate_hgvsconverterversion_used_converter_type(apps, _schema_editor):
     HGVSConverterVersion = apps.get_model('classification', 'HGVSConverterVersion')
     ResolvedVariantInfo = apps.get_model('classification', 'ResolvedVariantInfo')
     ImportedAlleleInfo = apps.get_model('classification', 'ImportedAlleleInfo')

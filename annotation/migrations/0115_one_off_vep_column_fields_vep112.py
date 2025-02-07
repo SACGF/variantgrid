@@ -5,7 +5,7 @@ from django.db import migrations
 from library.django_utils import bulk_insert_class_data
 
 
-def _one_off_undo_0113(apps, schema_editor):
+def _one_off_undo_0113(apps, _schema_editor):
     ColumnVEPField = apps.get_model('annotation', 'ColumnVEPField')
     bigwigs = [
         'phastcons_100_way_vertebrate',
@@ -18,7 +18,7 @@ def _one_off_undo_0113(apps, schema_editor):
     ColumnVEPField.objects.filter(column__in=bigwigs).update(summary_stats=None)
 
 
-def _one_off_vep_112_summary_stats_fields(apps, schema_editor):
+def _one_off_vep_112_summary_stats_fields(apps, _schema_editor):
     ColumnVEPField = apps.get_model('annotation', 'ColumnVEPField')
     bigwigs = [
         'phastcons_100_way_vertebrate',

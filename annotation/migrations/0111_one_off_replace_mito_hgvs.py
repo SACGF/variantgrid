@@ -5,7 +5,7 @@ from django.db.models import Value
 from django.db.models.functions import Replace
 
 
-def _one_off_replace_mito_hgvs(apps, schema_editor):
+def _one_off_replace_mito_hgvs(apps, _schema_editor):
     VariantAnnotationVersion = apps.get_model('annotation', 'VariantAnnotationVersion')
     VariantAnnotation = apps.get_model('annotation', 'VariantAnnotation')
     GenomeBuild = apps.get_model('snpdb', 'GenomeBuild')

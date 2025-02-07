@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def add_evidence_key(apps, schema_editor):
+def add_evidence_key(apps, _schema_editor):
     data = {
         "key": "allele_origin_confirmation",
         "order": 12,
@@ -26,7 +26,7 @@ def add_evidence_key(apps, schema_editor):
     EvidenceKey.objects.get_or_create(key="allele_origin_confirmation", defaults=data)
 
 
-def remove_evidence_key(apps, schema_editor):
+def remove_evidence_key(apps, _schema_editor):
     EvidenceKey = apps.get_model('classification', 'EvidenceKey')
     if ek := EvidenceKey.objects.filter(key="allele_origin_confirmation").first():
         ek.delete()

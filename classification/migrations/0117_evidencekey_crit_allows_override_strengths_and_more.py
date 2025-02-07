@@ -3,7 +3,7 @@
 from django.db import migrations, models
 
 
-def _set_allow_custom_strengths(apps, schema):
+def _set_allow_custom_strengths(apps, _schema):
     EvidenceKey = apps.get_model('classification', 'EvidenceKey')
     EvidenceKey.objects.filter(value_type="C").update(crit_allows_override_strengths=True)
 

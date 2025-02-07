@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_rename_clinvar_variantgridcolum(apps, schema_editor):
+def _one_off_rename_clinvar_variantgridcolum(apps, _schema_editor):
     VariantGridColumn = apps.get_model('snpdb', 'VariantGridColumn')
 
     NEW_VARIANT_COLUMNS = {

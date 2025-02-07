@@ -5,7 +5,7 @@ from django.db import migrations
 from classification.evidence_key_rename import OptionUpdator
 
 
-def _update_clinical_significance_to_classification(apps, schema):
+def _update_clinical_significance_to_classification(apps, _schema):
     EvidenceKey = apps.get_model('classification', 'EvidenceKey')
     clin_sig = EvidenceKey.objects.get(key='clinical_significance')
 

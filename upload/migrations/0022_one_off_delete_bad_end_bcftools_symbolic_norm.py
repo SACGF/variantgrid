@@ -8,7 +8,7 @@ from django.db import migrations
 from library.utils import mk_path
 
 
-def _delete_bad_modified_imported_variants(apps, schema_editor):
+def _delete_bad_modified_imported_variants(apps, _schema_editor):
     ModifiedImportedVariant = apps.get_model("upload", "ModifiedImportedVariant")
     qs = ModifiedImportedVariant.objects.all().filter(variant__svlen__isnull=False)
     if miv_values := list(qs.values()):

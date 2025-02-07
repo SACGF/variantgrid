@@ -7,7 +7,7 @@ def _major_version(version_str) -> str:
     return version_str.split(".")[0]
 
 
-def _one_off_vep_version_major_only(apps, schema_editor):
+def _one_off_vep_version_major_only(apps, _schema_editor):
     VariantAnnotationVersion = apps.get_model('annotation', 'VariantAnnotationVersion')
 
     for vav in VariantAnnotationVersion.objects.all():

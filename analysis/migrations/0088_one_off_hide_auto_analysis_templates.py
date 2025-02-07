@@ -3,7 +3,7 @@ from django.conf import settings
 from django.db import migrations
 
 
-def _one_off_hide_auto_analysis_templates(apps, schema_editor):
+def _one_off_hide_auto_analysis_templates(apps, _schema_editor):
     # This is now done in analysis_create_default_templates - so can be deleted
     AnalysisTemplateVersion = apps.get_model("analysis", "AnalysisTemplateVersion")
 

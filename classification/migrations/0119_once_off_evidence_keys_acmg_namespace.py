@@ -36,14 +36,14 @@ __ACMG_KEYS = [
 ]
 
 
-def _namespace_acmg_keys(apps, schema):
+def _namespace_acmg_keys(apps, _schema):
     acmg_key_dict = {}
     for key in __ACMG_KEYS:
         acmg_key_dict[key] = f"acmg:{key}"
     EvidenceKeyRenamer.rename(apps, key_dict=acmg_key_dict)
 
 
-def _reverse_namespace_acmg_keys(apps, schema):
+def _reverse_namespace_acmg_keys(apps, _schema):
     acmg_key_dict = {}
     for key in __ACMG_KEYS:
         acmg_key_dict[f"acmg:{key}"] = key

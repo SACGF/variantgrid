@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_change_hgvs_g_too_long_message(apps, schema_editor):
+def _one_off_change_hgvs_g_too_long_message(apps, _schema_editor):
     VariantAnnotation = apps.get_model('annotation', 'VariantAnnotation')
     VariantTranscriptAnnotation = apps.get_model('annotation', 'VariantTranscriptAnnotation')
 

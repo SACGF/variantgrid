@@ -5,7 +5,7 @@ import os
 from django.db import migrations
 
 
-def _delete_cached_generated_graphs(apps, schema_editor):
+def _delete_cached_generated_graphs(apps, _schema_editor):
     CachedGeneratedFile = apps.get_model("snpdb", "CachedGeneratedFile")
 
     num_deleted_files = 0

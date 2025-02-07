@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _update_condition_for_somatic(apps, schema):
+def _update_condition_for_somatic(apps, _schema):
     EvidenceKey = apps.get_model('classification', 'EvidenceKey')
     condition = EvidenceKey.objects.get(key='condition')
     condition.namespace_overrides = {

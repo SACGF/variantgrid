@@ -4,7 +4,7 @@ from django.db import migrations
 from django.db.models import F
 
 
-def _one_off_copy_citext_to_textfield(apps, schema_editor):
+def _one_off_copy_citext_to_textfield(apps, _schema_editor):
     GeneSymbol = apps.get_model('genes', 'GeneSymbol')
     GeneSymbolAlias = apps.get_model('genes', 'GeneSymbolAlias')
 

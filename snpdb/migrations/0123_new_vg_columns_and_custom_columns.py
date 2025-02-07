@@ -25,7 +25,7 @@ _COLLECTIONS = {
 }
 
 
-def _add_vg_columns(apps, schema_editor):
+def _add_vg_columns(apps, _schema_editor):
     VARIANT_LEVEL = 'V'
     DATABASE_LEVEL = 'D'
 

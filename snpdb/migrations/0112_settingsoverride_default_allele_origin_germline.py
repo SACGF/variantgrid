@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _set_global_default(apps, schema):
+def _set_global_default(apps, _schema):
     GlobalSettings = apps.get_model("snpdb", "GlobalSettings")
     global_settings = GlobalSettings.objects.get()
     global_settings.allele_origin_focus = "G"

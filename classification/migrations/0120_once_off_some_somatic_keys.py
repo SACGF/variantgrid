@@ -4,7 +4,7 @@ from typing import Any
 from django.db import migrations
 
 
-def _create_somatic_clinical_significance(apps, schema):
+def _create_somatic_clinical_significance(apps, _schema):
     EvidenceKey = apps.get_model('classification', 'EvidenceKey')
     EvidenceKey.objects.create(
         key="somatic:clinical_significance",
@@ -62,12 +62,12 @@ Tier IV: Benign or Likely Benign Variants
     )
 
 
-def _reverse_create_somatic_clinical_significance(apps, schema_editor):
+def _reverse_create_somatic_clinical_significance(apps, _schema_editor):
     EvidenceKey = apps.get_model('classification', 'EvidenceKey')
     EvidenceKey.objects.filter(key="somatic:clinical_significance").delete()
 
 
-def _update_allele_origin(apps, schema_editor):
+def _update_allele_origin(apps, _schema_editor):
     EvidenceKey = apps.get_model('classification', 'EvidenceKey')
     allele_origin = EvidenceKey.objects.get(key="allele_origin")
     options: list[dict[str, Any]] = allele_origin.options
@@ -91,7 +91,7 @@ def _re_mandatory_clinical_siginficance(apps, sceham_editor):
     EvidenceKey.objects.filter(key="clinical_significance").update(mandatory=True)
 
 
-def _reverse_allele_origin(apps, schema_editor):
+def _reverse_allele_origin(apps, _schema_editor):
     EvidenceKey = apps.get_model('classification', 'EvidenceKey')
     allele_origin = EvidenceKey.objects.get(key="allele_origin")
     options: list[dict[str, Any]] = allele_origin.options

@@ -2,7 +2,7 @@
 
 from django.db import migrations
 
-def _one_off_update_vep_112_conservation_sv(apps, schema_editor):
+def _one_off_update_vep_112_conservation_sv(apps, _schema_editor):
     """
         These were accidentally left as short/standard variant only due to copy/paste
         I have modified the migration 0115 - so can delete this if squishing migrations

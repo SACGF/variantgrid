@@ -5,7 +5,7 @@ from django.db import migrations
 from classification.evidence_key_rename import OptionUpdator
 
 
-def _tweak_somatic_e_keys(apps, schema_editor):
+def _tweak_somatic_e_keys(apps, _schema_editor):
     EvidenceKey = apps.get_model('classification', 'EvidenceKey')
 
     option_updator = OptionUpdator(EvidenceKey.objects.get(key='assertion_method'))

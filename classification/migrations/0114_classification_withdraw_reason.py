@@ -1,7 +1,7 @@
 from django.db import migrations, models
 
 
-def set_withdrawn_record_to_other(apps, schema_editor):
+def set_withdrawn_record_to_other(apps, _schema_editor):
     Classification = apps.get_model('classification', 'Classification')
     for classification in Classification.objects.filter(withdrawn=True, withdraw_reason__isnull=True):
         classification.withdraw_reason = 'OTHER'

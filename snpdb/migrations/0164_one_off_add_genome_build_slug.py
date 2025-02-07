@@ -4,7 +4,7 @@ from django.db import migrations
 from django.utils.text import slugify
 
 
-def _one_off_add_genome_build_slug(apps, schema_editor):
+def _one_off_add_genome_build_slug(apps, _schema_editor):
     GenomeBuild = apps.get_model("snpdb", "GenomeBuild")
     for genome_build in GenomeBuild.objects.filter(slug__isnull=True):
         genome_build.slug = slugify(genome_build.name)

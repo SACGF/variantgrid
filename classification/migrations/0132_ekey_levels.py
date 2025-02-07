@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _add_evidence_keys(apps, schema_editor):
+def _add_evidence_keys(apps, _schema_editor):
     EvidenceKey = apps.get_model('classification', 'EvidenceKey')
     EvidenceKey.objects.filter(key__startswith='amp:level_').delete()
 

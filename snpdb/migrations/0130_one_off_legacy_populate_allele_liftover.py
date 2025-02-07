@@ -5,7 +5,7 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
-def _one_off_allele_liftover(apps, schema_editor):
+def _one_off_allele_liftover(apps, _schema_editor):
     AlleleLiftover = apps.get_model("snpdb", "AlleleLiftover")
 
     records = []

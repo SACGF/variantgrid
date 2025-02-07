@@ -5,7 +5,7 @@ from django.db import migrations
 from django.db.models.functions import Abs
 
 
-def _one_off_historical_vep_too_long(apps, schema_editor):
+def _one_off_historical_vep_too_long(apps, _schema_editor):
     Variant = apps.get_model("snpdb", "Variant")
     VariantAnnotation = apps.get_model("annotation", "VariantAnnotation")
 

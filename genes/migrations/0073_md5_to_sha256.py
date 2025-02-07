@@ -6,7 +6,7 @@ from django.db import migrations
 from library.utils import file_sha256sum, sha256sum_str
 
 
-def _md5_to_sha256(apps, schema_editor):
+def _md5_to_sha256(apps, _schema_editor):
     CanonicalTranscriptCollection = apps.get_model('genes', 'CanonicalTranscriptCollection')
     TranscriptVersionSequenceInfoFastaFileImport = apps.get_model('genes', 'TranscriptVersionSequenceInfoFastaFileImport')
     CustomTextGeneList = apps.get_model('genes', 'CustomTextGeneList')

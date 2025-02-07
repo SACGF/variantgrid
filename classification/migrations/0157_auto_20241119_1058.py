@@ -5,7 +5,7 @@ from django.db import migrations
 from classification.evidence_key_rename import EvidenceKeyRenamer, OptionUpdator
 
 
-def _migrate_testing_context(apps, schema):
+def _migrate_testing_context(apps, _schema):
     EvidenceKeyRenamer.rename(apps, old_key="somatic:testing_context", new_key="testing_context")
     e_key = apps.get_model('classification', 'EvidenceKey').objects.get(key="testing_context")
     e_key.sub_label = None
@@ -20,7 +20,7 @@ def _migrate_testing_context(apps, schema):
     options.save()
 
 
-def _reverse_migrate_testing_context(apps, schema):
+def _reverse_migrate_testing_context(apps, _schema):
     EvidenceKeyRenamer.rename(apps, old_key="testing_context", new_key="somatic:testing_context")
     e_key = apps.get_model('classification', 'EvidenceKey').objects.get(key="somatic:testing_context")
     e_key.sub_label = "Somatic"

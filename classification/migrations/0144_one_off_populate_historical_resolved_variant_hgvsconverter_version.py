@@ -7,7 +7,7 @@ from django.db import migrations
 from genes.hgvs import HGVSConverterType
 
 
-def _one_off_populate_historical_resolved_variant_hgvsconverter_version(apps, schema_editor):
+def _one_off_populate_historical_resolved_variant_hgvsconverter_version(apps, _schema_editor):
     HGVSConverterVersion = apps.get_model('classification', 'HGVSConverterVersion')
     ResolvedVariantInfo = apps.get_model('classification', 'ResolvedVariantInfo')
 
