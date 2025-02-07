@@ -207,7 +207,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
         try:
             var_g, matches_reference = self._hgvs_to_g_hgvs(hgvs_string)
             try:
-                (chrom, position, ref, alt, typ) = self.babelfish.hgvs_to_vcf(var_g)
+                (chrom, position, ref, alt, _typ) = self.babelfish.hgvs_to_vcf(var_g)
                 if alt == '.':
                     alt = ref
             except HGVSDataNotAvailableError:

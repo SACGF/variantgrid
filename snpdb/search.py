@@ -237,7 +237,7 @@ class SearchMessage:
     def __post_init__(self):
         if not isinstance(self.message, str):
             raise ValueError(f"Created a Search Message with something other than string {self.message}")
-        if self.message == "" or self.message == "None":
+        if self.message in {"", "None"}:
             raise ValueError(f"Created SearchMessage with message of ({self.message})")
 
     def __str__(self):
@@ -556,7 +556,7 @@ class _SearchResultFactory:
             search_result = self.converter(obj)
             if search_result is None:
                 continue
-            elif not isinstance(search_result, SearchResult):
+            if not isinstance(search_result, SearchResult):
                 raise ValueError(f"search result factory returned {search_result} instead of a SearchResult")
             if self.extra_messages:
                 search_result.messages += self.extra_messages

@@ -368,8 +368,7 @@ def _yield_results_from_hgvs(search_input, genome_build, matcher, hgvs_string) -
     results = get_results_from_variant_coordinate(genome_build, search_input.get_visible_variants(genome_build),
                                                   variant_coordinate)
     if results.exists():
-        for r in results:
-            yield r
+        yield from results
     else:
         variant_string = Variant.format_tuple(*variant_coordinate)
         if create_manual := VariantExtra.create_manual_variant(
@@ -550,18 +549,11 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         variant_coordinate, used_transcript_accession, kind, _used_converter_type, method, matches_reference = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string)
         logging.info("get_variant_coordinate_used_transcript_kind_method_and_matches_reference - variant_coordinate=%s", variant_coordinate)
         if not matches_reference:
-            ref_base = variant_coordinate[2]
-
-            # reporting on the "provided" reference is slightly promblematic as it's not always provided directly, it could be indirectly
+            # reporting on the "provided" reference is slightly problematic as it's not always provided directly, it could be indirectly
 
             if isinstance(matches_reference, HgvsMatchRefAllele) and matches_reference.provided_ref:
                 msg = matches_reference.get_message()
                 search_messages.append(SearchMessage(msg, LogLevel.ERROR, substituted=True))
-            else:
-                # if no reference was provided, do we even need to provide a message?
-                # e.g. this is providing a ref for when we have a delins, e.g. delinsGT => delCCinsGT
-                # reference_message.append(SearchMessage(f'Using reference "{ref_base}" from our build', LogLevel.INFO))
-                pass
 
     except MissingTranscript:
         pass

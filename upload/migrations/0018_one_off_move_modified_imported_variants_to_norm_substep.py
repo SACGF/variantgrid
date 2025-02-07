@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_move_modified_imported_variants_to_norm_substep(apps, sample):
+def _one_off_move_modified_imported_variants_to_norm_substep(apps, _schema_editor):
     ModifiedImportedVariants = apps.get_model("upload", "ModifiedImportedVariants")
 
     # These are useless, get rid of them so we speed up migration
