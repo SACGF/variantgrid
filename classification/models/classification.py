@@ -40,7 +40,8 @@ from classification.models.classification_variant_info_models import ImportedAll
 from classification.models.evidence_key import EvidenceKeyValueType, \
     EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell, EvidenceKeyOverrides
 from classification.models.evidence_mixin import EvidenceMixin, VCPatch
-from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCalculator
+from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCalculator, \
+    ClassificationSummaryCacheDict
 from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagPermissionLevel, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
@@ -508,6 +509,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     summary = models.JSONField(null=False, blank=True, default=dict)  # useful for overall classification details
     """ Will be a ClassificationSummaryCacheDict """
+
+    @property
+    def summary_typed(self) -> ClassificationSummaryCacheDict:
+        return self.summary
 
     last_source_id = models.TextField(blank=True, null=True)
     last_import_run = models.ForeignKey(ClassificationImportRun, null=True, blank=True, on_delete=SET_NULL)

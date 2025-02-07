@@ -1,0 +1,5 @@
+{% for values in values_list %}
+    <span title="{{ values.title }}" class="d-inline-block c-pill {{ values.css_class }}">{{ values.label }}
+        {% if values.pending_from %} <i class="fa-solid fa-clock" title="This is a pending change, the classification is currently {{ values.pending_from }}"></i>{% endif %}
+    </span>
+{% endfor %}
