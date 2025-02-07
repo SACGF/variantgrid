@@ -77,7 +77,7 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                     al = AlleleLiftover(allele=allele,
                                         liftover=liftover,
                                         status=ProcessingStatus.ERROR,
-                                        error = {
+                                        error={
                                             "error_message": f"Validation Error: {error_message}",
                                         })
                 allele_liftover_records.append(al)
