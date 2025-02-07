@@ -27,7 +27,7 @@ def _md5_to_sha256(apps, _schema_editor):
             gf.index_sha256sum = file_sha256sum(gf.index_filename)
         else:
             logging.warning("Genome fasta index: '%s' does not exist", gf.index_filename)
-            gf.index_sha256sum = f"old-md5sum-hash-" + gf.index_md5sum
+            gf.index_sha256sum = "old-md5sum-hash-" + gf.index_md5sum
         gf_records.append(gf)
     if gf_records:
         GenomeFasta.objects.bulk_update(gf_records, fields=['index_sha256sum'])

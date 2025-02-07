@@ -505,7 +505,7 @@ def sequencing_run_qc_json_graph(request, sequencing_run_id, qc_compare_type):
 
 def qc_column_graph(request, qc_column_id, use_percent):
     qc_column = get_object_or_404(QCColumn, pk=qc_column_id)
-    logging.info(f"USing %s", qc_column)
+    logging.info("Using %s", qc_column)
     use_percent = json.loads(use_percent)  # Boolean
 
     data_state = qc_column.qc_type.qc_object_path + "__data_state"

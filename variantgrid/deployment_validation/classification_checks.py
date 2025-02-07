@@ -24,7 +24,7 @@ def check_classification_reports() -> dict:
                 fixes.append(f"modify {unknown=}")
             if colons:
                 fixes.append(f"change colon (':') to underscore ('_') for: {colons=}")
-            fix = f"Modify ClassificationReportTemplate: " + " and ".join(fixes)
+            fix = "Modify ClassificationReportTemplate: " + " and ".join(fixes)
         else:
             fix = ""
 

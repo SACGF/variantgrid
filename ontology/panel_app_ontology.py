@@ -112,7 +112,7 @@ def _update_gene_relations(gene_symbol: str):
                                                                                        gene_symbol=alias.other_symbol)
                         if not is_empty_results(alias_results_json):
                             alias_symbol = alias.other_symbol
-                            report_message(message=f"PanelAppAU no results for gene symbol, making substitution",
+                            report_message(message="PanelAppAU no results for gene symbol, making substitution",
                                            extra_data={"target": f"{gene_symbol} -> {alias.other_symbol}"})
                             results_json = alias_results_json
                             break

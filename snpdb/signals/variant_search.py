@@ -265,7 +265,7 @@ def yield_search_variant_match(search_input: SearchInputInstance, get_variant_co
         if not variant_coordinate.is_symbolic():
             # Only check refs if explicit, non-symbolic refs
             calculated_ref = variant_coordinate.calculated_reference(genome_build)
-            logging.info(f"calc ref: %s, provided ref: %s", calculated_ref, variant_coordinate.ref)
+            logging.info("calc ref: %s, provided ref: %s", calculated_ref, variant_coordinate.ref)
             if calculated_ref != variant_coordinate.ref:
                 provided_ref = variant_coordinate.ref
                 sm = SearchMessage(f'Using genomic reference "{calculated_ref}" from our build, in place of provided reference "{provided_ref}"',

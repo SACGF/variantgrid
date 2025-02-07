@@ -23,7 +23,7 @@ def check_somalier() -> dict:
     somalier_data = {
         "somalier_config": {
             "valid": verify_somalier_config(),
-            "fix": f"Install Somalier, and place in path https://github.com/brentp/somalier/"
+            "fix": "Install Somalier, and place in path https://github.com/brentp/somalier/"
         }
     }
     somalier_cfg = SomalierConfig()

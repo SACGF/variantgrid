@@ -42,7 +42,7 @@ class Command(BaseCommand):
             for k, data in check.items():
                 if data.get("valid"):
                     if not quiet:
-                        logging.info(f"%s, %s: OK", check_type, k)
+                        logging.info("%s, %s: OK", check_type, k)
                 else:
                     fix = data.get("fix")
                     msg = f"{check_type=} {k} INVALID. Fix: {fix}"

@@ -39,7 +39,7 @@ def check_library_versions() -> dict:
                 assert version >= version_required, "Library %s (%s) requires version >= %s" % (name, version, version_required)
             library_version_valid[name] = {
                 "valid": True,
-                "fix": f"All good",
+                "fix": "All good",
             }
         except Exception as ex:
             library_version_valid[name] = {

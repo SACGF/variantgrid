@@ -654,7 +654,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
     @staticmethod
     def get_node_class_label():
         """ Used in create node dropdown """
-        raise NotImplementedError(f"get_node_class_label not implemented - this is probably due to a new class, or a reverse migration wiping out the subclass leaving just the AnalysisNode")
+        raise NotImplementedError("get_node_class_label not implemented - this is probably due to a new class, or a reverse migration wiping out the subclass leaving just the AnalysisNode")
 
     def _get_genome_build_errors(self, field_name, field_genome_build: GenomeBuild) -> list:
         """ Used to quickly add errors about genome build mismatches
