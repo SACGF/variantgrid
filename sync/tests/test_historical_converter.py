@@ -5,6 +5,7 @@ The key changes happened in:
 
 classification.migrations.0042_vep_ekeys.modifying_existing_keys
 """
+import unittest
 from collections import namedtuple
 from unittest import skip
 
