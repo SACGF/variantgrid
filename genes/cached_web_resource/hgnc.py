@@ -33,7 +33,7 @@ def store_hgnc_from_web(cached_web_resource: CachedWebResource):
     # Make sure gene symbols are matched to genes in each release
     for release in GeneAnnotationRelease.objects.all():
         gm = ReleaseGeneMatcher(release)
-        logging.info(f"Checking GeneAnnotationRelease: {release}")
+        logging.info("Checking GeneAnnotationRelease: %s", release)
         gm.match_unmatched_in_hgnc_and_gene_lists()
 
     status_counts = get_field_counts(HGNC.objects.all(), "status")

@@ -940,7 +940,7 @@ def search_receiver(
 
                 # TODO, determine if the Exception type is valid for users or not
                 overall_messages.add(SearchMessageOverall(message, severity=LogLevel.ERROR))
-                logging.error(f"Error handling search_receiver on {func}")
+                logging.error("Error handling search_receiver on %s", func)
                 report_exc_info()
 
             response = SearchResponse(

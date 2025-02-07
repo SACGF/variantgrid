@@ -680,7 +680,6 @@ class ModifiedImportedVariant(models.Model):
     def bcftools_format_old_variant(old_variant: str, svlen: Optional[str], genome_build: GenomeBuild) -> list[str]:
         """ We need consistent formatting (case and use of chrom) so we can retrieve it easily.
             May return multiple values """
-        formatted_old_variants = []
         # old variant can either have 4 or 5 fields (last one is alt index if multi-allelic)
         cols = old_variant.split("|")
         chrom, position, ref, alts = cols[:4]
