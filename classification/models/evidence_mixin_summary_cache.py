@@ -31,6 +31,7 @@ class ClassificationSummaryCacheDictPathogenicity(TypedDict):
     classification: Optional[str]
     sort: int
     bucket: Optional[int]
+    pending: Optional[str]
 
 
 class ClassificationSummaryCacheDictSomatic(TypedDict):
