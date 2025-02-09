@@ -6,6 +6,7 @@ from functools import cached_property, reduce
 from operator import attrgetter
 from typing import Optional, Iterable
 
+import django
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, transaction
@@ -31,6 +32,9 @@ from ontology.models import OntologyTerm, OntologyService, OntologySnake, Ontolo
 from ontology.ontology_matching import normalize_condition_text, \
     OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS, IGNORE_TERMS, NON_PR_TERMS
 from snpdb.models import Lab
+
+
+condition_set_signal = django.dispatch.Signal()  # args: "classification", "resolved_condition"
 
 
 class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
@@ -1128,24 +1132,27 @@ def apply_condition_resolution(classification: Classification, new_condition_res
         old_condition_resolution = classification_data['condition_resolution']
         condition_text_old = "No Matched Condition"
         condition_text = "No Matched Condition"
+
         if old_condition_resolution:
-            condition_text_old = ConditionResolved.from_dict(old_condition_resolution)
-            condition_text_old = condition_text_old.summary
+            condition_text_old = ConditionResolved.from_dict(old_condition_resolution).summary
 
         if new_condition_resolution:
-            condition_text = ConditionResolved.from_dict(new_condition_resolution)
-            condition_text = condition_text.summary
+            condition_text = ConditionResolved.from_dict(new_condition_resolution).summary
 
         if old_condition_resolution != new_condition_resolution:
             condition_text = f"{condition_text_old} --> {condition_text}"
             classification.condition_resolution = new_condition_resolution
 
+            # TODO, handle this via signal?
             classification.flag_collection_safe.add_flag(
                 comment=condition_text,
                 data=new_condition_resolution,
                 flag_type=classification_flag_types.condition_resolution,
             )
             classification.save(update_fields=['condition_resolution'])
+
+            condition_set_signal.send(sender=Classification, classification=classification,
+                                      condition=ConditionResolved.from_dict(new_condition_resolution))
 
 
 def apply_condition_resolution_to_classifications(ctm: ConditionTextMatch):
