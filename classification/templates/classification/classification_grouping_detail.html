@@ -18,7 +18,7 @@
         {% if classification_grouping.classification_count > 10 %}
             <div>Total of {{ classification_grouping.classification_count }} records, showing most recent 10 - <a data-toggle="ajax-modal" data-title="All classifications for grouping" href="{% url "classification_grouping_records_detail" classification_grouping.pk %}">Show All</a></div>
         {% endif %}
-        {% for record in classification_grouping.classification_modifications|slice:":10" reversed %}
+        {% for record in classification_grouping.classification_modifications|slice:"-10:" reversed %}
             {% if forloop.counter == 2 %}<hr/>{% endif %}
             {% if forloop.counter == 1 and classification_grouping.classification_modifications|length > 1 %}
                 <label class="mt-1">Latest</label>
