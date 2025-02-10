@@ -758,11 +758,12 @@ class ImportedAlleleInfo(TimeStampedModel):
             # Our string rep of indels doesn't show the reference base - so do a comparison of the object
             if self.matched_variant:
                 existing_vc = self.matched_variant.coordinate
+                new_vc = cvc.variant_coordinate
                 if existing_vc != cvc.variant_coordinate:
-                    if existing_vc.ref != cvc.variant_coordinate.ref:
-                        new_dirty_message = f"{cvc.message}\nRef was: {existing_vc.ref} -> {cvc.variant_coordinate.ref}"
+                    if existing_vc and new_vc and existing_vc.ref != new_vc.ref:
+                        new_dirty_message = f"{cvc.message}\nRef was: {existing_vc.ref} -> {new_vc.ref}"
                     else:
-                        new_dirty_message = f"{cvc.message}\nExisting={repr(existing_vc)} != {repr(cvc.variant_coordinate)}"
+                        new_dirty_message = f"{cvc.message}\n{repr(existing_vc)} -> {repr(new_vc)}"
 
         if self.dirty_message != new_dirty_message:
             self.dirty_message = new_dirty_message
