@@ -190,7 +190,7 @@ def code_shell(data: str):
 
 
 @register.inclusion_tag("uicore/tags/timestamp.html")
-def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False, text_only: bool = False):
+def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False, text_only: bool = False, tooltip: str = ""):
     css_classes = []
     if time_ago:
         css_classes.append('time-ago')
@@ -208,6 +208,7 @@ def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False, tex
                     raise ValueError(f"Unsure how to convert {timestamp} to timestamp")
             timestamp = timestamp.timestamp()
         return {
+            "tooltip": tooltip,
             "datetime": datetime.datetime.fromtimestamp(timestamp),
             "date": date_value,
             "timestamp": timestamp,

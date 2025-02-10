@@ -4,8 +4,8 @@ import re
 import uuid
 from collections import Counter, namedtuple
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
-from enum import Enum
+from datetime import datetime, timezone, timedelta, date
+from enum import Enum, StrEnum
 from functools import cached_property
 from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict, Tuple, Set
 
@@ -786,7 +786,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return None
 
     @staticmethod
-    def to_date_str(datetime_value: datetime) -> str:
+    def to_date_str(datetime_value: Union[date, datetime]) -> str:
         return datetime_value.strftime('%Y-%m-%d')
 
     def set_withdrawn(self, user: User, withdraw: bool = False, reason: str = 'OTHER') -> bool:
@@ -2660,18 +2660,45 @@ class ClassificationConsensus:
         return patch
 
 
-@dataclass
-class ClassificationDateType:
-    date: datetime
-    name: Optional[str] = None
+class ClassificationDateType(StrEnum):
+    CURATION = ""  # default
+    VERIFIED = "Verified"
+    SAMPLE_DATE = "Sample Date"
+    CREATED = "Created"
+
+
+@dataclass(frozen=True)
+class ClassificationDate:
+    date_type: ClassificationDateType
+    datetime: Optional[datetime] = None
+    date: Optional[date] = None
+
+    def __post_init__(self):
+        if not self.date and not self.datetime:
+            raise ValueError("Either datetime or date must be provided")
+
+    @property
+    def name(self):
+        return self.date_type.value
+
+    @property
+    def value(self) -> Union[date, datetime]:
+        if self.date:
+            return self.date
+        return self.datetime
 
     @property
     def date_str(self) -> str:
-        return Classification.to_date_str(self.date)
+        return Classification.to_date_str(self.value)
 
-    @property
-    def is_fallback(self) -> bool:
-        return self.name == "Created"
+    def __lt__(self, other: 'ClassificationDate'):
+        if self.datetime and other.datetime:
+            return self.datetime < other.datetime
+        else:
+            return self.date < other.date
+
+
+CLASSIFICATION_DATE_REGEX = re.compile(r"(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-(?P<day>[0-9]{2})")
 
 
 class CuratedDate:
@@ -2688,78 +2715,69 @@ class CuratedDate:
     def timezone(self):
         return gettz(settings.TIME_ZONE)
 
-    def convert_date(self, evidence_key):
+    def convert_date(self, evidence_key) -> Optional[date]:
         if date_str := self._modification.get(evidence_key):
-            try:
-                return Classification.to_date(date_str).astimezone(self.timezone)
-            except:
-                pass
-        return None
+            if m := CLASSIFICATION_DATE_REGEX.match(date_str):
+                return date(year=int(m.group("year")), month=int(m.group("month")), day=int(m.group("day")))
 
     @cached_property
-    def curated_date(self) -> Optional[datetime]:
-        return self.convert_date(SpecialEKeys.CURATION_DATE)
+    def curation_date(self) -> Optional[ClassificationDate]:
+        if date_val := self.convert_date(SpecialEKeys.CURATION_DATE):
+            return ClassificationDate(date_type=ClassificationDateType.CURATION, date=date_val)
 
     @cached_property
-    def sample_date(self) -> Optional[datetime]:
-        return self.convert_date(SpecialEKeys.SAMPLE_DATE)
+    def curated_verified_date(self) -> Optional[ClassificationDate]:
+        if date_val := self.convert_date(SpecialEKeys.CURATION_VERIFIED_DATE):
+            return ClassificationDate(date_type=ClassificationDateType.VERIFIED, date=date_val)
 
     @cached_property
-    def curated_verified_date(self) -> Optional[datetime]:
-        return self.convert_date(SpecialEKeys.CURATION_VERIFIED_DATE)
+    def sample_date(self) -> Optional[ClassificationDate]:
+        if date_val := self.convert_date(SpecialEKeys.SAMPLE_DATE):
+            return ClassificationDate(date_type=ClassificationDateType.SAMPLE_DATE, date=date_val)
 
     @cached_property
-    def created_date(self) -> datetime:
-        return self._modification.classification.created.astimezone(self.timezone)
+    def created_date(self) -> ClassificationDate:
+        return ClassificationDate(date_type=ClassificationDateType.CREATED, date=self._modification.classification.created.astimezone(self.timezone))
 
     @cached_property
-    def epoch(self):
-        return datetime.utcfromtimestamp(0).astimezone(self.timezone)
-
-    @cached_property
-    def relevant_date(self) -> ClassificationDateType:
+    def relevant_date(self) -> ClassificationDate:
         """
         Return the most relevant date (for reporting) along with a name for the date if it isn't the Sample Date
         """
-        if date := self.curated_date:
-            return ClassificationDateType(date)  # don't provide label for curated as it's the default
-        elif date := self.curated_verified_date:
-            return ClassificationDateType(date, "Verified")
-        elif date := self.sample_date:
-            return ClassificationDateType(date, "Sample Date")
-        return ClassificationDateType(self.created_date, "Created")
+        if curation_date := self.curation_date:
+            return curation_date
+        if curation_verified_date := self.curated_verified_date:
+            return curation_verified_date
+        if sample_date := self.sample_date:
+            return sample_date
+        return self.created_date
 
     @property
     def name(self) -> str:
         return self.relevant_date.name
 
     @property
-    def date(self) -> datetime:
-        return self.relevant_date.date
+    def value(self) -> Union[date, datetime]:
+        return self.relevant_date.value
+
+    @property
+    def date(self) -> Union[date, datetime]:
+        return self.value
 
     def __lt__(self, other: 'CuratedDate') -> bool:
-        epoch = self.epoch
-
         my_relevant_date = self.relevant_date
         other_relevant_date = other.relevant_date
 
-        # fallback dates (e.g. Created) are seen as before all other dates
-        # can almost think of it as null... but not 100% null
-        if my_relevant_date.is_fallback != other_relevant_date.is_fallback:
-            return my_relevant_date.is_fallback
-
-        # both dates aren't fallback (or both are) if they're diff return the earliest
-        if my_relevant_date.date != other_relevant_date.date:
-            return my_relevant_date.date < other_relevant_date.date
+        if my_relevant_date.value != other_relevant_date.value:
+            return my_relevant_date < other_relevant_date
 
         # Most relevant dates are the same, now go down the chain until we find a difference
-
-        def direction(date_1, date_2):
-            nonlocal epoch
-            date_1 = date_1 or epoch
-            date_2 = date_2 or epoch
-
-            if date_1 == date_2:
+        def direction(date_1: ClassificationDate, date_2: ClassificationDate):
+            if date_1 is None and date_2 is not None:
+                return -1
+            elif date_1 is not None and date_2 is None:
+                return 1
+            if date_1.value == date_2.value:
                 return 0
             elif date_1 < date_2:
                 return -1

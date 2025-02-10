@@ -2436,32 +2436,22 @@ VCTable.condition = (data, type, row) => {
 VCTable.latest_curation_and_link = (data, type, row) => {
     let lastCurated = data["curation_date"];
     if (lastCurated) {
-        let dom = $("<div>")
-        let curatedMoment = convertTimestampToMoment(lastCurated);
-        let timestampStr = curatedMoment.format(JS_DATE_ONLY_FORMAT);
-
-        // if we do time ago
-        let timeAgoText = jQuery.timeago(curatedMoment.valueOf());
-        let content = $('<time>', {class: 'ago', datetime: curatedMoment.toISOString(), text: timeAgoText, title: timestampStr});
-
-        // if we jsut want the date
-        //let content = $('<span>', {class: 'timestamp', text: timestampStr});
+        let dom = $("<div>");
+        let content = $("<data>", {"class": "convert-timestamp time-ago", "data-date": lastCurated});
 
         let classificationId = data["classification_id"];
         if (classificationId) {
-            content = $('<a>', {
+             content = $('<a>', {
                 href: Urls.view_classification(classificationId),
                 class: 'hover-link',
                 html: content
             });
+            dom.append(content);
         }
-        dom.append(content);
-
         let dateType = data["date_type"];
         if (dateType) {
             dom.append($("<div>", {text: dateType}));
         }
-
         return dom;
     } else {
         return $("<span>", {text:"-", class: "no-value"})
