@@ -12,20 +12,21 @@
             {% if record_count and record_count != 1 %}
                 x {{ record_count }}
             {% endif %}
-
-            <a class="hover-link" href="{% url 'view_classification' vcm.classification.id %}">&nbsp;
-                <img src="{% static vcm.share_level_enum.icon %}" width="12px" height="12px" style="margin-right:4px;" />
-                <span {% if vcm.vc.withdrawn %}style="text-decoration: line-through"{% endif %}>
-                    {% if show_lab %}{{vcm.classification.lab.name}} / {% endif %}{{vcm.cr_lab_id }}
-                </span>
-            </a>
+            <strong>
+                <a class="hover-link" href="{% url 'view_classification' vcm.classification.id %}">&nbsp;
+                    <img src="{% static vcm.share_level_enum.icon %}" width="12px" height="12px" style="margin-right:4px;" />
+                    <span {% if vcm.vc.withdrawn %}style="text-decoration: line-through"{% endif %}>
+                        {% if show_lab %}{{vcm.classification.lab.name}} / {% endif %}{{vcm.cr_lab_id }}
+                    </span>
+                </a>
+            </strong>
             {% if show_condition %}
                 - <span style="opacity:0.75">{% condition vcm.condition_resolution_obj_fallback limit=50 no_condition_message=True %}</span>
             {% endif %}
             {% if show_criteria and vcm.classification.summary.criteria_labels %}
                 - <span class="text-monospace text-secondary">{% for crit in vcm.classification.summary.criteria_labels %}{% if not forloop.first %},{% endif %}{{ crit }}{% endfor %}</span>
             {% endif %}
-            : {% timestamp vcm.curated_date time_ago=True %}
+            : {% timestamp vcm.curated_date_check.value time_ago=True tooltip=vcm.curated_date_check.name %}
     {% endif %}
     {% if show_flags %}<div class="flags d-inline-block" style="margin-left:12px; position: relative; bottom: -4px;" data-flags="{{ vcm.classification.flag_collection_id }}">...</div>{% endif %}
 </span>

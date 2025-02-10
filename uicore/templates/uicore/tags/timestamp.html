@@ -1,6 +1,8 @@
 {% if text_only %}{% if timestamp %}{{ datetime|date:"Y-m-d" }}{% else %}-{% endif %}{% else %}
-{% if timestamp %}
-    <data class="convert-timestamp {{ css_class }}" data-timestamp="{{ timestamp }}">{{ timestamp }}</data>
+{% if date %}
+    <data class="convert-timestamp {{ css_class }}" data-title="{{ tooltip }}" data-date="{{ date|date:"Y-m-d" }}">{{ date|date:"Y-m-d" }}</data>
+{% elif timestamp %}
+    <data class="convert-timestamp {{ css_class }}" data-title="{{ tooltip }}" data-timestamp="{{ timestamp }}">{{ timestamp }}</data>
 {% else %}
     <span class="no-value">-</span>
 {% endif %}{% endif %}

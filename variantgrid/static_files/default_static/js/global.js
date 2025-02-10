@@ -984,27 +984,73 @@ function configureTimestamps() {
 
 function convertTimestampDom(elem) {
     elem = $(elem);
-    let unix= Number(elem.attr('data-timestamp'));
-    let m = moment();
-    if (unix) {
-        m = moment(unix * 1000);
+
+    let m;
+    let wasDateOnly = false;
+    let title = elem.attr("data-title");
+
+    let date_str = elem.attr('data-date');
+    if (date_str) {
+        wasDateOnly = true;
+        m = moment(date_str, 'YYYY-MM-DD').startOf('day');
+
+        let today = moment().startOf('day');
+        let finalText = null;
+        let daysDiff = m.diff(today, 'days');
+        switch (daysDiff) {
+            // put a special case in for 2 as the hours component can sometimes trick timeAgo
+            case -2: finalText = "2 days ago"; break;
+            case -1: finalText = "Yesterday"; break;
+            case 0: finalText = "Today"; break;
+            case 1: finalText = "Tomorrow"; break;
+            case 2: finalText = "2 days from now"; break;
+            default: console.log(`Date Diff = ${daysDiff}`);
+        }
+        if (finalText) {
+            let text = m.format("YYYY-MM-DD");
+            if (title) {
+                text += "<br/>" + title;
+            }
+            let newElement = $('<time>', {text: finalText, title: text});
+            elem.replaceWith(newElement);
+            newElement.tooltip({html: true});
+            return newElement;
+        }
+    } else {
+        let unix= Number(elem.attr('data-timestamp'));
+        if (unix) {
+            m = moment(unix * 1000);
+        } else {
+            m = moment();
+        }
     }
+
+    let newElement;
     if (elem.hasClass('time-ago')) {
         let isFuture = moment().diff(m) < 0;
-        let newElement = $('<time>', {class: 'ago', datetime: m.toISOString(), text: m.format(JS_DATE_FORMAT_DETAILED)});
+        let format = JS_DATE_FORMAT_DETAILED;
+        if (wasDateOnly) {
+            format = JS_DATE_ONLY_FORMAT;
+        }
+        let text = m.format(format);
+        if (title) {
+            text += "<br/>" + title;
+        }
+        newElement = $('<time>', {class: 'ago', datetime: m.toISOString(), text: text});
         if (isFuture) {
             newElement.addClass('future');
         }
         elem.replaceWith(newElement);
         newElement.timeago();
-        newElement.tooltip();
+        newElement.tooltip({html: true});
     } else if (elem.hasClass('seconds')) {
-        let newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT_SECONDS)});
+        newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT_SECONDS)});
         elem.replaceWith(newElement);
     } else {
-        let newElement = $('<time>', {'datetime': m.toISOString(), class:'timestamp', text: m.format(JS_DATE_FORMAT)});
+        newElement = $('<time>', {'datetime': m.toISOString(), class:'timestamp', text: m.format(JS_DATE_FORMAT)});
         elem.replaceWith(newElement);
     }
+    return newElement;
 }
 
 function createTimestampDom(unix, timeAgo) {
