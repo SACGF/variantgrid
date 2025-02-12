@@ -207,6 +207,9 @@ def allele_search(search_input: SearchInputInstance):
                 yield SearchMessageOverall(str(e), severity=LogLevel.ERROR, genome_builds=[genome_build])
 
 
+def _sv_alt_description(v: Union[Variant, VariantCoordinate]) -> str:
+    return f"{v.alt}/SVLEN={v.svlen}"
+
 def _yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, variant_qs,
                                              variant_coordinate: VariantCoordinate,
                                              search_messages: list[SearchMessage]) -> Iterable[SearchResult]:
@@ -216,15 +219,23 @@ def _yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, va
                                                  variant_string=variant_string):
         yield SearchResult(cmv, messages=search_messages)
 
+    if variant_coordinate.is_symbolic:
+        original_alt_desc = _sv_alt_description(variant_coordinate)
+    else:
+        original_alt_desc = Sequence.abbreviate(variant_coordinate.alt)
+
     # search for alt alts
     alts = get_results_from_variant_coordinate(genome_build, variant_qs, variant_coordinate, any_alt=True)
-    for alt in alts:
-        abbreviated_alt = Sequence.abbreviate(variant_coordinate.alt)
+    for alternative_variant in alts:
+        if alternative_variant.is_symbolic:
+            alt_alt_desc = _sv_alt_description(alternative_variant)
+        else:
+            alt_alt_desc = Sequence.abbreviate(alternative_variant.alt)
 
         alt_messages = search_messages + [
-            SearchMessage(f'No results for alt "{abbreviated_alt}", but found this using alt "{alt.alt}"',
+            SearchMessage(f'No results for alt "{original_alt_desc}", but found this using alt "{alt_alt_desc}"',
                           severity=LogLevel.ERROR, substituted=True)]
-        yield SearchResult(alt.preview, messages=alt_messages)
+        yield SearchResult(alternative_variant.preview, messages=alt_messages)
 
 
 def get_results_from_variant_coordinate(genome_build: GenomeBuild, qs: QuerySet, variant_coordinate: VariantCoordinate,
