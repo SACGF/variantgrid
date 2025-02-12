@@ -72,6 +72,11 @@ class HGVSConverter(abc.ABC):
                 raise HGVSNomenclatureException("Insertions require inserted sequence, not an integer length")
             if re.match(".*ins$", hgvs_string):
                 raise HGVSNomenclatureException("Insertions require inserted sequence")
+        if ":" not in hgvs_string:
+            raise HGVSNomenclatureException("No colon (':') provided")
+        for char in [":", "c", "g", "."]:
+            if hgvs_string.startswith(char):
+                raise HGVSNomenclatureException("Missing reference sequence")
 
     @abc.abstractmethod
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
