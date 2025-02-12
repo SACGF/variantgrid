@@ -14,7 +14,7 @@
   },
   "RECAPTCHA": {
     "public_key": "",
-    "private_key": "",
+    "private_key": ""
   },
   "ROLLBAR": {
     "comment": "see James/Dave for keys"
