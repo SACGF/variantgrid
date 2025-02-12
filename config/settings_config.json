@@ -13,8 +13,8 @@
     "password": "cl1ng3n_VG"
   },
   "RECAPTCHA": {
-    "public_key": null,
-    "private_key": null
+    "public_key": "",
+    "private_key": "",
   },
   "ROLLBAR": {
     "comment": "see James/Dave for keys"
