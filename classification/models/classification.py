@@ -1,5 +1,4 @@
 import copy
-import json
 import re
 import uuid
 from collections import Counter, namedtuple
@@ -26,8 +25,6 @@ from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
-from unidecode import unidecode
-
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
 from annotation.regexes import db_ref_regexes, DbRegexes
 from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
@@ -2784,7 +2781,7 @@ class CuratedDate:
             else:
                 return 1
 
-        if diff := direction(self.curated_date, other.curated_date):
+        if diff := direction(self.curation_date, other.curation_date):
             return diff < 0
         if diff := direction(self.curated_verified_date, other.curated_verified_date):
             return diff < 0
