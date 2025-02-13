@@ -120,7 +120,7 @@ def hgvs_resolution_tool(request: HttpRequest):
 
             try:
                 variant_coordinate: Optional[VariantCoordinate] = None
-                if vcd := matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_str):
+                if vcd := matcher.get_variant_coordinate_and_details(hgvs_str):
                     variant_coordinate = vcd.variant_coordinate
                     output.variant_coordinate = variant_coordinate
                     output.used_converter_type = vcd.used_converter_type.name

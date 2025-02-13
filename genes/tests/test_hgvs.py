@@ -242,7 +242,7 @@ class TestHGVS(TestCase):
         create_gata2_transcript_version(genome_build)
         matcher = HGVSMatcher(genome_build, hgvs_converter_type=hgvs_converter_type)
         for hgvs_string, expected_vc, expected_matches_ref in TEST_HGVS:
-            vcd = matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string)
+            vcd = matcher.get_variant_coordinate_and_details(hgvs_string)
             #print(f"{vcd=}")
             #print(f"{type(vcd.matches_reference)=}")
             self.assertEqual(vcd.variant_coordinate, expected_vc)

@@ -728,7 +728,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
             version = hgvs_matcher.hgvs_converter.get_version()
 
-            vc_extra = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(use_hgvs)
+            vc_extra = hgvs_matcher.get_variant_coordinate_and_details(use_hgvs)
             message = f"HGVS matched by \"{vc_extra.method}\""
             hgvs_converter_version = HGVSConverterVersion.get(hgvs_converter_type, version=version,
                                                               used_converter_type=vc_extra.used_converter_type)

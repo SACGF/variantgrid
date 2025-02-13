@@ -1,6 +1,8 @@
 import abc
 import re
+from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 
 from genes.hgvs import HGVSVariant, HGVSNomenclatureException
 from snpdb.models import GenomeBuild, VariantCoordinate
@@ -50,6 +52,21 @@ class HgvsMatchRefAllele:
     def get_message(self) -> str:
         return f'Using {self.ref_type} reference "{self.calculated_ref}" from {self.ref_source}, in place of provided reference "{self.provided_ref}"'
 
+
+@dataclass
+class HgvsOriginallyNormalized(ValueError):
+    original_hgvs: HGVSVariant
+    normalized_hgvs: HGVSVariant
+
+    def __bool__(self):
+        return self.normalized_hgvs == self.original_hgvs
+
+    def get_message(self) -> Optional[str]:
+        msg = None
+        if not bool(self):
+            msg = f'Normalized HGVS "{self.original_hgvs}" to "{self.normalized_hgvs}"'
+        return msg
+
 # We need a common Exception
 # Common HGVS Extra??
 
@@ -82,6 +99,10 @@ class HGVSConverter(abc.ABC):
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
         pass
 
+    @abc.abstractmethod
+    def normalize(self, hgvs_variant: HGVSVariant) -> HGVSVariant:
+        pass
+
     def variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
         hgvs_variant = self._variant_coordinate_to_g_hgvs(vc)
         if hgvs_variant.contig_accession == self.genome_build.mitochondria_accession:
@@ -97,7 +118,7 @@ class HGVSConverter(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def hgvs_to_variant_coordinate_and_reference_match(self, hgvs_string: str, transcript_version) -> tuple[VariantCoordinate, HgvsMatchRefAllele]:
+    def hgvs_to_variant_coordinate_reference_match_and_normalized(self, hgvs_string: str, transcript_version) -> tuple[VariantCoordinate, HgvsMatchRefAllele, HgvsOriginallyNormalized]:
         pass
 
     @abc.abstractmethod

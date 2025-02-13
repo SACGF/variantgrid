@@ -1,3 +1,4 @@
+import logging
 import sys
 from importlib import metadata
 from typing import Optional
@@ -8,7 +9,7 @@ from pyhgvs import get_genomic_sequence, HGVSName
 from pyhgvs.utils import make_transcript
 
 from genes.hgvs import HGVSVariant, HGVSException
-from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele, HGVSConverterType
+from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele, HgvsOriginallyNormalized, HGVSConverterType
 from genes.transcripts_utils import transcript_is_lrg
 from snpdb.models import VariantCoordinate
 
@@ -139,6 +140,10 @@ class PyHGVSConverter(HGVSConverter):
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
         return PyHGVSVariant(self._hgvs_name(hgvs_string))
 
+    def normalize(self, hgvs_variant: PyHGVSVariant) -> HGVSVariant:
+        logging.warning("PyHGVSConverter normalize is a no-op")
+        return hgvs_variant
+
     def _variant_coordinate_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
         chrom, position, ref, alt, _svlen = vc.as_external_explicit(self.genome_build)
         hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, position, ref, alt,
@@ -155,7 +160,7 @@ class PyHGVSConverter(HGVSConverter):
                                                 pyhgvs_transcript, max_allele_length=sys.maxsize)
         return PyHGVSVariant(hgvs_name)
 
-    def hgvs_to_variant_coordinate_and_reference_match(self, hgvs_string: str, transcript_version) -> tuple[VariantCoordinate, HgvsMatchRefAllele]:
+    def hgvs_to_variant_coordinate_reference_match_and_normalized(self, hgvs_string: str, transcript_version) -> tuple[VariantCoordinate, HgvsMatchRefAllele, bool]:
         pyhgvs_transcript = None
         hgvs_name = self._hgvs_name(hgvs_string)
 
@@ -171,7 +176,7 @@ class PyHGVSConverter(HGVSConverter):
         chrom = contig.name
         vc = VariantCoordinate.from_explicit_no_svlen(chrom, position, ref, alt)
         matches_reference = self.get_hgvs_match_ref_allele(hgvs_name, pyhgvs_transcript)
-        return vc, matches_reference
+        return vc, matches_reference, True
 
     def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
         # ClinGen Allele Registry doesn't like gene names - so strip (unless LRG_)

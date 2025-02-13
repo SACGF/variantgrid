@@ -14,7 +14,7 @@ from annotation.cosmic import CosmicAPI
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from classification.models import Classification, CreateNoClassificationForbidden
 from genes.hgvs import HGVSMatcher, HGVSException, VariantResolvingError, HGVSImplementationException, \
-    HGVSNomenclatureException
+    HGVSNomenclatureException, HgvsOriginallyNormalized
 from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
 from genes.models import MissingTranscript, MANE, TranscriptVersion, BadTranscript
 from genes.models_enums import AnnotationConsortium
@@ -557,14 +557,21 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
     search_messages: list[SearchMessage] = []  # [SearchMessage(m) for m in hgvs_search_messages]
 
     try:
-        variant_coordinate, used_transcript_accession, kind, _used_converter_type, method, matches_reference = hgvs_matcher.get_variant_coordinate_used_transcript_kind_method_and_matches_reference(hgvs_string)
-        logging.info("get_variant_coordinate_used_transcript_kind_method_and_matches_reference - variant_coordinate=%s", variant_coordinate)
+        vc_details = hgvs_matcher.get_variant_coordinate_and_details(hgvs_string)
+        variant_coordinate, used_transcript_accession, kind, _used_converter_type, method, matches_reference, originally_normalized = vc_details
+        logging.info("get_variant_coordinate_and_details - variant_coordinate=%s", variant_coordinate)
         if not matches_reference:
             # reporting on the "provided" reference is slightly problematic as it's not always provided directly, it could be indirectly
 
             if isinstance(matches_reference, HgvsMatchRefAllele) and matches_reference.provided_ref:
                 msg = matches_reference.get_message()
-                search_messages.append(SearchMessage(msg, LogLevel.ERROR, substituted=True))
+                search_messages.append(SearchMessage(msg, LogLevel.WARNING, substituted=True))
+
+        if not originally_normalized:
+            if isinstance(originally_normalized, HgvsOriginallyNormalized):
+                if msg := originally_normalized.get_message():
+                    search_messages.append(SearchMessage(msg, LogLevel.WARNING, substituted=True))
+
 
     except MissingTranscript:
         pass

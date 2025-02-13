@@ -19,7 +19,7 @@ from hgvs.variantmapper import VariantMapper
 
 from genes.hgvs import HGVSVariant, HGVSException, HGVSNomenclatureException, HGVSImplementationException
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
-from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele, HGVSConverterType
+from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele, HgvsOriginallyNormalized, HGVSConverterType
 from genes.models import TranscriptVersion
 from genes.transcripts_utils import looks_like_transcript, get_refseq_type
 from snpdb.models import GenomeBuild, VariantCoordinate, Contig
@@ -174,6 +174,11 @@ class BioCommonsHGVSConverter(HGVSConverter):
         except HGVSError as e:
             raise HGVSNomenclatureException from e
 
+    def normalize(self, hgvs_variant: BioCommonsHGVSVariant) -> HGVSVariant:
+        sv = hgvs_variant._sequence_variant
+        sv_normalized = self.no_validate_normalizer.normalize(sv)
+        return BioCommonsHGVSVariant(sv_normalized)
+
     def _variant_coordinate_to_sequence_variant(self, vc: VariantCoordinate) -> SequenceVariant:
         chrom, position, ref, alt, _svlen = vc.as_external_explicit(self.genome_build)
         return self.babelfish.vcf_to_g_hgvs(chrom, position, ref, alt)
@@ -203,9 +208,9 @@ class BioCommonsHGVSConverter(HGVSConverter):
             var_c.gene = gene_symbol.symbol
         return BioCommonsHGVSVariant(var_c)
 
-    def hgvs_to_variant_coordinate_and_reference_match(self, hgvs_string: str, transcript_version=None) -> tuple[VariantCoordinate, HgvsMatchRefAllele]:
+    def hgvs_to_variant_coordinate_reference_match_and_normalized(self, hgvs_string: str, transcript_version=None) -> tuple[VariantCoordinate, HgvsMatchRefAllele, HgvsOriginallyNormalized]:
         try:
-            var_g, matches_reference = self._hgvs_to_g_hgvs(hgvs_string)
+            var_g, matches_reference, originally_normalized = self._hgvs_to_g_hgvs(hgvs_string)
             try:
                 (chrom, position, ref, alt, _typ) = self.babelfish.hgvs_to_vcf(var_g)
                 if alt == '.':
@@ -217,7 +222,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
             raise klass(hgvs_error) from hgvs_error
 
         vc = VariantCoordinate.from_explicit_no_svlen(chrom, position, ref=ref, alt=alt)
-        return vc.as_internal_symbolic(self.genome_build), matches_reference
+        return vc.as_internal_symbolic(self.genome_build), matches_reference, originally_normalized
 
     def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
         sequence_variant = self._parser_hgvs(hgvs_string)
@@ -254,7 +259,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
         var_m.type = 'g'
         return var_m
 
-    def _hgvs_to_g_hgvs(self, hgvs_string: str) -> tuple[SequenceVariant, HgvsMatchRefAllele]:
+    def _hgvs_to_g_hgvs(self, hgvs_string: str) -> tuple[SequenceVariant, HgvsMatchRefAllele, HgvsOriginallyNormalized]:
         CONVERT_TO_G = {
             'c': self.am.c_to_g,
             'n': self.am.n_to_g,
@@ -262,6 +267,19 @@ class BioCommonsHGVSConverter(HGVSConverter):
         }
 
         var_x = self._parser_hgvs(hgvs_string)
+
+        # TODO: Maybe we can always just normalize? Need some test cases to make sure
+        # If so, we can remove handling of 'Variant is outside CDS bounds' below
+        originally_normalized = None
+        var_x_normalized = None
+        normalization_error = None
+        try:
+            var_x_normalized = self.no_validate_normalizer.normalize(var_x)
+            originally_normalized = HgvsOriginallyNormalized(original_hgvs=BioCommonsHGVSVariant(var_x),
+                                                             normalized_hgvs=BioCommonsHGVSVariant(var_x_normalized))
+        except HGVSUnsupportedOperationError as hgvs_error:
+            normalization_error = hgvs_error
+
         # We are occasionally passed c. HGVS for non-coding transcripts - convert them to n.
         if var_x.type == 'c':
             transcript_accession = self.get_transcript_accession(hgvs_string)
@@ -301,7 +319,9 @@ class BioCommonsHGVSConverter(HGVSConverter):
                         calculated_g_ref = reverse_complement(calculated_ref)
                 matches_reference = HgvsMatchRefAllele(provided_ref=provided_g_ref, calculated_ref=calculated_g_ref)
             elif "Variant is outside CDS bounds" in exception_str:
-                var_x = self.no_validate_normalizer.normalize(var_x)
+                if normalization_error:
+                    raise normalization_error
+                var_x = var_x_normalized
                 ok = True
             else:
                 for msg in ACCEPTABLE_VALIDATION_MESSAGES:
@@ -320,7 +340,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
         if matches_reference is None:
             ref = var_g.posedit.edit.ref
             matches_reference = HgvsMatchRefAllele(provided_ref='', calculated_ref=ref)
-        return var_g, matches_reference
+        return var_g, matches_reference, originally_normalized
 
     @staticmethod
     def _get_exception_class(hgvs_error: HGVSError) -> type:
