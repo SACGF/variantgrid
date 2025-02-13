@@ -1,12 +1,31 @@
 import logging
 import os
 from subprocess import CalledProcessError
+from typing import Optional
 
 from django.conf import settings
 
 from annotation.vep_annotation import VEPConfig
 from library.utils import execute_cmd
-from snpdb.models import GenomeBuild
+from snpdb.models import GenomeBuild, VariantCoordinate
+
+
+def bcftools_pre_liftover_error_check(variant_coordinate: VariantCoordinate, source_genome_build) -> Optional[str]:
+    """ Return non-null (string reason) if you want to skip bcftools liftover """
+    # BCFTools requires ref match
+    if variant_coordinate.is_symbolic():
+        if not settings.LIFTOVER_BCFTOOLS_SYMBOLIC:
+            return f"Liftover of symbolic variants disabled via {settings.LIFTOVER_BCFTOOLS_SYMBOLIC=}"
+    else:
+        # Symbolics will pull out reference from build so always match, no point testing
+        calculated_ref = variant_coordinate.calculated_reference(source_genome_build)
+        if calculated_ref != variant_coordinate.ref:
+            return f"Reference='{variant_coordinate.ref}' not equal to calculated ref from genome {calculated_ref}"
+
+        if settings.LIFTOVER_BCFTOOLS_MAX_LENGTH:
+            if variant_coordinate.max_sequence_length > settings.LIFTOVER_BCFTOOLS_MAX_LENGTH:
+                return f"Variant max sequence length > {settings.LIFTOVER_BCFTOOLS_MAX_LENGTH=}"
+    return None
 
 
 def bcftools_liftover(source_vcf: str, source_genome_build: GenomeBuild,

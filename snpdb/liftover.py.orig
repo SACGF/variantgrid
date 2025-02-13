@@ -78,8 +78,13 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                     al = AlleleLiftover(allele=allele,
                                         liftover=liftover,
                                         status=ProcessingStatus.ERROR,
+<<<<<<< HEAD
+                                        error = {
+                                            "error_message": f"Validation Error: {error_message}",
+=======
                                         error={
                                             AlleleLiftover.ERROR_JSON_MESSAGE_KEY: f"Validation Error: {error_message}",
+>>>>>>> d4a0574e8 (SACGF/variantgrid_private#3732 - Symbolic Variants normalised by BCFTools - disable >1kb or symbolic)
                                         })
                 allele_liftover_records.append(al)
 
