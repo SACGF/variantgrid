@@ -59,7 +59,8 @@ class HgvsOriginallyNormalized(ValueError):
     normalized_hgvs: HGVSVariant
 
     def __bool__(self):
-        return self.normalized_hgvs == self.original_hgvs
+        # Dont' care about eg stripping gene from transcripts, just coordinates
+        return self.normalized_hgvs.get_cdna_coords() == self.original_hgvs.get_cdna_coords()
 
     def get_message(self) -> Optional[str]:
         msg = None
