@@ -17,6 +17,7 @@ from genes.hgvs import HGVSMatcher
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.genomics.vcf_utils import write_vcf_from_variant_coordinates, get_contigs_header_lines
 from library.guardian_utils import admin_bot
+from snpdb.bcftools_liftover import bcftools_pre_liftover_error_check
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.models.models_enums import ImportSource, AlleleConversionTool, AlleleOrigin, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
@@ -78,7 +79,7 @@ def create_liftover_pipelines(user: User, alleles: Iterable[Allele],
                                         liftover=liftover,
                                         status=ProcessingStatus.ERROR,
                                         error={
-                                            "error_message": f"Validation Error: {error_message}",
+                                            AlleleLiftover.ERROR_JSON_MESSAGE_KEY: f"Validation Error: {error_message}",
                                         })
                 allele_liftover_records.append(al)
 
@@ -293,10 +294,10 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
     # Try tools that write other builds, then run conversion
     options = [
         # Enabled, Tool Enum, Requires reference to match genome build
-        (settings.LIFTOVER_BCFTOOLS_ENABLED, AlleleConversionTool.BCFTOOLS_LIFTOVER, True),
+        (settings.LIFTOVER_BCFTOOLS_ENABLED, AlleleConversionTool.BCFTOOLS_LIFTOVER, bcftools_pre_liftover_error_check),
     ]
 
-    for enabled, conversion_tool, require_reference_match in options:
+    for enabled, conversion_tool, check_liftover_errors in options:
         if enabled:
             if AlleleLiftover.has_existing_failure(allele, dest_genome_build, conversion_tool):
                 continue  # Skip as already failed liftover method to desired build
@@ -305,11 +306,8 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
                 yield conversion_tool, None, variant_errors_str
                 continue
 
-            # Symbolics will pull out reference from build so always match, no point testing
-            if require_reference_match and not variant_coordinate.is_symbolic():
-                calculated_ref = variant_coordinate.calculated_reference(source_genome_build)
-                if calculated_ref != variant_coordinate.ref:
-                    error_message = f"reference='{variant_coordinate.ref}' not equal to calculated ref from genome {calculated_ref}"
+            if check_liftover_errors:
+                if error_message := check_liftover_errors(variant_coordinate, source_genome_build):
                     yield conversion_tool, None, error_message
                     continue
 

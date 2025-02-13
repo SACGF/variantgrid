@@ -252,6 +252,9 @@ LIFTOVER_TO_CHROMOSOMES_ONLY = True  # False = Liftover to alt/patches
 LIFTOVER_DBSNP_ENABLED = False  # Default=False - doesn't work so well due to dbSNP IDs being for loci
 
 LIFTOVER_BCFTOOLS_ENABLED = True
+# 2025-02-13 - bcftools liftover currently gives a warning about symbolic variants
+LIFTOVER_BCFTOOLS_SYMBOLIC = False
+LIFTOVER_BCFTOOLS_MAX_LENGTH = 1000
 LIFTOVER_BCFTOOLS_PLUGIN_DIR = "/usr/share/bcftools/plugins"
 BCFTOOLS_COMMAND = "bcftools"  # if not absolute, needs to be in path
 

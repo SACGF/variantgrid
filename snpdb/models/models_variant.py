@@ -984,18 +984,20 @@ class LiftoverRun(TimeStampedModel):
 
 
 class AlleleLiftover(models.Model):
+    ERROR_JSON_MESSAGE_KEY = "message"
+
     liftover = models.ForeignKey(LiftoverRun, on_delete=CASCADE)
     allele = models.ForeignKey(Allele, on_delete=CASCADE)
     # There will only ever be 1 successful AlleleLiftover for a VariantAllele - the one that populated it
     variant_allele = models.OneToOneField(VariantAllele, null=True, blank=True, on_delete=CASCADE)
     status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)
     error_message = models.TextField()  # This will be deleted
-    error = models.JSONField(null=True)  # Only set on error - uses "message" key in dict
+    error = models.JSONField(null=True)  # Only set on error - uses ERROR_JSON_MESSAGE_KEY key in dict
 
     def error_tidy(self) -> str | dict:
         # If the JSON is just message=, grab the message
         if error_json := self.error:
-            if message := error_json.get("message"):
+            if message := error_json.get(self.ERROR_JSON_MESSAGE_KEY):
                 if len(error_json.keys()) == 1:
                     return message
             return error_json
@@ -1006,7 +1008,7 @@ class AlleleLiftover(models.Model):
     def __str__(self):
         s = f"{self.allele}/{self.liftover}: {self.get_status_display()}"
         if self.error:
-            if msg := self.error.get("message"):
+            if msg := self.error.get(self.ERROR_JSON_MESSAGE_KEY):
                 s += f" error: {msg}"
         return s
 
