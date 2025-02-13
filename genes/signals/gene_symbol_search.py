@@ -3,7 +3,7 @@ import re
 from django.contrib.auth.models import User
 from django.dispatch.dispatcher import receiver
 
-from classification.models import ClassificationGroupingSearchTerm, ClassificationGrouping, ClassificationModification
+from classification.models import ClassificationModification
 from classification.models.classification_utils import classification_gene_symbol_filter
 from classification.signals.classification_search import classification_qs_to_extras
 from genes.models import GeneSymbol, GeneSymbolAlias
