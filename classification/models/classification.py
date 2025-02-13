@@ -2774,6 +2774,9 @@ class CuratedDate:
                 return -1
             elif date_1 is not None and date_2 is None:
                 return 1
+            if date_1 is None and date_2 is None:
+                return 0
+            
             if date_1.value == date_2.value:
                 return 0
             elif date_1 < date_2:
