@@ -2737,7 +2737,7 @@ class CuratedDate:
 
     @cached_property
     def created_date(self) -> ClassificationDate:
-        return ClassificationDate(date_type=ClassificationDateType.CREATED, date=self._modification.classification.created.astimezone(self.timezone))
+        return ClassificationDate(date_type=ClassificationDateType.CREATED, datetime=self._modification.classification.created.astimezone(self.timezone))
 
     @cached_property
     def relevant_date(self) -> ClassificationDate:
