@@ -74,7 +74,7 @@ def classification_search(search_input: SearchInputInstance):
     yield Classification.objects.filter(Q(pk__in=cm_ids) | Q(pk__in=cm_source_ids))
 
 
-def _classification_qs_to_extras(qs: QuerySet[ClassificationModification]) -> list[PreviewKeyValue]:
+def classification_qs_to_extras(qs: QuerySet[ClassificationModification]) -> list[PreviewKeyValue]:
     extras = []
     if qs.exists():
         includes_origins = []
@@ -101,7 +101,7 @@ def _allele_preview_classifications_extra(user: User, obj: Allele, genome_build:
     extras = []
     hgvs_extras = []
     if cms.exists():
-        extras += _classification_qs_to_extras(cms)
+        extras += classification_qs_to_extras(cms)
         column = ClassificationModification.column_name_for_build(genome_build)
         # provide the c.HGVS for alleles
         if c_hgvs := sorted(
@@ -156,4 +156,4 @@ def variant_preview_classifications_extra(sender, user: User, obj: Variant, **kw
 def ontology_preview_classifications_extra(sender, user: User, obj: OntologyTerm, **kwargs):
     terms = [{"term_id": obj.pk}]
     qs = ClassificationModification.latest_for_user(user=user, published=True, exclude_withdrawn=True, classification__condition_resolution__resolved_terms__contains=terms)
-    return _classification_qs_to_extras(qs)
+    return classification_qs_to_extras(qs)
