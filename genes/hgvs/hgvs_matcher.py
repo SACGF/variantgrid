@@ -610,6 +610,12 @@ class HGVSMatcher:
         cleaned_hgvs = clean_string(hgvs_string)  # remove non-printable characters
         cleaned_hgvs = cleaned_hgvs.replace(" ", "")  # No whitespace in HGVS
         cleaned_hgvs = cleaned_hgvs.replace("::", ":")  # Fix double colon
+        cleaned_hgvs = cleaned_hgvs.replace("__", "_")  # fix double underscore
+
+        # Fix double kind (eg c.c.)
+        for kind in HGVSKind:
+            cleaned_hgvs = cleaned_hgvs.replace(f"{kind}.{kind}.", f"{kind}.")
+
         if cleaned_hgvs[0:2].upper() in ("M_", "C_", "R_"):
             cleaned_hgvs = "N" + cleaned_hgvs
         # Lowercase mutation types, e.g. NM_032638:c.1126_1133DUP - won't matter if also changes gene name as that's
@@ -641,10 +647,6 @@ class HGVSMatcher:
                 cleaned_text += "(" + gene_symbol + ")"
             cleaned_text += ":" + match.group("letter").lower() + "." + match.group("nomen")
             cleaned_hgvs = cleaned_text
-
-        # Fix double kind (eg c.c.)
-        for kind in HGVSKind:
-            cleaned_hgvs = cleaned_hgvs.replace(f"{kind}.{kind}.", f"{kind}.")
 
         def fix_ref_alt(m):
             return m.group('ref').upper() + '>' + m.group('alt').upper()
