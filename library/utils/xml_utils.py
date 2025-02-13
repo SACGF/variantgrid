@@ -1,7 +1,8 @@
 import inspect
-from typing import Callable, Optional, Any
+from typing import Callable, Optional, Any, Union
 
 from lxml import etree
+from lxml.etree import Element
 
 
 class PP:
@@ -41,13 +42,13 @@ class PP:
 
 class PathPredicates:
 
-    def __init__(self, path: list):
+    def __init__(self, path: list[Union[PP, str]]):
         self._path = [PP.convert(elem) for elem in path]
 
-    def with_prefix(self, prefix: list) -> 'PathPredicates':
+    def with_prefix(self, prefix: list[Union[PP, str]]) -> 'PathPredicates':
         return PathPredicates(path=prefix + self._path)
 
-    def queue_test(self, elem) -> Optional['PathPredicates']:
+    def queue_test(self, elem: Element) -> Optional['PathPredicates']:
         if self._path[0].matches(elem):
             return PathPredicates(path=self._path[1:])
         else:
@@ -124,7 +125,7 @@ class XmlParser:
         return cls.parser_methods
 
     # determine if we only save tagName
-    def __init__(self, prefix: Optional[list] = None):
+    def __init__(self, prefix: Optional[list[Union[PP, str]]] = None):
         self._prefix = prefix or []
         self._stack: list = []
         self._candidates: list[ParserMethod] = []
@@ -169,7 +170,7 @@ class XmlParser:
     def _peek_candidates(self) -> list[ParserMethod]:
         return self._candidates[-1]
 
-    def _push(self, elem):
+    def _push(self, elem: Element):
         self._stack.append(elem)
         execute_later = []
         remaining_candidates = []
@@ -189,7 +190,7 @@ class XmlParser:
         self._candidates.append(remaining_candidates)
         self._execute.append(execute_later)
 
-    def _pop(self):
+    def _pop(self) -> list[ParserMethod]:
         if last_execute := self._execute.pop():
             for method in last_execute:
                 candidate = self._peek
@@ -199,11 +200,11 @@ class XmlParser:
         self._candidates.pop()
 
     @property
-    def tag_names(self):
+    def tag_names(self) -> list[str]:
         return [item.tag for item in self._stack]
 
     @property
-    def _peek(self):
+    def _peek(self) -> Element:
         return self._stack[-1]
 
     def _clear(self):
