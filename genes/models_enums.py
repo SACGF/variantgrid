@@ -25,6 +25,16 @@ class HGNCStatus(models.TextChoices):
     ENTRY_WITHDRAWN = 'E', 'Entry Withdrawn'
 
 
+class HGVSKind(models.TextChoices):
+    CODING = "c", "coding"
+    GENOMIC = "g", "genomic"
+    MITOCHONDRIA = "m", "mitochondria"
+    NON_CODING = "n", "non-coding"
+    CIRCULAR_GENOMIC = "o", "circular genomic"
+    PROTEIN = "p", "protein"
+    RNA = "r", "RNA transcript"
+
+
 class GeneSymbolAliasSource(models.TextChoices):
     NCBI = "N", 'NCBI'
     UCSC = "U", 'UCSC'

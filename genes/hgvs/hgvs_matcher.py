@@ -15,6 +15,7 @@ from genes.hgvs.hgvs_converter_combo import ComboCheckerHGVSConverter
 from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSConverter
 from genes.models import TranscriptVersion, Transcript, LRGRefSeqGene, BadTranscript, \
     NoTranscript, TranscriptParts
+from genes.models_enums import HGVSKind
 from genes.transcripts_utils import transcript_is_lrg, looks_like_transcript, looks_like_hgvs_prefix
 from library.constants import WEEK_SECS
 from library.log_utils import report_exc_info
@@ -640,6 +641,10 @@ class HGVSMatcher:
                 cleaned_text += "(" + gene_symbol + ")"
             cleaned_text += ":" + match.group("letter").lower() + "." + match.group("nomen")
             cleaned_hgvs = cleaned_text
+
+        # Fix double kind (eg c.c.)
+        for kind in HGVSKind:
+            cleaned_hgvs = cleaned_hgvs.replace(f"{kind}.{kind}.", f"{kind}.")
 
         def fix_ref_alt(m):
             return m.group('ref').upper() + '>' + m.group('alt').upper()
