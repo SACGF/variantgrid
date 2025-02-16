@@ -1136,8 +1136,10 @@ def apply_condition_resolution(classification: Classification, new_condition_res
         if old_condition_resolution:
             condition_text_old = ConditionResolved.from_dict(old_condition_resolution).summary
 
+        new_condition = None
         if new_condition_resolution:
-            condition_text = ConditionResolved.from_dict(new_condition_resolution).summary
+            new_condition = ConditionResolved.from_dict(new_condition_resolution)
+            condition_text = new_condition.summary
 
         if old_condition_resolution != new_condition_resolution:
             condition_text = f"{condition_text_old} --> {condition_text}"
@@ -1152,7 +1154,7 @@ def apply_condition_resolution(classification: Classification, new_condition_res
             classification.save(update_fields=['condition_resolution'])
 
             condition_set_signal.send(sender=Classification, classification=classification,
-                                      condition=ConditionResolved.from_dict(new_condition_resolution))
+                                      condition=new_condition)
 
 
 def apply_condition_resolution_to_classifications(ctm: ConditionTextMatch):
