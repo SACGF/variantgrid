@@ -1575,7 +1575,7 @@ class GeneAnnotationRelease(models.Model):
                                                 gene_version__gene__in=self.genes_for_symbol(gene_symbol))
 
     def __str__(self):
-        return f"{self.genome_build_id}/{self.get_annotation_consortium_display()} - v{self.version}"
+        return f"{self.genome_build.slug}/{self.get_annotation_consortium_display()} - v{self.version}"
 
 
 class ReleaseGeneVersion(models.Model):
