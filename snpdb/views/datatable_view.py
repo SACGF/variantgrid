@@ -129,9 +129,13 @@ class RichColumn:
         self.name = name or key
         if not self.name:
             raise ValueError("Cannot create a RichColumn without key or name must be provided")
+        if "." in self.name:
+            # This will be treated as nested objects in JS, which is not what we want to do passing literal strings
+            # @see https://datatables.net/reference/option/columns.data#string
+            raise ValueError("Cannot create a RichColumn with '.' (dot) in name")
         self.label = label
         if not label:
-            self.label = name or key
+            self.label = self.name
             self.label = pretty_label(self.label)
         if not key and not renderer and not client_renderer:
             raise ValueError("Cannot create a RichColumn without a key, server or client renderer")
