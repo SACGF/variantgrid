@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, Any, TypedDict, Literal
+from typing import Optional, Any, TypedDict, Literal, Tuple
 
 import django.dispatch
 from django.conf import settings
@@ -78,6 +78,14 @@ class HGVSConverterVersion(TimeStampedModel):
                                                           code_git_hash=get_cached_project_git_hash())[0]
 
 
+@dataclass(frozen=True)
+class CHGVSResolution:
+    c_hgvs: str
+    c_hgvs_compatible: str
+    transcript_version: str
+    gene_symbol: str
+
+
 class ResolvedVariantInfo(TimeStampedModel):
     """
     Stores information about a genome_build_patch_version/allele combo, generally stuff we have to have access quickly for sorting classifications.
@@ -152,37 +160,44 @@ class ResolvedVariantInfo(TimeStampedModel):
         self.c_hgvs_compat = None
         self.gene_symbol = None
         self.transcript_version: Optional[TranscriptVersion] = None
-
         self.variant = variant
-        genome_build = self.genome_build
         self.genomic_sort = variant.sort_string
 
-        imported_transcript = self.allele_info.get_transcript
-
-        hgvs_matcher = HGVSMatcher(genome_build=genome_build)
-        hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
-        version = hgvs_matcher.hgvs_converter.get_version()
-
         try:
-            hgvs_variant, used_converter_type, method = hgvs_matcher.variant_to_hgvs_variant_used_converter_type_and_method(variant, imported_transcript)
-            c_hgvs = hgvs_variant.format()
-            c_hgvs_obj = CHGVS(c_hgvs)
-            self.c_hgvs = c_hgvs
-            self.c_hgvs_compat = hgvs_variant.format(use_compat=True,
-                                                     max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH)
-            self.c_hgvs_converter_version = HGVSConverterVersion.get(hgvs_converter_type, version=version,
-                                                                     used_converter_type=used_converter_type)
-            self.transcript_version = c_hgvs_obj.transcript_version_model(genome_build=genome_build)
-            self.gene_symbol = GeneSymbol.objects.filter(symbol=c_hgvs_obj.gene_symbol).first()
+            c_hgvs_resolution = self.recalc_c_hgvs()
+            self.c_hgvs = c_hgvs_resolution.c_hgvs
+            self.c_hgvs_compat = c_hgvs_resolution.c_hgvs_compatible
+            self.transcript_version = c_hgvs_resolution.transcript_version
+            self.gene_symbol = c_hgvs_resolution.gene_symbol
         except Exception as exception:
             self.error = str(exception)
             report_exc_info(extra_data={
-                "genome_build": genome_build.name,
+                "genome_build": self.genome_build.name,
                 "variant": str(variant),
-                "transcript_id": imported_transcript
+                "transcript_id": self.allele_info.get_transcript
             })
+
         self.save()
         return self
+
+    def recalc_c_hgvs(self) -> CHGVSResolution:
+        variant = self.variant
+        genome_build = self.genome_build
+        imported_transcript = self.allele_info.get_transcript
+        hgvs_matcher = HGVSMatcher(genome_build=genome_build)
+        # hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
+        # version = hgvs_matcher.hgvs_converter.get_version()
+
+        hgvs_variant, used_converter_type, method = hgvs_matcher.variant_to_hgvs_variant_used_converter_type_and_method(variant, imported_transcript)
+        c_hgvs = hgvs_variant.format()
+        c_hgvs_obj = CHGVS(c_hgvs)
+
+        return CHGVSResolution(
+            c_hgvs=c_hgvs,
+            c_hgvs_compatible=hgvs_variant.format(use_compat=True, max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH),
+            transcript_version=c_hgvs_obj.transcript_version_model(genome_build=genome_build),
+            gene_symbol=GeneSymbol.objects.filter(symbol=c_hgvs_obj.gene_symbol).first()
+        )
 
     @staticmethod
     def get_or_create(allele_info: 'ImportedAlleleInfo', genome_build: GenomeBuild, variant: Variant) -> 'ResolvedVariantInfo':
@@ -765,8 +780,23 @@ class ImportedAlleleInfo(TimeStampedModel):
                     else:
                         new_dirty_message = f"{cvc.message}\n{repr(existing_vc)} -> {repr(new_vc)}"
 
+        if not new_dirty_message:
+            message_parts = []
+            for rvi in self.resolved_builds:
+                try:
+                    recalc_c_hgvs = rvi.recalc_c_hgvs()
+                    if rvi.c_hgvs != recalc_c_hgvs.c_hgvs:
+                        message_parts.append(f"{rvi.genome_build} c.HGVS {rvi.c_hgvs} -> {recalc_c_hgvs.c_hgvs}")
+                    elif rvi.c_hgvs_compat != recalc_c_hgvs.c_hgvs_compatible:
+                        message_parts.append(f"{rvi.genome_build} c.HGVS compatible {rvi.c_hgvs_compat} -> {recalc_c_hgvs.c_hgvs_compatible}")
+                except Exception as ex:
+                    message_parts.append(f"Error resolving {rvi.genome_build} c.HGVS: {ex}")
+            if message_parts:
+                new_dirty_message = "\n".join(message_parts)
+
         if self.dirty_message != new_dirty_message:
             self.dirty_message = new_dirty_message
+            print(f"Found {new_dirty_message}")
             self.save()
 
     def update_status(self):
