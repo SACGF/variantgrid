@@ -785,27 +785,29 @@ def search_suggestion(text: str) -> ConditionMatchingSuggestion:
     if local_mondo := find_local_term(match_text, OntologyService.MONDO):
         return local_mondo
 
-    try:
-        # TODO ensure "text" is safe, it should already be normalised
-        results = requests.get(
-            f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{text}', {
-                "prefix": "MONDO",
-                "rows": 10,
-                "minimal_tokenizer": "false",
-                "category": "disease"
-            }).json().get("docs")
+    if text:
+        # Only call if text is not blank as it would just return {"detail":"Not Found"}
+        try:
+            # TODO ensure "text" is safe, it should already be normalised
+            results = requests.get(
+                f'https://api.monarchinitiative.org/api/search/entity/autocomplete/{text}', {
+                    "prefix": "MONDO",
+                    "rows": 10,
+                    "minimal_tokenizer": "false",
+                    "category": "disease"
+                }).json().get("docs")
 
-        matches: List[ConditionMatchingSuggestion] = list()
-        for result in results:
-            o_id = result.get('id')
-            # result.get('label') gives the label as it's known by the search server
-            term = OntologyTerm.get_or_stub(o_id)
-            if cms := search_text_to_suggestion(match_text, term):
-                matches.append(cms)
-        if search_match := merge_matches(matches):
-            return search_match
-    except:
-        print("Error searching server")
+            matches: List[ConditionMatchingSuggestion] = list()
+            for result in results:
+                o_id = result.get('id')
+                # result.get('label') gives the label as it's known by the search server
+                term = OntologyTerm.get_or_stub(o_id)
+                if cms := search_text_to_suggestion(match_text, term):
+                    matches.append(cms)
+            if search_match := merge_matches(matches):
+                return search_match
+        except:
+            print("Error searching server")
 
     if local_omim := find_local_term(match_text, OntologyService.OMIM):
         return local_omim
