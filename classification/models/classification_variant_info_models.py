@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, Any, TypedDict, Literal, Tuple
+from typing import Optional, Any, TypedDict, Literal
 
 import django.dispatch
 from django.conf import settings
@@ -766,7 +766,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         new_dirty_message: Optional[str] = None
         if self.variant_coordinate != cvc.variant_coordinate_str:
             if cvc.variant_coordinate:
-                new_dirty_message = f"{cvc.message}\n{cvc.variant_coordinate_str}"
+                new_dirty_message = f"DIFF VARIANT COORDINATE\n{cvc.message}\n{self.variant_coordinate} -> {cvc.variant_coordinate_str}"
             else:
                 new_dirty_message = cvc.message
         else:
@@ -776,9 +776,9 @@ class ImportedAlleleInfo(TimeStampedModel):
                 new_vc = cvc.variant_coordinate
                 if existing_vc != cvc.variant_coordinate:
                     if existing_vc and new_vc and existing_vc.ref != new_vc.ref:
-                        new_dirty_message = f"{cvc.message}\nRef was: {existing_vc.ref} -> {new_vc.ref}"
+                        new_dirty_message = f"DIFF REF\n{cvc.message}\nRef {existing_vc.ref} -> {new_vc.ref}"
                     else:
-                        new_dirty_message = f"{cvc.message}\n{repr(existing_vc)} -> {repr(new_vc)}"
+                        new_dirty_message = f"????\n{cvc.message}\n{repr(existing_vc)} -> {repr(new_vc)}"
 
         if not new_dirty_message:
             message_parts = []
@@ -786,17 +786,18 @@ class ImportedAlleleInfo(TimeStampedModel):
                 try:
                     recalc_c_hgvs = rvi.recalc_c_hgvs()
                     if rvi.c_hgvs != recalc_c_hgvs.c_hgvs:
-                        message_parts.append(f"{rvi.genome_build} c.HGVS {rvi.c_hgvs} -> {recalc_c_hgvs.c_hgvs}")
+                        message_parts.append(f"c.HGVS DIFF\n{rvi.genome_build} {rvi.c_hgvs} -> {recalc_c_hgvs.c_hgvs}")
                     elif rvi.c_hgvs_compat != recalc_c_hgvs.c_hgvs_compatible:
-                        message_parts.append(f"{rvi.genome_build} c.HGVS compatible {rvi.c_hgvs_compat} -> {recalc_c_hgvs.c_hgvs_compatible}")
+                        message_parts.append(f"c.HGVS DIFF\n{rvi.genome_build} compatible {rvi.c_hgvs_compat} -> {recalc_c_hgvs.c_hgvs_compatible}")
                 except Exception as ex:
-                    message_parts.append(f"Error resolving {rvi.genome_build} c.HGVS: {ex}")
+                    # Make sure that we still fail
+                    if rvi.c_hgvs and CHGVS.HGVS_REGEX.match(rvi.c_hgvs):
+                        message_parts.append(f"Error resolving {rvi.genome_build} c.HGVS: {ex}")
             if message_parts:
                 new_dirty_message = "\n".join(message_parts)
 
         if self.dirty_message != new_dirty_message:
             self.dirty_message = new_dirty_message
-            print(f"Found {new_dirty_message}")
             self.save()
 
     def update_status(self):

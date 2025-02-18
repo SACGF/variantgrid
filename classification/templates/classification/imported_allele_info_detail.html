@@ -67,7 +67,7 @@
     {% endif %}
 
     {% if allele_info.message %}
-        {% labelled label="Note" %}{{ allele_info.message }}{% endlabelled %}
+        {% labelled label="Note" %}<div style="max-width:600px">{{ allele_info.message }}</div>{% endlabelled %}
     {% endif %}
 
     {% if allele_info.dirty_message %}
