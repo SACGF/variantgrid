@@ -165,14 +165,16 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                  Q(latest_validation__validation_tags__builds__missing_38__isnull=False))
             )
 
-        if (confirmed := self.get_query_param('confirmed')) and confirmed == 'true':
+        if self.get_query_param('confirmed') == 'true':
             qs = qs.filter(latest_validation__confirmed=True)
-        if (exclude := self.get_query_param('exclude')) and exclude == 'true':
+        if self.get_query_param('exclude') == 'true':
             qs = qs.filter(latest_validation__include=False)
-        if (error_mode := self.get_query_param('errors_mode')) and error_mode == 'true':
+        if self.get_query_param('errors_mode') == 'true':
             qs = qs.filter(Q(status=ImportedAlleleInfoStatus.FAILED) | Q(latest_validation__validation_tags__general__hgvs_issue__isnull=False))  # | Q(grch37__isnull=True) | Q(grch38__isnull=True))
-        if (in_progress := self.get_query_param('in_progress')) and in_progress == 'true':
+        if self.get_query_param('in_progress') == 'true':
             qs = qs.filter(Q(status__in=(ImportedAlleleInfoStatus.PROCESSING, ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD)))
+        if self.get_query_param('dirty') == 'true':
+            qs = qs.filter(Q(dirty_message__isnull=False))
 
         return qs
 
