@@ -121,11 +121,11 @@
                                     <tbody>
                                         {% for allele_liftover in vc.allele_liftover_qs %}
                                             <tr>
-                                                <td>{% timestamp allele_liftover.liftover.created %}</td>
+                                                <td>{% timestamp allele_liftover.liftover.created show_micro=True %}</td>
                                                 <td>{{ allele_liftover.liftover.get_conversion_tool_display }}</td>
                                                 <td>{{ allele_liftover.get_status_display }}</td>
                                                 <td><a href="{{ allele_liftover.liftover.get_absolute_url }}" class="hover-link">View LiftoverRun {{ allele_liftover.liftover_id }}</a></a></td>
-                                                <td>{{ allele_liftover.error_tidy|dash_if_empty }}</td>
+                                                <td>{{ allele_liftover.error_tidy|enrich|dash_if_empty }}</td>
                                             </tr>
                                         {% endfor %}
                                     </tbody>
