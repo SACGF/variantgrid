@@ -39,8 +39,9 @@ from classification.forms import ClassificationAlleleOriginForm
 from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
     ConditionResolvedDict, DiscordanceReport, ClassificationGrouping, AlleleGrouping, AlleleOriginGrouping, \
-    ImportedAlleleInfo, ImportedAlleleInfoStatus
+    ImportedAlleleInfo, ImportedAlleleInfoStatus, ClassificationImportRun
 from classification.models.classification import ClassificationModification
+from classification.models.classification_import_run import ClassificationImportRunStatus
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.discordance_models_utils import DiscordanceReportRowData
 from classification.models.evidence_key import EvidenceKeyMap
@@ -175,6 +176,9 @@ def classifications(request):
 
             failed_last_week_count = ImportedAlleleInfo.objects.filter(status=ImportedAlleleInfoStatus.FAILED).filter(modified__gt=now() - timedelta(days=7)).count()
             iai_processing["iai_failed_last_week_count"] = failed_last_week_count
+
+            if ongoing := list(ClassificationImportRun.objects.filter(status=ClassificationImportRunStatus.ONGOING)):
+                context["ongoing_imports"] = ongoing
 
     else:
         template = 'classification/classifications_legacy.html'

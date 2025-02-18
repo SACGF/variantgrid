@@ -199,18 +199,25 @@
         </div>
         <div class="container">
             {% if user.is_superuser %}
-                {% if iai_processing.iai_processing_count or iai_processing.iai_failed_last_week_count %}
-                    <div class="admin-only display-flex my-2">
-                        {% if iai_processing %}
-                            {% if iai_processing.iai_processing_count %}
-                                <div class="mx-2"><i class="fa-solid fa-hourglass"></i> <a class="hover-link" href="{% url 'view_imported_allele_info' %}?status=in_progress">Alleles in Processing</a>: {{ iai_processing.iai_processing_count | number }}
-                                    <span class="text-secondary">{% if iai_processing.iai_processing_recent %}Most recent: {% timestamp iai_processing.iai_processing_recent time_ago=True %}</span>{% endif %}
-                                </div>
+                {% if iai_processing.iai_processing_count or iai_processing.iai_failed_last_week_count or ongoing_import %}
+                    <div class="my-4">
+                        <div class="admin-only display-flex">
+                            {% if iai_processing %}
+                                {% if iai_processing.iai_processing_count %}
+                                    <div><i class="ml-1 fa-solid fa-hourglass"></i> <a class="hover-link" href="{% url 'view_imported_allele_info' %}?status=in_progress">Alleles in Processing</a>: {{ iai_processing.iai_processing_count | number }}
+                                        <span class="text-secondary">{% if iai_processing.iai_processing_recent %}Most recent: {% timestamp iai_processing.iai_processing_recent time_ago=True %}</span>{% endif %}
+                                    </div>
+                                {% endif %}
+                                {% if iai_processing.iai_failed_last_week_count %}
+                                    <div><i class="ml-1 fa-solid fa-circle-exclamation"></i> <a class="hover-link" href="{% url 'view_imported_allele_info' %}?status=failure">Alleles Failed this Week</a>: {{ iai_processing.iai_failed_last_week_count | number }}</div>
+                                {% endif %}
                             {% endif %}
-                            {% if iai_processing.iai_failed_last_week_count %}
-                                <div class="mx-2"><i class="fa-solid fa-circle-exclamation"></i> <a class="hover-link" href="{% url 'view_imported_allele_info' %}?status=failure">Alleles Failed this Week</a>: {{ iai_processing.iai_failed_last_week_count | number }}</div>
-                            {% endif %}
-                        {% endif %}
+                        </div>
+                        {% for ongoing_import in ongoing_imports %}
+                            <div class="admin-only">
+                                <i class="ml-1 fa-solid fa-file-arrow-up"></i><label>Ongoing Import</label>&nbsp; "{{ ongoing_import.identifier }}" rows: {{ ongoing_import.row_count | number }} <span class="text-secondary">Started: {% timestamp ongoing_import.created time_ago=True %}</span>
+                            </div>
+                        {% endfor %}
                     </div>
                 {% endif %}
             {% endif %}

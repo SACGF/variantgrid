@@ -83,8 +83,26 @@
     {% with curated_date=group.most_recent_curated %}
     <td style="width:100px" data-order="{{ group.date_sort_order_str }}">
         <a  href="{% url 'view_classification' group.most_recent.classification.id %}" class="hover-link">
-            {% if curated_date.name %}{{ curated_date.name }}<br/>{% endif %}{% timestamp curated_date.date.timestamp time_ago=True %}
-        </a><br/>
+            {% comment %}
+            let dom = $("<div>");
+            let content = $("<data>", {"class": "convert-timestamp time-ago", "data-date": lastCurated});
+
+            let classificationId = data["classification_id"];
+            if (classificationId) {
+                 content = $('<a>', {
+                    href: Urls.view_classification(classificationId),
+                    class: 'hover-link',
+                    html: content
+                });
+                dom.append(content);
+            }
+            let dateType = data["date_type"];
+            if (dateType) {
+                dom.append($("<div>", {text: dateType}));
+            }
+            {% endcomment %}
+            {% timestamp curated_date.value time_ago=True %}
+        </a>{% if curated_date.name %}<br/>{{ curated_date.name }}{% endif %}
     </td>
     <td data-order="{{ group.date_sort_order_str }}"></td>{% comment %}hidden column just used for sorting{% endcomment %}
     <td>{{ group.allele_origin_bucket }}</td>
