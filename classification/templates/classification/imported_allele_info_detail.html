@@ -71,7 +71,9 @@
     {% endif %}
 
     {% if allele_info.dirty_message %}
-        {% labelled admin_only=True label="Dirty Message" %}{{ allele_info.dirty_message }}{% endlabelled %}
+        {% labelled admin_only=True label="Dirty Message" %}
+            <div style="max-width:600px">{{ allele_info.dirty_message | enrich }}</div>
+        {% endlabelled %}
     {% endif %}
 
     <hr style="border-top:1px dashed lightgrey"/>
