@@ -165,7 +165,7 @@ def _get_build_liftover_dicts(alleles: Iterable[Allele], inserted_genome_build: 
                 build_liftover_allele_variant_coordinate_error[genome_build][conversion_tool].append(allele_vc_err)
                 if variant_coordinate:
                     # Quit on 1st success
-                    continue
+                    break
 
     return build_liftover_existing_allele_and_variants, build_liftover_allele_variant_coordinate_error
 
