@@ -2370,7 +2370,7 @@ VCTable.format_hgvs = (parts) => {
         let genomeBuildWrapper = $('<div>');
         let addNewLine = false;
         if (parts.normalized === false) {
-            $('<span>', {html: 'not resolved, showing imported ', style:'color:#888'}).appendTo(genomeBuildWrapper);
+            $('<span>', {html: 'not resolved<br/>showing imported ', style:'color:#888'}).appendTo(genomeBuildWrapper);
         } else if (parts.desired === false) {
             $('<span>', {html: 'not lifted-over ', style:'color:#888'}).appendTo(genomeBuildWrapper);
         } else {

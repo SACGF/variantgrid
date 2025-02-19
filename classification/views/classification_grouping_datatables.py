@@ -109,16 +109,18 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         def get_preferred_chgvs_json() -> Dict:
             nonlocal row
             for index, genome_build in enumerate(self.genome_build_prefs):
-                if c_hgvs_string := row.get(
-                        ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info")):
+                if c_hgvs_string := row.get(ImportedAlleleInfo.column_name_for_build(genome_build, "latest_allele_info")):
                     c_hgvs = CHGVS(c_hgvs_string)
                     c_hgvs.genome_build = genome_build
                     c_hgvs.is_desired_build = index == 0
                     return c_hgvs.to_json()
 
-            # ClassificationGroupings don't exist unless they've matched an allele, so no need to fallback
-            # to imported c.HGVS
-            return {}
+            # May still have linked to an allele without having the c_hgvs on either build
+            # TODO check imported g_hgvs or other importable columns
+            c_hgvs = CHGVS(row["latest_allele_info__imported_c_hgvs"])
+            c_hgvs.genome_build = GenomeBuild.get_name_or_alias(row["latest_allele_info__imported_genome_build_patch_version__genome_build"])
+            c_hgvs.is_normalised = False
+            return c_hgvs.to_json()
 
         response = get_preferred_chgvs_json()
         if settings.CLASSIFICATION_GRID_SHOW_PHGVS:
@@ -336,6 +338,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     'latest_allele_info__allele_id',
                     'latest_allele_info__latest_validation__include',
                     'latest_allele_info__status',
+                    'latest_allele_info__imported_c_hgvs',
+                    'latest_allele_info__imported_genome_build_patch_version__genome_build',
                     'latest_classification_modification__published_evidence__p_hgvs__value'  # TODO move this to allele info
                 ]
             ),
