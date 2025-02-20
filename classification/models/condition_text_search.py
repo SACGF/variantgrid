@@ -5,7 +5,7 @@ from ontology.models import OntologyTerm
 
 
 def condition_text_search(search_text: str, row_limit: int = 10) -> list[OntologyTerm]:
-    if not search_text:
+    if not search_text or search_text.lower() == "not set":
         # Searching for blank returns everything (29916 records, though you will only get row_limit)
         # This is probably not what you want, so return early without API call
         return []
