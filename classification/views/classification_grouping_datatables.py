@@ -117,10 +117,14 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
             # May still have linked to an allele without having the c_hgvs on either build
             # TODO check imported g_hgvs or other importable columns
-            c_hgvs = CHGVS(row["latest_allele_info__imported_c_hgvs"])
-            c_hgvs.genome_build = GenomeBuild.get_name_or_alias(row["latest_allele_info__imported_genome_build_patch_version__genome_build"])
-            c_hgvs.is_normalised = False
-            return c_hgvs.to_json()
+            # could be dirty and not have a latest_allele_info
+            if raw_genome_build := row["latest_allele_info__imported_genome_build_patch_version__genome_build"]:
+                c_hgvs = CHGVS(row["latest_allele_info__imported_c_hgvs"])
+                c_hgvs.genome_build = GenomeBuild.get_name_or_alias(raw_genome_build)
+                c_hgvs.is_normalised = False
+                return c_hgvs.to_json()
+            else:
+                return {}
 
         response = get_preferred_chgvs_json()
         if settings.CLASSIFICATION_GRID_SHOW_PHGVS:
@@ -128,7 +132,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 p_dot = p_hgvs.find('p.')
                 if p_dot != -1:
                     p_hgvs = p_hgvs[p_dot::]
-            response['p_hgvs'] = p_hgvs
+                response['p_hgvs'] = p_hgvs
 
         response['allele_id'] = row.get('latest_allele_info__allele_id')
         response['allele_info_id'] = row.get('latest_allele_info__allele_info__id')
@@ -332,6 +336,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 client_renderer='VCTable.hgvs',
                 order_sequence=[SortOrder.ASC, SortOrder.DESC],
                 extra_columns=[
+                    "pk",
+                    "latest_allele_info__pk",
                     "latest_allele_info__grch37__c_hgvs",
                     "latest_allele_info__grch38__c_hgvs",
                     'latest_allele_info__id',
