@@ -7,7 +7,8 @@ from datetime import date
 from decimal import Decimal
 from html import escape
 from typing import Union, Any, Optional
-
+import math
+import timedelta
 from django import template
 from django.db.models import TextChoices
 from django.utils.safestring import mark_safe, SafeString
@@ -187,6 +188,29 @@ def code_regex(data: str):
 def code_shell(data: str):
     # doesn't really do anything of note currently, but gives us the opportunity in future
     return {"text": data}
+
+
+@register.inclusion_tag("uicore/tags/timedelta.html", name="timedelta")
+def timedelta_tag(time: timedelta, show_micro=False):
+    remainder = time.seconds
+    hours = math.floor(remainder / (60*60))
+    if hours:
+        remainder -= (hours * 60*60)
+    minutes = math.floor(remainder / 60)
+    if minutes:
+        remainder -= (minutes * 60)
+    seconds = f"{remainder:02d}"
+    micro = None
+    if show_micro:
+        micro = time.microseconds
+
+    return {
+        "days": time.days,
+        "hours": hours,
+        "minutes": minutes,
+        "seconds": seconds,
+        "micro": micro
+    }
 
 
 @register.inclusion_tag("uicore/tags/timestamp.html")

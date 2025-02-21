@@ -1288,6 +1288,19 @@ h3.admin {
 .timestamp {
 	font-family: monospace;
 }
+
+.time-delta {
+	.amount {
+		font-family: monospace;
+	}
+	.unit {
+		font-size: 0.9rem;
+	}
+	.seconds {
+		font-size: 0.9rem;
+	}
+}
+
 .seconds {
 	font-size: 0.8rem;
 	color: #444;
