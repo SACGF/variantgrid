@@ -1,7 +1,7 @@
 import operator
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
-from typing import Optional, Set, Self
+from typing import Optional, Set, Self, Tuple
 
 import django
 from django.contrib.auth.models import User
@@ -280,10 +280,10 @@ class ClassificationGrouping(TimeStampedModel):
         return reverse('classification_grouping_detail', kwargs={"classification_grouping_id": self.pk})
 
     @staticmethod
-    def desired_grouping_for_classification(classification: Classification) -> Optional['ClassificationGrouping']:
+    def _desired_grouping_for_classification(classification: Classification) -> Tuple[Optional['ClassificationGrouping'], bool]:
         # withdrawn classifications are removed from groupings
         if classification.withdrawn:
-            return None
+            return None, False
 
         allele = classification.allele_object
         lab = classification.lab
@@ -294,18 +294,19 @@ class ClassificationGrouping(TimeStampedModel):
             allele_origin_grouping.dirty = True
             allele_origin_grouping.save(update_fields=["dirty"])
 
-            grouping, _ = ClassificationGrouping.objects.get_or_create(
+            grouping, is_new = ClassificationGrouping.objects.get_or_create(
                 allele_origin_grouping=allele_origin_grouping,
                 lab=lab,
                 allele_origin_bucket=classification.allele_origin_bucket,
                 share_level=share_level
             )
-            return grouping
-        return None
+            return grouping, is_new
+        return None, False
 
     @staticmethod
     def assign_grouping_for_classification(classification: Classification, force_dirty_up=True):
-        if desired_grouping := ClassificationGrouping.desired_grouping_for_classification(classification):
+        desired_grouping, new_grouping = ClassificationGrouping._desired_grouping_for_classification(classification)
+        if desired_grouping:
             entry, is_new = ClassificationGroupingEntry.objects.get_or_create(
                 classification=classification,
                 defaults={"grouping": desired_grouping}
@@ -320,6 +321,10 @@ class ClassificationGrouping(TimeStampedModel):
                     desired_grouping.dirty_up()
                 elif force_dirty_up:
                     entry.dirty_up()
+
+            if new_grouping:
+                # if we've got the first record in the grouping, process it right now, so we can see it during the import process
+                desired_grouping.update()
         else:
             # if we don't even have an allele, make sure we are removed from any grouping
             if existing := ClassificationGroupingEntry.objects.filter(classification=classification).first():

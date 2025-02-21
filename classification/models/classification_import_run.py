@@ -1,4 +1,6 @@
+import math
 from datetime import timedelta
+from functools import cached_property
 from typing import Optional
 
 from django import dispatch
@@ -43,6 +45,13 @@ class ClassificationImportRun(TimeStampedModel):
     row_count_unknown = models.IntegerField(default=0)
     missing_row_count = models.IntegerField(null=True, blank=True)
     logging_version = models.IntegerField(default=0)
+
+    @cached_property
+    def import_time(self) -> timedelta:
+        return self.modified - self.created
+
+    def rows_per_minute(self) -> float:
+        return int(self.row_count / (self.import_time.total_seconds() / 60))
 
     def __str__(self):
         parts = [f"(run_id={self.pk})"]
