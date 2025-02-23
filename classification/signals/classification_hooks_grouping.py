@@ -43,6 +43,7 @@ def published(sender,
     # this might be the first time we're publishing... so dirty_up
     ClassificationGrouping.assign_grouping_for_classification(classification)
     _instant_undirty_check()
+    debug_timer.tick("Assign to group")
 
 
 @receiver(condition_set_signal, sender=Classification)

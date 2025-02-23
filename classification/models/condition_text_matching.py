@@ -638,6 +638,7 @@ def published(sender,
     """
     Keeps condition_text_match in sync with the classifications when evidence changes
     """
+    debug_timer.tick("Condition Text Matching (PRE)")
     ConditionTextMatch.sync_condition_text_classification(newly_published, attempt_automatch=True, update_counts=True)
     debug_timer.tick("Condition Text Matching")
 
