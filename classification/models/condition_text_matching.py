@@ -27,7 +27,7 @@ from genes.models import GeneSymbol, GeneSymbolAlias
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info, report_message
-from library.utils import ArrayLength, DebugTimer
+from library.utils import ArrayLength, DebugTimer, get_timer
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation, OntologyRelation
 from ontology.ontology_matching import normalize_condition_text, \
     OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS, IGNORE_TERMS, NON_PR_TERMS
@@ -407,11 +407,16 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                     classification=classification
                 )
 
+            debug_timer = get_timer()
+            debug_timer.tick("Condition Text Matching - record setup")
+
             if attempt_automatch and (new_root or new_gene_level):
                 ConditionTextMatch.attempt_automatch(ct, gene_symbol=gene_symbol)
+                debug_timer.tick("Condition Text Matching - auto match")
             elif update_counts:  # attempt automatch update counts
                 update_condition_text_match_counts(ct)
                 ct.save()
+                debug_timer.tick("Condition Text Matching - update counts")
 
     def as_resolved_condition(self) -> Optional[ConditionResolvedDict]:
         """
