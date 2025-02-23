@@ -3,6 +3,8 @@ from dataclasses import field, dataclass
 from datetime import datetime, timedelta
 from functools import reduce
 
+from threadlocals.threadlocals import get_request_variable, set_request_variable
+
 from library.utils import time_since
 
 
@@ -69,3 +71,19 @@ class NullTimer(DebugTimer):
 
 
 DebugTimer.NullTimer = NullTimer()
+
+
+def reset_timer() -> DebugTimer:
+    timer = DebugTimer()
+    set_request_variable("timer", timer, use_threadlocal_if_no_request=True)
+    return timer
+
+
+def get_timer() -> DebugTimer:
+    if timer := get_request_variable("timer", use_threadlocal_if_no_request=True):
+        return timer
+    # warning, asked for timer without reset timer being called
+    # return null timer
+    print(f"Using NullTimer - call reset_timer() if you want a timer")
+
+    return NullTimer()

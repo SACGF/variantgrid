@@ -1,3 +1,4 @@
+from functools import cached_property
 from typing import Optional, Mapping
 
 from django.contrib.auth.models import User
@@ -13,7 +14,7 @@ from classification.models.classification_utils import ClassificationPatchStatus
 from classification.models.variant_resolver import VariantResolver
 from eventlog.models import create_event
 from library.log_utils import report_exc_info
-from library.utils import DebugTimer
+from library.utils import DebugTimer, reset_timer
 
 
 class BulkClassificationInserter:
@@ -31,7 +32,10 @@ class BulkClassificationInserter:
         self.record_count = 0
         self.new_record_count = 0
         self.start = now()
-        self.debug_timer = DebugTimer()
+
+    @cached_property
+    def debug_timer(self) -> DebugTimer:
+        return reset_timer()
 
     @staticmethod
     def verify_source(data) -> SubmissionSource:

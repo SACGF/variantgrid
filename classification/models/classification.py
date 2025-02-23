@@ -51,7 +51,7 @@ from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
 from library.preview_request import PreviewData, PreviewModelMixin, PreviewKeyValue
 from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_text, DebugTimer, \
-    invalidate_cached_property, md5sum_str
+    invalidate_cached_property, md5sum_str, get_timer
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -1666,6 +1666,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             if not owner_cell.provided and user:
                 owner_cell.value = user.username
 
+        debug_timer = get_timer()
+        debug_timer.tick("Patch data normalisation")
+
         patch_meta = PatchMeta(patch=patch.data, existing=use_evidence.data, revalidate_all=revalidate_all)
 
         validations_received = classification_validation_signal.send(sender=Classification, classification=self,
@@ -1730,6 +1733,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         pending_modification: Optional[ClassificationModification]
 
+        debug_timer.tick("Patch validation")
+
         # only make a modification if there's data to actually patch
         if apply_patch:
             patch_response.modified_keys = set(diffs_only_patch.keys())
@@ -1791,6 +1796,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     pending_modification.classification = self
                     pending_modification.save()
                     assign_perm(ClassificationModification.get_read_perm(), self.lab.group, pending_modification)
+            debug_timer.tick("Saved")
 
         # end apply patch diff
         else:
