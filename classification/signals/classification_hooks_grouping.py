@@ -2,13 +2,14 @@ from django.contrib.auth.models import User
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
-from classification.enums import ShareLevel, SubmissionSource
+from classification.enums import ShareLevel
 from classification.models import classification_post_publish_signal, Classification, ClassificationModification, \
     classification_withdraw_signal, allele_info_changed_signal, ImportedAlleleInfo, ClassificationImportRun, \
     condition_set_signal
 from classification.models.classification_grouping import ClassificationGrouping, ClassificationGroupingEntry
 from classification.models.classification_import_run import classification_imports_complete_signal
-from library.utils import DebugTimer
+from library.utils import get_timer
+
 
 ###
 # Capture events that could require a ClassificationGrouping to update.
@@ -36,14 +37,13 @@ def published(sender,
               newly_published: ClassificationModification,
               previous_share_level: ShareLevel,
               user: User,
-              debug_timer: DebugTimer,
               **kwargs):  # pylint: disable=unused-argument
     # CLASSIFICATION PUBLISHED
     # we call assign_grouping_for_classification as we might have a new allele origin,
     # this might be the first time we're publishing... so dirty_up
     ClassificationGrouping.assign_grouping_for_classification(classification)
     _instant_undirty_check()
-    debug_timer.tick("Assign to group")
+    get_timer().tick("Assign to group")
 
 
 @receiver(condition_set_signal, sender=Classification)

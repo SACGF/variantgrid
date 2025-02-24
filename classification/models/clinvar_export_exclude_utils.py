@@ -11,7 +11,7 @@ from classification.models import ClassificationModification, EvidenceMixin, cla
     classification_post_publish_signal, Classification
 from flags.models import FlagStatus, Flag
 from library.guardian_utils import admin_bot
-from library.utils import DebugTimer
+from library.utils import get_timer
 from snpdb.models import ClinVarKey, ClinVarKeyExcludePattern
 
 """
@@ -27,7 +27,6 @@ def published(sender,
               previously_published: ClassificationModification,
               newly_published: ClassificationModification,
               user: User,
-              debug_timer: DebugTimer,
               **kwargs):  # pylint: disable=unused-argument
     """
     On publishing of a classification, see if if it matches the criteria of the clinvar key
@@ -38,7 +37,7 @@ def published(sender,
     if clinvar_key := classification.lab.clinvar_key:
         ClinVarExcludePatternUtil(clinvar_key).ignore_pattern_for(newly_published).apply()
 
-    debug_timer.tick("Reviewed ClinVar exclusion")
+    get_timer().tick("Reviewed ClinVar exclusion")
 
 
 @dataclass(frozen=True)

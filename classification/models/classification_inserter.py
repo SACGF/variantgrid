@@ -194,7 +194,7 @@ class BulkClassificationInserter:
 
                         debug_timer.tick("Prepare for Variant Resolution")
 
-                        record.publish_latest(user=user, debug_timer=debug_timer)
+                        record.publish_latest(user=user)
 
                         debug_timer.tick("Publish Complete")
                 else:

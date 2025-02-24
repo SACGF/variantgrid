@@ -82,8 +82,5 @@ def reset_timer() -> DebugTimer:
 def get_timer() -> DebugTimer:
     if timer := get_request_variable("timer", use_threadlocal_if_no_request=True):
         return timer
-    # warning, asked for timer without reset timer being called
-    # return null timer
-    print(f"Using NullTimer - call reset_timer() if you want a timer")
-
-    return NullTimer()
+    else:
+        return reset_timer()

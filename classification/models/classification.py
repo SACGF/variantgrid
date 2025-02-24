@@ -50,7 +50,7 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
 from library.preview_request import PreviewData, PreviewModelMixin, PreviewKeyValue
-from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_text, DebugTimer, \
+from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_text, \
     invalidate_cached_property, md5sum_str, get_timer
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
@@ -64,7 +64,7 @@ ChgvsKey = namedtuple('CHGVS', ['short', 'column', 'build'])
 
 classification_validation_signal = django.dispatch.Signal()  # args: "classification", "patch_meta", "key_map"
 classification_current_state_signal = django.dispatch.Signal()  # args: "user"
-classification_post_publish_signal = django.dispatch.Signal()  # args: "classification", "previously_published", "previous_share_level", "newly_published", "user", "debug_timer"
+classification_post_publish_signal = django.dispatch.Signal()  # args: "classification", "previously_published", "previous_share_level", "newly_published", "user"
 classification_withdraw_signal = django.dispatch.Signal()  # args: "classification", "user"
 classification_variant_set_signal = django.dispatch.Signal()  # args: "classification", "variant"
 classification_revalidate_signal = django.dispatch.Signal()  # args "classification"
@@ -1816,13 +1816,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         return patch_response
 
-    def publish_latest(self, user: User, share_level=None, debug_timer: DebugTimer = DebugTimer.NullTimer) -> bool:
+    def publish_latest(self, user: User, share_level=None) -> bool:
         if not share_level:
             share_level = self.share_level_enum
         latest_edited = self.last_edited_version
         if not latest_edited:
             raise ValueError(f'VC {self.id} does not have a last edited version')
-        return latest_edited.publish(share_level=share_level, user=user, vc=self, debug_timer=debug_timer)
+        return latest_edited.publish(share_level=share_level, user=user, vc=self)
 
     @property
     def last_edited_version(self) -> 'ClassificationModification':
@@ -2427,14 +2427,12 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                 and not self.published
 
     @transaction.atomic()
-    def publish(self, share_level: Union[ShareLevel, str, int], user: User, vc: 'Classification',
-                debug_timer: DebugTimer = DebugTimer.NullTimer) -> bool:
+    def publish(self, share_level: Union[ShareLevel, str, int], user: User, vc: 'Classification') -> bool:
         """
         :param share_level: The share level we want to publish as
         :param user: The user who initiated the publishing
         :param vc: The variant classification we're publishing - even though it's redundant, but we get the same object
         instance and don't reload it from the database
-        :param debug_timer: for timing the event
         :return a boolean indicating if a new version was published (false if no change was required)
         """
         old_share_level = vc.share_level_enum
@@ -2470,6 +2468,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         vc.summary = ClassificationSummaryCalculator(self).cache_dict()
         vc.save()
 
+        debug_timer = get_timer()
         debug_timer.tick("Published Modification")
 
         classification_post_publish_signal.send(
@@ -2478,8 +2477,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             previously_published=previously_published,
             previous_share_level=old_share_level,
             newly_published=self,
-            user=user,
-            debug_timer=debug_timer)
+            user=user)
 
         vc.refresh_from_db()
         return True

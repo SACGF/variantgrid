@@ -26,8 +26,8 @@ from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol, GeneSymbolAlias
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
-from library.log_utils import report_exc_info, report_message
-from library.utils import ArrayLength, DebugTimer, get_timer
+from library.log_utils import report_exc_info
+from library.utils import ArrayLength, get_timer
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation, OntologyRelation
 from ontology.ontology_matching import normalize_condition_text, \
     OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS, IGNORE_TERMS, NON_PR_TERMS
@@ -424,7 +424,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 debug_timer.tick("Condition Text Matching - auto match")
             elif update_counts:
                 ct.classifications_count += 1
-                is_valid = root.is_valid or gene_level.is_valid or mode_of_inheritance.is_valid or (existing and existing.is_valid)
+                is_valid = root.is_valid or gene_level.is_valid or mode_of_inheritance_level.is_valid or (existing and existing.is_valid)
                 if not is_valid:
                     ct.classifications_count_outstanding += 1
                 ct.save()
@@ -650,12 +650,11 @@ def published(sender,
               newly_published: ClassificationModification,
               previous_share_level: ShareLevel,
               user: User,
-              debug_timer: DebugTimer,
               **kwargs):
     """
     Keeps condition_text_match in sync with the classifications when evidence changes
     """
-    debug_timer.tick("Condition Text Matching - post publish")
+    get_timer().tick("Condition Text Matching - post publish")
     ConditionTextMatch.sync_condition_text_classification(newly_published, attempt_automatch=True, update_counts=True)
 
 
