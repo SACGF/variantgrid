@@ -390,7 +390,7 @@ class ClassificationGrouping(TimeStampedModel):
                 all_zygosities |= set(modification.get_value_list(SpecialEKeys.ZYGOSITY))
 
                 # only store valid terms as quick links to the classification
-                all_terms = {term for term in all_terms if term.is_valid_for_condition and not term.is_stub}
+                all_terms = {term for term in all_terms if term.is_valid_for_condition}
                 # self._update_conditions(all_terms)
                 summary_dict: ClassificationSummaryCacheDict = modification.classification.summary
 
