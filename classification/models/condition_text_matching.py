@@ -299,6 +299,8 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         This method will save any created ConditionTexts
         """
         debug_timer = get_timer()
+        debug_timer.tick("Condition Text Matching - PRE")
+
         classification = cm.classification
         existing: ConditionTextMatch = ConditionTextMatch.objects.filter(classification=classification).first()
 
@@ -653,9 +655,8 @@ def published(sender,
     """
     Keeps condition_text_match in sync with the classifications when evidence changes
     """
-    debug_timer.tick("Condition Text Matching (PRE)")
+    debug_timer.tick("Condition Text Matching - post publish")
     ConditionTextMatch.sync_condition_text_classification(newly_published, attempt_automatch=True, update_counts=True)
-    debug_timer.tick("Condition Text Matching")
 
 
 @receiver(flag_comment_action, sender=Flag)
