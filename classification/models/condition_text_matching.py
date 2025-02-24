@@ -298,6 +298,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         @param attempt_automatch - If true, attempt to automatch on the resulting ConditionText
         This method will save any created ConditionTexts
         """
+        debug_timer = get_timer()
         classification = cm.classification
         existing: ConditionTextMatch = ConditionTextMatch.objects.filter(classification=classification).first()
 
@@ -350,6 +351,8 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
         ct: ConditionText
         ct, ct_is_new = ConditionText.objects.get_or_create(normalized_text=normalized, lab=lab)
+
+        debug_timer.tick("Condition Text Matching - gene symbol resolution")
 
         with transaction.atomic():
             ct = ConditionText.objects.select_for_update().filter(pk=ct.pk).first()
@@ -407,16 +410,18 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                     classification=classification
                 )
 
-            debug_timer = get_timer()
             debug_timer.tick("Condition Text Matching - record setup")
 
             if attempt_automatch and (new_root or new_gene_level):
                 ConditionTextMatch.attempt_automatch(ct, gene_symbol=gene_symbol)
                 debug_timer.tick("Condition Text Matching - auto match")
-            elif update_counts:  # attempt automatch update counts
-                update_condition_text_match_counts(ct)
+            elif update_counts:
+                ct.classifications_count += 1
+                is_valid = root.is_valid or gene_level.is_valid or mode_of_inheritance.is_valid or (existing and existing.is_valid)
+                if not is_valid:
+                    ct.classifications_count_outstanding += 1
                 ct.save()
-                debug_timer.tick("Condition Text Matching - update counts")
+                debug_timer.tick("Condition Text Matching - update count quick")
 
     def as_resolved_condition(self) -> Optional[ConditionResolvedDict]:
         """
