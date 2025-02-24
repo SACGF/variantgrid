@@ -309,6 +309,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 existing.delete()
                 if update_counts:
                     update_condition_text_match_counts(ct)
+            debug_timer.tick("Condition Text Matching - withdrawn")
             return
 
         lab = classification.lab
@@ -334,13 +335,14 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 pass
 
         if not gene_symbol:
-            if gene_symbol_str:
-                report_message("Classification has unrecognised gene symbol, cannot link it to condition text",
-                               extra_data={
-                                   "target": gene_symbol_str or "<blank>",
-                                   "classification_id": classification.id,
-                                   "gene_symbol": gene_symbol_str
-                               })
+            # if gene_symbol_str:
+            #     report_message("Classification has unrecognised gene symbol, cannot link it to condition text",
+            #                    extra_data={
+            #                        "target": gene_symbol_str or "<blank>",
+            #                        "classification_id": classification.id,
+            #                        "gene_symbol": gene_symbol_str
+            #                    })
+            debug_timer.tick("Condition Text Matching - no valid gene symbol")
             return
 
         raw_condition_text = cm.get(SpecialEKeys.CONDITION) or ""
@@ -381,6 +383,8 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 classification=None
             )
 
+            debug_timer.tick("Condition Text Matching - ensure hierarchy")
+
             if existing:
                 if existing.parent != mode_of_inheritance_level or \
                         existing.condition_text != ct or \
@@ -398,7 +402,9 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                     if update_counts:
                         update_condition_text_match_counts(old_text)
                         old_text.save()
+                    debug_timer.tick("Condition Text Matching - change existing")
                 else:
+                    debug_timer.tick("Condition Text Matching - no change")
                     # nothing has changed, no need to update anything
                     return
             else:
@@ -409,8 +415,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                     mode_of_inheritance=mode_of_inheritance,
                     classification=classification
                 )
-
-            debug_timer.tick("Condition Text Matching - record setup")
+                debug_timer.tick("Condition Text Matching - create new entry")
 
             if attempt_automatch and (new_root or new_gene_level):
                 ConditionTextMatch.attempt_automatch(ct, gene_symbol=gene_symbol)
