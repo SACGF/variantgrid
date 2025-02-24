@@ -2468,8 +2468,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         vc.summary = ClassificationSummaryCalculator(self).cache_dict()
         vc.save()
 
-        debug_timer = get_timer()
-        debug_timer.tick("Published Modification")
+        get_timer().tick("Published Modification")
 
         classification_post_publish_signal.send(
             sender=Classification,
