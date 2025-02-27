@@ -2278,16 +2278,13 @@ VCForm.format_condition = function(condition_json) {
     if (!condition_json) {
         return $('<span>', {text: "-", class:'no-value'});
     }
-    let dom = $('<span>');
+    let dom = $('<div>');
     let domUsed = false;
     if (condition_json.resolved_terms) {
 
         let first = true;
         for (let term of condition_json.resolved_terms) {
             domUsed = true;
-            if (!first) {
-                $('<br>').appendTo(dom);
-            }
             first = false;
             $('<div>', {
                 class: 'ontology-term',
@@ -2306,15 +2303,15 @@ VCForm.format_condition = function(condition_json) {
     if (condition_json.plain_text_terms) {
         for (let term of condition_json.plain_text_terms) {
             domUsed = true;
-            $('<div>', {text: term, class:'ontology-term free-text'}).appendTo(dom);
+            $('<div>', {text: term, class:'ontology-term free-text semicolon-sep'}).appendTo(dom);
         }
     }
 
     if (!domUsed) {
-        return $('<span>', {class: 'ontology-term free-text', text: condition_json.display_text});
+        return $('<div>', {class: 'ontology-term free-text', text: condition_json.display_text});
     }
     if (condition_json.resolved_terms && condition_json.resolved_terms.length > 1 && condition_json.resolved_join) {
-        $('<span>', {class: 'font-italic', text:condition_json.resolved_join === 'C' ? ' Co-occurring' : ' Uncertain'}).appendTo(dom);
+        $('<div>', {class: 'font-italic', text:condition_json.resolved_join === 'C' ? ' Co-occurring' : ' Uncertain'}).appendTo(dom);
     }
     return dom;
 };

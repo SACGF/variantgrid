@@ -333,13 +333,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 pass
 
         if not gene_symbol:
-            if gene_symbol_str:
-                report_message("Classification has unrecognised gene symbol, cannot link it to condition text",
-                               extra_data={
-                                   "target": gene_symbol_str or "<blank>",
-                                   "classification_id": classification.id,
-                                   "gene_symbol": gene_symbol_str
-                               })
+            # Return as we cannot link to condition text
             return
 
         raw_condition_text = cm.get(SpecialEKeys.CONDITION) or ""
@@ -1136,8 +1130,10 @@ def apply_condition_resolution(classification: Classification, new_condition_res
         if old_condition_resolution:
             condition_text_old = ConditionResolved.from_dict(old_condition_resolution).summary
 
+        new_condition = None
         if new_condition_resolution:
-            condition_text = ConditionResolved.from_dict(new_condition_resolution).summary
+            new_condition = ConditionResolved.from_dict(new_condition_resolution)
+            condition_text = new_condition.summary
 
         if old_condition_resolution != new_condition_resolution:
             condition_text = f"{condition_text_old} --> {condition_text}"
@@ -1152,7 +1148,7 @@ def apply_condition_resolution(classification: Classification, new_condition_res
             classification.save(update_fields=['condition_resolution'])
 
             condition_set_signal.send(sender=Classification, classification=classification,
-                                      condition=ConditionResolved.from_dict(new_condition_resolution))
+                                      condition=new_condition)
 
 
 def apply_condition_resolution_to_classifications(ctm: ConditionTextMatch):

@@ -313,7 +313,10 @@ def node_view(request, analysis_id, analysis_version, node_id, node_version, ext
         to subclasses of NodeView in analysis.views.nodes based on the model field
 
         We use analysis version to be able to expire cache if the custom columns etc change """
-    node = get_node_subclass_or_404(request.user, node_id, version=node_version)
+    try:
+        node = get_node_subclass_or_404(request.user, node_id, version=node_version)
+    except NodeOutOfDateException:
+        return HttpResponseRedirect(reverse("node_load", kwargs={"node_id": node_id}))
     view = NODE_DISPATCHER[node.__class__]
     return view(request, pk=node_id, version_id=node_version, extra_filters=extra_filters)
 

@@ -1144,6 +1144,14 @@ select[disabled] {
   color: #888;
 }
 
+.semicolon-sep:not(.semicolon-sep:last-of-type):after {
+  font-family: monospace;
+  content: ";";
+  color: #888;
+  white-space: nowrap;
+  padding-left: 1px;
+}
+
 .error-value {
   font-weight: bold;
   color: red;

@@ -84,6 +84,12 @@
                     <input type="checkbox" class="form-check-input" id="exclude" onclick="applyFilters()"/>
                     <label for="exclude" title="Only show records that will be excluded from export">Excluded</label>
                 </div>
+                {% if user.is_superuser %}
+                    <div class="form-check-inline">
+                        <input type="checkbox" class="form-check-input" id="dirty" onclick="applyFilters()"/>
+                        <label for="dirty" title="Only show Imported Allele Infos with dirty messages">Dirty</label>
+                    </div>
+                {% endif %}
                 <br/>
                 <div class="form-check-inline">
                     <input type="radio" name="status" class="form-check-input" id="any_status" onclick="applyFilters()" {% if not status %}checked="checked"{% endif %}/>
