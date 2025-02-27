@@ -60,7 +60,7 @@ class PhenotypeMatcher:
         'ear', 'exclude',
         'face', 'familial', 'floating', 'focal', 'forms', 'frequent', 'frequency', 'from', "ft 4",
         'generalized', "generalised",
-        'hard', 'hearing',
+        'hard', 'has', 'hearing',
         'image', 'inheritance', 'insulin',
         'joints',
         'kit',
