@@ -1,10 +1,12 @@
 import tempfile
 
+import cyvcf2
 from django.test import TestCase
 
 from library.genomics.vcf_utils import write_vcf_from_variant_coordinates, vcf_to_variant_coordinates, \
-    vcf_to_variant_coordinates_and_records
+    vcf_to_variant_coordinates_and_records, vcf_get_ref_alt_svlen_and_modification
 from snpdb.models import VariantCoordinate
+from upload.models import ModifiedImportedVariant
 
 
 class TestVCFUtils(TestCase):
@@ -91,3 +93,11 @@ class TestVCFUtils(TestCase):
             out = vcf_to_variant_coordinates_and_records(temp_file.name)
             for in_vc, (out_vc, out_record) in zip(variant_coordinates, out):
                 self.assertEqual(out_record.INFO["END"], in_vc.end)
+
+
+    def test_vcf_get_ref_alt_svlen_and_modification(self):
+        filename = "snpdb/tests/test_data/svlen_split_multi_allele.vcf"
+        for v in cyvcf2.Reader(filename):
+            _ref, _alt, svlen, _modification = vcf_get_ref_alt_svlen_and_modification(v, old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
+            self.assertTrue(isinstance(svlen, int))
+

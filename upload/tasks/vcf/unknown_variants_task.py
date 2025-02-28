@@ -12,7 +12,7 @@ from library.utils.file_utils import name_from_filename, mk_path
 from snpdb import variant_collection
 from snpdb.models import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
-from upload.models import UploadStep, UploadStepTaskType, VCFPipelineStage
+from upload.models import UploadStep, UploadStepTaskType, VCFPipelineStage, ModifiedImportedVariant
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.vcf import sql_copy_files
 from variantgrid.celery import app
@@ -49,7 +49,8 @@ class BulkUnknownVariantInserter:
     def process_vcf_record(self, variant):
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
         # This has been decomposed (only be 1 alt per line)
-        ref, alt, svlen, _ = vcf_get_ref_alt_svlen_and_modification(variant)
+        ref, alt, svlen, _ = vcf_get_ref_alt_svlen_and_modification(variant,
+                                                                    old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
         variant_coordinate = VariantCoordinate(chrom=variant.CHROM, position=variant.POS, ref=ref, alt=alt, svlen=svlen)
         self.variant_pk_lookup.add(variant_coordinate)
         self.batch_process_check()

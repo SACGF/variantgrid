@@ -126,7 +126,13 @@ def vcf_allele_is_symbolic(allele: str) -> bool:
     return allele.startswith("<") and allele.endswith(">")
 
 
-def vcf_get_ref_alt_svlen_and_modification(variant: cyvcf2.Variant) -> tuple[str, str, Optional[int], Optional[str]]:
+def vcf_get_ref_alt_svlen_and_modification(variant: cyvcf2.Variant, old_variant_info: str) -> tuple[str, str, Optional[int], Optional[str]]:
+    """ old_variant_info: name of INFO created via bcftools norm --old-rec-tag=INFO_NAME
+
+        Looks like 'NC_000022.11|1544211|N|<DUP>,<DEL>|2' - we use the final index (1/2)
+
+
+    """
     ref = variant.REF.strip().upper()
     if variant.ALT:
         alt = variant.ALT[0].strip().upper()
@@ -137,8 +143,30 @@ def vcf_get_ref_alt_svlen_and_modification(variant: cyvcf2.Variant) -> tuple[str
     if Sequence.allele_is_symbolic(ref) or Sequence.allele_is_symbolic(alt):
         # Need to provide END or SVLEN
         if svlen_info := variant.INFO.get('SVLEN'):
+            # issue #1268 - bcftools norm doesn't split multi-allelic SVLEN
+            if isinstance(svlen_info, tuple):
+                if not old_variant_info:
+                    raise ValueError(f"SVLEN is a tuple, you need to pass in 'old_variant_info' to resolve these")
+
+                if old_variant := variant.INFO.get(old_variant_info):
+                    old_index_str = old_variant.split("|")[-1]
+                    try:
+                        old_index = int(old_index_str)
+                    except ValueError as ve:
+                        raise ValueError(f"SVLEN is a tuple (from bcftools norm multi-allelic split). Could not obtain"
+                                         f" old alt index from INFO/{old_variant_info}='{old_variant}'") from ve
+                    try:
+                        svlen_info = svlen_info[old_index - 1]
+                    except IndexError:
+                        raise ValueError(f"SVLEN is a tuple of length={len(svlen_info)}. Obtained 1 based index "
+                                         f"{old_index=} from INFO/{old_variant_info}='{old_variant}' which was out of range")
+                else:
+                    raise ValueError(f"SVLEN is a tuple. This requires INFO='{old_variant_info}', "
+                                     f"expected split multi-allelic by bcftools with that as --old-rec-tag")
+
             svlen = int(svlen_info)
             if alt == VCFSymbolicAllele.DEL and svlen > 0:
+                # issue #1245 - Manta SV produces <DEL> with positive SVLEN
                 svlen = -svlen
                 modification = f"SVLEN - inverted positive value for {alt=}"
         elif end_info := variant.INFO.get('END'):

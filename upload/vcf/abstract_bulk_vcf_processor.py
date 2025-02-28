@@ -58,7 +58,8 @@ class AbstractBulkVCFProcessor(abc.ABC):
         """ Ensures SVLEN fits symbolic alt, some callers eg Manta (non-Dragen) write positive SVLEN for dels
             We don't do this in vcf_clean_and_filter as we don't pull apart the INFO there
         """
-        ref, alt, svlen, modification = vcf_get_ref_alt_svlen_and_modification(variant)
+        ref, alt, svlen, modification = vcf_get_ref_alt_svlen_and_modification(variant,
+                                                                               old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
         if modification:
             self.svlen_modifications[modification] += 1
         return ref, alt, svlen
@@ -86,7 +87,9 @@ class AbstractBulkVCFProcessor(abc.ABC):
     def add_modified_imported_variant(self, variant: cyvcf2.Variant, variant_hash, miv_hash_list=None, miv_list=None):
         # This used to handle VT tags: OLD_MULTIALLELIC / OLD_VARIANT but now we handle BCFTOOLS only
         if bcftools_old_variant := variant.INFO.get(ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG):
-            svlen = variant.INFO.get("SVLEN")
+            _ref, _alt, svlen, _modification = vcf_get_ref_alt_svlen_and_modification(variant,
+                                                                                      old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
+            # svlen = variant.INFO.get("SVLEN")
 
             if miv_hash_list is None:
                 miv_hash_list = self.modified_imported_variant_hashes
