@@ -307,11 +307,16 @@ class ClassificationGrouping(TimeStampedModel):
     def assign_grouping_for_classification(classification: Classification, force_dirty_up=True):
         desired_grouping, new_grouping = ClassificationGrouping._desired_grouping_for_classification(classification)
         if desired_grouping:
-            entry, is_new = ClassificationGroupingEntry.objects.get_or_create(
+            entry, is_new_entry = ClassificationGroupingEntry.objects.get_or_create(
                 classification=classification,
                 defaults={"grouping": desired_grouping}
             )
-            if not is_new:
+            if new_grouping:
+                # if we've got the first record in the grouping, process it right now, so we can see it during the import process
+                desired_grouping.update()
+            elif is_new_entry:
+                entry.dirty_up()
+            else:
                 old_grouping = entry.grouping
                 if entry.grouping != desired_grouping:
                     entry.grouping = desired_grouping
@@ -321,10 +326,6 @@ class ClassificationGrouping(TimeStampedModel):
                     desired_grouping.dirty_up()
                 elif force_dirty_up:
                     entry.dirty_up()
-
-            if new_grouping:
-                # if we've got the first record in the grouping, process it right now, so we can see it during the import process
-                desired_grouping.update()
         else:
             # if we don't even have an allele, make sure we are removed from any grouping
             if existing := ClassificationGroupingEntry.objects.filter(classification=classification).first():

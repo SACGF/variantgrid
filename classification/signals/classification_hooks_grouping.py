@@ -54,14 +54,6 @@ def condition_set(sender, classification: Classification, **kwargs):
         _instant_undirty_check()
 
 
-@receiver(condition_set_signal, sender=Classification)
-def condition_set(sender, classification: Classification, **kwargs):
-    # Resolved condition updated, need to update the group to show it
-    if entry := ClassificationGroupingEntry.objects.filter(classification=classification).first():
-        entry.dirty_up()
-        _instant_undirty_check()
-
-
 @receiver(pre_delete, sender=Classification)
 def deleting_classification(sender, instance: Classification, **kwargs):  # pylint: disable=unused-argument
     # CLASSIFICATION DELETED

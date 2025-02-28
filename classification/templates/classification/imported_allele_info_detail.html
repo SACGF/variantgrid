@@ -76,10 +76,6 @@
         {% endlabelled %}
     {% endif %}
 
-    {% if allele_info.dirty_message %}
-        {% labelled admin_only=True label="Dirty Message" %}{{ allele_info.dirty_message }}{% endlabelled %}
-    {% endif %}
-
     <hr style="border-top:1px dashed lightgrey"/>
     <div id="classifications-allele-{{ allele_info.pk }}">
         {% if not on_allele_page %}
