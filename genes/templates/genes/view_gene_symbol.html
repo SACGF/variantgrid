@@ -407,7 +407,12 @@
                 <div class="card-header">Summary</div>
                 <div class="card-body">
                     {% labelled label="Approved Name" help=annotation_description.hgnc_name %}{{ hgnc.approved_name }}{% endlabelled %}
-                    {% labelled label="HGNC ID" help=annotation_description.hgnc_id %}<a href="{{ hgnc.url }}">HGNC:{{ hgnc.pk }}</a> ({{ hgnc.get_status_display }}){% endlabelled %}
+                    {% labelled label="HGNC ID" help=annotation_description.hgnc_id %}
+                        <a href="{{ hgnc.url }}">HGNC:{{ hgnc.pk }}</a> ({{ hgnc.get_status_display }})<br/>
+                    {% endlabelled %}
+                    {% labelled label="Ontology Links" help="Shows links to ontology terms within our system for "|add:gene_symbol.symbol %}
+                        <a href="{{ hgnc.get_absolute_url }}">{{ site_name }} HGNC:{{ hgnc.pk }}</a>
+                    {% endlabelled %}
                 </div>
             </div>
         {% endif %}
