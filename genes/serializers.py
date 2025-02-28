@@ -108,7 +108,7 @@ class GeneListSerializer(serializers.ModelSerializer):
         for field in exclude_fields:
             # providing a default prevents a KeyError
             # if the field does not exist
-            fields.pop(field, default=None)
+            fields.pop(field, None)
 
         return fields
 
