@@ -574,7 +574,7 @@ class SimpleVCFImportInfo(VCFImportInfo):
             We'll look up via upload pipeline rather than step, so they are merged together
         """
         if existing_info := SimpleVCFImportInfo.objects.filter(message_string=message_string,
-                                                               upload_step__upload_pipeline=upload_step).first():
+                                                               upload_step__upload_pipeline=upload_step.upload_pipeline).first():
             SimpleVCFImportInfo.objects.filter(pk=existing_info.pk).update(count=F('count') + count)
         else:
             SimpleVCFImportInfo.objects.create(message_string=message_string,
