@@ -717,7 +717,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return self.get(SpecialEKeys.GENOME_BUILD)
 
     @property
-    def imported_c_hgvs(self):
+    def imported_c_hgvs(self) -> str:
         if c_hgvs := self.get(SpecialEKeys.C_HGVS):
             # remove any white space inside the c.HGVS
             c_hgvs = re.sub(r'\s+', '', c_hgvs)
@@ -2231,6 +2231,18 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     # changing the share level does not change the actual logic of sharing
     # it is useful if we have to rework permissions though
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices(), null=True, blank=True)
+
+    @property
+    def imported_c_hgvs_obj(self) -> CHGVS:
+        if c_hgvs := self.get(SpecialEKeys.C_HGVS):
+            # remove any white space inside the c.HGVS
+            c_hgvs = re.sub(r'\s+', '', c_hgvs)
+            c_hgvs_obj = CHGVS(c_hgvs)
+            try:
+                c_hgvs_obj.genome_build = self.get_genome_build()
+            except ValueError:
+                pass
+            return c_hgvs_obj
 
     @property
     def allele_origin_bucket_obj(self) -> AlleleOriginBucket:

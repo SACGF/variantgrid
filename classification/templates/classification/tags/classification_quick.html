@@ -3,11 +3,15 @@
 {% load ui_utils %}
 {% load js_tags %}
 {% if vcm and vcm.classification.id %}
+    {% if show_imported_c_hgvs %}
+        <div style="display:inline-block;min-width:400px">
+        {% c_hgvs vcm.imported_c_hgvs_obj show_genome_build=True %}
+        </div>
+    {% endif %}
     {% if mode == "compact" %}
         <a class="hover-link" href="{% url 'view_classification' vcm.classification.id %}">{{ vcm.classification.lab }} / {{ vcm.cr_lab_id }}</a>
     {% else %}
         <span class="share-level-{{ vcm.share_level_enum.name }} sig-level-{{ vcm.evidence.clinical_significance.value}}">
-
             {% clinical_significance_values vcm %}
             {% if record_count and record_count != 1 %}
                 x {{ record_count }}
