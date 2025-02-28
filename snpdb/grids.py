@@ -594,6 +594,8 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
         if js := row["error"]:
             if "message" in js and len(js.keys()) == 1:
                 return js.get("message")
+        if js is None:
+            return "-"
         return jsonify_for_js(js, pretty=True)
 
 

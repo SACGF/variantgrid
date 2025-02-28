@@ -1,3 +1,4 @@
+from functools import cached_property
 from typing import Optional, Mapping
 
 from django.contrib.auth.models import User
@@ -13,7 +14,7 @@ from classification.models.classification_utils import ClassificationPatchStatus
 from classification.models.variant_resolver import VariantResolver
 from eventlog.models import create_event
 from library.log_utils import report_exc_info
-from library.utils import DebugTimer
+from library.utils import DebugTimer, reset_timer
 
 
 class BulkClassificationInserter:
@@ -31,7 +32,10 @@ class BulkClassificationInserter:
         self.record_count = 0
         self.new_record_count = 0
         self.start = now()
-        self.debug_timer = DebugTimer()
+
+    @cached_property
+    def debug_timer(self) -> DebugTimer:
+        return reset_timer()
 
     @staticmethod
     def verify_source(data) -> SubmissionSource:
@@ -147,6 +151,7 @@ class BulkClassificationInserter:
                 operation_data = EvidenceMixin.to_patch(operation_data)
 
             record = None
+            is_new_record = False
             if operation:
                 # operation modifiers
                 immutable = source == SubmissionSource.API and not data.pop('editable', False)
@@ -188,11 +193,13 @@ class BulkClassificationInserter:
 
                         record.save()
 
-                        debug_timer.tick("Prepare for Variant Resolution")
+                        # TODO remove this code if publishing just the once works
+                        # debug_timer.tick("Prepare for Variant Resolution")
+                        # PUBLISH NUMBER 1
+                        # record.publish_latest(user=user)
+                        is_new_record = True
 
-                        record.publish_latest(user=user, debug_timer=debug_timer)
-
-                        debug_timer.tick("Publish Complete")
+                        # debug_timer.tick("Publish Complete")
                 else:
                     ignore_if_only_patch: Optional[set[str]] = None
                     # if some updates are not-meaningful and by themselves shouldn't cause a new version of the record to be made
@@ -242,6 +249,7 @@ class BulkClassificationInserter:
             if data:
                 patch_response.append_warning(code="unexpected_parameters", message=f"Unexpected parameters {data}")
 
+            has_published = False
             if save:
                 if requested_delete or requested_withdraw:
                     # deleting or withdrawing
@@ -277,6 +285,7 @@ class BulkClassificationInserter:
                         patch_response.append_warning(code="shared_higher",
                                                       message=f"The record is already shared as '{record.share_level_enum.key}', re-sharing at that level instead of '{share_level}'")
                         patch_response.published = record.publish_latest(share_level=record.share_level_enum, user=user)
+                        has_published = True
                         if patch_response.published:
                             patch_response.saved = True
 
@@ -284,7 +293,9 @@ class BulkClassificationInserter:
                         patch_response.append_warning(code="share_failure", message="Cannot share record with errors")
 
                     else:
+                        # 2ND PUBLISH
                         record.publish_latest(share_level=share_level, user=user)
+                        has_published = True
                         patch_response.append_warning(code="shared",
                                                       message=f"Latest revision is now shared with {share_level}")
 
@@ -302,6 +313,9 @@ class BulkClassificationInserter:
 
             else:
                 patch_response.append_warning(code="test_mode", message="Test mode on, no changes have been saved")
+
+            if save and is_new_record and not has_published:
+                record.publish_latest(user=user)
 
             # Check to see if the current record matches the previous one exactly
             # then if the most recent record isn't marked as published, delete it.

@@ -1,0 +1,6 @@
+<span class="time-delta">
+    {% if days %}<span class="days"><span class="amount">{{ days }}</span><span class="unit">days</span></span> {% endif %}
+    {% if hours %}<span class="hours"><span class="amount">{{ hours }}</span><span class="unit">h</span> :</span> {% endif %}
+    <span class="minutes"><span class="amount">{{ minutes }}</span><span class="unit">m</span> : </span>
+    <span class="seconds"><span class="amount">{{ seconds }}</span><span class="unit">s</span></span>{% if micro %}<span class="microseconds">.<span class="amount">{{ microseconds }}</span></span>{% endif %}
+</span>

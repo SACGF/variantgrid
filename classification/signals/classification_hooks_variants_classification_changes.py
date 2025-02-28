@@ -4,7 +4,6 @@ from django.dispatch import receiver
 from classification.models import classification_post_publish_signal, Classification, ClassificationModification, \
     variants_classification_changed_signal, ImportedAlleleInfo
 from classification.models.classification_variant_info_models import allele_info_changed_signal
-from library.utils import DebugTimer
 from snpdb.models import Allele
 
 """
@@ -26,7 +25,6 @@ def published(sender,
               previously_published: ClassificationModification,
               newly_published: ClassificationModification,
               user: User,
-              debug_timer: DebugTimer,
               **kwargs):  # pylint: disable=unused-argument
     if not previously_published or (previously_published.clinical_significance != newly_published.clinical_significance):
         if allele_info := classification.allele_info:

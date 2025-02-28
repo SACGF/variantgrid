@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from classification.enums import SubmissionSource, SpecialEKeys
 from classification.models.classification import Classification, ClassificationModification, VCBlobKeys
@@ -24,6 +24,7 @@ class ClassificationTestCaseModifications(TestCase):
 
         self.assertEqual(latest_json, editable_json, 'Latest version json does not match editable json')
 
+    @override_settings(CLASSIFICATION_ALLOW_UNKNOWN_KEYS=True)
     def test_immutable(self):
         """
         Test uploading values from API, make sure they get marked as immutable
@@ -143,6 +144,7 @@ class ClassificationTestCaseModifications(TestCase):
             if vc:
                 vc.delete()
 
+    @override_settings(CLASSIFICATION_ALLOW_UNKNOWN_KEYS=True)
     def test_modifying(self):
         """
         Tests some general modifications

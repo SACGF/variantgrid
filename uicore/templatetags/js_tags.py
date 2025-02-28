@@ -3,11 +3,11 @@ import datetime
 import json
 import re
 import urllib
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from html import escape
 from typing import Union, Any, Optional
-
+import math
 from django import template
 from django.db.models import TextChoices
 from django.utils.safestring import mark_safe, SafeString
@@ -189,12 +189,37 @@ def code_shell(data: str):
     return {"text": data}
 
 
+@register.inclusion_tag("uicore/tags/timedelta.html", name="timedelta")
+def timedelta_tag(time: timedelta, show_micro=False):
+    remainder = time.seconds
+    hours = math.floor(remainder / (60*60))
+    if hours:
+        remainder -= (hours * 60*60)
+    minutes = math.floor(remainder / 60)
+    if minutes:
+        remainder -= (minutes * 60)
+    seconds = f"{remainder:02d}"
+    micro = None
+    if show_micro:
+        micro = time.microseconds
+
+    return {
+        "days": time.days,
+        "hours": hours,
+        "minutes": minutes,
+        "seconds": seconds,
+        "micro": micro
+    }
+
+
 @register.inclusion_tag("uicore/tags/timestamp.html")
-def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False, text_only: bool = False, tooltip: str = ""):
+def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False, show_micro = False, text_only: bool = False, tooltip: str = ""):
     css_classes = []
     if time_ago:
         css_classes.append('time-ago')
-    if show_seconds:
+    if show_micro:
+        css_classes.append('micro')
+    elif show_seconds:
         css_classes.append('seconds')
 
     date_value = None

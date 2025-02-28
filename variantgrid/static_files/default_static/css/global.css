@@ -1097,6 +1097,16 @@ h3.admin:before {
   font-family: monospace;
 }
 
+.time-delta .amount {
+  font-family: monospace;
+}
+.time-delta .unit {
+  font-size: 0.9rem;
+}
+.time-delta .seconds {
+  font-size: 0.9rem;
+}
+
 .seconds {
   font-size: 0.8rem;
   color: #444;

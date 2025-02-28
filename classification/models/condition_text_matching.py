@@ -26,8 +26,8 @@ from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol, GeneSymbolAlias
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
-from library.log_utils import report_exc_info, report_message
-from library.utils import ArrayLength, DebugTimer
+from library.log_utils import report_exc_info
+from library.utils import ArrayLength, get_timer
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation, OntologyRelation
 from ontology.ontology_matching import normalize_condition_text, \
     OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS, IGNORE_TERMS, NON_PR_TERMS
@@ -298,6 +298,9 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         @param attempt_automatch - If true, attempt to automatch on the resulting ConditionText
         This method will save any created ConditionTexts
         """
+        debug_timer = get_timer()
+        debug_timer.tick("Condition Text Matching - PRE")
+
         classification = cm.classification
         existing: ConditionTextMatch = ConditionTextMatch.objects.filter(classification=classification).first()
 
@@ -308,6 +311,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 existing.delete()
                 if update_counts:
                     update_condition_text_match_counts(ct)
+            debug_timer.tick("Condition Text Matching - withdrawn")
             return
 
         lab = classification.lab
@@ -333,7 +337,14 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 pass
 
         if not gene_symbol:
-            # Return as we cannot link to condition text
+            # if gene_symbol_str:
+            #     report_message("Classification has unrecognised gene symbol, cannot link it to condition text",
+            #                    extra_data={
+            #                        "target": gene_symbol_str or "<blank>",
+            #                        "classification_id": classification.id,
+            #                        "gene_symbol": gene_symbol_str
+            #                    })
+            debug_timer.tick("Condition Text Matching - no valid gene symbol")
             return
 
         raw_condition_text = cm.get(SpecialEKeys.CONDITION) or ""
@@ -344,6 +355,8 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
         ct: ConditionText
         ct, ct_is_new = ConditionText.objects.get_or_create(normalized_text=normalized, lab=lab)
+
+        debug_timer.tick("Condition Text Matching - gene symbol resolution")
 
         with transaction.atomic():
             ct = ConditionText.objects.select_for_update().filter(pk=ct.pk).first()
@@ -372,6 +385,8 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 classification=None
             )
 
+            debug_timer.tick("Condition Text Matching - ensure hierarchy")
+
             if existing:
                 if existing.parent != mode_of_inheritance_level or \
                         existing.condition_text != ct or \
@@ -389,7 +404,9 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                     if update_counts:
                         update_condition_text_match_counts(old_text)
                         old_text.save()
+                    debug_timer.tick("Condition Text Matching - change existing")
                 else:
+                    debug_timer.tick("Condition Text Matching - no change")
                     # nothing has changed, no need to update anything
                     return
             else:
@@ -400,12 +417,18 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                     mode_of_inheritance=mode_of_inheritance,
                     classification=classification
                 )
+                debug_timer.tick("Condition Text Matching - create new entry")
 
             if attempt_automatch and (new_root or new_gene_level):
                 ConditionTextMatch.attempt_automatch(ct, gene_symbol=gene_symbol)
-            elif update_counts:  # attempt automatch update counts
-                update_condition_text_match_counts(ct)
+                debug_timer.tick("Condition Text Matching - auto match")
+            elif update_counts:
+                ct.classifications_count += 1
+                is_valid = root.is_valid or gene_level.is_valid or mode_of_inheritance_level.is_valid or (existing and existing.is_valid)
+                if not is_valid:
+                    ct.classifications_count_outstanding += 1
                 ct.save()
+                debug_timer.tick("Condition Text Matching - update count quick")
 
     def as_resolved_condition(self) -> Optional[ConditionResolvedDict]:
         """
@@ -627,13 +650,12 @@ def published(sender,
               newly_published: ClassificationModification,
               previous_share_level: ShareLevel,
               user: User,
-              debug_timer: DebugTimer,
               **kwargs):
     """
     Keeps condition_text_match in sync with the classifications when evidence changes
     """
+    get_timer().tick("Condition Text Matching - post publish")
     ConditionTextMatch.sync_condition_text_classification(newly_published, attempt_automatch=True, update_counts=True)
-    debug_timer.tick("Condition Text Matching")
 
 
 @receiver(flag_comment_action, sender=Flag)

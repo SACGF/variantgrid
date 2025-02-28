@@ -26,7 +26,8 @@
             <div class="card-header">{{ liftover_run }}</div>
             <div class="card-body">
                 {% labelled label="Id" %}{{ liftover_run.pk }}{% endlabelled %}
-                {% labelled label="Run Date" %}{% timestamp liftover_run.created %}{% endlabelled %}
+                {% labelled label="Run Date" %}{% timestamp liftover_run.created show_micro=True %}{% endlabelled %}
+                {% labelled label="Completed Date" %}{% timestamp liftover_run.modified show_micro=True %}{% endlabelled %}
                 {% labelled label="Allele Source" %}
                     {% if liftover_run.allele_source %}
                         {{ liftover_run.get_allele_source }}

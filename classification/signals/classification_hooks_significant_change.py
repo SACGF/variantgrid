@@ -11,11 +11,11 @@ from classification.models import classification_post_publish_signal, Classifica
     EvidenceKey, ClassificationFlagTypes, ClassificationModification, EvidenceKeyMap
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
-from library.utils import DebugTimer
+from library.utils import get_timer
 
 
 @receiver(classification_post_publish_signal, sender=Classification)
-def turn_off_unsubmitted_edits(sender, classification, previously_published, newly_published, user, debug_timer: DebugTimer, **kwargs):  # pylint: disable=unused-argument
+def turn_off_unsubmitted_edits(sender, classification, previously_published, newly_published, user, **kwargs):  # pylint: disable=unused-argument
     """
     Removes outstanding edit flags if there aren't any left.
     This is a bit messy as regular code inserts it, but a signal closes it.
@@ -83,7 +83,6 @@ def clinical_significance_change_check(
         previously_published: ClassificationModification,
         newly_published: ClassificationModification,
         user: User,
-        debug_timer: DebugTimer,
         **kwargs):  # pylint: disable=unused-argument
     """
     Raises a clinical significance change flag if the clinical significance has changed after publishing
@@ -139,4 +138,4 @@ def clinical_significance_change_check(
                 comment=close_message
             )
 
-    debug_timer.tick("Update share flags")
+    get_timer().tick("Update share flags")

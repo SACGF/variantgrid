@@ -50,8 +50,8 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
 from library.preview_request import PreviewData, PreviewModelMixin, PreviewKeyValue
-from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_text, DebugTimer, \
-    invalidate_cached_property, md5sum_str
+from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_text, \
+    invalidate_cached_property, md5sum_str, get_timer
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -64,7 +64,7 @@ ChgvsKey = namedtuple('CHGVS', ['short', 'column', 'build'])
 
 classification_validation_signal = django.dispatch.Signal()  # args: "classification", "patch_meta", "key_map"
 classification_current_state_signal = django.dispatch.Signal()  # args: "user"
-classification_post_publish_signal = django.dispatch.Signal()  # args: "classification", "previously_published", "previous_share_level", "newly_published", "user", "debug_timer"
+classification_post_publish_signal = django.dispatch.Signal()  # args: "classification", "previously_published", "previous_share_level", "newly_published", "user"
 classification_withdraw_signal = django.dispatch.Signal()  # args: "classification", "user"
 classification_variant_set_signal = django.dispatch.Signal()  # args: "classification", "variant"
 classification_revalidate_signal = django.dispatch.Signal()  # args "classification"
@@ -717,7 +717,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return self.get(SpecialEKeys.GENOME_BUILD)
 
     @property
-    def imported_c_hgvs(self):
+    def imported_c_hgvs(self) -> str:
         if c_hgvs := self.get(SpecialEKeys.C_HGVS):
             # remove any white space inside the c.HGVS
             c_hgvs = re.sub(r'\s+', '', c_hgvs)
@@ -1503,7 +1503,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     initial_data=False,
                     revalidate_all=False,
                     ignore_if_only_patching: Optional[Set[str]] = None,
-                    patch_known_keys_only=True) -> ClassificationPatchResponse:
+                    patch_known_keys_only: Optional[bool]=None) -> ClassificationPatchResponse:
         """
             Creates a new ClassificationModification if the patch values are different to the current values
             Patching a value with the same value has no effect
@@ -1522,6 +1522,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             :param patch_known_keys_only: If true, data that doesn't match up with evidence keys will be ignored (e.g. {"acmg:bp34": "BM"} will do nothing)
             :returns: A dict with "messages" (validation errors, warnings etc.) and "modified" (fields that actually changed value)
         """
+        if patch_known_keys_only is None:
+            patch_known_keys_only = settings.CLASSIFICATION_ALLOW_UNKNOWN_KEYS is False
+
         source = source or SubmissionSource.API
 
         patch_response = ClassificationPatchResponse()
@@ -1666,6 +1669,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             if not owner_cell.provided and user:
                 owner_cell.value = user.username
 
+        debug_timer = get_timer()
+        debug_timer.tick("Patch data normalisation")
+
         patch_meta = PatchMeta(patch=patch.data, existing=use_evidence.data, revalidate_all=revalidate_all)
 
         validations_received = classification_validation_signal.send(sender=Classification, classification=self,
@@ -1730,6 +1736,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         pending_modification: Optional[ClassificationModification]
 
+        debug_timer.tick("Patch validation")
+
         # only make a modification if there's data to actually patch
         if apply_patch:
             patch_response.modified_keys = set(diffs_only_patch.keys())
@@ -1791,6 +1799,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     pending_modification.classification = self
                     pending_modification.save()
                     assign_perm(ClassificationModification.get_read_perm(), self.lab.group, pending_modification)
+            debug_timer.tick("Saved")
 
         # end apply patch diff
         else:
@@ -1810,13 +1819,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         return patch_response
 
-    def publish_latest(self, user: User, share_level=None, debug_timer: DebugTimer = DebugTimer.NullTimer) -> bool:
+    def publish_latest(self, user: User, share_level=None) -> bool:
         if not share_level:
             share_level = self.share_level_enum
         latest_edited = self.last_edited_version
         if not latest_edited:
             raise ValueError(f'VC {self.id} does not have a last edited version')
-        return latest_edited.publish(share_level=share_level, user=user, vc=self, debug_timer=debug_timer)
+        return latest_edited.publish(share_level=share_level, user=user, vc=self)
 
     @property
     def last_edited_version(self) -> 'ClassificationModification':
@@ -2227,6 +2236,18 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices(), null=True, blank=True)
 
     @property
+    def imported_c_hgvs_obj(self) -> CHGVS:
+        if c_hgvs := self.get(SpecialEKeys.C_HGVS):
+            # remove any white space inside the c.HGVS
+            c_hgvs = re.sub(r'\s+', '', c_hgvs)
+            c_hgvs_obj = CHGVS(c_hgvs)
+            try:
+                c_hgvs_obj.genome_build = self.get_genome_build()
+            except ValueError:
+                pass
+            return c_hgvs_obj
+
+    @property
     def allele_origin_bucket_obj(self) -> AlleleOriginBucket:
         return self.classification.allele_origin_bucket
 
@@ -2421,14 +2442,12 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                 and not self.published
 
     @transaction.atomic()
-    def publish(self, share_level: Union[ShareLevel, str, int], user: User, vc: 'Classification',
-                debug_timer: DebugTimer = DebugTimer.NullTimer) -> bool:
+    def publish(self, share_level: Union[ShareLevel, str, int], user: User, vc: 'Classification') -> bool:
         """
         :param share_level: The share level we want to publish as
         :param user: The user who initiated the publishing
         :param vc: The variant classification we're publishing - even though it's redundant, but we get the same object
         instance and don't reload it from the database
-        :param debug_timer: for timing the event
         :return a boolean indicating if a new version was published (false if no change was required)
         """
         old_share_level = vc.share_level_enum
@@ -2464,7 +2483,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         vc.summary = ClassificationSummaryCalculator(self).cache_dict()
         vc.save()
 
-        debug_timer.tick("Published Modification")
+        get_timer().tick("Published Modification")
 
         classification_post_publish_signal.send(
             sender=Classification,
@@ -2472,8 +2491,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             previously_published=previously_published,
             previous_share_level=old_share_level,
             newly_published=self,
-            user=user,
-            debug_timer=debug_timer)
+            user=user)
 
         vc.refresh_from_db()
         return True
@@ -2692,7 +2710,7 @@ class ClassificationDate:
         if self.datetime and other.datetime:
             return self.datetime < other.datetime
         else:
-            return self.date < other.date
+            return self.date or date.min < other.date or date.min
 
 
 CLASSIFICATION_DATE_REGEX = re.compile(r"(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-(?P<day>[0-9]{2})")

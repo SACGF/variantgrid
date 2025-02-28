@@ -315,7 +315,9 @@ def classification_quick(context,
                          show_condition=False,
                          show_criteria=False,
                          show_flags=False,
-                         record_count: Optional[int] = None, mode: Optional[str] = "detailed"):
+                         show_imported_c_hgvs=False,
+                         record_count: Optional[int] = None,
+                         mode: Optional[str] = "detailed"):
     user = context.request.user
     vcm = vc
     if isinstance(vc, Classification):
@@ -328,6 +330,7 @@ def classification_quick(context,
         "show_condition": show_condition,
         "show_criteria": show_criteria,
         "show_flags": show_flags,
+        "show_imported_c_hgvs": show_imported_c_hgvs,
         "record_count": record_count
     }
 

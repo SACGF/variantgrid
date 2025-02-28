@@ -455,6 +455,19 @@
             <a class='hover-link' onclick="clearGeneClassificationsGrid()">Show all...</a>
         </span>
 
+        {% if unmatched_classifications %}
+            {% modal label=unmatched_classifications_title size="xl" %}
+                <div class="modal-body">
+                    <div class="help my-2">
+                        These are classifications with c.HGVS values we were unable to resolve, but appear to be for the gene symbol in question.
+                    </div>
+                    {% for cs in unmatched_classifications %}
+                        {% classification_quick cs show_imported_c_hgvs=True %}<br/>
+                    {% endfor %}
+                </div>
+            {% endmodal %}
+        {% endif %}
+
         {% classification_groupings %}
     </div>
     <div class="container">

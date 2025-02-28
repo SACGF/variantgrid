@@ -12,7 +12,7 @@ from django.urls import reverse
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
-from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff, HGVSConverterType
+from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff, HGVSConverterType, chgvs_diff_description
 from genes.models import TranscriptVersion, GeneSymbol, Transcript
 from library.cache import timed_cache
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
@@ -773,7 +773,10 @@ class ImportedAlleleInfo(TimeStampedModel):
         new_dirty_message: Optional[str] = None
         if self.variant_coordinate != cvc.variant_coordinate_str:
             if cvc.variant_coordinate:
-                new_dirty_message = f"{cvc.message}\n{cvc.variant_coordinate_str}"
+                if not self.variant_coordinate:
+                    new_dirty_message = f"NEW VARIANT COORDINATE\n{cvc.message}\n{cvc.variant_coordinate_str}"
+                else:
+                    new_dirty_message = f"DIFF VARIANT COORDINATE\n{cvc.message}\n{self.variant_coordinate} -> {cvc.variant_coordinate_str}"
             else:
                 new_dirty_message = cvc.message
         else:
@@ -783,9 +786,28 @@ class ImportedAlleleInfo(TimeStampedModel):
                 new_vc = cvc.variant_coordinate
                 if existing_vc != cvc.variant_coordinate:
                     if existing_vc and new_vc and existing_vc.ref != new_vc.ref:
-                        new_dirty_message = f"{cvc.message}\nRef was: {existing_vc.ref} -> {new_vc.ref}"
+                        new_dirty_message = f"DIFF REF\n{cvc.message}\nRef {existing_vc.ref} -> {new_vc.ref}"
                     else:
-                        new_dirty_message = f"{cvc.message}\n{repr(existing_vc)} -> {repr(new_vc)}"
+                        new_dirty_message = f"????\n{cvc.message}\n{repr(existing_vc)} -> {repr(new_vc)}"
+
+        def c_hgvs_diff_if_applicable(original_chgvs: str, new_chgvs: str):
+
+            original_chgvs_obj = CHGVS(original_chgvs)
+            new_chgvs_obj = CHGVS(new_chgvs)
+            if original_chgvs_obj.transcript and new_chgvs_obj.transcript:
+                c_hgvs_diffs = original_chgvs_obj.diff(new_chgvs_obj)
+                return chgvs_diff_description(c_hgvs_diffs, include_minor=True)
+
+        def is_c_hgvs_same_as_imported(genome_build: GenomeBuild, new_chgvs: str) -> bool:
+            nonlocal self
+            if self.imported_genome_build == genome_build:
+                original_chgvs_obj = self.imported_c_hgvs_obj
+                new_chgvs_obj = CHGVS(new_chgvs)
+                if original_chgvs_obj and original_chgvs_obj.transcript and new_chgvs_obj.transcript:
+                    c_hgvs_diffs = original_chgvs_obj.diff(new_chgvs_obj)
+                    if not bool(chgvs_diff_description(c_hgvs_diffs, include_minor=False)):
+                        return True
+            return False
 
         if not new_dirty_message:
             message_parts = []
@@ -793,11 +815,22 @@ class ImportedAlleleInfo(TimeStampedModel):
                 try:
                     recalc_c_hgvs = rvi.recalc_c_hgvs()
                     if rvi.c_hgvs != recalc_c_hgvs.c_hgvs:
-                        message_parts.append(f"{rvi.genome_build} c.HGVS {rvi.c_hgvs} -> {recalc_c_hgvs.c_hgvs}")
+                        message_parts.append(f"c.HGVS DIFF {rvi.genome_build}\n{rvi.c_hgvs} ->\n{recalc_c_hgvs.c_hgvs}")
+                        if diffs := c_hgvs_diff_if_applicable(rvi.c_hgvs, recalc_c_hgvs.c_hgvs):
+                            message_parts += diffs
+                        if is_c_hgvs_same_as_imported(rvi.genome_build, recalc_c_hgvs.c_hgvs):
+                            message_parts.append("Now matches imported value")
+
                     elif rvi.c_hgvs_compat != recalc_c_hgvs.c_hgvs_compatible:
-                        message_parts.append(f"{rvi.genome_build} c.HGVS compatible {rvi.c_hgvs_compat} -> {recalc_c_hgvs.c_hgvs_compatible}")
+                        if message_parts:
+                            message_parts.append(" ")
+                        message_parts.append(f"c.HGVS DIFF {rvi.genome_build} compatible\n{rvi.c_hgvs_compat} ->\n{recalc_c_hgvs.c_hgvs_compatible}")
+                        if diffs := c_hgvs_diff_if_applicable(rvi.c_hgvs_compat, recalc_c_hgvs.c_hgvs_compatible):
+                            message_parts += diffs
                 except Exception as ex:
-                    message_parts.append(f"Error resolving {rvi.genome_build} c.HGVS: {ex}")
+                    # Make sure that we still fail
+                    if rvi.c_hgvs and CHGVS.HGVS_REGEX.match(rvi.c_hgvs):
+                        message_parts.append(f"Error resolving {rvi.genome_build} c.HGVS: {ex}")
             if message_parts:
                 new_dirty_message = "\n".join(message_parts)
 

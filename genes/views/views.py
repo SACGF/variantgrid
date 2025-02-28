@@ -1,6 +1,8 @@
+import operator
 from collections import defaultdict
 from dataclasses import dataclass
-from functools import cached_property
+from datetime import timezone, datetime, timedelta
+from functools import cached_property, reduce
 from itertools import combinations
 from typing import Optional, Iterable, Union, Any
 
@@ -319,6 +321,27 @@ class GeneSymbolViewInfo:
         classifications_qs = classifications_qs.select_related('classification', 'classification__lab', 'classification__allele', 'classification__allele__clingen_allele')
         return classifications_qs
 
+    @cached_property
+    def unmatched_classifications(self) -> QuerySet[ClassificationModification]:
+        "Only return classifications with no grouping"
+        evidence_q_list = []
+        for symbol in self.gene_symbol.alias_meta.alias_symbol_strs:
+            evidence_q_list.append(Q(published_evidence__gene_symbol__value__iexact=symbol))
+        classifications_qs = ClassificationModification.objects.filter(
+            classification__allele_info__allele__isnull=True,
+            classification__withdrawn=False,
+            is_last_published=True,
+            classification__created__lte=datetime.now() - timedelta(minutes=1),
+        ).filter(reduce(operator.or_, evidence_q_list))
+        classifications_qs = ClassificationModification.filter_for_user(user=self.user, queryset=classifications_qs)
+        classifications_qs = classifications_qs.select_related('classification', 'classification__lab')
+        return list(sorted(classifications_qs[0:100], key=lambda c: c.curated_date_check, reverse=True))
+
+    @cached_property
+    def unmatched_classifications_title(self):
+        if count := len(self.unmatched_classifications):
+            return f"{count} Unmatched Classification{'s' if count > 1 else ''} for {self.gene_symbol}"
+
     def panel_app_servers(self) -> Union[QuerySet, Iterable[PanelAppServer]]:
         return PanelAppServer.objects.order_by("pk")
 
@@ -379,7 +402,9 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
             "omim_and_hpo_for_gene",
             "has_variants",
             "show_classifications_hotspot_graph",
-            "show_hotspot_graph"
+            "show_hotspot_graph",
+            "unmatched_classifications",
+            "unmatched_classifications_title"
         ]
     )
     context["show_wiki"] = settings.VIEW_GENE_WIKI

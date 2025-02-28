@@ -67,7 +67,13 @@
     {% endif %}
 
     {% if allele_info.message %}
-        {% labelled label="Note" %}{{ allele_info.message }}{% endlabelled %}
+        {% labelled label="Note" %}<div style="max-width:600px">{{ allele_info.message | enrich }}</div>{% endlabelled %}
+    {% endif %}
+
+    {% if allele_info.dirty_message %}
+        {% labelled admin_only=True label="Dirty Message" %}
+            <div style="max-width:600px">{{ allele_info.dirty_message | enrich }}</div>
+        {% endlabelled %}
     {% endif %}
 
     {% if allele_info.dirty_message %}
