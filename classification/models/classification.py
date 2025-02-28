@@ -1503,7 +1503,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     initial_data=False,
                     revalidate_all=False,
                     ignore_if_only_patching: Optional[Set[str]] = None,
-                    patch_known_keys_only=True) -> ClassificationPatchResponse:
+                    patch_known_keys_only: Optional[bool]=None) -> ClassificationPatchResponse:
         """
             Creates a new ClassificationModification if the patch values are different to the current values
             Patching a value with the same value has no effect
@@ -1522,6 +1522,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             :param patch_known_keys_only: If true, data that doesn't match up with evidence keys will be ignored (e.g. {"acmg:bp34": "BM"} will do nothing)
             :returns: A dict with "messages" (validation errors, warnings etc.) and "modified" (fields that actually changed value)
         """
+        if patch_known_keys_only is None:
+            patch_known_keys_only = settings.CLASSIFICATION_ALLOW_UNKNOWN_KEYS is False
+
         source = source or SubmissionSource.API
 
         patch_response = ClassificationPatchResponse()
