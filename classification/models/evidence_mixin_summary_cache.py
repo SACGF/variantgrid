@@ -135,7 +135,7 @@ class ClassificationSummaryCalculator:
 
     @cached_property
     def somatic_amp_level(self) -> Optional[str]:
-        if self.is_possibly_somatic:
+        if self.is_possibly_somatic and self.somatic_clinical_significance:
             for key, level in SpecialEKeys.AMP_LEVELS_TO_LEVEL.items():
                 if self.cm.get(key):
                     return level

@@ -1351,7 +1351,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 try:
                     Classification.to_date(value)
                 except ValueError as ve:
-                    message = f"Invalid date (expect yyyy-mm-dd): {ve}"
+                    message = f"Invalid date (expect yyyy-mm-dd)"
                     cell.add_validation(code=ValidationCode.INVALID_DATE, severity='warning',
                                         message=message)
 
@@ -2733,7 +2733,12 @@ class CuratedDate:
     def convert_date(self, evidence_key) -> Optional[date]:
         if date_str := self._modification.get(evidence_key):
             if m := CLASSIFICATION_DATE_REGEX.match(date_str):
-                return date(year=int(m.group("year")), month=int(m.group("month")), day=int(m.group("day")))
+                try:
+                    return date(year=int(m.group("year")), month=int(m.group("month")), day=int(m.group("day")))
+                except ValueError:
+                    # an invalid date should already cause a warning on the classification form
+                    pass
+
 
     @cached_property
     def curation_date(self) -> Optional[ClassificationDate]:
