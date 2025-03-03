@@ -237,7 +237,7 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False):
                                                          name="Separate Unknown Variants Task",
                                                          sort_order=sort_order,
                                                          task_type=UploadStepTaskType.CELERY,
-                                                         pipeline_stage=VCFPipelineStage.INSERT_UNKNOWN_VARIANTS,
+                                                         pipeline_stage=VCFPipelineStage.PRE_DATA_INSERTION,
                                                          input_filename=split_vcf_filename)
         separate_upload_step.launch_task(SeparateUnknownVariantsTask)
         output_filename = split_vcf_filename
@@ -251,7 +251,7 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False):
                                                     name="Annotate gnomAD AF",
                                                     sort_order=sort_order,
                                                     task_type=UploadStepTaskType.CELERY,
-                                                    pipeline_stage=VCFPipelineStage.INSERT_UNKNOWN_VARIANTS,
+                                                    pipeline_stage=VCFPipelineStage.PRE_DATA_INSERTION,
                                                     input_filename=split_vcf_filename,
                                                     output_filename=output_filename)
             gnomad_step.launch_task(AnnotateImportedVCFTask)

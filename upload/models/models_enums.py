@@ -27,7 +27,8 @@ class UploadStepTaskType(models.TextChoices):
 class VCFPipelineStage(models.TextChoices):
     """ Some jobs can only run when we've moved to a certain stage of the pipeline """
 
-    INSERT_UNKNOWN_VARIANTS = 'U', 'Insert Unknown Variants'
+    # pre data insertion used to be 'Insert Unknown Variants' - just change label so we don't need to migrate all the tables
+    PRE_DATA_INSERTION = 'U', 'Pre-Data Insertion'
     DATA_INSERTION = 'D', 'Data Insertion'
     ANNOTATION_COMPLETE = 'A', 'Annotation Complete'
     FINISH = 'F', 'Finish'

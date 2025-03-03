@@ -1,3 +1,4 @@
+import logging
 import operator
 from abc import abstractmethod
 from functools import reduce
@@ -60,6 +61,7 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
                                                           name="Create Data from VCF Header",
                                                           sort_order=self.get_sort_order(),
                                                           task_type=UploadStepTaskType.CELERY,
+                                                          pipeline_stage=VCFPipelineStage.PRE_DATA_INSERTION,
                                                           script=class_name,
                                                           **kwargs)
         return create_data_from_vcf_header_task_clazz.si(unknown_variants_step.pk, 0)
@@ -75,7 +77,7 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
                                                     name=UploadStep.PREPROCESS_VCF_NAME,
                                                     sort_order=self.get_sort_order(),
                                                     task_type=UploadStepTaskType.CELERY,
-                                                    pipeline_stage=VCFPipelineStage.INSERT_UNKNOWN_VARIANTS,
+                                                    pipeline_stage=VCFPipelineStage.PRE_DATA_INSERTION,
                                                     input_filename=input_filename,
                                                     script=class_name,
                                                     split_file_rows=split_file_rows)
@@ -87,7 +89,7 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
 
             ScheduleMultiFileOutputTasksTask will launch a known_variants_parallel_vcf_processing_task_class
             for each sub file created by unknown_variants_step """
-        self.create_pipeline_stage_dependent_upload_steps(upload_pipeline, VCFPipelineStage.INSERT_UNKNOWN_VARIANTS, [CheckStartAnnotationTask])
+        self.create_pipeline_stage_dependent_upload_steps(upload_pipeline, VCFPipelineStage.PRE_DATA_INSERTION, [CheckStartAnnotationTask])
 
         known_variants_parallel_vcf_processing_task_class = self.get_known_variants_parallel_vcf_processing_task_class()
         schedule_class_name = full_class_name(ScheduleMultiFileOutputTasksTask)
@@ -97,7 +99,7 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
                                   name="Schedule Parallel VCF Processing tasks",
                                   sort_order=self.get_sort_order(),
                                   task_type=UploadStepTaskType.CELERY,
-                                  pipeline_stage_dependency=VCFPipelineStage.INSERT_UNKNOWN_VARIANTS,
+                                  pipeline_stage_dependency=VCFPipelineStage.PRE_DATA_INSERTION,
                                   input_upload_step=unknown_variants_step,
                                   script=schedule_class_name,
                                   child_script=known_variants_parallel_vcf_processing_task_class_name)
@@ -135,17 +137,17 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
         pre_vcf_task = self.get_pre_vcf_task(upload_pipeline)
         create_data_from_vcf_header_task = self.get_create_data_from_vcf_header_task(upload_pipeline, vcf_filename)
 
-        pipeline_tasks = [start_task, pre_vcf_task, create_data_from_vcf_header_task]
+        pre_data_insertion_tasks = [start_task, pre_vcf_task, create_data_from_vcf_header_task]
         if vcf_filename:
             preprocess_vcf_step, preprocess_vcf_task = self.get_preprocess_vcf_step_and_task(upload_pipeline, vcf_filename)
-            pipeline_tasks.append(preprocess_vcf_task)
+            pre_data_insertion_tasks.append(preprocess_vcf_task)
             # Create steps that will run when pipeline_stage is completed
             # @see upload.tasks.vcf.import_vcf_step_task.ImportVCFStepTask.check_pipeline_stage
             self.create_insert_unknown_dependent_upload_steps(upload_pipeline, preprocess_vcf_step)
             post_data_insertion_classes = self.get_post_data_insertion_classes()
         else:
             # Need one to kick off data_insertion dependencies
-            pipeline_tasks.append(self.get_fake_data_insertion_task(upload_pipeline))
+            pre_data_insertion_tasks.append(self.get_fake_data_insertion_task(upload_pipeline))
             post_data_insertion_classes = []
 
         DEPENDENT_STAGES = {
@@ -155,6 +157,7 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
         for pipeline_stage_dependency, task_classes in DEPENDENT_STAGES.items():
             self.create_pipeline_stage_dependent_upload_steps(upload_pipeline, pipeline_stage_dependency, task_classes)
 
-        pipeline_tasks = filter(is_not_none, pipeline_tasks)
-        chained_pipeline_task = reduce(operator.or_, pipeline_tasks)
+        logging.info("VCF Import tasks: %s", pre_data_insertion_tasks)
+        pre_data_insertion_tasks = filter(is_not_none, pre_data_insertion_tasks)
+        chained_pipeline_task = reduce(operator.or_, pre_data_insertion_tasks)
         return chained_pipeline_task

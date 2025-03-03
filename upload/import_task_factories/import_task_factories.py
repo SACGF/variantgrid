@@ -10,7 +10,7 @@ from upload.import_task_factories.abstract_vcf_import_task_factory import Abstra
 from upload.import_task_factories.import_task_factory import ImportTaskFactory
 from upload.models import UploadedFileTypes, UploadedBed, \
     UploadedGeneList, UploadedPatientRecords, UploadedPedFile, UploadedVCF, \
-    UploadedGeneCoverage, UploadStep, UploadStepTaskType, UploadedWikiCollection
+    UploadedGeneCoverage, UploadStep, UploadStepTaskType, UploadedWikiCollection, VCFPipelineStage
 from upload.tasks.import_bedfile_task import ImportBedFileTask
 from upload.tasks.import_gene_coverage_task import ImportGeneCoverageTask
 from upload.tasks.import_gene_list_task import ImportGeneListTask
@@ -199,6 +199,7 @@ class LiftoverImportFactory(AbstractVCFImportTaskFactory):
                                                               name="Liftover Source VCF",
                                                               sort_order=self.get_sort_order(),
                                                               task_type=UploadStepTaskType.CELERY,
+                                                              pipeline_stage=VCFPipelineStage.PRE_DATA_INSERTION,
                                                               script=full_class_name(LiftoverCreateVCFTask),
                                                               input_filename=liftover.source_vcf,
                                                               output_filename=output_filename)
@@ -260,6 +261,7 @@ class VariantTagsImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
                                                 name="Create VariantTags Variant VCF",
                                                 sort_order=self.get_sort_order(),
                                                 task_type=UploadStepTaskType.CELERY,
+                                                pipeline_stage=VCFPipelineStage.PRE_DATA_INSERTION,
                                                 script=full_class_name(VariantTagsCreateVCFTask),
                                                 input_filename=variant_tags_filename,
                                                 output_filename=vcf_filename)
@@ -332,6 +334,7 @@ class VariantWikiImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
                                                 name="Create VariantWiki Variant VCF",
                                                 sort_order=self.get_sort_order(),
                                                 task_type=UploadStepTaskType.CELERY,
+                                                pipeline_stage=VCFPipelineStage.PRE_DATA_INSERTION,
                                                 script=full_class_name(VariantWikiCreateVCFTask),
                                                 input_filename=variant_wiki_filename,
                                                 output_filename=vcf_filename)

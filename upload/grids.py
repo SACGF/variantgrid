@@ -1,3 +1,5 @@
+from functools import partial
+
 from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
@@ -7,7 +9,7 @@ from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.models import ProcessingStatus
 from snpdb.models.models_variant import Variant
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData
-from upload.models import UploadStep, ModifiedImportedVariant, UploadPipeline
+from upload.models import UploadStep, ModifiedImportedVariant, UploadPipeline, VCFPipelineStage
 
 
 class UploadStepColumns(DatatableConfig[UploadStep]):
@@ -21,6 +23,13 @@ class UploadStepColumns(DatatableConfig[UploadStep]):
     @staticmethod
     def render_status(row: CellData):
         return ProcessingStatus(row["status"]).label
+
+    @staticmethod
+    def _render_pipeline_stage(column_name, row: CellData):
+        value = None
+        if cell := row[column_name]:
+            value = VCFPipelineStage(cell).label
+        return value
 
     @staticmethod
     def render_duration(row: CellData):
@@ -41,6 +50,8 @@ class UploadStepColumns(DatatableConfig[UploadStep]):
             RichColumn(key='sort_order', orderable=True),
             RichColumn(key='id', orderable=True),
             RichColumn(key='name', orderable=True),
+            RichColumn(key='pipeline_stage', orderable=True, renderer=partial(self._render_pipeline_stage, 'pipeline_stage')),
+            RichColumn(key='pipeline_stage_dependency', orderable=True, renderer=partial(self._render_pipeline_stage, 'pipeline_stage_dependency')),
             RichColumn(key='status', orderable=True, renderer=UploadStepColumns.render_status),
             RichColumn(key='items_processed', css_class='num', orderable=True),
             RichColumn(key='error_message', orderable=True),
