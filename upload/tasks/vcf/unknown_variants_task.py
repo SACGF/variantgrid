@@ -29,7 +29,7 @@ def handle_unknown_variants(upload_pipeline, unknown_variants, unknown_variants_
                                             name=name,
                                             sort_order=sort_order,
                                             task_type=UploadStepTaskType.CELERY,
-                                            pipeline_stage=VCFPipelineStage.INSERT_UNKNOWN_VARIANTS,
+                                            pipeline_stage=VCFPipelineStage.PRE_DATA_INSERTION,
                                             input_filename=unknown_variants_filename,
                                             items_to_process=len(unknown_variants))
     upload_step.launch_task(InsertUnknownVariantsTask)
