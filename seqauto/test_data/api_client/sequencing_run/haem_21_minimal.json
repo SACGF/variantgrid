@@ -1,0 +1,12 @@
+{
+        "name": "Haem_21_001_210216_M02027_0112_000000000_JFT79",
+        "date": "2021-02-16",
+        "sequencer": "SN1101",
+        "experiment": "HAEM_21_001",
+        "enrichment_kit": {
+            "name": "idt_haem",
+            "version": 1
+        }
+}
+
+

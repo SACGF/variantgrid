@@ -1,0 +1,12 @@
+{
+        "path": "/home/dlawrence/localwork/variantgrid/seqauto/test_data/clinical_hg38/idt_haem/Haem_21_001_210216_M02027_0112_000000000_JFT79/2_variants/Haem_21_001_210216_M02027_0112_000000000_JFT79.vardict.hg38.vcf.gz",
+        "sample_sheet": {
+            "sequencing_run": "Haem_21_001_210216_M02027_0112_000000000_JFT79",
+            "hash": "f0ac87bcae3f0e56b3f65b70fd6389ce"
+        },
+        "variant_caller": {
+            "name": "VarDict",
+            "version": "1.8.2",
+            "run_params": null
+        }
+    }

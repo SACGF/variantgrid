@@ -1,6 +1,7 @@
 from library.django_utils.jqgrid_view import JQGridView
 from upload.grids import UploadStepsGrid, UploadPipelineModifiedVariantsGrid, UploadPipelineSkippedAnnotationGrid
 from upload.views import views
+from upload.views.views_rest import APIFileUploadView
 from variantgrid.perm_path import perm_path
 
 urlpatterns = [
@@ -22,4 +23,8 @@ urlpatterns = [
     perm_path('jfu_upload/', views.jfu_upload, name='jfu_upload'),
     perm_path('jfu_delete/<int:pk>', views.jfu_upload_delete, name='jfu_delete'),
     perm_path('uploaded_file/download/<int:pk>', views.DownloadUploadedFile.as_view(), name='download_uploaded_file'),
+
+    # APIs - Django REST framework
+    perm_path('api/v1/file_upload', APIFileUploadView.as_view(), name='api_file_upload'),
+
 ]

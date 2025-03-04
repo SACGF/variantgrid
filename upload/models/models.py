@@ -41,6 +41,7 @@ class UploadedFile(TimeStampedModel):
                                      max_length=256, null=True)
     md5_hash = models.CharField(max_length=32, null=True)
     file_type = models.CharField(max_length=1, choices=UploadedFileTypes.choices, null=True)
+    # import_source is used to decide whether to use 'path' or 'uploaded_file.path'
     import_source = models.CharField(max_length=1, choices=ImportSource.choices)
     name = models.TextField()
     user = models.ForeignKey(User, on_delete=CASCADE)
