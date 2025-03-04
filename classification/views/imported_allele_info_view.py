@@ -323,6 +323,19 @@ class ImportedAlleleInfoDownload(ExportRow):
         if c38 := self.allele_info[GenomeBuild.grch37()]:
             return c38.c_hgvs
 
+    @export_column(label="variant ID (37)")
+    def variant_id_37(self):
+        if resolved := self.allele_info[GenomeBuild.grch37()]:
+            return resolved.variant_id
+
+    @export_column(label="variant ID (38)")
+    def variant_id_38(self):
+        if resolved := self.allele_info[GenomeBuild.grch38()]:
+            return resolved.variant_id
+
+    # columns above are handy for comparison
+    # below are useful jsut for the full state
+
     @export_column(label="Differences")
     def differences(self):
         return "\n".join(str(tag) for tag in self.allele_info.latest_validation.validation_tags_list)
