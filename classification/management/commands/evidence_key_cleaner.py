@@ -11,7 +11,7 @@ from snpdb.models import Lab
 class Command(BaseCommand):
 
     def add_arguments(self, parser):
-        parser.add_argument('--key', type='str', required=True)
+        parser.add_argument('--key', type=str, required=True)
         parser.add_argument('--lab', type=str, required=False)
         parser.add_argument('--apply', action="store_true")
 
