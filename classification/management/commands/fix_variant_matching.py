@@ -86,6 +86,7 @@ class Command(BaseCommand):
                 if (len(batch) >= batch_size) or (force and len(batch) >= 0):
                     qs = ImportedAlleleInfo.objects.filter(pk__in=batch)
                     reattempt_variant_matching(user=admin_bot(), queryset=qs)
+                    batch.clear()
 
             for imported_allele_info in ImportedAlleleInfo.objects.filter(status=ImportedAlleleInfoStatus.PROCESSING).values_list('pk', flat=True).iterator():
                 batch.append(imported_allele_info)
