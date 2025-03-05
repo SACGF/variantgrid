@@ -134,7 +134,7 @@ def variant_matching_dry_run(queryset: QuerySet[ImportedAlleleInfo]):
         allele_info.dirty_check()
 
 
-def reattempt_variant_matching(user: User, queryset: QuerySet[ImportedAlleleInfo], clear_existing: bool = False):
+def reattempt_variant_matching(user: User, queryset: QuerySet[ImportedAlleleInfo], clear_existing: bool = False) -> int:
     """ @:returns (valid_record_count, invalid_record_count) """
     from classification.models.variant_resolver import VariantResolver
     qs: QuerySet[ImportedAlleleInfo] = queryset.order_by('imported_genome_build_patch_version')

@@ -3,8 +3,9 @@ import time
 from django.core.management import BaseCommand
 from django.db.models import Q
 
+from classification.classification_import import reattempt_variant_matching
 from classification.management.commands.fix_migrate_flags_to_imported_allele_info import FlagDatabase
-from classification.models import Classification, ImportedAlleleInfo
+from classification.models import Classification, ImportedAlleleInfo, ImportedAlleleInfoStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo
 from library.guardian_utils import admin_bot
 from snpdb.models import GenomeBuild
@@ -26,6 +27,7 @@ class Command(BaseCommand):
         parser.add_argument('--non-coding', action='store_true', default=False, help='Fix issue #762 NR had c. instead of n.')
         parser.add_argument('--revalidate', action='store_true', default=False)
         parser.add_argument('--variant_coordinate', action='store_true', default=False, help='Validates Variant Coordinates')
+        parser.add_argument('--rematch', type=int, default=0)
 
     def report_unmatched(self):
         print(f"Unmatched count = {Classification.objects.filter(variant__isnull=True).count()}")
@@ -42,6 +44,7 @@ class Command(BaseCommand):
         mode_non_coding = options.get('non_coding')
         mode_revalidate = options.get('revalidate')
         mode_variant_coordinate = options.get('variant_coordinate')
+        rematch_count = options.get('rematch')
 
         # if mode_all and mode_missing:
         #     raise ValueError("all and missing are mutually exclusive parameters")
@@ -71,6 +74,27 @@ class Command(BaseCommand):
 
         if mode_variant_coordinate:
             self.handle_coordinate_validation()
+
+        if rematch_count:
+
+            batch_size = 1000
+            # TODO rematch on statuses other than processing
+            batch = []
+
+            def process_batch(force: bool = False):
+                nonlocal batch
+                if (len(batch) >= batch_size) or (force and len(batch) >= 0):
+                    qs = ImportedAlleleInfo.objects.filter(pk__in=batch)
+                    reattempt_variant_matching(qs)
+
+            for imported_allele_info in ImportedAlleleInfo.objects.filter(status=ImportedAlleleInfoStatus.PROCESSING).values_list('pk', flat=True).iterator():
+                batch.append(imported_allele_info)
+                process_batch()
+                rematch_count -= 1
+                if rematch_count == 0:
+                    break
+
+            process_batch(force=True)
 
         # row_count = 0
         # batch_size = 50

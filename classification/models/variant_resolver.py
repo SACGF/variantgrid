@@ -37,7 +37,7 @@ class VariantResolver:
                         self.process_queue()
         return actually_queued
 
-    def process_queue(self):
+    def process_queue(self) -> int:
         for vcimport in self.ci_by_gb.values():
             task = process_classification_import_task.si(vcimport.pk, ImportSource.API)
             task.apply_async()
