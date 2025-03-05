@@ -118,10 +118,13 @@ class VariantPKLookup:
         variant_coordinate = variant_coordinate.as_symbolic_or_explicit_according_to_size(self.genome_build)
         if self.chrom_contig_id_mappings is None:
             raise ValueError("Need to initialise w/GenomeBuild to call get_variant_coordinate_hash")
-        contig_id = self.chrom_contig_id_mappings[variant_coordinate.chrom]
-        ref_id = self.sequence_pk_by_seq[variant_coordinate.ref]
-        alt_id = self.sequence_pk_by_seq[variant_coordinate.alt]
-        return self._get_variant_hash(contig_id, variant_coordinate.position, ref_id, alt_id, variant_coordinate.svlen)
+        if contig_id := self.chrom_contig_id_mappings.get(variant_coordinate.chrom):
+            ref_id = self.sequence_pk_by_seq[variant_coordinate.ref]
+            alt_id = self.sequence_pk_by_seq[variant_coordinate.alt]
+            return self._get_variant_hash(contig_id, variant_coordinate.position, ref_id, alt_id, variant_coordinate.svlen)
+        else:
+            all_keys = ", ".join(sorted(self.chrom_contig_id_mappings.keys()))
+            raise KeyError(f"No contig entry for \"{variant_coordinate.chrom}\" in {self.genome_build} - have {all_keys}")
 
     def add(self, variant_coordinate: VariantCoordinate) -> VariantHash:
         variant_coordinate = variant_coordinate.as_symbolic_or_explicit_according_to_size(self.genome_build)
