@@ -1,0 +1,17 @@
+##fileformat=VCFv4.2
+##FILTER=<ID=PASS,Description="All filters passed">
+##source=DRAGEN_CNV
+##reference=file://GRCh38_decoy2_with_cnv
+##contig=<ID=chr1,length=248956422>
+##ALT=<ID=DEL,Description="Region of lowered copy number relative to the reference, or a deletion breakpoint">
+##ALT=<ID=DUP,Description="Region of elevated copy number relative to the reference, or a tandem duplication breakpoint">
+##INFO=<ID=REFLEN,Number=1,Type=Integer,Description="Number of REF positions included in this record">
+##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Difference in length between REF and ALT alleles">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">
+##INFO=<ID=BCFTOOLS_OLD_VARIANT,Number=1,Type=String,Description="Original variant. Format: CHR|POS|REF|ALT|USED_ALT_IDX">
+##bcftools_normVersion=1.20+htslib-1.20
+##bcftools_normCommand=norm -m- --old-rec-tag=BCFTOOLS_OLD_VARIANT snpdb/tests/test_data/svlen_multi_allele.vcf; Date=Fri Feb 28 16:09:34 2025
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+chr1	1436723	DRAGEN:GAINLOH:chr1:1436724-1676932;DRAGEN:GAIN:chr1:1436724-1668557	N	<DEL>	12	PASS	SVLEN=-240209,240209;SVTYPE=CNV;END=1676932;REFLEN=240209;BCFTOOLS_OLD_VARIANT=chr1|1436723|N|<DEL>,<DUP>|1
+chr1	1436723	DRAGEN:GAINLOH:chr1:1436724-1676932;DRAGEN:GAIN:chr1:1436724-1668557	N	<DUP>	12	PASS	SVLEN=-240209,240209;SVTYPE=CNV;END=1676932;REFLEN=240209;BCFTOOLS_OLD_VARIANT=chr1|1436723|N|<DEL>,<DUP>|2
