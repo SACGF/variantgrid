@@ -108,7 +108,7 @@ function initSubCohort() {
 function setupSubCohortButton() {
     const numSelectedSamples = $("input:checked", "#sample-formset").length;
     const buttonEnabled = numSelectedSamples > 1;
-    $("#sub-cohort-button").button( "option", "disabled", !buttonEnabled );
+    $("#sub-cohort-button").attr("disabled", !buttonEnabled );
 }
 
 
@@ -460,7 +460,7 @@ $(document).ready(function() {
 
         <p>
         {% if has_write_permission %}
-            <button id="vcf-submit-button" class="btn btn-primary">Update VCF</button>
+            <button id="vcf-submit-button" type='button' class="btn btn-primary">Update VCF</button>
             {% if user.is_superuser %}
                 <button id="vcf-populate-clingen-alleles" class="btn btn-secondary"
                         title="Retrieves max {% settings_value 'CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS' %} ClinGen Alleles">
@@ -471,7 +471,7 @@ $(document).ready(function() {
         </p>
 
         {% if vcf.import_status == 'S' and vcf.cohort %}
-            <button id='sub-cohort-button' class="btn btn-outline-primary">
+            <button id='sub-cohort-button' type='button' class="btn btn-outline-primary">
               <img id="cohort-icon" class="sub-cohort-button-component" src="{% static 'images/node_icons/cohort.png' %}" width="28" height="28" />
               <div class='sub-cohort-button-component'> Create cohort from selected samples</div>
             </button>
