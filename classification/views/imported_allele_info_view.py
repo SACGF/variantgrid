@@ -313,6 +313,19 @@ class ImportedAlleleInfoDownload(ExportRow):
     def c_hgvs_imported(self):
         return self.allele_info.imported_c_hgvs
 
+    @export_column(label="Variant Coordinate (37)")
+    def variant_coordinate_37(self):
+        if c37 := self.allele_info[GenomeBuild.grch37()]:
+            if variant := c37.variant:
+                return variant.full_string
+
+    @export_column(label="Variant Coordinate (38)")
+    def variant_coordinate_38(self):
+        if c38 := self.allele_info[GenomeBuild.grch38()]:
+            if variant := c38.variant:
+                return variant.full_string
+
+
     @export_column(label="c.HGVS (37)")
     def c_hgvs_37(self):
         if c37 := self.allele_info[GenomeBuild.grch37()]:
@@ -320,7 +333,7 @@ class ImportedAlleleInfoDownload(ExportRow):
 
     @export_column(label="c.HGVS (38)")
     def c_hgvs_38(self):
-        if c38 := self.allele_info[GenomeBuild.grch37()]:
+        if c38 := self.allele_info[GenomeBuild.grch38()]:
             return c38.c_hgvs
 
     @export_column(label="variant ID (37)")
