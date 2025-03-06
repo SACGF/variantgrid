@@ -1326,7 +1326,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             if self.transcript.annotation_consortium == AnnotationConsortium.ENSEMBL:
                 data = json.loads(self.api_response)
                 if self.version != data["version"]:
-                    raise NoTranscript(f"Only latest version: (v{data['version']}) can be retrieved via API")
+                    raise NoTranscript(f"Only latest version: (v{data['version']}) can be retrieved via API - asked for TVSI({self.pk}) {self.transcript.identifier} v{self.version}")
 
     @staticmethod
     def get(transcript_accession: str, retrieve=True) -> Optional['TranscriptVersionSequenceInfo']:
