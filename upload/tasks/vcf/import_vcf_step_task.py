@@ -1,5 +1,6 @@
 import logging
 import subprocess
+from typing import Optional
 
 import celery
 from celery.app.task import Task
@@ -112,21 +113,37 @@ class ImportVCFStepTask(Task):
             self.check_pipeline_stage(upload_pipeline, upload_step)
 
     @staticmethod
-    def _schedule_steps(child_task_class, upload_step, multi_steps: list[tuple[str, int]]):
+    def _schedule_steps(child_task_class, parent_upload_step, multi_steps: list[tuple[str, int]],
+                        name: Optional[str]=None):
+        """ If name is None - will use simplified child class name """
         child_class_name = full_class_name(child_task_class)
-        sort_order = upload_step.upload_pipeline.get_max_step_sort_order()
+        if name is None:
+            name = child_class_name.split(".")[-1]
+
+        upload_pipeline = parent_upload_step.upload_pipeline
+        sort_order = parent_upload_step.upload_pipeline.get_max_step_sort_order()
+
+        pipeline_stage = VCFPipelineStage.DATA_INSERTION
+        pipeline_stage_dependency = None
+        if parent_upload_step.pipeline_stage != pipeline_stage:
+            pipeline_stage_dependency = parent_upload_step.pipeline_stage
 
         for input_filename, items_to_process in multi_steps:
             sort_order += 1
-            child_step = UploadStep.objects.create(upload_pipeline=upload_step.upload_pipeline,
-                                                   name=UploadStep.PROCESS_VCF_TASK_NAME,
+            child_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
+                                                   name=name,
                                                    sort_order=sort_order,
                                                    task_type=UploadStepTaskType.CELERY,
-                                                   pipeline_stage=VCFPipelineStage.DATA_INSERTION,
+                                                   pipeline_stage_dependency=pipeline_stage_dependency,
+                                                   pipeline_stage=pipeline_stage,
                                                    script=child_class_name,
                                                    input_filename=input_filename,
                                                    items_to_process=items_to_process)
-            child_step.launch_task(child_task_class)
+
+            # If parent/child are in same stage - launch
+            # Otherwise, will be kicked off in 'check_pipeline_stage' when current stage is done
+            if not pipeline_stage_dependency:
+                child_step.launch_task(child_task_class)
 
 
 @celery.shared_task
