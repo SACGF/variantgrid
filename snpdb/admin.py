@@ -1,6 +1,7 @@
 import re
 
 from django.contrib import admin, messages
+from django.contrib.admin import TabularInline
 from django.contrib.admin.widgets import AdminTextInputWidget
 from django.db.models import QuerySet
 from unidecode import unidecode
@@ -48,12 +49,27 @@ class AlleleClingenFilter(admin.SimpleListFilter):
         return queryset
 
 
+class VariantAlleleAdminInline(TabularInline):
+    model = VariantAllele
+    fields = ["genome_build", "variant", "allele_linking_tool", "clingen_error"]
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(Allele)
 class AlleleAdmin(ModelAdminBasics):
 
     list_display = ('pk', 'clingen_allele', 'variants')
     list_filter = (AlleleClingenFilter,)
     search_fields = ('id', 'clingen_allele__id')
+    inlines = (VariantAlleleAdminInline,)
 
     @admin_list_column()
     def variants(self, obj: Allele):
