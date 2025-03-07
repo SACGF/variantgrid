@@ -60,7 +60,7 @@ from library.log_utils import log_traceback
 from library.utils import delimited_row
 from library.utils.django_utils import render_ajax_view
 from library.utils.file_utils import rm_if_exists
-from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm, LabMultiSelectForm
+from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm, LabMultiSelectForm, UserLabChoiceForm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Variant, UserSettings, Sample, Lab, Allele
@@ -738,14 +738,19 @@ class CreateClassificationForVariantView(TemplateView):
 
         consensuses = ClassificationConsensus.all_consensus_candidates(allele=variant.allele, user=self.request.user)
         consensus_default_suggestion = first((c for c in consensuses if c.default_suggestion), default=None)
+
+        lab_form = None
+        if lab:
+            lab_form = UserLabChoiceForm(user=self.request.user, default_lab=lab)
+
         return {
             'variant': variant,
             "genome_build": genome_build,
             "form_post_url": self._get_form_post_url(),
             'variant_sample_autocomplete_form': self._get_sample_form(),
             "vts": vts,
-            "lab": lab,
             "lab_error": lab_error,
+            "lab_form": lab_form,
             "consensuses": consensuses,
             "consensus_default_suggestion": consensus_default_suggestion.modification.pk if consensus_default_suggestion else 0
         }

@@ -224,7 +224,10 @@
                 {% endlabelled %}
 
                 {% labelled label="For lab" %}
-                    {% if lab %}{{ lab.name }}{% endif %}
+                    {% if lab_form %}
+                        {{ lab_form.lab }}
+                        {{ lab_form.media }}
+                    {% endif %}
                     {% if lab_error %}
                     <div class='alert alert-danger'>{{ lab_error }}<br/><a href="{% url 'view_user_settings' %}">Please review your default lab here.</a></div>
                     {% endif %}
