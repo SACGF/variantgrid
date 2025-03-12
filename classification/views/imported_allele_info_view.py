@@ -325,7 +325,6 @@ class ImportedAlleleInfoDownload(ExportRow):
             if variant := c38.variant:
                 return variant.full_string
 
-
     @export_column(label="c.HGVS (37)")
     def c_hgvs_37(self):
         if c37 := self.allele_info[GenomeBuild.grch37()]:
