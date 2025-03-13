@@ -323,7 +323,7 @@ class ClinVarRecordCollection(TimeStampedModel):
     def records_with_min_stars(self, min_stars: int) -> list['ClinVarRecord']:
         return list(sorted(self.clinvarrecord_set.filter(stars__gte=min_stars), reverse=True))
 
-    def update_with_records_and_save(self, records: list['ClinVarR ecord']):
+    def update_with_records_and_save(self, records: list['ClinVarRecord']):
         records = list(sorted(records, reverse=True))
         self.clinvarrecord_set.all().delete()
         for record in records:
