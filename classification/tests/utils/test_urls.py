@@ -8,7 +8,7 @@ from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import
 from classification.models import EvidenceKey
 from library.django_utils.unittest_utils import prevent_request_warnings, URLTestCase
 from snpdb.models import GenomeBuild, Variant, ClinGenAllele, Allele, VariantAllele, AlleleOrigin, Lab, Organization, \
-    Country
+    Country, UserSettings
 
 
 class Test(URLTestCase):
@@ -51,9 +51,12 @@ class Test(URLTestCase):
                                             allele=allele,
                                             origin=AlleleOrigin.IMPORTED_TO_DATABASE)
 
+        user_settings = UserSettings.get_for_user(cls.user_owner)
+        lab = user_settings.get_lab()
         sample = None
         # ensembl_transcript_accession = "ENST00000376887.4:c.1498G>A"
         classification = create_classification_for_sample_and_variant_objects(cls.user_owner,
+                                                                              lab,
                                                                               sample,
                                                                               variant,
                                                                               grch37,

@@ -340,6 +340,7 @@ def create_classification_object(request) -> Classification:
     refseq_transcript_accession = request.POST.get("refseq_transcript_accession")
     ensembl_transcript_accession = request.POST.get("ensembl_transcript_accession")
     sample_id = request.POST.get("sample_id")
+    lab_id = request.POST.get("lab")
     copy_from_id = request.POST.get("copy_from_vcm_id")
     if copy_from_id:
         copy_from_id = int(copy_from_id)
@@ -359,7 +360,11 @@ def create_classification_object(request) -> Classification:
     else:
         sample = None
 
-    classification = create_classification_for_sample_and_variant_objects(request.user, sample,
+    lab = Lab.objects.get(pk=lab_id)
+    if not lab.is_member(request.user):
+        raise PermissionDenied(f"user={request.user} is not a member of {lab=}")
+
+    classification = create_classification_for_sample_and_variant_objects(request.user, lab, sample,
                                                                           variant, genome_build,
                                                                           refseq_transcript_accession=refseq_transcript_accession,
                                                                           ensembl_transcript_accession=ensembl_transcript_accession)

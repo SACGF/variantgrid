@@ -18,11 +18,12 @@ from classification.enums import SubmissionSource, SpecialEKeys
 from classification.models import EvidenceKey, Classification, ClassificationImport
 from classification.tasks.classification_import_process_variants_task import liftover_classification_import
 from library.git import Git
-from snpdb.models import GenomeBuild, ImportSource, Sample, UserSettings, Variant
+from snpdb.models import GenomeBuild, ImportSource, Sample, UserSettings, Variant, Lab
 
 
 def create_classification_for_sample_and_variant_objects(
         user: User,
+        lab: Lab,
         sample: Optional[Sample],
         variant: Variant,
         genome_build: GenomeBuild,
@@ -30,9 +31,6 @@ def create_classification_for_sample_and_variant_objects(
         ensembl_transcript_accession: str = None,
         annotation_version: str = None):
     """ Create internally from existing variant - not used by API which may need to create variants """
-    user_settings = UserSettings.get_for_user(user)
-    # TODO - if you have > 1 labs then redirect to pick page.
-    lab = user_settings.get_lab()
 
     kwargs = {"user": user,
               "lab": lab,
