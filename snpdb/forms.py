@@ -625,3 +625,21 @@ class GenomicIntervalsCollectionForm(forms.ModelForm, ROFormMixin):
             instance.save()
 
         return instance
+
+
+class UserLabChoiceForm(forms.Form):
+    lab = forms.ModelChoiceField(
+        required=True,
+        queryset=Lab.objects.all(),
+        widget=ModelSelect2(url='lab_autocomplete',
+                            attrs={'data-placeholder': 'Lab...'}))
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop("user")
+        default_lab = kwargs.pop("default_lab")
+        super().__init__(*args, **kwargs)
+        self.fields['lab'].queryset = Lab.valid_labs_qs(user)
+        if default_lab:
+            lab_field = self.fields['lab']
+            lab_field.initial = default_lab
+            # lab_field.choices = [(default_lab.pk, default_lab)]
