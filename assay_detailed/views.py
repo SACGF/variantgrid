@@ -18,6 +18,9 @@ class AssayDetailedRNAColumns(DatatableConfig[AssayDetailedRNA]):
 
         self.rich_columns = [
             RichColumn("lab"),
+            RichColumn(None, name="assay_type", label="Test Method", renderer=lambda x: "RNAseq"),
+            RichColumn(None, name="summary_result", label="Overall Conclusion", renderer=lambda x: "Major (10-25%)"),
+            RichColumn(None, name="acmg_applied", label="ACMG Code Applied", renderer=lambda x: "PVS1 (RNA)"),
             RichColumn("date", client_renderer='TableFormat.timestamp', orderable=True),
             RichColumn("id", visible=False)
         ]

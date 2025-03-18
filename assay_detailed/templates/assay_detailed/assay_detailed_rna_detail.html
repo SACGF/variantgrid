@@ -1,6 +1,11 @@
 {% load ui_utils %}
 {% load classification_tags %}
 {% load ontology_tags %}
+{% if detail == "full" %}
+    <h4>Assay Source</h4>
+    {% labelled label="Lab" %}{{ assay.lab }}{% endlabelled %}
+    {% labelled label="Date" %}{{ assay.date }}{% endlabelled %}
+{% endif %}
 <h4>Variant Information</h4>
 {% labelled label="Genome Build" %}GRCh38{% endlabelled %}
 {% labelled label="c.HGVS" %}{% c_hgvs "NM_000088.4:c.4248+2T>C" %}{% endlabelled %}
@@ -18,14 +23,17 @@
     <h4>Proband Information</h4>
 
     {% labelled label="Phenotype" %}{% endlabelled %}
-    {% labelled label="Age" %}20-30 years{% endlabelled %}
     {% labelled label="Chromosomal sex" %}XX{% endlabelled %}
 
     <h4>In silico predictors</h4>
 
     {% labelled label="Gene size" %}{% endlabelled %}
     {% labelled label="Gene GTEX tissue" %}Blood{% endlabelled %}
-    {% labelled label="Gene GTEX value" %}Number{% endlabelled %}
+    {% labelled label="Exon affected" %}{% endlabelled %}
+    {% labelled label="Intron affected" %}{% endlabelled %}
+    {% labelled label="Variant position in relation to canonical splice site" %}{% endlabelled %}
+    {% labelled label="Splicing prediction" %}{% endlabelled %}
+    {% labelled label="SpliceAI Date Accessed or Version" %}...{% endlabelled %}
 
     <h4>Relative Samples</h4>
     <table class="table">
@@ -33,28 +41,109 @@
             <tr>
                 <th>Relationship to proband</th>
                 <th>Sample type</th>
-                <th>Sample date received</th>
                 <th>Sample variant zygosity</th>
             </tr>
         </thead>
         <tbody>
             <td>sibling</td>
             <td>Blood</td>
-            <td>2020-01-01</td>
             <td>Heterozygous</td>
         </tbody>
     </table>
 
+    <h4>Unrelated Controls</h4>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Pos/Neg</th>
+                <th>Number</th>
+                <th>Sex-matched</th>
+                <th>Age-matched</th>
+                <th>Tissue-matched</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Negative</td>
+                <td>5</td>
+                <td>{{ False | boolean }}</td>
+                <td>{{ True | boolean }}</td>
+                <td>{{ False | boolean }}</td>
+            </tr>
+            <tr>
+                <td>Positive</td>
+                <td>6</td>
+                <td>{{ False | boolean }}</td>
+                <td>{{ True | boolean }}</td>
+                <td>{{ True | boolean }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4>RNA Assay method</h4>
+    {% labelled label="Test method" %}RNAseq{% endlabelled %}
+    {% labelled label="Test analysis method" %}Sanger{% endlabelled %}
+    {% labelled label="Alignment method/tool" %}STAR-2.7.8a.{% endlabelled %}
+    {% labelled label="Sample preparation method" %}{% endlabelled %}
+    {% comment %}
+    {% labelled label="RNA isolation method" %}{% endlabelled %}
+    {% labelled label="Method overview" %}{% endlabelled %}
+    {% labelled label="PCR polymerase used" %}{% endlabelled %}
+    {% labelled label="Number of PCR cycles" %}{% endlabelled %}
+    {% labelled label="PCR extension time" %}{% endlabelled %}
+    {% endcomment %}
+
+    <h4>RNA Assay method (proband/experiment specific)</h4>
+    {% labelled label="Sample/tissue type" %}Blood{% endlabelled %}
+    {% labelled label="Sample storage (where applicable)" %}PAX{% endlabelled %}
+    {% comment %}
+    {% labelled label="Request date" %}{% endlabelled %}
+    {% labelled label="Collection date" %}{% endlabelled %}
+    {% labelled label="Received date" %}{% endlabelled %}
+    {% labelled label="Sequencing date" %}{% endlabelled %}
+    {% endcomment %}
+    {% labelled label="NMD inhibitor" %}{{ True | boolean }} cycloheximide{% endlabelled %}
+    {% labelled label="Use of informative SNP for allele-specific quantitation" %}{{ True | boolean }} In trans variant NM_000088.4:c.4237G>T {% endlabelled %}
+    {% labelled label="Reads over informative SNP" %}{% endlabelled %}
+    {% comment %}
+    {% labelled label="Orthogonal validation performed" %}{{ False | boolean }}{% endlabelled %}
+    {% endcomment %}
+    {% labelled label="Forward primer - Exon" %}{% endlabelled %}
+    {% labelled label="Forward primer - Sequence" %}CAAGGAACCTGTCTCCACAAAGTG{% endlabelled %}
+    {% labelled label="Reverse primer - Exon" %}{% endlabelled %}
+    {% labelled label="Reverse primer - Sequence" %}CAAGGAACCTGTCTCCACAAAGTG{% endlabelled %}
+    {% comment %}
+    {% labelled label="Canonical PCR product size" %}{% endlabelled %}
+    {% labelled label="Alignment quality metrics" %}{% endlabelled %}
+    {% labelled label="Construct design" %}{% endlabelled %}
+    {% endcomment %}
+
+    {% comment %}
+    <h4>RNA assay results</h4>
+    {% labelled label="Overall conclusion" %}MAJOR (10-25%){% endlabelled %}
+    {% labelled label="Read depth/total reads across region" %}300{% endlabelled %}
+    {% labelled label="Total percentage of alternative splicing" %}{% endlabelled %}
+    {% labelled label="Allele specific analysis of transcript proportions" %}{{ False | boolean }}{% endlabelled %}
+    {% labelled label="PCR bias" %}{{ False | boolean }}{% endlabelled %}
+    {% endcomment %}
+
+
 {% endif %}
 <h4>Results</h4>
+{% labelled label="Overall conclusion" %}MAJOR (10-25%){% endlabelled %}
+{% labelled label="Read depth/total reads across region" %}300{% endlabelled %}
+{% labelled label="Allele specific analysis of transcript proportions" %}{{ False | boolean }}{% endlabelled %}
+
 <table class="table">
     <thead>
         <tr>
             <th>Transcript detected</th>
             <th>Detected r.</th>
             <th>Detected p.</th>
-            <th class="num text-right">Num reads<br/>(variant allele)</th>
+            <th class="num text-right">No. reads<br/>(variant allele)</th>
             <th class="num text-right">% reads patient<br/>(variant allele)</th>
+            <th class="num text-right">No. of reads range<br/>(controls)</th>
+            <th class="num text-right">% reads controls<br/>(+/- SD)</th>
         </tr>
     </thead>
     <tbody>
@@ -64,6 +153,8 @@
             <td>Canonical splicing</td>
             <td class="num"></td>
             <td class="num">5</td>
+            <td class="num"></td>
+            <td class="num">90</td>
         </tr>
         <tr>
             <td>Expon 6 skipping</td>
@@ -71,6 +162,8 @@
             <td>p.(Tyr101Serfs*11)</td>
             <td class="num"></td>
             <td class="num">80</td>
+            <td class="num"></td>
+            <td class="num">5</td>
         </tr>
         <tr>
             <td>Intron 6 partial intron retention</td>
@@ -78,6 +171,15 @@
             <td>p.(Phe152_Ala153insGlu)</td>
             <td class="num"></td>
             <td class="num">15</td>
+            <td class="num"></td>
+            <td class="num">5</td>
         </tr>
     </tbody>
 </table>
+
+<h4>RNA assay application to curation</h4>
+{% labelled label="Is RNA assay result consistent with bioinformatic prediction?" %}{{ True | boolean }}{% endlabelled %}
+{% labelled label="ACMG code applied" %}PVS1 (RNA){% endlabelled %}
+{% labelled label="Assertion Method" %}ClinGen SVI Splicing subgroup (Walker et al){% endlabelled %}
+{% labelled label="Variant re-classification" %}{{ False | boolean }}{% endlabelled %}
+{% labelled label="Result classification" %}Pathogenic{% endlabelled %}
