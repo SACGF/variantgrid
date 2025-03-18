@@ -25,15 +25,38 @@
     {% labelled label="Phenotype" %}{% endlabelled %}
     {% labelled label="Chromosomal sex" %}XX{% endlabelled %}
 
-    <h4>In silico predictors</h4>
+    <h4>In Silico Predictors</h4>
+    <style>
+        .splice-ai:before {
+            content: "Splice AI - ";
+            font-size: 0.8rem;
+        }
+        .splice-vault:before {
+            content: "SpliceVault - ";
+            font-size: 0.8rem;
+        }
+    </style>
+    <div class="row">
+        <div class="col-6">
+            <h5 style="text-align:center">Splice AI</h5>
+            {% labelled hint="tiny" label="Date accessed or version" label_css="splice-ai" %}{% endlabelled %}
+            {% labelled hint="tiny" label="Masked or raw" label_css="splice-ai" %}{% endlabelled %}
+            {% labelled hint="tiny" label="Acceptor gain" label_css="splice-ai" %}{% endlabelled %}
+            {% labelled hint="tiny" label="Acceptor loss" label_css="splice-ai" %}{% endlabelled %}
+            {% labelled hint="tiny" label="Donor gain" label_css="splice-ai" %}{% endlabelled %}
+            {% labelled hint="tiny" label="Donor loss" label_css="splice-ai" %}{% endlabelled %}
+        </div>
+        <div class="col-6">
+            <h5 style="text-align:center">SpliceVault</h5>
+            {% labelled hint="tiny" label="Date accessed or version" label_css="splice-vault" %}{% endlabelled %}
+            {% labelled hint="tiny" label="Number of events" label_css="splice-vault" %}{% endlabelled %}
+            {% labelled hint="tiny" label="Max no of exons skipped" label_css="splice-vault" %}{% endlabelled %}
+            {% labelled hint="tiny" label="Cryptic window" label_css="splice-vault" %}{% endlabelled %}
+            {% labelled hint="tiny" label="Tissue" label_css="splice-vault" %}{% endlabelled %}
+            {% labelled hint="tiny" label="Events predicted" label_css="splice-vault" %}{% endlabelled %}
+        </div>
+    </div>
 
-    {% labelled label="Gene size" %}{% endlabelled %}
-    {% labelled label="Gene GTEX tissue" %}Blood{% endlabelled %}
-    {% labelled label="Exon affected" %}{% endlabelled %}
-    {% labelled label="Intron affected" %}{% endlabelled %}
-    {% labelled label="Variant position in relation to canonical splice site" %}{% endlabelled %}
-    {% labelled label="Splicing prediction" %}{% endlabelled %}
-    {% labelled label="SpliceAI Date Accessed or Version" %}...{% endlabelled %}
 
     <h4>Relative Samples</h4>
     <table class="table">
