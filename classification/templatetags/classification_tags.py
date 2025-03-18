@@ -576,7 +576,7 @@ def db_ref(data: VCDbRefDict, css: Optional[str] = ''):
 
 
 @register.inclusion_tag("classification/tags/condition.html")
-def condition(condition_obj: Union[OntologyTerm, ConditionResolved],
+def condition(condition_obj: Union[OntologyTerm, ConditionResolved, str],
               limit: Optional[int] = 100,
               show_link: Optional[bool] = True,
               no_condition_message: bool = False):

@@ -1,0 +1,83 @@
+{% load ui_utils %}
+{% load classification_tags %}
+{% load ontology_tags %}
+<h4>Variant Information</h4>
+{% labelled label="Genome Build" %}GRCh38{% endlabelled %}
+{% labelled label="c.HGVS" %}{% c_hgvs "NM_000088.4:c.4248+2T>C" %}{% endlabelled %}
+{% labelled label="g.HGVS" %}{% endlabelled %}
+{% labelled label="Kind" %}Quantitative{% endlabelled %}
+{% labelled label="Zygosity" %}Heterozygous{% endlabelled %}
+{% if detail != "full" %}
+    {% labelled label="Full Details" %}<a class="hover-link" target="_blank" href="{% url 'view_assay_detailed_rna_detail' assay.pk %}?detail=full">Click Here</a>{% endlabelled %}
+{% else %}
+    {% labelled label="Other variants detected" %}{% endlabelled %}
+    {% labelled label="Classification before RNA assay" %}Pathogenic{% endlabelled %}
+    {% labelled label="Clinical indication/condition" %}{% ontology_term "MONDO:0008146" %}{% endlabelled %}
+    {% labelled label="Inheritance" %}Autosomal dominant{% endlabelled %}
+
+    <h4>Proband Information</h4>
+
+    {% labelled label="Phenotype" %}{% endlabelled %}
+    {% labelled label="Age" %}20-30 years{% endlabelled %}
+    {% labelled label="Chromosomal sex" %}XX{% endlabelled %}
+
+    <h4>In silico predictors</h4>
+
+    {% labelled label="Gene size" %}{% endlabelled %}
+    {% labelled label="Gene GTEX tissue" %}Blood{% endlabelled %}
+    {% labelled label="Gene GTEX value" %}Number{% endlabelled %}
+
+    <h4>Relative Samples</h4>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Relationship to proband</th>
+                <th>Sample type</th>
+                <th>Sample date received</th>
+                <th>Sample variant zygosity</th>
+            </tr>
+        </thead>
+        <tbody>
+            <td>sibling</td>
+            <td>Blood</td>
+            <td>2020-01-01</td>
+            <td>Heterozygous</td>
+        </tbody>
+    </table>
+
+{% endif %}
+<h4>Results</h4>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Transcript detected</th>
+            <th>Detected r.</th>
+            <th>Detected p.</th>
+            <th class="num text-right">Num reads<br/>(variant allele)</th>
+            <th class="num text-right">% reads patient<br/>(variant allele)</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Expon 6-7 splicing</td>
+            <td>Canonical splicing</td>
+            <td>Canonical splicing</td>
+            <td class="num"></td>
+            <td class="num">5</td>
+        </tr>
+        <tr>
+            <td>Expon 6 skipping</td>
+            <td>r.302_441del</td>
+            <td>p.(Tyr101Serfs*11)</td>
+            <td class="num"></td>
+            <td class="num">80</td>
+        </tr>
+        <tr>
+            <td>Intron 6 partial intron retention</td>
+            <td>r.441_442ins[441+1_441+3]</td>
+            <td>p.(Phe152_Ala153insGlu)</td>
+            <td class="num"></td>
+            <td class="num">15</td>
+        </tr>
+    </tbody>
+</table>

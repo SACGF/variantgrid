@@ -643,6 +643,7 @@ INSTALLED_APPS = [
     'snpdb.apps.SnpdbConfig',
     'upload.apps.UploadConfig',
     'classification.apps.ClassificationConfig',
+    'assay_detailed.apps.AssayDetailedConfig',
     'variantopedia',
     'review'
     # Uncomment the next line to enable admin documentation:

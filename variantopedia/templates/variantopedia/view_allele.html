@@ -314,4 +314,12 @@
         {% clinvar allele=allele expert_panel_only=True %}
     </div>
 
+    <script>
+        function assayRnaFilter(data) {}
+    </script>
+    <div class="mt-4">
+        <h4>RNA Assays</h4>
+        <table id="assay-rna" data-datatable-data='assayRnaFilter' data-datatable-url="{% url 'assay_detailed_rna_datatables' %}" class="sticky-header classification-table" data-adjust-columns="false"></table>
+    </div>
+
 {% endblock content %}
