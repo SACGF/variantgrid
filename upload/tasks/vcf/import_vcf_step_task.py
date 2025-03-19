@@ -10,7 +10,7 @@ import subprocess
 from library.log_utils import get_traceback
 from library.utils import import_class
 from upload.models import UploadPipeline, ProcessingStatus, \
-    UploadStep, PipelineFailedJobTerminateEarlyException, VCFPipelineStage, SkipUploadStepException
+    UploadStep, PipelineFailedJobTerminateEarlyException, VCFPipelineStage, SkipUploadStepException, SimpleVCFImportInfo
 
 
 class ImportVCFStepTask(Task):
@@ -110,6 +110,22 @@ class ImportVCFStepTask(Task):
         upload_pipeline = upload_pipeline_qs.get()  # Reload from DB
         if upload_pipeline.status == ProcessingStatus.PROCESSING:
             self.check_pipeline_stage(upload_pipeline, upload_step)
+
+    @staticmethod
+    def _handle_no_vcf_records(upload_step):
+        logging.info("_handle_no_vcf_records")
+        message = "Warning: VCF had no records (after filtering)"
+        SimpleVCFImportInfo.objects.create(upload_step=upload_step,
+                                           message_string=message)
+
+        upload_pipeline = upload_step.upload_pipeline
+        other_unfinished_upload_steps_qs = upload_pipeline.uploadstep_set.filter(end_date__isnull=True).exclude(
+            pk=upload_step.pk)
+        post_vcf_data_stages = [VCFPipelineStage.DATA_INSERTION, VCFPipelineStage.ANNOTATION_COMPLETE]
+        skip_steps = other_unfinished_upload_steps_qs.filter(pipeline_stage_dependency__in=post_vcf_data_stages)
+        skip_steps.update(end_date=timezone.now(),
+                          status=ProcessingStatus.SKIPPED,
+                          output_text=message + " - skipped")
 
 
 @celery.task

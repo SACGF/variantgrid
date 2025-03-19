@@ -51,17 +51,20 @@ class ScheduleMultiFileOutputTasksTask(ImportVCFStepTask):
         child_class_name = full_class_name(child_task_class)
         sort_order = upload_step.upload_pipeline.get_max_step_sort_order()
 
-        for input_filename, items_to_process in upload_step.get_multi_input_files_and_records():
-            sort_order += 1
-            child_step = UploadStep.objects.create(upload_pipeline=upload_step.upload_pipeline,
-                                                   name=UploadStep.PROCESS_VCF_TASK_NAME,
-                                                   sort_order=sort_order,
-                                                   task_type=UploadStepTaskType.CELERY,
-                                                   pipeline_stage=VCFPipelineStage.DATA_INSERTION,
-                                                   script=child_class_name,
-                                                   input_filename=input_filename,
-                                                   items_to_process=items_to_process)
-            child_step.launch_task(child_task_class)
+        if multi_steps := upload_step.get_multi_input_files_and_records():
+            for input_filename, items_to_process in multi_steps:
+                sort_order += 1
+                child_step = UploadStep.objects.create(upload_pipeline=upload_step.upload_pipeline,
+                                                       name=UploadStep.PROCESS_VCF_TASK_NAME,
+                                                       sort_order=sort_order,
+                                                       task_type=UploadStepTaskType.CELERY,
+                                                       pipeline_stage=VCFPipelineStage.DATA_INSERTION,
+                                                       script=child_class_name,
+                                                       input_filename=input_filename,
+                                                       items_to_process=items_to_process)
+                child_step.launch_task(child_task_class)
+        else:
+            self._handle_no_vcf_records(upload_step)
 
         return 0
 
