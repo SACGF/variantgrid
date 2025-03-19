@@ -75,8 +75,7 @@ class ScheduleMultiFileOutputTasksTask(ImportVCFStepTask):
             self._schedule_steps(child_task_class, upload_step, multi_steps,
                                  name=UploadStep.PROCESS_VCF_TASK_NAME)
         else:
-            upload_step.output_text = "Warning: Empty VCF so no split VCF records"
-            upload_step.save()
+            self._handle_no_vcf_records(upload_step)
         return 0
 
 

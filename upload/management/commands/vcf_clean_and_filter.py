@@ -30,6 +30,11 @@ class Command(BaseCommand):
         parser.add_argument('--skipped-records-stats-file', help='File name')
         parser.add_argument('--skipped-filters-stats-file', help='File name')
 
+    @staticmethod
+    def _write_header(vcf_header_lines: list[str]):
+        for header_line in vcf_header_lines:
+            sys.stdout.write(header_line)
+
     def handle(self, *args, **options):
         QUICK_ACCEPT_FILTERS = {".", "PASS"}
         vcf_filename = options["vcf"]
@@ -74,9 +79,7 @@ class Command(BaseCommand):
                     vcf_header_lines.append(line)
             else:
                 if first_non_header_line:
-                    # Dump out the header
-                    for header_line in vcf_header_lines:
-                        sys.stdout.write(header_line)
+                    self._write_header(vcf_header_lines)
                     defined_filters = self._get_defined_vcf_filters(vcf_header_lines)
                     first_non_header_line = False
 
@@ -135,6 +138,10 @@ class Command(BaseCommand):
                     columns[VCFColumns.FILTER] = filter_column
 
                 sys.stdout.write("\t".join(columns))
+
+        if first_non_header_line:
+            # Handle case where there were no records at all - still need to write header
+            self._write_header(vcf_header_lines)
 
         self._write_skip_counts(skipped_contigs, skipped_contigs_stats_file)
         self._write_skip_counts(skipped_records, skipped_records_stats_file)

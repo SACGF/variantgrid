@@ -261,10 +261,10 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False):
                                                  output_filename=output_filename)
 
 
-def _store_vcf_stats(filename, upload_set, description, operation='Skipped'):
+def _store_vcf_stats(filename, upload_step, description, operation='Skipped'):
     if os.path.exists(filename):
         df = pd.read_csv(filename, header=None, sep='\t', index_col=0)
         if not df.empty:
             for name, count in df.iloc[:, 0].items():
                 message_string = f"{operation} {count} '{name}' {description}"
-                SimpleVCFImportInfo.objects.create(upload_step=upload_set, message_string=message_string)
+                SimpleVCFImportInfo.objects.create(upload_step=upload_step, message_string=message_string)
