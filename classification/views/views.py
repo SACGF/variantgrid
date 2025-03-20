@@ -361,7 +361,7 @@ def create_classification_object(request) -> Classification:
         sample = None
 
     lab = Lab.objects.get(pk=lab_id)
-    if not lab.is_member(request.user):
+    if not lab.is_member(request.user, admin_check=True):
         raise PermissionDenied(f"user={request.user} is not a member of {lab=}")
 
     classification = create_classification_for_sample_and_variant_objects(request.user, lab, sample,
