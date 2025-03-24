@@ -164,12 +164,10 @@ class HGVSMatcher:
                                                            local_resolution=local_resolution,
                                                            clingen_resolution=clingen_resolution)
 
-    def _clingen_get_variant_coordinate_matches_reference_and_normalized(self, hgvs_string: str, match_ref_allele=None) -> tuple[VariantCoordinate, bool, bool]:
+    def _clingen_get_variant_coordinate_matches_reference_and_normalized(self, hgvs_string: str, match_ref_allele=None) -> tuple[VariantCoordinate, bool, Union[HgvsOriginallyNormalized, bool]]:
         hgvs_name = self.create_hgvs_variant(hgvs_string)
-        originally_normalized = self._normalized_check(hgvs_name)
         if hgvs_name.kind == 'g':
             clingen_check_variant_length(hgvs_string, hgvs_name.length, is_dup=hgvs_name.mutation_type == 'dup')
-
         cleaned_hgvs = self.hgvs_converter.c_hgvs_remove_gene_symbol(hgvs_string)
 
         try:
@@ -183,6 +181,12 @@ class HGVSMatcher:
                                                   alt=variant_coord.ref)  # ref == alt
             if match_ref_allele is None:
                 match_ref_allele = True
+
+            transcript_accession = self.get_transcript_accession(cleaned_hgvs)
+            normalized_hgvs = ca.get_c_hgvs_variant(self.hgvs_converter, transcript_accession)
+            no_gene_generated = self.hgvs_converter.c_hgvs_remove_gene_symbol(str(normalized_hgvs))
+            originally_normalized = HgvsOriginallyNormalized(original_hgvs=cleaned_hgvs,
+                                                             normalized_hgvs=no_gene_generated)
             return variant_coord, match_ref_allele, originally_normalized
         except ClinGenAlleleAPIException:
             self.attempt_clingen = False
@@ -304,8 +308,7 @@ class HGVSMatcher:
 
     def _normalized_check(self, hgvs_variant: HGVSVariant) -> HgvsOriginallyNormalized:
         normalized_hgvs = self.hgvs_converter.normalize(hgvs_variant)
-        originally_normalized = HgvsOriginallyNormalized(original_hgvs=hgvs_variant,
-                                                         normalized_hgvs=normalized_hgvs)
+        return HgvsOriginallyNormalized(original_hgvs=hgvs_variant, normalized_hgvs=normalized_hgvs)
 
 
     def filter_best_transcripts_and_converter_type_by_accession(self, transcript_accession, prefer_local=True, closest=False) -> list[tuple[TranscriptVersion, HGVSConverterType]]:
