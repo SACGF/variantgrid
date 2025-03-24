@@ -1,7 +1,7 @@
 from cdot.hgvs.dataproviders import LocalDataProvider, FastaSeqFetcher, ChainedSeqFetcher
 from hgvs.exceptions import HGVSDataNotAvailableError
 
-from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo
+from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo, NoTranscript
 from genes.transcripts_utils import get_refseq_type
 from snpdb.models import Contig
 
@@ -20,7 +20,12 @@ class DBTranscriptSeqFetcher:
         if is_contig(ac):
             raise HGVSDataNotAvailableError("This SeqFetcher implementation doesn't handle contigs")
 
-        tvsi = TranscriptVersionSequenceInfo.get(ac, retrieve=False)
+        tvsi = None
+        try:
+            tvsi = TranscriptVersionSequenceInfo.get(ac, retrieve=False)
+        except NoTranscript:
+            pass
+
         if tvsi is None:
             raise HGVSDataNotAvailableError(f"No database sequence for {ac}")
         transcript_seq = tvsi.sequence
