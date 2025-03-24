@@ -1,10 +1,12 @@
 import logging
 import re
+from datetime import timedelta
 from functools import cached_property, lru_cache
 from typing import Optional
 
 from django.conf import settings
 from django.db import models
+from django.db.models.fields import DateTimeField
 from django_extensions.db.models import TimeStampedModel
 
 from snpdb.models.models_enums import SequenceRole
@@ -94,6 +96,14 @@ class ClinGenAllele(TimeStampedModel):
             transcript_id = ClinGenAllele._strip_transcript_version(transcript_accession)
             ta_by_t[transcript_id] = ta
         return ta_by_t
+
+    def significantly_later_modified(self, seconds=5) -> Optional[DateTimeField]:
+        """ only return modified if significantly later """
+        threshold = timedelta(seconds=seconds)
+        modified = None
+        if self.modified - self.created > threshold:
+            modified = self.modified
+        return modified
 
     def _get_transcript_allele(self, transcript_accession, match_version=True) -> Optional[dict]:
         if match_version:
