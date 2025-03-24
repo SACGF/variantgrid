@@ -185,8 +185,8 @@ class HGVSMatcher:
             transcript_accession = self.get_transcript_accession(cleaned_hgvs)
             normalized_hgvs = ca.get_c_hgvs_variant(self.hgvs_converter, transcript_accession)
             no_gene_generated = self.hgvs_converter.c_hgvs_remove_gene_symbol(str(normalized_hgvs))
-            originally_normalized = HgvsOriginallyNormalized(original_hgvs=cleaned_hgvs,
-                                                             normalized_hgvs=no_gene_generated)
+            originally_normalized = HgvsOriginallyNormalized(original_hgvs=self.create_hgvs_variant(cleaned_hgvs),
+                                                             normalized_hgvs=self.create_hgvs_variant(no_gene_generated))
             return variant_coord, match_ref_allele, originally_normalized
         except ClinGenAlleleAPIException:
             self.attempt_clingen = False
