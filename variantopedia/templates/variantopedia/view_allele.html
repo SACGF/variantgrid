@@ -135,6 +135,15 @@
                         {% endfor %}
                         <h4>ClinGen API Response</h4>
 
+                        {% if allele.clingen_allele %}
+                            {% labelled label='Created' %}{{ allele.clingen_allele.created }}{% endlabelled %}
+                            {% with sl_modified=allele.clingen_allele.significantly_later_modified %}
+                                {% if sl_modified %}
+                                    {% labelled label='Modified' %}{{ allele.clingen_allele.modified }}{% endlabelled %}
+                                {% endif %}
+                            {% endwith %}
+                        {% endif %}
+
                         {% if clingen_error %}
                             <h5>Error retrieving ClinGen Allele</h5>
                             {% labelled label='Message' %}{{ clingen_error.message }}{% endlabelled %}
