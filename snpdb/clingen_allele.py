@@ -494,8 +494,8 @@ def _store_clingen_api_response(api_response_list) -> list[ClinGenAllele]:
     clingen_allele_list = []
     for api_response in api_response_list:
         clingen_allele_id = ClinGenAllele.get_id_from_response(api_response)
-        clingen_allele, _ = ClinGenAllele.objects.get_or_create(pk=clingen_allele_id,
-                                                                defaults={"api_response": api_response})
+        clingen_allele, _ = ClinGenAllele.objects.update_or_create(pk=clingen_allele_id,
+                                                                   defaults={"api_response": api_response})
         clingen_allele_list.append(clingen_allele)
         allele, _ = Allele.objects.get_or_create(clingen_allele=clingen_allele)
         link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
