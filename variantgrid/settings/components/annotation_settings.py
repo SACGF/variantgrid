@@ -99,6 +99,7 @@ ANNOTATION = {
             "spliceai_snv": "annotation_data/GRCh37/spliceai_scores.raw.snv.hg19.vcf.gz",
             "spliceai_indel": "annotation_data/GRCh37/spliceai_scores.raw.indel.hg19.vcf.gz",
             "topmed": "annotation_data/GRCh37/TOPMED_GRCh37.vcf.gz",
+            "transcript_blocklist": None,
             "uk10k": "annotation_data/GRCh37/UK10K_COHORT.20160215.sites.vcf.gz",
         }
     },
@@ -144,6 +145,7 @@ ANNOTATION = {
             "spliceai_snv": "annotation_data/GRCh38/spliceai_scores.raw.snv.hg38.vcf.gz",
             "spliceai_indel": "annotation_data/GRCh38/spliceai_scores.raw.indel.hg38.vcf.gz",
             "topmed": "annotation_data/GRCh38/TOPMED_GRCh38_20180418.vcf.gz",
+            "transcript_blocklist": "annotation_data/GRCh38/blocklist_brca1_new_transcripts.txt",
             "uk10k": "annotation_data/GRCh38/UK10K_COHORT.20160215.sites.GRCh38.vcf.gz",
         }
     },
@@ -183,6 +185,7 @@ ANNOTATION = {
             "spliceai_snv": None,
             "spliceai_indel": None,
             "topmed": None,
+            "transcript_blocklist": None,
             "uk10k": None,
         }
     },

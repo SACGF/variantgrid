@@ -184,6 +184,15 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     if settings.ANNOTATION_VEP_ARGS:
         cmd.extend(settings.ANNOTATION_VEP_ARGS)
 
+    # Restrict the number of BRCA1 transcripts to stop a blowout of VEP RAM usage
+    # RefSeq GRCh38 annotation (GCF_000001405.40-RS_2023_10) has 368 transcripts for BRCA1, up from 6 previously
+    # see https://github.com/SACGF/variantgrid/issues/1228
+    try:
+        transcript_blocklist_filename = vc["transcript_blocklist"]
+        cmd.append(f'--transcript_filter "not stable_id in {transcript_blocklist_filename}"')
+    except KeyError:
+        pass
+
     if pipeline_type == VariantAnnotationPipelineType.STANDARD:
         # TODO: At the moment we just skip everything, perhaps we should:
         # a) Add ColumnVEPField.pipeline_type (or maybe have a list of all types) so we can configure it to run on both
