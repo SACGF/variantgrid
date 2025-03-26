@@ -219,7 +219,7 @@ def _yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, va
                                                  variant_string=variant_string):
         yield SearchResult(cmv, messages=search_messages)
 
-    if variant_coordinate.is_symbolic:
+    if variant_coordinate.is_symbolic():
         original_alt_desc = _sv_alt_description(variant_coordinate)
     else:
         original_alt_desc = Sequence.abbreviate(variant_coordinate.alt)
