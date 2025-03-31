@@ -58,7 +58,7 @@
         </td>
         <td class="text-right" style="font-weight:500">
             <div class="v-middle h-right">
-                {% acmg_points grouping.extreme_acmg_points %}
+                {% criteria_points grouping.most_extreme_point %}
             </div>
         </td>
         <td class="text-right" style="font-weight:500">
@@ -117,9 +117,9 @@
                             <span class="no-value">No Criteria Provided</span>
                             {% endif %}
                         </td>
-                        {% with points=strengths.acmg_point_score %}
-                            <td class="text-right" data-order="{{ grouping.extreme_acmg_points.sort_string }}_{{ grouping.allele.pk }}_{{ points.sort_string }}">
-                                {% acmg_points points %}
+                        {% with points=strengths.criteria_point_score %}
+                            <td class="text-right" data-order="{{ grouping.most_extreme_point.sort_string }}_{{ grouping.allele.pk }}_{{ points.sort_string }}">
+                                {% criteria_points points %}
                             </td>
                         {% endwith %}
                         <td class="text-right" data-order="{{ grouping.patient_count.sort_string }}_{{ grouping.allele.pk }}_{{ lab_summary.patient_count.sort_string }}">

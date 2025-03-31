@@ -12,7 +12,7 @@ from django.template import Library
 from django.utils.safestring import mark_safe
 from django.utils.timezone import localtime
 
-from classification.criteria_strengths import CriteriaStrength, AcmgPointScore
+from classification.criteria_strengths import CriteriaStrength, CriteriaPointScore
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo, \
@@ -655,8 +655,8 @@ def criteria_strength_td(strength: Union[CriteriaStrength, Collection[CriteriaSt
     }
 
 
-@register.inclusion_tag("classification/tags/acmg_points.html")
-def acmg_points(points: AcmgPointScore):
+@register.inclusion_tag("classification/tags/criteria_points.html")
+def criteria_points(points: CriteriaPointScore):
     return {"points": points}
 
 

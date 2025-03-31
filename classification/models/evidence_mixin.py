@@ -200,13 +200,13 @@ class EvidenceMixin:
         return CitationFetchRequest.fetch_all_now(self.db_refs)
 
     @property
-    def is_likely_acmg(self) -> bool:
-        if non_standard_res := settings.CLASSIFICATION_NON_ACMG_ASSERTION_METHOD:
+    def is_heavily_mapped_criteria(self) -> bool:
+        if non_standard_res := settings.CLASSIFICATION_HEAVILY_MAPPED_ASSERTION_METHODS:
             for assertion_method in self.get_value_list(SpecialEKeys.ASSERTION_METHOD):
                 for non_standard_re in non_standard_res:
                     if non_standard_re.match(assertion_method):
-                        return False
-        return True
+                        return True
+        return False
 
     def criteria_strengths(self, e_keys: Optional['EvidenceKeyMap'] = None) -> CriteriaStrengths:
         from classification.models import EvidenceKeyMap
@@ -218,7 +218,7 @@ class EvidenceMixin:
             if strength := self.get(ek.key):
                 criteria.append(CriteriaStrength(ek, strength))
 
-        return CriteriaStrengths(strengths=criteria, is_acmg_standard=self.is_likely_acmg)
+        return CriteriaStrengths(strengths=criteria, is_heavily_mapped_criteria=self.is_heavily_mapped_criteria)
 
     def criteria_strength_summary(self, ekeys: Optional['EvidenceKeyMap'] = None, only_acmg: bool = False) -> str:
         strengths = self.criteria_strengths(e_keys=ekeys)

@@ -362,7 +362,7 @@ CLASSIFICATION_FILE_ATTACHMENTS = True  # allow users to attach files to classif
 CLASSIFICATION_MAX_REFERENCE_LENGTH = 100  # Used for MVL export, general display use HGVS_MAX_REF_ALLELE_LENGTH
 
 CLASSIFICATION_REDCAP_EXPORT = True
-CLASSIFICATION_NON_ACMG_ASSERTION_METHOD = None  # when calculating ACMG points, even if we have ACMG criteria, are they a little too trnaslated to be useful
+CLASSIFICATION_HEAVILY_MAPPED_ASSERTION_METHODS = None  # when calculating ACMG points, even if we have ACMG criteria, have they been too losely mapped to be trustworthy?
 
 CLASSIFICATION_ALLOW_DELETE = True
 """

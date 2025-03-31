@@ -16,7 +16,7 @@ class CriteriaStrength:
     custom_strength: Optional[str] = None
 
     @property
-    def acmg_point(self) -> Optional[int]:
+    def point_value(self) -> Optional[int]:
         if self.strength.endswith("X") and self.is_expected_direction:
             return CriteriaEvaluation.POINTS.get(self.ekey.default_crit_evaluation)
         return CriteriaEvaluation.POINTS.get(self.strength)
@@ -120,10 +120,10 @@ class CriteriaStrength:
 
 
 @dataclass(frozen=True)
-class AcmgPointScore:
+class CriteriaPointScore:
     points: Optional[int]
     has_criteria: bool
-    is_acmg_standard: bool
+    is_heavily_mapped_criteria: bool
     has_unspecified: bool = False
 
     def __bool__(self):
@@ -135,7 +135,7 @@ class AcmgPointScore:
     def __str__(self):
         if not self.has_criteria:
             return "-"
-        return f"{self.points}{'*' if not self.is_acmg_standard else ''}"
+        return f"{self.points}{'*' if self.is_heavily_mapped_criteria else ''}"
 
     @property
     def sort_string(self) -> str:
@@ -143,16 +143,16 @@ class AcmgPointScore:
         return f"{adjusted_score:03}"
 
     @staticmethod
-    def most_extreme_point_score(scores: Iterable['AcmgPointScore']) -> 'AcmgPointScore':
+    def most_extreme_point_score(scores: Iterable['CriteriaPointScore']) -> 'CriteriaPointScore':
         """
         Return the ACMG Criteria with the largest absolute points (e.g. -4 is more extreme than 3)
         If any record with criteria has non-standard ACMG criteria, mark the result as non-standard
         :param scores: A list of scores to inspect for the most extreme score
         :return: The most extreme score, or NO_CRITERIA if none of the scores has_criteria
         """
-        biggest_score: Optional[AcmgPointScore] = None
-        lowest_score: Optional[AcmgPointScore] = None
-        unspecified: Optional[AcmgPointScore] = None
+        biggest_score: Optional[CriteriaPointScore] = None
+        lowest_score: Optional[CriteriaPointScore] = None
+        unspecified: Optional[CriteriaPointScore] = None
         has_non_standard = False
         for score in scores:
             if score.has_unspecified:
@@ -162,25 +162,35 @@ class AcmgPointScore:
                     biggest_score = score
                 if not lowest_score or score < lowest_score:
                     lowest_score = score
-                has_non_standard = has_non_standard or not score.is_acmg_standard
+                has_non_standard = has_non_standard or score.is_heavily_mapped_criteria
 
         if not biggest_score:
             if unspecified:
                 return unspecified
-            return AcmgPointScore.NO_CRITERIA
+            return CriteriaPointScore.NO_CRITERIA
 
         most_extreme = biggest_score if abs(biggest_score.points) >= abs(lowest_score.points) else lowest_score
         return most_extreme
 
 
-AcmgPointScore.NO_CRITERIA = AcmgPointScore(points=None, has_criteria=False, is_acmg_standard=True)
+CriteriaPointScore.NO_CRITERIA = CriteriaPointScore(points=None, has_criteria=False, is_heavily_mapped_criteria=False)
 
 
 class CriteriaStrengths:
 
-    def __init__(self, strengths: Iterable[CriteriaStrength], is_acmg_standard: bool = True):
+    def __init__(self, strengths: Iterable[CriteriaStrength], is_heavily_mapped_criteria: bool = False):
+        """
+        :param strengths: All criteria strengths
+        :param is_heavily_mapped_criteria: If the overall strengths need a disclaimer for not being native
+        """
         self.strength_map = {strength.ekey.key.lower(): strength for strength in strengths}
-        self.is_acmg_standard = is_acmg_standard
+        self.is_heavily_mapped_criteria = is_heavily_mapped_criteria
+
+    def has_prefix(self, prefix: str):
+        for key in self.strength_map.keys():
+            if key.startswith(prefix + ":"):
+                return True
+        return False
 
     @property
     def strengths(self) -> Iterable[CriteriaStrength]:
@@ -224,17 +234,17 @@ class CriteriaStrengths:
         return any(CriteriaEvaluation.POINTS.get(s.strength) is None for s in self.strengths if s.is_met)
 
     @cached_property
-    def acmg_point_score(self) -> AcmgPointScore:
+    def criteria_point_score(self) -> CriteriaPointScore:
         has_unspecified = False
         if not self.has_criteria:
-            return AcmgPointScore.NO_CRITERIA
+            return CriteriaPointScore.NO_CRITERIA
         points = 0
         for cs in self.strength_list_met:
             if cs.is_unspecified:
                 has_unspecified = True
-            if bit_score := cs.acmg_point:
+            if bit_score := cs.point_value:
                 points += bit_score
-        return AcmgPointScore(points=points, has_criteria=True, is_acmg_standard=self.is_acmg_standard, has_unspecified=has_unspecified)
+        return CriteriaPointScore(points=points, has_criteria=True, is_heavily_mapped_criteria=self.is_heavily_mapped_criteria, has_unspecified=has_unspecified)
 
 
 @dataclass(frozen=True)

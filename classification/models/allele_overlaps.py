@@ -7,7 +7,7 @@ from typing import Optional, Iterator
 
 from django.db.models import Count, QuerySet, Subquery
 
-from classification.criteria_strengths import AcmgPointScore, CriteriaStrengths, CriteriaSummarizer
+from classification.criteria_strengths import CriteriaPointScore, CriteriaStrengths, CriteriaSummarizer
 from classification.enums import SpecialEKeys, ShareLevel
 from classification.models import ClassificationModification, ClinicalContext, ClassificationLabSummaryEntry, \
     ClassificationLabSummary, classification_flag_types, ClassificationFlagTypes, DiscordanceReport, Classification
@@ -175,9 +175,10 @@ class ClinicalGroupingOverlap:
         self.labs.add(cm.classification.lab)
 
     @cached_property
-    def extreme_acmg_points(self) -> AcmgPointScore:
-        return AcmgPointScore.most_extreme_point_score(
-            lb.criteria_strengths().acmg_point_score for lb in self.all_latest)
+    def most_extreme_point(self) -> CriteriaPointScore:
+        return CriteriaPointScore.most_extreme_point_score(
+            lb.criteria_strengths().criteria_point_score for lb in self.all_latest
+        )
 
     @property
     def cms(self):

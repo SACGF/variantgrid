@@ -9,7 +9,7 @@ from annotation.regexes import db_citation_regexes
 from classification.enums import SpecialEKeys, EvidenceKeyValueType, ShareLevel, AlleleOriginBucket
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
     MultiCondition, ClinVarExport, classification_flag_types, Classification, ClinVarExportStatus, \
-    ClinVarExportSubmission, CLINVAR_EXPORT_CONVERSION_VERSION
+    ClinVarExportSubmission, CLINVAR_EXPORT_CONVERSION_VERSION, ClinVarExportTypeBucket
 from genes.hgvs import CHGVS
 from library.utils import html_to_text, JsonObjType, JsonDiffs, invalidate_cached_property
 from ontology.models import OntologyTerm, OntologyService, OntologyTermStatus
@@ -419,8 +419,11 @@ class ClinVarExportConverter:
             c = self.classification_based_on.classification
             local_key = c.lab.group_name + "/" + c.lab_record_id
 
+            # note clinVarAssertion gets injected later
+            # as the SCV can change outside of the JSON generation
+            # and we don't want to detect a change in JSON when the only change is SCV has being assigned
             data = {
-                "clinicalSignificance": self.json_clinical_significance,
+                "germlineClassification": self.json_clinical_significance,
                 "conditionSet": self.condition_set,
                 "localID": local_id,
                 "localKey": local_key,
@@ -446,7 +449,7 @@ class ClinVarExportConverter:
             if not self.classification_based_on.classification.allele_info.latest_validation.include:
                 messages += JsonMessages.error("There are outstanding variant matching warnings for this record")
 
-            if self.clinvar_export_record.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
+            if self.clinvar_export_record.clinvar_allele.clinvar_export_bucket != ClinVarExportTypeBucket.GERMLINE:
                 messages += JsonMessages.error("Somatic support is under development, only Germline can be exported to ClinVar currently")
 
             # see if other shared classifications for the clinvar_key variant combo don't have a resolved condition

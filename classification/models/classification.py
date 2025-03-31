@@ -2739,7 +2739,6 @@ class CuratedDate:
                     # an invalid date should already cause a warning on the classification form
                     pass
 
-
     @cached_property
     def curation_date(self) -> Optional[ClassificationDate]:
         if date_val := self.convert_date(SpecialEKeys.CURATION_DATE):
