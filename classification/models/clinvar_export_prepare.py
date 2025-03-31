@@ -232,7 +232,6 @@ class ClinvarExportPrepare:
             for clinvar_key, alleles_for_clinvar_key in itertools.groupby(classifications_for_allele, lambda cm: cm.classification.lab.clinvar_key):
                 alleles_for_clinvar_key = list(alleles_for_clinvar_key)
                 for clinvar_export_bucket in clinvar_export_buckets:
-                    print(f"Checking {clinvar_export_bucket}")
                     clinvar_allele_classifications_allele_origin = [cac for cac in alleles_for_clinvar_key]
                     combined_log += ClinvarExportPrepare.process_allele(
                         clinvar_key=clinvar_key,
