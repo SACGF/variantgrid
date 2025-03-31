@@ -25,7 +25,7 @@ class Command(BaseCommand):
                 VariantZygosityCountForVCF.objects.filter(collection=collection).delete()
                 VariantZygosityCountForSample.objects.filter(collection=collection).delete()
                 logging.info("Resetting to 0")
-                collection.variantzygositycount_set.all().update(ref_count=0, het_count=0, hom_count=0)
+                collection.variantzygositycount_set.all().update(ref_count=0, het_count=0, hom_count=0, unk_count=0)
                 logging.info("Done")
             else:
                 logging.info("No existing VCF/Sample counts exist - skipping clear")
