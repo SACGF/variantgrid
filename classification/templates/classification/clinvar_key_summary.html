@@ -138,6 +138,8 @@
 {% endblock head %}
 {% block content %}
     <div class="container">
+        {% if user.is_superuser %}<a href="{% url 'clinvar_export_multi_listing' %}" class="hover-link">Review Possible Duplicates</a><br/>{% endif %}
+
         {% if all_keys.count > 1 %}
             <div class="btn-group mb-4" role="group" aria-label="ClinVar Key Picker">
                 {% for key in all_keys %}

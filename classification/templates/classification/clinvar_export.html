@@ -37,6 +37,7 @@
                 <div class="card-body">
                     {% labelled label="ClinVar Key" %}{{ clinvar_export.clinvar_allele.clinvar_key.label }}{% endlabelled %}
                     {% labelled label="Allele" %}{% with allele=clinvar_export.clinvar_allele.allele %}<a class="hover-link" href="{{ allele.get_absolute_url }}">{{ allele }}</a>{% endwith %}{% endlabelled %}
+                    {% labelled label="ClinVar Record Type" %}{{ clinvar_export.clinvar_allele.get_clinvar_export_bucket_display }}{% endlabelled %}
                     {% labelled label="Condition Umbrella" %}{% condition clinvar_export.condition_resolved %}
                         {% field_help %}Records for this variant and this (or a more specific) condition will be considered as part of this export.<br/>
                         The actual condition sent to ClinVar can be seen next to Source Condition.{% end_field_help %}

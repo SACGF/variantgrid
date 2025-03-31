@@ -2587,13 +2587,19 @@ VCTable.allele_origin_bucket_label = (allele_origin_bucket, override_text = "", 
     let allele_origin_label = override_text;
     if (!allele_origin_label) {
         if (allele_origin_bucket == "S") {
-            allele_origin_label = "SOMATIC"
+            allele_origin_label = "SOMATIC";
         } else if (allele_origin_bucket == "G") {
-            allele_origin_label = "GERMLINE"
+            allele_origin_label = "GERMLINE";
         } else if (allele_origin_bucket == "U") {
-            allele_origin_label = "UNKNOWN"
+            allele_origin_label = "UNKNOWN";
+
+        // for clinVar exports
+        } else if (allele_origin_bucket == "O") {
+            allele_origin_label = "ONCO"; //
+        } else if (allele_origin_bucket == "C") {
+            allele_origin_label = "C.IMPACT"
         } else {
-            allele_origin_label = "???"
+            allele_origin_label = `?${allele_origin_bucket}?`;
         }
     }
     return $('<div>', {

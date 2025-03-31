@@ -514,6 +514,8 @@ def value(value: Any, no_value: Optional[str] = None) -> str:
     if isinstance(value, bool):
         return boolean(value)
     if not value:
+        if value == '' or value is None:
+            no_value = '-'
         return SafeString(f'<span class="no-value">{no_value or value}</span>')
     elif isinstance(value, int):
         return f'{value:,}'

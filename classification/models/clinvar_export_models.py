@@ -11,6 +11,7 @@ from model_utils.models import TimeStampedModel
 
 from classification.enums import AlleleOriginBucket
 from classification.models import ClassificationModification, ConditionResolved
+from classification.models.clinvar_export_enums import ClinVarExportTypeBucket
 from library.preview_request import PreviewModelMixin, PreviewData, PreviewKeyValue
 from library.utils import first, invalidate_cached_property, JsonObjType
 from snpdb.models import ClinVarKey, Allele
@@ -32,7 +33,7 @@ class ClinVarAllele(TimeStampedModel):
 
     allele = models.ForeignKey(Allele, on_delete=models.CASCADE)
     clinvar_key = models.ForeignKey(ClinVarKey, null=True, blank=True, on_delete=models.CASCADE)
-    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, default=AlleleOriginBucket.GERMLINE)
+    clinvar_export_bucket = models.CharField(max_length=1, choices=ClinVarExportTypeBucket.choices, default=ClinVarExportTypeBucket.GERMLINE)
     classifications_missing_condition = models.IntegerField(default=0)
     submissions_valid = models.IntegerField(default=0)
     submissions_invalid = models.IntegerField(default=0)
@@ -70,7 +71,6 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
         verbose_name = "ClinVar export"
 
     clinvar_allele = models.ForeignKey(ClinVarAllele, null=True, blank=True, on_delete=models.CASCADE)
-    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, default=AlleleOriginBucket.GERMLINE)
     condition = models.JSONField()
 
     classification_based_on = models.ForeignKey(ClassificationModification, null=True, blank=True, on_delete=models.CASCADE)
@@ -80,6 +80,13 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
 
     submission_grouping_validated = models.JSONField(null=False, blank=False, default=dict)
     submission_body_validated = models.JSONField(null=False, blank=False, default=dict)
+
+    @property
+    def has_submission(self) -> bool:
+        return self.clinvarexportsubmission_set.exists()
+
+    def __lt__(self, other):
+        return self.pk < other.pk
 
     def refresh_condition_resolution_details(self) -> bool:
         """
@@ -182,13 +189,11 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
     @staticmethod
     def new_condition(
             clinvar_allele: ClinVarAllele,
-            allele_origin_bucket: AlleleOriginBucket,
             condition: ConditionResolved,
             candidate: Optional[ClassificationModification]
     ) -> 'ClinVarExport':
         cc = ClinVarExport(
             clinvar_allele=clinvar_allele,
-            allele_origin_bucket=allele_origin_bucket,
             condition=condition.to_json()
         )
         cc.update_classification(candidate)

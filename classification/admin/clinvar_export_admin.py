@@ -88,7 +88,7 @@ class ClinVarExportAdmin(ModelAdminBasics):
         ('status', AllValuesChoicesFieldListFilter),
         ClinVarClassificationAgeFilter,
         InterpretationSummaryLengthFilter,
-        "clinvar_allele__allele_origin_bucket"
+        "clinvar_allele__clinvar_export_bucket"
     )
     search_fields = ('pk', "scv")
     inlines = (ClinVarExportSubmissionAdmin, )

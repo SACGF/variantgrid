@@ -1,0 +1,51 @@
+{% extends "uicore/page/base.html" %}
+{% load classification_tags %}
+{% load ontology_tags %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_tabs_builder %}
+{% load english_tags %}
+{% load js_tags %}
+{% block title %}Clinvar Export Multi-Review{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block content %}
+    <div class="container">
+        <h4>ClinVar Possible Duplicates</h4>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>ClinVarKey</th>
+                    <th>Allele</th>
+                    <th>Export Type</th>
+                    <th>Common Condition</th>
+                    <th>Records</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for multi in clinvar_allele_mults %}
+                <tr>
+                    <td>
+                        <a href="{% url 'clinvar_export_multi' multi.clinvar_allele.pk %}" class="hover-link">{{ multi.clinvar_allele.pk }}</a>
+                    </td>
+                    <td>{{ multi.clinvar_allele.clinvar_key.name }}</td>
+                    <td>{{ multi.clinvar_allele.allele }}</td>
+                    <td>
+                        <div class="allele-origin-box horizontal allele-origin-{{ multi.clinvar_allele.clinvar_export_bucket }}">
+                            <div class="allele-origin-text">{{ multi.clinvar_allele.get_clinvar_export_bucket_display }}</div>
+                         </div>
+                    </td>
+                    <td>{% if multi.common_ancestor %}{% ontology_term multi.common_ancestor %}{% else %}<span class="no-value">No common ancestor</span>{% endif %}</td>
+                    <td>
+                        {% for other_clinvar_export in multi.clinvar_exports %}
+                            <div><a class="hover-link" href="{{ other_clinvar_export.get_absolute_url }}">{{ other_clinvar_export }}</a> - {% condition other_clinvar_export.condition_resolved %}</div>
+                        {% endfor %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+    </div>
+{% endblock %}

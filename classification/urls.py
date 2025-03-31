@@ -1,7 +1,7 @@
 from rest_framework import routers
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from classification.views import clinvar_export_view, search_view_metrics
+from classification.views import clinvar_export_view, search_view_metrics, clinvar_export_multi_view
 from classification.views import views, classification_dashboard_view, \
     classification_export_view, views_autocomplete, \
     classification_accumulation_graph
@@ -100,6 +100,8 @@ urlpatterns = [
     path('clinvar_export_batch/datatable', DatabaseTableView.as_view(column_class=clinvar_export_view.ClinVarExportBatchColumns), name='clinvar_export_batch_datatables'),
     path('clinvar_export_batch/<int:clinvar_export_batch_id>/detail', clinvar_export_view.clinvar_export_batch_detail, name='clinvar_export_batch_detail'),
     path('clinvar_export_batch/<int:clinvar_export_batch_id>/download', clinvar_export_view.clinvar_export_batch_download, name='clinvar_export_batch_download'),
+    path('clinvar_export_multi', clinvar_export_multi_view.view_multi_clinvar_exports_listing, name='clinvar_export_multi_listing'),
+    path('clinvar_export_multi/<int:clinvar_allele_pk>', clinvar_export_multi_view.view_multi_clinvar_exports, name='clinvar_export_multi'),
 
     path('condition_matchings', condition_matchings_view, name='condition_matchings'),
     path('condition_matchings/<str:lab_id>', condition_matchings_view, name='condition_matchings_lab'),

@@ -1,0 +1,72 @@
+{% extends "uicore/page/base.html" %}
+{% load classification_tags %}
+{% load ontology_tags %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_tabs_builder %}
+{% load english_tags %}
+{% load js_tags %}
+{% block title %}Clinvar Export Multi-Review{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block content %}
+    <div class="container">
+        {% labelled label="ClinVar Key" %}{{ clinvar_allele_mult.clinvar_allele.clinvar_key.name }}{% endlabelled %}
+        {% labelled label="Allele" %}{{ clinvar_allele_mult.clinvar_allele.allele }}{% endlabelled %}
+        <h4>Existing ClinVar Exports</h4>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>SCV</th>
+                    <th>Has Submissions</th>
+                    <th>Condition Umbrella</th>
+                    <th>Linked Classification</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for clinvar_export in clinvar_allele_mult.clinvar_exports %}
+                    <tr>
+                        <td><a class="hover-link" href="{% url 'clinvar_export' clinvar_export.id %}">{{ clinvar_export.id }}</a></td>
+                        <td>{{ clinvar_export.scv | value}}</td>
+                        <td>{{ clinvar_export.clinvarexportsubmission_set.exists | boolean }}</td>
+                        <td>{% condition clinvar_export.condition_resolved %}</td>
+                        <td>
+                            {% if clinvar_export.classification_based_on %}
+                                {% classification_quick clinvar_export.classification_based_on %}
+                            {% else %}
+                                <span class="no-value">No valid classification</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                {% with preview=clinvar_allele_mult.merge_preview.preview %}
+                    {% if preview %}
+                        <tr>
+                            <td colspan="5" style="border-top: 1px solid black;border-bottom: 1px solid black; text-align:center">Will be merged to</td>
+                        </tr>
+                        <tr>
+                            <td>{{ preview.pk }}</td>
+                            <td>{{ preview.scv | value }}</td>
+                            <td>{{ preview.merge_submissions | boolean }}</td>
+                            <td>{% condition preview.condition %}</td>
+                            <td>{% classification_quick preview.classification_based_on %}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="5" style="border-top: 1px solid black;border-bottom: 1px solid black; text-align:center">
+                                {% if clinvar_allele_mult.merge_preview.can_action %}
+                                    {{ 'S' | severity_icon }}
+                                {% else %}
+                                    {{ 'E' | severity_icon }}
+                                {% endif %}
+                                {{ clinvar_allele_mult.merge_preview.status.display }}
+                            </td>
+                        </tr>
+                    {% endif %}
+                {% endwith %}
+
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

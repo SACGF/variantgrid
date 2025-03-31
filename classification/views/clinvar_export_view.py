@@ -151,7 +151,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
             c_hgvs = CHGVS(c_hgvs_str)
             if c_hgvs.raw_c != c_hgvs.full_c_hgvs:
                 data = {
-                    "allele_origin_bucket": row["allele_origin_bucket"],
+                    "clinvar_export_bucket": row["clinvar_allele__clinvar_export_bucket"],
                     "genome_build": genome_build,
                     "transcript": c_hgvs.transcript,
                     "gene_symbol": c_hgvs.gene_symbol,
@@ -174,7 +174,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
     def render_id(self, row: CellData) -> JsonDataType:
         return {
             "id": row["id"],
-            "allele_origin_bucket": row["allele_origin_bucket"]
+            "allele_origin_bucket": row["clinvar_allele__clinvar_export_bucket"]
         }
 
     def __init__(self, request: HttpRequest):
@@ -191,7 +191,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
                        order_sequence=[SortOrder.DESC, SortOrder.ASC],
                        client_renderer='renderId',
                        renderer=self.render_id,
-                       extra_columns=["allele_origin_bucket"]
+                       extra_columns=["clinvar_allele__clinvar_export_bucket"]
             ),
             RichColumn(name="c_hgvs", label='Allele',
                     sort_keys=["classification_based_on__classification__allele_info__grch38__c_hgvs"],

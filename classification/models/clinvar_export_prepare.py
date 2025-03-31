@@ -7,7 +7,7 @@ from django.utils.timezone import now
 
 from classification.enums import ShareLevel, AlleleOriginBucket
 from classification.models import ClinVarAllele, ClassificationModification, ClinVarExport, \
-    ConditionResolved, ClinVarExportStatus
+    ConditionResolved, ClinVarExportStatus, ClinVarExportTypeBucket
 from classification.models.abstract_utils import ConsolidatingMerger
 from library.utils import pretty_collection
 from snpdb.lab_picker import LabPickerData
@@ -58,7 +58,6 @@ class ClinVarConsolidatingMerger(ConsolidatingMerger[ClinVarExport, Classificati
         self.log.append(f"Created export record for {new_candidate.condition_umbrella.summary} : {new_candidate.modification.id_str}")
         return ClinVarExport.new_condition(
             clinvar_allele=self.clinvar_allele,
-            allele_origin_bucket=new_candidate.allele_origin_bucket,
             condition=new_candidate.condition_umbrella,
             candidate=new_candidate.modification
         )
@@ -150,24 +149,29 @@ class ClinvarExportPrepare:
     def process_allele(
             clinvar_key: ClinVarKey,
             allele: Allele,
-            allele_origin_bucket: AlleleOriginBucket,
+            clinvar_export_bucket: ClinVarExportTypeBucket,
             modifications: Iterable[ClassificationModification]) -> List[str]:
 
         clinvar_allele, _ = ClinVarAllele.objects.get_or_create(
             clinvar_key=clinvar_key,
             allele=allele,
-            allele_origin_bucket=allele_origin_bucket
+            clinvar_export_bucket=clinvar_export_bucket
         )
-        clinvar_merger = ClinVarConsolidatingMerger(clinvar_allele, allele_origin_bucket=allele_origin_bucket)
+        clinvar_merger = ClinVarConsolidatingMerger(clinvar_allele, allele_origin_bucket=clinvar_export_bucket)
+
+        def is_valid_candidate_for(mod: ClassificationModification, bucket: ClinVarExportTypeBucket):
+            if bucket == ClinVarExportTypeBucket.GERMLINE:
+                return mod.classification.allele_origin_bucket == AlleleOriginBucket.GERMLINE
+            elif bucket in {ClinVarExportTypeBucket.ONCOGENIC, ClinVarExportTypeBucket.CLINICAL_IMPACT}:
+                return mod.classification.allele_origin_bucket == AlleleOriginBucket.SOMATIC
 
         no_condition_count = 0
         for mod in modifications:
-            if mod.classification.allele_origin_bucket != allele_origin_bucket:
-                pass
-            if ClinvarExportPrepare._has_condition(mod):
-                clinvar_merger.add_new_candidate(ClassificationModificationCandidate(mod))
-            else:
-                no_condition_count += 1
+            if is_valid_candidate_for(mod, clinvar_export_bucket):
+                if ClinvarExportPrepare._has_condition(mod):
+                    clinvar_merger.add_new_candidate(ClassificationModificationCandidate(mod))
+                else:
+                    no_condition_count += 1
         clinvar_merger.consolidate()
 
         total = clinvar_allele.clinvarexport_set.count()
@@ -185,9 +189,9 @@ class ClinvarExportPrepare:
 
         if no_condition_count:
             if no_condition_count == 1:
-                log.append(f"{clinvar_key} : 1 shared classification for {allele_origin_bucket} {allele} doesn't have resolved conditions")
+                log.append(f"{clinvar_key} : 1 shared classification for {clinvar_export_bucket} {allele} doesn't have resolved conditions")
             else:
-                log.append(f"{clinvar_key} : {no_condition_count} shared classifications for {allele_origin_bucket} {allele} don't have resolved conditions")
+                log.append(f"{clinvar_key} : {no_condition_count} shared classifications for {clinvar_export_bucket} {allele} don't have resolved conditions")
 
         return log
 
@@ -214,11 +218,11 @@ class ClinvarExportPrepare:
 
         # need to keep track of which allele, clinvar_key combos we've seen,
         # so we can check all other alleles to make sure they haven't lost candidates
-        valid_allele_origin_buckets = (AlleleOriginBucket.GERMLINE, AlleleOriginBucket.SOMATIC)
+        clinvar_export_buckets = (ClinVarExportTypeBucket.GERMLINE, ClinVarExportTypeBucket.ONCOGENIC, ClinVarExportTypeBucket.CLINICAL_IMPACT)
 
         allele_origin_clinvar_key_processed_alleles = {}
-        for allele_origin_bucket in valid_allele_origin_buckets:
-            allele_origin_clinvar_key_processed_alleles[allele_origin_bucket] = defaultdict(list)
+        for clinvar_export_bucket in clinvar_export_buckets:
+            allele_origin_clinvar_key_processed_alleles[clinvar_export_bucket] = defaultdict(list)
 
         # FIND ALL THE GOOD CANDIDATES FOR clinvar key / allele combo
 
@@ -227,25 +231,33 @@ class ClinvarExportPrepare:
             # now loop that grouping by clinvar key
             for clinvar_key, alleles_for_clinvar_key in itertools.groupby(classifications_for_allele, lambda cm: cm.classification.lab.clinvar_key):
                 alleles_for_clinvar_key = list(alleles_for_clinvar_key)
-                for allele_origin_bucket in valid_allele_origin_buckets:
-                    clinvar_allele_classifications_allele_origin = [cac for cac in alleles_for_clinvar_key if cac.classification.allele_origin_bucket == allele_origin_bucket]
+                for clinvar_export_bucket in clinvar_export_buckets:
+                    print(f"Checking {clinvar_export_bucket}")
+                    clinvar_allele_classifications_allele_origin = [cac for cac in alleles_for_clinvar_key]
                     combined_log += ClinvarExportPrepare.process_allele(
                         clinvar_key=clinvar_key,
                         allele=allele,
-                        allele_origin_bucket=allele_origin_bucket,
+                        clinvar_export_bucket=clinvar_export_bucket,
                         modifications=clinvar_allele_classifications_allele_origin
                     )
-                    allele_origin_clinvar_key_processed_alleles[allele_origin_bucket][clinvar_key].append(allele)
+                    allele_origin_clinvar_key_processed_alleles[clinvar_export_bucket][clinvar_key].append(allele)
 
         # FIND ALL THE PRE-EXISTING RECORDS THAT NO LONGER HAVE ANY CANDIDATES
 
         # loop through ClinVarAlleles for clinvar key that we didn't find by looking at all the non-withdrawn classifications for that lab
         # i.e. these will be the alleles that
         for clinvar_key in clinvar_keys:
-            for allele_origin_bucket in valid_allele_origin_buckets:
-                clinvar_key_to_processed_alleles = allele_origin_clinvar_key_processed_alleles[allele_origin_bucket]
-                for cva in ClinVarAllele.objects.filter(clinvar_key=clinvar_key, allele_origin_bucket=allele_origin_bucket).exclude(allele__in=clinvar_key_to_processed_alleles.get(clinvar_key, [])).select_related('allele').iterator():
-                    combined_log += ClinvarExportPrepare.process_allele(clinvar_key=clinvar_key, allele=cva.allele, allele_origin_bucket=allele_origin_bucket, modifications=[])
+            for clinvar_export_bucket in clinvar_export_buckets:
+                clinvar_key_to_processed_alleles = allele_origin_clinvar_key_processed_alleles[clinvar_export_bucket]
+                for cva in ClinVarAllele.objects.filter(
+                        clinvar_key=clinvar_key,
+                        clinvar_export_bucket=clinvar_export_bucket
+                    ).exclude(allele__in=clinvar_key_to_processed_alleles.get(clinvar_key, [])).select_related('allele').iterator():
+                    combined_log += ClinvarExportPrepare.process_allele(
+                        clinvar_key=clinvar_key,
+                        allele=cva.allele,
+                        clinvar_export_bucket=clinvar_export_bucket,
+                        modifications=[])
 
         # WRAP THINGS UP
 
