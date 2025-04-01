@@ -9,7 +9,7 @@ from annotation.regexes import db_citation_regexes
 from classification.enums import SpecialEKeys, EvidenceKeyValueType, ShareLevel, AlleleOriginBucket
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
     MultiCondition, ClinVarExport, classification_flag_types, Classification, ClinVarExportStatus, \
-    ClinVarExportSubmission, CLINVAR_EXPORT_CONVERSION_VERSION, ClinVarExportTypeBucket
+    ClinVarExportSubmission, CLINVAR_EXPORT_CONVERSION_VERSION, ClinVarExportTypeBucket, CuratedDate
 from genes.hgvs import CHGVS
 from library.utils import html_to_text, JsonObjType, JsonDiffs, invalidate_cached_property
 from ontology.models import OntologyTerm, OntologyService, OntologyTermStatus
@@ -358,6 +358,11 @@ class ClinVarExportConverter:
         else:
             return value
 
+    def convert_date(self, value: str) -> ValidatedJson:
+        if not CuratedDate.convert_classification_date_str(value):
+            return ValidatedJson(value, JsonMessages.error("Invalid date"))
+        return ValidatedJson(value)
+
     @staticmethod
     def condition_to_json(condition: OntologyTerm) -> ValidatedJson:
         # supported "OMIM", "MedGen", "Orphanet", "MeSH", "HP", "MONDO"
@@ -423,13 +428,19 @@ class ClinVarExportConverter:
             # as the SCV can change outside of the JSON generation
             # and we don't want to detect a change in JSON when the only change is SCV has being assigned
             data = {
-                "germlineClassification": self.json_clinical_significance,
                 "conditionSet": self.condition_set,
                 "localID": local_id,
                 "localKey": local_key,
                 "observedIn": self.observed_in,
                 "variantSet": self.variant_set
             }
+            match self.clinvar_export_record.clinvar_allele.clinvar_export_bucket:
+                case ClinVarExportTypeBucket.GERMLINE:
+                    data["germlineClassification"] = self.germline_classification
+                case ClinVarExportTypeBucket.ONCOGENIC:
+                    data["oncogenicityClassification"] = self.oncogenicity_classification
+                case ClinVarExportTypeBucket.CLINICAL_IMPACT:
+                    data["clinicalImpactClassification"] = self.clinical_impact_classification
 
             messages = JSON_MESSAGES_EMPTY
             for flag in self.classification_based_on.classification.flag_collection.flags(only_open=True):
@@ -448,9 +459,6 @@ class ClinVarExportConverter:
 
             if not self.classification_based_on.classification.allele_info.latest_validation.include:
                 messages += JsonMessages.error("There are outstanding variant matching warnings for this record")
-
-            if self.clinvar_export_record.clinvar_allele.clinvar_export_bucket != ClinVarExportTypeBucket.GERMLINE:
-                messages += JsonMessages.error("Somatic support is under development, only Germline can be exported to ClinVar currently")
 
             # see if other shared classifications for the clinvar_key variant combo don't have a resolved condition
             # but only if they don't have an open don't share flag
@@ -527,21 +535,21 @@ class ClinVarExportConverter:
             return ValidatedJson(mapped_assertion_method or "", JsonMessages.error(f'Could not map \"{assertion_criteria}\" to an assertionCriteria.'))
 
     @property
-    def json_clinical_significance(self) -> ValidatedJson:
+    def base_classification(self) -> ValidatedJson:
         data = {}
         # we exclude citations unless we include interpretation summary
         if self.clinvar_key.include_interpretation_summary:
             if citations := self.citations:
                 data["citation"] = citations
-        data["clinicalSignificanceDescription"] = self.clinvar_value(SpecialEKeys.CLINICAL_SIGNIFICANCE).value(single=True)
 
         comment_parts: list[str] = []
-
-        if self.clinvar_key.include_interpretation_summary and (interpret := self.value(SpecialEKeys.INTERPRETATION_SUMMARY)):
+        if self.clinvar_key.include_interpretation_summary and (
+            interpret := self.value(SpecialEKeys.INTERPRETATION_SUMMARY)):
             comment_parts.append(interpret.strip())
 
-        if self.clinvar_key.inject_acmg_description and (acmg_summary := self.classification_based_on.criteria_strength_summary()):
-            comment_parts.append(f"ACMG/AMP criteria applied: {acmg_summary}")
+        if self.clinvar_key.inject_acmg_description and (
+            criteria_summary := self.classification_based_on.criteria_strength_summary()):
+            comment_parts.append(f"Criteria applied: {criteria_summary}")
 
         if comment_parts:
             full_comment = " ".join(comment_parts)
@@ -549,15 +557,38 @@ class ClinVarExportConverter:
             data["comment"] = full_comment
 
         if date_last_evaluated := self.value(SpecialEKeys.CURATION_DATE):
-            data["dateLastEvaluated"] = date_last_evaluated
+            data["dateLastEvaluated"] = self.convert_date(date_last_evaluated)
         elif date_last_reviewed := self.value(SpecialEKeys.CURATION_VERIFIED_DATE):
-            data["dateLastEvaluated"] = ValidatedJson(date_last_reviewed, JsonMessages.warning("No curation date provided, falling back to curation verified date."))
+            data["dateLastEvaluated"] = self.convert_date(date_last_reviewed).with_more_messages(JsonMessages.warning(
+                "No curation date provided, falling back to curation verified date."))
+        return ValidatedJson(data)
 
-        messages = JsonMessages()
-        if mode_of_inheritance := self.clinvar_value(SpecialEKeys.MODE_OF_INHERITANCE):
-            data["modeOfInheritance"] = mode_of_inheritance.value(single=True, optional=True)
+    @property
+    def germline_classification(self) -> ValidatedJson:
+        data = {
+            "germlineClassificationDescription": self.clinvar_value(SpecialEKeys.CLINICAL_SIGNIFICANCE).value(single=True)
+        }
+        return self.base_classification + ValidatedJson(data)
 
-        return ValidatedJson(data, messages)
+    @property
+    def oncogenicity_classification(self) -> ValidatedJson:
+        value = self.clinvar_value(SpecialEKeys.CLINICAL_SIGNIFICANCE).value(single=True)
+        raw_value = value.json_data
+        messages = JSON_MESSAGES_EMPTY
+        if raw_value and raw_value not in {"Oncogenic", "Likely oncogenic", "Uncertain significance", "Likely benign", "Benign"}:
+            messages += f"Unsupported value for Oncogenic value - {value}"
+        data = {"oncogenicityClassificationDescription": value}
+        return self.base_classification + ValidatedJson(data, messages)
+
+    @property
+    def clinical_impact_classification(self) -> ValidatedJson:
+        messages = JSON_MESSAGES_EMPTY
+        value = self.clinvar_value(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).value(single=True)
+        raw_value = value.json_data
+        if raw_value in {"Tier I - Strong", "Tier II - Potential"}:
+            messages += JsonMessages.error("ClinVar requires a detailed assertion type for Clinical Impact of Tier I or Tier II that we can't currently provide")
+        data = {"clinicalImpactClassificationDescription": value}
+        return self.base_classification + ValidatedJson(data, messages)
 
     @property
     def condition_set(self) -> ValidatedJson:

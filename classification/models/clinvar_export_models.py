@@ -264,7 +264,6 @@ class ClinVarExportBatch(TimeStampedModel, PreviewModelMixin):
         verbose_name = "ClinVar export batch"
 
     clinvar_key = models.ForeignKey(ClinVarKey, on_delete=models.CASCADE)
-    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, default=AlleleOriginBucket.GERMLINE)
     submission_version = models.IntegerField()
     status = models.CharField(max_length=1, choices=ClinVarExportBatchStatus.choices, default=ClinVarExportBatchStatus.AWAITING_UPLOAD)
     submission_identifier = models.TextField(null=True, blank=True)
@@ -272,24 +271,36 @@ class ClinVarExportBatch(TimeStampedModel, PreviewModelMixin):
     assertion_criteria = models.JSONField(default=acmg_citation)
     release_status = models.TextField(default="public")
 
+
     def __str__(self):
         return f"ClinVar Submission Batch : {self.id} - {self.get_status_display()}"
 
     def to_json(self) -> JsonObjType:
         from classification.models.clinvar_export_sync import clinvar_export_sync
+
+        content = {
+            "behalfOrgID": clinvar_export_sync.org_id,
+            "submissionName": f"submission_{self.id}",
+            "assertionCriteria": self.assertion_criteria,
+            "clinvarSubmissionReleaseStatus": self.release_status
+        }
+
+        submission_qs = self.clinvarexportsubmission_set.order_by('created')
+        if germline := list(submission_qs.filter(clinvar_export__clinvar_allele__clinvar_export_bucket=ClinVarExportTypeBucket.GERMLINE)):
+            content["germlineSubmission"] = [submission.submission_full for submission in germline]
+
+        if oncogenic := list(submission_qs.filter(clinvar_export__clinvar_allele__clinvar_export_bucket=ClinVarExportTypeBucket.ONCOGENIC)):
+            content["oncogenicitySubmission"] = [submission.submission_full for submission in oncogenic]
+
+        if clinical_impact := list(submission_qs.filter(clinvar_export__clinvar_allele__clinvar_export_bucket=ClinVarExportTypeBucket.CLINICAL_IMPACT)):
+            content["clinicalImpactSubmission"] = [submission.submission_full for submission in clinical_impact]
+
         return {
             "actions": [{
                 "type": "AddData",
                 "targetDb": "clinvar",
                 "data": {
-                    "content": {
-                        "behalfOrgID": clinvar_export_sync.org_id,
-                        "submissionName": f"submission_{self.id}",
-                        "assertionCriteria": self.assertion_criteria,
-                        "clinvarSubmissionReleaseStatus": self.release_status,
-                        "clinvarSubmission": [submission.submission_full for submission in
-                                              self.clinvarexportsubmission_set.order_by('created')],
-                    }
+                    "content": content
                 }
             }]
         }
@@ -428,7 +439,6 @@ class ClinVarExportRequest(TimeStampedModel):
 @dataclass(frozen=True)
 class ClinVarExportBatchGrouping:
     clinvar_key: ClinVarKey
-    allele_origin_bucket: AlleleOriginBucket
     assertion_criteria: frozendict
 
 
@@ -453,14 +463,12 @@ class ClinVarExportBatches:
         else:
             grouping = ClinVarExportBatchGrouping(
                 clinvar_key=data.clinvar_export.clinvar_allele.clinvar_key,
-                assertion_criteria=frozendict(data.assertion_criteria),
-                allele_origin_bucket=data.clinvar_export.allele_origin_bucket
+                assertion_criteria=frozendict(data.assertion_criteria)
             )
             batch = self.group_batches.get(grouping)
             if not batch or self.batch_size.get(grouping, 0) == 10000:
                 batch = ClinVarExportBatch(
                     clinvar_key=grouping.clinvar_key,
-                    allele_origin_bucket=grouping.allele_origin_bucket,
                     submission_version=CLINVAR_EXPORT_CONVERSION_VERSION,
                     assertion_criteria=data.assertion_criteria,
                     release_status="public"

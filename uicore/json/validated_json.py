@@ -102,6 +102,26 @@ class ValidatedJson:
     messages: JsonMessages = JSON_MESSAGES_EMPTY
     void: bool = False
 
+    def __add__(self, other) -> 'ValidatedJson':
+        if self.void:
+            return other
+        elif other.void:
+            return self
+        if isinstance(self.json_data, list) and isinstance(other.json_data, list):
+            return ValidatedJson(self.json_data + other.json_data, messages=self.messages + other.messages)
+        elif isinstance(self.json_data, dict) and isinstance(other.json_data, dict):
+            data_copy = copy.deepcopy(self.json_data)
+            for key, value in other.json_data.items():
+                if key in data_copy:
+                    raise ValueError(f"Cannot safely merge ValidatedJson that share keys - common key = {key}")
+                data_copy[key] = value
+            return ValidatedJson(data_copy, messages=self.messages + other.messages)
+        else:
+            raise ValueError(f"Cannot safely merge ValidatedJson of {self.json_data} and {other.json_data}")
+
+    def with_more_messages(self, messages: 'JsonMessages') -> 'ValidatedJson':
+        return ValidatedJson(json_data=self.json_data, messages=self.messages + messages, void=self.void)
+
     @staticmethod
     def is_void(obj: Any) -> bool:
         return isinstance(obj, ValidatedJson) and obj.void

@@ -11,7 +11,8 @@ from django.utils import timezone
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarAllele, ClinVarExportBatchStatus, \
     ClinVarExportRequest, ClinVarExportSubmission
 from classification.models.clinvar_export_sync import clinvar_export_sync, ClinVarRequestException
-from snpdb.admin_utils import AllValuesChoicesFieldListFilter, ModelAdminBasics, admin_action, admin_list_column
+from snpdb.admin_utils import AllValuesChoicesFieldListFilter, ModelAdminBasics, admin_action, admin_list_column, \
+    admin_model_action
 
 
 class ClinVarExportSubmissionAdmin(admin.TabularInline):
@@ -165,8 +166,8 @@ class ClinVarExportRequestAdmin(admin.TabularInline):
 
 @admin.register(ClinVarExportBatch)
 class ClinVarExportBatchAdmin(ModelAdminBasics):
-    list_display = ("pk", "clinvar_key", "allele_origin_bucket", "created", "modified", "record_count", "status")
-    list_filter = (('status', AllValuesChoicesFieldListFilter), ('clinvar_key', admin.RelatedFieldListFilter), "allele_origin_bucket")
+    list_display = ("pk", "clinvar_key", "created", "modified", "record_count", "status")
+    list_filter = (('status', AllValuesChoicesFieldListFilter), ('clinvar_key', admin.RelatedFieldListFilter))
     search_fields = ('pk', )
     inlines = (ClinVarExportRequestAdmin, ClinVarExportSubmissionAdmin)
 
@@ -223,3 +224,8 @@ class ClinVarExportBatchAdmin(ModelAdminBasics):
                     messages.success(request, message=f"Batch {batch.pk} - updated")
                 except ClinVarRequestException as clinvar_except:
                     messages.error(request, message=f"Batch {batch.pk} - {clinvar_except}")
+
+    @admin_model_action(url_slug="submission_url/", short_description="Confirm Submission URL",
+                        icon="fa-regular")
+    def submission_url(self, request):
+        self.message_user(request, clinvar_export_sync.submission_url)

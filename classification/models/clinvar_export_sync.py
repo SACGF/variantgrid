@@ -184,7 +184,7 @@ class ClinVarExportSync:
                 clinvar_request = self._send_data(
                     batch=batch,
                     request_type=ClinVarExportRequestType.POLLING_SUBMISSION,
-                    url=f"{self.submission_url}/{batch.submission_identifier}/actions/")
+                    url=f"{self.submission_url}{batch.submission_identifier}/actions/")
             else:
                 clinvar_request = self._send_data(
                     batch=batch,

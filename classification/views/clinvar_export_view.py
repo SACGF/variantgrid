@@ -53,7 +53,6 @@ class ClinVarExportBatchColumns(DatatableConfig):
         self.rich_columns = [
             RichColumn("id", label="ID", orderable=True, renderer=self.batch_id, client_renderer='batchId', default_sort=SortOrder.DESC, order_sequence=[SortOrder.DESC, SortOrder.ASC]),
             RichColumn("clinvar_key", label="ClinVar Key", orderable=True, enabled=False),
-            RichColumn("allele_origin_bucket", label="Allele Origin", orderable=True, client_renderer="render_allele_origin_bucket"),
             RichColumn("created", client_renderer='TableFormat.timestamp', orderable=True, order_sequence=[SortOrder.DESC, SortOrder.ASC]),
             RichColumn("record_count", label="Records In Submission", orderable=True, order_sequence=[SortOrder.DESC, SortOrder.ASC]),
             RichColumn("status", renderer=self.render_status, orderable=True)

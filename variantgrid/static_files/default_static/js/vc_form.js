@@ -2597,7 +2597,7 @@ VCTable.allele_origin_bucket_label = (allele_origin_bucket, override_text = "", 
         } else if (allele_origin_bucket == "O") {
             allele_origin_label = "ONCO"; //
         } else if (allele_origin_bucket == "C") {
-            allele_origin_label = "C.IMPACT"
+            allele_origin_label = "CLIN-IMP"
         } else {
             allele_origin_label = `?${allele_origin_bucket}?`;
         }

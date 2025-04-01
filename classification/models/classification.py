@@ -2732,12 +2732,16 @@ class CuratedDate:
 
     def convert_date(self, evidence_key) -> Optional[date]:
         if date_str := self._modification.get(evidence_key):
-            if m := CLASSIFICATION_DATE_REGEX.match(date_str):
-                try:
-                    return date(year=int(m.group("year")), month=int(m.group("month")), day=int(m.group("day")))
-                except ValueError:
-                    # an invalid date should already cause a warning on the classification form
-                    pass
+            return CuratedDate.convert_classification_date_str(date_str)
+
+    @staticmethod
+    def convert_classification_date_str(date_str: str) -> Optional[date]:
+        if m := CLASSIFICATION_DATE_REGEX.match(date_str):
+            try:
+                return date(year=int(m.group("year")), month=int(m.group("month")), day=int(m.group("day")))
+            except ValueError:
+                # an invalid date should already cause a warning on the classification form
+                pass
 
     @cached_property
     def curation_date(self) -> Optional[ClassificationDate]:
