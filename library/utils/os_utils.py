@@ -24,6 +24,7 @@ def execute_cmd(cmd: list, **kwargs) -> CmdOutput:
         pipes = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
         logging.info('Completed')
     else:
+        logging.info('About to call %s', cmd)
         pipes = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
 
     std_out, std_err = pipes.communicate()

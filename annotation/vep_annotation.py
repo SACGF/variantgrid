@@ -189,7 +189,7 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     # see https://github.com/SACGF/variantgrid/issues/1228
     try:
         transcript_blocklist_filename = vc["transcript_blocklist"]
-        cmd.append(f'--transcript_filter "not stable_id in {transcript_blocklist_filename}"')
+        cmd.extend(["--transcript_filter", f"not stable_id in {transcript_blocklist_filename}"])
     except KeyError:
         pass
 
@@ -255,7 +255,7 @@ def run_vep(vcf_filename, output_filename, genome_build: GenomeBuild, annotation
     """ executes VEP command. Returns (command_line, code, stdout, stderr) """
 
     cmd = get_vep_command(vcf_filename, output_filename, genome_build, annotation_consortium, pipeline_type)
-    return execute_cmd(cmd, shell=True)
+    return execute_cmd(cmd, shell=False)
 
 
 def get_vep_version(genome_build: GenomeBuild, annotation_consortium):
