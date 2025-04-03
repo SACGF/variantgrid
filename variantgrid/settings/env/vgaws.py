@@ -13,7 +13,7 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 SITE_ID = 3  # vg.com
 
 WEB_HOSTNAME = 'variantgrid.com'
-WEB_IP = '3.27.144.228'
+WEB_IP = '3.104.38.188'
 
 DEBUG = False
 PYTHON_COMMAND = os.path.join(BASE_DIR, "env", "bin", "python3")
@@ -23,11 +23,7 @@ ANNOTATION_ENTREZ_EMAIL = 'davmlaw@gmail.com'
 
 _BIG_DISK_BASE_DIR = "/data"
 ANNOTATION_REFERENCE_BASE_DIR = os.path.join(_BIG_DISK_BASE_DIR, "annotation")
-ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "VEP")
-ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "ensembl-vep")
-ANNOTATION_VEP_CACHE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_cache")
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.expanduser("~/perlbrew_runner.sh")
-_ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "fasta")
 
 ANNOTATION[BUILD_GRCH38]["enabled"] = True
 ANNOTATION[BUILD_T2TV2]["enabled"] = True
