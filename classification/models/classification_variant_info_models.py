@@ -695,7 +695,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         return False
 
     @staticmethod
-    def __genome_build_to_attr(genome_build: GenomeBuild) -> str:
+    def _genome_build_to_attr(genome_build: GenomeBuild) -> str:
         """ for looping through the cached variant infos """
         if genome_build == GenomeBuild.grch37():
             return 'grch37'
@@ -713,7 +713,7 @@ class ImportedAlleleInfo(TimeStampedModel):
     def __getitem__(self, item: GenomeBuild) -> Optional[ResolvedVariantInfo]:
         if isinstance(item, GenomeBuild):
             try:
-                return getattr(self, ImportedAlleleInfo.__genome_build_to_attr(item))
+                return getattr(self, ImportedAlleleInfo._genome_build_to_attr(item))
             except ValueError:
                 return None
         else:
@@ -722,7 +722,7 @@ class ImportedAlleleInfo(TimeStampedModel):
     def __setitem__(self, key: GenomeBuild, value: Optional[ResolvedVariantInfo]):
         if isinstance(key, GenomeBuild):
             try:
-                setattr(self, ImportedAlleleInfo.__genome_build_to_attr(key), value)
+                setattr(self, ImportedAlleleInfo._genome_build_to_attr(key), value)
             except ValueError:
                 return None
         else:
@@ -998,7 +998,8 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     @staticmethod
     def relink_variants(vc_import: Optional['ClassificationImport'] = None,
-                        liftover_run: Optional['LiftoverRun'] = None):
+                        liftover_run: Optional['LiftoverRun'] = None,
+                        force_update=False):
         """
             Call after import/liftover as variants may not have been processed enough at the time of "set_variant"
             Updates all records that have a variant but not cached c.hgvs values or no clinical context.
@@ -1015,5 +1016,5 @@ class ImportedAlleleInfo(TimeStampedModel):
             relink_qs = relink_qs.filter(allele__alleleliftover__liftover=liftover_run).distinct()
 
         for allele_info in relink_qs:
-            allele_info.refresh_and_save()
+            allele_info.refresh_and_save(force_update=force_update)
             # note that refresh_and_save will update linked classifications
