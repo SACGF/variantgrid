@@ -18,7 +18,8 @@ from django.views.decorators.http import require_POST
 
 from classification.enums import SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
-    EvidenceKeyMap, ClinVarExportStatus, ClinVarExportSubmission
+    EvidenceKeyMap, ClinVarExportStatus, ClinVarExportSubmission, ClinVarExportDeleteStatus
+from classification.models.clinvar_export_convertor import ClinVarExportConverter
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.utils.clinvar_matcher import ClinVarLegacyRow, ClinVarLegacyMatches, ClinVarLegacyExportMatchType
 from classification.views.classification_dashboard_view import ClassificationDashboard
@@ -216,7 +217,13 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
             ),
             RichColumn(name="batches", label="In Batch IDs", renderer=self.batches, client_renderer='renderBatches', orderable=False, search=False, extra_columns=["id"]),
             RichColumn("status", label="Sync Status", client_renderer='renderStatus', sort_keys=["status_sort"], orderable=True, search=False),
-            RichColumn("scv", label="SCV", orderable=True),
+            RichColumn(
+                "scv",
+                label="SCV",
+                orderable=True,
+                client_renderer='renderSCV',
+                extra_columns=["delete_status"]
+            ),
         ]
 
     def get_initial_query_params(self, clinvar_key: Optional[str] = None, status: Optional[str] = None) -> QuerySet[ClinVarExport]:
@@ -255,7 +262,14 @@ def clinvar_export_review(request: HttpRequest, clinvar_export_id: int) -> HttpR
     clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)
 
     if request.method == "POST":
+
         clinvar_export.scv = request.POST.get("scv") or ""
+        if request.POST.get("delete_pending") == "true":
+            clinvar_export.delete_status = ClinVarExportDeleteStatus.DELETION_PENDING
+        else:
+            clinvar_export.delete_status = ClinVarExportDeleteStatus.LIVE_RECORD
+
+        ClinVarExportConverter(clinvar_export).convert().apply()
         clinvar_export.save()
         add_save_message(request, valid=True, name="ClinVarExport")
         return redirect(clinvar_export)
@@ -263,7 +277,7 @@ def clinvar_export_review(request: HttpRequest, clinvar_export_id: int) -> HttpR
     common_condition: Optional[OntologyTerm] = None
     clinvar_exports_for_allele = list(ClinVarExport.objects.filter(
         clinvar_allele_id=clinvar_export.clinvar_allele_id
-    ).exclude(pk=clinvar_export_id).all())
+    ).exclude(pk=clinvar_export_id).exclude(delete_status=ClinVarExportDeleteStatus.DELETED).all())
     if clinvar_exports_for_allele:
         all_condition_terms: Set[OntologyTerm] = set()
         clinvar_exports_for_allele.append(clinvar_export)
@@ -349,9 +363,13 @@ class ClinVarExportSummary(ExportRow):
             classification = modification.classification
             return classification.lab.group_name + "/" + classification.lab_record_id
 
-    @export_column("Allele Origin")
+    @export_column("Export Type")
     def _allele_origin(self):
-        return self.clinvar_export.get_allele_origin_bucket_display()
+        return self.clinvar_export.clinvar_allele.get_clinvar_export_bucket_display()
+
+    @export_column("Deletion Status")
+    def _deletion_status(self):
+        return self.clinvar_export.get_delete_status_display()
 
     @export_column("Genome Build")
     def _genome_build(self):
@@ -412,7 +430,7 @@ class ClinVarExportSummary(ExportRow):
     @export_column("Sync Status")
     def _sync_status(self):
         if self.clinvar_export.status == ClinVarExportStatus.UP_TO_DATE:
-            if clinvar_error := self.clinvar_export.last_submission_error:
+            if self.clinvar_export.last_submission_error:
                 return "ClinVar Error"
         return self.clinvar_export.get_status_display()
 
@@ -439,7 +457,7 @@ class ClinVarExportSummary(ExportRow):
     def _possible_duplicate(self):
         if self.has_duplicates:
             duplicates = ClinVarExport.objects.filter(clinvar_allele=self.clinvar_export.clinvar_allele).exclude(
-                pk=self.clinvar_export.pk).order_by('pk')
+                pk=self.clinvar_export.pk).exclude(delete_status=ClinVarExportDeleteStatus.DELETED).order_by('pk')
             return ", ".join(str(duplicate) for duplicate in duplicates)
 
     @export_column("Common Condition w Others")
@@ -475,7 +493,7 @@ class ClinVarExportSummary(ExportRow):
 
         return "\n".join(all_messages)
 
-    ## This column is a bit much
+    # This column is a bit much
     # @export_column("JSON")
     # def json(self):
     #     if json_version := self.clinvar_export.submission_full:
@@ -494,7 +512,7 @@ def clinvar_export_download(request: HttpRequest, clinvar_key_id: str) -> HttpRe
     duplicates = ClinVarExport.objects.filter(
         # classification_based_on__isnull=False,
         clinvar_allele__clinvar_key_id=clinvar_key_id
-    ).values('clinvar_allele').annotate(total=Count('clinvar_allele')).order_by('-total')
+    ).values('clinvar_allele').exclude(delete_status=ClinVarExportDeleteStatus.DELETED).annotate(total=Count('clinvar_allele')).order_by('-total')
 
     has_possible_duplicate_clinvar_allele_id: set[int] = set()
 
@@ -593,14 +611,14 @@ def clinvar_export_create_batch(request: HttpRequest, clinvar_key_id: str) -> Ht
         for batch in batches:
             batch_records_count = batch.clinvarexportsubmission_set.count()
             messages.add_message(request, level=messages.SUCCESS, message=f"Created Export Batch {batch} with {batch_records_count} records")
-            if missing := len(all_ids) - batch_records_count:
+            if (len(all_ids) - batch_records_count) > 0:
                 batch_record_ids = set(batch.clinvarexportsubmission_set.values_list('clinvar_export_id', flat=True).all())
                 missing_ids = sorted(all_ids - batch_record_ids)
                 missing_ids_list = ', '.join(str(i) for i in missing_ids)
                 messages.add_message(request, level=messages.WARNING, message=f"Some records were not added to the batch, already up to date or in error : {missing_ids_list}")
         if not batches:
             lab_record_ids = ', '.join(str(i) for i in all_ids)
-            messages.add_message(request, level=messages.ERROR, message=f"{lab_record_ids} IDs were already up to date or in error.")
+            messages.add_message(request, level=messages.ERROR, message=f"IDs ({lab_record_ids}) were already up to date or in error.")
     return redirect(reverse('clinvar_key_summary', kwargs={'clinvar_key_id': clinvar_key_id}))
 
 

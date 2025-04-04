@@ -17,7 +17,7 @@ from snpdb.admin_utils import AllValuesChoicesFieldListFilter, ModelAdminBasics,
 
 class ClinVarExportSubmissionAdmin(admin.TabularInline):
     model = ClinVarExportSubmission
-    fields = ('clinvar_export', 'classification_based_on', 'submission_full', 'submission_version', 'localId', 'localKey', 'status', 'scv', 'response_json')
+    fields = ('clinvar_export', 'classification_based_on', 'submission_full', 'submission_version', 'local_id', 'local_key', 'status', 'scv', 'response_json')
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -224,6 +224,15 @@ class ClinVarExportBatchAdmin(ModelAdminBasics):
                     messages.success(request, message=f"Batch {batch.pk} - updated")
                 except ClinVarRequestException as clinvar_except:
                     messages.error(request, message=f"Batch {batch.pk} - {clinvar_except}")
+
+    @admin_action("Next Action - Force File Action")
+    def next_action_force(self, request, queryset: QuerySet[ClinVarExportBatch]):
+        for batch in queryset:
+            try:
+                clinvar_export_sync.next_request(batch)
+                messages.success(request, message=f"Batch {batch.pk} - updated")
+            except ClinVarRequestException as clinvar_except:
+                messages.error(request, message=f"Batch {batch.pk} - {clinvar_except}")
 
     @admin_model_action(url_slug="submission_url/", short_description="Confirm Submission URL",
                         icon="fa-regular")

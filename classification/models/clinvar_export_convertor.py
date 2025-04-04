@@ -107,7 +107,9 @@ class ClinVarExportData:
     @property
     def is_valid(self):
         """ Are we able to send this data to ClinVar - important does NOT check status """
-        return bool(self.grouping) and bool(self.body) and not self.has_errors and 'assertionCriteria' in self.grouping
+        if self.clinvar_export.delete_pending and self.clinvar_export.scv:
+            return True
+        return self.assertion_criteria and bool(self.body) and not self.has_errors
 
     @cached_property
     def changes(self) -> Optional[ClinVarExportChanges]:
@@ -134,16 +136,19 @@ class ClinVarExportData:
         :return:
         """
         json_data = self.body.pure_json()
-        if scv := self.clinvar_export.scv:
-            json_data["recordStatus"] = "update"
-            json_data["clinvarAccession"] = scv
-        else:
-            json_data["recordStatus"] = "novel"
+        if not self.clinvar_export.delete_pending:
+            if scv := self.clinvar_export.scv:
+                json_data["recordStatus"] = "update"
+                json_data["clinvarAccession"] = scv
+            else:
+                json_data["recordStatus"] = "novel"
         return json_data
 
     @property
     def assertion_criteria(self) -> Optional[ClinVarCitation]:
-        return self.grouping.pure_json().get("assertionCriteria") if self.grouping else None
+        if grouping := self.grouping:
+            if pure_json := grouping.pure_json():
+                return pure_json.get("assertionCriteria")
 
     @property
     def local_id(self) -> str:
@@ -151,7 +156,7 @@ class ClinVarExportData:
 
     @property
     def local_key(self) -> str:
-        return self.body_json.get("localKey")
+        return self.body_json.get("local_key")
 
     def apply(self):
         """
@@ -160,7 +165,12 @@ class ClinVarExportData:
         clinvar_export = self.clinvar_export
 
         status: ClinVarExportStatus
-        if (cm := clinvar_export.classification_based_on) and cm.classification.flag_collection_safe.get_open_flag_of_type(
+        if self.clinvar_export.delete_pending:
+            if self.changes:
+                status = ClinVarExportStatus.CHANGES_PENDING
+            else:
+                status = ClinVarExportStatus.UP_TO_DATE
+        elif (cm := clinvar_export.classification_based_on) and cm.classification.flag_collection_safe.get_open_flag_of_type(
             classification_flag_types.classification_not_public):
             status = ClinVarExportStatus.EXCLUDE
         elif self.has_errors:
@@ -183,7 +193,7 @@ class ClinVarExportData:
     @staticmethod
     def current(clinvar_export: ClinVarExport) -> 'ClinVarExportData':
         """
-        Make ClinVarExoprtData based on current evidence (good if we just reloaded clinvar_export from the DB)
+        Make ClinVarExportData based on current evidence (good if we just reloaded clinvar_export from the DB)
         """
         return ClinVarExportData(
             clinvar_export=clinvar_export,
@@ -359,6 +369,7 @@ class ClinVarExportConverter:
             return value
 
     def convert_date(self, value: str) -> ValidatedJson:
+        # doesn't so much convert a date, as makes sure it's YYYY-MM-DD and is valid, e.g. not 2024-13-43
         if not CuratedDate.convert_classification_date_str(value):
             return ValidatedJson(value, JsonMessages.error("Invalid date"))
         return ValidatedJson(value)
@@ -405,6 +416,23 @@ class ClinVarExportConverter:
 
     def convert(self) -> ClinVarExportData:
 
+        if self.clinvar_export_record.delete_pending:
+            data = {}
+            # note we inject accession into non-deleted records live, and accession into deleted records straight into the DB
+            # this is because this data is used to calculate differences from any previous submission, and we don't want
+
+            if scv := self.clinvar_export_record.scv:
+                data["accession"] = scv
+            else:
+                data["accession"] = ValidatedJson.make_void(JsonMessages.error("To delete, there has to be a SCV"))
+            if reason := self.clinvar_export_record.delete_reason:
+                data["reason"] = reason
+
+            return ClinVarExportData(
+                clinvar_export=self.clinvar_export_record,
+                body=ValidatedJson(data),
+                grouping=ValidatedJson.make_void()
+            )
         if self.classification_based_on is None:
             return ClinVarExportData(
                 clinvar_export=self.clinvar_export_record,
@@ -430,7 +458,7 @@ class ClinVarExportConverter:
             data = {
                 "conditionSet": self.condition_set,
                 "localID": local_id,
-                "localKey": local_key,
+                "local_key": local_key,
                 "observedIn": self.observed_in,
                 "variantSet": self.variant_set
             }
@@ -543,12 +571,10 @@ class ClinVarExportConverter:
                 data["citation"] = citations
 
         comment_parts: list[str] = []
-        if self.clinvar_key.include_interpretation_summary and (
-            interpret := self.value(SpecialEKeys.INTERPRETATION_SUMMARY)):
+        if self.clinvar_key.include_interpretation_summary and (interpret := self.value(SpecialEKeys.INTERPRETATION_SUMMARY)):
             comment_parts.append(interpret.strip())
 
-        if self.clinvar_key.inject_acmg_description and (
-            criteria_summary := self.classification_based_on.criteria_strength_summary()):
+        if self.clinvar_key.inject_acmg_description and (criteria_summary := self.classification_based_on.criteria_strength_summary()):
             comment_parts.append(f"Criteria applied: {criteria_summary}")
 
         if comment_parts:

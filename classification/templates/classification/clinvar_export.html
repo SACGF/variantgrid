@@ -75,7 +75,7 @@
                     {% endwith %}
                     {% if clinvar_exports_for_allele %}
                         <hr/>
-                        {% labelled label="ClinVar Exports for this Allele" %}
+                        {% labelled label="Other ClinVar Exports for this Allele" help="Does not include records deleted from ClinVar"%}
                             {% for other_clinvar_export in clinvar_exports_for_allele %}
                                 {% if other_clinvar_export == clinvar_export %}
                                     <div>{{ clinvar_export }} - {% condition clinvar_export.condition_resolved %} <span class="no-value">(this record)</span></div>
@@ -88,11 +88,24 @@
                         {% endlabelled %}
                     {% endif %}
                     <hr/>
-                    {% labelled label="SCV" %}
-                        <div class="input-group">
-                            <input class="form-control" type="text" name="scv" value="{{ clinvar_export.scv | default_if_none:'' }}" placeholder="Enter SCV code if previously submitted to ClinVar externally, otherwise leave blank to be auto-assigned" />
-                        </div>
-                    {% endlabelled %}
+                    {% if clinvar_export.deleted %}
+                        <div class="text-danger text-center"><i class="fas fa-trash-can"></i> DELETED FROM CLINVAR</div>
+                        {% labelled label="SCV" %}{{ clinvar_export.scv }}{% endlabelled %}
+                    {% else %}
+                        {% labelled label="SCV" %}
+                            <div class="input-group">
+                                <input class="form-control" type="text" name="scv" value="{{ clinvar_export.scv | default_if_none:'' }}" placeholder="Enter SCV code if previously submitted to ClinVar externally, otherwise leave blank to be auto-assigned" />
+                            </div>
+                        {% endlabelled %}
+                        {% if clinvar_export.has_submission %}
+                            {% labelled label="Request Delete" %}
+                                <div class="ml-4">
+                                <input type="checkbox" id="delete_pending" class="form-check-input" name="delete_pending" value="true" {% if clinvar_export.delete_pending %}checked="checked"{% endif %} />
+                                <label for="delete_pending">If checked, and added to a batch, will requet the deletion of the SCV from ClinVar</label>
+                                </div>
+                            {% endlabelled %}
+                        {% endif %}
+                    {% endif %}
                 </div>
                 <div class="card-footer">
                     <input type="submit" class="btn btn-primary" value="Save" />

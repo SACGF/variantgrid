@@ -157,7 +157,7 @@ def code_json(data: JsonDataType, css_class: Optional[str] = "", dash_if_empty: 
     if not css_class:
         # if we're formatting ValidatedJson and the first element has messages, that provides formatting we don't need code-block
         # Also if we already have a css_class (like card-body) we don't need code-block
-        if not data or not isinstance(data, dict) or ('*wrapper$' not in data and not data.get('messages')):
+        if not data or not isinstance(data, dict) or not ('*wrapper$' in data and data.get('messages')):
             css_class = "code-block"
     return {"data": data, "css_class": css_class}
 

@@ -242,7 +242,10 @@ class ValidatedJson:
         return self.json_data[item]
 
     def __contains__(self, item):
-        return item in self.json_data
+        if json_data := self.json_data:
+            return item in json_data
+        else:
+            return False
 
     def __delitem__(self, key):
         del self.json_data[key]

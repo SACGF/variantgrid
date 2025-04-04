@@ -1,15 +1,12 @@
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Iterable
-
 from django.db import models, transaction
 from django.db.models import QuerySet, TextChoices
 from django.urls import reverse
 from django.utils.timezone import now
 from frozendict import frozendict
 from model_utils.models import TimeStampedModel
-
-from classification.enums import AlleleOriginBucket
 from classification.models import ClassificationModification, ConditionResolved
 from classification.models.clinvar_export_enums import ClinVarExportTypeBucket
 from library.preview_request import PreviewModelMixin, PreviewData, PreviewKeyValue
@@ -56,15 +53,28 @@ class ClinVarExportStatus(models.TextChoices):
     EXCLUDE = "X", "Exclude"
 
 
+class ClinVarExportDeleteStatus(models.TextChoices):
+    LIVE_RECORD = "L", "Live Record"  # just as in don't delete this
+    DELETION_PENDING = "R", "Deletion Pending"  # consistency with export status
+    DELETED = "Z", "Deleted"
+
+
 class ClinVarExport(TimeStampedModel, PreviewModelMixin):
 
     """
     Represents a unique entry we plan to upload to ClinVar.
-    Specifically the lab & allele (wrapped up in clinvar_allele), condition, the most up to date representation of the data
+    Specifically the lab & allele (wrapped up in clinvar_allele), condition, the most up-to-date representation of the data
     and a status that describes how the data compares to what we've already sent to ClinVar.
 
     A ClinVarSubmission is a snapshot of the data we actually intend to send (or have sent) to ClinVar, and they're sent
     bundled together in a ClinVarExportBatch
+
+    Note that ClinVarExports can be DELETED, but in reality, it's the SCV that's being removed.
+    I contemplated having a separate kind of record for SCV deletions, as a ClinVarExport represents more a lab/allele/export type/condition
+    combo, when we delete a SCV, we're just deleting a SCV.
+
+    However, keeping all submissions to be the same kind of object makes it a bit easier to comprehend, as well as having the
+    submission history go from the original record to deletion
     """
 
     class Meta:
@@ -80,6 +90,25 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
 
     submission_grouping_validated = models.JSONField(null=False, blank=False, default=dict)
     submission_body_validated = models.JSONField(null=False, blank=False, default=dict)
+
+    delete_status = models.CharField(max_length=1, choices=ClinVarExportDeleteStatus.choices, default=ClinVarExportDeleteStatus.LIVE_RECORD)
+    """
+    As status is auto-calculated, keep delete-status separate so it can be manually set
+    Deletion Pending - to indicate we want to delete the record, but haven't received confirmation from ClinVar it's deleted yet
+    Deleted - the SCV has actually been deleted
+    """
+    delete_reason = models.TextField(blank=True, null=True, default=None)
+    """
+    Not currently populated, but if we add it to the form will allow a SCV deletion to be sent with a reason
+    """
+
+    @property
+    def deleted(self) -> bool:
+        return self.delete_status == ClinVarExportDeleteStatus.DELETED
+
+    @property
+    def delete_pending(self) -> bool:
+        return self.delete_status == ClinVarExportDeleteStatus.DELETION_PENDING
 
     @property
     def has_submission(self) -> bool:
@@ -268,9 +297,8 @@ class ClinVarExportBatch(TimeStampedModel, PreviewModelMixin):
     status = models.CharField(max_length=1, choices=ClinVarExportBatchStatus.choices, default=ClinVarExportBatchStatus.AWAITING_UPLOAD)
     submission_identifier = models.TextField(null=True, blank=True)
     file_url = models.TextField(null=True, blank=True)
-    assertion_criteria = models.JSONField(default=acmg_citation)
+    assertion_criteria = models.JSONField(null=True, blank=True)
     release_status = models.TextField(default="public")
-
 
     def __str__(self):
         return f"ClinVar Submission Batch : {self.id} - {self.get_status_display()}"
@@ -281,19 +309,39 @@ class ClinVarExportBatch(TimeStampedModel, PreviewModelMixin):
         content = {
             "behalfOrgID": clinvar_export_sync.org_id,
             "submissionName": f"submission_{self.id}",
-            "assertionCriteria": self.assertion_criteria,
             "clinvarSubmissionReleaseStatus": self.release_status
         }
 
-        submission_qs = self.clinvarexportsubmission_set.order_by('created')
-        if germline := list(submission_qs.filter(clinvar_export__clinvar_allele__clinvar_export_bucket=ClinVarExportTypeBucket.GERMLINE)):
-            content["germlineSubmission"] = [submission.submission_full for submission in germline]
+        # note the only time we shouldn't have assertion criteria is for deletes
+        if assertion_criteria := self.assertion_criteria:
+            content["assertionCriteria"] = assertion_criteria
 
-        if oncogenic := list(submission_qs.filter(clinvar_export__clinvar_allele__clinvar_export_bucket=ClinVarExportTypeBucket.ONCOGENIC)):
-            content["oncogenicitySubmission"] = [submission.submission_full for submission in oncogenic]
+        deletion = []
+        germline_submission = []
+        oncogenic_submission = []
+        clinical_impact_submission = []
+        for submission in self.clinvarexportsubmission_set.select_related('clinvar_export', 'clinvar_export__clinvar_allele').order_by('created').iterator():
+            submission_json = submission.submission_full
+            match submission.clinvar_export.clinvar_allele.clinvar_export_bucket, submission.clinvar_export.delete_pending:
+                case _, submission.clinvar_export.delete_pending:
+                    deletion.append(submission_json)
+                case ClinVarExportTypeBucket.GERMLINE, _:
+                    germline_submission.append(submission_json)
+                case ClinVarExportTypeBucket.ONCOGENIC, _:
+                    oncogenic_submission.append(submission_json)
+                case ClinVarExportTypeBucket.CLINICAL_IMPACT, _:
+                    oncogenic_submission.append(submission_json)
+                case _, _:
+                    raise ValueError(f"Submission not addable to batch JSON {submission.clinvar_export}")
 
-        if clinical_impact := list(submission_qs.filter(clinvar_export__clinvar_allele__clinvar_export_bucket=ClinVarExportTypeBucket.CLINICAL_IMPACT)):
-            content["clinicalImpactSubmission"] = [submission.submission_full for submission in clinical_impact]
+        if deletion:
+            content["clinvarDeletion"] = {"accessionSet": deletion}
+        if germline_submission:
+            content["germlineSubmission"] = germline_submission
+        if oncogenic_submission:
+            content["oncogenicitySubmission"] = oncogenic_submission
+        if clinical_impact_submission:
+            content["clinicalImpactSubmission"] = clinical_impact_submission
 
         return {
             "actions": [{
@@ -395,7 +443,7 @@ class ClinVarExportSubmission(TimeStampedModel):
     class Meta:
         verbose_name = "ClinVar export submission"
         # below should be uncommented, but have to migrate any existing data first
-        # unique_together = ("clinvar_export", "localKey")
+        # unique_together = ("clinvar_export", "local_key")
 
     clinvar_export = models.ForeignKey(ClinVarExport, on_delete=models.CASCADE)  # if there's been an actual submission, don't allow deletes
     classification_based_on = models.ForeignKey(ClassificationModification, on_delete=models.PROTECT)
@@ -406,10 +454,10 @@ class ClinVarExportSubmission(TimeStampedModel):
     submission_grouping = models.JSONField(null=True, blank=True)  # should provide default? or just ignore if submission_version is under a certain amount
     submission_body = models.JSONField()  # used to see if there are any changes since last submission (other than going from novel to update)
     submission_version = models.IntegerField()
+    submission_deletion = models.BooleanField(default=False)  # since a deletion is sent in a different part of the JSON as regular submissions, it's cleaner to mark this
 
-    # fix me - should be snake case
-    localId = models.TextField()  # should generally not change for a c.hgvs/condition umbrella combo
-    localKey = models.TextField()  # can change as the selected classification changes
+    local_id = models.TextField(null=True, blank=True)  # should generally not change for a c.hgvs/condition umbrella combo
+    local_key = models.TextField(null=True, blank=True)  # can change as the selected classification changes
 
     # individual record failure, batch can be in error too
     status = models.CharField(max_length=1, choices=ClinVarExportSubmissionStatus.choices, default=ClinVarExportSubmissionStatus.WAITING)
@@ -461,9 +509,12 @@ class ClinVarExportBatches:
         if not data.is_valid:
             self.skipped_records += 1
         else:
+            assertion_criteria_value = None
+            if assertion_criteria := data.assertion_criteria:
+                assertion_criteria_value = frozendict(assertion_criteria)
             grouping = ClinVarExportBatchGrouping(
                 clinvar_key=data.clinvar_export.clinvar_allele.clinvar_key,
-                assertion_criteria=frozendict(data.assertion_criteria)
+                assertion_criteria=assertion_criteria_value
             )
             batch = self.group_batches.get(grouping)
             if not batch or self.batch_size.get(grouping, 0) == 10000:
@@ -488,31 +539,12 @@ class ClinVarExportBatches:
                 submission_body=record.submission_body.pure_json(),
                 submission_grouping=record.submission_grouping.pure_json(),
                 submission_version=CLINVAR_EXPORT_CONVERSION_VERSION,
-                localId=data.local_id,
-                localKey=data.local_key
+                local_id=data.local_id,
+                local_key=data.local_key,
+                submission_deletion=record.delete_pending,
             )
 
             cve.save()
 
             record.status = ClinVarExportStatus.UP_TO_DATE
             record.save()
-
-
-"""
-# CODE for immediate syncing submissions to Exports
-
-@receiver(classification_post_publish_signal, sender=Classification)
-def published(sender,
-              classification: Classification,
-              previously_published: ClassificationModification,
-              newly_published: ClassificationModification,
-              previous_share_level: ShareLevel,
-              user: User,
-              **kwargs):
-    pass
-
-
-@receiver(flag_comment_action, sender=Flag)
-def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: FlagResolution, **kwargs):  # pylint: disable=unused-argument
-    pass
-"""

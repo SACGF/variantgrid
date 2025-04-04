@@ -6,10 +6,8 @@ import requests
 from django.conf import settings
 from django.db import transaction
 from requests import Response
-
-from classification.enums import AlleleOriginBucket
 from classification.models import ClinVarExportBatch, ClinVarExportRequest, ClinVarExportRequestType, \
-    ClinVarExportBatchStatus, ClinVarExportSubmission, ClinVarExportSubmissionStatus
+    ClinVarExportBatchStatus, ClinVarExportSubmission, ClinVarExportSubmissionStatus, ClinVarExportDeleteStatus
 from library.constants import MINUTE_SECS
 from library.log_utils import report_message
 from library.utils import JsonObjType
@@ -159,14 +157,20 @@ class ClinVarExportSync:
         )
 
     def next_request(self, batch: ClinVarExportBatch) -> Tuple[ClinVarExportRequest, ClinVarResponseOutcome]:
-        if batch.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
-            raise ClinVarRequestException(
-                exception_type=ClinVarRequestExceptionType.NOT_SUPPORTED_YET,
-                message="Cannot yet action non-germline submissions"
-            )
-
         clinvar_request: ClinVarExportRequest
-        if not batch.submission_identifier:
+
+        # typical order would be:
+        # Send our full submission to get a submission identifier
+        # Send a polling request using our submission identifier until we get a file URL (likely to be told it's not ready yet)
+        # When we eventually get the file URL, Request that file URL
+
+        if unhandled_request := batch.clinvarexportrequest_set.filter(handled=False).first():
+            # did we error out after getting a request before, and it's not marked as handled?
+            # if so, try to handle it again now (typically after a bug fix has been deployed)
+            clinvar_request = unhandled_request
+
+        elif not batch.submission_identifier:
+            # we haven't uploaded anything at all for this batch
             batch.status = ClinVarExportBatchStatus.UPLOADING
             batch.save()
 
@@ -176,20 +180,18 @@ class ClinVarExportSync:
                 json_data=batch.to_json(),
                 url=self.submission_url)
 
+        elif not batch.file_url:
+            # we haven't been assigned a file yet, keep poling until we get one
+            clinvar_request = self._send_data(
+                batch=batch,
+                request_type=ClinVarExportRequestType.POLLING_SUBMISSION,
+                url=f"{self.submission_url}{batch.submission_identifier}/actions/")
         else:
-            # if self.is_test:
-            #    raise ValueError("ClinVarExport test is set to True, but attempted to perform an action other than initial submission")
-
-            if not batch.file_url:
-                clinvar_request = self._send_data(
-                    batch=batch,
-                    request_type=ClinVarExportRequestType.POLLING_SUBMISSION,
-                    url=f"{self.submission_url}{batch.submission_identifier}/actions/")
-            else:
-                clinvar_request = self._send_data(
-                    batch=batch,
-                    request_type=ClinVarExportRequestType.RESPONSE_FILES,
-                    url=batch.file_url)
+            # we have a file URL, request it
+            clinvar_request = self._send_data(
+                batch=batch,
+                request_type=ClinVarExportRequestType.RESPONSE_FILES,
+                url=batch.file_url)
 
         handle_outcome = self.handle_request_response(clinvar_request)
         batch.refresh_from_db()  # just in case we've indirectly modified it
@@ -243,49 +245,68 @@ class ClinVarExportSync:
         raise ValueError(f"Processing of JSON for request {clinvar_request.pk} couldn't find status of processing, submitted or file")
 
     def _handle_response_file(self, clinvar_request: ClinVarExportRequest) -> ClinVarResponseOutcome:
-        if (response_json := clinvar_request.response_json) and (submissions_json := response_json.get('submissions')):
+        if response_json := clinvar_request.response_json:
             success_count: int = response_json.get("totalSuccess")
+            success_delete_count: int = response_json.get("totalDeleteCount")
+
             submission_set = clinvar_request.submission_batch.clinvarexportsubmission_set
 
-            for submission_json in submissions_json:
-                identifiers_json = submission_json.get("identifiers")
+            # first check deletions if we have any
+            if deletion_json := response_json.get("deletions"):
+                for deletion in deletion_json:
+                    if identifiers := deletion.get("identifiers"):
+                        if delete_scv := identifiers.get("clinvarAccession"):
+                            clinvar_export_submissions = list(submission_set.filter(clinvar_export__scv=delete_scv))
+                            for clinvar_export_submission in clinvar_export_submissions:
+                                clinvar_export_submission: ClinVarExportSubmission
+                                clinvar_export_submission.response_json = identifiers
+                                clinvar_export_submission.status = ClinVarExportSubmissionStatus.SUCCESS
+                                clinvar_export_submission.save()
 
-                clinvar_export_submission: ClinVarExportSubmission
-                local_key = identifiers_json.get("clinvarLocalKey")
-                if clinvar_export_submission := submission_set.filter(localKey=local_key).first():
-                    clinvar_export = clinvar_export_submission.clinvar_export
-                    # TODO, do we want to do anything with the submission? e.g. around status?
+                                # note we only apply the DELETED status to the SCV for the record that was in the submission
+                                # if that SCV is duplicated across our records, the others wont be updated
+                                # it's up to other code and admins to stop duplicates
+                                clinvar_export = clinvar_export_submission.clinvar_export
+                                clinvar_export.classification_based_on = None
+                                clinvar_export.delete_status = ClinVarExportDeleteStatus.DELETED
+                                clinvar_export.save()
 
-                    if scv := identifiers_json.get("clinvarAccession"):
-                        clinvar_export.scv = scv
-                        clinvar_export.save()
+            if submissions_json := response_json.get('submissions'):
+                for submission_json in submissions_json:
+                    identifiers_json = submission_json.get("identifiers")
 
-                        clinvar_export_submission.scv = scv
+                    clinvar_export_submission: ClinVarExportSubmission
+                    local_key = identifiers_json.get("clinvarLocalKey")
+                    if clinvar_export_submission := submission_set.filter(localKey=local_key).first():
+                        clinvar_export = clinvar_export_submission.clinvar_export
+                        # TODO, do we want to do anything with the submission? e.g. around status?
 
-                    new_status: Optional[ClinVarExportSubmissionStatus] = None
-                    if processing_status := submission_json.get("processingStatus"):
-                        if processing_status == "Success":
-                            new_status = ClinVarExportSubmissionStatus.SUCCESS
-                        elif processing_status == "Error":
-                            new_status = ClinVarExportSubmissionStatus.ERROR
-                        # expect statuses of Success or Error
+                        if scv := identifiers_json.get("clinvarAccession"):
+                            clinvar_export.scv = scv
+                            clinvar_export.save()
 
-                    clinvar_export_submission.response_json = submission_json
-                    if new_status:
-                        clinvar_export_submission.status = new_status
+                            clinvar_export_submission.scv = scv
+
+                        new_status: Optional[ClinVarExportSubmissionStatus] = None
+                        if processing_status := submission_json.get("processingStatus"):
+                            if processing_status == "Success":
+                                new_status = ClinVarExportSubmissionStatus.SUCCESS
+                            elif processing_status == "Error":
+                                new_status = ClinVarExportSubmissionStatus.ERROR
+                            # expect statuses of Success or Error
+
+                        clinvar_export_submission.response_json = submission_json
+                        if new_status:
+                            clinvar_export_submission.status = new_status
+                        else:
+                            report_message("ClinVarExportSubmission - could not determine status",
+                                           level='error', extra_data={"target": clinvar_export_submission.pk})
+                        clinvar_export_submission.save()
                     else:
-                        report_message("ClinVarExportSubmission - could not determine status",
-                                       level='error', extra_data={"target": clinvar_export_submission.pk})
-                    clinvar_export_submission.save()
-                else:
-                    report_message("ClinVarExportRequest - could not find localKey",
-                                   level='error', extra_data={"target": clinvar_request.pk, "localKey": local_key})
+                        report_message("ClinVarExportRequest - could not find local_key",
+                                       level='error', extra_data={"target": clinvar_request.pk, "local_key": local_key})
 
-            if not submissions_json:
-                report_message("Expected submissions in ClinVarRequest",
-                               level='error', extra_data={"target": clinvar_request.pk})
-
-            clinvar_request.submission_batch.status = ClinVarExportBatchStatus.SUBMITTED if success_count > 0 else ClinVarExportBatchStatus.REJECTED
+            clinvar_request.submission_batch.status = ClinVarExportBatchStatus.SUBMITTED if (success_count > 0 or success_delete_count > 0) else ClinVarExportBatchStatus.REJECTED
             clinvar_request.submission_batch.save()
 
             return ClinVarResponseOutcome.COMPLETE

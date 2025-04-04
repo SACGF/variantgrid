@@ -7,7 +7,7 @@ from django.utils.timezone import now
 
 from classification.enums import ShareLevel, AlleleOriginBucket
 from classification.models import ClinVarAllele, ClassificationModification, ClinVarExport, \
-    ConditionResolved, ClinVarExportStatus, ClinVarExportTypeBucket
+    ConditionResolved, ClinVarExportStatus, ClinVarExportTypeBucket, ClinVarExportDeleteStatus
 from classification.models.abstract_utils import ConsolidatingMerger
 from library.utils import pretty_collection
 from snpdb.lab_picker import LabPickerData
@@ -52,7 +52,9 @@ class ClinVarConsolidatingMerger(ConsolidatingMerger[ClinVarExport, Classificati
         super().__init__()
 
     def retrieve_established(self) -> Set[ClinVarExport]:
-        return set(ClinVarExport.objects.filter(clinvar_allele=self.clinvar_allele))
+        # retrieve existing ClinVarExport records excluding those deleted or marked for deletion
+        # as we want to delete them based on their SCVs more than anything else
+        return set(ClinVarExport.objects.filter(clinvar_allele=self.clinvar_allele).filter(delete_status=ClinVarExportDeleteStatus.LIVE_RECORD))
 
     def establish_new_candidate(self, new_candidate: ClassificationModificationCandidate) -> ClinVarExport:
         self.log.append(f"Created export record for {new_candidate.condition_umbrella.summary} : {new_candidate.modification.id_str}")

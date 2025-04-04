@@ -48,12 +48,15 @@
             } else if (data === 'N') {
                 dom = $('<i class="fas fa-cloud-upload-alt text-success"></i>')
                 dom.attr('title', 'New submission');
-            } else if (data == 'C') {
+            } else if (data === 'C') {
                 dom = $('<i class="fas fa-cloud-upload-alt text-primary"></i>')
                 dom.attr('title', 'Changes to existing ClinVar record pending');
-            } else if (data == 'X') {
+            } else if (data === 'X') {
                 dom = $('<span/>', {html: [$('<i class="fas fa-globe-americas">'), $('</i><i class="fas fa-times"></i>')]});
                 dom.attr('title', 'Classification has been specifically excluded from ClinVar Export');
+            } else if (data === 'R') {
+                dom = $('<i class="fas text-secondary fa-trash-can"></i>');
+                dom.attr('title', 'Deletion pending');
             } else {
                 dom = $('<span>', {text: data});
             }
@@ -61,6 +64,18 @@
                 dom.attr('data-toggle', 'tooltip');
             }
             return dom.prop('outerHTML');
+        }
+        function renderSCV(data, type, row) {
+            let scv = data.scv;
+            if (_.isEmpty(scv)) {
+                return $('<span class="no-value">-</span>');
+            } else if (data.delete_status == 'R') {
+                return $(`<span class="strike" title="Schedule to be deleted">${scv}</span>`);
+            } else if (data.delete_status == 'Z') {
+                return $(`<span class="strike" title="Deleted from clinvar" style="opacity:0.6">${scv}</span>`);
+            } else {
+                return scv;
+            }
         }
         function renderReleaseStatus(data, type, row) {
             let dom = null;
@@ -79,13 +94,6 @@
                 dom.css('opacity', 0.4);
             }
             return dom.prop('outerHTML');
-        }
-        function renderSCV(data, type, row) {
-            if (!data) {
-                return $('<span>', {text: '-', class:'no-value'}).prop('outerHTML');
-            } else {
-                return data;
-            }
         }
         /*
         function renderId(data, type, row) {
