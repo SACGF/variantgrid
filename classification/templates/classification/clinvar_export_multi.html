@@ -30,7 +30,13 @@
                         <td><a class="hover-link" href="{% url 'clinvar_export' clinvar_export.id %}">{{ clinvar_export.id }}</a></td>
                         <td>{{ clinvar_export.scv | value}}</td>
                         <td>{{ clinvar_export.clinvarexportsubmission_set.exists | boolean }}</td>
-                        <td>{% condition clinvar_export.condition_resolved %}</td>
+                        <td>
+                            {% if clinvar_export.classification_based_on %}
+                                {% condition clinvar_export.condition_resolved %}
+                            {% else %}
+                                <span style="opacity:0.6" title="Conditions for exports without a linked classification are not considered">{% condition clinvar_export.condition_resolved %}</span>
+                            {% endif %}
+                        </td>
                         <td>
                             {% if clinvar_export.classification_based_on %}
                                 {% classification_quick clinvar_export.classification_based_on %}
@@ -56,16 +62,24 @@
                         <tr>
                             <td colspan="5" style="border-top: 1px solid black;border-bottom: 1px solid black; text-align:center">
                                 {% if clinvar_allele_mult.merge_preview.can_action %}
-                                    {{ 'S' | severity_icon }}
+                                    <div>{{ 'S' | severity_icon }} {{ clinvar_allele_mult.merge_preview.status.display }}</div>
                                 {% else %}
-                                    {{ 'E' | severity_icon }}
+                                    <div>{{ 'E' | severity_icon }} {{ clinvar_allele_mult.merge_preview.status.display }}</div>
                                 {% endif %}
-                                {{ clinvar_allele_mult.merge_preview.status.display }}
+                            </td>
+                        </tr>
+                    {% endif %}
+                    {% if clinvar_allele_mult.merge_preview.can_action %}
+                        <tr>
+                            <td colspan="5">
+                                <form method="post" action="{{ request.path }}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-danger">Action Duplicates</button>
+                                </form>
                             </td>
                         </tr>
                     {% endif %}
                 {% endwith %}
-
             </tbody>
         </table>
     </div>
