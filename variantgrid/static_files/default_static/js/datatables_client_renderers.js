@@ -1,12 +1,16 @@
 function renderGeneSymbol(geneSymbol, type, row) {
-    let link = $('<a>', {
-        href: Urls.view_gene_symbol(geneSymbol),
-        class: 'hover-link',
-        html: [
-            $('<span>', {text: geneSymbol}),
-        ]
-    });
-    return link.prop('outerHTML');
+    let link = "";
+    if (geneSymbol) {
+        let linkObj = $('<a>', {
+            href: Urls.view_gene_symbol(geneSymbol),
+            class: 'hover-link',
+            html: [
+                $('<span>', {text: geneSymbol}),
+            ]
+        });
+        link = linkObj.prop('outerHTML');
+    }
+    return link;
 }
 
 function renderAnalysisAuditLogSummary(summary, type, row) {
