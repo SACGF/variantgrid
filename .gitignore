@@ -18,6 +18,7 @@ lint.txt
 /bin/
 /env/
 /env_sapath/
+/.venv/
 /pyvenv.cfg
 /variantgrid/static_files/default_static/django_js_reverse/reverse.js
 **/.sass-cache/
