@@ -293,21 +293,35 @@ class ConditionResolved:
         else:
             return self
 
-    def is_same_or_more_specific(self, other: 'ConditionGroup') -> bool:
+    def same_or_more_specific_step_count(self, other: 'ConditionGroup') -> Optional[int]:
+        """
+        Returns the number of steps to go from this condition to the specific other condition
+        Returns None if self doesn't appear to be a descendant of other
+        :param other:
+        :return:
+        """
         if self.is_multi_condition or other.is_multi_condition:
             # when looking at multiple conditions, do not attempt merging unless we're the exact same
-            return self.terms == other.terms and self.join == other.join
+            if self.terms == other.terms and self.join == other.join:
+                return 0
+            else:
+                return None
         elif self.single_term == other.single_term:
-            return True
+            return 0
         else:
             if other_mondo := other.mondo_term:
                 if self_mondo := self.mondo_term:
-                    descendant_relationships = OntologySnake.check_if_ancestor(descendant=self_mondo,
-                                                                               ancestor=other_mondo)
-                    return bool(descendant_relationships)
+                    if other_mondo.index == 1:
+                        return 99  # MOND:000001 is always going to be an ancestor
+                    if descendant_relationships := OntologySnake.check_if_ancestor(descendant=self_mondo,
+                                                                               ancestor=other_mondo):
+                        return len(descendant_relationships)
 
             # terms cant be converted to MONDO and not exact match, just return False
-            return False
+            return None
+
+    def is_same_or_more_specific(self, other: 'ConditionGroup') -> bool:
+        return self.same_or_more_specific_step_count(other) is not None
 
     @staticmethod
     def more_general_term_if_related(resolved_1: 'ConditionResolved', resolved_2: 'ConditionResolved') -> Optional[

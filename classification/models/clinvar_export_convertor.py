@@ -494,8 +494,9 @@ class ClinVarExportConverter:
 
             if other_classifications_for_key := Classification.objects.filter(
                     withdrawn=False,
-                    variant__in=allele.variants,
+                    allele_info__allele=allele,
                     share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
+                    allele_origin_bucket=self.classification_based_on.classification.allele_origin_bucket,
                     lab__clinvar_key=self.clinvar_key
             ).exclude(id=self.classification_based_on.id):
                 for c in other_classifications_for_key:
@@ -503,7 +504,7 @@ class ClinVarExportConverter:
                     if not has_condition:
                         # make sure it doesn't have an exclude flag, no point complaining about that
                         if not c.flag_collection_safe.get_open_flag_of_type(flag_type=classification_flag_types.classification_not_public):
-                            messages += JsonMessages.error(f"Another classification for this allele '{c.lab_record_id}' has an unresolved condition with text '{c.get(SpecialEKeys.CONDITION)}'")
+                            messages += JsonMessages.error(f'Another classification for this allele & allele origin "{c.cr_lab_id}" has an unresolved condition with text "{c.get(SpecialEKeys.CONDITION)}"')
 
             return ClinVarExportData(
                 clinvar_export=self.clinvar_export_record,

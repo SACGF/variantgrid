@@ -13,6 +13,8 @@
     <div class="container">
         {% labelled label="ClinVar Key" %}{{ clinvar_allele_mult.clinvar_allele.clinvar_key.name }}{% endlabelled %}
         {% labelled label="Allele" %}{{ clinvar_allele_mult.clinvar_allele.allele }}{% endlabelled %}
+        {% labelled label="Export Type" %}{{ clinvar_allele_mult.clinvar_allele.get_clinvar_export_bucket_display }}{% endlabelled %}
+        {% labelled label="ClinVar Allele ID" %}{{ clinvar_allele_mult.clinvar_allele.pk }}{% admin_link clinvar_allele_mult.clinvar_allele %}{% endlabelled %}
         <h4>Existing ClinVar Exports</h4>
         <table class="table">
             <thead>

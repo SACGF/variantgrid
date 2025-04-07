@@ -2,6 +2,7 @@ import itertools
 from collections import defaultdict
 from typing import List, Optional, Set, Iterable
 
+from django.db.models import QuerySet
 from django.utils import timezone
 from django.utils.timezone import now
 
@@ -24,29 +25,22 @@ class ClassificationModificationCandidate:
 
     def __init__(self,
                  modification: ClassificationModification,
-                 allele_origin_bucket: Optional[AlleleOriginBucket] = None,
                  condition_umbrella: Optional[ConditionResolved] = None,
                  failed_candidates: Optional[Set[ClassificationModification]] = None):
         self.modification = modification
-        self.allele_origin_bucket = allele_origin_bucket or modification.classification.allele_origin_bucket
         self.condition_umbrella: ConditionResolved = condition_umbrella or modification.classification.condition_resolution_obj.as_mondo_if_possible()
         self.failed_candidates: Set[ClassificationModification] = failed_candidates or set()
 
         if self.condition_umbrella is None or not bool(self.condition_umbrella.terms):
             raise ValueError("Candidate must have a resolved condition associated with it")
 
-        if self.allele_origin_bucket not in (AlleleOriginBucket.GERMLINE, AlleleOriginBucket.SOMATIC):
-            raise ValueError(f"Candidate must have an allele origin of germline or somatic, not {modification.classification.allele_origin_bucket}")
-
 
 class ClinVarConsolidatingMerger(ConsolidatingMerger[ClinVarExport, ClassificationModificationCandidate]):
 
     def __init__(self,
                  clinvar_allele: ClinVarAllele,
-                 allele_origin_bucket: AlleleOriginBucket,
                  force_update: bool = True):
         self.clinvar_allele = clinvar_allele
-        self.allele_origin_bucket = allele_origin_bucket
         self.log: List[str] = []
         self.force_update = force_update
         super().__init__()
@@ -54,7 +48,7 @@ class ClinVarConsolidatingMerger(ConsolidatingMerger[ClinVarExport, Classificati
     def retrieve_established(self) -> Set[ClinVarExport]:
         # retrieve existing ClinVarExport records excluding those deleted or marked for deletion
         # as we want to delete them based on their SCVs more than anything else
-        return set(ClinVarExport.objects.filter(clinvar_allele=self.clinvar_allele).filter(delete_status=ClinVarExportDeleteStatus.LIVE_RECORD))
+        return set(ClinVarExport.objects.filter(clinvar_allele=self.clinvar_allele, delete_status=ClinVarExportDeleteStatus.LIVE_RECORD))
 
     def establish_new_candidate(self, new_candidate: ClassificationModificationCandidate) -> ClinVarExport:
         self.log.append(f"Created export record for {new_candidate.condition_umbrella.summary} : {new_candidate.modification.id_str}")
@@ -80,7 +74,6 @@ class ClinVarConsolidatingMerger(ConsolidatingMerger[ClinVarExport, Classificati
                 failed_candidates.add(mod_2)
             return ClassificationModificationCandidate(
                 modification=best_modification,
-                allele_origin_bucket=self.allele_origin_bucket,
                 condition_umbrella=general_condition,
                 failed_candidates=failed_candidates)
         else:
@@ -159,7 +152,7 @@ class ClinvarExportPrepare:
             allele=allele,
             clinvar_export_bucket=clinvar_export_bucket
         )
-        clinvar_merger = ClinVarConsolidatingMerger(clinvar_allele, allele_origin_bucket=clinvar_export_bucket)
+        clinvar_merger = ClinVarConsolidatingMerger(clinvar_allele)
 
         def is_valid_candidate_for(mod: ClassificationModification, bucket: ClinVarExportTypeBucket):
             if bucket == ClinVarExportTypeBucket.GERMLINE:
@@ -167,13 +160,14 @@ class ClinvarExportPrepare:
             elif bucket in {ClinVarExportTypeBucket.ONCOGENIC, ClinVarExportTypeBucket.CLINICAL_IMPACT}:
                 return mod.classification.allele_origin_bucket == AlleleOriginBucket.SOMATIC
 
+        modifications = [mod for mod in modifications if is_valid_candidate_for(mod, clinvar_export_bucket)]
+
         no_condition_count = 0
         for mod in modifications:
-            if is_valid_candidate_for(mod, clinvar_export_bucket):
-                if ClinvarExportPrepare._has_condition(mod):
-                    clinvar_merger.add_new_candidate(ClassificationModificationCandidate(mod))
-                else:
-                    no_condition_count += 1
+            if ClinvarExportPrepare._has_condition(mod):
+                clinvar_merger.add_new_candidate(ClassificationModificationCandidate(mod))
+            else:
+                no_condition_count += 1
         clinvar_merger.consolidate()
 
         total = clinvar_allele.clinvarexport_set.count()
@@ -187,7 +181,10 @@ class ClinvarExportPrepare:
         clinvar_allele.save()
 
         log = clinvar_merger.log
-        log = [f"{clinvar_key} : {entry}" for entry in log if not entry.startswith("No change")]
+        log.insert(0, f"Considered {len(modifications)} for {ClinVarExportTypeBucket(clinvar_export_bucket).name}")
+        # for entry in log:
+        #
+        # log = [f"{clinvar_key} : {entry}" for entry in log if not entry.startswith("No change")]
 
         if no_condition_count:
             if no_condition_count == 1:
@@ -198,23 +195,29 @@ class ClinvarExportPrepare:
         return log
 
     @staticmethod
-    def update_export_records_for_keys(clinvar_keys: Set[ClinVarKey]) -> ClinVarAlleleExportLog:
-        # work on clinvar keys, not on labs, as a user could have access to one lab but the clinvar key might be for 2
-        # and a clinvar key has to get all labs updated or none, can't deal with partial
+    def get_all_candidates(clinvar_keys: Set[ClinVarKey], single_allele: Optional[Allele] = None) -> QuerySet[ClassificationModification]:
         clinvar_labs = Lab.objects.filter(clinvar_key__in=clinvar_keys)
-
         all_classifications = ClassificationModification.objects.filter(
             classification__withdrawn=False,
             classification__share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
             classification__lab__in=clinvar_labs,
             is_last_published=True,
-            classification__allele__isnull=False
+            classification__allele_info__allele__isnull=False
         ).select_related(
             'classification',
             'classification__allele_info__allele',
             'classification__lab',
             'classification__lab__clinvar_key'
-        ).order_by('classification__allele_id', 'classification__lab__clinvar_key_id').iterator(chunk_size=1000)
+        ).order_by('classification__allele_info__allele_id', 'classification__lab__clinvar_key_id')
+        if single_allele:
+            all_classifications.filter(classification__allele_info__allele=single_allele)
+        return all_classifications.iterator(chunk_size=1000)
+
+    @staticmethod
+    def update_export_records_for_keys(clinvar_keys: Set[ClinVarKey]) -> ClinVarAlleleExportLog:
+        # work on clinvar keys, not on labs, as a user could have access to one lab but the clinvar key might be for 2
+        # and a clinvar key has to get all labs updated or none, can't deal with partial
+        all_classifications = ClinvarExportPrepare.get_all_candidates(clinvar_keys)
 
         combined_log = []
 

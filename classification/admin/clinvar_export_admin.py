@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarAllele, ClinVarExportBatchStatus, \
     ClinVarExportRequest, ClinVarExportSubmission
+from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.models.clinvar_export_sync import clinvar_export_sync, ClinVarRequestException
 from snpdb.admin_utils import AllValuesChoicesFieldListFilter, ModelAdminBasics, admin_action, admin_list_column, \
     admin_model_action
@@ -140,7 +141,7 @@ class ClinVarExportAdmin(ModelAdminBasics):
 
 @admin.register(ClinVarAllele)
 class ClinVarAlleleAdmin(ModelAdminBasics):
-    list_display = ("pk", "clinvar_key", "allele", "classifications_missing_condition", "submissions_valid", "submissions_invalid", "last_evaluated")
+    list_display = ("pk", "clinvar_key", "allele", "clinvar_export_bucket", "classifications_missing_condition", "submissions_valid", "submissions_invalid", "last_evaluated")
     search_fields = ("pk", "allele__pk")
     list_filter = (('clinvar_key', admin.RelatedFieldListFilter), )
 
@@ -152,6 +153,15 @@ class ClinVarAlleleAdmin(ModelAdminBasics):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    @admin_action("Refresh")
+    def refresh(self, request, queryset: QuerySet[ClinVarAllele]):
+        for cva in queryset:
+            modifications = list(ClinvarExportPrepare.get_all_candidates(clinvar_keys={cva.clinvar_key}, single_allele=cva.allele))
+            messages.info(request, message=f"ClinVarAllele {cva.pk} : has {len(modifications)} classifications to consider")
+            logs = ClinvarExportPrepare.process_allele(clinvar_key=cva.clinvar_key, allele=cva.allele, clinvar_export_bucket=cva.clinvar_export_bucket, modifications=modifications)
+            for log in logs:
+                messages.info(request, message=f"ClinVarAllele {cva.pk} : {log}")
 
 
 class ClinVarExportRequestAdmin(admin.TabularInline):
