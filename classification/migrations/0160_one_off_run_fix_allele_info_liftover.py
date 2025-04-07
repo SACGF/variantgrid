@@ -17,6 +17,7 @@ def _test_needs_imported_allele_info_liftover(apps):
 class Migration(migrations.Migration):
 
     dependencies = [
+        ('snpdb', '0164_one_off_add_genome_build_slug'),
         ('classification', '0159_classification_grouping'),
     ]
 
