@@ -138,15 +138,12 @@ def grid_export_csv(colmodels, items) -> Iterator[str]:
     writer = csv.writer(pseudo_buffer, dialect='excel', quoting=csv.QUOTE_MINIMAL)
     writer.writerow(header)
 
-    def iter_row_writer():
+    yield pseudo_buffer.value
+    for obj in items:
+        # labels dict is in same sorted order as header
+        row = [obj.get(k) for k in labels]
+        writer.writerow(row)
         yield pseudo_buffer.value
-        for obj in items:
-            # labels dict is in same sorted order as header
-            row = [obj.get(k) for k in labels]
-            writer.writerow(row)
-            yield pseudo_buffer.value
-
-    return iter_row_writer
 
 
 def colmodel_header_labels(colmodels, label_overrides=None):

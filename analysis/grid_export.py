@@ -103,13 +103,10 @@ def _grid_export_vcf(genome_build, colmodels, items, sample_ids, sample_names_by
         escapechar="\\",
     )
 
-    def iter_row_writer():
-        for obj in items:
-            record = _grid_item_to_vcf_record(info_dict, obj, sample_ids, samples, use_accession=use_accession)
-            vcf_writer.write_record(record)
-            yield pseudo_buffer.value
-
-    return iter_row_writer
+    for obj in items:
+        record = _grid_item_to_vcf_record(info_dict, obj, sample_ids, samples, use_accession=use_accession)
+        vcf_writer.write_record(record)
+        yield pseudo_buffer.value
 
 
 def _get_column_vcf_info():

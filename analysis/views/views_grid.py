@@ -161,7 +161,7 @@ def node_grid_export(request, analysis_id):
 
 
 def _get_streaming_response(filename, file_iterator):
-    response = StreamingHttpResponse(file_iterator(), content_type="text/csv")
+    response = StreamingHttpResponse(file_iterator, content_type="text/csv")
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
 
