@@ -38,6 +38,9 @@ class Command(BaseCommand):
                            help="Add new dbNSFP to existing gene annotation")
         group.add_argument('--fix-bad-gene-annotation', action="store_true",
                            help="Fix for bad gene IDs, dbNSFP not linked")
+        group.add_argument('--add-missing-omim', action="store_true",
+                           help="Add omim terms if missing due to no direct OMIM import and snake max_depth=0")
+
 
     def handle(self, *args, **options):
         if not settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED:
@@ -69,6 +72,10 @@ class Command(BaseCommand):
 
         if options["fix_bad_gene_annotation"]:
             self._fix_bad_gene_annotation(gene_symbols)
+            return
+
+        if options["add_missing_omim"]:
+            self._add_missing_omim()
             return
 
         if gar_id:
@@ -228,6 +235,38 @@ class Command(BaseCommand):
         print("Fixed gene annotation versions:")
         for gav in fixed:
             print(f"{gav.pk}: {gav}")
+
+    def _add_missing_omim(self):
+        for gav in GeneAnnotationVersion.objects.filter(ontology_version__omim_import__isnull=True):
+            ga_qs = gav.geneannotation_set.all()
+            if ga_qs.filter(omim_terms__isnull=False).exists():
+                continue  # Has OMIM already
+
+            print(f"Re-calculating OMIM terms for {gav}")
+            gene_symbol_for_gene = {}
+            for rgv in gav.gene_annotation_release.releasegeneversion_set.all().select_related("gene_version"):
+                gene_symbol_for_gene[rgv.gene_version.gene_id] = rgv.gene_version.gene_symbol_id
+
+            update_records = []
+            skip_genes = set()
+            for ga in ga_qs:
+                if gene_symbol := gene_symbol_for_gene.get(ga.gene_id):
+                    try:
+                        snake = gav.ontology_version.terms_for_gene_symbol(gene_symbol, OntologyService.OMIM, max_depth=1)
+                        if omim_terms := self.TERM_JOIN_STRING.join((str(lt) for lt in snake.leafs())):
+                            ga.omim_terms = omim_terms
+                            update_records.append(ga)
+                    except ValueError:
+                        skip_genes.add(gene_symbol)
+
+            if skip_genes:
+                skip_examples = ','.join(list(skip_genes)[:10])
+                print(f"{gav} - Skipped {len(skip_genes)} gene symbols (not HGNC) ({skip_examples} ....)")
+
+            if update_records:
+                print(f"{gav} - Updating {len(update_records)} records....")
+                GeneAnnotation.objects.bulk_update(update_records, ["omim_terms"], batch_size=1000)
+
 
     @staticmethod
     def _get_gene_disease(ontology_version, gene_symbol, delimiter: str):
