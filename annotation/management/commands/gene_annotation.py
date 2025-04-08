@@ -276,7 +276,7 @@ class Command(BaseCommand):
             service_terms = {}
             gene_symbol = hgnc_ot.name
             for ontology_service in [OntologyService.OMIM, OntologyService.HPO, OntologyService.MONDO]:
-                snake = gav.ontology_version.terms_for_gene_symbol(gene_symbol, ontology_service, max_depth=0)
+                snake = gav.ontology_version.terms_for_gene_symbol(gene_symbol, ontology_service, max_depth=1)
                 service_terms[ontology_service] = self.TERM_JOIN_STRING.join((str(lt) for lt in snake.leafs()))
 
             gene_disease_supportive_or_below, gene_disease_moderate_or_above = self._get_gene_disease(gav.ontology_version,
