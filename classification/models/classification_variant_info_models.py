@@ -491,6 +491,13 @@ class ImportedAlleleInfo(TimeStampedModel):
     def __str__(self):
         return f"{self.imported_genome_build_patch_version} {self.imported_c_hgvs or self.imported_g_hgvs}"
 
+    @classmethod
+    @property
+    def supported_genome_builds(cls) -> set:
+        """ While we have hardcoded genome builds, we can only use these. Eventually can remove this and/or
+            just return all annotated builds here """
+        return {GenomeBuild.grch37(), GenomeBuild.grch38()}
+
     @staticmethod
     def column_name_for_build(genome_build: GenomeBuild, prefix: str = "", suffix: str = 'c_hgvs'):
         build_str: str
