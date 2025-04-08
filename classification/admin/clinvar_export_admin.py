@@ -11,6 +11,7 @@ from django.utils import timezone
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarAllele, ClinVarExportBatchStatus, \
     ClinVarExportRequest, ClinVarExportSubmission
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
+from classification.models.clinvar_export_prepare_2 import ClinVarExportManager
 from classification.models.clinvar_export_sync import clinvar_export_sync, ClinVarRequestException
 from snpdb.admin_utils import AllValuesChoicesFieldListFilter, ModelAdminBasics, admin_action, admin_list_column, \
     admin_model_action
@@ -157,11 +158,9 @@ class ClinVarAlleleAdmin(ModelAdminBasics):
     @admin_action("Refresh")
     def refresh(self, request, queryset: QuerySet[ClinVarAllele]):
         for cva in queryset:
-            modifications = list(ClinvarExportPrepare.get_all_candidates(clinvar_keys={cva.clinvar_key}, single_allele=cva.allele))
-            messages.info(request, message=f"ClinVarAllele {cva.pk} : has {len(modifications)} classifications to consider")
-            logs = ClinvarExportPrepare.process_allele(clinvar_key=cva.clinvar_key, allele=cva.allele, clinvar_export_bucket=cva.clinvar_export_bucket, modifications=modifications)
-            for log in logs:
-                messages.info(request, message=f"ClinVarAllele {cva.pk} : {log}")
+            logs = ClinVarExportManager(cva.clinvar_key).run_for_single(cva)
+            for entry in logs:
+                messages.info(request, entry)
 
 
 class ClinVarExportRequestAdmin(admin.TabularInline):

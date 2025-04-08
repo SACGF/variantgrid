@@ -516,7 +516,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                             default=AlleleOriginBucket.GERMLINE)
     """ Used to cache if we consider this classification germline or somatic """
 
-    condition_resolution = models.JSONField(null=True, blank=True)  # of type ConditionProcessedDict
+    condition_resolution = models.JSONField(null=True, blank=True)  # of type ConditionResolvedDict
 
     summary = models.JSONField(null=False, blank=True, default=dict)  # useful for overall classification details
     """ Will be a ClassificationSummaryCacheDict """

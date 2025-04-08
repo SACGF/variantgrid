@@ -585,6 +585,7 @@ def clinvar_export_refresh(request: HttpRequest, clinvar_key_id: str) -> HttpRes
     logs = ClinvarExportPrepare.update_export_records_for_keys(clinvar_keys={clinvar_key, })
     print("\n".join(logs))
     messages.add_message(request, level=messages.INFO, message="Prepare complete")
+    # return render(request, 'blank.html', {})
     # TODO, actually store or display the logs somewhere - against the ClinVarAlleles?
     return redirect(reverse('clinvar_key_summary', kwargs={'clinvar_key_id': clinvar_key_id}))
 

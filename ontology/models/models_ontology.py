@@ -986,7 +986,7 @@ class OntologySnake:
     @staticmethod
     def check_if_ancestor(descendant: OntologyTerm, ancestor: OntologyTerm, max_levels=4) -> list['OntologySnake']:
         if ancestor == descendant:
-            return OntologySnake(source_term=ancestor, leaf_term=descendant)
+            return [OntologySnake(source_term=ancestor, leaf_term=descendant)]
 
         if descendant.ontology_service != ancestor.ontology_service:
             raise ValueError(f"Can only check for ancestry within the same ontology service, not {descendant.ontology_service} vs {ancestor.ontology_service}")
