@@ -11,7 +11,6 @@ from django.utils import timezone
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarAllele, ClinVarExportBatchStatus, \
     ClinVarExportRequest, ClinVarExportSubmission
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
-from classification.models.clinvar_export_prepare_2 import ClinVarExportManager
 from classification.models.clinvar_export_sync import clinvar_export_sync, ClinVarRequestException
 from snpdb.admin_utils import AllValuesChoicesFieldListFilter, ModelAdminBasics, admin_action, admin_list_column, \
     admin_model_action
@@ -142,7 +141,7 @@ class ClinVarExportAdmin(ModelAdminBasics):
 
 @admin.register(ClinVarAllele)
 class ClinVarAlleleAdmin(ModelAdminBasics):
-    list_display = ("pk", "clinvar_key", "allele", "clinvar_export_bucket", "classifications_missing_condition", "submissions_valid", "submissions_invalid", "last_evaluated")
+    list_display = ("pk", "clinvar_key", "allele", "clinvar_export_bucket", "last_evaluated")
     search_fields = ("pk", "allele__pk")
     list_filter = (('clinvar_key', admin.RelatedFieldListFilter), )
 
@@ -158,7 +157,7 @@ class ClinVarAlleleAdmin(ModelAdminBasics):
     @admin_action("Refresh")
     def refresh(self, request, queryset: QuerySet[ClinVarAllele]):
         for cva in queryset:
-            logs = ClinVarExportManager(cva.clinvar_key).run_for_single(cva)
+            logs = ClinvarExportPrepare(cva.clinvar_key).run_for_single(cva)
             for entry in logs:
                 messages.info(request, entry)
 

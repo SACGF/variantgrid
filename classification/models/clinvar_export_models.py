@@ -31,9 +31,6 @@ class ClinVarAllele(TimeStampedModel):
     allele = models.ForeignKey(Allele, on_delete=models.CASCADE)
     clinvar_key = models.ForeignKey(ClinVarKey, null=True, blank=True, on_delete=models.CASCADE)
     clinvar_export_bucket = models.CharField(max_length=1, choices=ClinVarExportTypeBucket.choices, default=ClinVarExportTypeBucket.GERMLINE)
-    classifications_missing_condition = models.IntegerField(default=0)
-    submissions_valid = models.IntegerField(default=0)
-    submissions_invalid = models.IntegerField(default=0)
     last_evaluated = models.DateTimeField(default=now)
 
     def __str__(self):
