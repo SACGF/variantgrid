@@ -111,10 +111,35 @@
                         False
                     {% endif %}
                 </td>
-                <td class="text-center">{{ transcript_version.hgvs_ok | boolean }}</td>
+                <td class="text-center">
+                    <span title="{{ transcript_version.hgvs_error_tooltip }}">
+                        {{ transcript_version.hgvs_ok | boolean }}
+                    </span>
+                </td>
                 <td>
-                    {% modal id="transcript-"|append:transcript_version.pk|append:"-json" label="JSON" %}
-                        {% code_json transcript_version.data css_class="modal-body" %}
+                    {% modal id="transcript-"|append:transcript_version.pk|append:"-json" label="Transcript Version Data" %}
+                        <div class="modal-body">
+                            {% with hgvs_data_errors=transcript_version.hgvs_data_errors %}
+                                {% if hgvs_data_errors %}
+                                    <div>
+                                        <h3>HGVS Data errors</h3>
+
+                                        <p>This cannot be used for local HGVS resolution due to the following problems:</p>
+                                        <div class="error alert-error" role="alert">
+                                            {% for error_key, error_value in hgvs_data_errors.items %}
+                                                <i class="fas fa-exclamation-triangle text-error"></i> {{ error_key }}: {{ error_value }}
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% endwith %}
+
+                            <div>
+                                <h3>JSON</h3>
+
+                                {% code_json transcript_version.data %}
+                            </div>
+                        </div>
                     {% endmodal %}
                 </td>
                 {% if user.is_staff %}
