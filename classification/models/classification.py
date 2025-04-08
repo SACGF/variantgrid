@@ -2710,7 +2710,7 @@ class ClassificationDate:
         if self.datetime and other.datetime:
             return self.datetime < other.datetime
         else:
-            return self.date or date.min < other.date or date.min
+            return (self.date or date.min) < (other.date or date.min)
 
 
 CLASSIFICATION_DATE_REGEX = re.compile(r"(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-(?P<day>[0-9]{2})")
