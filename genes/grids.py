@@ -191,6 +191,7 @@ class GenesGrid(JqGridUserRowConfig):
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
 
         # TODO: Put back all the other fields - joining to HGNC and to GeneAnnotation
+        q_and_list = []
 
         av = AnnotationVersion.latest(genome_build)
         gene_annotation_release_id = av.gene_annotation_version.gene_annotation_release_id
@@ -198,7 +199,7 @@ class GenesGrid(JqGridUserRowConfig):
             if contig_id := extra_filters.get("contig_id"):
                 contig = Contig.objects.get(pk=contig_id)
                 gene_versions = TranscriptVersion.objects.filter(contig=contig).values_list("gene_version_id", flat=True)
-                queryset = queryset.filter(gene_version__in=gene_versions)
+                q_and_list.append(Q(gene_version__in=gene_versions))
 
             if gar_id := extra_filters.get("gene_annotation_release_id"):
                 gene_annotation_release_id = gar_id
@@ -207,16 +208,20 @@ class GenesGrid(JqGridUserRowConfig):
                 if column in self.fields:
                     is_null = extra_filters.get("is_null", False)
                     kwargs = {f"{column}__isnull": is_null}
-                    queryset = queryset.filter(**kwargs)
+                    q_and_list.append(Q(**kwargs))
                 else:
                     raise PermissionDenied(f"Bad column '{column}'")
 
         gene_annotation_version = GeneAnnotationVersion.objects.filter(gene_annotation_release_id=gene_annotation_release_id).order_by("annotation_date").last()
         if gene_annotation_version is None:
             raise InvalidAnnotationVersionError(f"No gene annotation version for gene_annotation_release: {gene_annotation_release_id}")
-        queryset = queryset.filter(release_id=gene_annotation_release_id)
-        queryset = queryset.filter(gene_version__gene__geneannotation__version=gene_annotation_version)
-        self.queryset = queryset.values(*self.get_field_names())
+
+        q_and_list.extend([
+            Q(release_id=gene_annotation_release_id),
+            Q(gene_version__gene__geneannotation__version=gene_annotation_version),
+        ])
+        q = reduce(operator.and_, q_and_list)
+        self.queryset = queryset.filter(q).values(*self.get_field_names())
         grid_export_url = reverse("genes_grid", kwargs={"genome_build_name": genome_build_name,
                                                         "op": JQGridViewOp.DOWNLOAD})
         self.extra_config.update({'sortname': 'gene_version__gene_symbol',
