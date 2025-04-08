@@ -1172,15 +1172,32 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
                 last_end = cdna_end
         return cdna_match_errors
 
+    def hgvs_data_errors(self) -> dict[str, str]:
+        data_errors = {}
+        for key in ["contig", "strand", "exons"]:
+            try:
+                _ = self.genome_build_data[key]
+            except KeyError:
+                data_errors[key] = f"Field missing"
+
+        if error := (self.data.get("error") or self.genome_build_data.get("error")):
+            data_errors["error"] = error
+
+        if cdna_errors := self._validate_cdna_match():
+            data_errors["cdna_match"] = ", ".join(cdna_errors)
+
+        return data_errors
+
     @property
     def has_valid_data(self) -> bool:
-        try:
-            for key in ["contig", "strand", "exons"]:
-                _ = self.genome_build_data[key]
-        except KeyError:
-            return False
+        return not self.hgvs_data_errors()
 
-        return not ("error" in self.data or self._validate_cdna_match())
+    @property
+    def hgvs_error_tooltip(self) -> str:
+        field_errors = []
+        for k, v in self.hgvs_data_errors().items():
+            field_errors.append(f"{k}: {v}")
+        return ", ".join(field_errors)
 
     def get_differences(self, transcript_version):
         """ Used to inform while HGVS may resolve differently """
