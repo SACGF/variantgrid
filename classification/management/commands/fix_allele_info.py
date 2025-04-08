@@ -7,7 +7,7 @@ from classification.models import ImportedAlleleInfo
 from snpdb.models import GenomeBuild
 
 
-class FixAlleleInfoCommand(BaseCommand):
+class Command(BaseCommand):
     """
         At the moment this is only used for liftover but I'm using subcommands so we can have multiple fixes
     """
