@@ -16,6 +16,7 @@ from django.db.models.functions.text import Concat
 from django.db.models.query_utils import Q, FilteredRelation
 from django.dispatch import receiver
 from django.urls.base import reverse
+from django.utils.text import slugify
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 from pydantic import field_validator
@@ -991,8 +992,17 @@ class AlleleLiftover(models.Model):
     # There will only ever be 1 successful AlleleLiftover for a VariantAllele - the one that populated it
     variant_allele = models.OneToOneField(VariantAllele, null=True, blank=True, on_delete=CASCADE)
     status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)
-    error_message = models.TextField()  # This will be deleted
+    data = models.JSONField(null=True)  # Per-tool extra info about liftover
     error = models.JSONField(null=True)  # Only set on error - uses ERROR_JSON_MESSAGE_KEY key in dict
+
+    def set_info(self, info: dict):
+        print(f"Setting AlleleLiftover({self.pk}): {info=}")
+        data = self.data or {}
+        data[self._get_data_key()] = info
+        self.data = data
+
+    def _get_data_key(self) -> str:
+        return slugify(self.liftover.get_conversion_tool_display()) + "-vcf-info"
 
     def error_tidy(self) -> str | dict:
         # If the JSON is just message=, grab the message
@@ -1001,6 +1011,7 @@ class AlleleLiftover(models.Model):
                 if len(error_json.keys()) == 1:
                     return message
             return error_json
+        return {}
 
     class Meta:
         unique_together = ('liftover', 'allele')

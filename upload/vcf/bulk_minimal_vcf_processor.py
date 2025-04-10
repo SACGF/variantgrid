@@ -25,7 +25,8 @@ class BulkMinimalVCFProcessor(AbstractBulkVCFProcessor):
                                                             code_git_hash=Git(settings.BASE_DIR).hash)
         return vcf_importer
 
-    def process_entry(self, variant: cyvcf2.Variant):
+    def process_entry(self, variant: cyvcf2.Variant) -> tuple[VariantCoordinate, str]:
+        """ :return variant coordinate, variant_hash """
         ref, alt, svlen = self.get_ref_alt_svlen(variant)
         variant_coordinate = VariantCoordinate(chrom=variant.CHROM, position=variant.POS, ref=ref, alt=alt, svlen=svlen)
         variant_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant_coordinate)
@@ -33,14 +34,16 @@ class BulkMinimalVCFProcessor(AbstractBulkVCFProcessor):
         self.add_modified_imported_variant(variant, variant_hash)
         self.batch_process_check()
         self.rows_processed += 1
+        return variant_coordinate, variant_hash
 
-    def batch_handle_variant_ids(self, variant_ids):
+    def batch_handle_variant_ids(self, variant_ids) -> dict:
         variant_ids_by_hash = dict(zip(self.variant_hashes, variant_ids))
         if self.modified_imported_variants:
             self.process_modified_imported_variants(variant_ids_by_hash)
 
         self.set_max_variant(self.variant_hashes, variant_ids)
         self.variant_hashes = []
+        return variant_ids_by_hash
 
     def batch_process_check(self, minimum_insert_size=None):
         if minimum_insert_size is None:

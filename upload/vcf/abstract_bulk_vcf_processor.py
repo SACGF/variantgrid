@@ -8,6 +8,7 @@ from django.conf import settings
 
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.genomics.vcf_utils import vcf_get_ref_alt_svlen_and_modification
+from snpdb.models import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import UploadStep, ModifiedImportedVariant, UploadStepTaskType, VCFPipelineStage, \
     SimpleVCFImportInfo, ModifiedImportedVariantOperation
@@ -36,7 +37,8 @@ class AbstractBulkVCFProcessor(abc.ABC):
         self.svlen_modifications = Counter()
 
     @abc.abstractmethod
-    def process_entry(self, variant: cyvcf2.Variant):
+    def process_entry(self, variant: cyvcf2.Variant) -> tuple[VariantCoordinate, str]:
+        """ :return variant coordinate, variant_hash """
         pass
 
     @abc.abstractmethod

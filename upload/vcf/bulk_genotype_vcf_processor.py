@@ -335,7 +335,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         self.locus_modified_imported_variants = []
         self.locus_ad_sum.fill(0)
 
-    def process_entry(self, variant: cyvcf2.Variant):
+    def process_entry(self, variant: cyvcf2.Variant) -> tuple[VariantCoordinate, str]:
+        """ :return variant coordinate, variant_hash """
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
         ref, alt, svlen = self.get_ref_alt_svlen(variant)
         locus_tuple = (variant.CHROM, variant.POS, ref)
@@ -371,7 +372,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         samples_filters_str = self.get_samples_filters_str(variant)
 
         variant_coordinate = VariantCoordinate(chrom=variant.CHROM, position=variant.POS, ref=ref, alt=alt, svlen=svlen)
-        alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant_coordinate)
+        variant_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant_coordinate)
         format_json = self._get_format_json(self.num_samples, variant)
         info_json = self._get_info_json(variant)
 
@@ -412,14 +413,14 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             simplejson.dumps(info_json, ignore_nan=True, default=json_default_converter),
         ]
 
-        self.locus_variant_hashes.append(alt_hash)
+        self.locus_variant_hashes.append(variant_hash)
         self.locus_filters.append(self.convert_filters(variant.FILTER))
         self.locus_cohort_genotypes.append(cohort_gt)
         gnomad_af = variant.INFO.get(settings.VCF_IMPORT_COMMON_FILTER_INFO)
         self.locus_gnomad_af.append(gnomad_af)
 
         if self.preprocess_vcf_import_info:
-            self.add_modified_imported_variant(variant, alt_hash,
+            self.add_modified_imported_variant(variant, variant_hash,
                                                miv_hash_list=self.locus_modified_imported_variant_hashes,
                                                miv_list=self.locus_modified_imported_variants)
 
@@ -428,6 +429,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
         self.rows_processed += 1
         self.batch_process_check()
+        return variant_coordinate, variant_hash
+
 
     def check_pipeline_for_failures(self):
         """ If a pipeline has already died, quit the Reading early to save doing useless work
