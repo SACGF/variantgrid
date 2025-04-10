@@ -54,6 +54,11 @@ class VariantTestCase(TestCase):
         self._test_internal_to_external_and_back(variant_coordinate, genome_build)
         self._test_to_and_from_string(variant_coordinate, genome_build)
 
+    def test_internal_representation_ref(self):
+        vc_ref = VariantCoordinate(chrom='21', position=47532744, ref='T', alt='T')
+        vc_internal = vc_ref.as_internal_canonical_form(self.grch37)
+        self.assertEqual(vc_internal.alt, Variant.REFERENCE_ALT)
+
     def test_del(self):
         vc = VariantCoordinate(chrom='21', position=47532744, ref='T', alt='<DEL>', svlen=-1224)
         self._test_coordinate_conversion(vc, self.grch37)
@@ -100,14 +105,14 @@ class VariantTestCase(TestCase):
     def test_short_symbolic_alt(self):
         vc = VariantCoordinate(chrom='3', position=37047542, ref='A', alt="<DUP>",
                                svlen=settings.VARIANT_SYMBOLIC_ALT_SIZE-1)
-        vc = vc.as_symbolic_or_explicit_according_to_size(self.grch37)
+        vc = vc.as_internal_canonical_form(self.grch37)
         self.assertIsNone(vc.svlen)
 
-    def test_as_symbolic_or_explicit_according_to_size(self):
+    def test_as_internal_canonical_form(self):
         # test for issue #1214 - however we get there, it should end up the same
         vc_symbolic = VariantCoordinate(chrom='1', position=1000000, ref='T', alt='<DUP>', svlen=999)
         vc_explicit = vc_symbolic.as_external_explicit(self.grch37)
 
-        vc_from_symbolic = vc_symbolic.as_symbolic_or_explicit_according_to_size(self.grch37)
-        vc_from_explicit = vc_explicit.as_symbolic_or_explicit_according_to_size(self.grch37)
+        vc_from_symbolic = vc_symbolic.as_internal_canonical_form(self.grch37)
+        vc_from_explicit = vc_explicit.as_internal_canonical_form(self.grch37)
         self.assertEqual(vc_from_symbolic, vc_from_explicit)
