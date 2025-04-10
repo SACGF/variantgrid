@@ -8,11 +8,11 @@ from django.utils.timezone import now
 from frozendict import frozendict
 from model_utils.models import TimeStampedModel
 from classification.models import ClassificationModification, ConditionResolved
-from classification.models.clinvar_export_enums import ClinVarExportTypeBucket
 from library.preview_request import PreviewModelMixin, PreviewData, PreviewKeyValue
 from library.utils import first, invalidate_cached_property, JsonObjType
-from snpdb.models import ClinVarKey, Allele
+from snpdb.models import ClinVarKey, Allele, ClinVarExportTypeBucket
 from uicore.json.validated_json import ValidatedJson, JsonMessages
+
 
 CLINVAR_EXPORT_CONVERSION_VERSION = 4
 

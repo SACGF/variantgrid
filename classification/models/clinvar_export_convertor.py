@@ -9,11 +9,12 @@ from annotation.regexes import db_citation_regexes
 from classification.enums import SpecialEKeys, EvidenceKeyValueType, ShareLevel, AlleleOriginBucket
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
     MultiCondition, ClinVarExport, classification_flag_types, Classification, ClinVarExportStatus, \
-    ClinVarExportSubmission, CLINVAR_EXPORT_CONVERSION_VERSION, ClinVarExportTypeBucket, CuratedDate
+    ClinVarExportSubmission, CLINVAR_EXPORT_CONVERSION_VERSION, CuratedDate
 from genes.hgvs import CHGVS
 from library.utils import html_to_text, JsonObjType, JsonDiffs, invalidate_cached_property
 from ontology.models import OntologyTerm, OntologyService, OntologyTermStatus
-from snpdb.models import ClinVarKey, ClinVarCitationsModes
+from snpdb.models import ClinVarKey, ClinVarCitationsModes, ClinVarExportTypeBucket, ClinVarExportAssertionMethod, \
+    ClinVarCitationSource
 from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
 
 """
@@ -317,9 +318,9 @@ class ClinVarExportConverter:
         return self.clinvar_export_record.classification_based_on
 
     CITATION_SOURCE_TO_CLINVAR = {
-        CitationSource.PUBMED: "PubMed",
-        CitationSource.PUBMED_CENTRAL: "pmc",
-        CitationSource.NCBI_BOOKSHELF: "BookShelf"
+        CitationSource.PUBMED: ClinVarCitationSource.PUBMED,
+        CitationSource.PUBMED_CENTRAL: ClinVarCitationSource.PUBMED_CENTRAL,
+        CitationSource.NCBI_BOOKSHELF: ClinVarCitationSource.NCBI_BOOKSHELF
     }
 
     @property
@@ -341,7 +342,7 @@ class ClinVarExportConverter:
                         citation_id = m.group(1)
 
                 citation_json = {
-                    "db": clinvar_db,
+                    "db": clinvar_db.value,
                     "id": citation_id
                 }
                 messages = JSON_MESSAGES_EMPTY
@@ -549,19 +550,42 @@ class ClinVarExportConverter:
             return ValidatedJson(None, JsonMessages.error("Could not determine genome build of submission"))
 
     @property
-    def json_assertion_criteria(self) -> ValidatedJson:
-        assertion_criterias = self.classification_based_on.get_value_list(SpecialEKeys.ASSERTION_METHOD)
-        if len(assertion_criterias) > 1:
-            return ValidatedJson(", ".join(assertion_criterias), JsonMessages.error("ClinVar does not currently support multiple assertion methods"))
+    def mapped_assertion_method(self) -> Optional[ClinVarExportAssertionMethod]:
+        export_type_bucket = self.clinvar_export_record.clinvar_allele.clinvar_export_bucket
+        assertion_criterias = list(sorted(self.classification_based_on.get_value_list(SpecialEKeys.ASSERTION_METHOD)))
+        if len(assertion_criterias) == 0:
+            assertion_criterias = [""]
 
-        assertion_criteria = assertion_criterias[0] if assertion_criterias else ""
-        if mapped_assertion_method := self.clinvar_key.assertion_criteria_vg_to_code(assertion_criteria):
-            if "url" in mapped_assertion_method or ("db" in mapped_assertion_method and "id" in mapped_assertion_method):
-                return ValidatedJson(mapped_assertion_method, JsonMessages.info(f"Mapped from \"{assertion_criteria}\"."))
-            else:
-                return ValidatedJson(mapped_assertion_method, JsonMessages.error("ADMIN: Mapped to invalid assertionCriteria"))
+        # pick the assertion method with the priority closest to 1
+        assertion_method: Optional[ClinVarExportAssertionMethod] = None
+        assertion_method_priority: Optional[int] = None
+        for assertion_criteria in assertion_criterias:
+            for mapping in self.clinvar_key.clinvarexportassertionmethodmapping_set.filter(
+                    assertion_method__export_type=export_type_bucket).order_by('order'):
+                if mapping.matches(assertion_criteria):
+                    if assertion_method_priority is None or assertion_method_priority > mapping.order:
+                        assertion_method = mapping.assertion_method
+                        assertion_method_priority = mapping.order
+                        break
+
+        if assertion_method:
+            return assertion_method
         else:
-            return ValidatedJson(mapped_assertion_method or "", JsonMessages.error(f'Could not map \"{assertion_criteria}\" to an assertionCriteria.'))
+            for assertion_criteria in assertion_criterias:
+                for possible_assertion_method in ClinVarExportAssertionMethod.objects.filter(
+                        export_type=export_type_bucket).order_by('id').all():
+                    if possible_assertion_method.matches(assertion_criteria):
+                        return possible_assertion_method
+
+    @property
+    def json_assertion_criteria(self) -> ValidatedJson:
+        if mapped_assertion_method := self.mapped_assertion_method:
+            return ValidatedJson(mapped_assertion_method.as_clinvar_json)
+        else:
+            assertion_criterias = list(sorted(self.classification_based_on.get_value_list(SpecialEKeys.ASSERTION_METHOD)))
+            assertion_criterias_str = ", ".join(f"\"{ac}\"" for ac in assertion_criterias) if assertion_criterias else "<blank>"
+            export_type_bucket = ClinVarExportTypeBucket(self.clinvar_export_record.clinvar_allele.clinvar_export_bucket).name
+            return ValidatedJson.make_void(JsonMessages.error(f"Could not map assertion methods {assertion_criterias_str} to a {export_type_bucket} assertion method"))
 
     @property
     def base_classification(self) -> ValidatedJson:

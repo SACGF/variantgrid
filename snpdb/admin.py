@@ -11,7 +11,7 @@ from snpdb.admin_utils import ModelAdminBasics, GuardedModelAdminBasics, admin_l
 from snpdb.liftover import liftover_alleles
 from snpdb.models import Allele, VariantAllele, ClinVarKey, ClinVarKeyExcludePattern, UserSettingsOverride, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, UserPageAck, Organization, Lab, GlobalSettings, Variant, \
-    AlleleLiftover
+    AlleleLiftover, ClinVarExportAssertionMethodMapping, ClinVarExportAssertionMethod
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -148,10 +148,18 @@ class ClinVarKeyExcludePatternAdmin(admin.TabularInline):
     }
 
 
+class ClinVarExportAssertionMethodMapping(admin.TabularInline):
+    model = ClinVarExportAssertionMethodMapping
+
+    formfield_overrides = {
+        models.TextField: {'widget': AdminTextInputWidget}
+    }
+
+
 @admin.register(ClinVarKey)
 class ClinVarKeyAdmin(ModelAdminBasics):
     list_display = ('id', 'name', 'last_full_run')
-    inlines = (ClinVarKeyExcludePatternAdmin,)
+    inlines = (ClinVarKeyExcludePatternAdmin,ClinVarExportAssertionMethodMapping)
 
     def run_ignores(self, request, queryset: QuerySet[ClinVarKey], apply: bool):
         from classification.models.clinvar_export_exclude_utils import ClinVarExcludePatternUtil
@@ -194,6 +202,11 @@ class ClinVarKeyAdmin(ModelAdminBasics):
         form.base_fields["assertion_method_lookup"].help_text = \
             'Preferred format is<br/>{"lookups":[<br/>&nbsp;{"match": "(regex1)", "citation": "acmg"},<br/>&nbsp;{"match": "(regex2)", "citation": {"db": "PubMed", "id": "PMID:123456"}}<br/>]}'
         return form
+
+
+@admin.register(ClinVarExportAssertionMethod)
+class ClinVarExportAssertionMethodAdmin(ModelAdminBasics):
+    list_display = ('id', 'label', 'reference_db', 'reference_id', 'reference_url', 'export_type', 'pattern')
 
 
 def make_code_friendly(text: str) -> str:

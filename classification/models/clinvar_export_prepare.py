@@ -7,6 +7,8 @@ from classification.enums import ShareLevel, AlleleOriginBucket
 from classification.models import ConditionResolved, ClinVarExport, ClinVarAllele, ClassificationModification, \
     ClinVarExportTypeBucket
 from dataclasses import dataclass
+
+from classification.models.clinvar_export_convertor import ClinVarExportConverter
 from snpdb.models import Allele, ClinVarKey
 
 
@@ -55,11 +57,12 @@ class ClinVarExportStub:
                     log.append(f"Updating CE_{clinvar_export.pk} with new classification modification {clinvar_export.classification_based_on} -> {new_classification_modification}")
                     clinvar_export.update_classification(new_classification_modification)
                     has_changes = True
-            if has_changes:
-                clinvar_export.save()
+            # if has_changes:
+            #     clinvar_export.save()  # save will be called by apply
             else:
                 log.append(f"No changes for CE_{clinvar_export.pk}")
 
+            ClinVarExportConverter(clinvar_export).convert().apply()
         else:
             if self.new_classification_modification and self.condition_umbrella:
                 ce = ClinVarExport.new_condition(self.clinvar_allele, condition=self.condition_umbrella, candidate=self.new_classification_modification)

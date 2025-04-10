@@ -1,4 +1,5 @@
 from .models import *
+from .models_clinvar_key import *
 from .models_cohort import *
 from .models_columns import *
 from .models_dbsnp import *

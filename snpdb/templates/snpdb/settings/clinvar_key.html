@@ -17,6 +17,30 @@
     {% labelled label="Citations Mode" %}{{ clinvar_key.get_citations_mode_display }}{% endlabelled %}
     {% labelled label="Assert Method Configuration" %}{% code_json clinvar_key.assertion_method_lookup %}{% endlabelled %}
 
+    {% labelled label="Assertion Method Mappings" %}
+        {% if clinvar_key.clinvarexportassertionmethodmapping_set.exists %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Export Type</th>
+                        <th>Pattern</th>
+                        <th>Assertion Method</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mapping in clinvar_key.clinvarexportassertionmethodmapping_set.all %}
+                        <tr>
+                        <td>{{ mapping.assertion_method.get_export_type_display }}</td>
+                        <td>{% code_regex mapping.pattern %}</td>
+                        <td>{{ mapping.assertion_method.label }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="no-value">No Mapping Patterns Configured</div>
+        {% endif %}
+    {% endlabelled %}
     {% labelled label="Exclude Patterns" %}
         {% if clinvar_key.clinvarkeyexcludepattern_set.exists %}
             <table class="table">
