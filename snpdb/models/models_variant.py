@@ -282,7 +282,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         ref = match.group(3)
         alt = match.group(4)
         vc = VariantCoordinate.from_explicit_no_svlen(chrom, position, ref, alt)
-        return vc.as_symbolic_or_explicit_according_to_size(genome_build)
+        return vc.as_internal_canonical_form(genome_build)
 
     @staticmethod
     def from_symbolic_match(match, genome_build):
@@ -302,7 +302,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         # 0-based
         ref = contig_sequence[start-1:start].upper()
         vc = VariantCoordinate(chrom=chrom, position=start, ref=ref, alt=alt, svlen=svlen)
-        return vc.as_symbolic_or_explicit_according_to_size(genome_build)
+        return vc.as_internal_canonical_form(genome_build)
 
     @staticmethod
     def from_string(variant_string: str, genome_build):
@@ -413,7 +413,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
                         svlen = len(self.ref) - 1  # explicit inv had same length ref/alt, now we have len(ref) == 1
         return VariantCoordinate(chrom=self.chrom, position=self.position, ref=ref, alt=alt, svlen=svlen)
 
-    def as_symbolic_or_explicit_according_to_size(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
+    def as_internal_canonical_form(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
         """ Make sure we only have 1 representation for a variant """
 
         # Easiest way is to just convert to symbolic then check svlen
@@ -424,6 +424,9 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             vc = self.as_external_explicit(genome_build)
         else:
             vc = self
+
+        if vc.alt in (Variant.REFERENCE_ALT, vc.ref):
+            vc.alt = Variant.REFERENCE_ALT
         return vc
 
     def as_contig_accession(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
