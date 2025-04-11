@@ -67,3 +67,6 @@ class VariantClass(models.TextChoices):
     INSERTION = 'IS', "insertion"
     SEQUENCE_ALTERATION = 'SA', "sequence_alteration"
     PROBE = 'PR', "probe"
+
+
+INFO_LIFTOVER_SWAPPED_REF_ALT = "VG_LIFTOVER_SWAPPED_REF_ALT"

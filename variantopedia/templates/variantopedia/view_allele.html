@@ -115,6 +115,7 @@
                                             <th>Tool</th>
                                             <th>Status</th>
                                             <th>Liftover Run</th>
+                                            <th>Data</th>
                                             <th>Error</th>
                                         </tr>
                                     </thead>
@@ -125,6 +126,7 @@
                                                 <td>{{ allele_liftover.liftover.get_conversion_tool_display }}</td>
                                                 <td>{{ allele_liftover.get_status_display }}</td>
                                                 <td><a href="{{ allele_liftover.liftover.get_absolute_url }}" class="hover-link">View LiftoverRun {{ allele_liftover.liftover_id }}</a></a></td>
+                                                <td>{{ allele_liftover.data_tidy|enrich|dash_if_empty }}</td>
                                                 <td>{{ allele_liftover.error_tidy|enrich|dash_if_empty }}</td>
                                             </tr>
                                         {% endfor %}

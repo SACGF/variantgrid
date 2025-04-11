@@ -9,7 +9,7 @@ from collections import Counter
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from library.genomics.vcf_enums import VCFColumns
+from library.genomics.vcf_enums import VCFColumns, INFO_LIFTOVER_SWAPPED_REF_ALT
 
 
 class Command(BaseCommand):
@@ -66,8 +66,24 @@ class Command(BaseCommand):
                     if skip_reason:
                         skipped_records[skip_reason] += 1
                         continue
+                else:
+                    if info := columns[VCFColumns.INFO]:
+                        # Which alternate allele became the reference during liftover (-1 for new reference)
+                        # See - SACGF/variantgrid_private#3763
+                        if "SWAP=1" in info:
+                            if "," not in alt:
+                                # This should never be a multi-alt but just to be sure
+                                ref = columns[VCFColumns.REF]
+                                columns[VCFColumns.REF] = alt
+                                columns[VCFColumns.ALT] = ref
+                                # We know info isn't '.'
+                                new_info = ";".join([info.strip(), INFO_LIFTOVER_SWAPPED_REF_ALT])
+                                columns[VCFColumns.INFO] = new_info
 
-                sys.stdout.write("\t".join(columns))
+                line = "\t".join(columns)
+                if not line.endswith("\n"):
+                    line += "\n"
+                sys.stdout.write(line)
 
         self._write_vcf_stats(skipped_records, skipped_records_stats_file)
         self._write_vcf_stats(converted_records, converted_records_stats_file)
