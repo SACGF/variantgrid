@@ -43,6 +43,7 @@ from variantgrid.perm_path import path
 router = routers.DefaultRouter()
 
 urlpatterns = [
+    path('mock_notifications', views.view_mock_notifications, name='view_mock_notifications'),
     path('activity', views.activity, name='activity'),
     path('activity/lab/<int:lab_id>', views.activity, name='activity_lab'),
     path('activity/user/<int:user_id>', views.activity, name='activity_user'),

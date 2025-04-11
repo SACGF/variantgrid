@@ -1,0 +1,508 @@
+{% extends "uicore/page/base.html" %}
+{% load classification_tags %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load js_tags %}
+{% load ontology_tags %}
+{% block title %}Classification Record Activity{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block content %}
+    <style>
+        tr.your-lab td {
+            background-color: #f8f8f8;
+        }
+        tr.your-lab td.lab {
+            font-weight: 500;
+        }
+        tr.external-party td.lab {
+            font-weight: 500;
+            font-style: italic;
+        }
+        td.lab {
+            width: 150px;
+        }
+        td.classification {
+            width: 150px;
+        }
+        td.date {
+            width: 100px;
+        }
+        td.status {
+            width: 90px;
+        }
+        td.condition {
+            width: auto;
+        }
+        td.col-c-hgvs {
+            width: 230px;
+        }
+        table.main-table>tbody>tr>td {
+            padding-bottom: 50px;
+        }
+    </style>
+    <div class="container">
+        <h4>Classification Conflicts</h4>
+        <table class="table main-table">
+            <thead>
+                <tr>
+                    <td class="col-c-hgvs">c.HGVS</td>
+                    <th class="col-conflict-type">Conflict Type</th>
+                    <th class="col-data">Data</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><a href="#">{% c_hgvs "NM_206933.3(USH2A):c.4298G>A" %}</a></td>
+                    <td>
+                        <div>Discordance</div>
+                        <div class="my-1"><div class="allele-origin-box horizontal allele-origin-G"><div class="allele-origin-text">Germline</div></div></div>
+                        <div>Medically Significant</div>
+                        <div class="mt-1">
+                            <div><a href="#" class="hover-link">Show Diffs</div>
+                            <div class="mt-1"><a href="#" class="hover-link">Start Discussion</a></div>
+                        </div>
+                    </td>
+                    <td>
+                        <table class="table" style="margin-top:-12px">
+                            <thead>
+                                <tr>
+                                    <th>Lab</th>
+                                    <th>Classification</th>
+                                    <th>Conditions</th>
+                                    <th>Curated</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="your-lab">
+                                    <td class="lab">Lab X</td>
+                                    <td class="classification">{% clinical_significance "P" %}</td>
+                                    <td class="condition">{% ontology_term "MONDO:0100316" %}</td>
+                                    <td class="date"><span class="mono">2024-03-12</span></td>
+                                    <td class="status"><a class="hover-link" href="#">Waiting <i class="fa-solid fa-pen-to-square"></i></a></td>
+                                </tr>
+                                <tr>
+                                    <td class="lab">Lab Y</td>
+                                    <td class="classification">{% clinical_significance "VUS" %}</td>
+                                    <td class="condition">{% ontology_term "MONDO:0100316" %}</td>
+                                    <td class="date"><span class="mono">2024-03-12</span></td>
+                                    <td class="status">Waiting</td>
+                                </tr>
+                                <tr>
+                                    <td class="lab">Lab Z</td>
+                                    <td class="classification">{% clinical_significance "VUS" %}</td>
+                                    <td class="condition">{% ontology_term "MONDO:0100316" %}</td>
+                                    <td class="date"><span class="mono">2024-03-12</span></td>
+                                    <td class="status">Waiting</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td><a href="#">{% c_hgvs "NM_000051.4(ATM):c.8672G>A" %}</a></td>
+                    <td>
+                        <div>Expert Panel Discordance</div>
+                        <div class="mt-1">
+                            <div class="my-1"><div class="allele-origin-box horizontal allele-origin-G"><div class="allele-origin-text">Germline</div></div></div>
+                            <div><a href="#" class="hover-link">See Expert Panel</a></div>
+                        </div>
+                    </td>
+                    <td>
+                        <table class="table" style="margin-top:-12px">
+                            <thead>
+                                <tr>
+                                    <th>Lab</th>
+                                    <th>Classification</th>
+                                    <th>Conditions</th>
+                                    <th>Curated</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="your-lab">
+                                    <td class="lab">Lab X</td>
+                                    <td class="classification">{% clinical_significance "LB" %}</td>
+                                    <td class="condition">{% ontology_term "OMIM:208900" %}</td>
+                                    <td class="date"><span class="mono">2024-03-12</span></td>
+                                    <td class="status"><a class="hover-link" href="#">Waiting <i class="fa-solid fa-pen-to-square"></i></a></td>
+                                </tr>
+                                <tr class="external-party">
+                                    <td class="lab">ClinVar EP</td>
+                                    <td class="classification">{% clinical_significance "B" %}</td>
+                                    <td class="condition">{% ontology_term "MONDO:0008840" %}</td>
+                                    <td class="date"><span class="mono">2025-02-12</span></td>
+                                    <td class="status no-value">-</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td><a href="#">{% c_hgvs "NM_000314.6(PTEN):c.389G>A" %}</a></td>
+                    <td>
+                        <div>Discordance</div>
+                        <div>Low</div>
+                        <div class="mt-1">
+                            <div class="my-1"><div class="allele-origin-box horizontal allele-origin-S"><div class="allele-origin-text">S. Tumor</div></div></div>
+                            <div><a href="#" class="hover-link">Show Diffs</a></div>
+                        </div>
+                    </td>
+                    <td>
+                        <table class="table" style="margin-top:-12px">
+                            <thead>
+                                <tr>
+                                    <th>Lab</th>
+                                    <th>Clin Sig</th>
+                                    <th>Conditions</th>
+                                    <th>Curated</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="your-lab">
+                                    <td class="lab">Lab X</td>
+                                    <td class="classification">{% clinical_significance "tier_1" "somatic:clinical_significance" %}</td>
+                                    <td class="condition">{% ontology_term "MONDO:0015608" %}</td>
+                                    <td class="date"><span class="mono">2024-03-12</span></td>
+                                    <td class="status"><a class="hover-link" href="#">Waiting <i class="fa-solid fa-pen-to-square"></i></a></td>
+                                </tr>
+                                <tr>
+                                    <td class="lab">Lab Z</td>
+                                    <td class="classification">{% clinical_significance "tier_2" "somatic:clinical_significance" %}</td>
+                                    <td class="condition">{% ontology_term "MONDO:0018874" %}</td>
+                                    <td class="date"><span class="mono">2025-02-12</span></td>
+                                    <td class="status">Confident in Classification</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td><a href="#">{% c_hgvs "NM_000314.6(PTEN):c.389G>A" %}</a></td>
+                    <td>
+                        <div>RNA Assay Diff</div>
+                        <div class="mt-1">
+                            <div class="my-1"><div class="allele-origin-box horizontal allele-origin-G"><div class="allele-origin-text">Germline</div></div></div>
+                            <div><a href="#" class="hover-link">Show RNA Assay</a></div>
+                        </div>
+                    </td>
+                    <td>
+                        <table class="table" style="margin-top:-12px">
+                            <thead>
+                                <tr>
+                                    <th>Lab</th>
+                                    <th>Criteria</th>
+                                    <th>Conditions</th>
+                                    <th>Curated</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="your-lab">
+                                    <td class="lab">Lab X</td>
+                                    <td class="classification">PM3, PM4</td>
+                                    <td class="condition">{% ontology_term "MONDO:0015608" %}</td>
+                                    <td class="date"><span class="mono">2024-03-12</span></td>
+                                    <td class="status"><a class="hover-link" href="#">Waiting <i class="fa-solid fa-pen-to-square"></i></a></td>
+                                </tr>
+                                <tr>
+                                    <td class="lab">Lab Z</td>
+                                    <td class="classification">PM2, PM3, PM4</td>
+                                    <td class="condition">{% ontology_term "MONDO:0018874" %}</td>
+                                    <td class="date"><span class="mono">2025-02-12</span></td>
+                                    <td class="status" class="no-value">-</td>
+                                </tr>
+                                <tr class="external-party">
+                                    <td class="lab">RNA Panel</td>
+                                    <td class="classification">PM2</td>
+                                    <td class="condition">-</td>
+                                    <td class="date"><span class="mono">2025-02-12</span></td>
+                                    <td class="status" class="no-value">-</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div>
+            <div class="card">
+                <div class="card-header">
+                    Notification 1 : Discordance
+                </div>
+                <div class="card-body">
+                    {% labelled label="Type" %}Discordance <div style="margin-left:4px; margin-bottom:4px" class="allele-origin-box horizontal allele-origin-G"><div class="allele-origin-text">Germline</div></div> <span class="text-secondary">Medically Significant</span>{% endlabelled %}
+                    {% labelled label="c.HGVS" %}{% c_hgvs "NM_206933.3(USH2A):c.4298G>A" %}{% endlabelled %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Lab</th>
+                                <th>Classification</th>
+                                <th>Conditions</th>
+                                <th>Curated</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="your-lab">
+                                <td class="lab">Lab X</td>
+                                <td class="classification">{% clinical_significance "P" %}</td>
+                                <td class="condition">{% ontology_term "MONDO:0100316" %}</td>
+                                <td class="date"><span class="mono">2024-03-12</span></td>
+                                <td class="status"><a class="hover-link" href="#">Waiting <i class="fa-solid fa-pen-to-square"></i></a></td>
+                            </tr>
+                            <tr>
+                                <td class="lab">Lab Y</td>
+                                <td class="classification">{% clinical_significance "VUS" %}</td>
+                                <td class="condition">{% ontology_term "MONDO:0100316" %}</td>
+                                <td class="date"><span class="mono">2024-03-12</span></td>
+                                <td class="status">Waiting</td>
+                            </tr>
+                            <tr>
+                                <td class="lab">Lab Z</td>
+                                <td class="classification">{% clinical_significance "VUS" %}</td>
+                                <td class="condition">{% ontology_term "MONDO:0100316" %}</td>
+                                <td class="date"><span class="mono">2024-03-12</span></td>
+                                <td class="status">Waiting</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer link-toolbar">
+                    <a href="#" class="hover-link">Show Diffs</a>
+                    <a href="#" class="hover-link">Start Discussion</a>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    Notification 2 : Expert Panel Discordance
+                </div>
+                <div class="card-body">
+                    {% labelled label="Type" %}Expert Panel Discordance  <span class="text-secondary"></span>{% endlabelled %}
+                    {% labelled label="Allele Origin" %}<div style="margin-bottom:4px" class="allele-origin-box horizontal allele-origin-G"><div class="allele-origin-text">Germline</div></div>{% endlabelled %}
+                    {% labelled label="c.HGVS" %}{% c_hgvs "NM_000051.4(ATM):c.8672G>A" %}{% endlabelled %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Lab</th>
+                                <th>Classification</th>
+                                <th>Conditions</th>
+                                 <th>Curated</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="your-lab">
+                                <td class="lab">Lab X</td>
+                                <td class="classification">{% clinical_significance "LB" %}</td>
+                                <td class="condition">{% ontology_term "OMIM:208900" %}</td>
+                                <td class="date"><span class="mono">2024-03-12</span></td>
+                                <td class="status"><a class="hover-link" href="#">Waiting <i class="fa-solid fa-pen-to-square"></i></a></td>
+                            </tr>
+                            <tr class="external-party">
+                                <td class="lab">ClinVar EP</td>
+                                <td class="classification">{% clinical_significance "B" %}</td>
+                                <td class="condition">{% ontology_term "MONDO:0008840" %}</td>
+                                <td class="date"><span class="mono">2025-02-12</span></td>
+                                <td class="status no-value">-</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer link-toolbar">
+                    <a href="#" class="hover-link">See Expert Panel</a>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    Notification 3 : Discordance
+                </div>
+                <div class="card-body">
+                    {% labelled label="Type" %}Discordance{% endlabelled %}
+                    {% labelled label="Allele Origin" %}<div class="allele-origin-box horizontal allele-origin-S"><div class="allele-origin-text">S. Tumor</div></div>{% endlabelled %}
+                    {% labelled label="c.HGVS" %}{% c_hgvs "NM_000314.6(PTEN):c.389G>A" %}{% endlabelled %}
+                    <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Lab</th>
+                                    <th>Classification</th>
+                                    <th>Clin Sig</th>
+                                    <th>Conditions</th>
+                                    <th>Curated</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="your-lab">
+                                    <td class="lab">Lab X</td>
+                                    <td class="classification">{% clinical_significance "LP" %}</td>
+                                    <td class="classification">{% clinical_significance "tier_1" "somatic:clinical_significance" %}</td>
+                                    <td class="condition">{% ontology_term "MONDO:0015608" %}</td>
+                                    <td class="date"><span class="mono">2024-03-12</span></td>
+                                    <td class="status"><a class="hover-link" href="#">Waiting <i class="fa-solid fa-pen-to-square"></i></a></td>
+                                </tr>
+                                <tr>
+                                    <td class="lab">Lab Z</td>
+                                    <td class="classification">{% clinical_significance "" %}</td>
+                                    <td class="classification">{% clinical_significance "tier_2" "somatic:clinical_significance" %}</td>
+                                    <td class="condition">{% ontology_term "MONDO:0018874" %}</td>
+                                    <td class="date"><span class="mono">2025-02-12</span></td>
+                                    <td class="status">Confident in Classification</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                </div>
+                <div class="card-footer link-toolbar">
+                    <a href="#" class="hover-link">Show Diffs</a>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    Notification 4 : RNA Assay Diff
+                </div>
+                <div class="card-body">
+                    {% labelled label="Type" %}RNA Assay Diff{% endlabelled %}
+                    {% labelled label="Allele Origin" %}<div style="margin-bottom:4px" class="allele-origin-box horizontal allele-origin-G"><div class="allele-origin-text">Germline</div></div>{% endlabelled %}
+                    {% labelled label="c.HGVS" %}{% c_hgvs "NM_000314.6(PTEN):c.389G>A" %}{% endlabelled %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Lab</th>
+                                <th>Classification</th>
+                                <th>Criteria</th>
+                                <th>Curated</th>
+                                <th>Conditions</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="your-lab">
+                                <td class="lab">Lab X</td>
+                                <td class="classification">{% clinical_significance "LP" %}</td>
+                                <td class="classification">PM3, PM4</td>
+                                <td class="condition">{% ontology_term "MONDO:0015608" %}</td>
+                                <td class="date"><span class="mono">2024-03-12</span></td>
+                                <td class="status"><a class="hover-link" href="#">Waiting <i class="fa-solid fa-pen-to-square"></i></a></td>
+                            </tr>
+                            <tr>
+                                <td class="lab">Lab Z</td>
+                                <td class="classification">{% clinical_significance "LP" %}</td>
+                                <td class="classification">PM2, PM3, PM4</td>
+                                <td class="condition">{% ontology_term "MONDO:0018874" %}</td>
+                                <td class="date"><span class="mono">2025-02-12</span></td>
+                                <td class="status" class="no-value">-</td>
+                            </tr>
+                            <tr class="external-party">
+                                <td class="lab">RNA Panel</td>
+                                <td class="classification"><span class="no-value">-</span></td>
+                                <td class="classification">PM2</td>
+                                <td class="condition">-</td>
+                                <td class="date"><span class="mono">2025-02-12</span></td>
+                                <td class="status" class="no-value">-</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer link-toolbar">
+                    <a href="#" class="hover-link">Show RNA Assay</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <h4>Notification Summary rows</h4>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>c.HGVS</th>
+                        <th>Type</th>
+                        <th>Allele Origin</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><a class="toggle-link">NOTE_1</a></td>
+                        <td>{% c_hgvs "NM_206933.3(USH2A):c.4298G>A" %}</td>
+                        <td>Discordance - Medically Significant</td>
+                        <td><div style="mmargin-bottom:4px" class="allele-origin-box horizontal allele-origin-G"><div class="allele-origin-text">Germline</div></div></td>
+                        <td><span class="date">2025-02-01</span></td>
+                    </tr>
+                    <tr>
+                        <td><a class="toggle-link">NOTE_2</a></td>
+                        <td>{% c_hgvs "NM_000051.4(ATM):c.8672G>A" %}</td>
+                        <td>Expert Panel Discordance</td>
+                        <td><div style="mmargin-bottom:4px" class="allele-origin-box horizontal allele-origin-G"><div class="allele-origin-text">Germline</div></div></td>
+                        <td><span class="date">2025-02-01</span></td>
+                    </tr>
+                    <tr>
+                        <td><a class="toggle-link toggled">NOTE_3</a></td>
+                        <td>{% c_hgvs "NM_000314.6(PTEN):c.389G>A" %}</td>
+                        <td>Discordance - Medically Significant</td>
+                        <td><div style="mmargin-bottom:4px" class="allele-origin-box horizontal allele-origin-S"><div class="allele-origin-text">S. Tumor</div></div></td>
+                        <td><span class="date">2024-12-01</span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="5" style="border-top:0">
+                            <div class="m-4">
+                    {% labelled label="Type" %}Discordance{% endlabelled %}
+                    {% labelled label="Allele Origin" %}<div class="allele-origin-box horizontal allele-origin-S"><div class="allele-origin-text">S. Tumor</div></div>{% endlabelled %}
+                    {% labelled label="c.HGVS" %}{% c_hgvs "NM_000314.6(PTEN):c.389G>A" %}{% endlabelled %}
+                    <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Lab</th>
+                                    <th>Classification</th>
+                                    <th>Clin Sig</th>
+                                    <th>Conditions</th>
+                                    <th>Curated</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="your-lab">
+                                    <td class="lab">Lab X</td>
+                                    <td class="classification">{% clinical_significance "LP" %}</td>
+                                    <td class="classification">{% clinical_significance "tier_1" "somatic:clinical_significance" %}</td>
+                                    <td class="condition">{% ontology_term "MONDO:0015608" %}</td>
+                                    <td class="date"><span class="mono">2024-03-12</span></td>
+                                    <td class="status"><a class="hover-link" href="#">Waiting <i class="fa-solid fa-pen-to-square"></i></a></td>
+                                </tr>
+                                <tr>
+                                    <td class="lab">Lab Z</td>
+                                    <td class="classification">{% clinical_significance "" %}</td>
+                                    <td class="classification">{% clinical_significance "tier_2" "somatic:clinical_significance" %}</td>
+                                    <td class="condition">{% ontology_term "MONDO:0018874" %}</td>
+                                    <td class="date"><span class="mono">2025-02-12</span></td>
+                                    <td class="status">Confident in Classification</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                <div class="card-footer link-toolbar">
+                    <a href="#" class="hover-link">Show Diffs</a>
+                </div>
+            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><a class="toggle-link">NOTE_4</a></td>
+                        <td>{% c_hgvs "NM_000314.6(PTEN):c.389G>A" %}</td>
+                        <td>RNA Assay Diff</td>
+                        <td><div style="mmargin-bottom:4px" class="allele-origin-box horizontal allele-origin-G"><div class="allele-origin-text">Germline</div></div></td>
+                        <td><span class="date">2024-12-20</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

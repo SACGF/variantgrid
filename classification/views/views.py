@@ -1016,3 +1016,7 @@ def view_allele_grouping_detail(request, allele_grouping_id: int):
         "allele_grouping": allele_grouping,
         "groupings": AlleleOriginGroupingVisible.from_grouping(allele_grouping=allele_grouping, user=request.user)
     })
+
+
+def view_mock_notifications(request):
+    return render(request, "classification/mock_notifications.html", {})
