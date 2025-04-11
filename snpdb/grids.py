@@ -12,6 +12,7 @@ from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
 from library.django_utils import get_url_from_view_path
+from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import calculate_age, JsonDataType
@@ -556,6 +557,7 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
             RichColumn(key="allele", orderable=True,
                        renderer=self.render_allele, client_renderer='TableFormat.linkUrl'),
             RichColumn(key="status", label="Status", renderer=self.render_status, orderable=True),
+            RichColumn(key="data", label="Data", renderer=self.render_data_json, orderable=True),
             RichColumn(key="error", label="Error", renderer=self.render_error_json, orderable=True),
         ]
 
@@ -589,6 +591,14 @@ class AbstractAlleleLiftoverColumns(DatatableConfig[AlleleLiftover]):
                 label += f" (Current: {has_build_to_icon[has_37]} GRCh37, {has_build_to_icon[has_38]} GRCh38)"
 
         return label
+
+    def render_data_json(self, row: dict[str, Any]) -> JsonDataType:
+        if js := row["data"]:
+            if INFO_LIFTOVER_SWAPPED_REF_ALT in str(js):
+                return "Swapped Ref/Alt due to SWAP=1"
+        if js is None:
+            return "-"
+        return jsonify_for_js(js, pretty=True)
 
     def render_error_json(self, row: dict[str, Any]) -> JsonDataType:
         if js := row["error"]:

@@ -26,7 +26,7 @@ from flags.models.models import FlagsMixin, FlagTypeContext
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
-from library.genomics.vcf_enums import VCFSymbolicAllele
+from library.genomics.vcf_enums import VCFSymbolicAllele, INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.guardian_utils import admin_bot
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import FormerTuple, sha256sum_str
@@ -1006,6 +1006,17 @@ class AlleleLiftover(models.Model):
 
     def _get_data_key(self) -> str:
         return slugify(self.liftover.get_conversion_tool_display()) + "-vcf-info"
+
+    def data_tidy(self) -> str | dict:
+        if self.data:
+            key = self._get_data_key()
+            if value := self.data.get(key):
+                if INFO_LIFTOVER_SWAPPED_REF_ALT in value:
+                    return "Swapped Ref/Alt due to SWAP=1"
+                return value
+            else:
+                return self.data
+        return ""
 
     def error_tidy(self) -> str | dict:
         # If the JSON is just message=, grab the message

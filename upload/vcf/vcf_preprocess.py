@@ -8,6 +8,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from library.django_utils.django_file_utils import get_import_processing_filename
+from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.genomics.vcf_utils import write_cleaned_vcf_header
 from library.utils.file_utils import name_from_filename
 from upload.models import ModifiedImportedVariants, ToolVersion, UploadStep, \
@@ -58,6 +59,7 @@ def _write_cleaned_header(genome_build, upload_pipeline, vcf_filename) -> str:
     tag = ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG
     HEADERS = [
         f'##INFO=<ID={tag},Number=1,Type=String,Description="Original variant. Format: CHR|POS|REF|ALT|USED_ALT_IDX">',
+        f'##INFO=<ID={INFO_LIFTOVER_SWAPPED_REF_ALT},Number=0,Type=Flag,Description="Whether we have switched REF/ALT due to SWAP=1">'
     ]
     write_cleaned_vcf_header(genome_build, vcf_filename, cleaned_vcf_header_filename,
                              new_info_lines=HEADERS, standard_contigs_only=True)
