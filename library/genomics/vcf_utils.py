@@ -56,7 +56,7 @@ def write_vcf_from_variant_coordinates(file_or_filename: Union[str, IO], variant
 
     info = [
         '##INFO=<ID=END,Number=.,Type=Integer,Description="Stop position of the interval">',
-        '##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Difference in length between REF and ALT alleles">',
+        '##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Difference in length between REF and ALT alleles">',
         '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">',
     ]
     columns = "\t".join(["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"])
