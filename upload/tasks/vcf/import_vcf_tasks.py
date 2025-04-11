@@ -17,6 +17,7 @@ from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.upload_processing import process_vcf_file
 from upload.vcf.bulk_allele_linking_vcf_processor import BulkAlleleLinkingVCFProcessor, FailedLiftoverVCFProcessor
 from upload.vcf.bulk_clingen_allele_vcf_processor import BulkClinGenAlleleVCFProcessor
+from upload.vcf.bulk_manual_variant_entry_linking_vcf_processor import BulkManualVariantEntryLinkingVCFProcessor
 from upload.vcf.bulk_minimal_vcf_processor import BulkMinimalVCFProcessor
 from upload.vcf.vcf_import import import_vcf_file
 from upload.vcf.vcf_preprocess import preprocess_vcf
@@ -128,6 +129,15 @@ class ProcessVCFLinkAllelesSetMaxVariantTask(AbstractProcessVCFTask):
         return BulkAlleleLinkingVCFProcessor(upload_step, preprocess_vcf_import_info)
 
 
+class ProcessVCFLinkManualVariantEntrySetMaxVariantTask(AbstractProcessVCFTask):
+    """ Link Alleles provided as the ID column in VCF
+        Finds highest variant_id in VCF so we can tell whether we're done annotating or not
+        Can run in parallel on split VCFs """
+
+    def _get_vcf_processor(self, upload_step, preprocess_vcf_import_info):
+        return BulkManualVariantEntryLinkingVCFProcessor(upload_step, preprocess_vcf_import_info)
+
+
 class ProcessVCFClinGenAlleleTask(AbstractProcessVCFTask):
     """ Gets ClinGenAlleles for variants """
 
@@ -199,6 +209,7 @@ UploadPipelineFinishedTask = app.register_task(UploadPipelineFinishedTask())
 ImportCreateUploadedVCFTask = app.register_task(ImportCreateUploadedVCFTask())
 ProcessVCFSetMaxVariantTask = app.register_task(ProcessVCFSetMaxVariantTask())
 ProcessVCFLinkAllelesSetMaxVariantTask = app.register_task(ProcessVCFLinkAllelesSetMaxVariantTask())
+ProcessVCFLinkManualVariantEntrySetMaxVariantTask = app.register_task(ProcessVCFLinkManualVariantEntrySetMaxVariantTask())
 ProcessVCFClinGenAlleleTask = app.register_task(ProcessVCFClinGenAlleleTask())
 DoNothingVCFTask = app.register_task(DoNothingVCFTask())
 LiftoverCreateVCFTask = app.register_task(LiftoverCreateVCFTask())

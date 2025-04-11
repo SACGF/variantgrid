@@ -36,6 +36,7 @@ def create_manual_variants(user, genome_build: GenomeBuild, variants_text: str):
     mvec = ManualVariantEntryCollection.objects.create(user=user,
                                                        genome_build=genome_build)
     variant_coordinates = []
+    vcf_ids = []
     for i, line in enumerate(variants_text.split('\n')):
         line = line.strip()
         entry_type = ManualVariantEntry.get_entry_type(line)
@@ -50,7 +51,9 @@ def create_manual_variants(user, genome_build: GenomeBuild, variants_text: str):
 
         if entry_type != ManualVariantEntryType.UNKNOWN:
             try:
-                variant_coordinates.extend(get_manual_variant_coordinates(mve))
+                for vc in get_manual_variant_coordinates(mve):
+                    variant_coordinates.append(vc)
+                    vcf_ids.append(mve.id)
             except Exception as ve:
                 mve.error_message = f"Error parsing {entry_type}: '{ve}'"
                 mve.save()
@@ -63,12 +66,12 @@ def create_manual_variants(user, genome_build: GenomeBuild, variants_text: str):
     # and run through upload pipeline
     working_dir = get_import_processing_dir(mvec.pk, "manual_variants")
     vcf_filename = os.path.join(working_dir, "manual_variant_entry.vcf")
-    write_vcf_from_variant_coordinates(vcf_filename, variant_coordinates)
+    write_vcf_from_variant_coordinates(vcf_filename, variant_coordinates, vcf_ids=vcf_ids)
     uploaded_file = UploadedFile.objects.create(path=vcf_filename,
                                                 import_source=ImportSource.WEB,
                                                 name='Manual Variant Entry',
                                                 user=user,
-                                                file_type=UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY)
+                                                file_type=UploadedFileTypes.MANUAL_VARIANT_ENTRY)
 
     UploadedManualVariantEntryCollection.objects.create(uploaded_file=uploaded_file,
                                                         collection=mvec)

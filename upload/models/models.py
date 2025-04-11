@@ -258,7 +258,7 @@ class UploadPipeline(models.Model):
         genome_build = None
         if file_type == UploadedFileTypes.VCF:
             genome_build = uploaded_file.uploadedvcf.vcf.genome_build
-        elif file_type == UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY:
+        elif file_type in (UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY, UploadedFileTypes.MANUAL_VARIANT_ENTRY):
             # This can be either a manually entered variants or from variant classification
             try:
                 genome_build = uploaded_file.uploadedmanualvariantentrycollection.collection.genome_build

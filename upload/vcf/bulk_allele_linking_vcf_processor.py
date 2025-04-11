@@ -103,6 +103,7 @@ class BulkAlleleLinkingVCFProcessor(BulkMinimalVCFProcessor):
             VariantAllele.objects.bulk_create(variant_alleles, ignore_conflicts=True)
 
         self.allele_ids = []
+        self.info_by_variant_hash = {}
 
     def merge_alleles(self, allele_1_id, allele_2_id):
         # We always merge into the lowest PK so that things are consistent if merge(a, b) and merge(b, a) both run
