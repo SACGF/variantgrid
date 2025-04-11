@@ -23,7 +23,7 @@ from upload.tasks.vcf.genotype_vcf_tasks import VCFCheckAnnotationTask, ProcessG
     ImportCreateVCFModelForGenotypeVCFTask, SomalierVCFTask
 from upload.tasks.vcf.import_vcf_tasks import ProcessVCFSetMaxVariantTask, \
     ImportCreateUploadedVCFTask, ProcessVCFLinkAllelesSetMaxVariantTask, LiftoverCompleteTask, LiftoverCreateVCFTask, \
-    PreprocessAndAnnotateVCFTask, ProcessVCFClinGenAlleleTask
+    PreprocessAndAnnotateVCFTask, ProcessVCFClinGenAlleleTask, ProcessVCFLinkManualVariantEntrySetMaxVariantTask
 
 
 class BedImportTaskFactory(ImportTaskFactory):
@@ -172,6 +172,30 @@ class VCFInsertVariantsOnlyImportFactory(AbstractVCFImportTaskFactory):
 
     def get_post_data_insertion_classes(self):
         return [VCFCheckAnnotationTask]
+
+
+class ManualVariantEntryImportFactory(AbstractVCFImportTaskFactory):
+
+    def get_uploaded_file_type(self):
+        return UploadedFileTypes.MANUAL_VARIANT_ENTRY
+
+    def get_data_classes(self):
+        return [UploadedVCF]
+
+    def get_processing_ability(self, user, filename, file_extension):
+        # Variants Only should only ever be explicitly chosen as a file type
+        # Never detected and set on an uploaded file
+        return 0
+
+    def get_create_data_from_vcf_header_task_class(self):
+        return ImportCreateUploadedVCFTask
+
+    def get_known_variants_parallel_vcf_processing_task_class(self):
+        return ProcessVCFLinkManualVariantEntrySetMaxVariantTask
+
+    def get_post_data_insertion_classes(self):
+        return [VCFCheckAnnotationTask]
+
 
 
 class LiftoverImportFactory(AbstractVCFImportTaskFactory):

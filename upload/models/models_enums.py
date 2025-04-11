@@ -7,6 +7,7 @@ class UploadedFileTypes(models.TextChoices):
     GENE_LIST = 'G', 'Gene List'
     GENE_COVERAGE = 'O', 'Gene Coverage'
     LIFTOVER = 'I', 'Liftover'
+    MANUAL_VARIANT_ENTRY = 'M', 'Manual Variant Entry'
     PED = 'P', 'Pedigree'
     PATIENT_RECORDS = 'R', 'Patient Records'
     VARIANT_CLASSIFICATIONS = 'S', 'Variant Classifications'
