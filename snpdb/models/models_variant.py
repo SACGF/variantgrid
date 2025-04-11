@@ -1014,7 +1014,7 @@ class AlleleLiftover(models.Model):
                 if len(error_json.keys()) == 1:
                     return message
             return error_json
-        return {}
+        return ""
 
     class Meta:
         unique_together = ('liftover', 'allele')
