@@ -199,8 +199,6 @@ class ClinVarKeyAdmin(ModelAdminBasics):
             'org_id': admin.widgets.AdminTextInputWidget(),
             'name': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
-        form.base_fields["assertion_method_lookup"].help_text = \
-            'Preferred format is<br/>{"lookups":[<br/>&nbsp;{"match": "(regex1)", "citation": "acmg"},<br/>&nbsp;{"match": "(regex2)", "citation": {"db": "PubMed", "id": "PMID:123456"}}<br/>]}'
         return form
 
 

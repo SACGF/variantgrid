@@ -166,7 +166,9 @@ class ClinVarExportData:
         clinvar_export = self.clinvar_export
 
         status: ClinVarExportStatus
-        if self.clinvar_export.delete_pending:
+        if self.clinvar_export.deleted:
+            status = ClinVarExportStatus.DELETED
+        elif self.clinvar_export.delete_pending:
             if self.changes:
                 status = ClinVarExportStatus.CHANGES_PENDING
             else:
@@ -417,7 +419,13 @@ class ClinVarExportConverter:
 
     def convert(self) -> ClinVarExportData:
 
-        if self.clinvar_export_record.delete_pending:
+        if self.clinvar_export_record.deleted:
+            return ClinVarExportData(
+                clinvar_export=self.clinvar_export_record,
+                body=ValidatedJson.make_void(JsonMessages.info("This record has been deleted from ClinVar - no further syncing is possible")),
+                grouping=ValidatedJson.make_void()
+            )
+        elif self.clinvar_export_record.delete_pending:
             data = {}
             # note we inject accession into non-deleted records live, and accession into deleted records straight into the DB
             # this is because this data is used to calculate differences from any previous submission, and we don't want
@@ -550,21 +558,21 @@ class ClinVarExportConverter:
             return ValidatedJson(None, JsonMessages.error("Could not determine genome build of submission"))
 
     @property
-    def mapped_assertion_method(self) -> Optional[ClinVarExportAssertionMethod]:
+    def mapped_assertion_method(self) -> Optional[tuple[str, ClinVarExportAssertionMethod]]:
         export_type_bucket = self.clinvar_export_record.clinvar_allele.clinvar_export_bucket
         assertion_criterias = list(sorted(self.classification_based_on.get_value_list(SpecialEKeys.ASSERTION_METHOD)))
         if len(assertion_criterias) == 0:
             assertion_criterias = [""]
 
         # pick the assertion method with the priority closest to 1
-        assertion_method: Optional[ClinVarExportAssertionMethod] = None
+        assertion_method: Optional[str, ClinVarExportAssertionMethod] = None
         assertion_method_priority: Optional[int] = None
         for assertion_criteria in assertion_criterias:
             for mapping in self.clinvar_key.clinvarexportassertionmethodmapping_set.filter(
                     assertion_method__export_type=export_type_bucket).order_by('order'):
                 if mapping.matches(assertion_criteria):
                     if assertion_method_priority is None or assertion_method_priority > mapping.order:
-                        assertion_method = mapping.assertion_method
+                        assertion_method = assertion_criteria, mapping.assertion_method
                         assertion_method_priority = mapping.order
                         break
 
@@ -572,20 +580,19 @@ class ClinVarExportConverter:
             return assertion_method
         else:
             for assertion_criteria in assertion_criterias:
-                for possible_assertion_method in ClinVarExportAssertionMethod.objects.filter(
-                        export_type=export_type_bucket).order_by('id').all():
+                for possible_assertion_method in ClinVarExportAssertionMethod.objects.filter(export_type=export_type_bucket).order_by('id').all():
                     if possible_assertion_method.matches(assertion_criteria):
-                        return possible_assertion_method
+                        return assertion_criteria, possible_assertion_method
 
     @property
     def json_assertion_criteria(self) -> ValidatedJson:
-        if mapped_assertion_method := self.mapped_assertion_method:
-            return ValidatedJson(mapped_assertion_method.as_clinvar_json)
+        if mapped_assertion_method_tuple := self.mapped_assertion_method:
+            return ValidatedJson(mapped_assertion_method_tuple[1].as_clinvar_json, messages=JsonMessages.info(f"Mapped assertion method \"{mapped_assertion_method_tuple[0]}\" to \"{mapped_assertion_method_tuple[1].label}\""))
         else:
-            assertion_criterias = list(sorted(self.classification_based_on.get_value_list(SpecialEKeys.ASSERTION_METHOD)))
-            assertion_criterias_str = ", ".join(f"\"{ac}\"" for ac in assertion_criterias) if assertion_criterias else "<blank>"
+            assertion_criterias = [x for x in sorted(self.classification_based_on.get_value_list(SpecialEKeys.ASSERTION_METHOD)) if x]
+            assertion_criterias_str = ", ".join(f"\"{ac}\"" for ac in assertion_criterias) if assertion_criterias else "-blank-"
             export_type_bucket = ClinVarExportTypeBucket(self.clinvar_export_record.clinvar_allele.clinvar_export_bucket).name
-            return ValidatedJson.make_void(JsonMessages.error(f"Could not map assertion methods {assertion_criterias_str} to a {export_type_bucket} assertion method"))
+            return ValidatedJson.make_void(JsonMessages.error(f"Could not map assertion methods {assertion_criterias_str} to {export_type_bucket} assertion method"))
 
     @property
     def base_classification(self) -> ValidatedJson:

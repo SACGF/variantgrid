@@ -48,6 +48,7 @@ class ClinVarExportStatus(models.TextChoices):
     UP_TO_DATE = "D", "Up to Date"
     IN_ERROR = "E", "Error"
     EXCLUDE = "X", "Exclude"
+    DELETED = "Z", "Deleted"
 
 
 class ClinVarExportDeleteStatus(models.TextChoices):

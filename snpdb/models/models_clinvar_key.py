@@ -74,7 +74,6 @@ class ClinVarKey(TimeStampedModel):
     inject_acmg_description = models.BooleanField(blank=True, default=False)
     include_interpretation_summary = models.BooleanField(blank=True, default=True)
     citations_mode = models.TextField(choices=ClinVarCitationsModes.choices, default=ClinVarCitationsModes.all)
-    assertion_method_lookup = models.JSONField(null=False, default=dict)
 
     @property
     def label(self) -> str:

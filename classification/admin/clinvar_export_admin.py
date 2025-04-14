@@ -84,7 +84,7 @@ class InterpretationSummaryLengthFilter(admin.SimpleListFilter):
 
 @admin.register(ClinVarExport)
 class ClinVarExportAdmin(ModelAdminBasics):
-    list_display = ("pk", "clinvar_allele", "status", "classification_based_on", "classification_created", "condition_smart", "scv", "latest_batch", "created", "modified")
+    list_display = ("pk", "clinvar_allele", "delete_status", "status", "classification_based_on", "classification_created", "condition_smart", "scv", "latest_batch", "created", "modified")
     list_filter = (
         ('clinvar_allele__clinvar_key', admin.RelatedFieldListFilter),
         ('status', AllValuesChoicesFieldListFilter),

@@ -5,7 +5,7 @@ from django.db.models import QuerySet
 
 from classification.enums import ShareLevel, AlleleOriginBucket
 from classification.models import ConditionResolved, ClinVarExport, ClinVarAllele, ClassificationModification, \
-    ClinVarExportTypeBucket
+    ClinVarExportTypeBucket, ClinVarExportDeleteStatus
 from dataclasses import dataclass
 
 from classification.models.clinvar_export_convertor import ClinVarExportConverter
@@ -33,8 +33,8 @@ class ClinVarExportStub:
 
     def assign_if_newer(self, classification_modification: ClassificationModification):
         if existing := self.new_classification_modification:
-            if existing.curated_date > classification_modification:
-                return
+            if existing.curated_date_check > classification_modification.curated_date_check:
+                return  # existing is more up to date
         self.new_classification_modification = classification_modification
 
     def apply(self) -> list[str]:
@@ -93,7 +93,7 @@ class ClinVarAlleleExportManager:
 
     def __init__(self, clinvar_allele: ClinVarAllele):
         self.clinvar_allele = clinvar_allele
-        existing_alleles = ClinVarExport.objects.filter(clinvar_allele=clinvar_allele).order_by('-pk')
+        existing_alleles = ClinVarExport.objects.filter(clinvar_allele=clinvar_allele).exclude(delete_status=ClinVarExportDeleteStatus.DELETED).order_by('-pk')
         self.stubs = [ClinVarExportStub.from_clinvar_export(self.clinvar_allele, clinvar_export) for clinvar_export in existing_alleles]
 
     def add_classification_modification(self, classification_modification: ClassificationModification):
