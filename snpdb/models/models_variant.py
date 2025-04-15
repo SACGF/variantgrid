@@ -288,6 +288,7 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
     def from_symbolic_match(match, genome_build):
         chrom, start, range_end, alt = match.groups()
         chrom = format_chrom(chrom, genome_build.reference_fasta_has_chr)
+        alt = alt.upper()
         start = int(start)
         range_end = int(range_end)
         if range_end < start + 1:
