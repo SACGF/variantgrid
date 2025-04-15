@@ -39,6 +39,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # We need to create the message before deleting them so make sure this runs 1st
         ManualOperation.operation_other("Manually liftover variants (as admin top menu Variants->Liftover)",
                                         test=_get_variant_alleles),
         migrations.RunPython(_delete_bcftools_liftover_historical_swapped)
