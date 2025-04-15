@@ -283,7 +283,10 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
                                              dest_genome_build: GenomeBuild) -> Iterable[LIFTOVER_TUPLE]:
     """ This gets tuples from another build to run through a tool """
 
-    variant = allele.variant_for_build(source_genome_build)
+    # If we have >=3 builds, sometimes this will be called for us when we don't have the variant in this build
+    variant = allele.variant_for_build_optional(source_genome_build)
+    if not variant:
+        return
     variant_coordinate = variant.coordinate
 
     # BCFTools fails with "Unable to fetch sequence" if any variant is outside contig size
