@@ -340,7 +340,7 @@ CLASSIFICATION_DOWNLOADABLE_FIELDS = set([
     "p_hgvs",
     "sherloc:same_amino_acid_change_benign",
     "somatic:clinical_significance",
-    "somatic:testing_context",
+    "testing_context",
     "somatic:tumor_cellularity",
     "variant_class",
     "variant_inheritance",
