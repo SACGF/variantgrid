@@ -116,3 +116,9 @@ class VariantTestCase(TestCase):
         vc_from_symbolic = vc_symbolic.as_internal_canonical_form(self.grch37)
         vc_from_explicit = vc_explicit.as_internal_canonical_form(self.grch37)
         self.assertEqual(vc_from_symbolic, vc_from_explicit)
+
+    def test_symbolic_from_string(self):
+        variant_string_lower = "1:10000-50000 <del>"  # Written with lower case
+        vc_lower = VariantCoordinate.from_string(variant_string_lower, self.grch37)
+        vc_upper = VariantCoordinate.from_string(variant_string_lower.upper(), self.grch37)
+        self.assertEqual(vc_lower, vc_upper, msg="symbolic from string case insensitive")
