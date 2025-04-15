@@ -30,7 +30,7 @@
             {% if show_criteria and vcm.classification.summary.criteria_labels %}
                 - <span class="text-monospace text-secondary">{% for crit in vcm.classification.summary.criteria_labels %}{% if not forloop.first %},{% endif %}{{ crit }}{% endfor %}</span>
             {% endif %}
-            : {% timestamp vcm.curated_date_check.value time_ago=True tooltip=vcm.curated_date_check.name %}
+            : {% timestamp vcm.curated_date_check.value time_ago=True tooltip=vcm.curated_date_check.name %} {% if vcm.curated_date_check.name %}<span class="text-secondary">{{ vcm.curated_date_check.name }}</span>{% endif %}
     {% endif %}
     {% if show_flags %}<div class="flags d-inline-block" style="margin-left:12px; position: relative; bottom: -4px;" data-flags="{{ vcm.classification.flag_collection_id }}">...</div>{% endif %}
 </span>
