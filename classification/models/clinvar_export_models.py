@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Iterable
+from typing import Optional, Iterable, Set, Collection
 from django.db import models, transaction
 from django.db.models import QuerySet, TextChoices
 from django.urls import reverse
@@ -31,10 +31,41 @@ class ClinVarAllele(TimeStampedModel):
     allele = models.ForeignKey(Allele, on_delete=models.CASCADE)
     clinvar_key = models.ForeignKey(ClinVarKey, null=True, blank=True, on_delete=models.CASCADE)
     clinvar_export_bucket = models.CharField(max_length=1, choices=ClinVarExportTypeBucket.choices, default=ClinVarExportTypeBucket.GERMLINE)
+    accepted_condition_splits = models.JSONField(default=dict)
+    duplicates_require_review = models.BooleanField(default=False)
     last_evaluated = models.DateTimeField(default=now)
 
     def __str__(self):
         return f"{self.allele} {self.clinvar_key}"
+
+    def check_if_conditions_require_review(self, conditions: Collection[ConditionResolved]) -> bool:
+        """
+        Updates duplicates_require_review will set to True if conditions is more than 1 and not a subset of accepted_condition_splits
+        :returns A boolean indicate if the duplicate is required
+        """
+        if len(conditions) > 1:
+            if accepted_conditions := self.accepted_conditions:
+                for condition in conditions:
+                    if condition not in accepted_conditions:
+                        self.duplicates_require_review = True
+                        return True
+        self.duplicates_require_review = False
+        return False
+
+    @property
+    def accepted_conditions(self) -> set[ConditionResolved]:
+        resolved_conditions: Set[ConditionResolved] = set()
+        if splits_wrapper := self.accepted_condition_splits:
+            if splits := splits_wrapper.get("splits"):
+                for split in splits:
+                    resolved_conditions.add(ConditionResolved.from_dict(split))
+        return resolved_conditions
+
+    @accepted_conditions.setter
+    def accepted_conditions(self, value: Iterable[ConditionResolved]):
+        self.accepted_condition_splits = {
+            "splits": [v.to_json(include_join=True) for v in value]
+        }
 
 
 class ClinVarExportStatus(models.TextChoices):

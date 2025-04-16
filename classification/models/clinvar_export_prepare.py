@@ -1,5 +1,5 @@
 import itertools
-from typing import Optional
+from typing import Optional, Set
 from django.utils.timezone import now
 from django.db.models import QuerySet
 
@@ -22,6 +22,7 @@ class ClinVarExportStub:
     new_condition_umbrella: ConditionResolved
     new_classification_modification: ClassificationModification
     clinvar_export: Optional[ClinVarExport] = None
+    deleted = False
 
     @property
     def condition_umbrella(self) -> ConditionResolved:
@@ -44,6 +45,7 @@ class ClinVarExportStub:
                 if not clinvar_export.has_submission:
                     log.append(f"Deleting CE_{clinvar_export.pk} as no submissions and no classification attached")
                     clinvar_export.delete()
+                    self.deleted = True
                     return log
 
             has_changes = False
@@ -57,8 +59,8 @@ class ClinVarExportStub:
                     log.append(f"Updating CE_{clinvar_export.pk} with new classification modification {clinvar_export.classification_based_on} -> {new_classification_modification}")
                     clinvar_export.update_classification(new_classification_modification)
                     has_changes = True
-            # if has_changes:
-            #     clinvar_export.save()  # save will be called by apply
+            if has_changes:
+                clinvar_export.save()  # save will be called by apply
             else:
                 log.append(f"No changes for CE_{clinvar_export.pk}")
 
@@ -67,6 +69,7 @@ class ClinVarExportStub:
             if self.new_classification_modification and self.condition_umbrella:
                 ce = ClinVarExport.new_condition(self.clinvar_allele, condition=self.condition_umbrella, candidate=self.new_classification_modification)
                 ce.save()
+                self.clinvar_export = ce
                 log.append(f"Creating new clinvar export CE_{ce.pk} {self.condition_umbrella.summary} {self.new_classification_modification}")
         return log
 
@@ -140,9 +143,16 @@ class ClinVarAlleleExportManager:
         :return: A log of modifications
         """
         complete_log = []
+        all_conditions_set: Set[ConditionResolved] = set()
         for stub in self.stubs:
             complete_log += stub.apply()
-        return ClinVarAlleleLog(clinvar_allele=self.clinvar_allele, log=complete_log)
+            if not stub.deleted:
+                all_conditions_set.add(stub.condition_umbrella)
+        self.clinvar_allele.check_if_conditions_require_review(all_conditions_set)
+
+        self.clinvar_allele.last_evaluated = now()
+        self.clinvar_allele.save()
+        log = ClinVarAlleleLog(clinvar_allele=self.clinvar_allele, log=complete_log)
 
 
 def allele_origin_to_clinvar_export_types(bucket: AlleleOriginBucket) -> list[ClinVarExportTypeBucket]:
@@ -255,8 +265,4 @@ class ClinvarExportPrepare:
                     clinvar_allele_manager.add_classification_modification(latest_for_condition)
 
             if clinvar_allele_manager:
-                output = clinvar_allele_manager.apply()
-                clinvar_allele = clinvar_allele_manager.clinvar_allele
-                clinvar_allele.last_evaluated = now()
-                clinvar_allele.save()
-                return output
+                return clinvar_allele_manager.apply()

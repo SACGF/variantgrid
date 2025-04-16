@@ -293,7 +293,7 @@ class ConditionResolved:
         else:
             return self
 
-    def same_or_more_specific_step_count(self, other: 'ConditionGroup') -> Optional[int]:
+    def same_or_more_specific_step_count(self, other: 'ConditionResolved') -> Optional[int]:
         """
         Returns the number of steps to go from this condition to the specific other condition
         Returns None if self doesn't appear to be a descendant of other
@@ -320,7 +320,7 @@ class ConditionResolved:
             # terms cant be converted to MONDO and not exact match, just return False
             return None
 
-    def is_same_or_more_specific(self, other: 'ConditionGroup') -> bool:
+    def is_same_or_more_specific(self, other: 'ConditionResolved') -> bool:
         return self.same_or_more_specific_step_count(other) is not None
 
     @staticmethod
