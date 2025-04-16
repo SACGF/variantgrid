@@ -17,6 +17,13 @@ from uicore.json.validated_json import ValidatedJson, JsonMessages
 CLINVAR_EXPORT_CONVERSION_VERSION = 4
 
 
+class ClinVarAlleleMultiStatus(TextChoices):
+    SINGLE_CONDITION = "S", "Single Condition"
+    MULTI_CONDITION_REQUIRES_REVIEW = "R", "Requires Review"
+    MULTI_CONDITION_APPROVED = "A", "Approved Multiple Conditions"
+    MULTI_CONDITION_STATUS_UNKNOWN = "U", "Unknown Status"  #
+
+
 class ClinVarAllele(TimeStampedModel):
     """
     Wraps an Allele with a ClinVarKey to make it easier to keep track of our submissions
@@ -32,25 +39,32 @@ class ClinVarAllele(TimeStampedModel):
     clinvar_key = models.ForeignKey(ClinVarKey, null=True, blank=True, on_delete=models.CASCADE)
     clinvar_export_bucket = models.CharField(max_length=1, choices=ClinVarExportTypeBucket.choices, default=ClinVarExportTypeBucket.GERMLINE)
     accepted_condition_splits = models.JSONField(default=dict)
-    duplicates_require_review = models.BooleanField(default=False)
+    multiple_review_status = models.TextField(max_length=1, choices=ClinVarAlleleMultiStatus.choices, default=ClinVarAlleleMultiStatus.MULTI_CONDITION_STATUS_UNKNOWN)
     last_evaluated = models.DateTimeField(default=now)
 
     def __str__(self):
         return f"{self.allele} {self.clinvar_key}"
 
-    def check_if_conditions_require_review(self, conditions: Collection[ConditionResolved]) -> bool:
+    def apply_conditions_require_review(self, conditions: Collection[ConditionResolved]) -> ClinVarAlleleMultiStatus:
+        multiple_review_status = self._calculate_conditions_require_review(conditions)
+        self.multiple_review_status = multiple_review_status
+        return multiple_review_status
+
+    def _calculate_conditions_require_review(self, conditions: Collection[ConditionResolved]) -> ClinVarAlleleMultiStatus:
         """
         Updates duplicates_require_review will set to True if conditions is more than 1 and not a subset of accepted_condition_splits
         :returns A boolean indicate if the duplicate is required
         """
-        if len(conditions) > 1:
+        if len(conditions) <= 1:
+            return ClinVarAlleleMultiStatus.SINGLE_CONDITION
+        else:
             if accepted_conditions := self.accepted_conditions:
                 for condition in conditions:
                     if condition not in accepted_conditions:
-                        self.duplicates_require_review = True
-                        return True
-        self.duplicates_require_review = False
-        return False
+                        return ClinVarAlleleMultiStatus.MULTI_CONDITION_REQUIRES_REVIEW
+                return ClinVarAlleleMultiStatus.MULTI_CONDITION_APPROVED
+            else:
+                return ClinVarAlleleMultiStatus.MULTI_CONDITION_REQUIRES_REVIEW
 
     @property
     def accepted_conditions(self) -> set[ConditionResolved]:

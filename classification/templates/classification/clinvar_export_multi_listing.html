@@ -10,50 +10,33 @@
 {% block title %}Clinvar Export Multi-Review{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
+    <style>
+        .clinvar-export-row + .clinvar-export-row {
+            margin-top: 6px;
+        }
+    </style>
+    <script>
+        function renderClinVarExports(data, type, row) {
+            let dom = $('<div>');
+            for (record of data) {
+                let subRow = $('<div>', {class: 'clinvar-export-row', html:[
+                    $('<a>', {class:'hover-link', href: Urls.clinvar_export, text: `ClinVar Export (${record.pk}) ${record.status}`}),
+                    VCForm.format_condition(record.condition)
+                ]});
+                dom.append(subRow);
+            }
+            return dom;
+        }
+    </script>
+
     <div class="container">
         <h4>ClinVar Possible Duplicates</h4>
         {% page_help_embedded title="ClinVar Possible Duplicates Help" %}
             This page will list ClinVar Export Alleles that have multiple ClinVar Export records (excluding ones marked as deleted from ClinVar).<br/>
             A ClinVar Export Allele consists of a ClinVar Key, Allele and ClinVar Export type (Germline, Oncogenic, Clinical Impact).
         {% end_page_help_embedded %}
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>ClinVarKey</th>
-                    <th>Allele</th>
-                    <th>Export Type</th>
-                    <th>Common Condition</th>
-                    <th>Records</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for multi in clinvar_allele_mults %}
-                <tr>
-                    <td>
-                        <a href="{% url 'clinvar_export_multi' multi.clinvar_allele.pk %}" class="hover-link">{{ multi.clinvar_allele.pk }}</a>
-                    </td>
-                    <td>{{ multi.clinvar_allele.clinvar_key.name }}</td>
-                    <td>{{ multi.clinvar_allele.allele }}</td>
-                    <td>
-                        <div class="allele-origin-box horizontal allele-origin-{{ multi.clinvar_allele.clinvar_export_bucket }}">
-                            <div class="allele-origin-text">{{ multi.clinvar_allele.get_clinvar_export_bucket_display }}</div>
-                         </div>
-                    </td>
-                    <td>{% if multi.common_ancestor %}{% ontology_term multi.common_ancestor %}{% else %}<span class="no-value">No common ancestor</span>{% endif %}</td>
-                    <td>
-                        {% for other_clinvar_export in multi.clinvar_exports %}
-                            <div><a class="hover-link" href="{{ other_clinvar_export.get_absolute_url }}">{{ other_clinvar_export }}</a> - {% condition other_clinvar_export.condition_resolved %}</div>
-                        {% endfor %}
-                    </td>
-                </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="6" class="text-center no-value">No ClinVar Alleles with multiple exports found.</td>
-                    </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+
+        <table id="vc-clinvar-multi" data-datatable-url="{% url 'clinvar_export_multi_datatables' %}" class="sticky-header"></table>
 
     </div>
 {% endblock %}

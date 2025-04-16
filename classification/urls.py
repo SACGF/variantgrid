@@ -102,6 +102,7 @@ urlpatterns = [
     path('clinvar_export_batch/<int:clinvar_export_batch_id>/download', clinvar_export_view.clinvar_export_batch_download, name='clinvar_export_batch_download'),
     path('clinvar_export_multi', clinvar_export_multi_view.view_multi_clinvar_exports_listing, name='clinvar_export_multi_listing'),
     path('clinvar_export_multi/<int:clinvar_allele_pk>', clinvar_export_multi_view.view_multi_clinvar_exports, name='clinvar_export_multi'),
+    path('clinvar_export_multi/datatable', DatabaseTableView.as_view(column_class=clinvar_export_multi_view.ClinVarAlleleMultiExportColumns), name='clinvar_export_multi_datatables'),
 
     path('condition_matchings', condition_matchings_view, name='condition_matchings'),
     path('condition_matchings/<str:lab_id>', condition_matchings_view, name='condition_matchings_lab'),

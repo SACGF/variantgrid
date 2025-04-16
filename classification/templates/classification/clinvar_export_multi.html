@@ -15,6 +15,7 @@
         {% labelled label="Allele" %}{{ clinvar_allele_mult.clinvar_allele.allele }}{% endlabelled %}
         {% labelled label="Export Type" %}{{ clinvar_allele_mult.clinvar_allele.get_clinvar_export_bucket_display }}{% endlabelled %}
         {% labelled label="ClinVar Allele ID" %}{{ clinvar_allele_mult.clinvar_allele.pk }}{% admin_link clinvar_allele_mult.clinvar_allele %}{% endlabelled %}
+        {% labelled label="Multiple Record Status" %}{{ clinvar_allele_mult.clinvar_allele.get_multiple_review_status_display }}{% endlabelled %}
         <h4>Existing ClinVar Exports</h4>
         <table class="table">
             <thead>
@@ -71,16 +72,23 @@
                             </td>
                         </tr>
                     {% endif %}
-                    {% if clinvar_allele_mult.merge_preview.can_action %}
                         <tr>
                             <td colspan="5">
                                 <form method="post" action="{{ request.path }}">
                                     {% csrf_token %}
-                                    <button class="btn btn-danger">Action Duplicates</button>
+                                    <div class="btn-toolbar float-right">
+                                        {% if clinvar_allele_mult.merge_preview.can_action %}
+                                            <button class="btn btn-danger" name="action" value="merge">Action Duplicates</button>
+                                        {% endif %}
+                                        {% if clinvar_allele_mult.clinvar_allele.multiple_review_status == "A" %}
+                                            <button class="btn btn-warning" name="action" value="unapprove">Un-Approve Duplicates</button>
+                                        {% else %}
+                                            <button class="btn btn-primary" name="action" value="approve">Approve Duplicates</button>
+                                        {% endif %}
+                                    </div>
                                 </form>
                             </td>
                         </tr>
-                    {% endif %}
                 {% endwith %}
             </tbody>
         </table>

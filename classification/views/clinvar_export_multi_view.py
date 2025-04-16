@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import IntEnum
 from functools import cached_property, reduce
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Any
 
 from django.contrib import messages
 from django.db import transaction
@@ -12,10 +12,11 @@ from django.urls import reverse
 from more_itertools import first
 
 from classification.models import ClinVarAllele, ClinVarExport, ConditionResolved, ClassificationModification, \
-    ClinVarExportDeleteStatus
+    ClinVarExportDeleteStatus, ClinVarAlleleMultiStatus
 from classification.models.clinvar_export_convertor import ClinVarExportConverter
 from library.django_utils import require_superuser
 from ontology.models import AncestorCalculator, OntologyTerm
+from snpdb.views.datatable_view import DatatableConfig, DC, DatatableConfigQuerySetMode, RichColumn, CellData, SortOrder
 
 
 class ClinVarAlleleMultiMergeStatus(IntEnum):
@@ -102,6 +103,26 @@ class ClinVarAlleleMultiExport:
         except ValueError:
             return None
 
+    @property
+    def common_ancestor_json(self):
+        if common_ancestor := self.common_ancestor:
+            return ConditionResolved(terms=[common_ancestor]).to_json(include_join=False)
+
+    def approve(self):
+        all_conditions = set()
+        for clinvar_export in self.clinvar_exports_with_classification:
+            if resolved := clinvar_export.condition_resolved:
+                all_conditions.add(resolved)
+        self.clinvar_allele.accepted_condition_splits = list(sorted(all_conditions))
+        self.clinvar_allele.multiple_review_status = ClinVarAlleleMultiStatus.MULTI_CONDITION_APPROVED
+        self.clinvar_allele.save()
+
+    def unapprove(self):
+        self.clinvar_allele.accepted_condition_splits = []
+        self.clinvar_allele.multiple_review_status = ClinVarAlleleMultiStatus.MULTI_CONDITION_REQUIRES_REVIEW
+        self.clinvar_allele.save()
+
+
     @cached_property
     def merge_preview(self) -> ClinVarAlleleMultiMergeOutput:
         consider_exports = list(self.clinvar_exports)
@@ -165,19 +186,43 @@ class ClinVarAlleleMultiExport:
         )
 
 
-def multi_export_clinvar_alleles() -> Iterable[ClinVarAlleleMultiExport]:
-    return [ClinVarAlleleMultiExport(ca) for ca in (
-        ClinVarAllele.objects.annotate(
-            clinvar_export_count=Count('clinvarexport', filter=~Q(clinvarexport__delete_status=ClinVarExportDeleteStatus.DELETED))
-        ).filter(clinvar_export_count__gte=2).iterator())
-    ]
+class ClinVarAlleleMultiExportColumns(DatatableConfig[ClinVarAllele]):
+
+    def get_initial_queryset(self) -> QuerySet[DC]:
+        return ClinVarAllele.objects.filter(multiple_review_status__in=(ClinVarAlleleMultiStatus.MULTI_CONDITION_REQUIRES_REVIEW, ClinVarAlleleMultiStatus.MULTI_CONDITION_APPROVED))
+
+    def map_object(self, obj: DC) -> Any:
+        return ClinVarAlleleMultiExport(obj)
+
+    def pre_render(self, qs: QuerySet[DC]):
+        return qs.select_related('clinvar_key', 'allele').prefetch_related('clinvarexport_set')
+
+    def render_exports(self, row: CellData):
+        multi: ClinVarAlleleMultiExport = row.obj
+        data = []
+        for ce in multi.clinvar_exports_with_classification:
+            data.append({"pk": ce.pk, "status": ce.get_status_display(), "condition": ce.condition})
+        return data
+
+    def __init__(self, request: HttpRequest):
+        self.server_calculate_mode = DatatableConfigQuerySetMode.OBJECTS
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn(key="pk", label="ID", renderer=lambda cell: {"text": cell.obj.clinvar_allele.pk, "url": reverse('clinvar_export_multi', kwargs={"clinvar_allele_pk": cell.obj.clinvar_allele.pk})}, client_renderer='TableFormat.linkUrl', orderable=True),
+            RichColumn(key="clinvar_key", label="ClinVar Key", renderer=lambda cell: str(cell.obj.clinvar_allele.clinvar_key)),
+            RichColumn(key="allele", label="Allele", renderer=lambda cell: str(cell.obj.clinvar_allele.allele), sort_keys=['allele']),
+            RichColumn(key="export_bucket", label="Export Type", renderer=lambda cell: str(cell.obj.clinvar_allele.clinvar_export_bucket), sort_keys=['clinvar_allele__clinvar_export_bucket'], client_renderer='VCTable.allele_origin_cell'),
+            RichColumn(name="common-condition", label="Common Condition", renderer=lambda cell: cell.obj.common_ancestor_json, client_renderer='VCTable.condition'),
+            RichColumn(name="exports", label="ClinVar Exports", renderer=self.render_exports, client_renderer='renderClinVarExports'),
+            RichColumn(name="status", label="Duplicate Status", renderer=lambda cell: cell.obj.clinvar_allele.get_multiple_review_status_display(), sort_keys=['multiple_review_status'], orderable=True, default_sort=SortOrder.DESC)
+        ]
+
 
 
 @require_superuser
 def view_multi_clinvar_exports_listing(request: HttpRequest):
     return render(
         request=request,
-        context={"clinvar_allele_mults": multi_export_clinvar_alleles()},
         template_name="classification/clinvar_export_multi_listing.html"
     )
 
@@ -185,10 +230,21 @@ def view_multi_clinvar_exports_listing(request: HttpRequest):
 @require_superuser
 def view_multi_clinvar_exports(request: HttpRequest, clinvar_allele_pk: int):
     if request.method == "POST":
+        action = request.POST.get("action")
         merge_me = ClinVarAlleleMultiExport(ClinVarAllele.objects.get(pk=clinvar_allele_pk))
-        message_list = merge_me.merge_preview.apply()
-        for message in message_list:
-            messages.add_message(request, messages.SUCCESS, message)
+        if action == "merge":
+            message_list = merge_me.merge_preview.apply()
+            for message in message_list:
+                messages.add_message(request, messages.SUCCESS, message)
+        elif action == "approve":
+            merge_me.approve()
+            messages.add_message(request, messages.SUCCESS, f"ClinVarAllele {clinvar_allele_pk} marked as accepting provided conditions")
+        elif action == "unapprove":
+            merge_me.unapprove()
+            messages.add_message(request, messages.SUCCESS,f"ClinVarAllele {clinvar_allele_pk} marked as accepting provided conditions")
+        else:
+            raise ValueError(f"Unknown action {action}")
+
         return redirect(reverse('clinvar_export_multi_listing'))
     else:
         return render(

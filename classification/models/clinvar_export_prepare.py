@@ -148,11 +148,12 @@ class ClinVarAlleleExportManager:
             complete_log += stub.apply()
             if not stub.deleted:
                 all_conditions_set.add(stub.condition_umbrella)
-        self.clinvar_allele.check_if_conditions_require_review(all_conditions_set)
 
+        self.clinvar_allele.apply_conditions_require_review(all_conditions_set)
         self.clinvar_allele.last_evaluated = now()
         self.clinvar_allele.save()
-        log = ClinVarAlleleLog(clinvar_allele=self.clinvar_allele, log=complete_log)
+
+        return ClinVarAlleleLog(clinvar_allele=self.clinvar_allele, log=complete_log)
 
 
 def allele_origin_to_clinvar_export_types(bucket: AlleleOriginBucket) -> list[ClinVarExportTypeBucket]:

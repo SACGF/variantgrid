@@ -2583,6 +2583,10 @@ VCTable.evidence_key = (key_name, data, type, row) => {
     return span;
 };
 
+VCTable.allele_origin_cell = (data, type, row) => {
+    return VCTable.allele_origin_bucket_label(data, "", "horizontal")
+}
+
 VCTable.allele_origin_bucket_label = (allele_origin_bucket, override_text = "", alignment="vertical") => {
     let allele_origin_label = override_text;
     if (!allele_origin_label) {

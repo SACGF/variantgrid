@@ -5,6 +5,7 @@ import logging
 import operator
 from dataclasses import dataclass
 from datetime import datetime
+from enum import auto
 from functools import cached_property, reduce
 from typing import Optional, Any, Callable, Union, TypeVar, Generic, Type, List
 
@@ -32,7 +33,8 @@ class CellData:
     Parameter to be passed to server side renders,
     call .value to get the single column, otherwise can inspect columns
     """
-    all_data: dict[str, Any]
+    all_data: Optional[dict[str, Any]]
+    obj: Optional[Any]
     key: Optional[str]
 
     @property
@@ -207,6 +209,11 @@ class RichColumn:
 DC = TypeVar('DC', bound=models.Model)  # Data Class
 
 
+class DatatableConfigQuerySetMode(enum.IntEnum):
+    COLUMNS = auto()
+    OBJECTS = auto()
+
+
 class DatatableConfig(Generic[DC]):
     """
     This class both determines how the client side table should be defined (via tags)
@@ -217,6 +224,16 @@ class DatatableConfig(Generic[DC]):
     rich_columns: list[RichColumn]  # columns for display
     expand_client_renderer: Optional[str] = None  # if provided, will expand rows and render content with this JavaScript method
     scroll_x = False
+    server_calculate_mode = DatatableConfigQuerySetMode.COLUMNS
+
+    def map_object(self, obj: DC) -> Any:
+        """
+        This method is only invoked if server_calculate_mode=DatatableConfigQuerySetMode.OBJECTS
+        Allows you to wrap the object with something else
+        :param obj: Input object from the queryset
+        :return: A mapped object
+        """
+        return obj
 
     def value_columns(self) -> list[str]:
         column_names = list(itertools.chain(*[rc.value_columns for rc in self.rich_columns if rc.enabled]))
@@ -408,12 +425,14 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
             value = cloned
         return value
 
-    def render_cell(self, row: dict, column: RichColumn) -> JsonDataType:
+    def render_cell(self, row: CellData, column: RichColumn) -> JsonDataType:
         """ Renders a column on a row. column can be given in a module notation e.g. document.invoice.type """
         data: Any
+        if row.obj and not column.renderer:
+            raise ValueError("RichColumns must have a sever renderer if in object mode")
+
         if column.renderer:
-            render_data = CellData(all_data=row, key=column.key)
-            return DatabaseTableView.limit_value_size(column.renderer(render_data))
+            return DatabaseTableView.limit_value_size(column.renderer(row))
         elif column.extra_columns:
             data_dict = {}
             for col in column.value_columns:
@@ -463,18 +482,28 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
 
     def prepare_results(self, qs: QuerySet[DC]):
         self.config.pre_render(qs)
-
         data = []
-        # select out all columns but only send down data for enabled columns
-        all_columns = self.config.value_columns()
 
-        for row in qs.values(*all_columns):
-            # fix me, do server side rendering
-            row_json = {}
-            for rc in self.config.enabled_columns:
-                value = self.render_cell(row=row, column=rc)
-                row_json[rc.name] = value
-            data.append(row_json)
+        if self.config.server_calculate_mode == DatatableConfigQuerySetMode.COLUMNS:
+            # select out all columns but only send down data for enabled columns
+            all_columns = self.config.value_columns()
+            for row in qs.values(*all_columns):
+                row_json = {}
+                for rc in self.config.enabled_columns:
+                    value = self.render_cell(row=CellData(all_data=row, key=rc.key), column=rc)
+                    row_json[rc.name] = value
+                data.append(row_json)
+        elif self.config.server_calculate_mode == DatatableConfigQuerySetMode.OBJECTS:
+            for row_obj in qs:
+                mapped_obj = self.config.map_object(row_obj)
+                row_json = {}
+                for rc in self.config.enabled_columns:
+                    value = self.render_cell(row=CellData(all_data=None, obj=mapped_obj, key=rc.key), column=rc)
+                    row_json[rc.name] = value
+                data.append(row_json)
+        else:
+            raise ValueError(f"Unexpected QuerySet mode {self.config.server_calculate_mode}")
+
         return data
 
     def handle_exception(self, e: BaseException):
