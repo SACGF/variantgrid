@@ -337,6 +337,16 @@ class ImportedAlleleInfoDownload(ExportRow):
         if c38 := self.allele_info[GenomeBuild.grch38()]:
             return c38.genomic_sort
 
+    @export_column(label="variant ID (37)")
+    def variant_id_37(self):
+        if resolved := self.allele_info[GenomeBuild.grch37()]:
+            return resolved.variant_id
+
+    @export_column(label="variant ID (38)")
+    def variant_id_38(self):
+        if resolved := self.allele_info[GenomeBuild.grch38()]:
+            return resolved.variant_id
+
     @export_column(label="Included")
     def included(self):
         return self.allele_info.latest_validation.include
