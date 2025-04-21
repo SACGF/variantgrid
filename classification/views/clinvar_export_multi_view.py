@@ -68,7 +68,7 @@ class ClinVarAlleleMultiMergeOutput:
             delete_us = list(self.clinvar_allele.clinvarexport_set.exclude(delete_status=ClinVarExportDeleteStatus.DELETED))
         elif self.status == ClinVarAlleleMultiMergeStatus.CAN_MERGE:
             merge_into = self.clinvar_allele.clinvarexport_set.filter(pk=self.preview.pk).get()
-            merge_into.scv = self.preview.scv
+            merge_into.scv = self.preview.scv or ""
             merge_into.condition = self.preview.condition.to_json()
             merge_into.classification_based_on = self.preview.classification_based_on
             ClinVarExportConverter(merge_into).convert().apply()
@@ -245,7 +245,7 @@ def view_multi_clinvar_exports(request: HttpRequest, clinvar_allele_pk: int):
         else:
             raise ValueError(f"Unknown action {action}")
 
-        return redirect(reverse('clinvar_export_multi_listing'))
+        return redirect(reverse('clinvar_export_multi', kwargs={"clinvar_allele_pk": clinvar_allele_pk}))
     else:
         return render(
             request=request,

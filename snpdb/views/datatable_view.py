@@ -34,8 +34,8 @@ class CellData:
     call .value to get the single column, otherwise can inspect columns
     """
     all_data: Optional[dict[str, Any]]
-    obj: Optional[Any]
     key: Optional[str]
+    obj: Optional[Any] = None
 
     @property
     def value(self):

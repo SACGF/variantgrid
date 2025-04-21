@@ -11,6 +11,9 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
     <div class="container">
+        <div class="mb-4">
+            <a href="{% url 'clinvar_export_multi_listing' %}" class="hover-link"><i class="fas fa-angle-left"></i>Back to all ClinVar Multiple Exports</a>
+        </div>
         {% labelled label="ClinVar Key" %}{{ clinvar_allele_mult.clinvar_allele.clinvar_key.name }}{% endlabelled %}
         {% labelled label="Allele" %}{{ clinvar_allele_mult.clinvar_allele.allele }}{% endlabelled %}
         {% labelled label="Export Type" %}{{ clinvar_allele_mult.clinvar_allele.get_clinvar_export_bucket_display }}{% endlabelled %}
