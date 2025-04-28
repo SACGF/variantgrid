@@ -14,6 +14,7 @@ from django.core.exceptions import PermissionDenied, ImproperlyConfigured, Objec
 from django.db.utils import IntegrityError
 from django.forms.models import inlineformset_factory, ALL_FIELDS
 from django.forms.widgets import TextInput
+from django.http import HttpRequest
 from django.http.response import HttpResponse, HttpResponseRedirect, HttpResponseServerError, JsonResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls.base import reverse
@@ -34,7 +35,7 @@ from annotation.manual_variant_entry import create_manual_variants, can_create_v
 from annotation.models import AnnotationVersion, SampleVariantAnnotationStats, SampleGeneAnnotationStats, \
     SampleClinVarAnnotationStats, SampleVariantAnnotationStatsPassingFilter, SampleGeneAnnotationStatsPassingFilter, \
     SampleClinVarAnnotationStatsPassingFilter
-from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion
+from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion, ManualVariantEntry
 from annotation.models.models_gene_counts import GeneValueCountCollection, \
     GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
 from annotation.serializers import ManualVariantEntryCollectionSerializer
@@ -579,7 +580,6 @@ def messages_bulk_delete(request):
 
 
 def manual_variant_entry(request):
-
     if can_create_variants(request.user):
         form = forms.ManualVariantEntryForm(request.POST or None, user=request.user)
         if request.method == 'POST':
@@ -600,10 +600,14 @@ def manual_variant_entry(request):
         form = None
         messages.add_message(request, messages.INFO, "Manual variant entry has been disabled by an admin.")
 
-    mvec_qs = ManualVariantEntryCollection.objects.order_by("-id")
-    context = {"form": form,
-               "mvec_qs": mvec_qs}
+    context = {"form": form}
     return render(request, 'snpdb/data/manual_variant_entry.html', context=context)
+
+
+def manual_variant_entry_collection_detail(request: HttpRequest, pk: int):
+    mvec = ManualVariantEntryCollection.objects.get(pk=pk)
+    return render(request, 'snpdb/data/manual_variant_entry_collection_detail.html', context={'mvec': mvec})
+
 
 
 def watch_manual_variant_entry(request, pk):

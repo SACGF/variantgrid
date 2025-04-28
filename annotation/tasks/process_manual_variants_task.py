@@ -3,13 +3,11 @@ import logging
 from django.db.models.query_utils import Q
 
 from annotation.models import ManualVariantEntryType
-from annotation.models.models import CreatedManualVariant, ManualVariantEntry
-from genes.hgvs import get_hgvs_variant_coordinate
+from annotation.models.models import ManualVariantEntry
+from genes.hgvs import HGVSMatcher
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants, get_clingen_alleles_from_external_code
 from snpdb.models import Variant, VariantCoordinate
 from snpdb.models.models_enums import ImportStatus, ClinGenAlleleExternalRecordType
-from snpdb.variant_pk_lookup import VariantPKLookup
-from upload.models import ModifiedImportedVariant
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
 
@@ -22,7 +20,13 @@ def get_manual_variant_coordinates(mve: ManualVariantEntry) -> list[VariantCoord
                                                                      mve.entry_text):
             variant_coordinates.append(clingen_allele.get_variant_coordinate(mve.genome_build))
     elif mve.entry_type == ManualVariantEntryType.HGVS:
-        variant_coordinates.append(get_hgvs_variant_coordinate(mve.entry_text, mve.genome_build))
+        hgvs_matcher = HGVSMatcher(mve.genome_build)
+        hgvs_string, search_messages = hgvs_matcher.clean_hgvs(mve.entry_text)
+        if search_messages:
+            mve.warning_message = "\n".join(search_messages)
+            mve.save()
+        vc = hgvs_matcher.get_variant_coordinate(hgvs_string)
+        variant_coordinates.append(vc)
     elif mve.entry_type == ManualVariantEntryType.VARIANT:
         variant_coordinates.append(VariantCoordinate.from_string(mve.entry_text, mve.genome_build))
     else:

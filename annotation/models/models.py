@@ -1638,6 +1638,7 @@ class ManualVariantEntry(models.Model):
     line_number = models.IntegerField()
     entry_text = models.TextField()
     entry_type = models.CharField(max_length=1, choices=ManualVariantEntryType.choices, default=ManualVariantEntryType.UNKNOWN)
+    warning_message = models.TextField(blank=True, null=True)
     error_message = models.TextField(blank=True, null=True)  # Set if any error...
 
     @property

@@ -1,0 +1,48 @@
+{% load ui_utils %}
+
+{% if url_name_visible.view_upload_pipeline and mvec.uploadedmanualvariantentrycollection %}
+    <a class="hover-link" href="{% url 'view_upload_pipeline' mvec.uploadedmanualvariantentrycollection.uploaded_file.uploadpipeline.pk %}">
+        view upload pipeline
+    </a>
+{% endif %}
+
+
+{% if mvec.manualvariantentry_set.exists %}
+    <table>
+        <tr>
+            <th>Type</th>
+            <th>Entry text</th>
+            <th>Variants</th>
+            <th>Messages</th>
+        </tr>
+    {% for mve in mvec.manualvariantentry_set.all %}
+        <tr>
+            <td>{{ mve.get_entry_type_display }}</td>
+            <td>{{ mve.entry_text | truncatechars:50 }}</td>
+            <td>
+                {% for cmv in mve.unique_created_variants %}
+                    <br/>
+                    {% if cmv.variant.variantannotation_set.exists %}
+                        <a class="hover-link variant-coordinate" href="{% url 'view_variant' cmv.variant_id  %}">{{ cmv.variant }}</a>
+                    {% else %}
+                        <a class="hover-link variant-coordinate un-annotated" title="Not annotated" href="{% url 'view_variant' cmv.variant_id  %}">{{ cmv.variant }}</a>
+                    {% endif %}
+                {% endfor %}
+            </td>
+            <td>
+                {% if mve.warning_message %}
+                <ul class='messages'>
+                    <li class="warning">{{ mve.warning_message|default_if_none:'' }}</li>
+                </ul>
+                {% endif %}
+                {% if mve.error_message %}
+                <ul class='messages'>
+                    <li class="error">{{ mve.error_message|default_if_none:'' }}</li>
+                </ul>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </table>
+{% endif %}
+

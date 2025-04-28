@@ -8,9 +8,8 @@ from library.django_utils.jqgrid_view import JQGridView
 from library.preview_request import preview_view
 from snpdb.grids import CohortListGrid, CohortSampleListGrid, SamplesListGrid, GenomicIntervalsListGrid, \
     CustomColumnsCollectionColumns, TriosListGrid, VCFListGrid, TagColorsCollectionColumns, \
-    LiftoverRunColumns, LiftoverRunAlleleLiftoverColumns, AlleleLiftoverFailureColumns
-from snpdb.views import views, views_json, views_rest, \
-    views_autocomplete
+    LiftoverRunColumns, LiftoverRunAlleleLiftoverColumns, AlleleLiftoverFailureColumns, ManualVariantEntryCollectionColumns
+from snpdb.views import views, views_json, views_rest, views_autocomplete
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 
@@ -103,6 +102,9 @@ urlpatterns = [
     path('view_genome_build/<genome_build_name>', views.view_genome_build, name='view_genome_build'),
     path('view_contig/<contig_accession>', views.view_contig, name='view_contig'),
 
+    path('manual_variant_entry_collections/detail/<int:pk>', views.manual_variant_entry_collection_detail,
+         name='manual_variant_entry_collection_detail'),
+
     # Grids
     path('cohort/grid/<slug:op>/', JQGridView.as_view(grid=CohortListGrid, delete_row=True), name='cohort_grid'),
     path('cohort_sample/grid/<int:cohort_id>/<slug:op>/', JQGridView.as_view(grid=CohortSampleListGrid), name='cohort_sample_grid'),
@@ -115,6 +117,9 @@ urlpatterns = [
     path('liftover/allele_liftover_failures/datatable',
          DatabaseTableView.as_view(column_class=AlleleLiftoverFailureColumns),
          name='allele_liftover_failures_datatable'),
+    path('manual_variant_entry_collections/datatable',
+         DatabaseTableView.as_view(column_class=ManualVariantEntryCollectionColumns),
+         name='manual_variant_entry_collections_datatable'),
     path('settings/custom_columns/collection/datatable',
          DatabaseTableView.as_view(column_class=CustomColumnsCollectionColumns),
          name='custom_columns_collections_datatable'),

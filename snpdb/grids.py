@@ -7,10 +7,12 @@ from django.db.models import F, QuerySet, Value, Func
 from django.db.models.aggregates import Count, Max
 from django.db.models.fields import CharField
 from django.db.models.query_utils import Q
+from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
+from annotation.models import ManualVariantEntryCollection
 from library.django_utils import get_url_from_view_path
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
@@ -646,4 +648,31 @@ class AlleleLiftoverFailureColumns(AbstractAlleleLiftoverColumns):
         ).filter(
             id=F('max_id')
         )
+        return qs
+
+
+class ManualVariantEntryCollectionColumns(DatatableConfig[ManualVariantEntryCollection]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+
+        self.expand_client_renderer = DatatableConfig._row_expand_ajax('manual_variant_entry_collection_detail', expected_height=120)
+        self.rich_columns = [
+            RichColumn('id', orderable=True, default_sort=SortOrder.DESC),
+            RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn('user__username', orderable=True),
+            RichColumn('import_status', orderable=True, renderer=self._render_import_status),
+            RichColumn('genome_build', orderable=True),
+        ]
+
+    def _render_import_status(self, row: dict[str, Any]) -> JsonDataType:
+        label = ""
+        if status := row['import_status']:
+            import_status = ImportStatus(status)
+            label = import_status.label
+        return label
+
+    def get_initial_queryset(self) -> QuerySet[ManualVariantEntryCollection]:
+        qs = ManualVariantEntryCollection.objects.all()
+        if not self.user.is_staff:
+            qs = qs.filter(user=self.user)
         return qs
