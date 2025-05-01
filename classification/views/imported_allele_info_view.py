@@ -326,7 +326,7 @@ class ImportedAlleleInfoDownload(ExportRow):
 
     @export_column(label="c.HGVS (38)")
     def c_hgvs_38(self):
-        if c38 := self.allele_info[GenomeBuild.grch37()]:
+        if c38 := self.allele_info[GenomeBuild.grch38()]:
             return c38.c_hgvs
 
     @export_column(label="Differences")
