@@ -82,8 +82,9 @@ class HGVSConverterVersion(TimeStampedModel):
 class CHGVSResolution:
     c_hgvs: str
     c_hgvs_compatible: str
-    transcript_version: str
-    gene_symbol: str
+    c_hgvs_converter_version: HGVSConverterVersion
+    transcript_version: Optional[str]
+    gene_symbol: Optional[str]
 
 
 class ResolvedVariantInfo(TimeStampedModel):
@@ -167,6 +168,7 @@ class ResolvedVariantInfo(TimeStampedModel):
             c_hgvs_resolution = self.recalc_c_hgvs()
             self.c_hgvs = c_hgvs_resolution.c_hgvs
             self.c_hgvs_compat = c_hgvs_resolution.c_hgvs_compatible
+            self.c_hgvs_converter_version = c_hgvs_resolution.c_hgvs_converter_version
             self.transcript_version = c_hgvs_resolution.transcript_version
             self.gene_symbol = c_hgvs_resolution.gene_symbol
         except Exception as exception:
@@ -184,7 +186,7 @@ class ResolvedVariantInfo(TimeStampedModel):
         variant = self.variant
         genome_build = self.genome_build
         imported_transcript = self.allele_info.get_transcript
-        hgvs_matcher = HGVSMatcher(genome_build=genome_build)
+        hgvs_matcher = HGVSMatcher(genome_build=genome_build) #
         # hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
         # version = hgvs_matcher.hgvs_converter.get_version()
 
@@ -192,11 +194,16 @@ class ResolvedVariantInfo(TimeStampedModel):
         c_hgvs = hgvs_variant.format()
         c_hgvs_obj = CHGVS(c_hgvs)
 
+        hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
+        version = hgvs_matcher.hgvs_converter.get_version()
+        c_hgvs_converter_version = HGVSConverterVersion.get(hgvs_converter_type, version=version,
+                                                          used_converter_type=used_converter_type)
         return CHGVSResolution(
-            c_hgvs=c_hgvs,
-            c_hgvs_compatible=hgvs_variant.format(use_compat=True, max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH),
-            transcript_version=c_hgvs_obj.transcript_version_model(genome_build=genome_build),
-            gene_symbol=GeneSymbol.objects.filter(symbol=c_hgvs_obj.gene_symbol).first()
+                c_hgvs=c_hgvs,
+                c_hgvs_compatible=hgvs_variant.format(use_compat=True, max_ref_length=settings.CLASSIFICATION_MAX_REFERENCE_LENGTH),
+                c_hgvs_converter_version=c_hgvs_converter_version,
+                transcript_version=c_hgvs_obj.transcript_version_model(genome_build=genome_build),
+                gene_symbol=GeneSymbol.objects.filter(symbol=c_hgvs_obj.gene_symbol).first()
         )
 
     @staticmethod
