@@ -19,6 +19,7 @@ from classification.views.classification_view import ClassificationView, LabGene
 from classification.views.classification_view_metrics import view_classification_metrics, \
     view_page_metrics_detail
 from classification.views.clinvar_export_view import ClinVarMatchView, clinvar_match_detail
+from classification.views.clinvar_legacy_view import ClinVarLegacyView, ClinVarLegacyColumns
 from classification.views.condition_match_test_view import condition_match_test_view, \
     condition_match_test_download_view, condition_obsoletes_view
 from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
@@ -87,6 +88,11 @@ urlpatterns = [
     path('clinvar_match', ClinVarMatchView.as_view(), name='clinvar_match'),
     path('clinvar_match/<str:clinvar_key_id>', ClinVarMatchView.as_view(), name='clinvar_match'),
     path('clinvar_match/<str:clinvar_key_id>/match_detail', clinvar_match_detail, name='clinvar_match_detail'),
+
+    path('clinvar_legacy', ClinVarLegacyView.as_view(), name='clinvar_legacy'),
+    path('clinvar_legacy/<str:clinvar_key_id>/datatable', DatabaseTableView.as_view(column_class=ClinVarLegacyColumns), name='clinvar_legacy_datatables'),
+    path('clinvar_legacy/<str:clinvar_key_id>', ClinVarLegacyView.as_view(), name='clinvar_legacy'),
+
 
     path('clinvar_export_summary', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),  # version that lets you pick which clinvarkey if you access to multiple
     path('clinvar_export_summary/<str:clinvar_key_id>', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),
