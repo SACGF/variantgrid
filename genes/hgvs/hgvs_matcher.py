@@ -45,7 +45,7 @@ class VariantCoordinateAndDetails(FormerTuple):
     variant_coordinate: VariantCoordinate
     transcript_accession: str
     kind: str
-    used_converter_type: HGVSConverterType
+    used_converter_type: Optional[HGVSConverterType]
     method: str  # human readable contains a trail of what was tried
     matches_reference: Union[bool, HgvsMatchRefAllele]
     originally_normalized: Union[bool, HgvsOriginallyNormalized]

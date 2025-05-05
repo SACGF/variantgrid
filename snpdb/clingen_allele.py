@@ -436,15 +436,17 @@ def get_clingen_allele_for_variant_coordinate(genome_build: GenomeBuild, variant
 
     rep = f"{variant_coordinate=}"
     _clingen_check_variant_coordinate_length(rep, genome_build, variant_coordinate)
-
     try:
         # Use variant if we have it in the system so we can lookup cache, or store result
         variant = Variant.get_from_variant_coordinate(variant_coordinate, genome_build)
         # This will create ClinGen allele ID if not present (sends via PUT)
         ca = get_clingen_allele_for_variant(genome_build, variant, clingen_api=clingen_api)
     except Variant.DoesNotExist:
+        ca = None
+
+    if ca is None or ca.cache_expired():
         g_hgvs_string = hgvs_matcher.variant_coordinate_to_g_hgvs(variant_coordinate).format()
-        # We'll be retrieving ClinGen via GET so can sometimes allele ID won't be there
+        # We'll be retrieving ClinGen via GET so sometimes allele ID won't be there
         ca = get_clingen_allele_from_hgvs(g_hgvs_string, require_allele_id=require_allele_id, clingen_api=clingen_api)
     return ca
 
