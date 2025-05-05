@@ -7,6 +7,7 @@ from typing import Optional
 from django.conf import settings
 from django.db import models
 from django.db.models.fields import DateTimeField
+from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 
 from snpdb.models.models_enums import SequenceRole
@@ -104,6 +105,12 @@ class ClinGenAllele(TimeStampedModel):
         if self.modified - self.created > threshold:
             modified = self.modified
         return modified
+
+    def cache_expired(self) -> bool:
+        if settings.CLINGEN_ALLELE_REGISTRY_MAX_CACHE_DAYS is not None:
+            threshold = timezone.now() - timedelta(days=settings.CLINGEN_ALLELE_REGISTRY_MAX_CACHE_DAYS)
+            return self.modified < threshold
+        return False
 
     def _get_transcript_allele(self, transcript_accession, match_version=True) -> Optional[dict]:
         if match_version:
