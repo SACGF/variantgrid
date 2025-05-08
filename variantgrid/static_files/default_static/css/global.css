@@ -905,6 +905,9 @@ table.dataTable .dt-detail {
   font-size: 12px;
   color: #444444;
 }
+table.dataTable tr.expand-row td {
+  border-top-style: dotted;
+}
 table.dataTable tr.child td.child {
   padding-top: 0;
   padding-bottom: 16px;

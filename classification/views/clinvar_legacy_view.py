@@ -1,17 +1,21 @@
 import io
+import re
 from functools import cached_property
-
 from django.contrib import messages
 from django.db.models import QuerySet
 from django.shortcuts import redirect, get_object_or_404, render
 from django.urls import reverse
 from django.views import View
-
+from classification.models import ConditionResolved, ClinVarExport
 from classification.models.clinvar_legacy import ClinVarLegacy
 from classification.services.clinvar_legacy_services import ClinVarLegacyService
+from genes.hgvs import CHGVS
 from library.django_utils import RequireSuperUserView
+from library.utils import JsonDataType
+from library.utils.django_utils import render_ajax_view
+from ontology.models import OntologyTerm
 from snpdb.models import ClinVarKey
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, DC
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, DC, CellData, DatatableConfigQuerySetMode
 
 
 class ClinVarLegacyView(RequireSuperUserView, View):
@@ -53,13 +57,58 @@ class ClinVarLegacyView(RequireSuperUserView, View):
         })
 
 
+def view_clinvar_legacy_detail(request, scv: str):
+    clinvar_legacy = get_object_or_404(ClinVarLegacy, scv=scv)
+    clinvar_legacy.clinvar_key.check_user_can_access(request.user)
+    matches = ClinVarLegacyService.find_matches(clinvar_legacy)
+    return render_ajax_view(request, 'classification/clinvar_legacy_detail.html', {
+        "clinvar_legacy": clinvar_legacy,
+        "matches": matches,
+    })
+
+
 class ClinVarLegacyColumns(DatatableConfig[ClinVarLegacy]):
+
+    def render_hgvs(self, row: CellData[ClinVarLegacy]) -> JsonDataType:
+        return row.obj.hgvs_obj.to_json()
+
+    def render_condition(self, row: CellData[ClinVarLegacy]) -> JsonDataType:
+        if value := row.obj.your_condition_identifier:
+            stub = OntologyTerm.get_or_stub(value)
+            return ConditionResolved(terms=[stub]).to_json()
+        return None
+
+    def render_classification(self, row: CellData[ClinVarLegacy]) -> JsonDataType:
+        return row.obj.classification_code
+
+    def render_last_evaluated(self, row: CellData[ClinVarLegacy]) -> JsonDataType:
+        return row.obj.date_last_evaluated
+
+    def render_scv(self, row: CellData[ClinVarLegacy]) -> JsonDataType:
+        return row.obj.scv
+        # scv = row.obj.scv
+        # if existing := ClinVarExport.objects.filter(scv=scv).first():
+        #     return {"url": existing.get_absolute_url(), "text": existing.scv}
+        # return {"text": scv}
+
+    def render_allele(self, row: CellData[ClinVarLegacy]) -> JsonDataType:
+        if allele := row.obj.allele:
+            return {"url": allele.get_absolute_url(), "text": f"A{allele.pk}"}
+        else:
+            return None
+
 
     def __init__(self, request: any):
         super().__init__(request)
+        self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_legacy_detail', id_field="scv", expected_height=120)
+        self.server_calculate_mode = DatatableConfigQuerySetMode.OBJECTS
         self.rich_columns = [
-            RichColumn("scv", default_sort=SortOrder.ASC),
-            RichColumn("clinvar_allele_id", label="ClinVar Allele"),
+            RichColumn(name="scv", label="SCV", renderer=self.render_scv, default_sort=SortOrder.ASC, sort_keys=["scv"]),
+            RichColumn("allele", label="Allele", renderer=self.render_allele, client_renderer="TableFormat.linkUrl"),
+            RichColumn("preferred_variant_name", label="HGVS", renderer=self.render_hgvs, client_renderer="VCTable.hgvs"),
+            RichColumn("your_condition_identifier", label="Condition", renderer=self.render_condition, client_renderer="VCTable.condition"),
+            RichColumn("clinical_significance", label="Classification", renderer=self.render_classification, client_renderer="VCTable.classification"),
+            RichColumn("date_last_evaluated", label="Date Last Evaluated", client_renderer="TableFormat.timestamp"),
         ]
 
     @cached_property

@@ -1061,6 +1061,10 @@ table.dataTable {
 		color: #444444;
 	}
 
+	tr.expand-row td {
+		border-top-style: dotted;
+	}
+
 	tr.child td.child {
 		padding-top: 0;
 		padding-bottom: 16px;
@@ -1079,6 +1083,8 @@ table.dataTable {
 			}
 		}
 	}
+
+
 
 	td.dataTables_empty {
 		font-size: 16px !important;

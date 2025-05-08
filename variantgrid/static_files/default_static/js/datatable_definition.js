@@ -295,6 +295,7 @@ let DataTableDefinition = (function() {
                         // loading hasn't started yet, load the row
                         let childHtml = expandFn(row.data());
                         row.child( childHtml );
+                        row.child().addClass('expand-row');
                         tr.addClass('loaded');
                     }
                     // show the row
@@ -505,15 +506,16 @@ TableFormat.linkUrl = (data, type, row) => {
     }
     let text = data.text;
 
-    let textDom;
+    let useDom;
     if (!text) {
-        textDom = $('<span>', {class: 'no-value', text:'<blank>'});
+        useDom = $('<span>', {class: 'no-value', text:'<blank>'});
     } else {
-        textDom = $('<span>', {text: text});
+        useDom = $('<span>', {text: text});
     }
-    let aDom = $('<a>', {href:data.url, html: textDom, class: 'hover-link'});
-
-    return aDom.prop('outerHTML');
+    if (data.url) {
+        useDom = $('<a>', {href:data.url, html: useDom, class: 'hover-link'});
+    }
+    return useDom;
 };
 
 TableFormat.preview = (columns, data, type, row) => {

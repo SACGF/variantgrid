@@ -60,9 +60,8 @@ class ClinVarLegacyExportMatchType(str, Enum):
 @dataclass
 class ClinVarLegacyMatch:
     """
-    This represents the match between a legacy ClinVar (as in records that were submitted to ClinVar prior to Shariant)
-    Specifically between a LegacyMatch (which will reference many of these) with a ClinVarExport in Shariant
-    This will allow us to match up the two
+    This represents the match between a legacy ClinVar record (aka one submitted outside of VariantGrid)
+    with ClinVarExport records within VariantGrid, the idea then being the SCVs can be copied over to stop duplicates
     """
     clinvar_export: ClinVarExport
     match_types: set[ClinVarLegacyExportMatchType]

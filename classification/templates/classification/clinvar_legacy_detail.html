@@ -1,0 +1,46 @@
+{% load ui_utils %}
+{% load js_tags %}
+{% load classification_tags %}
+{% if clinvar_export.deleted %}
+    <div class="text-danger text-center"><i class="fas fa-trash-can"></i> DELETED FROM CLINVAR</div>
+{% endif %}
+{% labelled label="SCV" %}{{ clinvar_legacy.scv }}{% admin_link clinvar_legacy %}</a>{% endlabelled %}
+{% labelled label="HGVS" %}{% c_hgvs clinvar_legacy.hgvs_obj %}</a>{% endlabelled %}
+{% labelled label="Classification" %}{% clinical_significance clinvar_legacy.classification_code %}{% endlabelled %}
+{% labelled label="Condition" %}{% condition clinvar_legacy.condition_obj %}{% endlabelled %}
+{% labelled label="Last Evaluated" %}{% timestamp clinvar_legacy.date_last_evaluated time_ago=True %}{% endlabelled %}
+
+{% if matches %}
+    {% labelled label="Possible Matches" hint="chunky" %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ClinVar Export</th>
+                    <th>HGVS</th>
+                    <th>Condition</th>
+                    <th>Status</th>
+                    <th>SCV</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for match in matches %}
+                <tr>
+                    <td><a href="{{ match.clinvar_export.get_absolute_url }}" class="id-link">CE_{{ match.clinvar_export.pk }}</a>{% if not match.clinvar_key_match.matches %}{{ 'E' | severity_icon:'This record belongs to a different clinvar key' }}{% endif %}</td>
+                    <td>{% c_hgvs match.c_hgvs_match.value %} {% if match.c_hgvs.matches %} {{ 'S' | severity_icon }}{% elif not match.allele_match.matches %}{{ 'E' | severity_icon:'This record is from a different allele' }}{% endif %}</td>
+                    <td>{% condition match.condition_match.value%}{% if match.condition_match.matches %} {{ 'S' | severity_icon }}{% endif %}</td>
+                    <td>{{ match.clinvar_export.get_status_display }}</td>
+                    <td>{{ match.scv_match.value }}{% if match.condition_match.scv_match.matches %} {{ 'S' | severity_icon }}{% endif %}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endlabelled %}
+{% else %}
+    {% labelled label="Possible Matches" %}<div class="no-value">
+        No Matches Found
+        {% if clinvar_legacy.allele is None %}
+            {% if clinvar_legacy.has_match_attempted %}- Could not find allele, last attempted - {% timestamp clinvar_legacy.allele_match_date time_ago=True %}{% else %}- Have not tried to match allele yet{% endif %}
+        {% endif %}
+    </div>
+    {% endlabelled %}
+{% endif %}

@@ -10,6 +10,11 @@
 {% block title %}Clinvar Legacy Uploads{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
+    <style>
+        #legacy-table td.dt-scv {
+            width: 120px;
+        }
+    </style>
     <div class="container">
         {% if all_keys.count > 1 %}
             <div class="btn-group mb-4" role="group" aria-label="ClinVar Key Picker">
@@ -25,21 +30,17 @@
             <div class="card">
                 <div class="card-header">File Upload</div>
                 <div class="card-body">
-                    {% labelled label="Upload File" %}
+                    {% labelled label="ClinVar Cumulative Report File" %}
                         <input type="file" name="file">
                     {% endlabelled %}
-                    <p>{{ 'W'|severity_icon }} The matching process takes a few minutes, please be patient.</p>
                 </div>
                 <div class="card-footer">
-                    <input type="submit" class="btn btn-primary" value="Compare" />
+                    <input type="submit" class="btn btn-primary" value="Upload" />
                 </div>
             </div>
         </form>
-
-        WATCH THIS SPACE
-
         {% if clinvar_key %}
-            <table data-datatable-url="{% url 'clinvar_legacy_datatables' clinvar_key.pk %}" class="sticky-header"></table>
+            <table id="legacy-table" data-datatable-url="{% url 'clinvar_legacy_datatables' clinvar_key.pk %}" class="sticky-header"></table>
         {% endif %}
 
     </div>

@@ -27,15 +27,18 @@ class SortOrder(enum.Enum):
     DESC = 'desc'
 
 
+RDC = TypeVar('RDC', bound=models.Model)  # Row Data Class (should match the DatatableConfig but only required if using OBjects mode)
+
+
 @dataclass(frozen=True)
-class CellData:
+class CellData(Generic[RDC]):
     """
     Parameter to be passed to server side renders,
     call .value to get the single column, otherwise can inspect columns
     """
     all_data: Optional[dict[str, Any]]
     key: Optional[str]
-    obj: Optional[Any] = None
+    obj: Optional[RDC] = None
 
     @property
     def value(self):
@@ -50,7 +53,7 @@ class CellData:
         if data := self.all_data.get(key):
             return data.get(sub_key)
 
-    def get(self, key: Any, default: Optional[Any] = None) -> Any:
+    def get(self, key: Any, default: Optional[RDC] = None) -> Any:
         return self.all_data.get(key, default)
 
 
@@ -429,7 +432,13 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
         """ Renders a column on a row. column can be given in a module notation e.g. document.invoice.type """
         data: Any
         if row.obj and not column.renderer:
-            raise ValueError("RichColumns must have a sever renderer if in object mode")
+            if key := row.key:
+                try:
+                    return getattr(row.obj, key)
+                except AttributeError:
+                    pass
+
+            raise ValueError("RichColumns must have a sever renderer, or a key that matches an attribute if in object mode")
 
         if column.renderer:
             return DatabaseTableView.limit_value_size(column.renderer(row))
