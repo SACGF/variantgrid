@@ -1,0 +1,11 @@
+{% load ui_utils %}
+{% if e_key.value_type == "S" or e_key.value_type == "M" %}
+    <select id="{{ e_key.key }}" class="form-control data-field">
+        {% if not e_key.mandatory %}<option value=""></option>{% endif %}
+        {% for option in e_key.virtual_options %}
+            <option value="{{ option.key }}">{% if option.label %}{{ option.label }}{% else %}{{ option.key | pretty_label }}{% endif %}</option>
+        {% endfor %}
+    </select>
+{% else %}
+    <input id="{{ e_key.key }} type="text" class="form-control data-field" />
+{% endif %}

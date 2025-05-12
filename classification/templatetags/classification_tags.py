@@ -697,3 +697,9 @@ def user_view_events(user: User, days: int = 1):
             'args': json.dumps(event.args)
         })
     return view_event_data
+
+
+@register.inclusion_tag("classification/tags/evidence_key_input.html")
+def evidence_key_input(key: str):
+    e_key = EvidenceKeyMap.cached_key(key)
+    return {"e_key": e_key}

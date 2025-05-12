@@ -15,7 +15,7 @@ from django.utils.safestring import SafeString
 from library.enums.log_level import LogLevel
 from library.log_utils import log_level_to_bootstrap
 from library.preview_request import PreviewModelMixin
-from library.utils import diff_text, html_id_safe, emoji_to_unicode, format_diff_text
+from library.utils import diff_text, html_id_safe, emoji_to_unicode, format_diff_text, pretty_label
 from snpdb.admin_utils import get_admin_url
 from uicore.views.ajax_form_view import LazyRender
 from variantgrid.perm_path import get_visible_url_names
@@ -759,3 +759,8 @@ def debug(obj: Any):
         if isinstance(obj, Model):
             response.append(f"PK = {obj.pk}")
         return " ".join(response)
+
+
+@register.filter(name='pretty_label')
+def _pretty_label(code: str):
+    return pretty_label(code)
