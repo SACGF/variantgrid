@@ -5,6 +5,7 @@
 {% load js_tags %}
 {% load lab_tags %}
 {% load static %}
+{% load classification_tags %}
 {% block title %}Variant Classification Import{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
@@ -298,14 +299,27 @@ div.json {
             </select>
         {% endlabelled %}
         {% labelled label="Classification" %}
+            {% comment %}
             <input id="clinical_significance" type="text" placeholder="B, LB, VUS, LP, P, etc" class="form-control data-field" value="VUS" />
+            {% endcomment %}
+            {% evidence_key_input "clinical_significance" %}
         {% endlabelled %}
         {% labelled label="Zygosity" %}
+            {% comment %}
             <input id="zygosity" type="text" placeholder="heterozygous, homozygous, hemizygous, mosaic, etc" class="form-control data-field" value="heterozygous" />
+            {% endcomment %}
+            {% evidence_key_input "zygosity" %}
         {% endlabelled %}
         {% labelled label="Condition" %}
             <input id="condition" type="text" class="form-control data-field"/>
         {% endlabelled %}
+        {% labelled label="Allele Origin" %}
+            {% evidence_key_input "allele_origin" %}
+        {% endlabelled %}
+        {% labelled label="Somatic Clin Sig" %}
+            {% evidence_key_input "somatic:clinical_significance" %}
+        {% endlabelled %}
+
 
         <p>
             See <a href="/classification/evidence_keys" class="hover-link" target="_blank">Evidence Keys</a> for valid values.
