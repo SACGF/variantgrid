@@ -1,11 +1,15 @@
 import io
 import re
 from functools import cached_property
+from typing import Optional
+
 from django.contrib import messages
 from django.db.models import QuerySet
 from django.shortcuts import redirect, get_object_or_404, render
 from django.urls import reverse
 from django.views import View
+from pysam.libcvcf import defaultdict
+
 from classification.models import ConditionResolved, ClinVarExport
 from classification.models.clinvar_legacy import ClinVarLegacy
 from classification.services.clinvar_legacy_services import ClinVarLegacyService
@@ -14,7 +18,7 @@ from library.django_utils import RequireSuperUserView
 from library.utils import JsonDataType
 from library.utils.django_utils import render_ajax_view
 from ontology.models import OntologyTerm
-from snpdb.models import ClinVarKey
+from snpdb.models import ClinVarKey, Allele, ClinVarExportTypeBucket
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, DC, CellData, DatatableConfigQuerySetMode
 
 
@@ -51,10 +55,7 @@ class ClinVarLegacyView(RequireSuperUserView, View):
         except AttributeError as ve:
             messages.error(request, f"File is missing or in the wrong format ({ve})")
 
-        return render(request, 'classification/clinvar_legacy.html', {
-            'all_keys': ClinVarKey.clinvar_keys_for_user(request.user),
-            'clinvar_key': clinvar_key
-        })
+        return redirect(reverse('clinvar_legacy', kwargs={'clinvar_key_id': clinvar_key_id}))
 
 
 def view_clinvar_legacy_detail(request, scv: str):
@@ -97,19 +98,48 @@ class ClinVarLegacyColumns(DatatableConfig[ClinVarLegacy]):
         else:
             return None
 
+    def render_matches(self, row: CellData[ClinVarLegacy]) -> JsonDataType:
+        if row.obj.scv in self.matched_scvs:
+            return {"code": "scv"}
+        elif not row.obj.allele:
+            return {"code": "no-allele"}
+        elif matches := self.possible_matches_by_allele.get(row.obj.allele):
+            return {"code": "matches", "count": len(matches)}
+        else:
+            return {"code": "matches", "count": 0}
 
     def __init__(self, request: any):
         super().__init__(request)
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_legacy_detail', id_field="scv", expected_height=120)
         self.server_calculate_mode = DatatableConfigQuerySetMode.OBJECTS
+        self.matched_scvs: Optional[set[str]] = None
+        self.possible_matches_by_allele: Optional[dict[Allele, list[ClinVarExport]]] = None
+
         self.rich_columns = [
             RichColumn(name="scv", label="SCV", renderer=self.render_scv, default_sort=SortOrder.ASC, sort_keys=["scv"]),
             RichColumn("allele", label="Allele", renderer=self.render_allele, client_renderer="TableFormat.linkUrl"),
             RichColumn("preferred_variant_name", label="HGVS", renderer=self.render_hgvs, client_renderer="VCTable.hgvs"),
             RichColumn("your_condition_identifier", label="Condition", renderer=self.render_condition, client_renderer="VCTable.condition"),
+
+            RichColumn("clinvar_bucket", label="Export Type", client_renderer='VCTable.allele_origin_cell'),
+
             RichColumn("clinical_significance", label="Classification", renderer=self.render_classification, client_renderer="VCTable.classification"),
-            RichColumn("date_last_evaluated", label="Date Last Evaluated", client_renderer="TableFormat.timestamp"),
+            RichColumn("matches", label="Matches", renderer=self.render_matches, client_renderer="render_matches"),
+            # RichColumn("date_last_evaluated", label="Date Last Evaluated", client_renderer="TableFormat.timestamp"),
         ]
+
+    def pre_render(self, qs: QuerySet[ClinVarLegacy]):
+        self.matched_scvs = set(ClinVarExport.objects.filter(scv__in=qs.values_list('scv', flat=True)).values_list('scv', flat=True))
+        possible_matches = ClinVarExport.objects.filter(
+            clinvar_allele__clinvar_key=self.get_clinvar_key,
+            clinvar_allele__allele__in=qs.values_list('allele', flat=True),
+            # TODO support multiple bucket types
+            clinvar_allele__clinvar_export_bucket=ClinVarExportTypeBucket.GERMLINE
+        )
+        matches_by_allele: dict[Allele, list[ClinVarExport]] = defaultdict(list)
+        for clinvar_export in possible_matches:
+            matches_by_allele[clinvar_export.clinvar_allele.allele].append(clinvar_export)
+        self.possible_matches_by_allele = matches_by_allele
 
     @cached_property
     def get_clinvar_key(self):
@@ -117,4 +147,3 @@ class ClinVarLegacyColumns(DatatableConfig[ClinVarLegacy]):
 
     def get_initial_queryset(self) -> QuerySet[DC]:
         return ClinVarLegacy.objects.filter(clinvar_key=self.get_clinvar_key)
-

@@ -1,9 +1,11 @@
 import csv
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import StrEnum
 from functools import cached_property
 from typing import Iterator, Any, Optional, TypeVar, Generic
+
+from django.db.models import QuerySet
 from django.utils.timezone import now
 from annotation.models import ClinVarVersion, AnnotationVersion, ClinVar
 from classification.enums import SpecialEKeys
@@ -13,8 +15,8 @@ from classification.utils.clinvar_matcher import ClinVarLegacyRow
 from genes.hgvs import CHGVS
 from library.guardian_utils import admin_bot
 from library.utils import first
-from ontology.models import OntologySnake, OntologyTermRelation
-from snpdb.models import ClinVarKey, GenomeBuild, Allele, Variant
+from ontology.models import OntologyTermRelation
+from snpdb.models import ClinVarKey, GenomeBuild, Allele, Variant, ClinVarExportTypeBucket
 from snpdb.search import SearchInput
 from snpdb.signals.variant_search import search_hgvs
 
@@ -32,6 +34,7 @@ class ClinVarLegacyColumn(StrEnum):
     Your_condition_identifier = "Your_condition_identifier"
     ClinVar_condition_name = "ClinVar_condition_name"
     Clinical_significance = "Clinical_significance"
+    Germline_classification = "Germline_classification"
     Date_last_evaluated = "Date_last_evaluated"
     Assertion_criteria = "Assertion_criteria"
     Submitted_gene = "Submitted_gene"
@@ -109,7 +112,6 @@ class ClinVarLegacyMatch:
         )
 
 
-
 class ClinVarLegacyService:
 
     def __init__(self, clinvar_key: ClinVarKey):
@@ -122,6 +124,15 @@ class ClinVarLegacyService:
             legacy_dict[existing.scv] = existing
         return legacy_dict
 
+    @staticmethod
+    def clean_condition_identifier(identifier: str) -> str:
+        if identifier:
+            if identifier.startswith("MONDO:MONDO:"):
+                identifier = identifier.replace("MONDO:MONDO:", "MONDO:")
+            elif identifier.isnumeric():
+                identifier = f"OMIM:{identifier}"
+        return identifier
+
     def _process_row(self, row: dict[str, Any]):
         scv = row.get(ClinVarLegacyColumn.SCV)
         # don't worry about SCV version numbers, they don't affect matching
@@ -132,10 +143,10 @@ class ClinVarLegacyService:
         if existing := self.existing_legacy_records.get(row.get('SCV')):
             update_me = existing
         else:
-            update_me = ClinVarLegacy(scv=scv, clinvar_key=self.clinvar_key)
+            update_me = ClinVarLegacy(scv=scv, clinvar_key=self.clinvar_key, clinvar_bucket=ClinVarExportTypeBucket.GERMLINE)
             self.existing_legacy_records[scv] = update_me
 
-        # TODO - really should check if thse values change
+        # TODO - really should check if these values change
         # and if they do, mark the record as dirty
         # and if they never change, move this logic to only when we get a new row
         update_me.clinvar_variation_id = row.get(ClinVarLegacyColumn.VariationID)
@@ -144,8 +155,8 @@ class ClinVarLegacyService:
         update_me.your_variant_description_chromosome_coordinates = row.get(ClinVarLegacyColumn.Your_variant_description_chromosome_coordinates)
         update_me.preferred_variant_name = row.get(ClinVarLegacyColumn.Preferred_variant_name)
         update_me.your_condition_name = row.get(ClinVarLegacyColumn.Your_condition_name)
-        update_me.your_condition_identifier = row.get(ClinVarLegacyColumn.Your_condition_identifier)
-        update_me.clinical_significance = row.get(ClinVarLegacyColumn.Clinical_significance)
+        update_me.your_condition_identifier = ClinVarLegacyService.clean_condition_identifier(row.get(ClinVarLegacyColumn.Your_condition_identifier))
+        update_me.germline_classification = row.get(ClinVarLegacyColumn.Germline_classification) or row.get(ClinVarLegacyColumn.Clinical_significance)
 
         date_last_evaluated = None
         if raw_date := row.get(ClinVarLegacyColumn.Date_last_evaluated):
@@ -158,14 +169,14 @@ class ClinVarLegacyService:
     def load_file(self, file, delimiter='\t') -> Iterator['ClinVarLegacyRow']:
         csv_f = csv.reader(file, delimiter=delimiter)
         header_indexes: dict[str, int] = {}
-        # Clinvar cummalative summary file
-        # it has a list of rows describing the columns (all these descriptors appear in the first column)
+        # ClinVar cumulative summary file
+        # it has a list of rows describing the columns (all these descriptors appear in the first column).
         # then finally the actual columns (the first column is then left blank - only used for the descriptors above)
         for row in csv_f:
             if not header_indexes:
                 # test to see if this row is the actual header
                 if len(row) > 1 and row[1] == 'VariationID':
-                    # work out weird header row halfway down the file (and one column over)
+                    # work out the unusual header row halfway down the file (and one column over)
                     # don't process the header row itself as data, now skip to the next row
                     header_indexes = {label: index for index, label in enumerate(row)}
             else:
@@ -191,7 +202,7 @@ class ClinVarLegacyService:
                 'preferred_variant_name',
                 'your_condition_name',
                 'your_condition_identifier',
-                'clinical_significance',
+                'germline_classification',
                 'date_last_evaluated',
                 'assertion_criteria',
                 'submitted_gene'
@@ -200,18 +211,32 @@ class ClinVarLegacyService:
 
     @cached_property
     def clinvar_version(self) -> ClinVarVersion:
-        # is it better just to select latest ClinVarVersion
+        # is it better just to select the latest ClinVarVersion rather than a specific genome build's one?
         return AnnotationVersion.latest(GenomeBuild.grch38()).clinvar_version
 
     @staticmethod
-    def find_matches(clinvar_legacy: ClinVarLegacy) -> list[ClinVarExport]:
-        query = ClinVarExport.objects.filter(scv=clinvar_legacy.scv)
+    def possible_allele_matches_qs(clinvar_legacy: ClinVarLegacy) -> Optional[QuerySet[ClinVarExport]]:
         if allele := clinvar_legacy.allele:
-            query = query.union(ClinVarExport.objects.filter(
+            return ClinVarExport.objects.filter(
                 clinvar_allele__clinvar_key=clinvar_legacy.clinvar_key,
-                clinvar_allele__allele=allele
-            ))
-        return [ClinVarLegacyMatch(clinvar_legacy=clinvar_legacy, clinvar_export=clinvar_export) for clinvar_export in query]
+                clinvar_allele__allele=allele,
+                clinvar_allele__clinvar_export_bucket=clinvar_legacy.clinvar_bucket
+            )
+        else:
+            return None
+
+    @staticmethod
+    def scv_match_qs(clinvar_legacy: ClinVarLegacy) -> QuerySet[ClinVarExport]:
+        return ClinVarExport.objects.filter(scv=clinvar_legacy.scv)
+
+    @staticmethod
+    def find_matches(clinvar_legacy: ClinVarLegacy) -> list[ClinVarExport]:
+        query = ClinVarLegacyService.scv_match_qs(clinvar_legacy)
+        allele_matches = ClinVarLegacyService.possible_allele_matches_qs(clinvar_legacy)
+        if allele_matches:
+            query = query.union(allele_matches)
+        return [ClinVarLegacyMatch(clinvar_legacy=clinvar_legacy, clinvar_export=clinvar_export) for clinvar_export in
+                query]
 
     def match_allele(self, clinvar_legacy: ClinVarLegacy) -> None:
         clinvar_legacy.allele = None

@@ -40,6 +40,18 @@
             </div>
         </form>
         {% if clinvar_key %}
+            <script>
+                function render_matches(data, type, columns) {
+                    let code = data["code"];
+                    if (code === "scv") {
+                        return "SCV matched"
+                    } else if (code === "no-allele") {
+                        return $("<span>", {class: "no-value", text: "No Allele"});
+                    } else {
+                        return $("<span>", {text: "{code.matches} possible"});
+                    }
+                }
+            </script>
             <table id="legacy-table" data-datatable-url="{% url 'clinvar_legacy_datatables' clinvar_key.pk %}" class="sticky-header"></table>
         {% endif %}
 

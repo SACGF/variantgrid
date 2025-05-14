@@ -15,6 +15,7 @@ from classification.models import ClinVarAllele, ClinVarExport, ConditionResolve
     ClinVarExportDeleteStatus, ClinVarAlleleMultiStatus
 from classification.models.clinvar_export_convertor import ClinVarExportConverter
 from library.django_utils import require_superuser
+from library.utils import JsonObjType
 from ontology.models import AncestorCalculator, OntologyTerm
 from snpdb.views.datatable_view import DatatableConfig, DC, DatatableConfigQuerySetMode, RichColumn, CellData, SortOrder
 
@@ -97,16 +98,17 @@ class ClinVarAlleleMultiExport:
         return list(sorted(self.clinvar_allele.clinvarexport_set.exclude(delete_status=ClinVarExportDeleteStatus.DELETED).exclude(classification_based_on__isnull=True)))
 
     @cached_property
-    def common_ancestor(self) -> Optional[OntologyTerm]:
+    def common_ancestor(self) -> OntologyTerm:
+        common_ancestor: OntologyTerm
         try:
-            return AncestorCalculator.common_ancestor(terms=reduce(lambda x,y: x+y, (export.condition_resolved.terms for export in self.clinvar_exports_with_classification), []))
+            common_ancestor = AncestorCalculator.common_ancestor(terms=reduce(lambda x,y: x+y, (export.condition_resolved.terms for export in self.clinvar_exports_with_classification), []))
         except ValueError:
-            return None
+            pass
+        return OntologyTerm.get_or_stub("MONDO:0000001")
 
     @property
-    def common_ancestor_json(self):
-        if common_ancestor := self.common_ancestor:
-            return ConditionResolved(terms=[common_ancestor]).to_json(include_join=False)
+    def common_ancestor_json(self) -> JsonObjType:
+        return ConditionResolved(terms=[self.common_ancestor]).to_json(include_join=False)
 
     def approve(self):
         all_conditions = set()

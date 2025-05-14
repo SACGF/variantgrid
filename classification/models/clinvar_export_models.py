@@ -122,6 +122,9 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
 
     class Meta:
         verbose_name = "ClinVar export"
+        indexes = [
+            models.Index(fields=["scv"])
+        ]
 
     clinvar_allele = models.ForeignKey(ClinVarAllele, null=True, blank=True, on_delete=models.CASCADE)
     condition = models.JSONField()
@@ -184,6 +187,7 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
     def last_submission(self) -> Optional['ClinVarExportSubmission']:
         if last_submission := self.clinvarexportsubmission_set.order_by('-created').first():
             return last_submission
+        return None
 
     @property
     def last_submission_error(self) -> Optional[str]:
@@ -198,6 +202,7 @@ class ClinVarExport(TimeStampedModel, PreviewModelMixin):
                                     all_errors.append(inner_error.get('userMessage'))
                 if all_errors:
                     return "\n".join(all_errors)
+        return None
 
     def get_absolute_url(self):
         return reverse('clinvar_export', kwargs={'clinvar_export_id': self.pk})

@@ -15,11 +15,12 @@
         <table class="table">
             <thead>
                 <tr>
-                    <th>ClinVar Export</th>
-                    <th>HGVS</th>
+                    <th style="width:100px">ClinVar Export</th>
+                    <th style="min-width:200px">HGVS</th>
                     <th>Condition</th>
-                    <th>Status</th>
-                    <th>SCV</th>
+                    <th style="width:150px">Classification</th>
+                    <th style="width:70px">Status</th>
+                    <th style="width:100px">SCV</th>
                 </tr>
             </thead>
             <tbody>
@@ -27,7 +28,8 @@
                 <tr>
                     <td><a href="{{ match.clinvar_export.get_absolute_url }}" class="id-link">CE_{{ match.clinvar_export.pk }}</a>{% if not match.clinvar_key_match.matches %}{{ 'E' | severity_icon:'This record belongs to a different clinvar key' }}{% endif %}</td>
                     <td>{% c_hgvs match.c_hgvs_match.value %} {% if match.c_hgvs.matches %} {{ 'S' | severity_icon }}{% elif not match.allele_match.matches %}{{ 'E' | severity_icon:'This record is from a different allele' }}{% endif %}</td>
-                    <td>{% condition match.condition_match.value%}{% if match.condition_match.matches %} {{ 'S' | severity_icon }}{% endif %}</td>
+                    <td>{% condition match.condition_match.value %}{% if match.condition_match.matches %} {{ 'S' | severity_icon:'The record is for the same condition' }}{% endif %}</td>
+                    <td>{% clinical_significance match.classification_match.value %}{% if match.classification_match.matches %} {{ 'S' | severity_icon:'The record has the same classification' }}{% endif %}</td>
                     <td>{{ match.clinvar_export.get_status_display }}</td>
                     <td>{{ match.scv_match.value }}{% if match.condition_match.scv_match.matches %} {{ 'S' | severity_icon }}{% endif %}</td>
                 </tr>
