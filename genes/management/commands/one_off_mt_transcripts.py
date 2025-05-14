@@ -6,16 +6,19 @@
 """
 import gzip
 import json
+import logging
 
 from collections import defaultdict
 from django.core.management.base import BaseCommand
 from intervaltree import IntervalTree
 
 from annotation.models import VariantAnnotationVersion, VariantAnnotation, VariantGeneOverlap, AnnotationRun
+from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from genes.models import GeneAnnotationImport, GeneSymbol, Gene, GeneVersion, TranscriptVersion, HGNC, Transcript
 from genes.models_enums import AnnotationConsortium
 from library.utils import get_single_element
 from snpdb.models import GenomeBuild, Contig
+from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
 
 class Command(BaseCommand):
@@ -154,6 +157,7 @@ class Command(BaseCommand):
                     va.overlapping_symbols = ",".join(sorted([tv_i.data.gene_version.gene_symbol.symbol for tv_i in tv_set]))
                     variant_annotation.append(va)
 
+                    # This needs to go in the right partition - if this is run twice it will insert dupes and fail
                     vgo = VariantGeneOverlap(version=va.version,
                                              annotation_run=va.annotation_run,
                                              variant=v,
@@ -171,5 +175,23 @@ class Command(BaseCommand):
                 VariantAnnotation.objects.bulk_update(variant_annotation, fields)
 
             if variant_gene_overlaps:
+                # This needs to go in own partition
                 print(f"Creating {len(variant_gene_overlaps)} variant_gene_overlaps")
-                VariantGeneOverlap.objects.bulk_create(variant_gene_overlaps, ignore_conflicts=True)
+                base_table_name = VariantAnnotationVersion.VARIANT_GENE_OVERLAP
+                header = [
+                    "version_id",
+                    "annotation_run_id",
+                    "variant_id",
+                    "gene_id",
+                ]
+                DELIMITER = '\t'
+
+                data_filename = f"/tmp/mt_gene_overlap_{genome_build.name}_vav_{vav.pk}.tsv"
+                row_data = BulkVEPVCFAnnotationInserter._annotations_list_to_row_data(header, variant_gene_overlaps)
+                write_sql_copy_csv(row_data, data_filename, delimiter=DELIMITER)
+                partition_table = vav.get_partition_table(base_table_name=base_table_name)
+
+                logging.info("Inserting file '%s' into partition %s", data_filename, partition_table)
+                sql_copy_csv(data_filename, partition_table, header, delimiter=DELIMITER)
+
+                # VariantGeneOverlap.objects.bulk_create(variant_gene_overlaps, ignore_conflicts=True)
