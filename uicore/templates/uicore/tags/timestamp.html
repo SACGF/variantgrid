@@ -1,3 +1,4 @@
+<span style="white-space: nowrap;">
 {% if text_only %}{% if timestamp %}{{ datetime|date:"Y-m-d" }}{% else %}-{% endif %}{% else %}
 {% if date %}
     <data class="convert-timestamp {{ css_class }}" data-title="{{ tooltip }}" data-date="{{ date|date:"Y-m-d" }}">{{ date|date:"Y-m-d" }}</data>
@@ -6,3 +7,4 @@
 {% else %}
     <span class="no-value">-</span>
 {% endif %}{% endif %}
+</span>
