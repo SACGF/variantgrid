@@ -634,7 +634,7 @@ class ClinVarExportConverter:
         raw_value = value.json_data
         messages = JSON_MESSAGES_EMPTY
         if raw_value and raw_value not in {"Oncogenic", "Likely oncogenic", "Uncertain significance", "Likely benign", "Benign"}:
-            messages += f"Unsupported value for Oncogenic value - {value}"
+            messages += JsonMessages.error(f"Unsupported value for Oncogenic value - {value}")
         data = {"oncogenicityClassificationDescription": value}
         return self.base_classification + ValidatedJson(data, messages)
 
