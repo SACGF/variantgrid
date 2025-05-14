@@ -22,8 +22,8 @@ class Command(BaseCommand):
     @staticmethod
     def _insert_transcripts():
         FILES = {
-            GenomeBuild.grch37: "/tau/references/VariantGrid/variantgrid_setup_data/cdot-0.2.28-Homo_sapiens_GRCh37_RefSeq_105.20190906.gff.mt_only.json.gz",
-            GenomeBuild.grch38: "/tau/references/VariantGrid/variantgrid_setup_data/cdot-0.2.28-Homo_sapiens_GRCh38_RefSeq_109.20190607.gff.mt_only.json.gz",
+            GenomeBuild.grch37(): "/tau/references/VariantGrid/variantgrid_setup_data/cdot-0.2.28-Homo_sapiens_GRCh37_RefSeq_105.20190906.gff.mt_only.json.gz",
+            GenomeBuild.grch38(): "/tau/references/VariantGrid/variantgrid_setup_data/cdot-0.2.28-Homo_sapiens_GRCh38_RefSeq_109.20190607.gff.mt_only.json.gz",
         }
 
         for genome_build in GenomeBuild.builds_with_annotation():
@@ -39,8 +39,8 @@ class Command(BaseCommand):
             genes = []
             gene_versions = []
             for gene_id, gene_data in data["genes"].items():
-                gene_symbol = gene_data["gene_symbol"]
-                gene_symbols.append(GeneSymbol(symbol=gene_symbol))
+                gene_symbol_id = gene_data["gene_symbol"]
+                gene_symbols.append(GeneSymbol(symbol=gene_symbol_id))
                 genes.append(Gene(identifier=gene_id,
                                   annotation_consortium=AnnotationConsortium.REFSEQ,
                                   summary=gene_data["summary"]))
@@ -51,7 +51,7 @@ class Command(BaseCommand):
 
                 gv = GeneVersion(gene_id=gene_id,
                                  version=1, # Always for RefSeq,
-                                 gene_symbol=gene_symbol,
+                                 gene_symbol_id=gene_symbol_id,
                                  hgnc=hgnc,
                                  biotype=",".join(gene_data["biotype"]),
                                  genome_build=genome_build,
@@ -75,12 +75,12 @@ class Command(BaseCommand):
 
             gene_versions_by_gene_id = {}
             for gv in GeneVersion.objects.filter(genome_build=genome_build,
-                                                 annotation_consortium=AnnotationConsortium.REFSEQ,
-                                                 gene_symbols__in=[gs.symbol for gs in gene_symbols]):
+                                                 gene__annotation_consortium=AnnotationConsortium.REFSEQ,
+                                                 gene_symbol__in=[gs.symbol for gs in gene_symbols]):
                 gene_versions_by_gene_id[gv.gene_id] = gv
 
             transcript_versions = []
-            for transcript_id, transcript_data in data["transcript"].items():
+            for transcript_id, transcript_data in data["transcripts"].items():
                 transcript_id = transcript_id.replace("fake-rna-", "")
                 gv = gene_versions_by_gene_id[transcript_data["gene_version"]]
                 transcript, _ = Transcript.objects.get_or_create(identifier=transcript_id,
