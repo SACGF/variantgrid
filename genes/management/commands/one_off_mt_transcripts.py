@@ -17,6 +17,10 @@ from snpdb.models import GenomeBuild
 class Command(BaseCommand):
 
     def handle(self, *args, **options):
+        self._insert_transcripts()
+
+    @staticmethod
+    def _insert_transcripts():
         FILES = {
             GenomeBuild.grch37: "/tau/references/VariantGrid/variantgrid_setup_data/cdot-0.2.28-Homo_sapiens_GRCh37_RefSeq_105.20190906.gff.mt_only.json.gz",
             GenomeBuild.grch38: "/tau/references/VariantGrid/variantgrid_setup_data/cdot-0.2.28-Homo_sapiens_GRCh38_RefSeq_109.20190607.gff.mt_only.json.gz",
