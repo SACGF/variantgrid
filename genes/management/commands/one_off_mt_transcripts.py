@@ -7,17 +7,22 @@
 import gzip
 import json
 
+from collections import defaultdict
 from django.core.management.base import BaseCommand
+from intervaltree import IntervalTree
 
+from annotation.models import VariantAnnotationVersion, VariantAnnotation, VariantGeneOverlap, AnnotationRun
 from genes.models import GeneAnnotationImport, GeneSymbol, Gene, GeneVersion, TranscriptVersion, HGNC, Transcript
 from genes.models_enums import AnnotationConsortium
-from snpdb.models import GenomeBuild
+from library.utils import get_single_element
+from snpdb.models import GenomeBuild, Contig
 
 
 class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self._insert_transcripts()
+        self._assign_mt_transcripts()
 
     @staticmethod
     def _insert_transcripts():
@@ -111,3 +116,60 @@ class Command(BaseCommand):
                 TranscriptVersion.objects.bulk_create(transcript_versions, ignore_conflicts=True)
 
 
+        @staticmethod
+        def _assign_mt_transcripts():
+            # Variants are inserted against contig - thus there will only be 1 for both GRCh37/GRCh38
+            # However there will be diff VariantAnnotation for each build
+            mt_contig_accession = 'NC_012920.1'
+            for genome_build in GenomeBuild.builds_with_annotation():
+                print("-" * 40)
+                print(f"{genome_build=}")
+
+                tx_transcripts = defaultdict(IntervalTree)
+                tv_qs = TranscriptVersion.objects.filter(data__icontains=mt_contig_accession, genome_build=genome_build)
+                for tv in tv_qs:
+                    contig_str = tv.data["chrom"]
+                    start = tv.data["start"]
+                    end = tv.data["end"]
+                    tx_transcripts[contig_str][start:end] = tv
+
+                vav = VariantAnnotationVersion.latest(genome_build)
+                mt_contig = Contig.objects.get(refseq_accession=mt_contig_accession)
+
+                variant_annotation = []
+                variant_gene_overlaps = []
+                va_qs = VariantAnnotation.objects.filter(version=vav, variant__locus__contig=mt_contig)
+                for va in va_qs.select_related("variant", "variant__locus"):
+                    v = va.variant
+                    contig_str = v.locus.contig.refseq_accession
+                    tv_set = tx_transcripts[contig_str][v.start:v.end]
+                    if tv_set:
+                        # Just get the 1st one out
+                        tv = next(iter(tv_set)).data
+                        gene = tv.gene_version.gene
+                        va.gene = gene
+                        va.transcript = tv.transcript
+                        va.transcript_version = tv
+                        va.symbol = tv.gene_version.gene_symbol.symbol
+                        va.overlapping_symbols = ",".join(sorted([tv_i.data.gene_version.gene_symbol.symbol for tv_i in tv_set]))
+                        variant_annotation.append(va)
+
+                        vgo = VariantGeneOverlap(version=va.version,
+                                                 annotation_run=va.annotation_run,
+                                                 variant=v,
+                                                 gene=gene)
+                        variant_gene_overlaps.append(vgo)
+
+                if variant_annotation:
+                    fields = [
+                        "gene",
+                        "transcript",
+                        "symbol",
+                        "overlapping_symbols",
+                    ]
+                    print(f"Updating {len(variant_annotation)} variant_annotation")
+                    VariantAnnotation.objects.bulk_update(variant_annotation, fields)
+
+                if variant_gene_overlaps:
+                    print(f"Creating {len(variant_gene_overlaps)} variant_gene_overlaps")
+                    VariantGeneOverlap.objects.bulk_create(variant_gene_overlaps, ignore_conflicts=True)
