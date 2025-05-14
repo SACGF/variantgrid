@@ -159,10 +159,10 @@ class Command(BaseCommand):
 
                     # This needs to go in the right partition - if this is run twice it will insert dupes and fail
                     vgo = {
-                        "version": va.version,
-                        "annotation_run": va.annotation_run,
-                        "variant": v,
-                        "gene": gene,
+                        "version_id": va.version_id,
+                        "annotation_run_id": va.annotation_run_id,
+                        "variant_id": v.pk,
+                        "gene_id": gene.pk,
                     }
                     variant_gene_overlaps.append(vgo)
 
