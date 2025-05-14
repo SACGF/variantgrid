@@ -158,10 +158,12 @@ class Command(BaseCommand):
                     variant_annotation.append(va)
 
                     # This needs to go in the right partition - if this is run twice it will insert dupes and fail
-                    vgo = VariantGeneOverlap(version=va.version,
-                                             annotation_run=va.annotation_run,
-                                             variant=v,
-                                             gene=gene)
+                    vgo = {
+                        "version": va.version,
+                        "annotation_run": va.annotation_run,
+                        "variant": v,
+                        "gene": gene,
+                    }
                     variant_gene_overlaps.append(vgo)
 
             if variant_annotation:
