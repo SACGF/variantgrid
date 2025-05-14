@@ -12,7 +12,8 @@ from collections import defaultdict
 from django.core.management.base import BaseCommand
 from intervaltree import IntervalTree
 
-from annotation.models import VariantAnnotationVersion, VariantAnnotation, VariantGeneOverlap, AnnotationRun
+from annotation.models import VariantAnnotationVersion, VariantAnnotation, VariantGeneOverlap, AnnotationRun, \
+    AbstractVariantAnnotation, VariantTranscriptAnnotation
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from genes.models import GeneAnnotationImport, GeneSymbol, Gene, GeneVersion, TranscriptVersion, HGNC, Transcript
 from genes.models_enums import AnnotationConsortium
@@ -139,42 +140,60 @@ class Command(BaseCommand):
             vav = VariantAnnotationVersion.latest(genome_build)
             mt_contig = Contig.objects.get(refseq_accession=mt_contig_accession)
 
-            variant_annotation = []
+            variant_annotation = []  # These will be updated
+            variant_transcript_annotation = []  # These will be updated
             variant_gene_overlaps = []
-            va_qs = VariantAnnotation.objects.filter(version=vav, variant__locus__contig=mt_contig)
-            for va in va_qs.select_related("variant", "variant__locus"):
-                v = va.variant
-                contig_str = v.locus.contig.refseq_accession
-                tv_set = tx_transcripts[contig_str][v.start:v.end]
-                if tv_set:
-                    # Just get the 1st one out
-                    tv = next(iter(tv_set)).data
-                    gene = tv.gene_version.gene
-                    va.gene = gene
-                    va.transcript = tv.transcript
-                    va.transcript_version = tv
-                    va.symbol = tv.gene_version.gene_symbol.symbol
-                    va.overlapping_symbols = ",".join(sorted([tv_i.data.gene_version.gene_symbol.symbol for tv_i in tv_set]))
-                    variant_annotation.append(va)
 
-                    # This needs to go in the right partition - if this is run twice it will insert dupes and fail
-                    vgo = {
-                        "version_id": va.version_id,
-                        "annotation_run_id": va.annotation_run_id,
-                        "variant_id": v.pk,
-                        "gene_id": gene.pk,
-                    }
-                    variant_gene_overlaps.append(vgo)
+            annotation_classes = {
+                VariantAnnotation: variant_annotation,
+                VariantTranscriptAnnotation: variant_transcript_annotation,
+            }
 
-            if variant_annotation:
-                fields = [
-                    "gene",
-                    "transcript",
-                    "symbol",
-                    "overlapping_symbols",
-                ]
-                print(f"Updating {len(variant_annotation)} variant_annotation")
-                VariantAnnotation.objects.bulk_update(variant_annotation, fields)
+            for klass, array in annotation_classes.items():
+                va_qs = klass.objects.filter(version=vav, variant__locus__contig=mt_contig)
+
+                for va in va_qs.select_related("variant", "variant__locus"):
+                    v = va.variant
+                    contig_str = v.locus.contig.refseq_accession
+                    tv_set = tx_transcripts[contig_str][v.start:v.end]
+                    if tv_set:
+                        array.append(va)  # Will be modified
+
+                        # Just get the 1st one out
+                        tv = next(iter(tv_set)).data
+                        va.consequence = "unknown MT exon change"
+                        va.gene = tv.gene_version.gene
+                        va.transcript = tv.transcript
+                        va.transcript_version = tv
+                        va.symbol = tv.gene_version.gene_symbol.symbol
+
+                        if klass == VariantAnnotation:
+                            va.overlapping_symbols = ",".join(sorted([tv_i.data.gene_version.gene_symbol.symbol for tv_i in tv_set]))
+
+                            # This needs to go in the right partition - if this is run twice it will insert dupes and fail
+                            gene = tv.gene_version.gene
+                            vgo = {
+                                "version_id": va.version_id,
+                                "annotation_run_id": va.annotation_run_id,
+                                "variant_id": v.pk,
+                                "gene_id": gene.pk,
+                            }
+                            variant_gene_overlaps.append(vgo)
+
+            ava_fields = [
+                "consequence",
+                "gene",
+                "transcript",
+                "transcript_version",
+                "symbol",
+            ]
+
+            for klass, array in annotation_classes.items():
+                if array:
+                    if klass == VariantAnnotation:
+                        fields = ava_fields + ["overlapping_symbols"]
+                    print(f"Updating {klass}: {len(array)}")
+                    klass.objects.bulk_update(array, fields)
 
             if variant_gene_overlaps:
                 # This needs to go in own partition
