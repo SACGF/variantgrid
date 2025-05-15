@@ -7,16 +7,16 @@ from manual.operations.manual_operations import ManualOperation
 
 def _get_variant_alleles(apps) -> list:
     BCFTOOLS_LIFTOVER = "BL"
-    LIFTOVER = 'L'
-    LIFTOVER_NORMALIZED = 'M'
+    IMPORTED_TO_DATABASE = 'D'
+    IMPORTED_NORMALIZED = 'N'
 
     VariantAllele = apps.get_model("snpdb", "VariantAllele")
 
     bad_va = []
     for va in VariantAllele.objects.filter(allele_linking_tool=BCFTOOLS_LIFTOVER):
-        for other_va in va.allele.variantallele_set.all().filter(origin__in=[LIFTOVER, LIFTOVER_NORMALIZED]).exclude(genome_build=va.genome_build):
+        for other_va in va.allele.variantallele_set.all().filter(origin__in=[IMPORTED_TO_DATABASE, IMPORTED_NORMALIZED]).exclude(genome_build=va.genome_build):
             if va.variant.locus.ref == other_va.variant.alt and va.variant.alt == other_va.variant.locus.ref:
-                bad_va.append(other_va)
+                bad_va.append(va)
     return bad_va
 
 
@@ -40,7 +40,7 @@ class Migration(migrations.Migration):
 
     operations = [
         # We need to create the message before deleting them so make sure this runs 1st
-        ManualOperation.operation_other("Manually liftover variants (as admin top menu Variants->Liftover)",
+        ManualOperation.operation_other(args=["Manually liftover variants (as admin top menu Variants->Liftover)"],
                                         test=_get_variant_alleles),
         migrations.RunPython(_delete_bcftools_liftover_historical_swapped)
     ]
