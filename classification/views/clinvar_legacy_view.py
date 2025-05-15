@@ -1,20 +1,17 @@
 import io
-import re
 from functools import cached_property
 from typing import Optional
-
 from django.contrib import messages
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Subquery, OuterRef, Exists
 from django.shortcuts import redirect, get_object_or_404, render
 from django.urls import reverse
 from django.views import View
+from django.views.decorators.http import require_POST
 from pysam.libcvcf import defaultdict
-
 from classification.models import ConditionResolved, ClinVarExport
 from classification.models.clinvar_legacy import ClinVarLegacy
 from classification.services.clinvar_legacy_services import ClinVarLegacyService
-from genes.hgvs import CHGVS
-from library.django_utils import RequireSuperUserView
+from library.django_utils import RequireSuperUserView, require_superuser
 from library.utils import JsonDataType
 from library.utils.django_utils import render_ajax_view
 from ontology.models import OntologyTerm
@@ -68,6 +65,18 @@ def view_clinvar_legacy_detail(request, scv: str):
     })
 
 
+@require_superuser
+@require_POST
+def view_assign_clinvar_legacy_scv(request):
+    scv = request.POST.get("scv")
+    clinvar_export_pk = request.POST.get("clinvar_export")
+    clinvar_export = get_object_or_404(ClinVarExport, pk=clinvar_export_pk)
+    ClinVarExport.objects.filter(scv=scv).update(scv=None)
+    clinvar_export.scv = scv
+    clinvar_export.save()
+    return render(request, 'classification/clinvar_legacy_assign_scv.html', {"scv": scv})
+
+
 class ClinVarLegacyColumns(DatatableConfig[ClinVarLegacy]):
 
     def render_hgvs(self, row: CellData[ClinVarLegacy]) -> JsonDataType:
@@ -98,15 +107,20 @@ class ClinVarLegacyColumns(DatatableConfig[ClinVarLegacy]):
         else:
             return None
 
+    def count_for(self, clinvar_legacy: ClinVarLegacy) -> int:
+        if export_list := self.possible_matches_by_allele.get(clinvar_legacy.allele):
+            return len([e for e in export_list if e.clinvar_allele.clinvar_export_bucket == clinvar_legacy.clinvar_bucket])
+        else:
+            return 0
+
     def render_matches(self, row: CellData[ClinVarLegacy]) -> JsonDataType:
         if row.obj.scv in self.matched_scvs:
             return {"code": "scv"}
         elif not row.obj.allele:
             return {"code": "no-allele"}
-        elif matches := self.possible_matches_by_allele.get(row.obj.allele):
-            return {"code": "matches", "count": len(matches)}
         else:
-            return {"code": "matches", "count": 0}
+            match_count = self.count_for(row.obj)
+            return {"code": "matches", "count": match_count}
 
     def __init__(self, request: any):
         super().__init__(request)
@@ -132,9 +146,7 @@ class ClinVarLegacyColumns(DatatableConfig[ClinVarLegacy]):
         self.matched_scvs = set(ClinVarExport.objects.filter(scv__in=qs.values_list('scv', flat=True)).values_list('scv', flat=True))
         possible_matches = ClinVarExport.objects.filter(
             clinvar_allele__clinvar_key=self.get_clinvar_key,
-            clinvar_allele__allele__in=qs.values_list('allele', flat=True),
-            # TODO support multiple bucket types
-            clinvar_allele__clinvar_export_bucket=ClinVarExportTypeBucket.GERMLINE
+            clinvar_allele__allele__in=qs.values_list('allele', flat=True)
         )
         matches_by_allele: dict[Allele, list[ClinVarExport]] = defaultdict(list)
         for clinvar_export in possible_matches:
@@ -145,5 +157,17 @@ class ClinVarLegacyColumns(DatatableConfig[ClinVarLegacy]):
     def get_clinvar_key(self):
         return ClinVarKey.objects.filter(id=self.get_query_param('clinvar_key_id')).first()
 
-    def get_initial_queryset(self) -> QuerySet[DC]:
-        return ClinVarLegacy.objects.filter(clinvar_key=self.get_clinvar_key)
+    def get_initial_queryset(self) -> QuerySet[ClinVarLegacy]:
+        qs = ClinVarLegacy.objects.filter(clinvar_key=self.get_clinvar_key)
+        qs = qs.annotate(has_scv_match=Exists(Subquery(ClinVarExport.objects.filter(scv=OuterRef('scv')))))
+        qs = qs.annotate(has_allele_match=Exists(Subquery(ClinVarExport.objects.filter(clinvar_allele__allele=OuterRef('allele'), clinvar_allele__clinvar_export_bucket=OuterRef('clinvar_bucket')))))
+        return qs
+
+    def filter_queryset(self, qs: QuerySet[ClinVarLegacy]) -> QuerySet[ClinVarLegacy]:
+        if self.get_query_param("clinvar_legacy_matched") == "true":
+            qs = qs.filter(has_scv_match=True)
+        elif self.get_query_param("clinvar_legacy_potential") == "true":
+            qs = qs.filter(has_scv_match=False, has_allele_match=True)
+        return qs
+
+

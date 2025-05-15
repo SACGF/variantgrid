@@ -1,9 +1,6 @@
 {% load ui_utils %}
 {% load js_tags %}
 {% load classification_tags %}
-{% if clinvar_export.deleted %}
-    <div class="text-danger text-center"><i class="fas fa-trash-can"></i> DELETED FROM CLINVAR</div>
-{% endif %}
 {% labelled label="SCV" %}{{ clinvar_legacy.scv }}{% admin_link clinvar_legacy %}</a>{% endlabelled %}
 {% labelled label="HGVS" %}{% c_hgvs clinvar_legacy.hgvs_obj %}</a>{% endlabelled %}
 {% labelled label="Classification" %}{% clinical_significance clinvar_legacy.classification_code %}{% endlabelled %}
@@ -31,7 +28,20 @@
                     <td>{% condition match.condition_match.value %}{% if match.condition_match.matches %} {{ 'S' | severity_icon:'The record is for the same condition' }}{% endif %}</td>
                     <td>{% clinical_significance match.classification_match.value %}{% if match.classification_match.matches %} {{ 'S' | severity_icon:'The record has the same classification' }}{% endif %}</td>
                     <td>{{ match.clinvar_export.get_status_display }}</td>
-                    <td>{{ match.scv_match.value }}{% if match.condition_match.scv_match.matches %} {{ 'S' | severity_icon }}{% endif %}</td>
+                    <td>
+                        {% if match.scv_match.value %}
+                            {{ match.scv_match.value }}{% if match.scv_match.matches %} {{ 'S' | severity_icon }}{% endif %}
+                        {% else %}
+                            <div class="embed-wrapper">
+                                <form data-toggle="ajax-form" method="POST" action="{% url 'clinvar_legacy_assign_scv' %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="clinvar_export" value="{{ match.clinvar_export.pk }}" />
+                                    <input type="hidden" name="scv" value="{{ match.clinvar_legacy.scv }}" />
+                                    <button class="btn btn-outline-primary">Assign SCV</button>
+                                </form>
+                            </div>
+                        {% endif %}
+                    </td>
                 </tr>
             {% endfor %}
             </tbody>
