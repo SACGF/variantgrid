@@ -424,7 +424,7 @@ class SequencingSample(models.Model):
     # For Hiseq and if left empty on MiSeq this will be sample_id
     sample_name = models.TextField(null=True)
     sample_project = models.TextField(null=True)
-    sample_number = models.IntegerField()
+    sample_number = models.IntegerField()  # Row from sample sheet
     lane = models.IntegerField(null=True)
     barcode = models.TextField()
     enrichment_kit = models.ForeignKey(EnrichmentKit, null=True, on_delete=CASCADE)
