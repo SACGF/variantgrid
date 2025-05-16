@@ -146,7 +146,8 @@
 {% endblock head %}
 {% block content %}
     <div class="container">
-        {% if user.is_superuser %}<a href="{% url 'clinvar_export_multi_listing' %}" class="hover-link">Review Possible Duplicates</a><br/>{% endif %}
+        {% if user.is_superuser %}<a href="{% url 'clinvar_export_multi_listing' %}" class="hover-link admin-only">Review Possible Duplicates</a><br/>{% endif %}
+        {% if user.is_superuser %}<a href="{% url 'clinvar_legacy' clinvar_key_id=clinvar_key.pk %}" class="hover-link admin-only">Review Legacy SCVs</a><br/>{% endif %}
 
         {% if all_keys.count > 1 %}
             <div class="btn-group mb-4" role="group" aria-label="ClinVar Key Picker">
