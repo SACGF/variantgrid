@@ -11,7 +11,6 @@ from annotation.models import ClinVarVersion, AnnotationVersion, ClinVar
 from classification.enums import SpecialEKeys
 from classification.models import ClinVarExport, ConditionResolved
 from classification.models.clinvar_legacy import ClinVarLegacy, ClinVarLegacyAlleleMatchType
-from classification.utils.clinvar_matcher import ClinVarLegacyRow
 from genes.hgvs import CHGVS
 from library.guardian_utils import admin_bot
 from library.utils import first
@@ -166,7 +165,7 @@ class ClinVarLegacyService:
         update_me.assertion_criteria = row.get(ClinVarLegacyColumn.Assertion_criteria)
         update_me.submitted_gene = row.get(ClinVarLegacyColumn.Submitted_gene)
 
-    def load_file(self, file, delimiter='\t') -> Iterator['ClinVarLegacyRow']:
+    def load_file(self, file, delimiter='\t') -> Iterator['ClinVarLegacy']:
         csv_f = csv.reader(file, delimiter=delimiter)
         header_indexes: dict[str, int] = {}
         # ClinVar cumulative summary file

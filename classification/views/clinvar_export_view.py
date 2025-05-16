@@ -1,11 +1,9 @@
-import io
 import json
 import re
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Dict, Any, Optional, List, Set
-
 from django.contrib import messages
 from django.db.models import QuerySet, When, Value, Case, IntegerField, Count, Q, TextField
 from django.db.models.functions import Cast
@@ -13,19 +11,16 @@ from django.http import HttpResponse, StreamingHttpResponse, HttpRequest
 from django.http.response import HttpResponseBase
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from django.views import View
 from django.views.decorators.http import require_POST
-
 from classification.enums import SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
     EvidenceKeyMap, ClinVarExportStatus, ClinVarExportSubmission, ClinVarExportDeleteStatus
 from classification.models.clinvar_export_convertor import ClinVarExportConverter
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
-from classification.utils.clinvar_matcher import ClinVarLegacyRow, ClinVarLegacyMatches, ClinVarLegacyExportMatchType
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
-from library.django_utils import add_save_message, get_url_from_view_path, require_superuser, RequireSuperUserView
+from library.django_utils import add_save_message, get_url_from_view_path
 from library.utils import html_to_text, export_column, ExportRow, local_date_string, ExportDataType, JsonDataType
 from library.utils.django_utils import render_ajax_view
 from ontology.models import OntologyTerm, AncestorCalculator, OntologyTermRelation
@@ -638,68 +633,3 @@ def clinvar_export_detail(request: HttpRequest, clinvar_export_id: int) -> HttpR
         'interpretation_summary': interpretation_summary
     })
 
-
-class ClinVarMatchView(RequireSuperUserView, View):
-
-    def get(self, request, **kwargs):
-        clinvar_key_id = kwargs.get('clinvar_key_id')
-        clinvar_key: ClinVarKey
-        if not clinvar_key_id:
-            if clinvar_key := ClinVarKey.clinvar_keys_for_user(request.user).first():
-                return redirect(reverse('clinvar_match', kwargs={'clinvar_key_id': clinvar_key.pk}))
-            else:
-                # page has special support if no clinvar key is available to the user
-                return render(request, 'classification/clinvar_key_summary_none.html')
-
-        clinvar_key = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
-        clinvar_key.check_user_can_access(request.user)
-
-        return render(request, 'classification/clinvar_match.html', {
-            'all_keys': ClinVarKey.clinvar_keys_for_user(request.user),
-            'clinvar_key': clinvar_key
-        })
-
-    def post(self, request, **kwargs):
-        clinvar_key_id = kwargs.get('clinvar_key_id')
-        clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
-        clinvar_key.check_user_can_access(request.user)
-
-        clinvar_legacy_rows: List[ClinVarLegacyRow] = []
-        try:
-            file_obj = io.StringIO(request.FILES.get('file').read().decode("utf-8"))
-            clinvar_legacy_rows = list(ClinVarLegacyRow.load_file(file_obj, clinvar_key))
-        except AttributeError as ve:
-            messages.error(request, f"File is missing or in the wrong format ({ve})")
-
-        return render(request, 'classification/clinvar_match.html', {
-            'all_keys': ClinVarKey.clinvar_keys_for_user(request.user),
-            'clinvar_key': clinvar_key,
-            'rows': clinvar_legacy_rows
-        })
-
-
-@require_superuser
-def clinvar_match_detail(request, clinvar_key_id: str):
-    clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
-    clinvar_key.check_user_can_access(request.user)
-
-    data_str = request.GET.get('data_str')
-
-    legacy_row = ClinVarLegacyRow.from_data_str(clinvar_key, data_str)
-    matches: List[ClinVarLegacyMatches] = legacy_row.find_variant_grid_allele() if data_str else []
-
-    # see if we match to a ClinVarExport, but not using SCV
-    # implying that the SCV might need to be copied over
-    has_clinvar_export = False
-    has_scv_match = False
-    for legacy_match in matches:
-        for clinvar_export_match in legacy_match.clinvar_export_matches:
-            has_clinvar_export = has_clinvar_export or bool(clinvar_export_match.clinvar_export)
-            has_scv_match = has_scv_match or ClinVarLegacyExportMatchType.SCV_MATCHES in clinvar_export_match.match_types
-
-    action_required = has_clinvar_export and not has_scv_match
-
-    return render(request, 'classification/clinvar_match_detail.html', {
-        'matches': matches,
-        'action_required': action_required
-    })

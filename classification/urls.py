@@ -18,7 +18,6 @@ from classification.views.classification_overlaps_vus_view import view_overlaps_
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
 from classification.views.classification_view_metrics import view_classification_metrics, \
     view_page_metrics_detail
-from classification.views.clinvar_export_view import ClinVarMatchView, clinvar_match_detail
 from classification.views.clinvar_legacy_view import ClinVarLegacyView, ClinVarLegacyColumns, \
     view_clinvar_legacy_detail, view_assign_clinvar_legacy_scv
 from classification.views.condition_match_test_view import condition_match_test_view, \
@@ -86,16 +85,11 @@ urlpatterns = [
     path('classification_grid/export/', views.export_classifications_grid, name='export_classifications_grid'),
     path('classification_grid/export_redcap/', views.export_classifications_grid_redcap, name='export_classifications_grid_redcap'),
 
-    path('clinvar_match', ClinVarMatchView.as_view(), name='clinvar_match'),
-    path('clinvar_match/<str:clinvar_key_id>', ClinVarMatchView.as_view(), name='clinvar_match'),
-    path('clinvar_match/<str:clinvar_key_id>/match_detail', clinvar_match_detail, name='clinvar_match_detail'),
-
     path('clinvar_legacy', ClinVarLegacyView.as_view(), name='clinvar_legacy'),
     path('clinvar_legacy/assign_scv', view_assign_clinvar_legacy_scv, name='clinvar_legacy_assign_scv'),
     path('clinvar_legacy/detail/<str:scv>', view_clinvar_legacy_detail, name='clinvar_legacy_detail'),
     path('clinvar_legacy/<str:clinvar_key_id>/datatable', DatabaseTableView.as_view(column_class=ClinVarLegacyColumns), name='clinvar_legacy_datatables'),
     path('clinvar_legacy/<str:clinvar_key_id>', ClinVarLegacyView.as_view(), name='clinvar_legacy'),
-
 
     path('clinvar_export_summary', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),  # version that lets you pick which clinvarkey if you access to multiple
     path('clinvar_export_summary/<str:clinvar_key_id>', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),
