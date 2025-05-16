@@ -19,7 +19,7 @@ from classification.views.classification_view import ClassificationView, LabGene
 from classification.views.classification_view_metrics import view_classification_metrics, \
     view_page_metrics_detail
 from classification.views.clinvar_legacy_view import ClinVarLegacyView, ClinVarLegacyColumns, \
-    view_clinvar_legacy_detail, view_assign_clinvar_legacy_scv
+    view_clinvar_legacy_detail, view_assign_clinvar_legacy_scv, view_clinvar_legacy_allele_match
 from classification.views.condition_match_test_view import condition_match_test_view, \
     condition_match_test_download_view, condition_obsoletes_view
 from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
@@ -88,6 +88,7 @@ urlpatterns = [
     path('clinvar_legacy', ClinVarLegacyView.as_view(), name='clinvar_legacy'),
     path('clinvar_legacy/assign_scv', view_assign_clinvar_legacy_scv, name='clinvar_legacy_assign_scv'),
     path('clinvar_legacy/detail/<str:scv>', view_clinvar_legacy_detail, name='clinvar_legacy_detail'),
+    path('clinvar_legacy/<str:clinvar_key_id>/match_alleles', view_clinvar_legacy_allele_match, name='clinvar_legacy_match_alleles'),
     path('clinvar_legacy/<str:clinvar_key_id>/datatable', DatabaseTableView.as_view(column_class=ClinVarLegacyColumns), name='clinvar_legacy_datatables'),
     path('clinvar_legacy/<str:clinvar_key_id>', ClinVarLegacyView.as_view(), name='clinvar_legacy'),
 

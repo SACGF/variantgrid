@@ -39,7 +39,13 @@
                 </div>
             </div>
         </form>
+
         {% if clinvar_key %}
+            <form method="post" action="{% url 'clinvar_legacy_match_alleles' clinvar_key.pk %}">
+                {% csrf_token %}
+                {% labelled label="Run Allele Matching" %}<button class="btn btn-primary">Run Allele Matching</button>{% endlabelled %}
+            </form>
+
             <script>
                 function render_matches(data, type, columns) {
                     let code = data["code"];

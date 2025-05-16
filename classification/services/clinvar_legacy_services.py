@@ -5,6 +5,7 @@ from enum import StrEnum
 from functools import cached_property
 from typing import Iterator, Any, Optional, TypeVar, Generic
 
+from celery import Task
 from django.db.models import QuerySet
 from django.utils.timezone import now
 from annotation.models import ClinVarVersion, AnnotationVersion, ClinVar
@@ -18,6 +19,7 @@ from ontology.models import OntologyTermRelation
 from snpdb.models import ClinVarKey, GenomeBuild, Allele, Variant, ClinVarExportTypeBucket
 from snpdb.search import SearchInput
 from snpdb.signals.variant_search import search_hgvs
+from variantgrid.celery import app
 
 
 class ClinVarLegacyColumn(StrEnum):
@@ -276,3 +278,20 @@ class ClinVarLegacyService:
                 except ValueError:
                     pass
         clinvar_legacy.save()
+
+
+def match_alleles_for(clinvar_key_id: str):
+    clinvar_key = ClinVarKey.objects.get(pk=clinvar_key_id)
+    service = ClinVarLegacyService(clinvar_key)
+    legacies = ClinVarLegacy.objects.filter(clinvar_key=clinvar_key)
+    for legacy in legacies.iterator():
+        service.match_allele(legacy)
+
+
+class ClinVarLegacyAlleleMatchTask(Task):
+
+    def run(self, clinvar_key_id: str):
+        match_alleles_for(clinvar_key_id)
+
+
+ClinVarLegacyAlleleMatchTask = app.register_task(ClinVarLegacyAlleleMatchTask())

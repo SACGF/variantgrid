@@ -1,6 +1,8 @@
 import io
 from functools import cached_property
 from typing import Optional
+
+from django.conf import settings
 from django.contrib import messages
 from django.db.models import QuerySet, Subquery, OuterRef, Exists
 from django.shortcuts import redirect, get_object_or_404, render
@@ -10,7 +12,8 @@ from django.views.decorators.http import require_POST
 from pysam.libcvcf import defaultdict
 from classification.models import ConditionResolved, ClinVarExport
 from classification.models.clinvar_legacy import ClinVarLegacy
-from classification.services.clinvar_legacy_services import ClinVarLegacyService
+from classification.services.clinvar_legacy_services import ClinVarLegacyService, ClinVarLegacyAlleleMatchTask, \
+    match_alleles_for
 from library.django_utils import RequireSuperUserView, require_superuser
 from library.utils import JsonDataType
 from library.utils.django_utils import render_ajax_view
@@ -75,6 +78,17 @@ def view_assign_clinvar_legacy_scv(request):
     clinvar_export.scv = scv
     clinvar_export.save()
     return render(request, 'classification/clinvar_legacy_assign_scv.html', {"scv": scv})
+
+
+@require_superuser
+def view_clinvar_legacy_allele_match(request, clinvar_key_id: str):
+    if settings.CELERY_ENABLED:
+        task = ClinVarLegacyAlleleMatchTask.si(clinvar_key_id)
+        task.apply_async()
+        messages.add_message(request, messages.INFO, "Allele matching task is running, refresh in a minute")
+    else:
+        match_alleles_for(clinvar_key_id)
+    return redirect(reverse('clinvar_legacy', kwargs={'clinvar_key_id': clinvar_key_id}))
 
 
 class ClinVarLegacyColumns(DatatableConfig[ClinVarLegacy]):
@@ -158,6 +172,8 @@ class ClinVarLegacyColumns(DatatableConfig[ClinVarLegacy]):
         return ClinVarKey.objects.filter(id=self.get_query_param('clinvar_key_id')).first()
 
     def get_initial_queryset(self) -> QuerySet[ClinVarLegacy]:
+        if not self.user.is_superuser:
+            raise PermissionError("Admin only")
         qs = ClinVarLegacy.objects.filter(clinvar_key=self.get_clinvar_key)
         qs = qs.annotate(has_scv_match=Exists(Subquery(ClinVarExport.objects.filter(scv=OuterRef('scv')))))
         qs = qs.annotate(has_allele_match=Exists(Subquery(ClinVarExport.objects.filter(clinvar_allele__allele=OuterRef('allele'), clinvar_allele__clinvar_export_bucket=OuterRef('clinvar_bucket')))))
