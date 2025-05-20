@@ -218,10 +218,27 @@ class DatatableConfig(Generic[DC]):
     expand_client_renderer: Optional[str] = None  # if provided, will expand rows and render content with this JavaScript method
     scroll_x = False
 
+    def row_css(self, row: CellData) -> Optional[str]:
+        """
+        Override to provide a CSS class to add to the row
+        :param row: The row data to be styled
+        :return: A css class or None
+        """
+        return None
+
+    def row_columns(self) -> list[str]:
+        """
+        Override to include columns regardless of which rows are rendered
+        Typically used to provide data to row_css
+        :return: A list of column names
+        """
+        return []
+
     def value_columns(self) -> list[str]:
         column_names = list(itertools.chain(*[rc.value_columns for rc in self.rich_columns if rc.enabled]))
-        all_columns = list(set(column_names))
-        return all_columns
+        if row_columns := self.row_columns():
+            column_names += row_columns
+        return list(set(column_names))
 
     def __init__(self, request: HttpRequest):
         self.request: HttpRequest = request
@@ -474,6 +491,8 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
             for rc in self.config.enabled_columns:
                 value = self.render_cell(row=row, column=rc)
                 row_json[rc.name] = value
+            if row_css := self.config.row_css(row):
+                row_json["row_css"] = row_css;
             data.append(row_json)
         return data
 
