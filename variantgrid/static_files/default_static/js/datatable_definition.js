@@ -230,6 +230,13 @@ let DataTableDefinition = (function() {
                 $('<th/>', {class: columnDef.classNames, html: columnDef.label}).appendTo(tHeadTr);
             }
 
+            dtParams.createdRow = (row, data, dataIndex) => {
+                let row_css = data.row_css;
+                if (row_css) {
+                    $(row).addClass(row_css);
+                }
+            }
+
             let dataTable = dom.DataTable(dtParams);
             this.dataTable = dataTable;
 
