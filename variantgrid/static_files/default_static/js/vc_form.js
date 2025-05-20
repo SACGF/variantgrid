@@ -2664,9 +2664,9 @@ VCTable.groupIdentifier = (data, type, row) => {
         dom
     ]});
 
-    if (data.share_level == "lab" || data.share_level == "institution") {
-        fullDom.css({"opacity": 0.5});
-    }
+    // if (data.share_level == "lab" || data.share_level == "institution") {
+    //     fullDom.css({"opacity": 0.5});
+    // }
 
     return fullDom;
 }
