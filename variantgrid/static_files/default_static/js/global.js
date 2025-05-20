@@ -1004,7 +1004,7 @@ function convertTimestampDom(elem) {
             case 0: finalText = "Today"; break;
             case 1: finalText = "Tomorrow"; break;
             case 2: finalText = "2 days from now"; break;
-            default: console.log(`Date Diff = ${daysDiff}`);
+            default: break;
         }
         if (finalText) {
             let text = m.format("YYYY-MM-DD");
