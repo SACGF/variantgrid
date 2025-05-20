@@ -31,6 +31,15 @@ HGVS_RE = re.compile("(?P<c_hgvs>.*?) (?P<p_hgvs>[(]p[.].*[)])")
 
 
 class ClinVarLegacy(TimeStampedModel):
+    """
+    A ClinVarLegacy represents a record uploaded to ClinVar by a lab outside of this VariantGrid instance.
+    They are sourced from a private extract by the lab.
+    Once loaded in, we can then try to match them to ClinVarExport records, then copy the SCVs into the ClinVarExports
+    so VariantGrid becomes the custodian of those records, rather than us creating duplicates.
+
+    See ClinVarlegacyService for the loading of the data and matching it alleles
+    """
+
     class Meta:
         verbose_name = "ClinVar legacy uploads"
         indexes = [
@@ -42,8 +51,8 @@ class ClinVarLegacy(TimeStampedModel):
 
     scv = models.TextField(primary_key=True)
     clinvar_key = models.ForeignKey(ClinVarKey, on_delete=models.CASCADE)
-    clinvar_variation_id = models.TextField(null=True, blank=True)
-    clinvar_allele_id = models.TextField(null=True, blank=True)
+    clinvar_variation_id = models.IntegerField(null=True, blank=True)
+    clinvar_allele_id = models.IntegerField(null=True, blank=True)
     your_variant_description_hgvs = models.TextField(null=True, blank=True)
     your_variant_description_chromosome_coordinates = models.TextField(null=True, blank=True)
     preferred_variant_name = models.TextField(null=True, blank=True)

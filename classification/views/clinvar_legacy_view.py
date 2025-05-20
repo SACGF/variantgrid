@@ -12,14 +12,15 @@ from django.views.decorators.http import require_POST
 from pysam.libcvcf import defaultdict
 from classification.models import ConditionResolved, ClinVarExport
 from classification.models.clinvar_legacy import ClinVarLegacy
-from classification.services.clinvar_legacy_services import ClinVarLegacyService, ClinVarLegacyAlleleMatchTask, \
-    match_alleles_for
+from classification.services.clinvar_legacy_services import ClinVarLegacyImporter, ClinVarLegacyAlleleMatchTask, \
+    clinvar_legacy_match_alleles_for_clinvar_key, clinvar_legacy_find_matches
 from library.django_utils import RequireSuperUserView, require_superuser
+from library.log_utils import report_exc_info
 from library.utils import JsonDataType
 from library.utils.django_utils import render_ajax_view
 from ontology.models import OntologyTerm
-from snpdb.models import ClinVarKey, Allele, ClinVarExportTypeBucket
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, DC, CellData, DatatableConfigQuerySetMode
+from snpdb.models import ClinVarKey, Allele
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData, DatatableConfigQuerySetMode
 
 
 class ClinVarLegacyView(RequireSuperUserView, View):
@@ -51,8 +52,14 @@ class ClinVarLegacyView(RequireSuperUserView, View):
             file_obj = io.StringIO(request.FILES.get('file').read().decode("utf-8"))
             filename = request.FILES.get('file').name
             delimiter = "\t" if filename.endswith(".tsv") else ","
-            ClinVarLegacyService(clinvar_key=clinvar_key).load_file(file_obj, delimiter=delimiter)
+            ClinVarLegacyImporter(clinvar_key=clinvar_key).load_file(file_obj, delimiter=delimiter)
+
+            if settings.CELERY_ENABLED:
+                task = ClinVarLegacyAlleleMatchTask.si(clinvar_key_id)
+                task.apply_async()
+                messages.add_message(request, messages.INFO, "Allele matching task is running, refresh in a minute")
         except AttributeError as ve:
+            report_exc_info()
             messages.error(request, f"File is missing or in the wrong format ({ve})")
 
         return redirect(reverse('clinvar_legacy', kwargs={'clinvar_key_id': clinvar_key_id}))
@@ -61,7 +68,7 @@ class ClinVarLegacyView(RequireSuperUserView, View):
 def view_clinvar_legacy_detail(request, scv: str):
     clinvar_legacy = get_object_or_404(ClinVarLegacy, scv=scv)
     clinvar_legacy.clinvar_key.check_user_can_access(request.user)
-    matches = ClinVarLegacyService.find_matches(clinvar_legacy)
+    matches = clinvar_legacy_find_matches(clinvar_legacy)
     return render_ajax_view(request, 'classification/clinvar_legacy_detail.html', {
         "clinvar_legacy": clinvar_legacy,
         "matches": matches,
@@ -87,7 +94,7 @@ def view_clinvar_legacy_allele_match(request, clinvar_key_id: str):
         task.apply_async()
         messages.add_message(request, messages.INFO, "Allele matching task is running, refresh in a minute")
     else:
-        match_alleles_for(clinvar_key_id)
+        clinvar_legacy_match_alleles_for_clinvar_key(clinvar_key_id)
     return redirect(reverse('clinvar_legacy', kwargs={'clinvar_key_id': clinvar_key_id}))
 
 

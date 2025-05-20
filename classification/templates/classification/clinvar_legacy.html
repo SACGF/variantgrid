@@ -25,10 +25,17 @@
                 {% endfor %}
             </div>
         {% endif %}
+
+        {% page_help_embedded "ClinVar Legacy Records" %}
+            <p>Upload the ClinVar extract file e.g. `cum_report.tsv`.<br/>
+            IMPORTANT make sure you upload to the correct ClinVar Key as there's no validation to confirm the key and file match.</p>
+            <p>You can upload a new file, or run allele matching to see if any of the previous records now match alleles.</p>
+        {% end_page_help_embedded %}
+
         <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
             <div class="card">
-                <div class="card-header">File Upload</div>
+                <div class="card-header">File Upload for {{ clinvar_key.pk }}</div>
                 <div class="card-body">
                     {% labelled label="ClinVar Cumulative Report File" %}
                         <input type="file" name="file">
@@ -41,48 +48,50 @@
         </form>
 
         {% if clinvar_key %}
-            <form method="post" action="{% url 'clinvar_legacy_match_alleles' clinvar_key.pk %}">
-                {% csrf_token %}
-                {% labelled label="Run Allele Matching" %}<button class="btn btn-primary">Run Allele Matching</button>{% endlabelled %}
-            </form>
+            <div class="mt-4">
+                <form method="post" action="{% url 'clinvar_legacy_match_alleles' clinvar_key.pk %}">
+                    {% csrf_token %}
+                    {% labelled label="Run Allele Matching" %}<button class="btn btn-primary"><i class="fa-solid fa-arrows-rotate"></i> Run Allele Matching</button>{% endlabelled %}
+                </form>
 
-            <script>
-                function render_matches(data, type, columns) {
-                    let code = data["code"];
-                    if (code === "scv") {
-                        return "SCV Matched"
-                    } else if (code === "no-allele") {
-                        return $("<span>", {class: "no-value", text: "No Allele"});
-                    } else if (data.count === 0) {
-                        return $("<span>", {class: "no-value", text: "0 Matches"});
-                    } else {
-                        return $("<span>", {text: `${data.count} Matches`});
+                <script>
+                    function render_matches(data, type, columns) {
+                        let code = data["code"];
+                        if (code === "scv") {
+                            return "SCV Matched"
+                        } else if (code === "no-allele") {
+                            return $("<span>", {class: "no-value", text: "No Allele"});
+                        } else if (data.count === 0) {
+                            return $("<span>", {class: "no-value", text: "0 Matches"});
+                        } else {
+                            return $("<span>", {text: `${data.count} Matches`});
+                        }
                     }
-                }
-                function datatableFilter(data) {
-                    $('#clinvar-legacy-filters .form-check-input').each((index, element) => {
-                        let $element = $(element);
-                        data[$element.attr('id')] = $element.is(':checked');
-                    });
-                }
-                function applyFilters() {
-                    $('#clinvar-legacy-table').DataTable().ajax.reload();
-                }
-            </script>
-            <table id="clinvar-legacy-table" data-datatable-data='datatableFilter' data-datatable-url="{% url 'clinvar_legacy_datatables' clinvar_key.pk %}" class="sticky-header" data-adjust-columns="false"></table>
-            <div data-toolbar="#clinvar-legacy-table">
-                <div id="clinvar-legacy-filters">
-                    <div class="form-check-inline">
-                        <input type="radio" name="status" class="form-check-input" id="clinvar_any_status" onclick="applyFilters()" checked/>
-                        <label for="clinvar_any_status" title="Show all records">Any Status</label>
-                    </div>
-                    <div class="form-check-inline">
-                        <input type="radio" name="status" class="form-check-input" id="clinvar_legacy_matched" onclick="applyFilters()" />
-                        <label for="clinvar_legacy_matched" title="Only show records that are matched by SCV">Matched</label>
-                    </div>
-                    <div class="form-check-inline">
-                        <input type="radio" name="status" class="form-check-input" id="clinvar_legacy_potential" onclick="applyFilters()" />
-                        <label for="clinvar_legacy_potential" title="Only show records that have potential matches">Potential Matches</label>
+                    function datatableFilter(data) {
+                        $('#clinvar-legacy-filters .form-check-input').each((index, element) => {
+                            let $element = $(element);
+                            data[$element.attr('id')] = $element.is(':checked');
+                        });
+                    }
+                    function applyFilters() {
+                        $('#clinvar-legacy-table').DataTable().ajax.reload();
+                    }
+                </script>
+                <table id="clinvar-legacy-table" data-datatable-data='datatableFilter' data-datatable-url="{% url 'clinvar_legacy_datatables' clinvar_key.pk %}" class="sticky-header" data-adjust-columns="false"></table>
+                <div data-toolbar="#clinvar-legacy-table">
+                    <div id="clinvar-legacy-filters">
+                        <div class="form-check-inline">
+                            <input type="radio" name="status" class="form-check-input" id="clinvar_any_status" onclick="applyFilters()" checked/>
+                            <label for="clinvar_any_status" title="Show all records">Any Status</label>
+                        </div>
+                        <div class="form-check-inline">
+                            <input type="radio" name="status" class="form-check-input" id="clinvar_legacy_matched" onclick="applyFilters()" />
+                            <label for="clinvar_legacy_matched" title="Only show records that are matched by SCV">Matched</label>
+                        </div>
+                        <div class="form-check-inline">
+                            <input type="radio" name="status" class="form-check-input" id="clinvar_legacy_potential" onclick="applyFilters()" />
+                            <label for="clinvar_legacy_potential" title="Only show records that have potential matches">Potential Matches</label>
+                        </div>
                     </div>
                 </div>
             </div>

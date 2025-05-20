@@ -23,6 +23,11 @@ from variantgrid.celery import app
 
 
 class ClinVarLegacyColumn(StrEnum):
+    """
+    Lists the columns as provided by ClinVar for parsing
+    Note that with the introduction of Somatic/Clinical Impact records, the column
+    Clinical_significance has been renamed to Germline_classification with no type indicator or column for Tier/Somatic value etc
+    """
     VariationID = "VariationID"
     AlleleID = "AlleleID"
     Your_record_id = "Your_record_id"
@@ -46,12 +51,21 @@ T = TypeVar('T')
 
 @dataclass(frozen=True)
 class ClinVarLegacyMatchProperty(Generic[T]):
+    """
+    When matching between a ClinVarLegacy and ClinVarExport record, keep the value of the ClinVarExport
+    and provide a boolean indicating if the value matched the Legacy (sometimes a little more complex than just == )
+    """
     value: T
     matches: bool
 
 
 @dataclass(frozen=True)
 class ClinVarLegacyMatch:
+    """
+    Represents a possible match between ClinVarLegacy and ClinVarExport.
+    Might be matched based on allele & export type or SCV
+    """
+
     clinvar_legacy: ClinVarLegacy
     clinvar_export: ClinVarExport
 
@@ -113,13 +127,16 @@ class ClinVarLegacyMatch:
         )
 
 
-class ClinVarLegacyService:
+class ClinVarLegacyImporter:
 
     def __init__(self, clinvar_key: ClinVarKey):
         self.clinvar_key = clinvar_key
 
     @cached_property
     def existing_legacy_records(self) -> dict[str, ClinVarLegacy]:
+        """
+        Get all ClinVarlegacy records for the clinvar_key, in a dict keyed by SCV
+        """
         legacy_dict: dict[str, ClinVarLegacy] = {}
         for existing in ClinVarLegacy.objects.filter(clinvar_key=self.clinvar_key).iterator():
             legacy_dict[existing.scv] = existing
@@ -127,6 +144,11 @@ class ClinVarLegacyService:
 
     @staticmethod
     def clean_condition_identifier(identifier: str) -> str:
+        """
+        ClinVar has conditions a big screwed up (also need to check for HPO as I believe that's expanded for some reason)
+        :param identifier: The condition identifier as provided by ClinVar
+        :return: The standard condition identifier as can be parsed by VariantGrid
+        """
         if identifier:
             if identifier.startswith("MONDO:MONDO:"):
                 identifier = identifier.replace("MONDO:MONDO:", "MONDO:")
@@ -134,9 +156,16 @@ class ClinVarLegacyService:
                 identifier = f"OMIM:{identifier}"
         return identifier
 
-    def _process_row(self, row: dict[str, Any]):
+    def _process_row(self, row: dict[str, Any]) -> ClinVarLegacy:
+        """
+        Pass in a row of the ClinVarLegacy import, and update an existing ClinVarLegacy record (matching on SCV) or create
+        a new one.
+        Updates the dictionary returned by existing_legacy_records, so need to bulk_update the contents of that dict after
+        """
+
         scv = row.get(ClinVarLegacyColumn.SCV)
-        # don't worry about SCV version numbers, they don't affect matching
+        # remove version number from SCV, so we can match on the number (version number just increments with each
+        # submission and doesn't alter variant matching)
         if "." in scv:
             scv = scv.split(".")[0]
 
@@ -147,16 +176,15 @@ class ClinVarLegacyService:
             update_me = ClinVarLegacy(scv=scv, clinvar_key=self.clinvar_key, clinvar_bucket=ClinVarExportTypeBucket.GERMLINE)
             self.existing_legacy_records[scv] = update_me
 
-        # TODO - really should check if these values change
         # and if they do, mark the record as dirty
         # and if they never change, move this logic to only when we get a new row
-        update_me.clinvar_variation_id = row.get(ClinVarLegacyColumn.VariationID)
-        update_me.clinvar_allele_id = row.get(ClinVarLegacyColumn.AlleleID)
+        update_me.clinvar_variation_id = int(row.get(ClinVarLegacyColumn.VariationID))
+        update_me.clinvar_allele_id = int(row.get(ClinVarLegacyColumn.AlleleID))
         update_me.your_variant_description_hgvs = row.get(ClinVarLegacyColumn.Your_variant_description_HGVS)
         update_me.your_variant_description_chromosome_coordinates = row.get(ClinVarLegacyColumn.Your_variant_description_chromosome_coordinates)
         update_me.preferred_variant_name = row.get(ClinVarLegacyColumn.Preferred_variant_name)
         update_me.your_condition_name = row.get(ClinVarLegacyColumn.Your_condition_name)
-        update_me.your_condition_identifier = ClinVarLegacyService.clean_condition_identifier(row.get(ClinVarLegacyColumn.Your_condition_identifier))
+        update_me.your_condition_identifier = ClinVarLegacyImporter.clean_condition_identifier(row.get(ClinVarLegacyColumn.Your_condition_identifier))
         update_me.germline_classification = row.get(ClinVarLegacyColumn.Germline_classification) or row.get(ClinVarLegacyColumn.Clinical_significance)
 
         date_last_evaluated = None
@@ -166,13 +194,22 @@ class ClinVarLegacyService:
         update_me.date_last_evaluated = date_last_evaluated
         update_me.assertion_criteria = row.get(ClinVarLegacyColumn.Assertion_criteria)
         update_me.submitted_gene = row.get(ClinVarLegacyColumn.Submitted_gene)
+        return update_me
 
-    def load_file(self, file, delimiter='\t') -> Iterator['ClinVarLegacy']:
+    def load_file(self, file, delimiter='\t') -> None:
+        """
+        ClinVar cumulative summary file
+        it has a list of rows describing the columns (all these descriptors appear in the first column).
+        then finally the actual columns (the first column is then left blank - only used for the descriptors above)
+        :param file: File object that can be put into a CSV reader
+        :param delimiter: Delimiter for the file, as the file seems to come in tsv and csv
+        :return:
+        """
         csv_f = csv.reader(file, delimiter=delimiter)
         header_indexes: dict[str, int] = {}
-        # ClinVar cumulative summary file
-        # it has a list of rows describing the columns (all these descriptors appear in the first column).
-        # then finally the actual columns (the first column is then left blank - only used for the descriptors above)
+
+        updated_rows: list[ClinVarLegacy] = []
+
         for row in csv_f:
             if not header_indexes:
                 # test to see if this row is the actual header
@@ -186,13 +223,15 @@ class ClinVarLegacyService:
                 for header_key, index in header_indexes.items():
                     row_dict[header_key] = row[index]
 
-                self._process_row(row_dict)
+                updated_rows.append(self._process_row(row_dict))
 
         if not header_indexes:
             raise ValueError("Did not find the header row")
 
+        # note we don't delete rows that weren't present in the file, htat has to be done manually for now
+
         ClinVarLegacy.objects.bulk_create(
-            objs=self.existing_legacy_records.values(),
+            objs=updated_rows,
             update_conflicts=True,
             unique_fields=['scv'],
             update_fields=[
@@ -210,58 +249,63 @@ class ClinVarLegacyService:
             ]
         )
 
-    @cached_property
-    def clinvar_version(self) -> ClinVarVersion:
-        # is it better just to select the latest ClinVarVersion rather than a specific genome build's one?
-        return AnnotationVersion.latest(GenomeBuild.grch38()).clinvar_version
 
-    @staticmethod
-    def possible_allele_matches_qs(clinvar_legacy: ClinVarLegacy) -> Optional[QuerySet[ClinVarExport]]:
-        if allele := clinvar_legacy.allele:
-            return ClinVarExport.objects.filter(
-                clinvar_allele__clinvar_key=clinvar_legacy.clinvar_key,
-                clinvar_allele__allele=allele,
-                clinvar_allele__clinvar_export_bucket=clinvar_legacy.clinvar_bucket
-            )
-        else:
-            return None
+@staticmethod
+def clinvar_legacy_find_matches(clinvar_legacy: ClinVarLegacy) -> list[ClinVarLegacyMatch]:
+    """
+    Returns ClinVarLegacyMatch objects for the given ClinVarLegacy
+    Matches on SCV unioned with Allele and ClinVar Export type (assuming the clinvar_legacy has matched to an allele)
+    """
+    query = ClinVarExport.objects.filter(scv=clinvar_legacy.scv)
+    if allele := clinvar_legacy.allele:
+        allele_matches_qs = ClinVarExport.objects.filter(
+            clinvar_allele__clinvar_key=clinvar_legacy.clinvar_key,
+            clinvar_allele__allele=allele,
+            clinvar_allele__clinvar_export_bucket=clinvar_legacy.clinvar_bucket
+        )
+        query = query.union(allele_matches_qs)
+    return [ClinVarLegacyMatch(clinvar_legacy=clinvar_legacy, clinvar_export=clinvar_export) for clinvar_export in
+            query]
 
-    @staticmethod
-    def scv_match_qs(clinvar_legacy: ClinVarLegacy) -> QuerySet[ClinVarExport]:
-        return ClinVarExport.objects.filter(scv=clinvar_legacy.scv)
 
-    @staticmethod
-    def find_matches(clinvar_legacy: ClinVarLegacy) -> list[ClinVarExport]:
-        query = ClinVarLegacyService.scv_match_qs(clinvar_legacy)
-        allele_matches = ClinVarLegacyService.possible_allele_matches_qs(clinvar_legacy)
-        if allele_matches:
-            query = query.union(allele_matches)
-        return [ClinVarLegacyMatch(clinvar_legacy=clinvar_legacy, clinvar_export=clinvar_export) for clinvar_export in
-                query]
+def clinvar_legacy_match_alleles_for_clinvar_key(clinvar_key: str):
+    clinvar_key = ClinVarKey.objects.get(pk=clinvar_key)
+    return clinvar_legacy_match_alleles_for_query(clinvar_key.clinvarlegacy_set.all())
 
-    def match_allele(self, clinvar_legacy: ClinVarLegacy) -> None:
-        clinvar_legacy.allele = None
-        clinvar_legacy.allele_match_type = ClinVarLegacyAlleleMatchType.MATCHED_NOT_FOUND
-        clinvar_legacy.allele_match_date = now()
 
-        if clinvar_annotation := ClinVar.objects.filter(
-                clinvar_variation_id=clinvar_legacy.clinvar_variation_id,
-                version=self.clinvar_version
-        ).first():
-            if variant := clinvar_annotation.variant:
-                if allele := variant.allele:
-                    clinvar_legacy.allele = allele
-                    clinvar_legacy.allele_match_type = ClinVarLegacyAlleleMatchType.MATCHED_ON_CLINVAR_ALLELE
+def clinvar_legacy_match_alleles_for_query(qs: QuerySet[ClinVarLegacy]):
+    """
+    Matches all ClinVarLegacy records to alleles (as best we can).
+    Is a long running so best done as a task
+    :param qs: String key of a ClinVarKey
+    """
 
-        if not clinvar_legacy.allele:
-            # use search, this is v slow
-            if c_hgvs_preferred_str := clinvar_legacy.hgvs_obj.full_c_hgvs:
+    variation_id_to_legacy: dict[int, ClinVarLegacy] = {}
+    for legacy in qs.iterator():
+        variation_id_to_legacy[legacy.clinvar_variation_id] = legacy
+
+    match_date = now()
+
+    latest_clinvar = AnnotationVersion.latest(GenomeBuild.grch38()).clinvar_version
+    for cv in ClinVar.objects.filter(
+        clinvar_variation_id__in=variation_id_to_legacy.keys(),
+        version=latest_clinvar
+    ).select_related('variant'):
+        legacy = variation_id_to_legacy[cv.clinvar_variation_id]
+        legacy.allele = cv.variant.allele
+        legacy.allele_match_type = ClinVarLegacyAlleleMatchType.MATCHED_ON_CLINVAR_ALLELE
+        legacy.allele_match_date = match_date
+
+    for cv in variation_id_to_legacy.values():
+        if cv.allele_match_date != match_date:
+            found_allele_in_search = False
+            if c_hgvs_preferred_str := cv.hgvs_obj.full_c_hgvs:
                 search_input = SearchInput(user=admin_bot(), search_string=c_hgvs_preferred_str,
                                            genome_build_preferred=GenomeBuild.grch38())
                 try:
                     response = search_hgvs(sender=None, search_input=search_input)
                     # note, the method signature is correct, the annotation on search_hgvs makes it take a search_input not a search_input_instance
-                    matched_alleles = set()
+                    matched_alleles: set[Allele] = set()
                     for result_entry in response.results:
                         result = result_entry.preview.obj
                         allele: Optional[Allele] = None
@@ -273,25 +317,25 @@ class ClinVarLegacyService:
                             matched_alleles.add(allele)
 
                     if len(matched_alleles) == 1:
-                        clinvar_legacy.allele = first(matched_alleles)
-                        clinvar_legacy.allele_match_type = ClinVarLegacyAlleleMatchType.MATCHED_ON_HGVS
-                except ValueError:
+                        cv.allele = first(matched_alleles)
+                        cv.allele_match_type = ClinVarLegacyAlleleMatchType.MATCHED_ON_HGVS
+                        cv.allele_match_date = match_date
+                        found_allele_in_search = True
+                except:
                     pass
-        clinvar_legacy.save()
 
+            if not found_allele_in_search:
+                cv.allele = None
+                cv.allele_match_type = ClinVarLegacyAlleleMatchType.MATCHED_NOT_FOUND
+                cv.allele_match_date = match_date
 
-def match_alleles_for(clinvar_key_id: str):
-    clinvar_key = ClinVarKey.objects.get(pk=clinvar_key_id)
-    service = ClinVarLegacyService(clinvar_key)
-    legacies = ClinVarLegacy.objects.filter(clinvar_key=clinvar_key)
-    for legacy in legacies.iterator():
-        service.match_allele(legacy)
+    ClinVarLegacy.objects.bulk_update(variation_id_to_legacy.values(), fields=["allele", "allele_match_type", "allele_match_date"])
 
 
 class ClinVarLegacyAlleleMatchTask(Task):
 
     def run(self, clinvar_key_id: str):
-        match_alleles_for(clinvar_key_id)
+        clinvar_legacy_match_alleles_for_clinvar_key(clinvar_key_id)
 
 
 ClinVarLegacyAlleleMatchTask = app.register_task(ClinVarLegacyAlleleMatchTask())
