@@ -5,7 +5,7 @@ from django.conf import settings
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from more_itertools import first
-from classification.enums import AlleleOriginBucket, EvidenceCategory, SpecialEKeys
+from classification.enums import AlleleOriginBucket, EvidenceCategory, SpecialEKeys, ShareLevel
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
     ClassificationGroupingSearchTermType, EvidenceKeyMap, ClassificationModification, ClassificationGroupingEntry, \
     Classification, DiscordanceReport, DiscordanceReportClassification
@@ -291,6 +291,15 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                                                              all_strs)
         except ValueError:
             pass
+
+    def row_columns(self) -> list[str]:
+        return ["share_level"]
+
+    def row_css(self, row: CellData) -> Optional[str]:
+        share_level = ShareLevel(row["share_level"])
+        if not share_level.is_discordant_level:
+            return "unshared"
+        return None
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)

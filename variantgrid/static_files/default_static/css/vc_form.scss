@@ -227,6 +227,10 @@ table.diff {
 
 .classification-table {
 
+    tr.unshared td {
+        opacity: 0.6;
+    }
+
     // old ones - moving away from these
     td.dt-lab, td.lab {
         width: 150px;

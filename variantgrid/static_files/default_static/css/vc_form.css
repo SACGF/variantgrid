@@ -210,6 +210,9 @@ table.diff tbody tr.textarea td {
   color: #888;
 }
 
+.classification-table tr.unshared td {
+  opacity: 0.6;
+}
 .classification-table td.dt-lab, .classification-table td.lab {
   width: 150px;
 }
