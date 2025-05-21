@@ -1,3 +1,4 @@
+import copy
 import os.path
 import re
 from importlib import metadata
@@ -115,9 +116,45 @@ class BioCommonsHGVSVariant(HGVSVariant):
         return gene_symbol
 
 
+class HgvsMatchTranscriptAndGenomeRefAllele(HgvsMatchRefAllele):
+    """ This stores both transcript and Genomic ref/alt so we can report if different """
+
+    def __init__(self, strand: Optional[str], provided_ref: str, calculated_ref):
+        # HgvsMatchRefAllele wants genomic refs, may need to convert
+        self.provided_transcript_ref = provided_ref
+        self.calculated_transcript_ref = calculated_ref
+        self.strand = strand
+
+        provided_g_ref, calculated_g_ref = self._get_genomic_provided_and_calculated_ref_from_transcript()
+        super().__init__(provided_g_ref, calculated_g_ref, "transcript", "our transcript sequence")
+
+    def _get_genomic_provided_and_calculated_ref_from_transcript(self):
+        if self.strand and self.strand == "-":
+            provided_g_ref = reverse_complement(self.provided_transcript_ref)
+            calculated_g_ref = reverse_complement(self.calculated_transcript_ref)
+        else:
+            provided_g_ref = self.provided_transcript_ref
+            calculated_g_ref = self.calculated_transcript_ref
+        return provided_g_ref, calculated_g_ref
+
+    def __bool__(self):
+        return super().__bool__() and self.provided_transcript_ref and self.provided_transcript_ref == self.calculated_transcript_ref
+
+    def get_message(self) -> str:
+        if self.provided_ref:
+            provided_g_ref, calculated_g_ref = self._get_genomic_provided_and_calculated_ref_from_transcript()
+            if self.provided_transcript_ref != provided_g_ref:
+                message = f'Using {self.ref_type} reference "{self.calculated_transcript_ref}" from {self.ref_source}, in place of provided reference "{self.provided_transcript_ref}". ' \
+                          f'Transcript (strand="{self.strand}") and genome reference "{self.calculated_ref}" differ.'
+            else:
+                message = f'Using {self.ref_type} reference "{self.calculated_ref}" from {self.ref_source}, in place of provided reference "{self.provided_ref}"'
+        else:
+            message = ""
+        return message
+
+
 class BioCommonsHGVSConverter(HGVSConverter):
     hgvs_span_trailing_int_length_pattern = re.compile(r"(.*(?:del|dup|inv))(\d+)$")
-    reference_sequence_pattern = re.compile(r".*: Variant reference \((.*)\) does not agree with reference sequence \((.*)\)")
 
     def __init__(self, genome_build: GenomeBuild, local_resolution=True, clingen_resolution=True):
         super().__init__(genome_build, local_resolution=local_resolution, clingen_resolution=clingen_resolution)
@@ -133,8 +170,9 @@ class BioCommonsHGVSConverter(HGVSConverter):
                                  replace_reference=True)
         self.ev = ExtrinsicValidator(self.hdp)
         self.norm_5p = Normalizer(self.hdp, shuffle_direction=5)
+        self.no_validate_mapper = VariantMapper(self.hdp, replace_reference=True, prevalidation_level="NONE")
         self.no_validate_normalizer = Normalizer(self.hdp, cross_boundaries=True, validate=False,
-                                                 variantmapper=VariantMapper(self.hdp, prevalidation_level="NONE"))
+                                                 variantmapper=self.no_validate_mapper)
 
     @staticmethod
     def _parser_hgvs(hgvs_string: str) -> SequenceVariant:
@@ -234,10 +272,17 @@ class BioCommonsHGVSConverter(HGVSConverter):
         transcript_accession = ''
         if hgvs_string is not None:
             sequence_variant = self._parser_hgvs(hgvs_string)
-            if sequence_variant.type != 'g':
-                if looks_like_transcript(sequence_variant.ac):
-                    transcript_accession = sequence_variant.ac
+            transcript_accession = self._get_transcript_accession_from_sequence_variant(sequence_variant)
         return transcript_accession
+
+    @staticmethod
+    def _get_transcript_accession_from_sequence_variant(sequence_variant: SequenceVariant) -> str:
+        transcript_accession = ''
+        if sequence_variant.type != 'g':
+            if looks_like_transcript(sequence_variant.ac):
+                transcript_accession = sequence_variant.ac
+        return transcript_accession
+
 
     @staticmethod
     def _strip_common_prefix(ref: str, alt: str) -> tuple[str, str]:
@@ -259,6 +304,29 @@ class BioCommonsHGVSConverter(HGVSConverter):
         var_m.type = 'g'
         return var_m
 
+    def _fix_ref(self, var_x: SequenceVariant) -> tuple[SequenceVariant, HgvsMatchRefAllele]:
+        if provided_ref := var_x.posedit.edit.ref_s:
+            var_x_fixed_ref = self.no_validate_mapper._replace_reference(copy.deepcopy(var_x))
+            calculated_ref = var_x_fixed_ref.posedit.edit.ref_s
+            pr_len = len(provided_ref)
+            cr_len = len(calculated_ref)
+            if pr_len != cr_len:
+                msg = f"Calculated reference '{calculated_ref}' length ({cr_len}) different from provided " \
+                      + f"reference '{provided_ref}' length ({pr_len})"
+                raise HGVSInvalidVariantError(msg)
+
+            strand = None
+            if var_x.type in ['c', 'n']:
+                transcript_accession = BioCommonsHGVSConverter._get_transcript_accession_from_sequence_variant(var_x)
+                tv = TranscriptVersion.get_transcript_version(self.genome_build, transcript_accession)
+                strand = tv.strand
+            matches_reference = HgvsMatchTranscriptAndGenomeRefAllele(strand, provided_ref, calculated_ref)
+            return var_x_fixed_ref, matches_reference
+
+        # didn't provide anything so won't say anything
+        return var_x, HgvsMatchRefAllele(provided_ref='', calculated_ref='')
+
+
     def _hgvs_to_g_hgvs(self, hgvs_string: str) -> tuple[SequenceVariant, HgvsMatchRefAllele, HgvsOriginallyNormalized]:
         CONVERT_TO_G = {
             'c': self.am.c_to_g,
@@ -266,7 +334,8 @@ class BioCommonsHGVSConverter(HGVSConverter):
             'm': self._m_to_g,
         }
 
-        var_x = self._parser_hgvs(hgvs_string)
+        var_x_original = self._parser_hgvs(hgvs_string)
+        var_x, matches_reference = self._fix_ref(var_x_original)
 
         # TODO: Maybe we can always just normalize? Need some test cases to make sure
         # If so, we can remove handling of 'Variant is outside CDS bounds' below
@@ -275,7 +344,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
         normalization_error = None
         try:
             var_x_normalized = self.no_validate_normalizer.normalize(var_x)
-            originally_normalized = HgvsOriginallyNormalized(original_hgvs=BioCommonsHGVSVariant(var_x),
+            originally_normalized = HgvsOriginallyNormalized(original_hgvs=BioCommonsHGVSVariant(var_x_original),
                                                              normalized_hgvs=BioCommonsHGVSVariant(var_x_normalized))
         except HGVSUnsupportedOperationError as hgvs_error:
             normalization_error = hgvs_error
@@ -285,7 +354,6 @@ class BioCommonsHGVSConverter(HGVSConverter):
             transcript_accession = self.get_transcript_accession(hgvs_string)
             if get_refseq_type(transcript_accession) == 'RNA':
                 var_x.type = 'n'
-        matches_reference = None
 
         try:
             self.ev.validate(var_x, strict=True)  # Validate in transcript range
@@ -295,30 +363,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
             ]
             ok = False
             exception_str = str(hgvs_e)
-            # Switch reference base
-            # Conversion also does validation, so we have to switch out reference base in original HGVS
-            if m := self.reference_sequence_pattern.match(exception_str):
-                ok = True
-                provided_ref, calculated_ref = m.groups()
-                pr_len = len(provided_ref)
-                cr_len = len(calculated_ref)
-                if pr_len != cr_len:
-                    msg = f"Calculated reference '{calculated_ref}' length ({cr_len}) different from provided " \
-                            + f"reference '{provided_ref}' length ({pr_len})"
-                    raise HGVSInvalidVariantError(msg) from hgvs_e
-
-                var_x.posedit.edit.ref = calculated_ref  # Switch reference
-                # HgvsMatchRefAllele wants genomic refs, may need to convert
-                provided_g_ref = provided_ref
-                calculated_g_ref = calculated_ref
-                if var_x.type in ['c', 'n']:
-                    transcript_accession = self.get_transcript_accession(hgvs_string)
-                    tv = TranscriptVersion.get_transcript_version(self.genome_build, transcript_accession)
-                    if tv.strand == '-':
-                        provided_g_ref = reverse_complement(provided_ref)
-                        calculated_g_ref = reverse_complement(calculated_ref)
-                matches_reference = HgvsMatchRefAllele(provided_ref=provided_g_ref, calculated_ref=calculated_g_ref)
-            elif "Variant is outside CDS bounds" in exception_str:
+            if "Variant is outside CDS bounds" in exception_str:
                 if normalization_error:
                     raise normalization_error
                 var_x = var_x_normalized
@@ -333,13 +378,15 @@ class BioCommonsHGVSConverter(HGVSConverter):
 
         if converter := CONVERT_TO_G.get(var_x.type):
             var_g = converter(var_x)
+            if not matches_reference and var_g.posedit.edit.ref_s != matches_reference.calculated_ref:
+                # transcript must be different than genome
+                matches_reference.ref_type = "transcript"
+                matches_reference.ref_source = "our transcript sequence"
+
+
         else:
             var_g = var_x
 
-        # If not set, must have passed ref validation - so grab genomic ref from g.HGVS
-        if matches_reference is None:
-            ref = var_g.posedit.edit.ref
-            matches_reference = HgvsMatchRefAllele(provided_ref='', calculated_ref=ref)
         return var_g, matches_reference, originally_normalized
 
     @staticmethod
