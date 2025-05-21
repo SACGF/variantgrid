@@ -126,7 +126,7 @@ class HgvsMatchTranscriptAndGenomeRefAllele(HgvsMatchRefAllele):
         self.strand = strand
 
         provided_g_ref, calculated_g_ref = self._get_genomic_provided_and_calculated_ref_from_transcript()
-        super().__init__(provided_g_ref, calculated_g_ref, "transcript", "our transcript sequence")
+        super().__init__(provided_g_ref, calculated_g_ref)
 
     def _get_genomic_provided_and_calculated_ref_from_transcript(self):
         if self.strand and self.strand == "-":
@@ -144,7 +144,7 @@ class HgvsMatchTranscriptAndGenomeRefAllele(HgvsMatchRefAllele):
         if self.provided_ref:
             provided_g_ref, calculated_g_ref = self._get_genomic_provided_and_calculated_ref_from_transcript()
             if self.provided_transcript_ref != provided_g_ref:
-                message = f'Using {self.ref_type} reference "{self.calculated_transcript_ref}" from {self.ref_source}, in place of provided reference "{self.provided_transcript_ref}". ' \
+                message = f'Using transcript reference "{self.calculated_transcript_ref}" from transcript sequence in place of provided reference "{self.provided_transcript_ref}". ' \
                           f'Transcript (strand="{self.strand}") and genome reference "{self.calculated_ref}" differ.'
             else:
                 message = f'Using {self.ref_type} reference "{self.calculated_ref}" from {self.ref_source}, in place of provided reference "{self.provided_ref}"'
@@ -378,12 +378,9 @@ class BioCommonsHGVSConverter(HGVSConverter):
 
         if converter := CONVERT_TO_G.get(var_x.type):
             var_g = converter(var_x)
-            if not matches_reference and var_g.posedit.edit.ref_s != matches_reference.calculated_ref:
-                # transcript must be different than genome
-                matches_reference.ref_type = "transcript"
-                matches_reference.ref_source = "our transcript sequence"
-
-
+            if not matches_reference:
+                # Set from genomic coord in case it's diff than transcript
+                matches_reference.calculated_ref = var_g.posedit.edit.ref_s
         else:
             var_g = var_x
 
