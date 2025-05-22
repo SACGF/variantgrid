@@ -55,10 +55,11 @@ def _get_sample_stats_code_version() -> SampleStatsCodeVersion:
         0 - Set for historical versions created before code_version added
         1 - Existing code when code_version added
         2 - Added VCFLengthStats
+        3 - Optimisations
     """
     code_version, _ = thread_safe_unique_together_get_or_create(SampleStatsCodeVersion,
                                                                 name="SampleStats",
-                                                                version=2,
+                                                                version=3,
                                                                 code_git_hash=Git(settings.BASE_DIR).hash)
     return code_version
 
@@ -102,8 +103,6 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
     qs = vcf.get_variant_qs(qs)
     cgc = vcf.cohort.cohort_genotype_collection
     samples_zygosity_column = f"{cgc.cohortgenotype_alias}__samples_zygosity"
-    filters_column = f"{cgc.cohortgenotype_alias}__filters"
-
     columns = [
         "locus__contig__name",
         "locus__ref__seq",
@@ -117,46 +116,69 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
         "variantannotation__vep_skipped_reason",
         "variantannotation__hgvs_g",
         "clinvar__highest_pathogenicity",
+        f"{cgc.cohortgenotype_alias}__filters",
     ]
-
-    if vcf.has_filters:
-        columns.append(filters_column)
-
-    values_queryset = qs.values(*columns)
     cohort_samples = list(vcf.cohort.get_cohort_samples())
-    stats_per_sample, stats_passing_filters_per_sample = _create_stats_per_sample(vcf, annotation_version)
     vep_skipped_count = 0
+    total_delta = 0
     variant_class_lengths = defaultdict(list)
 
-    for vals in values_queryset.iterator():
-        chrom = vals["locus__contig__name"]
-        ref = vals["locus__ref__seq"]
-        alt = vals["alt__seq"]
-        svlen = vals["svlen"]
-        samples_zygosity = vals[samples_zygosity_column]
-        dbsnp = vals["variantannotation__dbsnp_rs_id"]
-        impact = vals["variantannotation__impact"]
-        transcript = vals["variantannotation__transcript_id"]
-        omim = vals["variantannotation__gene__geneannotation__omim_terms"]
-        vep_skipped = vals["variantannotation__vep_skipped_reason"]
-        clinvar_highest_pathogenicity = vals["clinvar__highest_pathogenicity"]
-        hgvs_g = vals["variantannotation__hgvs_g"]
+    # bind constants and functions locally
+    pathogenicity_high_mod = {PathogenicityImpact.HIGH, PathogenicityImpact.MODERATE}
+    symbolic_insertions = {VCFSymbolicAllele.DUP, VCFSymbolicAllele.INS}
+    HET, HOM_ALT, HOM_REF, UNK = Zygosity.HET, Zygosity.HOM_ALT, Zygosity.HOM_REF, Zygosity.UNKNOWN_ZYGOSITY
+    sample_and_index = []
+    for cohort_sample in cohort_samples:
+        sample_and_index.append((cohort_sample.sample, cohort_sample.cohort_genotype_packed_field_index))
+
+    # Use array indexes to avoid dict lookups
+    F_CLINVAR_COUNT = 0
+    F_DELETIONS_COUNT = 1
+    F_DELETIONS_DBSNP_COUNT = 2
+    F_GENE_COUNT = 3
+    F_HET_CLINVAR_PATHOGENIC_COUNT = 4
+    F_HET_COUNT = 5
+    F_HET_HIGH_OR_MODERATE_COUNT = 6
+    F_HET_OMIM_PHENOTYPE_COUNT = 7
+    F_HOM_CLINVAR_PATHOGENIC_COUNT = 8
+    F_HOM_COUNT = 9
+    F_HOM_HIGH_OR_MODERATE_COUNT = 10
+    F_HOM_OMIM_PHENOTYPE_COUNT = 11
+    F_INSERTIONS_COUNT = 12
+    F_INSERTIONS_DBSNP_COUNT = 13
+    F_REF_CLINVAR_PATHOGENIC_COUNT = 14
+    F_REF_COUNT = 15
+    F_REF_HIGH_OR_MODERATE_COUNT = 16
+    F_REF_OMIM_PHENOTYPE_COUNT = 17
+    F_SNP_COUNT = 18
+    F_SNP_DBSNP_COUNT = 19
+    F_UNK_CLINVAR_PATHOGENIC_COUNT = 20
+    F_UNK_COUNT = 21
+    F_UNK_OMIM_PHENOTYPE_COUNT = 22
+    F_VARIANT_COUNT = 23
+    F_VARIANT_DBSNP_COUNT = 24
+    F_X_HET_COUNT = 25
+    F_X_HOM_COUNT = 26
+    F_X_UNK_COUNT = 27
+    NUM_FIELDS = 28
+
+    # Use Counter instead of Django models as it has lower overhead
+    sample_counts = defaultdict(lambda: [0] * NUM_FIELDS)
+    sample_counts_passing_filters = defaultdict(lambda: [0] * NUM_FIELDS)
+
+    for row in qs.values_list(*columns).iterator(chunk_size=10_000):
+        (chrom, ref, alt, svlen, samples_zygosity, dbsnp, impact, transcript, omim, vep_skipped, hgvs_g, clinvar, filters) = row
+        clinvar_highest_pathogenicity = clinvar or 0
 
         ref_len = len(ref)
         alt_len = len(alt)
         is_snp = ref_len == 1 and alt_len == 1
-        impact_high_or_mod = impact in {PathogenicityImpact.HIGH, PathogenicityImpact.MODERATE}
-
-        stats_list = [stats_per_sample]
-
-        if vcf.has_filters:
-            filters = vals[filters_column]
-            if not filters:
-                stats_list.append(stats_passing_filters_per_sample)
+        impact_high_or_mod = impact in pathogenicity_high_mod
 
         if vep_skipped:
             vep_skipped_count += 1
 
+        variant_type_field = F_SNP_COUNT
         if not is_snp:
             variant_class = _get_variant_class(alt, hgvs_g)
             if svlen:
@@ -165,94 +187,126 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
                 variant_length = max(alt_len, ref_len)
             variant_class_lengths[variant_class].append(variant_length)
 
-        # Sample related stuff
-
-        for cohort_sample in cohort_samples:
-            zygosity = samples_zygosity[cohort_sample.cohort_genotype_packed_field_index]
-            sample_stats_list = [s[cohort_sample.sample] for s in stats_list]
-
-            for ss in [sl[SAMPLE_STATS] for sl in sample_stats_list]:
-                ss.variant_count += 1
-
-                if Sequence.allele_is_symbolic(alt):
-                    if alt in (VCFSymbolicAllele.DUP, VCFSymbolicAllele.INS):
-                        ss.insertions_count += 1
-                    elif alt == VCFSymbolicAllele.DEL:
-                        ss.deletions_count += 1
+            if Sequence.allele_is_symbolic(alt):
+                if alt in symbolic_insertions:
+                    variant_type_field = F_INSERTIONS_COUNT
+                elif alt == VCFSymbolicAllele.DEL:
+                    variant_type_field = F_DELETIONS_COUNT
+            else:
+                if ref_len > alt_len:
+                    variant_type_field = F_DELETIONS_COUNT
                 else:
-                    if is_snp:
-                        ss.snp_count += 1
-                    elif ref_len > alt_len:
-                        ss.deletions_count += 1
-                    elif ref_len < alt_len:
-                        ss.insertions_count += 1
+                    variant_type_field = F_INSERTIONS_COUNT
 
-                if zygosity == Zygosity.HET:
-                    ss.het_count += 1
-                elif zygosity == Zygosity.HOM_ALT:
-                    ss.hom_count += 1
-                elif zygosity == Zygosity.HOM_REF:
-                    ss.ref_count += 1
-                elif zygosity == Zygosity.UNKNOWN_ZYGOSITY:
-                    ss.unk_count += 1
+        zygosity_updates = {
+            HET: [F_HET_COUNT],
+            HOM_ALT: [F_HOM_COUNT],
+            HOM_REF: [F_REF_COUNT],
+            UNK: [F_UNK_COUNT],
+        }
+        if chrom == 'X':
+            zygosity_updates[HET].append(F_X_HET_COUNT)
+            zygosity_updates[HOM_ALT].append(F_X_HOM_COUNT)
+            zygosity_updates[HOM_REF].append(F_X_HOM_COUNT)
+            zygosity_updates[UNK].append(F_X_UNK_COUNT)
+        if impact_high_or_mod:
+            zygosity_updates[HET].append(F_HET_HIGH_OR_MODERATE_COUNT)
+            zygosity_updates[HOM_ALT].append(F_HOM_HIGH_OR_MODERATE_COUNT)
+            zygosity_updates[HOM_REF].append(F_REF_HIGH_OR_MODERATE_COUNT)
+        if omim:
+            zygosity_updates[HET].append(F_HET_OMIM_PHENOTYPE_COUNT)
+            zygosity_updates[HOM_ALT].append(F_HOM_OMIM_PHENOTYPE_COUNT)
+            zygosity_updates[HOM_REF].append(F_REF_OMIM_PHENOTYPE_COUNT)
+            zygosity_updates[UNK].append(F_UNK_OMIM_PHENOTYPE_COUNT)
+        if clinvar_highest_pathogenicity >= 4:
+            zygosity_updates[HET].append(F_HET_CLINVAR_PATHOGENIC_COUNT)
+            zygosity_updates[HOM_ALT].append(F_HOM_CLINVAR_PATHOGENIC_COUNT)
+            zygosity_updates[HOM_REF].append(F_REF_CLINVAR_PATHOGENIC_COUNT)
+            zygosity_updates[UNK].append(F_UNK_CLINVAR_PATHOGENIC_COUNT)
 
-                if chrom == 'X':
-                    if zygosity == Zygosity.HET:
-                        ss.x_het_count += 1
-                    elif zygosity in [Zygosity.HOM_REF, Zygosity.HOM_ALT]:
-                        ss.x_hom_count += 1
+        variant_updates = [F_VARIANT_COUNT, variant_type_field]
+        if dbsnp:
+            variant_updates.append(F_VARIANT_DBSNP_COUNT)
 
-            for ast in [sl[SAMPLE_ANNOTATION_STATS] for sl in sample_stats_list]:
-                if dbsnp:
-                    ast.variant_dbsnp_count += 1
+            if ref_len == 1 and alt_len == 1:
+                variant_updates.append(F_SNP_DBSNP_COUNT)
+            elif ref_len > alt_len:
+                variant_updates.append(F_DELETIONS_DBSNP_COUNT)
+            elif ref_len < alt_len:
+                variant_updates.append(F_INSERTIONS_DBSNP_COUNT)
 
-                    if ref_len == 1 and alt_len == 1:
-                        ast.snp_dbsnp_count += 1
-                    elif ref_len > alt_len:
-                        ast.deletions_dbsnp_count += 1
-                    elif ref_len < alt_len:
-                        ast.insertions_dbsnp_count += 1
+        if transcript:
+            variant_updates.append(F_GENE_COUNT)
 
-                if impact_high_or_mod:
-                    if zygosity == Zygosity.HET:
-                        ast.het_high_or_moderate_count += 1
-                    elif zygosity == Zygosity.HOM_ALT:
-                        ast.hom_high_or_moderate_count += 1
-                    elif zygosity == Zygosity.HOM_REF:
-                        ast.ref_high_or_moderate_count += 1
+        if clinvar_highest_pathogenicity:
+            variant_updates.append(F_CLINVAR_COUNT)
 
-            if transcript:
-                for gs in [sl[SAMPLE_GENE_STATS] for sl in sample_stats_list]:
-                    gs.gene_count += 1
+        for sample, sample_index in sample_and_index:
+            zygosity = samples_zygosity[sample_index]
 
-                    if omim:
-                        if zygosity == Zygosity.HET:
-                            gs.het_omim_phenotype_count += 1
-                        elif zygosity == Zygosity.HOM_ALT:
-                            gs.hom_omim_phenotype_count += 1
-                        elif zygosity == Zygosity.HOM_REF:
-                            gs.ref_omim_phenotype_count += 1
-                        elif zygosity == Zygosity.UNKNOWN_ZYGOSITY:
-                            gs.unk_omim_phenotype_count += 1
+            update_indexes = variant_updates + zygosity_updates[zygosity]
+            sc = sample_counts[sample]
+            for i in update_indexes:
+                sc[i] += 1
+            # Update if passed
+            if vcf.has_filters and not filters:
+                sc_pf = sample_counts_passing_filters[sample]
+                for i in update_indexes:
+                    sc_pf[i] += 1
+            # End of per-sample stuff
 
-            if clinvar_highest_pathogenicity:
-                for cs in [sl[SAMPLE_CLINVAR_STATS] for sl in sample_stats_list]:
-                    cs.clinvar_count += 1
-                    if clinvar_highest_pathogenicity >= 4:
-                        if zygosity == Zygosity.HET:
-                            cs.het_clinvar_pathogenic_count += 1
-                        elif zygosity == Zygosity.HOM_ALT:
-                            cs.hom_clinvar_pathogenic_count += 1
-                        elif zygosity == Zygosity.HOM_REF:
-                            cs.ref_clinvar_pathogenic_count += 1
-                        elif zygosity == Zygosity.UNKNOWN_ZYGOSITY:
-                            cs.unk_clinvar_pathogenic_count += 1
+    copy_start = time.time()
+    print(f"calc time: {copy_start - start}")
 
-    for stats_dict in [stats_per_sample, stats_passing_filters_per_sample or {}]:
-        for stats in stats_dict.values():
-            stats[SAMPLE_STATS].import_status = ImportStatus.SUCCESS
-            for s in stats.values():
-                s.save()
+    stats_per_sample, stats_passing_filters_per_sample = _create_stats_per_sample(vcf, annotation_version)
+    counter_and_models = [
+        (sample_counts, stats_per_sample),
+        (sample_counts_passing_filters, stats_passing_filters_per_sample),
+    ]
+
+    FIELD_LOOKUPS = {
+        'clinvar_count': F_CLINVAR_COUNT,
+        'deletions_count': F_DELETIONS_COUNT,
+        'deletions_dbsnp_count': F_DELETIONS_DBSNP_COUNT,
+        'gene_count': F_GENE_COUNT,
+        'het_clinvar_pathogenic_count': F_HET_CLINVAR_PATHOGENIC_COUNT,
+        'het_count': F_HET_COUNT,
+        'het_high_or_moderate_count': F_HET_HIGH_OR_MODERATE_COUNT,
+        'het_omim_phenotype_count': F_HET_OMIM_PHENOTYPE_COUNT,
+        'hom_clinvar_pathogenic_count': F_HOM_CLINVAR_PATHOGENIC_COUNT,
+        'hom_count': F_HOM_COUNT,
+        'hom_high_or_moderate_count': F_HOM_HIGH_OR_MODERATE_COUNT,
+        'hom_omim_phenotype_count': F_HOM_OMIM_PHENOTYPE_COUNT,
+        'insertions_count': F_INSERTIONS_COUNT,
+        'insertions_dbsnp_count': F_INSERTIONS_DBSNP_COUNT,
+        'ref_clinvar_pathogenic_count': F_REF_CLINVAR_PATHOGENIC_COUNT,
+        'ref_count': F_REF_COUNT,
+        'ref_high_or_moderate_count': F_REF_HIGH_OR_MODERATE_COUNT,
+        'ref_omim_phenotype_count': F_REF_OMIM_PHENOTYPE_COUNT,
+        'snp_count': F_SNP_COUNT,
+        'snp_dbsnp_count': F_SNP_DBSNP_COUNT,
+        'unk_clinvar_pathogenic_count': F_UNK_CLINVAR_PATHOGENIC_COUNT,
+        'unk_count': F_UNK_COUNT,
+        'unk_omim_phenotype_count': F_UNK_OMIM_PHENOTYPE_COUNT,
+        'variant_count': F_VARIANT_COUNT,
+        'variant_dbsnp_count': F_VARIANT_DBSNP_COUNT,
+        'x_het_count': F_X_HET_COUNT,
+        'x_hom_count': F_X_HOM_COUNT,
+        'x_unk_count': F_X_UNK_COUNT,
+    }
+    # Count is a big mix of everything, copy off into appropriate models
+    for sc, sample_stats_models in counter_and_models:
+        for sample, stats_models in sample_stats_models.items():
+            stats_models[SAMPLE_STATS].import_status = ImportStatus.SUCCESS  # Only SampleStats has import_status
+
+            for stats_model in stats_models.values():
+                counts = sc[sample]
+                for field_name, i in FIELD_LOOKUPS.items():
+                    count = counts[i]
+                    if hasattr(stats_model, field_name):
+                        setattr(stats_model, field_name, count)
+
+                stats_model.save()
 
     if vep_skipped_count:
         # We may be re-running a part of sample stats. Store the highest number skipped
@@ -295,6 +349,7 @@ def _actually_calculate_vcf_stats(vcf: VCF, annotation_version: AnnotationVersio
 
     end = time.time()
     logging.info("SampleStats for %s took %.2f seconds", vcf, end - start)
+
 
 def _get_variant_class(alt: str, hgvs_g: str) -> Optional[VariantClass]:
     """ The VEP VariantClass is not always accurate so basically DIY here """
