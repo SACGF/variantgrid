@@ -372,6 +372,10 @@ class ClassificationAdmin(ModelAdminBasics):
             changed_group = ClassificationGrouping.assign_grouping_for_classification(vc)
             if changed_group:
                 changed_count += 1
+        if ClassificationImportRun.ongoing_imports():
+            pass
+        else:
+            ClassificationGrouping.update_all_dirty()
         self.message_user(request, f"{changed_count} of {qs_count} records assigned to groups")
 
     @admin_action("Matching: Re-Match Variant")
