@@ -359,9 +359,24 @@ class ClassificationAdmin(ModelAdminBasics):
 
     @admin_action("Fixes: Revalidate")
     def revalidate(self, request, queryset):
+        qs_count = queryset.count()
         for vc in queryset:
             vc.revalidate(request.user)
-        self.message_user(request, str(queryset.count()) + " records revalidated")
+        self.message_user(request, str(qs_count) + " records revalidated")
+
+    @admin_action("Fixes: Assign Classification Grouping")
+    def assign_classification_grouping(self, request, queryset: QuerySet[Classification]):
+        qs_count = queryset.count()
+        changed_count = 0
+        for vc in queryset:
+            changed_group = ClassificationGrouping.assign_grouping_for_classification(vc)
+            if changed_group:
+                changed_count += 1
+        if ClassificationImportRun.ongoing_imports():
+            pass
+        else:
+            ClassificationGrouping.update_all_dirty()
+        self.message_user(request, f"{changed_count} of {qs_count} records assigned to groups")
 
     @admin_action("Matching: Re-Match Variant")
     def admin_reattempt_variant_matching(self, request, queryset: QuerySet[Classification]):
