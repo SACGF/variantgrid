@@ -59,7 +59,9 @@ class ImportGeneCoverageTask(ImportTask):
         # So that we can get the right canonical transcripts etc
         qc_gene_coverage = None
         if settings.SEQAUTO_ENABLED:
-            if uploaded_file.import_source == ImportSource.API and uploaded_file.path:
+            # Only API or seqauto sets path - but seqauto won't call this method it just directly calls
+            # GeneCoverageCollection.load_from_file
+            if uploaded_file.path:
                 from seqauto.models import QCGeneCoverage
                 if qc_gene_coverage := QCGeneCoverage.objects.filter(path=uploaded_file.path).first():
                     logging.info("Found seqauto QCGeneCoverage sharing path: %s", qc_gene_coverage.path)
