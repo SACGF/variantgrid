@@ -243,7 +243,7 @@ class SequencingRun(SeqAutoRecord):
         errors = None
         if settings.SEQAUTO_SEQUENCING_RUN_VALIDATE_ILLUMINA_FORMULA:
             if not re.search(SEQUENCING_RUN_REGEX, name):
-                errors = "Name does not match Illumina regex: '{SEQUENCING_RUN_REGEX}'"
+                errors = f"Name does not match Illumina regex: '{SEQUENCING_RUN_REGEX}'"
         return errors
 
     @staticmethod
