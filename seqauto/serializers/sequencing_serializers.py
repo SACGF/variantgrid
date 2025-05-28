@@ -133,6 +133,11 @@ class SequencingRunSerializer(serializers.ModelSerializer):
         model = SequencingRun
         fields = ("path", "name", "date", "sequencer", "gold_standard", "bad", "hidden", "experiment", "enrichment_kit", "has_basecalls", "has_interop")
 
+    def validate_name(self, value):
+        if error := SequencingRun.get_name_validation_errors(value):
+            raise serializers.ValidationError(error)
+        return value
+
     def create(self, validated_data):
         name = validated_data.get('name')
         if ek_data := validated_data.pop('enrichment_kit', None):
