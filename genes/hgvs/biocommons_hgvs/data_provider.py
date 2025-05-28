@@ -1,4 +1,7 @@
+from typing import Optional
+
 from cdot.hgvs.dataproviders import LocalDataProvider, FastaSeqFetcher, ChainedSeqFetcher
+from django.conf import settings
 from hgvs.exceptions import HGVSDataNotAvailableError
 
 from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo, NoTranscript
@@ -16,13 +19,18 @@ class DBTranscriptSeqFetcher:
     """ We store some transcripts in the database, use them if we have them   """
     source = "VG DB Transcript sequences (transcript fasta/API)"
 
+    def __init__(self, retrieve_transcripts: Optional[bool] = None):
+        if retrieve_transcripts is None:
+            retrieve_transcripts = settings.HGVS_RETRIEVE_TRANSCRIPT_SEQUENCE
+        self.retrieve_transcripts = retrieve_transcripts
+
     def fetch_seq(self, ac, start_i=None, end_i=None):
         if is_contig(ac):
             raise HGVSDataNotAvailableError("This SeqFetcher implementation doesn't handle contigs")
 
         tvsi = None
         try:
-            tvsi = TranscriptVersionSequenceInfo.get(ac, retrieve=False)
+            tvsi = TranscriptVersionSequenceInfo.get(ac, retrieve=self.retrieve_transcripts)
         except NoTranscript:
             pass
 
@@ -55,10 +63,11 @@ class SingleBuildFastaSeqFetcher(FastaSeqFetcher):
 
 class DjangoTranscriptDataProvider(LocalDataProvider):
 
-    def __init__(self, genome_build):
-        db_transcript_seqfetcher = DBTranscriptSeqFetcher()
-        fasta_seqfetcher = SingleBuildFastaSeqFetcher(genome_build)
-        seqfetcher = ChainedSeqFetcher(db_transcript_seqfetcher, fasta_seqfetcher)
+    def __init__(self, genome_build, retrieve_transcripts: Optional[bool]=None):
+        """ retrieve_transcripts: attempt to retrieve transcript if not present (slower) """
+        self.db_transcript_seqfetcher = DBTranscriptSeqFetcher(retrieve_transcripts)
+        self.fasta_seqfetcher = SingleBuildFastaSeqFetcher(genome_build)
+        seqfetcher = ChainedSeqFetcher(self.db_transcript_seqfetcher, self.fasta_seqfetcher)
 
         super().__init__(assemblies=[genome_build.name], seqfetcher=seqfetcher)
         self.genome_build = genome_build
