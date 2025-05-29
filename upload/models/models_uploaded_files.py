@@ -116,8 +116,10 @@ class UploadedLiftover(models.Model):
 
 @receiver(post_delete, sender=UploadedGeneCoverage)
 def uploaded_gene_coverage_post_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
-    if instance.gene_coverage_collection:
-        instance.gene_coverage_collection.delete()
+    # This can be called via a CASCADE delete from GeneCoverageCollection
+    # in which case that object will already be deleted (so check id w/o ORM)
+    if gc_id := instance.gene_coverage_collection_id:
+        GeneCoverageCollection.objects.filter(pk=gc_id).delete()
 
 
 class UploadedClinVarVersion(models.Model):
