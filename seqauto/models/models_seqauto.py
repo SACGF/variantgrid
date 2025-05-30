@@ -965,9 +965,8 @@ class QC(SeqAutoRecord):
 
     @property
     def genome_build(self):
-        try:
-            gb = GenomeBuild.objects.get(vcf__sample__samplefromsequencingsample__sequencing_sample=self.sequencing_sample)
-        except GenomeBuild.DoesNotExist:
+        gb = GenomeBuild.objects.filter(vcf__sample__samplefromsequencingsample__sequencing_sample=self.sequencing_sample).first()
+        if gb is None:
             logging.warning("%s: requested genome build, but don't know (no VCFs linked)", self)
             gb = GenomeBuild.legacy_build()
         return gb
