@@ -17,7 +17,6 @@ import logging
 import pandas as pd
 from dateutil import parser
 from django.utils import timezone
-from guardian.shortcuts import get_objects_for_user
 
 from annotation.phenotype_matching import bulk_patient_phenotype_matching
 from library.guardian_utils import assign_permission_to_user_and_groups
@@ -135,7 +134,7 @@ def match_sample(user, sample_id, sample_name, validation_messages):
     sample = None
     if sample_id or sample_name:
         msg = None
-        samples_qs = get_objects_for_user(user, 'snpdb.change_sample')
+        samples_qs = Sample.filter_for_user(user, has_write_permission=True)
 
         if sample_id:
             kwargs = {"id": sample_id}
