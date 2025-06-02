@@ -361,6 +361,8 @@ class PatientRecordOriginType:
 
 
 class PatientImport(models.Model):
+    """ All the modifications hang off this. We don't want this to get deleted so modifications stay there
+        Even after reload patient import """
     name = models.TextField()
 
 
