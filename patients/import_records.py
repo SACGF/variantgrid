@@ -299,7 +299,7 @@ def process_record(patient_records, record_id, row):
     patient_modified = False
     for patient_field, field_value in PATIENT_FIELDS.items():
         if field_value:
-            old_value = getattr(patient, field_value)
+            old_value = getattr(patient, patient_field)
             setattr(patient, patient_field, field_value)
             description = f"Set {patient_field} to {field_value}"
             if old_value != field_value:
