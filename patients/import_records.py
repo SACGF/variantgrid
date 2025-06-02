@@ -256,7 +256,7 @@ def process_record(patient_records, record_id, row):
         if patient.date_of_death != date_of_death:
             patient._deceased = None
             patient.date_of_death = date_of_death
-            patient.save()
+            patient.save(check_patient_text_phenotype=False)
             description = "Updated patient date of death"
 
     else:
@@ -271,14 +271,14 @@ def process_record(patient_records, record_id, row):
         elif not patient_deceased:
             patient.date_of_death = None
             patient._deceased = patient_deceased
-            patient.save()
+            patient.save(check_patient_text_phenotype=False)
             description = "Updated patient as deceased = False"
         else:
             # only clear date_of_death and _deceased if they are not currently NULL
             if patient.date_of_death is not None or patient._deceased is not None:
                 patient.date_of_death = None
                 patient._deceased = None
-                patient.save()
+                patient.save(check_patient_text_phenotype=False)
                 description = "Updated patient deceased and date_of_death to NULL values"
 
     # if patient has been modified, create a PatientModification record
