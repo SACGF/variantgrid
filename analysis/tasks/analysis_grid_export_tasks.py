@@ -66,7 +66,7 @@ def _write_node_to_cached_generated_file(cgf, analysis, node, name, export_type)
 
     total_records = node.count
     update_size = max(1000, total_records / 100)  # 1% or every 1k records
-    update_progress_iterator = update_cgf_progress_iterator(file_iterator(), cgf.pk, total_records, update_size)
+    update_progress_iterator = update_cgf_progress_iterator(file_iterator, cgf.pk, total_records, update_size)
 
     media_root_filename = os.path.join(settings.GENERATED_DIR, cgf.generator, str(cgf.pk), basename)
     logging.info("Starting to write %s", media_root_filename)
