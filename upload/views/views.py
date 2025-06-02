@@ -48,6 +48,24 @@ def get_icon_for_uploaded_file_status(status):
         return os.path.join(settings.STATIC_URL, 'icons', icon)
     return None
 
+def _get_basic_uploaded_file_context(uploaded_file) -> dict:
+    data_url, upload_data = get_url_and_data_for_uploaded_file_data(uploaded_file)
+    file_type = None
+    if uploaded_file.file_type:
+        file_type = UploadedFileTypes(uploaded_file.file_type).label
+
+    data = {
+        'file_type': file_type,
+        'file_type_code': uploaded_file.file_type,
+        'data_url': data_url,
+    }
+    if upload_data:
+        try:
+            data["upload_data"] = upload_data.get_upload_context()
+        except:
+            pass
+    return data
+
 
 def uploadedfile_dict(uploaded_file) -> dict:
     try:
@@ -55,11 +73,7 @@ def uploadedfile_dict(uploaded_file) -> dict:
     except:
         size = None
 
-    data_url, upload_data = get_url_and_data_for_uploaded_file_data(uploaded_file)
     time_since = timesince(uploaded_file.created)
-    file_type = None
-    if uploaded_file.file_type:
-        file_type = UploadedFileTypes(uploaded_file.file_type).label
 
     data = {
         'uploaded_file_id': uploaded_file.pk,
@@ -67,18 +81,10 @@ def uploadedfile_dict(uploaded_file) -> dict:
         'size': size,
         'user': uploaded_file.user.get_full_name(),
         'time_since': f"{time_since} ago",
-        'file_type': file_type,
-        'file_type_code': uploaded_file.file_type,
-        'data_url': data_url,
         'deleteUrl': reverse('jfu_delete', kwargs={'pk': uploaded_file.pk}),
         'deleteType': 'POST',
     }
-
-    if upload_data:
-        try:
-            data["upload_data"] = upload_data.get_upload_context()
-        except:
-            pass
+    data.update(_get_basic_uploaded_file_context(uploaded_file))
 
     if not uploaded_file.file_type:
         data['error'] = f'Could not determine how to read file: "{uploaded_file.name}"'
@@ -268,14 +274,17 @@ def view_upload_pipeline(request, upload_pipeline_id):
         messages.add_message(request, messages.WARNING, msg, extra_tags='import-message')
         more_warning_or_error_details |= vii.has_more_details
 
-    context = {'upload_pipeline': upload_pipeline,
-               'has_upload_steps': upload_pipeline.uploadstep_set.exists(),
-               "allow_retry_import": allow_retry_import and settings.UPLOAD_ENABLED,
-               "more_warning_or_error_details": more_warning_or_error_details,
-               # this data is redundant if there isn't multiple runs for the same step
-               "step_total_stats": upload_stats.get_step_total_stats(upload_pipeline, only_if_multiple_runs=True),
-               "step_order": list(step_order),
-               "step_start_end_lines": step_start_end_lines}
+    context = {
+        'upload_pipeline': upload_pipeline,
+        'has_upload_steps': upload_pipeline.uploadstep_set.exists(),
+        "allow_retry_import": allow_retry_import and settings.UPLOAD_ENABLED,
+        "more_warning_or_error_details": more_warning_or_error_details,
+        # this data is redundant if there isn't multiple runs for the same step
+        "step_total_stats": upload_stats.get_step_total_stats(upload_pipeline, only_if_multiple_runs=True),
+        "step_order": list(step_order),
+        "step_start_end_lines": step_start_end_lines,
+    }
+    context.update(_get_basic_uploaded_file_context(uploaded_file))
 
     context_name = UPLOADED_FILE_CONTEXT.get(upload_pipeline.file_type)
     if context_name:

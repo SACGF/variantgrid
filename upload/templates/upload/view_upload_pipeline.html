@@ -229,6 +229,16 @@
                             <i class="fa-solid fa-file-circle-xmark"></i> GeneList for this file has been deleted
                         </div>
                     {% endif %}
+                {% else %}
+                    <!-- Generic show data for other types -->
+                    {% if data_url %}
+                        {% labelled label="Data" %}
+                            <a href="{{ data_url }}">
+                                <div class='file_type_icon file-type-{{ file_type_code }}'></div>
+                                {{ file_type }}
+                            </a>
+                        {% endlabelled %}
+                    {% endif %}
                 {% endif %}
                 {% if more_warning_or_error_details %}
                     {% labelled label="Warnings & Errors" %}{{ 'W' | severity_icon }} <a class="hover-link" href="{% url "view_upload_pipeline_warnings_and_errors" upload_pipeline.pk %}">View Warnings & Errors</a>{% endlabelled %}
