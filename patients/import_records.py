@@ -218,9 +218,9 @@ def process_record(patient_records, record_id, row):
     deceased = row[PatientColumns.DECEASED]
 
     # only set patient_deceased if deceased flag set but date_of_death not set
-    if (deceased == 'Y' and date_of_death is None):
+    if deceased == 'Y' and date_of_death is None:
         patient_deceased = True
-    elif (deceased == 'N' and date_of_death is None):
+    elif deceased == 'N' and date_of_death is None:
         patient_deceased = False
     else:
         patient_deceased = None
