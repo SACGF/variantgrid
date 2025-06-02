@@ -1,3 +1,4 @@
+import logging
 import os
 
 from django.conf import settings
@@ -67,6 +68,14 @@ class UploadedPatientRecords(models.Model):
 
     def get_data(self):
         return self.patient_records
+
+
+@receiver(post_delete, sender=UploadedPatientRecords)
+def uploaded_patient_records_post_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    logging.info("UploadedPatientRecords deleted")
+    if instance.patient_records:
+        logging.info("Deleting linked PatientRecords")
+        instance.patient_records.delete()
 
 
 class UploadedGeneCoverage(models.Model):
