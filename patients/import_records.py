@@ -297,14 +297,16 @@ def process_record(patient_records, record_id, row):
     patient_modified = False
     for patient_field, field_value in PATIENT_FIELDS.items():
         if field_value:
+            old_value = getattr(patient, field_value)
             setattr(patient, patient_field, field_value)
             description = f"Set {patient_field} to {field_value}"
-            PatientModification.objects.create(patient=patient,
-                                               user=user,
-                                               description=description,
-                                               origin=PatientRecordOriginType.UPLOADED_CSV,
-                                               patient_import=patient_records.patient_import)
-            patient_modified = True
+            if old_value != field_value:
+                PatientModification.objects.create(patient=patient,
+                                                   user=user,
+                                                   description=description,
+                                                   origin=PatientRecordOriginType.UPLOADED_CSV,
+                                                   patient_import=patient_records.patient_import)
+                patient_modified = True
 
     PHENOTYPE_FIELDS = {"phenotype": patient_phenotype}
 
@@ -378,11 +380,12 @@ def process_record(patient_records, record_id, row):
         created_specimen = None
 
     if matched_sample:
-        if specimen:
-            matched_sample.specimen = specimen
-
         description = "Set during patient records import"
-        assign_patient_to_sample(patient_records.patient_import, user, matched_sample, patient, description, origin=PatientRecordOriginType.UPLOADED_CSV)
+        origin = PatientRecordOriginType.UPLOADED_CSV
+        assign_patient_to_sample(patient_records.patient_import, user, matched_sample, patient, description, origin)
+
+        if specimen:
+            assign_specimen_to_sample(patient_records.patient_import, user, matched_sample, specimen, description, origin)
 
     validation_message = '\n'.join(validation_messages)
     valid = not validation_messages
