@@ -16,7 +16,10 @@ def _one_off_fix_patient_imports_and_modifications(apps, _schema_editor):
     # Updated patient as deceased = False
     # Set family_code to 43335
 
-    mod_strings = ["Updated patient as deceased = ", "Set family_code to "]
+    mod_strings = ["Updated patient as deceased = ",
+                   "Set affected to",
+                   "Set family_code to ",
+                   "Set during patient records import"]  # No values on this one so will always match
     for patient in Patient.objects.filter(patientmodification__isnull=False).distinct():
         last_patient_mod = {}
         for pm in patient.patientmodification_set.all().order_by("pk"):
@@ -24,11 +27,13 @@ def _one_off_fix_patient_imports_and_modifications(apps, _schema_editor):
                 if pm.description and pm.description.startswith(ms):
                     value = pm.description[len(ms):]
                     print(f"{pm.description=}")
-                    if last_set_value := last_patient_mod.get(ms):
+                    last_set_value = last_patient_mod.get(ms)
+                    if last_set_value is not None:
                         if last_set_value == value:
                             print(f"--> Deleting: {patient} record={pm.pk}, {pm.description}/{pm.date} as redundant")
                             pm.delete()
                     last_patient_mod[ms] = value
+
 
 class Migration(migrations.Migration):
 
