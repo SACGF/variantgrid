@@ -5,27 +5,27 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
-def _get_variant_alleles(apps) -> list:
+def _get_variant_alleles(apps) -> set:
     BCFTOOLS_LIFTOVER = "BL"
     IMPORTED_TO_DATABASE = 'D'
     IMPORTED_NORMALIZED = 'N'
 
     VariantAllele = apps.get_model("snpdb", "VariantAllele")
 
-    bad_va = []
+    bad_va_set = set()
     for va in VariantAllele.objects.filter(allele_linking_tool=BCFTOOLS_LIFTOVER):
         for other_va in va.allele.variantallele_set.all().filter(origin__in=[IMPORTED_TO_DATABASE, IMPORTED_NORMALIZED]).exclude(genome_build=va.genome_build):
             if va.variant.locus.ref == other_va.variant.alt and va.variant.alt == other_va.variant.locus.ref:
-                bad_va.append(va)
-    return bad_va
+                bad_va_set.add(va)
+    return bad_va_set
 
 
 def _delete_bcftools_liftover_historical_swapped(apps, _schema_editor):
-    if bad_va := _get_variant_alleles(apps):
-        print(f"Found {len(bad_va)} variant alleles w/swapped ref/alt")
+    if bad_va_set := _get_variant_alleles(apps):
+        print(f"Found {len(bad_va_set)} variant alleles w/swapped ref/alt")
 
         genome_builds = set()
-        for va in bad_va:
+        for va in bad_va_set:
             genome_builds.add(va.genome_build)
             va.delete()
 
