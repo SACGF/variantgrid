@@ -92,7 +92,9 @@ class PatientRecordsGrid(JqGridUserRowConfig):
     def __init__(self, **kwargs):
         user = kwargs.get("user")
         super().__init__(user)
-        queryset = self.model.objects.filter(uploadedpatientrecords__uploaded_file__user=user)
+        queryset = self.model.objects.all()
+        if not user.is_superuser:
+            queryset = queryset.filter(uploadedpatientrecords__uploaded_file__user=user)
         self.queryset = queryset.values(*self.get_field_names())
         self.extra_config.update({'sortname': 'id',
                                   'sortorder': 'desc'})
