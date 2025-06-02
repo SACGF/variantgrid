@@ -29,7 +29,7 @@ from snpdb.models import Sample
 UNKNOWN_STRING = 'UNKNOWN'  # Upper
 
 
-def assign_patient_to_sample(patient_import, user, sample, patient, description, origin):
+def assign_patient_to_sample(patient_import, user, sample, patient, origin):
     """ Creates patient modification record """
 
     if sample.patient == patient:
@@ -40,6 +40,7 @@ def assign_patient_to_sample(patient_import, user, sample, patient, description,
     sample.patient = patient
     sample.save()
 
+    description = f"Assigned patient to {sample=}"
     if old_patient:
         description += f" (previously patient was: {old_patient})"
 
@@ -50,7 +51,7 @@ def assign_patient_to_sample(patient_import, user, sample, patient, description,
                                        patient_import=patient_import)
 
 
-def assign_specimen_to_sample(patient_import, user, sample, specimen, description, origin):
+def assign_specimen_to_sample(patient_import, user, sample, specimen, origin):
     """ Creates patient modification record """
 
     if sample.specimen == specimen:
@@ -61,6 +62,7 @@ def assign_specimen_to_sample(patient_import, user, sample, specimen, descriptio
     sample.specimen = specimen
     sample.save()
 
+    description = f"Assigned specimen to {sample=}"
     if old_specimen:
         description += f" (previously specimen was: {old_specimen})"
 
@@ -380,12 +382,11 @@ def process_record(patient_records, record_id, row):
         created_specimen = None
 
     if matched_sample:
-        description = "Set during patient records import"
         origin = PatientRecordOriginType.UPLOADED_CSV
-        assign_patient_to_sample(patient_records.patient_import, user, matched_sample, patient, description, origin)
+        assign_patient_to_sample(patient_records.patient_import, user, matched_sample, patient, origin)
 
         if specimen:
-            assign_specimen_to_sample(patient_records.patient_import, user, matched_sample, specimen, description, origin)
+            assign_specimen_to_sample(patient_records.patient_import, user, matched_sample, specimen, origin)
 
     validation_message = '\n'.join(validation_messages)
     valid = not validation_messages
