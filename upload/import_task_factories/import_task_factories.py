@@ -95,6 +95,7 @@ class PatientRecordsImportTaskFactory(ImportTaskFactory):
         df = pd.read_csv(filename, encoding='unicode_escape')
         if PatientColumns.PATIENT_LAST_NAME in df.columns:
             return 1000
+        return 0
 
     def create_import_task(self, upload_pipeline):
         return ImportPatientRecords.si(upload_pipeline.pk)
