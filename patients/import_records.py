@@ -348,16 +348,18 @@ def process_record(patient_records, record_id, row):
                                                patient=patient)
             created_specimen = specimen
 
-        field_values = {"reference_id": specimen_reference_id,
-                        "description": specimen_description,
-                        "collected_by": specimen_collected_by,
-                        "patient": patient,
-                        #tissue=tissue,
-                        "collection_date": specimen_collection_date,
-                        "received_date": specimen_received_date,
-                        "mutation_type": specimen_mutation_type,
-                        "nucleic_acid_source": specimen_nucleic_acid_source,
-                        "_age_at_collection_date": specimen_age_at_collection}
+        field_values = {
+            "reference_id": specimen_reference_id,
+            "description": specimen_description,
+            "collected_by": specimen_collected_by,
+            "patient": patient,
+            #tissue=tissue,
+            "collection_date": specimen_collection_date,
+            "received_date": specimen_received_date,
+            "mutation_type": specimen_mutation_type,
+            "nucleic_acid_source": specimen_nucleic_acid_source,
+            "_age_at_collection_date": specimen_age_at_collection
+        }
         changed = set_fields_if_blank(specimen, field_values)
         if changed:
             # print("save specimen id=%s" %(specimen_reference_id))
@@ -383,9 +385,10 @@ def process_record(patient_records, record_id, row):
         assign_patient_to_sample(patient_records.patient_import, user, matched_sample, patient, description, origin=PatientRecordOriginType.UPLOADED_CSV)
 
     validation_message = '\n'.join(validation_messages)
-
+    valid = not validation_messages
     PatientRecord.objects.create(patient_records=patient_records,
                                  record_id=record_id,
+                                 valid=valid,
                                  validation_message=validation_message,
                                  matched_sample_id=matched_sample_id,
                                  matched_patient=matched_patient,
