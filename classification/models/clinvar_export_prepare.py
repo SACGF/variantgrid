@@ -165,6 +165,7 @@ def allele_origin_to_clinvar_export_types(bucket: AlleleOriginBucket) -> list[Cl
         return [ClinVarExportTypeBucket.GERMLINE]
     elif bucket == AlleleOriginBucket.SOMATIC:
         return [ClinVarExportTypeBucket.ONCOGENIC, ClinVarExportTypeBucket.CLINICAL_IMPACT]
+    raise ValueError(f"AlleleOriginBucket {bucket} has no ClinVar equivalents")
 
 
 def clinvar_export_type_to_allele_origin(bucket: ClinVarExportTypeBucket) -> AlleleOriginBucket:
@@ -267,3 +268,4 @@ class ClinvarExportPrepare:
 
             if clinvar_allele_manager:
                 return clinvar_allele_manager.apply()
+        return None

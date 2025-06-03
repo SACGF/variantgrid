@@ -123,6 +123,7 @@ class ClassificationSummaryCalculator:
             collection_id=self.cm.classification.flag_collection_id
         ).first():
             return flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) if flag.data else 'Unknown'
+        return None
 
     @cached_property
     def germline_bucket(self) -> Optional[int]:
@@ -139,6 +140,7 @@ class ClassificationSummaryCalculator:
             for key, level in SpecialEKeys.AMP_LEVELS_TO_LEVEL.items():
                 if self.cm.get(key):
                     return level
+        return None
 
     @cached_property
     def classification_value(self) -> Optional[str]:
@@ -157,6 +159,7 @@ class ClassificationSummaryCalculator:
     def somatic_clinical_significance(self) -> Optional[str]:
         if self.is_possibly_somatic:
             return self.cm.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
+        return None
 
     @cached_property
     def somatic_sort(self) -> Optional[int]:

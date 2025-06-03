@@ -215,7 +215,7 @@ class EvidenceKey(TimeStampedModel):
     def matched_options(self, normal_value_obj) -> List[Dict[str, str]]:
         """
         Given a value (or possibly list of values) generate or find the options that match.
-        e.g. for the value ["maternal","xsdfdwerew"] for variant inheritance we'd get
+        e.g., for the value ["maternal","xsdfdwerew"] for variant inheritance we'd get
         [{"key":"maternal", "value":"Maternal"}, {"key":"xsdfdwerew", "label":"xsdfdwerew"}]
         See in the 2nd example that we still try to provide an option for unmatched.
         :param normal_value_obj: A value or dict with a key value
@@ -247,7 +247,7 @@ class EvidenceKey(TimeStampedModel):
     @staticmethod
     def __special_up_options(options: List[Dict[str, Any]], default: str, allow_overrides=True) -> List[EvidenceKeyOption]:
         """
-        Converts a CriteriaEvaluation options (e.g. CriteriaEvaluation.BENIGN_OPTIONS) and a default strength (e.g. BM)
+        Converts a CriteriaEvaluation options (e.g., CriteriaEvaluation.BENIGN_OPTIONS) and a default strength (e.g., BM)
         to a list of evidence keys with default and override populated appropriately
         """
         use_options = []

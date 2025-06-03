@@ -1,5 +1,10 @@
 from typing import Optional, TypedDict, Any
 
+"""
+This file was made do give definitions to the JSON returned by the classification API.
+A few of the definitions are used, but not all.
+"""
+
 
 class ClassificationJsonLabDict(TypedDict):
     group_name: str

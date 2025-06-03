@@ -105,9 +105,10 @@ class ClassificationGroupEntry:
     def curated_date_check(self) -> 'CuratedDate':
         return self.modification.curated_date_check
 
-    def __lt__(self, other):
+    def __lt__(self, other) -> bool:
         if self.grouping_key < other.grouping_key:
             return True
+        return False
 
 
 @deprecation.deprecated("Use ClassificationGrouping whenever possible")
@@ -299,10 +300,11 @@ class ClassificationGroup:
         return all(cm.classification.withdrawn for cm in self.modifications)
 
     @property
-    def is_discordant(self):
+    def is_discordant(self) -> bool:
         if self.most_recent.share_level in ShareLevel.DISCORDANT_LEVEL_KEYS:
             if cc := self.most_recent.classification.clinical_context:
                 return cc.is_discordant()
+        return False
 
     @staticmethod
     def c_hgvs_for(cm: ClassificationModification, genome_build: GenomeBuild) -> CHGVS:

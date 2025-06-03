@@ -14,6 +14,10 @@ from classification.models.classification import Classification, ClassificationM
 from library.django_utils import get_field_counts
 from snpdb.models import Lab
 
+"""
+Used for some graphs
+"""
+
 
 def get_classification_counts(
         user: User,

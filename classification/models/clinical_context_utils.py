@@ -51,6 +51,7 @@ def _assign_new_cc_reason(classification: Classification) -> Optional[ClinicalCo
         if classification.allele_object:
             # if we have no cc, but we have an allele (so we should have a cc too)
             return ClinicalContextRecalcTrigger.VARIANT_SET
+    return None
 
 
 def _update_clinical_context(
@@ -69,8 +70,8 @@ def _update_clinical_context(
 
     if not assign_new_clinical_trigger:
         if force_recalc_text and existing_clinical_context:
-            # the current clinical context is just fine, but we've been asked to recalc it regardless
-            # e.g. a classification record has changed classification and was re-published
+            # the current clinical context is just fine, but we've been asked to recalculate it regardless
+            # e.g., a classification record has changed classification and was re-published
             existing_clinical_context.recalc_and_save(cause=force_recalc_text, cause_code=ClinicalContextRecalcTrigger.SUBMISSION)
         return []
 

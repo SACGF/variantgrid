@@ -179,8 +179,8 @@ class FileHandleS3(FileHandle):
         return f"{self.clean_url} {self.modified} {self.size/1024}KB"
 
 
-UPLOADED_S3_TEMP_URL = re.compile(r"https:\/\/(?P<bucket>.*?)\.s3\.amazonaws\.com/(?P<file>.*?)(?:\?AWSAccessKeyId.*|$)")
-UPLOADED_S3_CLEAN_URL = re.compile(r"s3:\/\/(?P<bucket>.*?)\/(?P<file>.*)")
+UPLOADED_S3_TEMP_URL = re.compile(r"https://(?P<bucket>.*?)\.s3\.amazonaws\.com/(?P<file>.*?)(?:\?AWSAccessKeyId.*|$)")
+UPLOADED_S3_CLEAN_URL = re.compile(r"s3://(?P<bucket>.*?)/(?P<file>.*)")
 
 
 def resolve_uploaded_url_to_handle(url: str) -> FileHandle:

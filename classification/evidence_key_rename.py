@@ -3,6 +3,11 @@ import contextlib
 from collections import defaultdict
 from typing import Optional
 
+"""
+Used for migration scripts only.
+Note that the imports should NOT include any models, as for the sake of migration they have to be loaded dynamically
+"""
+
 
 class OptionUpdator:
 
@@ -81,6 +86,10 @@ class OptionUpdator:
 
 
 class BulkUpdator:
+    """
+    Utility class to update a bunch of records but is just too clever for its own good.
+    Adding to a list and then just running bulk_update with a batch size will get the same effect
+    """
 
     def __init__(self, model, fields: list[str]):
         self.model = model
@@ -176,6 +185,9 @@ class EvidenceKeyRenamer:
 
 
 class EvidenceSelectKeyRenamer:
+    """
+    Used for renaming or adding options within a drop down Evidence Key
+    """
 
     def __init__(self, apps, key: str, old_option: str, new_option: str):
         self.apps = apps

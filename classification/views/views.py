@@ -111,7 +111,7 @@ def activity(request, user_id: Optional[int] = None, lab_id: Optional[int] = Non
         else:
             raise PermissionDenied()
 
-    changes = ClassificationChanges.list_changes(classifications=classifications, latest_date=latest_timestamp, for_user=user, for_lab=lab)
+    changes = ClassificationChanges.list_changes(for_classifications=classifications, for_user=user, for_lab=lab, latest_date=latest_timestamp)
 
     load_older_url = None
     if last_date := changes[len(changes)-1].date.timestamp() if changes else None:
@@ -406,7 +406,7 @@ def classification_history(request, classification_id: Any):
     ref.check_security(must_be_writable=True)
     classification: Classification = ref.record
 
-    changes = ClassificationChanges.list_changes(classifications=[classification], limit=100)
+    changes = ClassificationChanges.list_changes(for_classifications=[classification], limit=100)
     context = {
         'changes': changes,
         'can_create_classifications': Classification.can_create_via_web_form(request.user),

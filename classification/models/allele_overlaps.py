@@ -198,6 +198,7 @@ class ClinicalGroupingOverlap:
         if self.status.is_discordant:
             if cc := self.clinical_context:
                 return DiscordanceReport.latest_report(cc)
+        return None
 
     @property
     def shared(self):
@@ -226,6 +227,7 @@ class ClinicalGroupingOverlap:
     def __lt__(self, other):
         if isinstance(other, ClinicalGroupingOverlap):
             return self._sort_value < other._sort_value
+        raise ValueError(f"Can't compare {other} to ClinicalGroupingOverlap")
 
     @property
     def all_latest(self) -> list[ClassificationModification]:
@@ -316,6 +318,7 @@ class AlleleOverlap(OverlapState):
     def __lt__(self, other):
         if isinstance(other, AlleleOverlap):
             return self._sort_value < other._sort_value
+        raise ValueError(f"Can't compare {other} to AlleleOverlap")
 
 
 @dataclass(frozen=True)
@@ -329,7 +332,7 @@ class OverlapsCalculator:
     def __init__(self, perspective: LabPickerData, shared_only=False):
         """
         Calculates classification overlaps (when more than 1 classification is provided from the same allele.)
-        Is the generally split up between
+        Is generally split up between
         :param perspective: User must be present in this perspective
         """
         self.calculator_state = OverlapsCalculatorState(perspective=perspective)

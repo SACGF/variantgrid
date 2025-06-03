@@ -8,6 +8,7 @@ from classification.models import ClassificationLabSummary, DiscordanceReport, C
     classification_flag_types, ClassificationFlagTypes, DiscordanceReportClassification, DiscordanceReportTriage
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
+from uicore.views.ajax_form_view import LazyRender
 
 
 @dataclass(frozen=True)
@@ -16,10 +17,11 @@ class DiscordanceLabSummary(ClassificationLabSummary):
     triage: Optional[DiscordanceReportTriage] = None
 
     @cached_property
-    def embedded(self):
+    def embedded(self) -> Optional[LazyRender]:
         if triage := self.triage:
             from classification.views.discordance_report_triage_view import DiscordanceReportTriageView
             return DiscordanceReportTriageView.lazy_render(triage)
+        return None
 
     def _with_triage(self, triage: Optional[DiscordanceReportTriage]) -> 'DiscordanceLabSummary':
         return DiscordanceLabSummary(

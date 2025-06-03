@@ -207,7 +207,7 @@ def populate_classification_json(classification: Classification, params: Classif
     if include_data_bool:
         # Optionally filter the JSON attributes based on what was requested
         # strip_notes_and_explains: strip everything but value and validation
-        # strip_complicated: strip everything but value, note, explain, db_refs and validation (e.g. strip immutable)
+        # strip_complicated: strip everything but value, note, explain, db_refs and validation (e.g., strip immutable)
         # include_messages: determines if validation messages will be included or not
         if strip_notes_and_explains or strip_complicated or not include_messages:
             keep_attributes = defaultdict(lambda: True)

@@ -22,7 +22,7 @@ class AlleleOriginBucket(TextChoices):
 
     @staticmethod
     def bucket_for_allele_origin(allele_origin: Optional[str]) -> 'AlleleOriginBucket':
-        # logic is duplicated in JavaSCript in vc_form.js updateTitle()
+        # logic is duplicated in JavaScript in vc_form.js updateTitle()
         if not allele_origin:
             return AlleleOriginBucket(settings.ALLELE_ORIGIN_NOT_PROVIDED_BUCKET)
 
@@ -41,6 +41,12 @@ class AlleleOriginBucket(TextChoices):
 
 
 class SpecialEKeys:
+    """
+    A subset of EvidenceKeys that should be present in any environment.
+    Refer to them by their constant here instead of string when possible - makes it easier to track what code
+    references specific EvidenceKeys
+    """
+
     AUTOPOPULATE = 'autopopulate'
     VARIANT_COORDINATE = 'variant_coordinate'
     G_HGVS = 'g_hgvs'
@@ -58,7 +64,7 @@ class SpecialEKeys:
 
     # POPULATED
     # Note: Some fields not here are populated - those with variantgrid_column
-    # and the pops - ie "pop_AFR" "pop_NFE" etc.
+    # and the pops - i.e. "pop_AFR" "pop_NFE" etc.
     AGE = "age"
     AGE_UNITS = "age_units"  # deleted now, but declared fo migrations
     ALLELE_DEPTH = 'allele_depth'
@@ -183,7 +189,7 @@ class EvidenceCategory:
     SIGN_OFF = 'SO'
     LITERATURE = 'L'
     # Summary data covers things like literature
-    # Things that are typically cross evidence concerns that have been bundled up
+    # Things that are typically cross-evidence concerns that have been bundled up
     # in one spot
 
     CHOICES = (
@@ -241,9 +247,11 @@ _ShareLevelData = typing.NamedTuple('ShareLevelData', [('index', int), ('label',
 
 @total_ordering
 class ShareLevel(ChoicesEnum):
-    _ignore_ = ['ALL_LEVELS', 'DISCORDANT_LEVEL_KEYS']
-    ALL_LEVELS: list['ShareLevel'] = []
-    DISCORDANT_LEVEL_KEYS: list[str] = []
+    # note the following aren't enums (thus the _ignore_) type is defined here, contents is defined below ShareLevel definition
+    _ignore_ = ['ALL_LEVELS', 'DISCORDANT_LEVEL_KEYS', '_DATA']
+    ALL_LEVELS: list['ShareLevel']
+    DISCORDANT_LEVEL_KEYS: list[str]
+    _DATA: dict['ShareLevel', _ShareLevelData]
 
     # These strings have to be <= 16 characters for choice field
     CURRENT_USER = 'user'

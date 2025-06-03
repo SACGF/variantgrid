@@ -1262,7 +1262,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 else:
                     pass
 
-            # normalise booleans if it's un-ambiguous what the value is meant to be
+            # normalise booleans if it's un-ambiguous what the value is meant to be,
             # otherwise leave the value as is to be caught by validation
             elif e_key.value_type == EvidenceKeyValueType.BOOLEAN:
                 if isinstance(value, list) and len(value) == 1:
@@ -1364,7 +1364,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             elif e_key.value_type == EvidenceKeyValueType.DATE:
                 try:
                     Classification.to_date(value)
-                except ValueError as ve:
+                except ValueError:
                     message = f"Invalid date (expect yyyy-mm-dd)"
                     cell.add_validation(code=ValidationCode.INVALID_DATE, severity='warning',
                                         message=message)
@@ -1517,7 +1517,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     initial_data=False,
                     revalidate_all=False,
                     ignore_if_only_patching: Optional[Set[str]] = None,
-                    patch_known_keys_only: Optional[bool]=None) -> ClassificationPatchResponse:
+                    patch_known_keys_only: Optional[bool] = None) -> ClassificationPatchResponse:
         """
             Creates a new ClassificationModification if the patch values are different to the current values
             Patching a value with the same value has no effect
@@ -1898,6 +1898,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if validations is not None:
                     if not isinstance(validations, list):
                         validations = [validations]  # just required to not blow up on legacy
+                    validations: list[dict]
                     for validation in validations:
                         if validation.get('severity') == 'error':
                             return True
@@ -2250,7 +2251,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices(), null=True, blank=True)
 
     @property
-    def imported_c_hgvs_obj(self) -> CHGVS:
+    def imported_c_hgvs_obj(self) -> Optional[CHGVS]:
         if c_hgvs := self.get(SpecialEKeys.C_HGVS):
             # remove any white space inside the c.HGVS
             c_hgvs = re.sub(r'\s+', '', c_hgvs)
@@ -2260,6 +2261,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             except ValueError:
                 pass
             return c_hgvs_obj
+        return None
 
     @property
     def allele_origin_bucket_obj(self) -> AlleleOriginBucket:

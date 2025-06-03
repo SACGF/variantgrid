@@ -21,6 +21,13 @@ from upload.models.models_enums import UploadedFileTypes, UploadStepOrigin, \
     UploadStepTaskType, VCFPipelineStage
 from upload.upload_processing import process_upload_pipeline
 
+
+"""
+A ClassificationImport is a batch of ImportedAlleleInfos that were part of an import.
+We can then create pipelines to resolve the variants attached 
+"""
+
+
 # MAX_VCF_FIELD_LENGTH = 131072
 MAX_VCF_FIELD_LENGTH = 1000  # while maximum is much larger than this, it indicated a problem
 
@@ -38,7 +45,7 @@ def process_classification_import(classification_import: ClassificationImport, i
     """ Classifications are submitted via API with evidence fields (e.g. HGVS) which we need to
         resolve to a single coordinate - ie link to Variant model.
         If the variant is in the database, link to it, otherwise we need to run it through the VCF import
-        pipeline to normalise and/or insert it.
+        pipeline to normalize and/or insert it.
 
         @see https://github.com/SACGF/variantgrid/wiki/Variant-Classification-Import-and-Liftover
         Batch variant classification submissions are broken up into 1 ClassificationImport per GenomeBuild """

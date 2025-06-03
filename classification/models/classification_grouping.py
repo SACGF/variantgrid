@@ -20,7 +20,7 @@ from classification.models import Classification, ImportedAlleleInfo, EvidenceKe
 from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheDict, \
     ClassificationSummaryCacheDictPathogenicity, ClassificationSummaryCacheDictSomatic
 from genes.models import GeneSymbol
-from library.utils import first, strip_json
+from library.utils import strip_json
 from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
 

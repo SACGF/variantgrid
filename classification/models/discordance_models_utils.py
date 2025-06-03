@@ -83,9 +83,10 @@ class DiscordanceReportRowData(ExportRow):
         return self.discordance_report.resolution_text
 
     @export_column(label="Next Step")
-    def _next_step(self):
+    def _next_step(self) -> Optional[str]:
         if next_step := self.next_step:
             return pretty_label(next_step.name.lower())
+        return None
 
     @export_column(label="c.HGVS")
     def _chgvs(self):

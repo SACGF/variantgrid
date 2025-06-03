@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, Any, TypedDict, Literal, Tuple
+from typing import Optional, Any, TypedDict, Literal
 
 import django.dispatch
 from django.conf import settings
@@ -114,6 +114,7 @@ class ResolvedVariantInfo(TimeStampedModel):
             c_hgvs = CHGVS(self.c_hgvs)
             c_hgvs.genome_build = self.genome_build
             return c_hgvs
+        return None
 
     c_hgvs_compat = TextField(null=True, blank=True)
     """ c.HGVS with all bases explicit in the case of dels & dups """
@@ -186,7 +187,7 @@ class ResolvedVariantInfo(TimeStampedModel):
         variant = self.variant
         genome_build = self.genome_build
         imported_transcript = self.allele_info.get_transcript
-        hgvs_matcher = HGVSMatcher(genome_build=genome_build) #
+        hgvs_matcher = HGVSMatcher(genome_build=genome_build)
         # hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
         # version = hgvs_matcher.hgvs_converter.get_version()
 
@@ -244,7 +245,7 @@ TODO: Should I use an str, Enum instead of Literal for the sake of PyCharm intro
 """
 
 
-_VALIDATION_TO_SEVERITY: [str, ALLELE_INFO_VALIDATION_SEVERITY] = {
+_VALIDATION_TO_SEVERITY: dict[str, ALLELE_INFO_VALIDATION_SEVERITY] = {
     'transcript_type_not_supported': "E",
     'transcript_id_change': "E",
     'transcript_version_change': "W",
@@ -450,6 +451,7 @@ class ImportedAlleleInfo(TimeStampedModel):
     def imported_genome_build(self) -> Optional[GenomeBuild]:
         if patch_version := self.imported_genome_build_patch_version:
             return patch_version.genome_build
+        return None
 
     variant_coordinate = TextField(null=True, blank=True)  # One initially made by HGVS
     variant_coordinate_normalized = TextField(null=True, blank=True)  # Run through VCF normalization
@@ -620,11 +622,13 @@ class ImportedAlleleInfo(TimeStampedModel):
     def imported_c_hgvs_obj(self) -> Optional[CHGVS]:
         if self.imported_c_hgvs:
             return CHGVS(self.imported_c_hgvs)
+        return None
 
     @property
     def imported_g_hgvs_obj(self) -> Optional[CHGVS]:
         if self.imported_g_hgvs:
             return CHGVS(self.imported_g_hgvs)
+        return None
 
     def imported_hgvs_obj(self) -> Optional[CHGVS]:
         if c_hgvs := self.imported_c_hgvs_obj:
@@ -643,11 +647,12 @@ class ImportedAlleleInfo(TimeStampedModel):
         return list(sorted(all_chgvs, key=lambda x: (x.genome_build, x.sort_str)))
 
     @property
-    def get_transcript(self) -> str:
+    def get_transcript(self) -> Optional[str]:
         if self.imported_transcript:
             return self.imported_transcript
         elif self.imported_c_hgvs:
             return CHGVS(self.imported_c_hgvs).transcript
+        return None
 
     @property
     def gene_symbols(self) -> list[GeneSymbol]:
@@ -687,6 +692,7 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         if icon:
             return IconWithTooltip("ml-1 " + icon, tooltip)
+        return None
 
     @property
     def issue_icon(self) -> Optional[IconWithTooltip]:
@@ -797,13 +803,13 @@ class ImportedAlleleInfo(TimeStampedModel):
                     else:
                         new_dirty_message = f"????\n{cvc.message}\n{repr(existing_vc)} -> {repr(new_vc)}"
 
-        def c_hgvs_diff_if_applicable(original_chgvs: str, new_chgvs: str):
-
+        def c_hgvs_diff_if_applicable(original_chgvs: str, new_chgvs: str) -> Optional[list[str]]:
             original_chgvs_obj = CHGVS(original_chgvs)
             new_chgvs_obj = CHGVS(new_chgvs)
             if original_chgvs_obj.transcript and new_chgvs_obj.transcript:
                 c_hgvs_diffs = original_chgvs_obj.diff(new_chgvs_obj)
                 return chgvs_diff_description(c_hgvs_diffs, include_minor=True)
+            return None
 
         def is_c_hgvs_same_as_imported(genome_build: GenomeBuild, new_chgvs: str) -> bool:
             nonlocal self
@@ -921,7 +927,7 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     def set_variant_and_save(self, matched_variant: Variant, message: Optional[str] = None, force_update: bool = False, liftover_complete: bool = False):
         """
-        Call to update this object, and attached ResolvedVariantInfos (will check if matched_variant has an attached allele).
+        Call to update this object and attached ResolvedVariantInfos (will check if matched_variant has an attached allele).
         If the variant is not yet attached to an allele (or the attached allele doesn't have a variant for each build yet
         call again when it does).
         :param matched_variant: The variant (for the imported genome build) that we matched on.
@@ -940,7 +946,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             if message and message != self.message or self.dirty_message:
                 self.message = message
                 self.save()
-            return
+            return None
 
         self.matched_variant = matched_variant
         self.variant_coordinate_normalized = str(matched_variant.coordinate)

@@ -56,6 +56,8 @@ class ClinVarRequestException(Exception):
             return self.message
         elif self.exception_type == ClinVarRequestExceptionType.NOT_SUPPORTED_YET:
             return self.message
+        else:
+            return f"Unknown error {self.message}"
 
     @staticmethod
     def raise_for_status_code(code: int):

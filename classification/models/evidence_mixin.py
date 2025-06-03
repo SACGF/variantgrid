@@ -113,7 +113,7 @@ VCPatch = Dict[str, VCPatchValue]
 
 class EvidenceMixin:
     """
-    For methods common between Classification and ClassificationModification
+    For methods common between Classification and ClassificationModification.
     Specifically anything that simply needs there to be a dictionary of evidence
     """
 
@@ -287,6 +287,7 @@ class EvidenceMixin:
         options = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).matched_options(cs)
         if options:
             return options[0].get('vg')
+        return None
 
     @staticmethod
     def _clean_key(key):

@@ -1,6 +1,7 @@
 import json
 import re
 from datetime import timedelta
+from typing import Optional
 
 from django.contrib import messages, admin
 from django.db.models import QuerySet, TextField, Q
@@ -106,10 +107,11 @@ class ClinVarExportAdmin(ModelAdminBasics):
         }, **kwargs)
 
     @admin_list_column(short_description="Classification Created", order_field="classification_based_on__classification__created")
-    def classification_created(self, obj: ClinVarExport):
+    def classification_created(self, obj: ClinVarExport) -> Optional[str]:
         if cm := obj.classification_based_on:
             return f"{(timezone.now() - cm.classification.created).days} days old : {cm.classification.created.strftime('%Y-%m-%d')}"
             # return cm.classification.created.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        return None
 
     @admin_list_column(short_description="Condition",
                        order_field="condition__sort_text")
@@ -120,9 +122,10 @@ class ClinVarExportAdmin(ModelAdminBasics):
         return condition
 
     @admin_list_column("Latest Batch")
-    def latest_batch(self, obj: ClinVarExport):
+    def latest_batch(self, obj: ClinVarExport) -> Optional[int]:
         if submission := obj.clinvarexportsubmission_set.order_by('-pk').first():
             return submission.submission_batch_id
+        return None
 
     @admin_action("Add to ClinVar Submission Batch")
     def add_to_batch(self, request, queryset):
@@ -189,7 +192,7 @@ class ClinVarExportBatchAdmin(ModelAdminBasics):
         }, **kwargs)
 
     @admin_list_column(short_description="Record Count")
-    def record_count(self, obj: ClinVarExportBatch):
+    def record_count(self, obj: ClinVarExportBatch) -> int:
         return obj.clinvarexportsubmission_set.count()
 
     @admin_action("Reject")
@@ -203,10 +206,10 @@ class ClinVarExportBatchAdmin(ModelAdminBasics):
             ceb.regenerate()
 
     @admin_action("Download JSON")
-    def download_json(self, request, queryset: QuerySet[ClinVarExportBatch]):
+    def download_json(self, request, queryset: QuerySet[ClinVarExportBatch]) -> Optional[HttpResponse]:
         if queryset.count() != 1:
             messages.error(request, message="Error Can only download one batch at a time")
-            return
+            return None
 
         batch: ClinVarExportBatch = queryset.first()
 

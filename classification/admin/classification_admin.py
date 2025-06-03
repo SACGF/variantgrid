@@ -151,13 +151,15 @@ class ClassificationImportRunCountFilter(admin.SimpleListFilter):
             ("rematch", "Allele Re-Match"),
         ]
 
-    def queryset(self, request, queryset: QuerySet[ClassificationImportRun]):
+    def queryset(self, request, queryset: QuerySet[ClassificationImportRun]) -> Optional[QuerySet[ClassificationImportRun]]:
         if self.value() == "test":
             return queryset.filter(identifier__endswith="#classification_import_tool")
         elif self.value() == "rematch":
             return queryset.filter(identifier="admin-variant-rematch")
         elif self.value() == "import":
             return queryset.exclude(identifier__endswith="#classification_import_tool").exclude(identifier="admin-variant-rematch")
+        else:
+            return None
 
 
 @admin.register(ClassificationImportRun)
@@ -248,14 +250,16 @@ class ClassificationAdmin(ModelAdminBasics):
     list_select_related = ('lab', 'user', 'allele')
 
     @admin_list_column(short_description="Classification", order_field="summary__pathogenicity__sort")
-    def classification(self, obj: Classification):
+    def classification(self, obj: Classification) -> Optional[str]:
         if cm := ClassificationModification.objects.filter(is_last_published=True, classification=obj).first():
             return cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+        return None
 
     @admin_list_column(short_description="Somatic Clin Sig", order_field="summary__somatic__sort")
-    def somatic_clin_sig(self, obj: Classification):
+    def somatic_clin_sig(self, obj: Classification) -> Optional[str]:
         if cm := ClassificationModification.objects.filter(is_last_published=True, classification=obj).first():
             return cm.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
+        return None
 
     @admin_list_column(short_description="c.hgvs (37)", order_field="allele_info__grch37__c_hgvs")
     def grch37_c_hgvs(self, obj: Classification):
@@ -526,8 +530,7 @@ class ClassificationImportAdmin(ModelAdminBasics):
 
 @admin.register(ClinicalContext)
 class ClinicalContextAdmin(ModelAdminBasics):
-    list_display = (
-    'id', 'allele', 'name', 'status', 'allele_origin_bucket', 'modified', 'pending_cause', 'pending_status')
+    list_display = ('id', 'allele', 'name', 'status', 'allele_origin_bucket', 'modified', 'pending_cause', 'pending_status')
     search_fields = ('id', 'allele__pk', 'name')
 
     def get_form(self, request, obj=None, **kwargs):
@@ -1145,9 +1148,10 @@ class ImportedAlleleInfoDirtyFilter(admin.SimpleListFilter):
     def lookups(self, request, model_admin):
         return [("dirty", "Dirty")]
 
-    def queryset(self, request, queryset: QuerySet[ImportedAlleleInfo]):
+    def queryset(self, request, queryset: QuerySet[ImportedAlleleInfo]) -> Optional[QuerySet[ImportedAlleleInfo]]:
         if self.value() == "dirty":
             return queryset.filter(dirty_message__isnull=False)
+        return None
 
 
 class ImportedAlleleValidationFilter(admin.SimpleListFilter):

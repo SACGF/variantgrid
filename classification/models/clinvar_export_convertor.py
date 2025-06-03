@@ -150,6 +150,7 @@ class ClinVarExportData:
         if grouping := self.grouping:
             if pure_json := grouping.pure_json():
                 return pure_json.get("assertionCriteria")
+        return None
 
     @property
     def local_id(self) -> str:
@@ -161,7 +162,7 @@ class ClinVarExportData:
 
     def apply(self):
         """
-        Updates the underlying ClinVarExport record with this data, and updates the status
+        Updates the underlying ClinVarExport record with this data and updates the status
         """
         clinvar_export = self.clinvar_export
 
@@ -310,6 +311,7 @@ class ClinVarExportConverter:
                 "PMID:28492532",  # Sherloc criteria
                 "PMID:30192042",  # Recommendations for interpreting the loss of function PVS1 ACMG/AMP variant criterion
             }
+        return False
 
     @property
     def clinvar_key(self) -> ClinVarKey:
@@ -332,7 +334,7 @@ class ClinVarExportConverter:
             if text := self.classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY):
                 request_ids = db_citation_regexes.search(text)
         else:
-            # non citation refs will be ignored
+            # non-citation refs will be ignored
             request_ids = self.classification_based_on.db_refs
 
         citation_list = []
@@ -372,7 +374,7 @@ class ClinVarExportConverter:
             return value
 
     def convert_date(self, value: str) -> ValidatedJson:
-        # doesn't so much convert a date, as makes sure it's YYYY-MM-DD and is valid, e.g. not 2024-13-43
+        # doesn't so much convert a date, as makes sure it's YYYY-MM-DD and is valid, e.g., not 2024-13-43
         if not CuratedDate.convert_classification_date_str(value):
             return ValidatedJson(value, JsonMessages.error("Invalid date"))
         return ValidatedJson(value)
@@ -583,6 +585,7 @@ class ClinVarExportConverter:
                 for possible_assertion_method in ClinVarExportAssertionMethod.objects.filter(export_type=export_type_bucket).order_by('id').all():
                     if possible_assertion_method.matches(assertion_criteria):
                         return assertion_criteria, possible_assertion_method
+        return None
 
     @property
     def json_assertion_criteria(self) -> ValidatedJson:

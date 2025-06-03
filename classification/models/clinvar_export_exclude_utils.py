@@ -30,7 +30,7 @@ def published(sender,
               **kwargs):  # pylint: disable=unused-argument
     """
     On publishing of a classification, see if if it matches the criteria of the clinvar key
-    and update it's ignore clinvar properties accordingly
+    and update its ignore clinvar properties accordingly
     (will have no effect if ClinVarKey is not configured)
     """
 
@@ -144,7 +144,7 @@ class ClinVarExcludePatternUtil:
 
     def matching_exclude_patterns(self, record: EvidenceMixin) -> Optional[list[ClinVarKeyExcludePattern]]:
         """
-        Return list of exclude patterns that the record has failed
+        Return a list of exclude patterns that the record has failed
         """
         if not self.exclude_patterns:
             return None

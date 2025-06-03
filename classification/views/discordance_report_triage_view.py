@@ -53,6 +53,7 @@ class DiscordanceReportTriageView(AjaxFormView[DiscordanceReportTriage]):
                     "next_step": discordance_report_row.next_step,
                     "report": discordance_report
                 }
+            return None
 
         return LazyRender(
             template_name="classification/discordance_report_triage_detail.html",

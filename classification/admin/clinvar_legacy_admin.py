@@ -1,8 +1,7 @@
 from django.db.models import QuerySet
 
 from classification.models.clinvar_legacy import ClinVarLegacy
-from classification.services.clinvar_legacy_services import ClinVarLegacyImporter, \
-    clinvar_legacy_match_alleles_for_query
+from classification.services.clinvar_legacy_services import clinvar_legacy_match_alleles_for_query
 from snpdb.admin_utils import ModelAdminBasics, admin_action
 from django.contrib import admin
 

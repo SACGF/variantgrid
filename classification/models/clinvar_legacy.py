@@ -1,5 +1,4 @@
 from typing import Optional
-from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import TextChoices
 from django.urls import reverse
@@ -37,7 +36,7 @@ class ClinVarLegacy(TimeStampedModel):
     Once loaded in, we can then try to match them to ClinVarExport records, then copy the SCVs into the ClinVarExports
     so VariantGrid becomes the custodian of those records, rather than us creating duplicates.
 
-    See ClinVarlegacyService for the loading of the data and matching it alleles
+    See ClinVarlegacyService for the loading of the data and matching its alleles
     """
 
     class Meta:

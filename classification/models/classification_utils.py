@@ -4,7 +4,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from functools import reduce, cached_property
-from typing import List, Set, Optional, Union, Any, Dict, Iterable
+from typing import List, Set, Optional, Union, Any, Dict, Iterable, Tuple
 
 from django.contrib.auth.models import User
 from django.db.models import Q
@@ -64,7 +64,7 @@ class ClassificationPatchResponse(VarsDict):
         self.deleted = self.deleted or other.deleted
         self.published = self.published or other.published
         self.saved = self.saved or other.saved
-        # classification json is a hard field to merge, just take the 2nd?
+        # classification JSON is a hard field to merge, just take the 2nd?
         self.classification_json = other.classification_json or self.classification_json
         # status is a hard field to merge
         return self
@@ -108,7 +108,7 @@ class ValidationMerger:
     """
 
     @staticmethod
-    def union_send_responses(tuples: Iterable['ValidationMerger']) -> 'ValidationMerger':
+    def union_send_responses(tuples: Iterable[Tuple[Any, 'ValidationMerger']]) -> 'ValidationMerger':
         validations = [v[1] for v in tuples]
         merged = ValidationMerger()
         for vm in validations:

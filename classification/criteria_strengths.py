@@ -145,8 +145,8 @@ class CriteriaPointScore:
     @staticmethod
     def most_extreme_point_score(scores: Iterable['CriteriaPointScore']) -> 'CriteriaPointScore':
         """
-        Return the ACMG Criteria with the largest absolute points (e.g. -4 is more extreme than 3)
-        If any record with criteria has non-standard ACMG criteria, mark the result as non-standard
+        Return the ACMG Criteria with the largest absolute points (e.g. -4 is more extreme than 3).
+        If any record with criteria has non-standard ACMG criteria, mark the result as non-standard.
         :param scores: A list of scores to inspect for the most extreme score
         :return: The most extreme score, or NO_CRITERIA if none of the scores has_criteria
         """
@@ -224,10 +224,12 @@ class CriteriaStrengths:
                 return [self.strength_map.get(part) or CriteriaStrength(EvidenceKeyMap.cached_key(part), None) for part in parts]
 
             return self.strength_map.get(item.lower()) or CriteriaStrength(EvidenceKeyMap.cached_key(item), None)
+        return None
 
     def __contains__(self, item) -> bool:
         if isinstance(item, str):
             return item.lower() in self.strength_map.keys()
+        return False
 
     @property
     def has_non_standard_strengths(self):

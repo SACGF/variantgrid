@@ -17,7 +17,7 @@ class ClassificationReportTemplate(TimeStampedModel):
     @staticmethod
     def preferred_template_for(c: ClassificationModification) -> Optional['ClassificationReportTemplate']:
         """
-        :param c: The classification that we're generating a report template for, in future the allele origin bucket of hte
+        :param c: The classification that we're generating a report template for, in future the allele origin bucket of the
         classification will most likely help define the template
         :return: A report template
         """

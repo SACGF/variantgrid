@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import Optional
+from typing import Optional, Any
 
 from django.contrib.auth.models import User
 from django.db.models import Q, QuerySet
@@ -15,6 +15,9 @@ from snpdb.variant_links import variant_link_info
 
 
 class VariantCard:
+    """
+    The "AlleleCard" on the allele page lists details of the variants, done in "VariantCards"
+    """
 
     def __init__(self, user: User, allele: Allele, genome_build: GenomeBuild):
 
@@ -47,7 +50,7 @@ class VariantCard:
         self.variant = variant
 
     @cached_property
-    def allele_liftover_qs(self):
+    def allele_liftover_qs(self) -> QuerySet[AlleleLiftover]:
         return self.allele.alleleliftover_set.filter(liftover__genome_build=self.genome_build).order_by("liftover__created")
 
     @property
@@ -55,7 +58,7 @@ class VariantCard:
         return self.can_create_classification or self.can_create_variant
 
     @cached_property
-    def imported_allele_infos(self):
+    def imported_allele_infos(self) -> list[ImportedAlleleInfo]:
         return list(
             ImportedAlleleInfo.objects.filter(
                 allele=self.allele,
@@ -70,13 +73,13 @@ class VariantCard:
         return hgvs_g
 
     @property
-    def is_imported_directly(self):
+    def is_imported_directly(self) -> bool:
         if va := self.variant_allele:
             return va.origin in (AlleleOrigin.IMPORTED_TO_DATABASE.value, AlleleOrigin.IMPORTED_NORMALIZED.value)
         return False
 
     @property
-    def quick_link_data(self):
+    def quick_link_data(self) -> Optional[dict[str, Any]]:
         if variant := self.variant:
             return variant_link_info(variant, self.genome_build)
         return None
@@ -92,7 +95,7 @@ class VariantCard:
         # SpecialEKeys.CLINGEN_ALLELE_ID,
         # SpecialEKeys.GENOME_BUILD,
         # SpecialEKeys.UNIPROT_ID,
-        # SpecialEKeys.CLINVAR_VARIANTION_ID,
+        # SpecialEKeys.CLINVAR_VARIATION_ID,
         # SpecialEKeys.HGNC_ID,
         # SpecialEKeys.GENE_OMIM_ID,
         # SpecialEKeys.UNIPROT_ID
@@ -117,7 +120,7 @@ class AlleleCard:
         return ClinVarDetails.instance_from(allele=self.allele)
 
     @cached_property
-    def imported_allele_infos(self):
+    def imported_allele_infos(self) -> list[ImportedAlleleInfo]:
         return list(
             sorted(ImportedAlleleInfo.objects.filter(
                 allele=self.allele
@@ -125,7 +128,7 @@ class AlleleCard:
         )
 
     @property
-    def imported_allele_info_label(self):
+    def imported_allele_info_label(self) -> str:
         count = len(self.imported_allele_infos)
         if count == 1:
             return "1 Imported c.HGVS Resolving to this Allele"
