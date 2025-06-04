@@ -5,7 +5,6 @@ from django.db.models.query_utils import Q
 from django.shortcuts import get_object_or_404
 
 from annotation.models.models_phenotype_match import PATIENT_ONTOLOGY_TERM_PATH
-from library.django_utils import get_model_fields
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from ontology.grids import AbstractOntologyGenesGrid
 from ontology.models import OntologyTerm, OntologyService
@@ -103,7 +102,40 @@ class PatientRecordsGrid(JqGridUserRowConfig):
 class PatientRecordGrid(JqGridUserRowConfig):
     model = PatientRecord
     caption = 'PatientRecord'
-    fields = get_model_fields(PatientRecord)
+    fields = [
+        'id',
+        'patient_records__id',
+        'record_id',
+        'valid',
+        'validation_message',
+        'matched_sample_id',
+        'matched_patient__first_name',
+        'matched_patient__last_name',
+        'matched_specimen__reference_id',
+        'created_patient__first_name',
+        'created_patient__last_name',
+        'created_specimen__reference_id',
+        'sample_id',
+        'sample_name',
+        'patient_family_code',
+        'patient_first_name',
+        'patient_last_name',
+        'date_of_birth',
+        'date_of_death',
+        'sex',
+        'affected',
+        'consanguineous',
+        '_deceased',
+        'patient_phenotype',
+        'specimen_reference_id',
+        'specimen_description',
+        'specimen_collected_by',
+        'specimen_collection_date',
+        'specimen_received_date',
+        'specimen_mutation_type',
+        'specimen_nucleic_acid_source',
+        'specimen_age_at_collection_date'
+    ]
 
     def __init__(self, **kwargs):
         user = kwargs.get("user")
