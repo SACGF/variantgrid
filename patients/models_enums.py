@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 
 from library.utils import invert_dict, Constant
 
@@ -101,6 +102,15 @@ class Sex(models.TextChoices):
         sd = invert_dict(dict(Sex.choices))
         return sd.get(s.lower(), Sex.UNKNOWN)
 
+    @staticmethod
+    def get_q_handling_unknown(field: str, s: 'Sex') -> Q:
+        if s == Sex.MALE:
+            values = [Sex.MALE, Sex.UNKNOWN]
+        elif s == Sex.FEMALE:
+            values = [Sex.FEMALE, Sex.UNKNOWN]
+        else:
+            values = [Sex.MALE, Sex.FEMALE, Sex.UNKNOWN]
+        return Q(**{f"{field}__in": values})
 
 class GnomADPopulation(models.TextChoices):
     """ http://gnomad.broadinstitute.org/faq """
