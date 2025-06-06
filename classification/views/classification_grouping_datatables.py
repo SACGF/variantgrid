@@ -1,6 +1,6 @@
 import operator
 from functools import cached_property, reduce
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 from django.conf import settings
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
@@ -14,7 +14,7 @@ from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType
 from ontology.models import OntologyTerm, OntologyTermRelation, OntologySnake
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import UserSettings, GenomeBuild, Variant
+from snpdb.models import GenomeBuild, Variant
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, DC, SortOrder, CellData
 
 
@@ -24,7 +24,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
     This is taking over from ClassificationGroup (in memory merging of rows that then have to be all rendered client side)
     ClassificationColumns - the one classification per row
 
-    Filters are done between a combination of get_initial_query (when on the gene symbol page and we want the maximum
+    Filters are done between a combination of get_initial_query (when on the gene symbol page and if we want the maximum
     number of results to be how many groupings for that gene symbol, rather than presenting the user with
     showing 6 out of 30,000 records)
     and then on filter_query_set when it's a filter that the user can do above and beyond what the page initially loads
@@ -71,6 +71,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             if somatic_dict := row["latest_classification_modification__classification__summary__somatic"]:
                 somatic_dict["diff"] = diff_value
                 return somatic_dict
+        return None
 
     def render_pathogenic(self, row: CellData) -> JsonDataType:
         diff_value = row["pathogenic_difference"]
@@ -221,6 +222,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             dr = DiscordanceReport.objects.get(pk=discordance_report_id)
             dr.check_can_view(self.user)
             return dr
+        return None
 
     @cached_property
     def id_columns(self) -> List[str]:
@@ -256,27 +258,29 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 ).values_list('grouping_id', flat=True)
         )
 
-    def gene_symbol_filter(self, gene_symbol: str):
+    def gene_symbol_filter(self, gene_symbol: str) -> Optional[Q]:
         if gene_symbol := GeneSymbol.objects.filter(symbol=gene_symbol).first():
             all_strs = [gene_symbol.symbol] + gene_symbol.alias_meta.alias_symbol_strs
             all_strs = [gs.upper() for gs in all_strs]
             return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.GENE_SYMBOL, all_strs)
+        return None
         # FIXME add support for gene symbol alias
 
-    def scv_filter(self, scv: str):
+    def scv_filter(self, scv: str) -> Optional[Q]:
         if scv.startswith("SCV"):
             return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.CLINVAR_SCV, scv)
+        return None
 
-    def condition_filter(self, text, must_exist: bool = False):
+    def condition_filter(self, text, must_exist: bool = False) -> Optional[Q]:
         try:
             term = OntologyTerm.get_or_stub(text)
             if must_exist and term.is_stub:
-                return False
+                return None
 
             all_terms = {term}
             if mondo_term := OntologyTermRelation.as_mondo(term):
-                # if we have (or can translate) into a mondo term
-                # get all the direct parent and all the direct children terms
+                # if we have (or can translate) into a mondo term.
+                # get all the direct parent terms and all the direct children terms
                 # and then the OMIM equiv of them
                 mondo_terms = {mondo_term}
                 mondo_terms |= OntologySnake.get_children(mondo_term)
@@ -291,6 +295,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                                                              all_strs)
         except ValueError:
             pass
+        return None
 
     def row_columns(self) -> list[str]:
         return ["share_level"]
@@ -337,7 +342,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             ),
             RichColumn(
                 key=ImportedAlleleInfo.column_name_for_build(genome_build_preferred, "latest_allele_info"),
-                # sort_keys=['variant_sort', 'c_hgvs'],  # annotated column
+                # sort_keys=['variant_sort', 'c_hgvs'], # annotated column
                 sort_keys=[ImportedAlleleInfo.column_name_for_build(genome_build_preferred, "latest_allele_info",
                                                                     "genomic_sort")],
                 name='c_hgvs',

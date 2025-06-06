@@ -89,8 +89,8 @@ class VCBlobKeys(Enum):
 
 class ClassificationProcessError(Exception):
     """
-    Use to report critical errors that an API user should be able to see
-    e.g. referring to a non-existent lab
+    Use to report critical errors that an API user should be able to see.
+    e.g., referring to a non-existent lab
     """
 
 
@@ -151,7 +151,7 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
 
     def get_variants_qs(self) -> QuerySet[Variant]:
         # Note: This deliberately only gets classifications where the submitting variant was against this genome build
-        # ie we don't use Classification.get_variant_q_from_classification_qs() to get liftovers
+        # i.e., we don't use Classification.get_variant_q_from_classification_qs() to get liftovers
         contigs_q = Variant.get_contigs_q(self.genome_build)
         return Variant.objects.filter(contigs_q, importedalleleinfo__isnull=False)
 
@@ -162,7 +162,7 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
 @receiver(flag_collection_extra_info_signal, sender=FlagCollection)
 def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pylint: disable=unused-argument
     """
-    Allows us to provide extra info for FlagCollections attached to Classification
+    Allows us to provide extra info for FlagCollections attached to Classification.
     e.g. linking to the appropriate allele page, discordance report etc.
     :param flag_infos: Information on the flag collections being displayed to the user.
     Populates this with the extra info
@@ -396,7 +396,7 @@ class ConditionResolved:
         :return:
         """
         if self.is_multi_condition or other.is_multi_condition:
-            # when looking at multiple conditions, do not attempt merging unless we're the exact same
+            # when looking at multiple conditions, do not attempt to merge unless we're the exact same
             if self.terms == other.terms and self.join == other.join:
                 return 0
             else:
@@ -867,8 +867,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if self.can_write(user):
             return FlagPermissionLevel.OWNER
 
-        # view permission is on the modification (not the variant classification)
-        # but maybe it should be on both ?
+        # view permission is on the modification (not the classification)
+        # but maybe it should be on both?
         lp = self.last_published_version
         if lp and lp.can_view(user):
             return FlagPermissionLevel.USERS
@@ -1136,7 +1136,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                       initial_data=True,
                                       # revalidate all - so validations that only occur when specific fields change will still fire
                                       # even if no values are provided for that field, handy if there's validation that requires
-                                      # at least 1 of 2 fields to be present for example
+                                      # at least 1 of 2 fields to be present for the example
                                       revalidate_all=True)
         if save:
             try:
@@ -1300,7 +1300,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @cached_property
     def evidence_keys(self) -> EvidenceKeyMap:
         # note that this should be invalidated if the config changes (which would happen if
-        # assertion method is updated for example)
+        # assertion method is updated for the example)
         return EvidenceKeyMap.instance().with_overrides(self.evidence_key_overrides)
 
     def process_entry(self, cell: VCDataCell, source: str):
@@ -1349,7 +1349,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 # if the array is empty, treat that as a null value
                 value = None
             elif e_key.value_type != EvidenceKeyValueType.MULTISELECT and len(value) == 1:
-                # if we're not a multi-select key, and we have an array with 1 value in it
+                # if we're not a multi-select key, and we have an array with 1 value in it.
                 # use that 1 value
                 value = value[0]
 
@@ -1374,7 +1374,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 else:
                     pass
 
-            # normalise booleans if it's un-ambiguous what the value is meant to be,
+            # normalise booleans if it's unambiguous what the value is meant to be,
             # otherwise leave the value as is to be caught by validation
             elif e_key.value_type == EvidenceKeyValueType.BOOLEAN:
                 if isinstance(value, list) and len(value) == 1:
@@ -1659,7 +1659,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         key_dict: EvidenceKeyMap = self.evidence_keys
 
         use_evidence = VCDataDict(copy.deepcopy(self.evidence),
-                                  evidence_keys=self.evidence_keys)  # deep copy so don't accidentally mutate the data
+                                  evidence_keys=self.evidence_keys)  # deep copy so we don't accidentally mutate the data
 
         patch = VCDataDict(data=EvidenceMixin.to_patch(patch),
                            evidence_keys=self.evidence_keys)  # the patch we're going to apply on-top of the evidence
@@ -1722,7 +1722,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                         gene_symbol_cell.value = gene_symbol
 
                     elif not gene_symbol and gene_symbol_cell.value:
-                        # if gene symbol provided (but not in c.hgvs) inject it into it
+                        # if gene symbol provided (but not in c.HGVS) inject it into it
                         c_parts = c_parts.with_gene_symbol(gene_symbol_cell.value)
                         c_parts_cell.value = c_parts.full_c_hgvs
 
@@ -1740,7 +1740,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             for key in use_evidence.keys():
                 if key not in patch:
                     patch[key].wipe(WipeMode.SET_NONE)
-            # when making a new classification ensure we trigger mandatory fields
+            # when making a new classification record, ensure we trigger mandatory fields
             for e_key in key_dict.mandatory():
                 if e_key not in patch:
                     patch[e_key].wipe(WipeMode.SET_EMPTY)
@@ -2861,6 +2861,7 @@ class CuratedDate:
     def convert_date(self, evidence_key) -> Optional[date]:
         if date_str := self._modification.get(evidence_key):
             return CuratedDate.convert_classification_date_str(date_str)
+        return None
 
     @staticmethod
     def convert_classification_date_str(date_str: str) -> Optional[date]:
@@ -2870,21 +2871,25 @@ class CuratedDate:
             except ValueError:
                 # an invalid date should already cause a warning on the classification form
                 pass
+        return None
 
     @cached_property
     def curation_date(self) -> Optional[ClassificationDate]:
         if date_val := self.convert_date(SpecialEKeys.CURATION_DATE):
             return ClassificationDate(date_type=ClassificationDateType.CURATION, date=date_val)
+        return None
 
     @cached_property
     def curated_verified_date(self) -> Optional[ClassificationDate]:
         if date_val := self.convert_date(SpecialEKeys.CURATION_VERIFIED_DATE):
             return ClassificationDate(date_type=ClassificationDateType.VERIFIED, date=date_val)
+        return None
 
     @cached_property
     def sample_date(self) -> Optional[ClassificationDate]:
         if date_val := self.convert_date(SpecialEKeys.SAMPLE_DATE):
             return ClassificationDate(date_type=ClassificationDateType.SAMPLE_DATE, date=date_val)
+        return None
 
     @cached_property
     def created_date(self) -> ClassificationDate:
