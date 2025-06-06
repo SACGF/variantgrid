@@ -46,10 +46,10 @@ class ResolvedConditionTest(TestCase):
         m_bad_lung = OntologyTerm.get_or_stub(ConditionMock.MONDO_BAD_LUNG)
         o_big_toe = OntologyTerm.get_or_stub(ConditionMock.OMIM_BIG_TOE_BROKEN)
 
-        simple_big_toe = ConditionResolved(terms=[m_big_toe])
-        simple_toe = ConditionResolved(terms=[m_toe])
-        simple_bad_lung = ConditionResolved(terms=[m_bad_lung])
-        simple_o_big_toe = ConditionResolved(terms=[o_big_toe])
+        simple_big_toe = ConditionResolved.from_uncounted_terms(terms=[m_big_toe])
+        simple_toe = ConditionResolved.from_uncounted_terms(terms=[m_toe])
+        simple_bad_lung = ConditionResolved.from_uncounted_terms(terms=[m_bad_lung])
+        simple_o_big_toe = ConditionResolved.from_uncounted_terms(terms=[o_big_toe])
 
         self.assertFalse(simple_toe.is_multi_condition)
         self.assertEqual(m_big_toe, simple_big_toe.mondo_term)
@@ -63,8 +63,8 @@ class ResolvedConditionTest(TestCase):
         # two unrelated terms should return None
         self.assertIsNone(ConditionResolved.more_general_term_if_related(simple_big_toe, simple_bad_lung))
 
-        complex_combo_1 = ConditionResolved(terms=[m_bad_lung, m_big_toe], join=MultiCondition.CO_OCCURRING)
-        complex_combo_2 = ConditionResolved(terms=[m_big_toe, m_toe], join=MultiCondition.CO_OCCURRING)
+        complex_combo_1 = ConditionResolved.from_uncounted_terms(terms=[m_bad_lung, m_big_toe], join=MultiCondition.CO_OCCURRING)
+        complex_combo_2 = ConditionResolved.from_uncounted_terms(terms=[m_big_toe, m_toe], join=MultiCondition.CO_OCCURRING)
 
         # ensure limitations of multi-condition are obeyed
         self.assertTrue(complex_combo_1.is_multi_condition)

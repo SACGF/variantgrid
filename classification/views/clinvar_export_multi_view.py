@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from enum import IntEnum
 from functools import cached_property, reduce
-from typing import Iterable, Optional, Any
+from typing import Optional, Any
 
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Count, Q, QuerySet
+from django.db.models import  QuerySet
 from django.http import HttpRequest
 from django.shortcuts import render, redirect
 from django.urls import reverse
@@ -108,7 +108,7 @@ class ClinVarAlleleMultiExport:
 
     @property
     def common_ancestor_json(self) -> JsonObjType:
-        return ConditionResolved(terms=[self.common_ancestor]).to_json(include_join=False)
+        return ConditionResolved.from_uncounted_terms(terms=[self.common_ancestor]).to_json(include_join=False)
 
     def approve(self):
         all_conditions = set()
@@ -153,7 +153,7 @@ class ClinVarAlleleMultiExport:
         if len(conditions_that_matter) == 1:
             resulting_condition = conditions_that_matter[0]
         elif len(conditions_that_matter) > 1:
-            resulting_condition = ConditionResolved(terms=[self.common_ancestor])
+            resulting_condition = ConditionResolved.from_uncounted_terms(terms=[self.common_ancestor])
 
         if resulting_condition is None:
             return ClinVarAlleleMultiMergeOutput(clinvar_allele=self.clinvar_allele, preview=None, status=ClinVarAlleleMultiMergeStatus.NO_COMMON_CONDITION)

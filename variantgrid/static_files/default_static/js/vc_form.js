@@ -2275,45 +2275,48 @@ const VCForm = (function() {
 })();
 
 VCForm.format_condition = function(condition_json) {
-    if (!condition_json) {
-        return $('<span>', {text: "-", class:'no-value'});
-    }
-    let dom = $('<div>');
-    let domUsed = false;
-    if (condition_json.resolved_terms) {
+    if (condition_json) {
+        if (condition_json.references) {
+            let dom = $('<div>');
+            for (let condition_reference of condition_json.references) {
+                let term_id = condition_reference.term_id;
+                let name = condition_reference.name;
+                let count = condition_reference.count || 1;
 
-        let first = true;
-        for (let term of condition_json.resolved_terms) {
-            domUsed = true;
-            first = false;
-            $('<div>', {
-                class: 'ontology-term',
-                html: [
-                    $('<a>', {
-                        class: 'hover-link',
-                        html: $('<span>', {class: 'term-id', text: term.term_id}),
-                        href: Urls.ontology_term(term.term_id.replace(':', '_'))
-                    }),
-                    " ",
-                    $('<span>', {text: term.name, class: 'term-name'})
-                ]
-            }).appendTo(dom);
+                let termDom = $("<div>").appendTo(dom);
+                if (term_id) {
+                    $('<span>', {
+                        class: 'ontology-term',
+                        html: [
+                            $('<a>', {
+                                class: 'hover-link',
+                                html: $('<span>', {class: 'term-id', text: term_id}),
+                                href: Urls.ontology_term(term_id.replace(':', '_'))
+                            }),
+                            " ",
+                            $('<span>', {text: name, class: 'term-name'})
+                        ]
+                    }).appendTo(termDom);
+                } else {
+                    $('<span>', {text: name, class: 'ontology-term free-text'}).appendTo(termDom);
+                    termDom.addClass('semicolon-sep');
+                }
+                if (count > 1) {
+                    $('<span>', {text: ` x ${count}`, class: ''}).appendTo(termDom);
+                }
+            }
+            if (condition_json.resolved_terms && condition_json.resolved_terms.length > 1 && condition_json.resolved_join) {
+                $('<div>', {
+                    class: 'font-italic',
+                    text: condition_json.resolved_join === 'C' ? ' Co-occurring' : ' Uncertain'
+                }).appendTo(dom);
+            }
+            return dom;
+        } else if (condition_json.display_text) {
+            return $('<div>', {text: condition_json.display_text, class: 'ontology-term free-text semicolon-sep'});
         }
     }
-    if (condition_json.plain_text_terms) {
-        for (let term of condition_json.plain_text_terms) {
-            domUsed = true;
-            $('<div>', {text: term, class:'ontology-term free-text semicolon-sep'}).appendTo(dom);
-        }
-    }
-
-    if (!domUsed) {
-        return $('<div>', {class: 'ontology-term free-text', text: condition_json.display_text});
-    }
-    if (condition_json.resolved_terms && condition_json.resolved_terms.length > 1 && condition_json.resolved_join) {
-        $('<div>', {class: 'font-italic', text:condition_json.resolved_join === 'C' ? ' Co-occurring' : ' Uncertain'}).appendTo(dom);
-    }
-    return dom;
+    return $('<span>', {text: "-", class:'no-value'});
 };
 
 let VCTable = (function() {

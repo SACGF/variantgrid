@@ -1,4 +1,5 @@
 import operator
+from collections import Counter
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
 from typing import Optional, Set, Self, Tuple
@@ -16,7 +17,7 @@ from more_itertools import last
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
 from django.db import models, transaction
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
-    ConditionResolved
+    ConditionResolved, ConditionReference
 from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheDict, \
     ClassificationSummaryCacheDictPathogenicity, ClassificationSummaryCacheDictSomatic
 from genes.models import GeneSymbol
@@ -380,8 +381,10 @@ class ClassificationGrouping(TimeStampedModel):
             self.latest_allele_info = best_classification.classification.allele_info
 
             # TODO check for dirty values
-            all_terms: Set[OntologyTerm] = set()
-            all_free_text_conditions: Set[str] = set()
+            all_terms = Counter()
+            all_free_text_conditions = Counter()
+
+            all_terms.keys()
 
             # UPDATE CLASSIFICATION / CLINICAL SIGNIFICANCE
             # TODO - CLINICAL SIGNIFICANCE
@@ -391,19 +394,23 @@ class ClassificationGrouping(TimeStampedModel):
             all_pathogenic_values = set()
             all_tiers = set()
             all_levels = set()
+            condition_references: list[ConditionReference] = []
 
             for modification in all_modifications:
                 if condition := modification.classification.condition_resolution_obj:
-                    all_terms |= set(condition.terms)
-                    if plain_text := condition.plain_text:
-                        all_free_text_conditions.add(plain_text)
+                    for term in condition.terms:
+                        all_terms[term] += 1
+                    # all_terms |= set(condition.terms)
+                    # if plain_text := condition.plain_text:
+                    #     all_free_text_conditions.add(plain_text)
                 elif condition_text := modification.get(SpecialEKeys.CONDITION):
-                    all_free_text_conditions.add(condition_text)
+                    all_free_text_conditions[condition_text] += 1
+                    # all_free_text_conditions.add(condition_text)
 
                 all_zygosities |= set(modification.get_value_list(SpecialEKeys.ZYGOSITY))
 
                 # only store valid terms as quick links to the classification
-                all_terms = {term for term in all_terms if term.is_valid_for_condition}
+                # all_terms = {term for term in all_terms if term.is_valid_for_condition}
                 # self._update_conditions(all_terms)
                 summary_dict: ClassificationSummaryCacheDict = modification.classification.summary
 
@@ -428,10 +435,16 @@ class ClassificationGrouping(TimeStampedModel):
             all_zygosities = list(sorted(evidence_map[SpecialEKeys.ZYGOSITY].sort_values(all_zygosities)))
             self.zygosity_values = all_zygosities
 
-            self.conditions = strip_json(ConditionResolved(
-                terms=list(sorted(all_terms)),
-                plain_text_terms=list(sorted(all_free_text_conditions))
-            ).to_json(include_join=False))
+            # self.conditions = strip_json(ConditionResolved.from_uncounted_terms(
+            #     terms=list(sorted(all_terms)),
+            #     plain_text_terms=list(sorted(all_free_text_conditions))
+            # ).to_json(include_join=False))
+            for term, count in all_terms.items():
+                condition_references.append(ConditionReference(term=term, count=count))
+            for text, count in all_free_text_conditions.items():
+                condition_references.append(ConditionReference(name=text, count=count))
+            condition_references.sort()
+            self.conditions = strip_json(ConditionResolved(references=condition_references).to_json())
 
             self.classification_count = len(all_modifications)
 

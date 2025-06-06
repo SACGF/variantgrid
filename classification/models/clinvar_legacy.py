@@ -84,7 +84,7 @@ class ClinVarLegacy(TimeStampedModel):
     @property
     def condition_obj(self) -> Optional[ConditionResolved]:
         if identifier := self.your_condition_identifier:
-            return ConditionResolved(terms=[OntologyTerm.get_or_stub(identifier)])
+            return ConditionResolved.from_uncounted_terms(terms=[OntologyTerm.get_or_stub(identifier)])
         return None
 
     @property

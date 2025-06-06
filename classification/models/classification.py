@@ -1,13 +1,13 @@
 import copy
 import re
 import uuid
+import pydantic
 from collections import Counter, namedtuple
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta, date
 from enum import Enum, StrEnum
 from functools import cached_property
 from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict, Tuple, Set
-
 import django.dispatch
 from datetimeutc.fields import DateTimeUTCField
 from dateutil.tz import gettz
@@ -211,37 +211,116 @@ def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pyli
         flag_infos.set_extra_info(vc.flag_collection_id, context, source_object=vc)
 
 
-class ConditionResolvedTermDict(TypedDict):
+class ConditionResolvedReferenceDict(TypedDict):
+    term_id: Optional[str]
+    name: str  # name of the term if term_id is provided, otherwise from a plain text condition
+    count: Optional[int]  # assumed to be 1 if not provided
+
+
+class ConditionResolvedTermDict(TypedDict, total=False):
+    """
+    DEPRECATED, please use ConditionResolvedReferenceDict instead
+    """
     term_id: str
     name: str
 
 
 class ConditionResolvedDict(TypedDict, total=False):
     """
-    Structure of data used to cached resolved condition text again a classification
+    Structure of data used to cached resolved condition text again a classification.
+    Used to use "resolved_terms" and "plain_text_terms" to store matched OntologyIDs and plain text conditions
+    respectively, but now both those are bundled into references.
+    Fields are still defined for reading pre-existing JSON.
     """
     display_text: str  # plain text to show to users if not in a position to render links
     sort_text: str  # lower case representation of description
     resolved_terms: list[ConditionResolvedTermDict]
+    """
+    DEPRECATED, please use references instead
+    """
+
     plain_text_terms: list[str]  # A full list of unresolved plain text conditions
+    """
+    DEPRECATED, please use references instead
+    """
+
     resolved_join: str
+
+    references: list[ConditionResolvedReferenceDict]  # new method of saving counts
+
+
+@pydantic.dataclasses.dataclass(frozen=True, config=pydantic.ConfigDict(arbitrary_types_allowed=True))
+class ConditionReference:
+    """
+    Represents an OntologyTerm (just provide the OntologyTerm) or
+    Free condition text (just provide name)
+    as well as a count of how many times they've appeared.
+    Count will be more meaningful when looking at a group of records rather than individual.
+    """
+
+    term: Optional[OntologyTerm] = None
+    name: Optional[str] = None
+    count: int = 1
+
+    @property
+    def full_text(self) -> str:
+        if term := self.term:
+            return f"{term.pk} {self.name}"
+        else:
+            return self.name
+
+    def to_json(self) -> ConditionResolvedReferenceDict:
+        result: ConditionResolvedReferenceDict = {}
+        if term := self.term:
+            result["term_id"] = term.id
+            result["name"] = term.name
+        else:
+            result["name"] = self.name
+        if count := self.count:
+            result["count"] = count
+        return result
+
+    def __lt__(self, other) -> bool:
+        if self.term and other.term:
+            return self.term < other.term
+        if not self.term and not other.term:
+            return self.name < other.name
+        if self.term:
+            return False
+        return True
 
 
 @dataclass(frozen=True)
 class ConditionResolved:
-    terms: List[OntologyTerm]
-    plain_text_terms: List[str] = None
+    # terms: list[OntologyTerm]
+    # plain_text_terms: list[str] = None
+    references: list[ConditionReference]
     join: Optional['MultiCondition'] = None
     plain_text: Optional[str] = None  # fallback, not populated in all contexts
 
-    def __hash__(self):
-        hash_total = 0
-        if terms := self.terms:
-            for t in terms:
-                hash_total += hash(t)
-        hash_total += hash(self.join, )
-        hash_total += hash(self.plain_text)
-        return hash_total
+    @property
+    def terms(self) -> list[OntologyTerm]:
+        return [t.term for t in self.references if t.term is not None]
+
+    @property
+    def plain_text_terms(self) -> list[str]:
+        # TODO used to return None where it now returns []
+        # but some code puts this directly into JSON
+        return [t.name for t in self.references if t.term is None]
+
+    @staticmethod
+    def from_uncounted_terms(
+            terms: list[OntologyTerm] = None,
+            plain_text_terms: list[str] = None,
+            join: Optional['MultiCondition'] = None,
+            plain_text: Optional[str] = None
+    ) -> 'ConditionResolved':
+        references: list[ConditionReference] = []
+        if terms:
+            references += [ConditionReference(term=term) for term in terms]
+        if plain_text_terms:
+            references += [ConditionReference(name=plain_text_term) for plain_text_term in plain_text_terms]
+        return ConditionResolved(references=references, join=join, plain_text=plain_text)
 
     @property
     def summary(self) -> str:
@@ -256,22 +335,38 @@ class ConditionResolved:
 
     @staticmethod
     def from_dict(condition_dict: ConditionResolvedDict) -> 'ConditionResolved':
-        terms = [OntologyTerm.get_or_stub_cached(term.get("term_id")) for term in condition_dict.get("resolved_terms")]
-        join = None
-        if len(terms) > 1:
-            from classification.models import MultiCondition
-            join = MultiCondition(condition_dict.get("resolved_join"))
+        join: Optional['MultiCondition'] = None
+        plain_text = condition_dict.get("display_text")
 
-        terms.sort()
-        return ConditionResolved(
-            terms=terms,
-            plain_text_terms=condition_dict.get("plain_text_terms"),
-            join=join
-        )
+        if resolved_join_text := condition_dict.get("resolved_join"):
+            from classification.models import MultiCondition
+            join = MultiCondition(resolved_join_text)
+
+        if references_list := condition_dict.get("references"):
+            references: list[ConditionReference] = []
+            reference_dict: ConditionResolvedReferenceDict
+            for reference_dict in references_list:
+                term: Optional[OntologyTerm] = None
+                if term_id := reference_dict.get("term_id"):
+                    term = OntologyTerm.get_or_stub_cached(term_id)
+
+                references.append(ConditionReference(
+                    term=term,
+                    name=reference_dict.get("name"),
+                    count=reference_dict.get("count")
+                ))
+            references.sort()
+            return ConditionResolved(references=references, join=join, plain_text=plain_text)
+        else:
+            # old format with resolved terms and plain_text_terms
+            terms = list(sorted(OntologyTerm.get_or_stub_cached(term_dict.get("term_id")) for term_dict in condition_dict.get("resolved_terms")))
+            plain_text_terms = condition_dict.get("plain_text_terms")
+
+            return ConditionResolved.from_uncounted_terms(terms=terms, plain_text_terms=plain_text_terms, join=join, plain_text=plain_text)
 
     @property
     def is_multi_condition(self) -> bool:
-        return len(self.terms) > 1
+        return len(self.references) > 1
 
     @property
     def single_term(self) -> Optional[OntologyTerm]:
@@ -289,7 +384,7 @@ class ConditionResolved:
 
     def as_mondo_if_possible(self) -> 'ConditionResolved':
         if mondo_term := self.mondo_term:
-            return ConditionResolved(terms=[mondo_term])
+            return ConditionResolved.from_uncounted_terms(terms=[mondo_term])
         else:
             return self
 
@@ -337,7 +432,7 @@ class ConditionResolved:
             if not more_general.is_multi_condition and \
                     resolved_1.single_term.ontology_service != resolved_2.single_term.ontology_service:
                 if mondo_term := more_general.mondo_term:
-                    more_general = ConditionResolved(terms=[mondo_term])
+                    more_general = ConditionResolved.from_uncounted_terms(terms=[mondo_term])
             return more_general
 
         return None
@@ -359,42 +454,59 @@ class ConditionResolved:
 
     def to_json(self, include_join: bool = True) -> ConditionResolvedDict:
         jsoned: ConditionResolvedDict
-        if self.terms:
+        display_text = ", ".join((reference.full_text for reference in self.references))
+        sort_text = ", ".join([term.name for term in self.terms] + self.plain_text_terms).lower()
+        join = None
+        if len(self.references) > 1 and include_join:
             from classification.models import MultiCondition
-
-            def format_term(term: OntologyTerm) -> str:
-                if name := term.name:
-                    return f"{term.id} {name}"
-                return term.id
-
-            terms = self.terms
-            text = ", ".join([format_term(term) for term in terms])
-            if self.plain_text_terms:
-                text += ",".join(self.plain_text_terms)
-
-            sort_text = ", ".join([term.name for term in terms]).lower()
-            join: Optional[MultiCondition] = None
-            if len(terms) > 1 and include_join:
-                join = self.join or MultiCondition.NOT_DECIDED
-                text = f"{text}; {join.label}"
-
-            resolved_term_dicts: List[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in
-                                                                    self.terms]
-            jsoned: ConditionResolvedDict = {
-                "resolved_terms": resolved_term_dicts,
-                "resolved_join": join,
-                "plain_text_terms": self.plain_text_terms,
-                "display_text": text,
-                "sort_text": sort_text
-            }
-            return jsoned
-        else:
-            jsoned: ConditionResolvedDict = {
-                "plain_text_terms": self.plain_text_terms,
-                "display_text": ", ".join(pt.lower() for pt in self.plain_text) if self.plain_text else None,
-                "sort_text": ", ".join(pt.lower() for pt in self.plain_text) if self.plain_text else None
-            }
+            join = self.join or MultiCondition.NOT_DECIDED
+            display_text = f"{display_text}; {join.label}"
+        jsoned: ConditionResolvedDict = {
+            "references": [r.to_json() for r in self.references],
+            "resolved_join": join,
+            "display_text": display_text or self.plain_text,
+            "sort_text": sort_text
+        }
         return jsoned
+
+        #
+        #
+        # if self.terms:
+        #     from classification.models import MultiCondition
+        #
+        #     def format_term(term: OntologyTerm) -> str:
+        #         if name := term.name:
+        #             return f"{term.id} {name}"
+        #         return term.id
+        #
+        #     terms = self.terms
+        #     text = ", ".join([format_term(term) for term in terms])
+        #     if self.plain_text_terms:
+        #         text += ",".join(self.plain_text_terms)
+        #
+        #     sort_text = ", ".join([term.name for term in terms]).lower()
+        #     join: Optional[MultiCondition] = None
+        #     if len(terms) > 1 and include_join:
+        #         join = self.join or MultiCondition.NOT_DECIDED
+        #         text = f"{text}; {join.label}"
+        #
+        #     resolved_term_dicts: List[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in
+        #                                                             self.terms]
+        #     jsoned: ConditionResolvedDict = {
+        #         "resolved_terms": resolved_term_dicts,
+        #         "resolved_join": join,
+        #         "plain_text_terms": self.plain_text_terms,
+        #         "display_text": text,
+        #         "sort_text": sort_text
+        #     }
+        #     return jsoned
+        # else:
+        #     jsoned: ConditionResolvedDict = {
+        #         "plain_text_terms": self.plain_text_terms,
+        #         "display_text": ", ".join(pt.lower() for pt in self.plain_text) if self.plain_text else None,
+        #         "sort_text": ", ".join(pt.lower() for pt in self.plain_text) if self.plain_text else None
+        #     }
+        # return jsoned
 
     @cached_property
     def join_text(self) -> Optional[str]:
@@ -2288,7 +2400,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         if cr_obj := self.classification.condition_resolution_obj:
             return cr_obj
         else:
-            return ConditionResolved(terms=[], plain_text=self.get(SpecialEKeys.CONDITION))
+            return ConditionResolved.from_uncounted_terms(terms=[], plain_text_terms=[self.get(SpecialEKeys.CONDITION)])
 
     @staticmethod
     def column_name_for_build(genome_build: GenomeBuild, suffix: str = 'c_hgvs'):

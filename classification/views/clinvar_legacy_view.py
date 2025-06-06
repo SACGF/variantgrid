@@ -106,7 +106,7 @@ class ClinVarLegacyColumns(DatatableConfig[ClinVarLegacy]):
     def render_condition(self, row: CellData[ClinVarLegacy]) -> JsonDataType:
         if value := row.obj.your_condition_identifier:
             stub = OntologyTerm.get_or_stub(value)
-            return ConditionResolved(terms=[stub]).to_json()
+            return ConditionResolved.from_uncounted_terms(terms=[stub]).to_json()
         return None
 
     def render_classification(self, row: CellData[ClinVarLegacy]) -> JsonDataType:

@@ -581,7 +581,7 @@ def condition(condition_obj: Union[OntologyTerm, ConditionResolved],
               show_link: Optional[bool] = True,
               no_condition_message: bool = False):
     if isinstance(condition_obj, OntologyTerm):
-        condition_obj = ConditionResolved(terms=[condition_obj])
+        condition_obj = ConditionResolved.from_uncounted_terms(terms=[condition_obj])
     return {"condition": condition_obj, "limit": limit, "show_link": show_link, "no_condition_message": no_condition_message}
 
 
