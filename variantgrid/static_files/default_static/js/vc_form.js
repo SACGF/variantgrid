@@ -2283,7 +2283,7 @@ VCForm.format_condition = function(condition_json) {
                 let name = condition_reference.name;
                 let count = condition_reference.count || 1;
 
-                let termDom = $("<div>").appendTo(dom);
+                let termDom = $("<div>", {'class': 'semicolon-sep'}).appendTo(dom);
                 if (term_id) {
                     $('<span>', {
                         class: 'ontology-term',
@@ -2299,7 +2299,6 @@ VCForm.format_condition = function(condition_json) {
                     }).appendTo(termDom);
                 } else {
                     $('<span>', {text: name, class: 'ontology-term free-text'}).appendTo(termDom);
-                    termDom.addClass('semicolon-sep');
                 }
                 if (count > 1) {
                     $('<span>', {text: ` x ${count}`, class: ''}).appendTo(termDom);
