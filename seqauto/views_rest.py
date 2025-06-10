@@ -68,6 +68,8 @@ class VariantCallerViewSet(ModelViewSet):
 class SequencingRunViewSet(ModelViewSet):
     queryset = SequencingRun.objects.filter(hidden=False)
     serializer_class = SequencingRunSerializer
+    lookup_field = 'name'
+    lookup_value_regex = '[^/]+'
 
 
 class SampleSheetViewSet(ModelViewSet):
