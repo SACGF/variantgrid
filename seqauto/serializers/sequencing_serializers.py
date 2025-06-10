@@ -153,7 +153,7 @@ class SequencingRunSerializer(serializers.ModelSerializer):
 
     def get_vcf_set(self, obj):
         vcfs = []
-        for vsr in self.vcffromsequencingrun_set.all().order_by("pk"):
+        for vsr in obj.vcffromsequencingrun_set.all().order_by("pk"):
             vcf = vsr.vcf
             data = {
                 "pk": vcf.pk,
