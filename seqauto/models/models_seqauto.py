@@ -249,6 +249,15 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
             raise
 
     @staticmethod
+    def get_name_validation_errors(name: str) -> Optional[str]:
+        """ Returns a string of issues with the name """
+        errors = None
+        if settings.SEQAUTO_SEQUENCING_RUN_VALIDATE_ILLUMINA_FORMULA:
+            if not re.search(SEQUENCING_RUN_REGEX, name):
+                errors = f"Name does not match Illumina regex: '{SEQUENCING_RUN_REGEX}'"
+        return errors
+
+    @staticmethod
     def get_original_illumina_sequencing_run(modified_sequencing_run):
         # TAU rename the sequencing run dir with enrichment kit at the end - need to clean it
         original_sequencing_run = modified_sequencing_run
@@ -974,9 +983,8 @@ class QC(SeqAutoRecord):
 
     @property
     def genome_build(self):
-        try:
-            gb = GenomeBuild.objects.get(vcf__sample__samplefromsequencingsample__sequencing_sample=self.sequencing_sample)
-        except GenomeBuild.DoesNotExist:
+        gb = GenomeBuild.objects.filter(vcf__sample__samplefromsequencingsample__sequencing_sample=self.sequencing_sample).first()
+        if gb is None:
             logging.warning("%s: requested genome build, but don't know (no VCFs linked)", self)
             gb = GenomeBuild.legacy_build()
         return gb

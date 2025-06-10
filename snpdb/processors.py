@@ -62,6 +62,9 @@ def settings_context_processor(request):
     if settings.SOMALIER.get("enabled"):
         context['somalier_enabled'] = request.user.is_superuser or not settings.SOMALIER.get("admin_only")
 
+    if r_match := request.resolver_match:
+        context['url_name'] = r_match.url_name
+
     # We extend templates to provide the menus
     # For clinicians, set them all to a restricted view with less menus
     MENU_BASE_TEMPLATES = [
