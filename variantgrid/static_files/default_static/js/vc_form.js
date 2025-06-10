@@ -2287,7 +2287,7 @@ VCForm.format_condition = function(condition_json) {
             domUsed = true;
             first = false;
             $('<div>', {
-                class: 'ontology-term',
+                class: 'ontology-term semicolon-sep',
                 html: [
                     $('<a>', {
                         class: 'hover-link',
