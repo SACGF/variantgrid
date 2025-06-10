@@ -29,7 +29,6 @@ def settings_context_processor(request):
         'site_name': settings.SITE_NAME,
         'timezone': settings.TIME_ZONE,
         'top_right_search_form': SearchForm(search_allow_blank=True),
-        'url_name': request.resolver_match.url_name,
         'url_name_visible': get_visible_url_names(),
         'use_oidc': settings.USE_OIDC,  # whether user is managed by django or externally by open connect
         'user_feedback_enabled': settings.ROLLBAR.get('enabled', False) and settings.USER_FEEDBACK_ENABLED,
@@ -42,6 +41,9 @@ def settings_context_processor(request):
 
     if settings.SOMALIER.get("enabled"):
         context['somalier_enabled'] = request.user.is_superuser or not settings.SOMALIER.get("admin_only")
+
+    if r_match := request.resolver_match:
+        context['url_name'] = r_match.url_name
 
     # We extend templates to provide the menus
     # For clinicians, set them all to a restricted view with less menus

@@ -5,8 +5,8 @@ from rest_framework import serializers
 
 from seqauto.models import Sequencer, Experiment, VariantCaller, SequencingRun, SequencerModel, SampleSheet, \
     SequencingSampleData, SequencingSample, UnalignedReads, Flagstats, SampleSheetCombinedVCFFile, VCFFile, \
-    BamFile, Fastq, Aligner, EnrichmentKit, PairedEnd
-from seqauto.serializers import EnrichmentKitSerializer
+    BamFile, Fastq, Aligner, PairedEnd
+from seqauto.serializers import EnrichmentKitSerializer, EnrichmentKitSummarySerializer
 from snpdb.models import Manufacturer, DataState
 
 
@@ -127,11 +127,17 @@ class SequencingRunSerializer(serializers.ModelSerializer):
     name = serializers.CharField(validators=[])  # disable UniqueValidator
     sequencer = serializers.PrimaryKeyRelatedField(queryset=Sequencer.objects.all())
     experiment = serializers.PrimaryKeyRelatedField(queryset=Experiment.objects.all())
-    enrichment_kit = EnrichmentKitSerializer()
+    enrichment_kit = EnrichmentKitSummarySerializer()
+    vcf_set = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = SequencingRun
-        fields = ("path", "name", "date", "sequencer", "gold_standard", "bad", "hidden", "experiment", "enrichment_kit", "has_basecalls", "has_interop")
+        fields = ("path", "name", "date", "sequencer", "gold_standard", "bad", "hidden", "experiment", "enrichment_kit", "has_basecalls", "has_interop", "vcf_set")
+
+    def validate_name(self, value):
+        if error := SequencingRun.get_name_validation_errors(value):
+            raise serializers.ValidationError(error)
+        return value
 
     def create(self, validated_data):
         name = validated_data.get('name')
@@ -144,6 +150,22 @@ class SequencingRunSerializer(serializers.ModelSerializer):
             defaults=validated_data
         )
         return instance
+
+    def get_vcf_set(self, obj):
+        vcfs = []
+        for vsr in obj.vcffromsequencingrun_set.all().order_by("pk"):
+            vcf = vsr.vcf
+            data = {
+                "pk": vcf.pk,
+                "name": vcf.name,
+            }
+            try:
+                # This is set on ones sent up via API
+                data["path"] = vcf.uploadedvcf.uploaded_file.path
+            except:
+                pass
+            vcfs.append(data)
+        return vcfs
 
 
 class SequencingSampleDataSerializer(serializers.ModelSerializer):
