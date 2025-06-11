@@ -56,11 +56,13 @@ def file_to_array(filename, comment: Optional[str] = None, max_lines: Optional[i
 def file_or_filename_md5sum(file_or_filename: Union[IO, str]) -> str:
     m = md5()
     f: IO
-    if all(hasattr(file_or_filename, method) for method in ["read", "readlines"]):
+    if hasattr(file_or_filename, "read"):
         f = file_or_filename  # Already a file
     else:
-        f = open(file_or_filename)
-    m.update(f.read())
+        f = open(file_or_filename, "rb")
+
+    for chunk in iter(lambda: f.read(8192), b''):
+         m.update(chunk)
     return m.hexdigest()
 
 
