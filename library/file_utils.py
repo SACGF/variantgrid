@@ -4,6 +4,7 @@ import logging
 import os
 from pathlib import Path
 import subprocess
+from typing import Union, IO
 
 
 def file_or_filename(f, mode='r'):
@@ -57,6 +58,17 @@ def file_md5sum(filename):
     m = md5()
     with open(filename, "rb") as f:
         m.update(f.read())
+    return m.hexdigest()
+
+
+def file_or_filename_md5sum(file_or_filename: Union[IO, str]) -> str:
+    m = md5()
+    f: IO
+    if all(hasattr(file_or_filename, method) for method in ["read", "readlines"]):
+        f = file_or_filename  # Already a file
+    else:
+        f = open(file_or_filename)
+    m.update(f.read())
     return m.hexdigest()
 
 
