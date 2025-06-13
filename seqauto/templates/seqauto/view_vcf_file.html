@@ -1,6 +1,6 @@
 {% extends "seqauto/menu_sequencing_data_base.html" %}
 {% load static %}
-{% load model_helpers %}
+{% load ui_utils %}
 {% load seqauto_record_tags %}
 {% block title %}{{ vcf_file }}{% endblock %}
 {% block head %}
@@ -16,9 +16,10 @@
 	<img class='vcenter' src="{% static 'icons/vcf_64.png' %}" /> <b>{{ vcf_file }}</b>
 	</div>
 
-    <table class="table as_table">
-    {{ vcf_file | as_table | safe }}
-    </table>
+    <div>
+    {% labelled label="Path" %}{{ vcf_file.path }}{% endlabelled %}
+    {% labelled label="Variant Caller" %}{{ vcf_file.variant_caller }}{% endlabelled %}
+    </div>
 
 	{% record_data_state_helper vcf_file %}
 
