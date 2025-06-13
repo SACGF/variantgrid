@@ -13,6 +13,7 @@ import sys
 import traceback
 
 from library.guardian_utils import assign_permission_to_user_and_groups
+from library.utils import get_single_element
 from library.vcf_utils import cyvcf2_header_types, cyvcf2_header_get, VCFConstant,\
     cyvcf2_get_contig_lengths_dict
 from seqauto.models import SampleSheetCombinedVCFFile, VCFFile, VCFFromSequencingRun, \
@@ -338,21 +339,29 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
         vcf.fake_data = sequencing_run.fake_data
         vcf.save()
 
-        try:
-            vfsr = VCFFromSequencingRun.objects.get(vcf=vcf)
-            if replace_existing or vfsr.vcf.import_status in ImportStatus.DELETION_STATES:
-                vfsr.vcf = vcf  # OK to replace
-                vfsr.save()
-            else:
-                logging.warning("SR %s already linked to non-deleting vcf: %s (%s/%s)", sequencing_run,
-                                vfsr.vcf, vfsr.vcf.pk, vfsr.vcf.import_status)
-        except VCFFromSequencingRun.DoesNotExist:
-            # We also have unique_together on sequencing_run/variant_caller
+        samples_by_sequencing_sample = backend_vcf.get_samples_by_sequencing_sample()
+
+        # We have unique_together on sequencing_run/variant_caller
+        if backend_vcf.combo_vcf:
+            # There can only be 1 combo vcf file per run / variant caller
             VCFFromSequencingRun.objects.update_or_create(sequencing_run=sequencing_run,
                                                           variant_caller=backend_vcf.variant_caller,
                                                           defaults={"vcf": vcf})
+        elif backend_vcf.vcf_file:
+            # Single sample VCF - we'll enforce uniqueness by just deleting any old ones against this sequencing sample
+            # That has null variant caller
+            sequencing_sample = get_single_element(samples_by_sequencing_sample)
+            existing = VCFFromSequencingRun.objects.filter(vcf__sample__in=sequencing_sample.samplefromsequencingsample_set.values_list("sample"),
+                                                           variant_caller__isnull=True)
+            if existing.exists():
+                existing_vcfs = ", ".join([vfsr.vcf for vfsr in existing])
+                logging.info("Removing existing VCFs linked against run: %s / sequencing_sample=%s",
+                             existing_vcfs, sequencing_sample)
+                existing.delete()
 
-        samples_by_sequencing_sample = backend_vcf.get_samples_by_sequencing_sample()
+            VCFFromSequencingRun.objects.create(sequencing_run=sequencing_run,
+                                                variant_caller=None,  # this flags single sample - won't hit unique_together
+                                                vcf=vcf)
 
         for sequencing_sample, sample in samples_by_sequencing_sample.items():
             modified_sample = False
