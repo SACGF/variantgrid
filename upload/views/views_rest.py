@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from library.file_utils import file_or_filename_md5sum
 from upload.models import UploadedFile
+from upload.uploaded_file_type import get_upload_data_for_uploaded_file
 from upload.views.views import handle_file_upload
 
 
@@ -43,8 +44,11 @@ class APIFileUploadView(APIView):
         if existing_ufs := list(UploadedFile.objects.filter(path=path).order_by("pk")):
             new_hash = file_or_filename_md5sum(django_uploaded_file)
             for existing_uf in existing_ufs:
-                existing_hash = file_or_filename_md5sum(existing_uf.uploaded_file.path)
-                if new_hash == existing_hash:
-                    return existing_uf
+                # Only look at uploaded files that have been successfully processed
+                upload_data = get_upload_data_for_uploaded_file(existing_uf)
+                if upload_data is not None:
+                    existing_hash = file_or_filename_md5sum(existing_uf.uploaded_file.path)
+                    if new_hash == existing_hash:
+                        return existing_uf
         return None
 
