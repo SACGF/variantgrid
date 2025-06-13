@@ -871,6 +871,10 @@ class VCFFile(SeqAutoRecord):
             up = None
         return up
 
+    @property
+    def sample_sheet(self) -> SampleSheet:
+        return self.bam_file.unaligned_reads.sequencing_sample.sample_sheet
+
     def load_from_file(self, seqauto_run, **kwargs):
         if not settings.SEQAUTO_IMPORT_VCF:
             raise DontAutoLoadException()
