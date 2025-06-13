@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db.models.aggregates import Count
+from django.db.models.query_utils import Q
 from django.http.response import HttpResponseRedirect, JsonResponse, HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls.base import reverse
@@ -170,12 +171,17 @@ def view_sequencing_run(request, sequencing_run_id, tab_id=0):
 
     sequencing_run.add_messages(request)
 
-    run_vcfs = []
-    try:
-        for vcf_for_run in sequencing_run.vcffromsequencingrun_set.all():
-            run_vcfs.append((vcf_for_run.variant_caller, vcf_for_run.vcf, vcf_for_run.vcf.can_view(request.user)))
-    except:
-        log_traceback()
+    vcf_types = {
+        "Combined VCF": Q(vcf__uploadedvcf__backendvcf__combo_vcf__isnull=False),
+        "Single Sample VCF": Q(vcf__uploadedvcf__backendvcf__vcf_file__isnull=False),
+    }
+
+    run_vcfs = defaultdict(list)
+    sr_vcf_qs = sequencing_run.vcffromsequencingrun_set.all()
+    for vcf_type, q in vcf_types.items():
+        for vcf_for_run in sr_vcf_qs.filter(q):
+            run_vcfs[vcf_type].append((vcf_for_run.get_variant_caller(), vcf_for_run.vcf, vcf_for_run.vcf.can_view(request.user)))
+
     context = {
         "sequencing_run": sequencing_run,
         "sequencing_run_form": sequencing_run_form,

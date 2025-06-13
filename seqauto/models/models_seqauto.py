@@ -531,6 +531,17 @@ class VCFFromSequencingRun(models.Model):
     class Meta:
         unique_together = ("sequencing_run", "variant_caller")
 
+    def get_variant_caller(self):
+        """ Because we can't do a schema change for VG3, we need to basically always store variant_caller as None
+            for single sample VCFs """
+        if self.variant_caller:
+            return self.variant_caller
+        try:
+            return self.vcf.uploadedvcf.backendvcf.variant_caller
+        except:
+            pass
+        return None
+
 
 class IlluminaFlowcellQC(SeqAutoRecord):
     sample_sheet = models.OneToOneField(SampleSheet, on_delete=CASCADE)
