@@ -305,17 +305,14 @@ def view_bam_file(request, bam_file_id):
 
 def view_vcf_file(request, vcf_file_id):
     vcf_file = get_object_or_404(VCFFile, pk=vcf_file_id)
-    form = forms.VCFFileForm(instance=vcf_file)
-
-    context = {"vcf_file": vcf_file,
-               'form': form}
+    context = {
+        "vcf_file": vcf_file
+    }
     return render(request, 'seqauto/view_vcf_file.html', context)
 
 
 def view_combo_vcf_file(request, combo_vcf_file_id):
     combo_vcf_file = get_object_or_404(SampleSheetCombinedVCFFile, pk=combo_vcf_file_id)
-    #form = forms.VCFFileForm(instance=vcf_file)
-
     context = {"combo_vcf_file": combo_vcf_file}
     return render(request, 'seqauto/view_combo_vcf_file.html', context)
 
