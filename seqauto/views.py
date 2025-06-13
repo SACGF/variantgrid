@@ -187,7 +187,7 @@ def view_sequencing_run(request, sequencing_run_id, tab_id=0):
         "sequencing_run": sequencing_run,
         "sequencing_run_form": sequencing_run_form,
         'tab_id': tab_id,
-        'run_vcfs': run_vcfs
+        'run_vcfs': dict(run_vcfs),
     }
 
     try:  # May not have sample sheet and die
