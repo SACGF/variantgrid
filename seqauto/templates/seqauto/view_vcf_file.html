@@ -1,5 +1,6 @@
 {% extends "seqauto/menu_sequencing_data_base.html" %}
 {% load static %}
+{% load model_helpers %}
 {% load seqauto_record_tags %}
 {% block title %}{{ vcf_file }}{% endblock %}
 {% block head %}
@@ -15,9 +16,9 @@
 	<img class='vcenter' src="{% static 'icons/vcf_64.png' %}" /> <b>{{ vcf_file }}</b>
 	</div>
 
-	<form>
-		{{ form.as_p }}
-	</form>
+    <table class="table as_table">
+    {{ vcf_file | as_table | safe }}
+    </table>
 
 	{% record_data_state_helper vcf_file %}
 
