@@ -255,7 +255,7 @@ class SequencingRun(SeqAutoRecord):
         return original_sequencing_run
 
     def get_flowcell_id(self) -> str:
-        run_name = self.get_name_validation_errors(self.name)
+        run_name = self.get_original_illumina_sequencing_run(self.name)
         return run_name.split("_")[-1]
 
     @staticmethod
