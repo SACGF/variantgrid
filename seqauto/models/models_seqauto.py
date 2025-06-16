@@ -444,7 +444,9 @@ class SequencingSample(models.Model):
             index2 = indexes[1]
         else:
             index2 = "NO_INDEX2_STORED"
-        params.update({"lane": self.lane or 1,
+        lane_num = self.lane or 1
+        params.update({"lane": lane_num,
+                       "lane_code": f"L{lane_num:03d}",
                        "sample_number": self.sample_number,
                        "sample_id": self.sample_id,
                        "sample_name": self.sample_name,
@@ -641,7 +643,7 @@ class Fastq(SeqAutoRecord):
         # New Diagnostic pipeline all FastQs have this simple format
         patterns = [
             "%(sample_id)s_R%(read)d.fastq.gz",
-            "%(sample_id)s_%(flowcell_id)s_%(index)s-%(index2)s_%(lane_num)s_%(read)s.fastq.gz",
+            "%(sample_id)s_%(flowcell_id)s_%(index)s-%(index2)s_%(lane_code)s_%(read)s.fastq.gz",
         ]
 
         params = sequencing_sample.get_params()
