@@ -254,6 +254,10 @@ class SequencingRun(SeqAutoRecord):
             original_sequencing_run = m.group(0)
         return original_sequencing_run
 
+    def get_flowcell_id(self) -> str:
+        run_name = self.get_name_validation_errors(self.name)
+        return run_name.split("_")[-1]
+
     @staticmethod
     def get_date_from_name(name) -> Optional[datetime.date]:
         date = None
@@ -268,6 +272,7 @@ class SequencingRun(SeqAutoRecord):
         params = {
             "sequencing_run": self.name,
             "sequencing_run_dir": self.path,
+            "flowcell_id": self.get_flowcell_id(),
             "original_sequencing_run": self.get_original_illumina_sequencing_run(self.name),
         }
         if self.enrichment_kit:
@@ -425,7 +430,7 @@ class SequencingSample(models.Model):
     sample_project = models.TextField(null=True)
     sample_number = models.IntegerField()
     lane = models.IntegerField(null=True)
-    barcode = models.TextField()
+    barcode = models.TextField()  # historically we stored 'index' in here. Now we store index1|index2
     enrichment_kit = models.ForeignKey(EnrichmentKit, null=True, on_delete=CASCADE)
     is_control = models.BooleanField(default=False)
     failed = models.BooleanField(default=False)
@@ -433,13 +438,23 @@ class SequencingSample(models.Model):
 
     def get_params(self):
         params = self.sample_sheet.get_params()
+        indexes = self.barcode.split("|")
+        index = indexes[0]
+        if len(indexes) > 1:
+            index2 = indexes[1]
+        else:
+            index2 = "NO_INDEX2_STORED"
         params.update({"lane": self.lane or 1,
                        "sample_number": self.sample_number,
                        "sample_id": self.sample_id,
                        "sample_name": self.sample_name,
                        "sample_project": self.sample_project or '',
                        "sample_name_underscores": self.sample_name.replace("-", "_"),
-                       "barcode": self.barcode})
+                       "barcode": index,
+                       "index": index,
+                       "index2": index2})
+        if len(indexes) == 2:
+            params["index2"] = indexes[1]
 
         if self.enrichment_kit is not None:
             params['enrichment_kit'] = self.enrichment_kit.name
@@ -624,7 +639,10 @@ class Fastq(SeqAutoRecord):
         #     raise ValueError(msg)
 
         # New Diagnostic pipeline all FastQs have this simple format
-        patterns = ["%(sample_id)s_R%(read)d.fastq.gz"]
+        patterns = [
+            "%(sample_id)s_R%(read)d.fastq.gz",
+            "%(sample_id)s_%(flowcell_id)s_%(index)s-%(index2)s_%(lane_num)s_%(read)s.fastq.gz",
+        ]
 
         params = sequencing_sample.get_params()
         r1_params = {"read": 1}
