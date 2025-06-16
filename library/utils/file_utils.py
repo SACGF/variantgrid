@@ -2,6 +2,7 @@ import gzip
 import logging
 import os
 import subprocess
+from hashlib import md5
 from pathlib import Path
 from typing import Optional, Union, IO
 

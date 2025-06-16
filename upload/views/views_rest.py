@@ -6,7 +6,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
 
-from library.file_utils import file_or_filename_md5sum
+from library.utils import file_or_filename_md5sum
 from upload.models import UploadedFile
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file
 from upload.views.views import handle_file_upload
