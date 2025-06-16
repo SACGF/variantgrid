@@ -175,6 +175,7 @@ def samplesheet_is_valid(sample_sheet_df):
                     msg += "Column: %s, row value: '%s', illegal char = '%s' \n" % (column, row, char)
                     return False, msg
 
+    # The barcode should be consistent across a flowcell as if any index2 is used they must always have it
     barcode_lengths = sample_sheet_df["barcode"].str.len().value_counts()
     if len(barcode_lengths) != 1:
         msg = f"Barcodes must be all the same size, was: {barcode_lengths}"
