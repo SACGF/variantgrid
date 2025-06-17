@@ -47,6 +47,7 @@ def create_canonical_transcript_collection(genome_build: GenomeBuild, annotation
                                                               file_md5sum=file_md5hash)
 
     if gene_matcher is None:
+        logging.info("Loading GeneSymbolMatcher")
         gene_matcher = GeneSymbolMatcher()
 
     # Comment at top is: gene, ChosenTranscript, CanonicalTranscript, AllTranscripts

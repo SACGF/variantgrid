@@ -23,6 +23,8 @@ class Command(BaseCommand):
         build_name = options["genome_build"]
         filename = options['filename']
 
+        logging.basicConfig(level=logging.INFO)
+
         ac_dict = invert_dict(dict(AnnotationConsortium.choices))
         annotation_consortium = ac_dict[annotation_consortium_name]
         genome_build = GenomeBuild.get_name_or_alias(build_name)
