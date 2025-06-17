@@ -63,6 +63,7 @@ def create_canonical_transcript_collection(genome_build: GenomeBuild, annotation
     total = 0
     num_matched_transcript = 0
     num_matched_transcript_version = 0
+    batch_size = 2000
 
     for _, row in df.iterrows():
         total += 1
@@ -88,6 +89,10 @@ def create_canonical_transcript_collection(genome_build: GenomeBuild, annotation
                                  original_gene_symbol=original_gene_symbol,
                                  original_transcript=original_transcript)
         canonical_transcript_list.append(ct)
+        if len(canonical_transcript_list) >= batch_size:
+            logging.info("Inserted %d canonical transcripts", total)
+            CanonicalTranscript.objects.bulk_create(canonical_transcript_list)
+            canonical_transcript_list = []
 
     if canonical_transcript_list:
         CanonicalTranscript.objects.bulk_create(canonical_transcript_list)
