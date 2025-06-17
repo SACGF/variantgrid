@@ -1033,6 +1033,10 @@ class QC(SeqAutoRecord):
         QCExecSummary.load_for_qc(seqauto_run, self, **kwargs)
 
     def __str__(self):
+        if self.path:
+            name = os.path.basename(self.path)
+        else:
+            name = self.bam_file.name.split(".")[0]
         return f"QC {name_from_filename(self.path)} ({self.get_data_state_display()})"
 
 
