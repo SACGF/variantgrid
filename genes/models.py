@@ -2228,7 +2228,8 @@ class GeneCoverageCollection(RelatedModelsPartitionModel):
         gene_coverage_tuples = []
         gene_coverage_canonical_transcript_tuples = []
         warnings = []
-        unmatched_canonical_transcripts = set()
+        genes_with_matched_canonical = set()
+        unmatched_transcripts_by_gene = defaultdict(set)
 
         for _, row in gene_coverage_df.iterrows():
             original_gene_symbol = row["original_gene_symbol"]
@@ -2257,22 +2258,28 @@ class GeneCoverageCollection(RelatedModelsPartitionModel):
             if settings.SEQAUTO_QC_GENE_COVERAGE_STORE_CANONICAL:
                 if original_transcript in original_canonical_transcript_accessions:
                     gene_coverage_canonical_transcript_tuples.append((canonical_transcript_collection.pk,) + gc_tup)
+                    genes_with_matched_canonical.add(gene_symbol_id)
                 else:
-                    unmatched_canonical_transcripts.add(original_transcript)
+                    unmatched_transcripts_by_gene[gene_symbol_id].add(original_transcript)
 
-        num_unmatched = len(unmatched_canonical_transcripts)
-        num_matched = len(gene_coverage_canonical_transcript_tuples)
-        if num_unmatched > num_matched:
-            def get_examples(iterable):
-                return ", ".join(list(iterable)[:5])
-            sample_unmatched_transcripts = get_examples(unmatched_canonical_transcripts)
-            sample_canonical_transcripts = get_examples(original_canonical_transcript_accessions)
+        if settings.SEQAUTO_QC_GENE_COVERAGE_STORE_CANONICAL:
+            genes_with_unmatched_transcripts = set(unmatched_transcripts_by_gene.keys())
+            genes_no_match = genes_with_unmatched_transcripts - genes_with_matched_canonical
+            num_unmatched = len(genes_no_match)
+            num_matched = len(genes_with_matched_canonical)
+            if num_unmatched > num_matched:
+                def get_examples(iterable):
+                    return ", ".join(list(iterable)[:5])
 
-            message = (f"More unmatched transcripts ({num_unmatched}) than matched ({num_matched}). {enrichment_kit=} "
-                       f"{canonical_transcript_collection=} (this may be fall back if not set on kit) "
-                       f"Sample unmatched transcripts: {sample_unmatched_transcripts}. "
-                       f"Sample transcripts from canonical transcript collection: {sample_canonical_transcripts}. ")
-            raise ValueError(message)
+                first_transcripts_iter = (next(iter(v)) for v in unmatched_transcripts_by_gene.values())
+                sample_unmatched_transcripts = get_examples(first_transcripts_iter)
+                sample_canonical_transcripts = get_examples(original_canonical_transcript_accessions)
+
+                message = (f"More genes with NO matched transcripts ({num_unmatched}) than matched ({num_matched})."
+                           f"{enrichment_kit=} {canonical_transcript_collection=} (may be fall back if not set on kit) "
+                           f"Sample unmatched transcripts: {sample_unmatched_transcripts}. "
+                           f"Sample transcripts from canonical transcript collection: {sample_canonical_transcripts}. ")
+                raise ValueError(message)
 
         processing_dir = os.path.join(settings.IMPORT_PROCESSING_DIR, "gene_coverage",
                                       f"gene_coverage_collection_{self.pk}")
