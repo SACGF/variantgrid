@@ -56,15 +56,18 @@ def create_canonical_transcript_collection(genome_build: GenomeBuild, annotation
     CANONICAL_TRANSCRIPT_COLUMN = "CanonicalTranscript"
     COLUMNS = [GENE_SYMBOL_COLUMN, CHOSEN_TRANSCRIPT_COLUMN, CANONICAL_TRANSCRIPT_COLUMN, "AllTranscripts"]
 
-    df = pd.read_csv(filename, names=COLUMNS, index_col=None, sep='\t', comment='#', dtype=str)
+    batch_size = 2000
+    logging.info("Loading pd.DataFrame")
+    df = pd.read_csv(filename, names=COLUMNS, index_col=None, sep='\t', comment='#', dtype=str,
+                     iterator=True, chunksize=batch_size)
 
     transcript_versions_by_id = TranscriptVersion.transcript_versions_by_id(genome_build, annotation_consortium)
     canonical_transcript_list = []
     total = 0
     num_matched_transcript = 0
     num_matched_transcript_version = 0
-    batch_size = 2000
 
+    logging.info("Inserting to DB")
     for _, row in df.iterrows():
         total += 1
         original_gene_symbol = row[GENE_SYMBOL_COLUMN]
