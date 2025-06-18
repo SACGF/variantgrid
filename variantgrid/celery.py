@@ -41,10 +41,17 @@ if settings.SYNC_DETAILS and any(sd["enabled"] for sd in settings.SYNC_DETAILS.v
 
 # TODO - move this into settings???
 if all([settings.SEQAUTO_ENABLED, settings.SEQAUTO_SCAN_DISKS, settings.UPLOAD_ENABLED]):
-    app.conf.beat_schedule['seqauto-nightly-scan'] = {
-        'task': 'seqauto.tasks.scan_run_jobs.scan_run_jobs',
-        'schedule': HOUR_SECS * 8,
-    }
+    scan_run_jobs = 'seqauto.tasks.scan_run_jobs.scan_run_jobs'
+    app.conf.beat_schedule.update({
+        'seqauto-scan-06': {
+            'task': scan_run_jobs,
+            'schedule': crontab(hour=6, minute=0),
+        },
+        'seqauto-scan-19': {
+            'task': scan_run_jobs,
+            'schedule': crontab(hour=19, minute=0),
+        },
+    })
 
 SAPATH_ENABLED = any((a.startswith("sapath") for a in settings.INSTALLED_APPS))
 if SAPATH_ENABLED:
