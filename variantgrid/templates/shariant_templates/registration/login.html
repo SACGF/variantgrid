@@ -7,6 +7,13 @@
     .btn-login {
         animation: glow 1s infinite alternate;
     }
+    .number-box {
+        color: #444;
+        font-size: 1.2rem;
+    }
+    .number-box .big-num {
+        font-size: 2rem;
+    }
     @keyframes glow {
       from {
         box-shadow: 0 0 5px -5px #ccf;
@@ -47,7 +54,7 @@
                     </div>
                     <hr class="my-4"/>
 
-                    <p>Developed for <a class="external-link" href='https://www.australiangenomics.org.au'>Australian Genomics</a> as part of the project area “Genomics Diagnostics” to support the efficiency, quality and consistency of genomic diagnostic practice in Australia.</p>
+                    <p>Developed for <a class="external-link" href='https://www.australiangenomics.org.au/projects/shariant/'>Australian Genomics</a> as part of the project area “Genomics Diagnostics” to support the efficiency, quality and consistency of genomic diagnostic practice in Australia.</p>
                     <p><a class="external-link" href="https://www.cell.com/ajhg/fulltext/S0002-9297(22)00454-2">Shariant Paper (AJHG)</a></p>
                     <p><a class="external-link" href='https://www.australiangenomics.org.au/project-areas/genomic-diagnostics/'>About the Genomic Diagnostics project area</a></p>
 
@@ -62,6 +69,26 @@
                 <img src="{% static 'images/shariant_cloud.png' %}" style="max-width: 500px" />
                 </div>
             </div>
+        </div>
+    {% comment %}
+        <hr/>
+        <div class="row">
+            <div class="col-4 text-center number-box">
+                <div class="label">Some Stat</div>
+                <div class="big-num">40,000</div>
+            </div>
+
+            <div class="col-4 text-center number-box">
+                <div class="label">Some Stat</div>
+                <div class="big-num">40,000</div>
+            </div>
+
+            <div class="col-4 text-center number-box">
+                <div class="label">Some Stat</div>
+                <div class="big-num">40,000</div>
+            </div>
+        </div>
+    {% endcomment %}
     </div>
 
     <div class="footer fixed-bottom p-4 text-center">
