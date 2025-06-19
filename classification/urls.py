@@ -183,6 +183,8 @@ urlpatterns = [
     path('lab_gene_classification_counts', views.lab_gene_classification_counts, name='lab_gene_classification_counts'),
     path('clinical_significance_change_data', views.clin_sig_change_data, name='clinical_significance_change_data'),
     path('autocomplete/EvidenceKey/', views_autocomplete.EvidenceKeyAutocompleteView.as_view(), name='evidence_key_autocomplete'),
+
+    path('public_info', views.view_public_info, name='classification_public_info')
 ]
 
 rest_urlpatterns = [
