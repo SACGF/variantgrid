@@ -1,4 +1,5 @@
 import copy
+import operator
 import re
 import uuid
 import pydantic
@@ -6,7 +7,7 @@ from collections import Counter, namedtuple
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta, date
 from enum import Enum, StrEnum
-from functools import cached_property
+from functools import cached_property, reduce
 from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict, Tuple, Set
 import django.dispatch
 from datetimeutc.fields import DateTimeUTCField
@@ -297,6 +298,14 @@ class ConditionResolved:
     references: list[ConditionReference]
     join: Optional['MultiCondition'] = None
     plain_text: Optional[str] = None  # fallback, not populated in all contexts
+
+    def __hash__(self) -> int:
+        hash_value = 34543
+        if join := self.join:
+            hash_value += hash(join)
+        if references := self.references:
+            hash_value += reduce(operator.add, map(hash, self.references))
+        return hash_value
 
     @property
     def terms(self) -> list[OntologyTerm]:
