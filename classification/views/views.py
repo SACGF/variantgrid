@@ -2,7 +2,7 @@ import json
 import mimetypes
 import re
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional, Any, Union
 
 import rest_framework
 from crispy_forms.bootstrap import FieldWithButtons
@@ -42,6 +42,8 @@ from classification.models.classification import ClassificationModification
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
+from classification.services.public_summary_data import ClassificationPublicSummaryData
+from classification.views.classification_dashboard_view import ClassificationDashboard
 from classification.views.classification_datatables import ClassificationColumns
 from classification.views.exports import ClassificationExportFormatterCSV, ClassificationExportFormatterRedCap
 from classification.views.exports.classification_export_filter import ClassificationFilter
@@ -823,3 +825,10 @@ def clin_sig_change_data(request):
     # response['Last-Modified'] = modified_str
     response['Content-Disposition'] = f'attachment; filename="clin_sig_changes.tsv"'
     return response
+
+
+@login_not_required
+def view_public_info(request):
+    return render(request, 'classification/public_summary_data.html', {
+        "data": ClassificationPublicSummaryData()
+    })
