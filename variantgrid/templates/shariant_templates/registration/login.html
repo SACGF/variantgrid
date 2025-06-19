@@ -4,15 +4,8 @@
 {% load ui_utils %}
 {% block head %}
     <style>
-    .btn-login {
-        animation: glow 1s infinite alternate;
-    }
-    .number-box {
+    .classification-info {
         color: #444;
-        font-size: 1.2rem;
-    }
-    .number-box .big-num {
-        font-size: 2rem;
     }
     @keyframes glow {
       from {
@@ -23,6 +16,11 @@
       }
     }
     </style>
+    <script>
+        $(document).ready(() => {
+            globalSetup();
+        });
+    </script>
 {% endblock %}
 {% block content %}
     {% comment %}
@@ -55,6 +53,7 @@
                     <hr class="my-4"/>
 
                     <p>Developed for <a class="external-link" href='https://www.australiangenomics.org.au/projects/shariant/'>Australian Genomics</a> as part of the project area “Genomics Diagnostics” to support the efficiency, quality and consistency of genomic diagnostic practice in Australia.</p>
+                    <p><a class="external-link" href="https://shariant-public.s3.ap-southeast-2.amazonaws.com/Resource+Snapshot_Shariant_June+2024_WEB+VERSION.pdf">Shariant Snapshot</a></p>
                     <p><a class="external-link" href="https://www.cell.com/ajhg/fulltext/S0002-9297(22)00454-2">Shariant Paper (AJHG)</a></p>
                     <p><a class="external-link" href='https://www.australiangenomics.org.au/project-areas/genomic-diagnostics/'>About the Genomic Diagnostics project area</a></p>
 
@@ -70,25 +69,9 @@
                 </div>
             </div>
         </div>
-    {% comment %}
-        <hr/>
-        <div class="row">
-            <div class="col-4 text-center number-box">
-                <div class="label">Some Stat</div>
-                <div class="big-num">40,000</div>
-            </div>
-
-            <div class="col-4 text-center number-box">
-                <div class="label">Some Stat</div>
-                <div class="big-num">40,000</div>
-            </div>
-
-            <div class="col-4 text-center number-box">
-                <div class="label">Some Stat</div>
-                <div class="big-num">40,000</div>
-            </div>
+        <div class="classification-info" data-toggle="ajax" href="{% url 'classification_public_info' %}">
+            <div style="text-align:center">...loading...</div>
         </div>
-    {% endcomment %}
     </div>
 
     <div class="footer fixed-bottom p-4 text-center">

@@ -43,9 +43,9 @@ from classification.models import ClassificationAttachment, Classification, \
 from classification.models.classification import ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRunStatus
 from classification.models.clinical_context_models import ClinicalContext
-from classification.models.discordance_models_utils import DiscordanceReportRowData
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
+from classification.services.public_summary_data import ClassificationPublicSummaryData
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from classification.views.classification_datatables import ClassificationColumns
 from classification.views.exports import ClassificationExportFormatterCSV, ClassificationExportFormatterRedCap
@@ -1015,4 +1015,11 @@ def view_allele_grouping_detail(request, allele_grouping_id: int):
     return render_ajax_view(request, 'classification/allele_grouping_detail.html', {
         "allele_grouping": allele_grouping,
         "groupings": AlleleOriginGroupingVisible.from_grouping(allele_grouping=allele_grouping, user=request.user)
+    })
+
+
+@login_not_required
+def view_public_info(request):
+    return render(request, 'classification/public_summary_data.html', {
+        "data": ClassificationPublicSummaryData()
     })
