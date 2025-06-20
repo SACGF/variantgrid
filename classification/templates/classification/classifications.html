@@ -198,6 +198,7 @@
             {% end_page_help_embedded %}
         </div>
         <div class="container">
+            <a class="hover-link font-italic" href="?legacy=true" title="Each uploaded record (including those unmatched to an allele) will have its own row">Switch to single record mode</a>
             {% if user.is_superuser %}
                 {% if iai_processing.iai_processing_count or iai_processing.iai_failed_last_week_count or ongoing_import %}
                     <div class="my-4">
@@ -251,9 +252,6 @@
                 </div>
                 {% endif %}
 
-                <div class="col-md-2 mt-2">
-                    <a class="hover-link font-italic" href="?legacy=true">Switch to single record mode</a>
-                </div>
                 {% comment %}
                 <div class="col-md-4 col-lg-2">
                     <br/>

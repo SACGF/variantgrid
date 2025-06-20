@@ -311,7 +311,13 @@ class ImportedAlleleInfoDownload(ExportRow):
 
     @export_column(label="c.HGVS (Imported)")
     def c_hgvs_imported(self):
-        return self.allele_info.imported_c_hgvs
+        """"
+        Technically should be called "HGVS (Imported)" but leaving as c.HGVS for compatibility with tools
+        """
+        if imported_c_hgvs := self.allele_info.imported_c_hgvs:
+            return imported_c_hgvs
+        else:
+            return self.allele_info.imported_g_hgvs
 
     @export_column(label="c.HGVS (37)")
     def c_hgvs_37(self):
