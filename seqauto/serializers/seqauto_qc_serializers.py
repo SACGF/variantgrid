@@ -167,6 +167,7 @@ class QCExecSummarySerializer(serializers.ModelSerializer):
         qc_data = validated_data.pop("qc")
         qc = QCSerializer.get_object(qc_data)
         validated_data["data_state"] = DataState.COMPLETE
+        validated_data["sequencing_run"] = qc.sequencing_run
         instance, _created = QCExecSummary.objects.update_or_create(qc=qc,
                                                                     defaults=validated_data)
         return instance

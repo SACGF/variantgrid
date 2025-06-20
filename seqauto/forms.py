@@ -38,13 +38,6 @@ class BamFileForm(forms.ModelForm, ROFormMixin):
         read_only = ('path', 'aligner', 'data_state')
 
 
-class VCFFileForm(forms.ModelForm, ROFormMixin):
-    class Meta:
-        model = models.VCFFile
-        fields = ('path', 'bam_file', 'variant_caller')
-        read_only = ('path', 'bam_file', 'variant_caller')
-
-
 class QCFileForm(forms.ModelForm, ROFormMixin):
     class Meta:
         model = models.QC

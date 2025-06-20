@@ -176,17 +176,20 @@
         </td>
     </tr>
     {% endif %}
-    {% for variant_caller, vcf, can_view in run_vcfs %}
+
+    {% for vcf_type, vcf_files in run_vcfs.items %}
+        {% for variant_caller, vcf, can_view in vcf_files %}
         <tr>
-            <th>{{ variant_caller.name }} VCF:</th>
+            <th>{{ vcf_type }} / {{ variant_caller.name }} VCF:</th>
             <td>
-                {% if can_view %}
-                    <a href="{% url 'view_vcf' vcf.pk %}"><div class='vcf-icon'></div>{{ vcf }}</a>
-                {% else %}
-                    <div title="You don't have permission to view this VCF" class='vcf-icon'></div>{{ vcf }}
-                {% endif %}
+                    {% if can_view %}
+                        <a href="{% url 'view_vcf' vcf.pk %}"><div class='vcf-icon'></div>{{ vcf }}</a>
+                    {% else %}
+                        <div title="You don't have permission to view this VCF" class='vcf-icon'></div>{{ vcf }}
+                    {% endif %}
             </td>
         </tr>
+        {% endfor %}
     {% endfor %}
 	</table>
 

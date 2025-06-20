@@ -2,8 +2,9 @@ import gzip
 import logging
 import os
 import subprocess
+from hashlib import md5
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union, IO
 
 
 def open_file_or_filename(f, mode='r', **kwargs):
@@ -53,7 +54,20 @@ def file_to_array(filename, comment: Optional[str] = None, max_lines: Optional[i
     return array
 
 
-def remove_gz_if_exists(filename: str) -> str:
+def file_or_filename_md5sum(file_or_filename: Union[IO, str]) -> str:
+    m = md5()
+    f: IO
+    if hasattr(file_or_filename, "read"):
+        f = file_or_filename  # Already a file
+    else:
+        f = open(file_or_filename, "rb")
+
+    for chunk in iter(lambda: f.read(8192), b''):
+         m.update(chunk)
+    return m.hexdigest()
+
+
+def remove_gz_if_exists(filename):
     GZIP_EXTENSIONS = [".gz", ".bgz"]
     for ext in GZIP_EXTENSIONS:
         if filename.endswith(ext):
