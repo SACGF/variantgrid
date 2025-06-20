@@ -59,8 +59,7 @@ def create_canonical_transcript_collection(genome_build: GenomeBuild, annotation
 
     batch_size = 2000
     logging.info("Loading pd.DataFrame")
-    df = pd.read_csv(filename, names=COLUMNS, index_col=None, sep='\t', comment='#', dtype=str,
-                     iterator=True, chunksize=batch_size)
+    df = pd.read_csv(filename, names=COLUMNS, index_col=None, sep='\t', comment='#', dtype=str)
 
     transcript_versions_by_id = TranscriptVersion.transcript_versions_by_id(genome_build, annotation_consortium)
     canonical_transcript_list = []
