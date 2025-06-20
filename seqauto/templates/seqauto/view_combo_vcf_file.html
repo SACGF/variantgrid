@@ -1,5 +1,6 @@
 {% extends "seqauto/menu_sequencing_data_base.html" %}
 {% load static %}
+{% load ui_utils %}
 {% load seqauto_record_tags %}
 {% block title %}{{ combo_vcf_file }}{% endblock %}
 {% block head %}
@@ -14,6 +15,12 @@
 	<div>
 	<img class='vcenter' src="{% static 'icons/vcf_64.png' %}" /> <b>{{ combo_vcf_file }}</b>
 	</div>
+
+    <div>
+    {% labelled label="Path" %}{{ combo_vcf_file.path }}{% endlabelled %}
+    {% labelled label="Variant Caller" %}{{ combo_vcf_file.variant_caller }}{% endlabelled %}
+    </div>
+
 
 	{% record_data_state_helper combo_vcf_file %}
 

@@ -1,10 +1,13 @@
+import operator
 import os
+from functools import reduce
 from typing import Optional
 
 import nameparser
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models import Q
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
@@ -217,27 +220,35 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         return args
 
     @staticmethod
-    def match(first_name, last_name, sex=None, date_of_birth=None, user=None):
+    def match(first_name, last_name, sex=None, date_of_birth=None, user=None) -> Optional['Patient']:
+        """" We need to be able to match incomplete info, eg Male if provided matches Sex = M or Unknown """
         if not last_name:
             msg = "Last name must be non-null!"
             raise ValueError(msg)
         last_name = last_name.upper()
         if first_name:
             first_name = first_name.upper()
+
+        patient_q_list = []
         patient_kwargs = {"last_name": last_name,
                           "first_name": first_name}
         if date_of_birth:
-            patient_kwargs["date_of_birth"] = date_of_birth
+            patient_q_list.append(Q(date_of_birth=date_of_birth) | Q(date_of_birth__isnull=True))
 
         if sex in Sex.FILLED_IN_CHOICES:
-            patient_kwargs['sex'] = sex
+            patient_q_list.append(Sex.get_q_handling_unknown("sex", sex))
 
         try:
             if user:
                 patients_queryset = Patient.filter_for_user(user)
             else:
                 patients_queryset = Patient.objects.all()
-            patient = patients_queryset.get(**patient_kwargs)
+
+            patient_args = []
+            if patient_q_list:
+                q = reduce(operator.and_, patient_q_list)
+                patient_args.append(q)
+            patient = patients_queryset.get(*patient_args, **patient_kwargs)
         except Patient.DoesNotExist:
             # TODO: Handle multiple patients - ie put in errors?
             patient = None

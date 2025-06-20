@@ -461,7 +461,7 @@ class ClinVarExportConverter:
 
             local_id = f"ALLELE_{allele_id}"
             c = self.classification_based_on.classification
-            local_key = c.lab.group_name + "/" + c.lab_record_id
+            local_key = f"CR_{c.id}"
 
             # note clinVarAssertion gets injected later
             # as the SCV can change outside of the JSON generation

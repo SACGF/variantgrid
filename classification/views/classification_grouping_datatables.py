@@ -306,6 +306,15 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             return "unshared"
         return None
 
+    def row_columns(self) -> list[str]:
+        return ["share_level"]
+
+    def row_css(self, row: CellData) -> Optional[str]:
+        share_level = ShareLevel(row["share_level"])
+        if not share_level.is_discordant_level:
+            return "unshared"
+        return None
+
     def __init__(self, request: HttpRequest):
         super().__init__(request)
 

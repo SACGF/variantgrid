@@ -187,7 +187,7 @@ class ResolvedVariantInfo(TimeStampedModel):
         variant = self.variant
         genome_build = self.genome_build
         imported_transcript = self.allele_info.get_transcript
-        hgvs_matcher = HGVSMatcher(genome_build=genome_build)
+        hgvs_matcher = HGVSMatcher(genome_build=genome_build) #
         # hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
         # version = hgvs_matcher.hgvs_converter.get_version()
 

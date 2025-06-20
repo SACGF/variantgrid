@@ -16,7 +16,7 @@ from annotation.models.models import AnnotationVersion, GeneAnnotationVersion, I
 from genes.models import CanonicalTranscript, GeneList, GeneSymbol, \
     GeneCoverageCanonicalTranscript, CanonicalTranscriptCollection, GeneCoverageCollection, TranscriptVersion, \
     GeneListGeneSymbol, GeneAnnotationRelease, ReleaseGeneVersion, GeneSymbolWiki
-from genes.models_enums import AnnotationConsortium
+from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import update_dict_of_dict_values, JsonDataType
@@ -66,7 +66,8 @@ class GeneListGenesColumns(DatatableConfig[GeneListGeneSymbol]):
         self.rich_columns = [
             RichColumn('original_name', orderable=True),
             RichColumn('gene_symbol', orderable=True, client_renderer="renderGeneSymbol"),
-            RichColumn('gene_symbol_alias__source', orderable=True, name='Alias'),
+            RichColumn('gene_symbol_alias__source', orderable=True, name='Alias',
+                       renderer=self.render_alias_source),
         ]
 
         self.annotation_releases = {}
@@ -92,6 +93,12 @@ class GeneListGenesColumns(DatatableConfig[GeneListGeneSymbol]):
             annotation_kwargs[field_name] = GeneListGeneSymbol.get_joined_genes_qs_annotation_for_release(release)
 
         return queryset.annotate(**annotation_kwargs)
+
+    @staticmethod
+    def render_alias_source(row: dict[str, Any]):
+        if alias_source := row["gene_symbol_alias__source"]:
+            return GeneSymbolAliasSource(alias_source).label
+        return ""
 
 
 class GeneSymbolVariantsGrid(AbstractVariantGrid):

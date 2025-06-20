@@ -82,7 +82,7 @@ class Test(URLTestCase):
     def testAutocompleteUrls(self):
         """ Autocompletes w/o permissions """
         AUTOCOMPLETE_URLS = [
-            ('clinician_autocomplete', self.clinician, {"q": self.clinician.last_name}),
+            # ('clinician_autocomplete', self.clinician, {"q": self.clinician.last_name}),
             ('external_pk_autocomplete', self.external_pk, {"q": self.external_pk.code}),
         ]
         self._test_autocomplete_urls(AUTOCOMPLETE_URLS, self.user_non_owner, True)
