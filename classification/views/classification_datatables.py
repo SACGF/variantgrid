@@ -11,7 +11,8 @@ from django.http import HttpRequest
 
 from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel, AlleleOriginBucket
 from classification.models import ClassificationModification, EvidenceKeyMap, \
-    ImportedAlleleInfo, DiscordanceReport
+    ImportedAlleleInfo, DiscordanceReport, ClassificationGroupingEntry
+from classification.models.classification_groups import ClassificationGroupEntry
 from classification.models.classification_utils import classification_gene_symbol_filter
 from flags.models import FlagCollection, FlagStatus
 from genes.hgvs import CHGVS
@@ -316,6 +317,9 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             output_field=TextField()
         )
         initial_qs = initial_qs.annotate(condition_sort=case)
+
+        if classification_grouping := self.get_query_param("classification_grouping"):
+            initial_qs = initial_qs.filter(classification__pk__in=ClassificationGroupingEntry.objects.filter(grouping=classification_grouping).values_list('classification', flat=True))
 
         return initial_qs
 
