@@ -16,6 +16,9 @@
     </span>
 {% endlabelled %}
 <h5>Classification Records</h5>
-{% for record in classification_grouping.classification_modifications reversed %}
-    <div class="mt-1">{% classification_quick record show_lab=False show_condition=True show_criteria=True show_flags=False %}</div>
-{% endfor %}
+<script>
+    function classificationFilter{{ classification_grouping.pk }}(data) {
+        data.classification_grouping = {{ classification_grouping.pk }};
+    }
+</script>
+<table id="vc-datatable-{{ classification_grouping.pk }}" data-datatable-data='classificationFilter{{ classification_grouping.pk }}' data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-adjust-columns="false"></table>
