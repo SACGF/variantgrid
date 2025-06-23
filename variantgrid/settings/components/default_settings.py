@@ -44,6 +44,11 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000
 # if None, discordance emails wont be sent
 DISCORDANCE_EMAIL = None
 
+ADMIN_LAB_EMAIL_COPY = None
+"""
+emails sent to labs will also be sent to this admin email
+"""
+
 # if None, Emails to admins wont be sent, is the FROM email for emails sent form this server to admins
 ADMIN_EMAIL_NOTIFICATION = None
 # Enable to have contact us functionality

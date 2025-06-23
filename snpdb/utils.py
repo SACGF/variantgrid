@@ -64,12 +64,29 @@ class LabNotificationBuilder(NotificationBuilder):
                     recipient_list.append(user.email)
 
         if recipient_list:
+            html_content = self.as_html()
+            txt_content = self.as_text()
             EmailLog.send_mail(subject=self.message,
-                               html=self.as_html(),
-                               text=self.as_text(),
+                               html=html_content,
+                               text=txt_content,
                                from_email=settings.DISCORDANCE_EMAIL,
                                recipient_list=recipient_list,
                                allow_users_to_see_others=True)
+
+            if admin_email := settings.ADMIN_LAB_EMAIL_COPY:
+                # duplicate lab emails an optional admin email
+                recipient_list_string = ", ".join(recipient_list)
+
+                html_content = f"<span style='color:#888;font-style:italic'><b>Original lab</b>: { self.lab }</i><br/><b>Original recipients</b>: {recipient_list_string}</span><br/><br/>{ html_content }"
+                txt_content = f"Originally sent to {self.lab}\nRecipients: {recipient_list_string}\n{txt_content}"
+                EmailLog.send_mail(
+                    subject=self.message,
+                    html=html_content,
+                    text=txt_content,
+                    from_email=settings.DISCORDANCE_EMAIL,
+                    recipient_list=[admin_email],
+                    allow_users_to_see_others=True
+                )
 
     @property
     def webhook_url(self) -> Optional[str]:

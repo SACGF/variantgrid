@@ -42,6 +42,7 @@ INBOX_ENABLED = False
 DISCORDANCE_ENABLED = True
 DISCORDANCE_EMAIL = '"Shariant Updates" <updates@shariant.org.au>'
 ACCOUNTS_EMAIL = 'accounts@shariant.org.au'
+ADMIN_LAB_EMAIL_COPY = 'communications@shariant.org.au'
 SEND_EMAILS = False
 HEALTH_CHECK_ENABLED = True
 
