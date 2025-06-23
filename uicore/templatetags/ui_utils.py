@@ -508,6 +508,14 @@ def number(number: int, severity: Optional[str] = None) -> str:
 
 
 @register.filter()
+def round_1000(value: int) -> str:
+    if value < 1000:
+        return "< 1000"
+    rounded_value = value - (value % 1000)
+    return f"{rounded_value:,}+"
+
+
+@register.filter()
 def value(value: Any, no_value: Optional[str] = None) -> str:
     if isinstance(value, bool):
         return boolean(value)
