@@ -1,3 +1,4 @@
+{% load ui_utils %}
 <style>
     .btn-login {
         animation: glow 1s infinite alternate;
@@ -12,23 +13,36 @@
 </style>
 <hr/>
 <div class="row">
-    <div class="col-3 text-center number-box">
+    <div class="col-1">&nbsp;</div>
+
+    <div class="col-2 text-center number-box">
         <div class="label">Contributing Labs</div>
-        <div class="big-num">{{ data.contributing_labs | length }}</div>
+        <div class="big-num">{{ data.contributing_lab_count }}</div>
     </div>
 
-    <div class="col-3 text-center number-box">
+    <div class="col-2 text-center number-box">
         <div class="label">ClinVar Exports</div>
-        <div class="big-num">{{ data.clinvar_export_count }}</div>
+        <div class="big-num">{{ data.clinvar_export_count | round_1000 }}</div>
     </div>
 
-    <div class="col-3 text-center number-box">
-        <div class="label">Alleles <span style="font-size:0.7rem">With</span> Multiple Contributors</div>
-        <div class="big-num">{{ data.overlapped_alleles }}</div>
+    <div class="col-2 text-center number-box">
+        <div class="label">Discordance Rate</div>
+        <div class="big-num">{{ data.discordant_percentage|floatformat:1 }}%</div>
+        <div class="label"><span style="font-size:0.7rem">with Multiple Contributors</span></div>
     </div>
 
-    <div class="col-3 text-center number-box">
-        <div class="label">Discordant Alleles</div>
-        <div class="big-num">{{ data.discordant_alleles }}</div>
+    <div class="col-2 text-center number-box">
+        <div class="label">Unique Alleles</div>
+        <div class="big-num">{{ data.unique_allele_count | round_1000 }}</div>
+    </div>
+
+    <div class="col-2 text-center number-box">
+        <div class="label">Total Records</div>
+        <div class="big-num">{{ data.classification_count | round_1000 }}</div>
     </div>
 </div>
+<hr/>
+<h4>Contributors</h4>
+{% for org in data.contribution_orgs %}
+    {{ org }}
+{% endfor %}
