@@ -49,7 +49,7 @@
                 <div>
                     <del>{% if group.clinical_significance %}{{ group.clinical_significance | ekey:"clinical_significance" }}{% else %}No Data{% endif %}</del>
                 </div>
-                <div class="c-pill cs cs-{{ group.clinical_significance }}">
+                <div class="c-pill cs cs-{{ group.clinical_significance_pending }}">
                     <div class="mb-1">{{ group.clinical_significance_pending | ekey:"clinical_significance" }}</div>
                     <div class="flag flag-classification_pending_changes hover-detail mx-1"></div>
                 </div>
