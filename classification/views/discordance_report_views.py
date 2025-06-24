@@ -429,12 +429,9 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
                                 # raising on behalf of the user handling discordance, doesn't necessarily have permission to open this normally,
                                 comment=comment,
                                 reopen=True,
+                                new_data=flag_data,
                                 add_comment_if_open=False
                             )
-
-                            if flag.data != flag_data:
-                                flag.data = flag_data
-                                flag.save()
 
                             needs_comment = True
                             if last_comment := flag.last_comment:
