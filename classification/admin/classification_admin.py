@@ -19,7 +19,7 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
     DiscordanceReportTriageStatus, ClassificationGrouping, ClassificationGroupingEntry, \
-    AlleleOriginGrouping, AlleleGrouping, ClassificationGroupingSearchTerm
+    AlleleOriginGrouping, AlleleGrouping, ClassificationGroupingSearchTerm, ClassificationSummaryCalculator
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -363,6 +363,18 @@ class ClassificationAdmin(ModelAdminBasics):
         for vc in queryset:
             vc.revalidate(request.user)
         self.message_user(request, str(qs_count) + " records revalidated")
+
+    @admin_action("Fixes: Update Summary")
+    def update_summary(self, request, queryset: QuerySet[Classification]):
+        for cm in queryset:
+            latest = cm.last_published_version
+            cm.summary = ClassificationSummaryCalculator(latest).cache_dict()
+            cm.save(update_fields=["summary"])
+            ClassificationGrouping.assign_grouping_for_classification(cm, force_dirty_up=True)
+        if ClassificationImportRun.ongoing_imports():
+            pass
+        else:
+            ClassificationGrouping.update_all_dirty()
 
     @admin_action("Fixes: Assign Classification Grouping")
     def assign_classification_grouping(self, request, queryset: QuerySet[Classification]):
