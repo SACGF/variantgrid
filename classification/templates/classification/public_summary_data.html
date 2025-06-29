@@ -43,6 +43,8 @@
 </div>
 <hr/>
 <h4>Contributors</h4>
+<div class="row row-cols-2" style="font-size:1.2rem; line-height: 2; color:#777">
 {% for org in data.contribution_orgs %}
-    {{ org }}
+    <div class="col text-center"><label>{{ org }}</label></div>
 {% endfor %}
+</div>
