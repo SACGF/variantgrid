@@ -1049,14 +1049,16 @@ function convertTimestampDom(elem) {
         elem.replaceWith(newElement);
         newElement.timeago();
         newElement.tooltip({html: true});
-    } else if (elem.hasClass('micro')) {
-        newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT_MILLISECONDS)});
-        elem.replaceWith(newElement);
-    } else if (elem.hasClass('seconds')) {
-        newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT_SECONDS)});
-        elem.replaceWith(newElement);
     } else {
-        newElement = $('<time>', {'datetime': m.toISOString(), class:'timestamp', text: m.format(JS_DATE_FORMAT)});
+        let formatStr = JS_DATE_FORMAT;
+        if (elem.hasClass('date-only')) {
+            formatStr = JS_DATE_ONLY_FORMAT;
+        } else if (elem.hasClass('micro')) {
+            formatStr = JS_DATE_FORMAT_MILLISECONDS;
+        } else if (elem.hasClass('seconds')) {
+            formatStr = JS_DATE_FORMAT_SECONDS;
+        }
+        newElement = $('<time>', {'datetime': m.toISOString(), class: 'timestamp', text: m.format(formatStr)});
         elem.replaceWith(newElement);
     }
     return newElement;

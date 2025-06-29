@@ -213,7 +213,7 @@ def timedelta_tag(time: timedelta, show_micro=False):
 
 
 @register.inclusion_tag("uicore/tags/timestamp.html")
-def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False, show_micro = False, text_only: bool = False, tooltip: str = ""):
+def timestamp(timestamp, time_ago: bool = False, date_only: bool = False, show_seconds: bool = False, show_micro = False, text_only: bool = False, tooltip: str = ""):
     css_classes = []
     if time_ago:
         css_classes.append('time-ago')
@@ -221,6 +221,8 @@ def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False, sho
         css_classes.append('micro')
     elif show_seconds:
         css_classes.append('seconds')
+    elif date_only:
+        css_classes.append('date-only')
 
     date_value = None
     if timestamp:

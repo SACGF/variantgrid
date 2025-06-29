@@ -1,6 +1,12 @@
 {% extends "uicore/page/base_external.html" %}
 {% load classification_tags %}
+{% load js_tags %}
 {% block head %}
+    <script>
+    $(document).ready(() => {
+        globalSetup();
+    });
+    </script>
     <style>
         #key-table_filter {
             font-size: 14px;
@@ -12,7 +18,7 @@
             display: none;
         }
         table {
-            font-size: 14px;
+            font-size: 12px;
         }
         td.description, td.category {
             font-size: 12px;
@@ -86,6 +92,15 @@
         .sticky-header th {
             top: 0 !important;
         }
+        td.values {
+            max-width: 250px;
+        }
+        td.description {
+            max-width: 250px;
+        }
+        td.description img {
+            max-width: 250px;
+        }
 
     </style>
     <script>
@@ -126,6 +141,8 @@
                 <th class="max-share-level" style="min-width:80px">Max<br/>Share Level</th>
                 <th class="values">Values</th>
                 <th class="description">Description</th>
+                <th>Created</th>
+                <th>Modified</th>
             </tr>
             </thead>
             <tbody>
@@ -150,6 +167,8 @@
                         <td class="description">
                             {% if ekey.description %}{{ ekey.description | safe }}{% endif %}{% if ekey.see %}<br><a href="{{ekey.see}}">{{ ekey.see }}{% endif %}</a>
                         </td>
+                        <td>{% timestamp ekey.created date_only=True %}</td>
+                        <td>{% timestamp ekey.modified date_only=True %}</td>
                     </tr>
                 {% endif %}
             {% endfor %}
