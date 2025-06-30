@@ -1023,5 +1023,6 @@ def view_allele_grouping_detail(request, allele_grouping_id: int):
 @cache_page(60 * 60)
 def view_public_info(request):
     return render(request, 'classification/public_summary_data.html', {
-        "data": ClassificationPublicSummaryData()
+        "data": ClassificationPublicSummaryData(),
+        "contributors": request.GET.get("contributors") != "False"
     })
