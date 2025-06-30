@@ -1,4 +1,5 @@
 {% load ui_utils %}
+{% load js_tags %}
 <style>
     .btn-login {
         animation: glow 1s infinite alternate;
@@ -12,7 +13,7 @@
     }
 </style>
 <hr/>
-<div class="row">
+<div class="row" style="position:relative">
     <div class="col-1">&nbsp;</div>
 
     <div class="col-2 text-center number-box">
@@ -21,8 +22,13 @@
     </div>
 
     <div class="col-2 text-center number-box">
-        <div class="label">ClinVar Exports</div>
-        <div class="big-num">{{ data.clinvar_export_count | round_1000 }}</div>
+        <div class="label">Total Records</div>
+        <div class="big-num">{{ data.classification_count | round_1000 }}</div>
+    </div>
+
+    <div class="col-2 text-center number-box">
+        <div class="label">Unique Alleles</div>
+        <div class="big-num">{{ data.unique_allele_count | round_1000 }}</div>
     </div>
 
     <div class="col-2 text-center number-box">
@@ -32,14 +38,10 @@
     </div>
 
     <div class="col-2 text-center number-box">
-        <div class="label">Unique Alleles</div>
-        <div class="big-num">{{ data.unique_allele_count | round_1000 }}</div>
+        <div class="label">ClinVar Submissions</div>
+        <div class="big-num">{{ data.clinvar_export_count | round_1000 }}</div>
     </div>
-
-    <div class="col-2 text-center number-box">
-        <div class="label">Total Records</div>
-        <div class="big-num">{{ data.classification_count | round_1000 }}</div>
-    </div>
+    <div style="position:absolute; right:16px; bottom:-10px;font-size:0.8rem;color:#999">As of {{ data.as_of_date }}</div>
 </div>
 <hr/>
 <h4>Contributors</h4>
