@@ -1,6 +1,8 @@
 from functools import cached_property
 from django.db.models import Q, QuerySet
 from django.db.models.aggregates import Count
+from django.utils.timezone import now
+
 from classification.enums import ShareLevel
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import DiscordanceReport, Classification, ClinVarExport, ClinVarExportStatus
@@ -8,6 +10,10 @@ from snpdb.models import Lab, Allele, Organization
 
 
 class ClassificationPublicSummaryData:
+
+    @cached_property
+    def as_of_date(self):
+        return now()
 
     @cached_property
     def contributing_labs_qs(self) -> QuerySet[Lab]:

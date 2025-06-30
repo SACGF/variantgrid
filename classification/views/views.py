@@ -18,6 +18,7 @@ from django.http.response import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.timezone import now
+from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 from global_login_required import login_not_required
@@ -828,6 +829,7 @@ def clin_sig_change_data(request):
 
 
 @login_not_required
+@cache_page(60 * 60)
 def view_public_info(request):
     return render(request, 'classification/public_summary_data.html', {
         "data": ClassificationPublicSummaryData()
