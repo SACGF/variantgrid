@@ -99,6 +99,7 @@ def get_analysis_settings(user, analysis):
         "annotation_version": analysis.annotation_version_id,
         "node_count_types": analysis.get_node_count_types(),
         "canonical_transcript_collection": canonical_transcript_collection,
+        "grid_sample_label_template": analysis.grid_sample_label_template,
         "show_igv_links": analysis.show_igv_links,
         "igv_data": igv_data,
         "open_variant_details_in_new_window": user_settings.variant_link_in_analysis_opens_new_tab,

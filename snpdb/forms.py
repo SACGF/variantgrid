@@ -403,18 +403,20 @@ class SettingsOverrideForm(BaseModelForm):
     class Meta:
         model = models.SettingsOverride
         fields = "__all__"
-        widgets = {"email_weekly_updates": BlankNullBooleanSelect(),
-                   "email_discordance_updates": BlankNullBooleanSelect(),
-                   "variant_link_in_analysis_opens_new_tab": BlankNullBooleanSelect(),
-                   "tool_tips": BlankNullBooleanSelect(),
-                   "node_debug_tab": BlankNullBooleanSelect(),
-                   "import_messages": BlankNullBooleanSelect(),
-                   'default_sort_by_column': ModelSelect2(url='custom_column_autocomplete',
-                                                          forward=['columns'],
-                                                          attrs={'data-placeholder': 'Column...'}),
-                   'timezone': forms.Select(choices=[(None, "")] + [(tz, tz) for tz in settings.AVAILABLE_TZS], attrs={}),
-                   "allele_origin_exclude_filter": BlankNullBooleanSelect()
-                   }
+        widgets = {
+            "email_weekly_updates": BlankNullBooleanSelect(),
+            "email_discordance_updates": BlankNullBooleanSelect(),
+            "variant_link_in_analysis_opens_new_tab": BlankNullBooleanSelect(),
+            "tool_tips": BlankNullBooleanSelect(),
+            "node_debug_tab": BlankNullBooleanSelect(),
+            "import_messages": BlankNullBooleanSelect(),
+            'default_sort_by_column': ModelSelect2(url='custom_column_autocomplete',
+                                                  forward=['columns'],
+                                                  attrs={'data-placeholder': 'Column...'}),
+            'timezone': forms.Select(choices=[(None, "")] + [(tz, tz) for tz in settings.AVAILABLE_TZS], attrs={}),
+            "allele_origin_exclude_filter": BlankNullBooleanSelect(),
+            "grid_sample_label_template": TextInput(),
+        }
         labels = {
             "email_weekly_updates": "Email Regular Updates",
             "email_discordance_updates": "Email Discordance Updates",
@@ -430,7 +432,8 @@ class SettingsOverrideForm(BaseModelForm):
             "default_lab": "Default Lab",
             "timezone": "TimeZone (for downloads)",
             "allele_origin_focus": "Allele Origin focus",
-            "allele_origin_exclude_filter": "Allele Origin (filter by default)"
+            "allele_origin_exclude_filter": "Allele Origin (filter by default)",
+            "grid_sample_label_template": "Grid Sample Label Template",
         }
 
     def __init__(self, *args, **kwargs):
@@ -452,6 +455,7 @@ class SettingsOverrideForm(BaseModelForm):
             "tag_colors": settings_config.analysis_enabled,
             "import_messages": settings_config.upload_enabled,
             "igv_port": settings_config.igv_links_enabled,
+            "grid_sample_label_template": settings_config.analysis_enabled,
         }
 
         for f, visible in field_visibility.items():

@@ -321,7 +321,10 @@ class Specimen(models.Model):
         return age
 
     def __str__(self):
-        return f"Specimen {self.reference_id}"
+        s = self.reference_id
+        if self.description:
+            s += f" ({self.description})"
+        return s
 
 
 class PatientAttachment(models.Model):

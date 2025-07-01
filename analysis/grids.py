@@ -1,6 +1,6 @@
 import time
 from collections import defaultdict
-from typing import Optional, Any
+from typing import Optional, Any, Callable
 
 import pandas as pd
 from auditlog.models import LogEntry
@@ -152,7 +152,29 @@ class VariantGrid(AbstractVariantGrid):
         update_dict_of_dict_values(overrides, self._get_standard_overrides(af_show_in_percent))
         update_dict_of_dict_values(overrides, node.get_extra_colmodel_overrides())
         if self.cohorts:
-            sample_columns, sample_overrides = VariantGrid.get_grid_genotype_columns_and_overrides(self.cohorts, self.visibility, af_show_in_percent)
+            sample_formatter = None
+            if grid_sample_label_template := node.analysis.grid_sample_label_template:
+                def _sample_formatter_func(sample):
+                    params = defaultdict(lambda: "")
+                    params.update({
+                        "sample_id": sample.pk,
+                        "sample": sample.name,
+                    })
+                    if patient := sample.patient:
+                        params["patient_id"] = patient.pk
+                        params["patient_code"] = patient.last_name
+                        params["patient"] = str(patient)
+
+                    if specimen := sample.specimen:
+                        params["specimen_id"] = specimen.pk
+                        params["specimen"] = str(specimen)
+
+                    return grid_sample_label_template % params
+
+                sample_formatter = _sample_formatter_func
+
+            sample_columns, sample_overrides = VariantGrid.get_grid_genotype_columns_and_overrides(self.cohorts, self.visibility,
+                                                                                                   af_show_in_percent, sample_formatter)
             if sample_cols_pos:
                 fields = fields[:sample_cols_pos] + sample_columns + fields[sample_cols_pos:]
             else:
@@ -195,7 +217,8 @@ class VariantGrid(AbstractVariantGrid):
         return server_side_formatter
 
     @staticmethod
-    def get_grid_genotype_columns_and_overrides(cohorts, visibility, af_show_in_percent: bool):
+    def get_grid_genotype_columns_and_overrides(cohorts, visibility,
+                                                af_show_in_percent: bool, sample_formatter: Optional[Callable]=None):
         available_format_columns = get_available_format_columns(cohorts)
         sample_columns = {
             'samples_zygosity': ('Zygosity', '%(sample)s %(label)s', 55),
@@ -228,7 +251,16 @@ class VariantGrid(AbstractVariantGrid):
                 if not available_format_columns[column]:
                     continue
                 column_names.append(f"sample_{sample.pk}_{column}")
-                label = label_format % {"sample": sample.name, "label": column_label}
+                sample_formatted_str = None
+                if sample_formatter:
+                    try:
+                        sample_formatted_str = sample_formatter(sample)
+                    except:
+                        pass
+                if sample_formatted_str is None or len(sample_formatted_str) == 0:
+                    sample_formatted_str = str(sample.name)
+
+                label = label_format % {"sample": sample_formatted_str, "label": column_label}
                 server_side_formatter = VariantGrid._get_sample_columns_server_side_formatter(sample,
                                                                                               packed_data_replace,
                                                                                               column, cohort_index,

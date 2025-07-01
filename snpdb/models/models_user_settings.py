@@ -159,6 +159,8 @@ class SettingsOverride(models.Model):
                                 help_text="Initial custom columns when creating analysis")
     default_sort_by_column = models.ForeignKey(CustomColumn, on_delete=SET_NULL, null=True, blank=True,
                                                help_text="Default value to sort analysis grids (can be changed per analysis)")
+    grid_sample_label_template = models.TextField(null=True, blank=True,
+                                                  help_text="Python string template, eg: '%(patient)s (%(sample)s)'. Variables: sample_id, sample (name), patient_id, patient_code, patient (full name), specimen_id, specimen (name). Falls back on 'sample' if blank or any error")
     tag_colors = models.ForeignKey(TagColorsCollection, on_delete=SET_NULL, null=True, blank=True,
                                    help_text="Set of colors assigned to tags (modify/create these in 'Tag settings')")
     variant_link_in_analysis_opens_new_tab = models.BooleanField(null=True,
@@ -348,6 +350,7 @@ class UserSettings:
     email_discordance_updates: bool
     columns: CustomColumnsCollection
     default_sort_by_column: CustomColumn
+    grid_sample_label_template: str
     tag_colors: TagColorsCollection
     variant_link_in_analysis_opens_new_tab: bool
     tool_tips: bool

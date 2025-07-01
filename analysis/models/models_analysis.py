@@ -40,6 +40,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
     user = models.ForeignKey(User, on_delete=CASCADE)
     name = models.TextField()
     description = models.TextField(null=True, blank=True)
+    grid_sample_label_template = models.TextField(null=True, blank=True)
     custom_columns_collection = models.ForeignKey(CustomColumnsCollection,
                                                   default=CustomColumnsCollection.get_system_default_id,
                                                   on_delete=SET_DEFAULT)
@@ -182,6 +183,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         user_settings = UserSettings.get_for_user(user)
         self.custom_columns_collection = user_settings.columns
         self.default_sort_by_column = user_settings.default_sort_by_column
+        self.grid_sample_label_template = user_settings.grid_sample_label_template
         self.save()
 
         default_node_count_config = user_settings.get_node_count_settings_collection()
