@@ -768,16 +768,32 @@ def _settings_override_node_counts_tab(request, settings_override, has_write_per
 def view_user(request, pk):
     user = get_object_or_404(User, pk=pk)
     user_contact = UserContact.get_for_user(user)
-    user_groups = set(user.groups.all().values_list("name", flat=True))
-    my_groups = set(request.user.groups.all().values_list("name", flat=True))
-    common_groups = user_groups & my_groups
+    common_groups = Group.objects.filter(user=user.pk).filter(user=request.user.pk).order_by("name")
 
     context = {
         "other_user": user,
         'user_contact': user_contact,
-        'common_groups': sorted(common_groups),
+        'common_groups': common_groups,
     }
     return render(request, 'snpdb/settings/view_user.html', context)
+
+
+def view_group(request, pk):
+    group = get_object_or_404(Group, pk=pk)
+    lab = Lab.objects.filter(group_name=group.name).first()  # group_name is unique so at most only 1
+    users_qs = group.user_set.all().order_by("username")
+    user_is_in_group = users_qs.filter(pk=request.user.pk).exists()
+    public_groups = (settings.PUBLIC_GROUP_NAME, settings.LOGGED_IN_USERS_GROUP_NAME)
+
+    context = {
+        "group": group,
+        "lab": lab,
+        "public_group": group.name in public_groups,
+        "user_is_in_group": user_is_in_group,
+        "users_qs": users_qs,
+    }
+    return render(request, 'snpdb/settings/view_group.html', context)
+
 
 
 def _add_read_only_settings_message(request, lab_list: Iterable[Lab]):

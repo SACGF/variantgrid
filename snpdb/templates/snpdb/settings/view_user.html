@@ -27,7 +27,9 @@
                 {% if common_groups %}
                     <ul>
                     {% for g in common_groups %}
-                        {% if g %}<li>{{ g }}</li>{% endif %}
+                        {% if g %}
+                            <li><a href="{% url 'view_group' g.pk %}">{{ g }}</a></li>
+                        {% endif %}
                     {% endfor %}
                     </ul>
                 {% else %}

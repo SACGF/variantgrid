@@ -1,0 +1,42 @@
+{% extends menu_settings_base %}
+{% load ui_utils %}
+{% load user_tags %}
+{% block title %}Group: {{ group }}{% endblock %}
+
+{% block submenu_page_content %}
+    <div class="container">
+        <div class="card">
+            <div class="card-header">Group {{ group }}</div>
+            <div class="card-body">
+                {% labelled label="Lab" %}
+                    {% if lab %}
+                        <a href="{% url 'view_lab' lab.pk %}">{{ lab }}</a>
+                    {% else %}
+                        There are no labs associated with this group
+                    {% endif %}
+                {% endlabelled %}
+            </div>
+        </div>
+
+        {% if public_group %}
+            <div>Cannot list users of public groups </div>
+        {% elif user_is_in_group %}
+            <div class="card mt-4">
+                <div class="card-header">Users in this group</div>
+                <div class="card-body">
+                    <ul>
+                    {% for other_user in users_qs %}
+                        <li>
+                            {% user other_user show_user_page_link=True %}
+                        </li>
+                    {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        {% else %}
+            <div>You are not a member of this group</div>
+        {% endif %}
+
+    </div>
+
+{% endblock %}
