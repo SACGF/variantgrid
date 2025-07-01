@@ -14,7 +14,7 @@ from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction, connection
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Subquery, OuterRef
 from django.db.models.deletion import PROTECT, CASCADE, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
@@ -727,6 +727,19 @@ class VariantAnnotationVersion(SubVersionPartition):
     def latest(genome_build, active=True) -> 'VariantAnnotationVersion':
         qs = VariantAnnotationVersion.objects.filter(genome_build=genome_build, active=active)
         return qs.order_by("annotation_date").last()
+
+    @staticmethod
+    def latest_for_all_builds(active=True) -> QuerySet:
+        # Default to latest
+        latest_qs = VariantAnnotationVersion.objects.filter(
+            genome_build=OuterRef('genome_build'),
+            active=active
+        ).order_by('-annotation_date')
+
+        return VariantAnnotationVersion.objects.filter(
+            pk__in=Subquery(latest_qs.values('pk')[:1]),
+            genome_build__in=GenomeBuild.builds_with_annotation()
+        )
 
     def get_any_annotation_version(self):
         """ Often you don't care what annotation version you use, only that variant annotation version is this one """
