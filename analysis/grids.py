@@ -184,19 +184,19 @@ class VariantGrid(AbstractVariantGrid):
         return fields, overrides
 
     @staticmethod
-    def _get_sample_columns_server_side_formatter(sample: Sample, packed_data_replace: dict,
+    def _get_sample_columns_server_side_formatter(cohort, sample: Sample, packed_data_replace: dict,
                                                   column, i: int, af_show_in_percent: bool):
         """ A function to capture loop variable """
 
         def packed_data_formatter(row, _field):
-            cgc = sample.vcf.cohort.cohort_genotype_collection
+            cgc = cohort.cohort_genotype_collection
             packed_column = cgc.get_packed_column_alias(column)
             packed_data = row[packed_column]
             val = packed_data[i]
             return packed_data_replace.get(val, val)
 
         server_side_formatter = packed_data_formatter
-        if column == "samples_filters":
+        if column == "samples_filters" and cohort.vcf:
             def sample_filters_formatter(row, field):
                 """ Need to unpack then switch filters """
                 # Sample Filters can be "."
@@ -261,7 +261,7 @@ class VariantGrid(AbstractVariantGrid):
                     sample_formatted_str = str(sample.name)
 
                 label = label_format % {"sample": sample_formatted_str, "label": column_label}
-                server_side_formatter = VariantGrid._get_sample_columns_server_side_formatter(sample,
+                server_side_formatter = VariantGrid._get_sample_columns_server_side_formatter(cohort, sample,
                                                                                               packed_data_replace,
                                                                                               column, cohort_index,
                                                                                               af_show_in_percent)

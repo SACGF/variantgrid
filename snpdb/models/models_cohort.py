@@ -48,7 +48,7 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
     version = models.IntegerField(null=False, default=0)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
-    vcf = models.OneToOneField(VCF, null=True, on_delete=CASCADE)
+    vcf = models.OneToOneField(VCF, null=True, on_delete=CASCADE)  # Will be NULL for custom Cohorts from multi-vcfs
     # Deal with parent_cohort delete in snpdb.signals.signal_handlers.pre_delete_cohort
     parent_cohort = models.ForeignKey("self", null=True, related_name="sub_cohort_set", on_delete=DO_NOTHING)
     sample_count = models.IntegerField(null=True)
