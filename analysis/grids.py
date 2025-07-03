@@ -147,7 +147,12 @@ class VariantGrid(AbstractVariantGrid):
         fields, overrides, sample_cols_pos = get_custom_column_fields_override_and_sample_position(ccc,
                                                                                                    annotation_version,
                                                                                                    analysis_tags=True)
-        fields.extend(node.get_extra_columns())
+        # Put extra columns after sample (they are all usually to do with sample/vcf etc info)
+        if extra_columns := node.get_extra_columns():
+            if sample_cols_pos:
+                fields = fields[:sample_cols_pos] + extra_columns + fields[sample_cols_pos:]
+            else:
+                fields.extend(extra_columns)
 
         update_dict_of_dict_values(overrides, self._get_standard_overrides(af_show_in_percent))
         update_dict_of_dict_values(overrides, node.get_extra_colmodel_overrides())
