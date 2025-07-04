@@ -159,7 +159,7 @@ class VariantGrid(AbstractVariantGrid):
         if self.cohorts:
             sample_formatter = None
             if grid_sample_label_template := node.analysis.grid_sample_label_template:
-                sample_formatter = self._get_sample_formatter_func(grid_sample_label_template)
+                sample_formatter = Sample._get_sample_formatter_func(grid_sample_label_template)
 
             sample_columns, sample_overrides = VariantGrid.get_grid_genotype_columns_and_overrides(self.cohorts, self.visibility,
                                                                                                    af_show_in_percent, sample_formatter)
@@ -170,30 +170,6 @@ class VariantGrid(AbstractVariantGrid):
 
             update_dict_of_dict_values(overrides, sample_overrides)
         return fields, overrides
-
-    @staticmethod
-    def _get_sample_formatter_func(grid_sample_label_template):
-        def _sample_formatter_func(sample):
-            params = {
-                "sample_id": sample.pk,
-                "sample": sample.name,
-            }
-            if patient := sample.patient:
-                params["patient_id"] = patient.pk
-                params["patient_code"] = patient.last_name
-                params["patient"] = str(patient)
-
-            if specimen := sample.specimen:
-                params["specimen_id"] = specimen.pk
-                params["specimen"] = str(specimen)
-
-            for t in grid_sample_label_template.split("||"):
-                try:
-                    return t % params
-                except (ValueError, KeyError):
-                    pass
-            return sample.name
-        return _sample_formatter_func
 
     @staticmethod
     def _get_sample_columns_server_side_formatter(cohort, sample: Sample, packed_data_replace: dict,

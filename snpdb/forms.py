@@ -7,6 +7,7 @@ from dal import forward
 from django import forms
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.forms import EmailInput, URLInput, inlineformset_factory, ALL_FIELDS
 from django.forms.forms import DeclarativeFieldsMetaclass
 from django.forms.widgets import TextInput, HiddenInput, NullBooleanSelect
@@ -441,6 +442,15 @@ class SettingsOverrideForm(BaseModelForm):
         self.fields['columns'].queryset = CustomColumnsCollection.filter_public()
         self.fields['default_genome_build'].queryset = GenomeBuild.builds_with_annotation()
         self._hide_unused_fields()
+
+    def clean_grid_sample_label_template(self):
+        data = self.cleaned_data["grid_sample_label_template"]
+        if data:
+            try:
+                Sample._validate_sample_formatter_func(data)
+            except (ValueError, KeyError) as e:
+                raise ValidationError(e)
+        return data
 
     def _hide_unused_fields(self):
         settings_config = get_settings_form_features()
