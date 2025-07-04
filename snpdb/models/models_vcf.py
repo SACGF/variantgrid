@@ -526,7 +526,8 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
             except (ValueError, KeyError) as exception:
                 errors.append(f"{i+1}: '{t}: {exception=}'")
         if errors:
-            raise ValueError(f"Sample formatter function failed: {'\n'.join(errors)}")
+            error_msg = '\n'.join(errors)
+            raise ValueError(f"Sample formatter function failed: {error_msg}")
 
 
     @staticmethod
