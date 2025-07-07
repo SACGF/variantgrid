@@ -291,12 +291,13 @@ class SettingsInitialGroupPermissionForm(forms.Form):
 
 
 class SampleForm(forms.ModelForm, ROFormMixin):
-    genome_build = forms.CharField()
+    genome_build = forms.CharField()  # From VCF.genome_build
+    grid_sample_label = forms.CharField(help_text="Calculated from your current user settings. May be different in analysis due to analysis settings")
 
     class Meta:
         model = models.Sample
         exclude = ['vcf', 'has_genotype']
-        read_only = ('genome_build', 'vcf_sample_name', 'import_status')
+        read_only = ('genome_build', 'vcf_sample_name', 'import_status', 'grid_sample_label')
         widgets = {'vcf_sample_name': TextInput(),
                    'name': TextInput(),
                    'patient': ModelSelect2(url='patient_autocomplete',
@@ -306,10 +307,19 @@ class SampleForm(forms.ModelForm, ROFormMixin):
                                             attrs={'data-placeholder': 'Specimen...'})}
 
     def __init__(self, *args, **kwargs):
+        user = kwargs.pop("user")
         super().__init__(*args, **kwargs)
         fields = ["genome_build"] + [f for f in self.fields if f != 'genome_build']
         self.order_fields(fields)
         self.fields['genome_build'].initial = self.instance.vcf.genome_build
+        self.fields['grid_sample_label'].initial = self._get_sample_label(user, self.instance)
+
+    @staticmethod
+    def _get_sample_label(user, sample):
+        user_settings = UserSettings.get_for_user(user)
+        grid_sample_label_template = user_settings.grid_sample_label_template
+        sample_formatter = Sample._get_sample_formatter_func(grid_sample_label_template)
+        return sample_formatter(sample)
 
     def clean(self):
         cleaned_data = super().clean()

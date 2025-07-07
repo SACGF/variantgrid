@@ -394,7 +394,7 @@ def view_sample(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
     has_write_permission = sample.can_write(request.user)
 
-    form = forms.SampleForm(request.POST or None, instance=sample)
+    form = forms.SampleForm(request.POST or None, user=request.user, instance=sample)
     if not has_write_permission:
         set_form_read_only(form)
         messages.add_message(request, messages.WARNING, "You can view but not modify this data.")
