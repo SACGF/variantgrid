@@ -140,3 +140,9 @@ class PopulationGroup(models.TextChoices):
     SOUTH_ASIAN = 'SAS', 'South Asian'
     SOUTH_EAST_ASIAN = 'SEA', 'South East Asian'
     OTHER = 'OTH', 'Other'
+
+
+class PatientRecordMatchType(models.TextChoices):
+    CREATED = 'C', 'CREATED'
+    EXACT = 'E', 'EXACT'
+    PARTIAL = 'P', 'PARTIAL'
