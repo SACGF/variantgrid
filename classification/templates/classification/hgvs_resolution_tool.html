@@ -13,6 +13,17 @@
 {% block head %}
 {% endblock %}
 {% block content %}
+    <style>
+        .td-variant-coordinate {
+            min-width: 200px;
+        }
+        .td-message {
+            min-width: 200px;
+        }
+        .td-method {
+            min-width: 100px;
+        }
+    </style>
     <div class="container">
         <h3>HGVS Resolution Tool</h3>
         <form method="GET" action="{% url 'hgvs_resolution_tool' %}">
@@ -36,11 +47,11 @@
                             <th>Used Converter Type</th>
                             <th>Method</th>
                         {% endif %}
-                        <th>Variant Coordinate {% if not outputs.all_equal_variant_coordinate %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
-                        <th>Variant Coordinate Explicit {% if not outputs.all_equal_variant_coordinate %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
+                        <th class="td-variant-coordinate">Variant Coordinate {% if not outputs.all_equal_variant_coordinate %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
+                        <th class="td-variant-coordinate">Variant Coordinate Explicit {% if not outputs.all_equal_variant_coordinate %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
                         <th>Transcript {% if not outputs.all_equal_transcript_version %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
                         <th>c.HGVS {% if not outputs.all_equal_hgvs %}<i class="fa-solid fa-arrow-down-up-across-line"></i>{% endif %}</th>
-                        <th>Message</th>
+                        <th class="td-message">Message</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -53,19 +64,20 @@
                                 {% endif %}
                             </th>
                         {% if show_method_column %}
-                            <td>{{ output.used_converter_type|dash_if_empty }}</td>
-                            <td>{{ output.method|dash_if_empty }}</td>
+                            <td class="td-method"><div class="variant-coordinate">{{ output.used_converter_type|dash_if_empty }}</td></td>
+                            <td class="td-method"><div class="variant-coordinate">{{ output.method|dash_if_empty }}</td>
                         {% endif %}
-                            <td>{{ output.variant_coordinate|dash_if_empty }}</td>
-                            <td>{{ output.variant_coordinate|stringformat:'r'|dash_if_empty }}</td>
-                            <td>{{ output.transcript_version|dash_if_empty }}</td>
-                            <td>{% c_hgvs output.hgvs %}</td>
-                            <td>
+                            <td class="td-variant-coordinate"><div class="variant-coordinate">{{ output.variant_coordinate|dash_if_empty }}</div></td>
+                            <td class="td-variant-coordinate"><div class="variant-coordinate">{{ output.variant_coordinate|stringformat:'r'|dash_if_empty }}</div></td>
+                            <td><div class="variant-coordinate">{{ output.transcript_version|dash_if_empty }}</div></td>
+                            <td><div class="variant-coordinate">{% c_hgvs output.hgvs %}</div></td>
+                            <td><div class="variant-coordinate">
                                 {% if output.is_error %}
                                     {{ 'E' | severity_icon }} <span style="white-space: pre-line">{{ output.message }}</span>
                                 {% elif output.message %}
                                     <span class="text-secondary">{{ output.message }}</span>
                                 {% endif %}
+                            </div>
                             </td>
                         </tr>
                     {% endfor %}
