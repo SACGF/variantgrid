@@ -1,7 +1,10 @@
+from functools import partial
+
 from django.contrib.postgres.aggregates.general import StringAgg
-from django.db.models import TextField
+from django.db.models import TextField, QuerySet
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
+from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
 from annotation.models.models_phenotype_match import PATIENT_ONTOLOGY_TERM_PATH
@@ -9,6 +12,8 @@ from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from ontology.grids import AbstractOntologyGenesGrid
 from ontology.models import OntologyTerm, OntologyService
 from patients.models import PatientRecords, Patient, PatientRecord
+from patients.models_enums import PatientRecordMatchType
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
 
 
 class PatientListGrid(JqGridUserRowConfig):
@@ -79,75 +84,67 @@ class PatientListGrid(JqGridUserRowConfig):
         return colmodels
 
 
-class PatientRecordsGrid(JqGridUserRowConfig):
-    model = PatientRecords
-    caption = 'PatientRecords'
-    fields = ["id", "uploadedpatientrecords__uploaded_file__user__username",
-              "uploadedpatientrecords__uploaded_file__name"]
-    colmodel_overrides = {'id': {'width': 40, 'formatter': 'viewPatientRecordsLink'},
-                          'uploadedpatientrecords__uploaded_file__user__username': {'label': 'Uploaded by'},
-                          'uploadedpatientrecords__uploaded_file__name': {'label': 'Uploaded File Name'}}
+class PatientRecordsColumns(DatatableConfig[PatientRecords]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
 
-    def __init__(self, **kwargs):
-        user = kwargs.get("user")
-        super().__init__(user)
-        queryset = self.model.objects.all()
-        if not user.is_superuser:
-            queryset = queryset.filter(uploadedpatientrecords__uploaded_file__user=user)
-        self.queryset = queryset.values(*self.get_field_names())
-        self.extra_config.update({'sortname': 'id',
-                                  'sortorder': 'desc'})
+        # self.expand_client_renderer = DatatableConfig._row_expand_ajax('eventlog_detail', expected_height=120)
+        self.rich_columns = [
+            RichColumn('id', orderable=True, renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn('uploadedpatientrecords__uploaded_file__created', label="Created",
+                       client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn('uploadedpatientrecords__uploaded_file__user__username', label="User", orderable=True),
+            RichColumn('uploadedpatientrecords__uploaded_file__name', orderable=True, label="Filename"),
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[PatientRecords]:
+        # show_group_data = self.get_query_param("patient_records")
+        qs = PatientRecords.objects.all()
+        if not self.user.is_superuser:
+            qs = qs.filter(uploadedpatientrecords__uploaded_file__user=self.user)
+        return qs
 
 
-class PatientRecordGrid(JqGridUserRowConfig):
-    model = PatientRecord
-    caption = 'PatientRecord'
-    fields = [
-        'id',
-        'patient_records__id',
-        'record_id',
-        'valid',
-        'validation_message',
-        'sample_id',
-        'patient_id',
-        'patient__first_name',
-        'patient__last_name',
-        'patient_match',
-        'specimen__reference_id',
-        'specimen_match',
-        'sample_identifier',
-        'sample_name',
-        'patient_family_code',
-        'patient_first_name',
-        'patient_last_name',
-        'date_of_birth',
-        'date_of_death',
-        'sex',
-        'affected',
-        'consanguineous',
-        '_deceased',
-        'patient_phenotype',
-        'specimen_reference_id',
-        'specimen_description',
-        'specimen_collected_by',
-        'specimen_collection_date',
-        'specimen_received_date',
-        'specimen_mutation_type',
-        'specimen_nucleic_acid_source',
-        'specimen_age_at_collection_date'
-    ]
+class PatientRecordColumns(DatatableConfig[PatientRecord]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
 
-    def __init__(self, **kwargs):
-        user = kwargs.get("user")
-        patient_records_id = kwargs.pop('patient_records_id')
-        super().__init__(user)
+        # self.expand_client_renderer = DatatableConfig._row_expand_ajax('eventlog_detail', expected_height=120)
+        self.rich_columns = [
+            RichColumn('id', orderable=True, renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn('record_id', orderable=True),
+            RichColumn('valid', orderable=True),
+            RichColumn('validation_message', orderable=True),
+            RichColumn('sample_id', orderable=True),
+            RichColumn('patient_id', orderable=True),
+            RichColumn('patient__first_name', orderable=True),
+            RichColumn('patient__last_name', orderable=True),
+            RichColumn('patient_match', orderable=True,
+                       renderer=partial(self._render_patient_match_type, "patient_match")),
+            RichColumn('specimen__reference_id', orderable=True),
+            RichColumn('specimen_match', orderable=True,
+                       renderer=partial(self._render_patient_match_type, "specimen_match")),
+            RichColumn('sample_identifier', orderable=True),
+            RichColumn('sample_name', orderable=True),
+            RichColumn('patient_family_code', orderable=True),
+            RichColumn('patient_first_name', orderable=True),
+            RichColumn('patient_last_name', orderable=True),
+            RichColumn('date_of_birth', orderable=True, client_renderer='TableFormat.timestamp'),
+            RichColumn('date_of_death', orderable=True, client_renderer='TableFormat.timestamp'),
+            RichColumn('sex', orderable=True)
+        ]
 
+    @staticmethod
+    def _render_patient_match_type(column_name, row: CellData):
+        return PatientRecordMatchType(row[column_name]).label
+
+    def get_initial_queryset(self) -> QuerySet[PatientRecord]:
+        patient_records_id = self.get_query_param("patient_records")
         patient_records = get_object_or_404(PatientRecords, pk=patient_records_id)
-        patient_records.uploaded_file.check_can_view(user)
-        queryset = self.model.objects.filter(patient_records=patient_records)
-        self.queryset = queryset.values(*self.get_field_names())
-        self.extra_config.update({'sortname': 'id',
-                                  'sortorder': 'desc'})
+        patient_records.uploaded_file.check_can_view(self.user)
+        return PatientRecord.objects.filter(patient_records=patient_records)
 
 
 class PatientOntologyGenesGrid(AbstractOntologyGenesGrid):

@@ -17,7 +17,7 @@ from ontology.forms import OMIMForm, HPOForm, HGNCForm, MONDOForm
 from patients import forms
 from patients.forms import PatientSearchForm, PatientContactForm
 from patients.models import PatientColumns, PatientRecords, Patient, PatientModification, PatientRecordOriginType, \
-    PatientAttachment
+    PatientAttachment, PatientRecord
 from snpdb.models import Sample
 from uicore.utils.form_helpers import form_helper_horizontal
 
@@ -162,22 +162,30 @@ def view_patient_file_attachment_thumbnail(request, patient_attachment_id):
     return view_patient_file_attachment(request, patient_attachment_id, thumbnail=True)
 
 
-def patient_record_imports(request):
+def patient_imports(request):
     context = {}
-    return render(request, 'patients/patient_record_imports.html', context)
+    return render(request, 'patients/patient_imports.html', context)
 
 
-def view_patient_records(request, patient_records_id):
+def view_patient_import(request, patient_records_id):
     patient_records = get_object_or_404(PatientRecords, pk=patient_records_id)
     patient_records.uploaded_file.check_can_view(request.user)
     context = {"patient_records": patient_records}
-    return render(request, 'patients/view_patient_records.html', context)
+    return render(request, 'patients/view_patient_import.html', context)
 
 
 def import_patient_records_details(request):
     context = {"column_descriptions": PatientColumns.COLUMN_DETAILS}
 
     return render(request, 'patients/import_patient_records_details.html', context)
+
+
+def view_patient_record(request, pk):
+    patient_record = get_object_or_404(PatientRecord, pk=pk)
+    patient_record.patient_records.uploaded_file.check_can_view(request.user)
+    context = {"patient_record": patient_record}
+    return render(request, 'patients/view_patient_record.html', context)
+
 
 
 def example_upload_csv_empty(request):

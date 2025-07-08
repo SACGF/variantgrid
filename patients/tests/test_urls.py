@@ -1,3 +1,4 @@
+import os
 import unittest
 
 from django.contrib.auth.models import User
@@ -32,15 +33,16 @@ class Test(URLTestCase):
         emm = ExternalModelManager.objects.get_or_create(name="fake_model_manager", details="blah")[0]
         cls.external_pk = ExternalPK.objects.get_or_create(code="XYZZY", external_type="foo", external_manager=emm)[0]
 
+        dirname = os.path.dirname(__file__)
+        filename = os.path.join(dirname, "test_data", "fake_patient_records.csv")
         uploaded_file = UploadedFile.objects.create(user=cls.user_owner,
                                                     name="fake uploaded file",
-                                                    path="/tmp/fake_patient_records.csv",
+                                                    path=filename,
                                                     file_type=UploadedFileTypes.PATIENT_RECORDS,
                                                     import_source=ImportSource.COMMAND_LINE)
         patient_import = PatientImport.objects.get_or_create(name="shazbot")[0]
         patient_records = PatientRecords.objects.get_or_create(patient_import=patient_import)[0]
         UploadedPatientRecords.objects.get_or_create(uploaded_file=uploaded_file, patient_records=patient_records)
-        patient_record = patient_records.patientrecord_set.create(record_id=1, valid=True)
 
         patient_kwargs = {"patient_id": cls.patient.pk}
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
@@ -49,7 +51,7 @@ class Test(URLTestCase):
             ('view_patient_specimens', patient_kwargs, 200),
             ('view_patient_genes', patient_kwargs, 200),
             ('view_patient_modifications', patient_kwargs, 200),
-            ('view_patient_records', {"patient_records_id": patient_records.pk}, 200),
+            ('view_patient_import', {"patient_records_id": patient_records.pk}, 200),
         ]
 
         cls.PRIVATE_AUTOCOMPLETE_URLS = [
@@ -59,15 +61,13 @@ class Test(URLTestCase):
 
         # (url_name, url_kwargs, object to check appears in grid pk column or (grid column, object)
         cls.PRIVATE_GRID_LIST_URLS = [
-            ("patient_grid", {}, cls.patient),
-            ("patient_records_grid", {}, patient_records),
-            ("patient_record_grid", {"patient_records_id": patient_records.pk}, patient_record),
+            ("patient_grid", {}, cls.patient)
         ]
 
     def testUrls(self):
         """ No permissions on any objects """
         URL_NAMES_AND_KWARGS = [
-            ("patient_record_imports", {}, 200),
+            ("patient_imports", {}, 200),
             ("import_patient_records_details", {}, 200),
             ("example_upload_csv_empty", {}, 200),
             ("example_upload_csv_all", {}, 200),

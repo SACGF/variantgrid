@@ -143,6 +143,7 @@ class PopulationGroup(models.TextChoices):
 
 
 class PatientRecordMatchType(models.TextChoices):
-    CREATED = 'C', 'CREATED'
-    EXACT = 'E', 'EXACT'
-    PARTIAL = 'P', 'PARTIAL'
+    CREATED = 'C', 'CREATED'  # Created new patient
+    # Matched existing
+    EXACT = 'E', 'MATCHED EXACT'
+    PARTIAL = 'P', 'MATCHED PARTIAL'

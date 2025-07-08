@@ -220,7 +220,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         return args
 
     @staticmethod
-    def match(first_name, last_name, sex=None, dob=None, user=None) -> tuple['Patient', Optional[PatientRecordMatchType]]:
+    def match(first_name, last_name, sex=None, date_of_birth=None, user=None) -> tuple['Patient', Optional[PatientRecordMatchType]]:
         """" We need to be able to match incomplete info, eg Male if provided matches Sex = M or Unknown """
 
         if not last_name:
@@ -229,8 +229,8 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         q = Q(last_name__iexact=last_name)
         if first_name:
             q &= Q(first_name__iexact=first_name)
-        if dob is not None:
-            q &= (Q(date_of_birth=dob) | Q(date_of_birth__isnull=True))
+        if date_of_birth is not None:
+            q &= (Q(date_of_birth=date_of_birth) | Q(date_of_birth__isnull=True))
         if sex in Sex.FILLED_IN_CHOICES:
             q &= Sex.get_q_handling_unknown('sex', sex)
 
@@ -241,7 +241,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
                 patients_queryset = Patient.objects.all()
 
             patient = patients_queryset.get(q)
-            if (dob and patient.date_of_birth is None) or (sex in Sex.FILLED_IN_CHOICES and patient.sex == Sex.UNKNOWN):
+            if (date_of_birth and patient.date_of_birth is None) or (sex in Sex.FILLED_IN_CHOICES and patient.sex == Sex.UNKNOWN):
                 match_type = PatientRecordMatchType.PARTIAL
             else:
                 match_type = PatientRecordMatchType.EXACT
@@ -384,6 +384,12 @@ class PatientModification(models.Model):
     origin = models.CharField(max_length=1, choices=PatientRecordOriginType.CHOICES)
     patient_import = models.ForeignKey(PatientImport, null=True, on_delete=CASCADE)
 
+    def get_import_url(self):
+        try:
+            url = self.patient_import.patientrecords.get_absolute_url()
+        except PatientRecords.DoesNotExist:
+            url = None
+        return url
 
 class PatientComment(models.Model):
     patient = models.ForeignKey(Patient, on_delete=CASCADE)
@@ -525,6 +531,9 @@ class Clinician(models.Model):
 class PatientRecords(models.Model):
     patient_import = models.OneToOneField(PatientImport, on_delete=CASCADE)
 
+    def can_view(self, user) -> bool:
+        return user.is_superuser or user == self.user
+
     @property
     def user(self):
         return self.uploaded_file.user
@@ -534,7 +543,7 @@ class PatientRecords(models.Model):
         return self.uploadedpatientrecords.uploaded_file
 
     def get_absolute_url(self):
-        return reverse('view_patient_records', kwargs={"patient_records_id": self.pk})
+        return reverse('view_patient_import', kwargs={"patient_records_id": self.pk})
 
 
 class PatientRecord(models.Model):
@@ -576,6 +585,10 @@ class PatientRecord(models.Model):
 
     # Methods on this can include save / isvalid etc -
     # call out to helper funcs etc
+
+    def get_absolute_url(self):
+        return reverse('view_patient_record', kwargs={"pk": self.pk})
+
 
 
 @receiver(models.signals.post_save, sender=PatientAttachment)

@@ -1,0 +1,57 @@
+{% extends menu_patients_base %}
+{% load ui_utils %}
+
+{% block title %}Patient Records{% endblock title %}
+{% block css %}
+#patient-header {
+    margin-bottom: 10px; 
+}
+{% endblock css %}
+
+{% block submenu_page_content %}
+    <div>
+        <div>
+            From <a href="{% url 'view_patient_import' patient_record.patient_records_id %}">Patient Import {{ patient_record.patient_records_id }}</a>
+        </div>
+        <div class="card mb-4">
+            <div class="card-header">Patient Record {{ patient_record.pk }} {% admin_link patient_record %}</div>
+            <div class="card-body">
+                {% labelled label="ID" %}{{ patient_record.id }}{% endlabelled %}
+                {% labelled label="Record ID (line number)" %}{{ patient_record.record_id }}{% endlabelled %}
+                {% labelled label="Valid" %}{{ patient_record.get_valid_display }}{% endlabelled %}
+                {% labelled label="Sample" %}
+                    {% if patient_record.sample %}
+                        <a href="{% url 'view_sample' patient_record.sample_id %}">{{ patient_record.sample }}</a>
+                    {% else %}
+                        -
+                    {% endif %}
+                {% endlabelled %}
+                {% labelled label="Patient" %}
+                    {% if patient_record.patient %}
+                        <a href="{% url 'view_patient' patient_record.patient_id %}">{{ patient_record.patient }}</a>
+                    {% else %}
+                        -
+                    {% endif %}
+                {% endlabelled %}
+                {% labelled label="Patient Match" %}{{ patient_record.get_patient_match_display }}{% endlabelled %}
+                {% labelled label="Specimen" %}{{ patient_record.specimen }}{% endlabelled %}
+                {% labelled label="Specimen Match" %}{{ patient_record.get_specimen_match_display }}{% endlabelled %}
+                {% labelled label="Sample Identifier" %}{{ patient_record.sample_identifier }}{% endlabelled %}
+                {% labelled label="Sample Name" %}{{ patient_record.sample_name }}{% endlabelled %}
+                {% labelled label="Patient Family Code" %}{{ patient_record.patient_family_code }}{% endlabelled %}
+                {% labelled label="Patient First Name" %}{{ patient_record.patient_first_name }}{% endlabelled %}
+                {% labelled label="Patient Last Name" %}{{ patient_record.patient_last_name }}{% endlabelled %}
+                {% labelled label="Patient DOB" %}{{ patient_record.date_of_birth }}{% endlabelled %}
+                {% labelled label="Patient Sex" %}{{ patient_record.get_sex_display }}{% endlabelled %}
+                {% labelled label="Specimen Ref #" %}{{ patient_record.specimen_reference_id }}{% endlabelled %}
+                {% labelled label="Specimen Description" %}{{ patient_record.specimen_description }}{% endlabelled %}
+                {% labelled label="Specimen Collected By" %}{{ patient_record.specimen_collected_by }}{% endlabelled %}
+                {% labelled label="Specimen Collected Date" %}{{ patient_record.specimen_collection_date }}{% endlabelled %}
+                {% labelled label="Specimen Received Date" %}{{ patient_record.specimen_received_date }}{% endlabelled %}
+                {% labelled label="Specimen Mutation Type" %}{{ patient_record.get_specimen_mutation_type_display }}{% endlabelled %}
+                {% labelled label="Specimen Nucleic Acid Source" %}{{ patient_record.get_specimen_nucleic_acid_source_display }}{% endlabelled %}
+                {% labelled label="Specimen Age at collection" %}{{ patient_record.specimen_age_at_collection_date }}{% endlabelled %}
+            </div>
+    </div>
+{% endblock submenu_page_content %}
+
