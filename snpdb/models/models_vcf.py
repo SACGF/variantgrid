@@ -534,12 +534,13 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
     def _get_sample_formatter_func(sample_label_template, fallback=True):
         """ This is for rendering sample names on analysis grids """
         def _sample_formatter_func(sample):
-            params = sample._get_sample_formatter_params()
-            for t in sample_label_template.split("||"):
-                try:
-                    return t % params
-                except (ValueError, KeyError) as e:
-                    pass
+            if sample_label_template:
+                params = sample._get_sample_formatter_params()
+                for t in sample_label_template.split("||"):
+                    try:
+                        return t % params
+                    except (ValueError, KeyError) as e:
+                        pass
             # In theory this should be valid due to form validator, but just in case
             return sample.name
         return _sample_formatter_func
