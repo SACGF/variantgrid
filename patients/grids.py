@@ -13,7 +13,7 @@ from ontology.grids import AbstractOntologyGenesGrid
 from ontology.models import OntologyTerm, OntologyService
 from patients.models import PatientRecords, Patient, PatientRecord
 from patients.models_enums import PatientRecordMatchType
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData
 
 
 class PatientListGrid(JqGridUserRowConfig):
