@@ -39,7 +39,7 @@ class AnalysisTemplateRunAdmin(ModelAdminBasics):
 
 
 @admin.register(models.AnalysisTemplateVersion)
-class AnalysisTemplateRunAdmin(ModelAdminBasics):
+class AnalysisTemplateVersionAdmin(ModelAdminBasics):
     pass
 
 
