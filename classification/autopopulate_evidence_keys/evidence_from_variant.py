@@ -11,7 +11,7 @@ from annotation.models import Citation
 from annotation.models.damage_enums import FATHMMPrediction, \
     MutationTasterPrediction, Polyphen2Prediction, SIFTPrediction, \
     MutationAssessorPrediction, ALoFTPrediction
-from annotation.models.models import VariantAnnotation, AnnotationVersion, GeneSymbolPubMedCount
+from annotation.models.models import VariantAnnotation, AnnotationVersion, GenePubMedCount
 from annotation.models.models_enums import ClinVarReviewStatus
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import VEP_SEPARATOR
@@ -410,12 +410,12 @@ def get_evidence_fields_from_preferred_transcript(
         data[SpecialEKeys.GNOMAD_OE_LOF] = gnomad_oe_lof_summary
 
     try:
-        gs_count = GeneSymbolPubMedCount.get_for_gene_symbol(gene_symbol_id)
-        pubmed_data = {"value": gs_count.count,
-                       "note": f"Retrieved {gs_count.modified.date()}"}
-    except (HTTPError, RuntimeError) as _e:
+        count, note = GenePubMedCount.get_count_and_note_for_gene_symbol(gene_symbol_id)
+        pubmed_data = {"value": count,
+                       "note": note}
+    except:
         pubmed_data = {
-            "value": "<NOT AVAILABLE> - network error connecting to PubMed. Please fill this in manually."
+            "value": "<NOT AVAILABLE> - no results. Please fill this in manually."
         }
     data[SpecialEKeys.PUBMED_GENE_SEARCH_COUNT] = pubmed_data
     return data

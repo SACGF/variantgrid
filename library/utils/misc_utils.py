@@ -1,5 +1,9 @@
 import functools
+import gzip
+import io
+import itertools
 import json
+import time
 from enum import Enum
 from json.encoder import JSONEncoder
 from typing import TypeVar, Optional, Any
@@ -7,6 +11,9 @@ from urllib.parse import urlparse
 
 from django.core.serializers import serialize
 from django.db.models.query import QuerySet
+from requests import Session
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 FLOAT_REGEX = r'([-+]?[0-9]*\.?[0-9]+.|Infinity)'
 
@@ -131,3 +138,29 @@ def update_dict_of_dict_values(dict_to_update: dict[Any, dict], new_values: dict
         old_values = dict_to_update.get(k, {})
         old_values.update(v)
         dict_to_update[k] = old_values
+
+
+_retry = Retry(total=5, read=5, backoff_factor=0, allowed_methods=["GET"])
+_ses = Session()
+_ses.mount("http://", HTTPAdapter(max_retries=_retry))
+_ses.mount("https://", HTTPAdapter(max_retries=_retry))
+
+def iter_http_lines(url, timeout=60, attempts=5, backoff=2, encoding="utf-8", session=_ses):
+    for n in itertools.count():
+        try:
+            with session.get(url, stream=True, timeout=timeout) as r:
+                r.raise_for_status()
+                binary = r.raw
+                if r.headers.get("Content-Encoding") == "gzip":
+                    binary.decode_content = True
+                elif url.endswith(".gz"):
+                    binary = gzip.GzipFile(fileobj=binary)
+                text = io.TextIOWrapper(binary, encoding=encoding)
+                for line in text:
+                    yield line.rstrip("\n")
+            return
+        except Exception:
+            if n + 1 >= attempts:
+                raise
+            time.sleep(backoff * 2**n)
+

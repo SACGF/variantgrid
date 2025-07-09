@@ -7,8 +7,10 @@ from genes.models import GeneListCategory
 from genes.tasks.cached_web_resource_tasks import PanelAppEnglandPanelsWebResourceTask, \
     PanelAppAustraliaPanelsWebResourceTask, GnomADGeneConstraintWebResourceTask, PfamWebResourceTask, \
     UniProtWebResourceTask, RefSeqGeneSummaryWebResourceTask, HGNCWebResourceTask, LRGRefSeqGeneWebResourceTask, \
-    RefSeqGeneInfoWebResourceTask, RefSeqSequenceInfoWebResourceTask, MANEWebResourceTask
+    RefSeqGeneInfoWebResourceTask, RefSeqSequenceInfoWebResourceTask, MANEWebResourceTask, \
+    RefSeqGenePubMedCountWebResourceTask
 
+# Remember to connect these handlers up in apps.GenesConfig
 # For some reason this doesn't work as a variable, has to be stored here...
 gnomad_gene_constraint_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT,
                                                                                    GnomADGeneConstraintWebResourceTask)
@@ -35,7 +37,11 @@ refseq_gene_info_post_save_handler = CachedWebResource.named_handler_factory(set
 
 refseq_sequence_info_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_REFSEQ_SEQUENCE_INFO, RefSeqSequenceInfoWebResourceTask)
 
+refseq_gene_pub_med_count_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_REFSEQ_GENE_PUBMED_COUNTS, RefSeqGenePubMedCountWebResourceTask)
+
 uniprot_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_UNIPROT, UniProtWebResourceTask)
+
+# Remember to connect these handlers up in apps.GenesConfig
 
 
 def cached_third_part_gene_list_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument

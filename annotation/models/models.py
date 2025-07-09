@@ -3,11 +3,10 @@ import operator
 import os
 import re
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from functools import cached_property, reduce
 from typing import Optional, Callable, Iterable
 
-from Bio import Entrez
 from Bio.Data.IUPACData import protein_letters_1to3
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -19,7 +18,6 @@ from django.db.models.deletion import PROTECT, CASCADE, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls import reverse
-from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
@@ -1883,28 +1881,44 @@ class GeneSymbolCitation(models.Model):
         unique_together = ('gene_symbol', 'citation')
 
 
-class GeneSymbolPubMedCount(TimeStampedModel):
-    gene_symbol = models.OneToOneField(GeneSymbol, on_delete=CASCADE)
+class GenePubMedCount(models.Model):
+    """ From https://ftp.ncbi.nlm.nih.gov/gene/DATA/gene2pubmed.gz """
+    gene = models.ForeignKey(Gene, on_delete=CASCADE)
     count = models.IntegerField()
+    cached_web_resource = models.ForeignKey(CachedWebResource, on_delete=CASCADE)
+
+    @staticmethod
+    def get_count_and_note_for_gene_symbol(gene_symbol_id) -> tuple[int, str]:
+        gene_symbol = GeneSymbol.objects.get(pk=gene_symbol_id)
+        genes_qs = gene_symbol.get_genes().filter(annotation_consortium=AnnotationConsortium.REFSEQ)
+        notes = []
+        count = 0
+        if gene_counts := list(GenePubMedCount.objects.filter(gene__in=genes_qs)):
+            for gc in gene_counts:
+                count = max(count, gc.count)
+                notes.append(f"{gc.gene}={gc.count}")
+            modified = gene_counts[0].retrieved_date
+        else:
+            if first_gpmc := GenePubMedCount.objects.first():
+                count = 0
+                notes.append(f"No results (could be no RefSeq gene for {gene_symbol=})")
+                modified = first_gpmc.retrieved_date
+            else:
+                raise ValueError("No GenePubMedCount entries")
+
+        retrieved = modified.date().isoformat()
+        notes.insert(0, f"NCBI curated gene2pubmed retrieved {retrieved}. Homo Sapien only. ")
+        return count, " ".join(notes)
+
 
     @staticmethod
     def get_for_gene_symbol(gene_symbol_id):
-        max_days = settings.ANNOTATION_PUBMED_GENE_SYMBOL_COUNT_CACHE_DAYS
-        latest_time = timezone.now() - timedelta(days=max_days)
-        try:
-            return GeneSymbolPubMedCount.objects.get(gene_symbol_id=gene_symbol_id,
-                                                     modified__gte=latest_time)
-        except GeneSymbolPubMedCount.DoesNotExist:
-            pass
+        # TODO
+        pass
 
-        h = Entrez.esearch(db="pubmed", term=gene_symbol_id, rettype='count')
-        record = Entrez.read(h)
-        count = record["Count"]
-        return GeneSymbolPubMedCount.objects.get_or_create(gene_symbol_id=gene_symbol_id,
-                                                           defaults={"count": count})[0]
-
-    def __str__(self):
-        return f"{self.gene_symbol_id}: {self.count}"
+    @property
+    def retrieved_date(self):
+        return self.cached_web_resource.created
 
 
 class MutationalSignatureInfo(models.Model):

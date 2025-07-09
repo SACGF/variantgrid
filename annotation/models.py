@@ -6,7 +6,7 @@ from annotation.models.models import ClinVarVersion, ClinVar, ClinVarRecordColle
     HumanProteinAtlasAnnotation, ColumnVEPField, VariantAnnotationVersion, VCFAnnotationStats, AnnotationRangeLock, \
     AnnotationRun, VariantAnnotation, VariantTranscriptAnnotation, VariantGeneOverlap, ManualVariantEntryCollection, \
     ManualVariantEntry, CreatedManualVariant, AnnotationVersion, CachedWebResource, GeneSymbolCitation, \
-    GeneSymbolPubMedCount, MutationalSignatureInfo
+    GenePubMedCount, MutationalSignatureInfo
 from annotation.models.models_citations import Citation
 from annotation.models.models_gene_counts import VariantSource, SampleAnnotationVersionVariantSource, GeneCountType, \
     GeneValue, GeneValueCountCollection, GeneValueCount, CohortGeneCounts

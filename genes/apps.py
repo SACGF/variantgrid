@@ -18,7 +18,8 @@ class GenesConfig(AppConfig):
             pfam_post_save_handler, \
             gnomad_gene_constraint_post_save_handler, cached_third_part_gene_list_pre_delete_handler, \
             refseq_gene_summary_post_save_handler, refseq_gene_info_post_save_handler, \
-            refseq_sequence_info_post_save_handler, uniprot_post_save_handler
+            refseq_sequence_info_post_save_handler, refseq_gene_pub_med_count_post_save_handler, \
+            uniprot_post_save_handler
         # pylint: enable=import-outside-toplevel,unused-import
 
         post_save.connect(gnomad_gene_constraint_post_save_handler, sender=CachedWebResource)
@@ -31,6 +32,7 @@ class GenesConfig(AppConfig):
         post_save.connect(refseq_gene_summary_post_save_handler, sender=CachedWebResource)
         post_save.connect(refseq_gene_info_post_save_handler, sender=CachedWebResource)
         post_save.connect(refseq_sequence_info_post_save_handler, sender=CachedWebResource)
+        post_save.connect(refseq_gene_pub_med_count_post_save_handler, sender=CachedWebResource)
         post_save.connect(uniprot_post_save_handler, sender=CachedWebResource)
 
         pre_delete.connect(cached_third_part_gene_list_pre_delete_handler, CachedThirdPartyGeneList)
