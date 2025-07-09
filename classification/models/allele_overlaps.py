@@ -380,8 +380,7 @@ class OverlapsCalculator:
     @property
     def clinical_groupings_overlaps(self) -> Iterator[ClinicalGroupingOverlap]:
         for overlap in self.overlaps:
-            for cc in overlap.clinical_groupings:
-                yield cc
+            yield from overlap.clinical_groupings
 
     @cached_property
     def overlaps_vus(self) -> list[ClinicalGroupingOverlap]:

@@ -1247,13 +1247,10 @@ class OntologySnake:
             if term.ontology_service in {OntologyService.MONDO, OntologyService.OMIM}:
                 if term.ontology_service == OntologyService.MONDO:
                     if omim := OntologyTermRelation.as_omim(term):
-                        for relation in OntologySnake.get_all_term_to_gene_relationships(omim, gene_symbol, try_related_terms=False):
-                            yield relation
-
+                        yield from OntologySnake.get_all_term_to_gene_relationships(omim, gene_symbol, try_related_terms=False)
                 elif term.ontology_service == OntologyService.OMIM:
                     if mondo := OntologyTermRelation.as_mondo(term):
-                        for relation in OntologySnake.get_all_term_to_gene_relationships(mondo, gene_symbol, try_related_terms=False):
-                            yield relation
+                        yield from OntologySnake.get_all_term_to_gene_relationships(mondo, gene_symbol, try_related_terms=False)
         except ValueError:
             report_exc_info()
             return None
