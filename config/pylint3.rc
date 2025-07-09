@@ -307,8 +307,8 @@ min-public-methods=2
 [EXCEPTIONS]
 
 # Exceptions that will emit a warning when caught.
-overgeneral-exceptions=BaseException,
-                       Exception
+overgeneral-exceptions=builtins.BaseException,
+                       builtins.Exception
 
 
 [FORMAT]
@@ -425,7 +425,10 @@ disable=raw-checker-failed,
 	    invalid-str-returned, # False positives Django __str__
 	    no-else-return,
 	    no-else-raise,
-	    no-name-in-module  # Our Django model stuff broke this one
+	    no-name-in-module,  # Our Django model stuff broke this one
+        imported-auth-user,  # We should do this one day, or going forward, but too hard now. Disabling as noisy
+        model-no-explicit-unicode, # Django Python 2 rule
+        model-missing-unicode,  # Django Python 2 rule
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
