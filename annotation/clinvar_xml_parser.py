@@ -7,10 +7,8 @@ from typing import Optional
 from annotation.models import ClinVarRecord
 from library.utils.xml_utils import XmlParser
 
-"""
-This file is responsible for retrieving data from the ClinVar API end points to get more granular data about a given
-ClinVar variant.
-"""
+# This file is responsible for retrieving data from the ClinVar API end points to get more granular data about a given
+# ClinVar variant.
 
 CLINVAR_RECORD_CACHE_DAYS = 60
 """
@@ -126,25 +124,25 @@ class ClinVarXmlParser(XmlParser, ABC):
     @staticmethod
     def clean_term_id_from_elem(elem) -> str:
         db = elem.get("DB")
-        id = elem.get("ID")
+        identifier = elem.get("ID")
         final_value = None
         # ClinVar is always a bit weird about how it represents different conditions
         # use this to convert to standard term descriptions
         if db == "MONDO":
-            final_value = id
+            final_value = identifier
         elif db == "OMIM":
-            final_value = f"OMIM:{id}"
+            final_value = f"OMIM:{identifier}"
         elif db == "Orphanet":
-            if m := ClinVarXmlParser.RE_ORPHA.match(id):
+            if m := ClinVarXmlParser.RE_ORPHA.match(identifier):
                 final_value = f"ORPHA:{m.group(1)}"
         elif db == "MedGen":
-            final_value = f"MedGen:{id}"
+            final_value = f"MedGen:{identifier}"
         elif db == "HP":
-            final_value = id
+            final_value = identifier
         elif db == "GeneReviews":
-            final_value = id
+            final_value = identifier
         elif db.upper() == "MESH":
-            final_value = f"MeSH:{id}"
+            final_value = f"MeSH:{identifier}"
         else:
-            final_value = f"{db} {id}"
+            final_value = f"{db} {identifier}"
         return final_value
