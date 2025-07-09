@@ -572,7 +572,6 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 if msg := originally_normalized.get_message():
                     search_messages.append(SearchMessage(msg, LogLevel.WARNING, substituted=True))
 
-
     except MissingTranscript:
         pass
     except Contig.ContigNotInBuildError as e:

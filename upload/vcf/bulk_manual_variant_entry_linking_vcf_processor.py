@@ -35,7 +35,6 @@ class BulkManualVariantEntryLinkingVCFProcessor(BulkMinimalVCFProcessor):
                                        variant_id=variant_id)
             created_manual_variants.append(cmv)
 
-
         if created_manual_variants:
             CreatedManualVariant.objects.bulk_create(created_manual_variants)
 

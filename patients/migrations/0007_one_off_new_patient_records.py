@@ -40,7 +40,6 @@ def _one_off_new_patient_records(apps, _schema_editor):
                                                                         matched_specimen=None)
 
 
-
 class Migration(migrations.Migration):
 
     dependencies = [

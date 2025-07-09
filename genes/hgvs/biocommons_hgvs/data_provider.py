@@ -63,7 +63,7 @@ class SingleBuildFastaSeqFetcher(FastaSeqFetcher):
 
 class DjangoTranscriptDataProvider(LocalDataProvider):
 
-    def __init__(self, genome_build, retrieve_transcripts: Optional[bool]=None):
+    def __init__(self, genome_build, retrieve_transcripts: Optional[bool] = None):
         """ retrieve_transcripts: attempt to retrieve transcript if not present (slower) """
         self.db_transcript_seqfetcher = DBTranscriptSeqFetcher(retrieve_transcripts)
         self.fasta_seqfetcher = SingleBuildFastaSeqFetcher(genome_build)

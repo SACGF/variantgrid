@@ -1910,7 +1910,6 @@ class GenePubMedCount(models.Model):
         notes.insert(0, f"NCBI curated gene2pubmed retrieved {retrieved}. Homo Sapien only. ")
         return count, " ".join(notes)
 
-
     @staticmethod
     def get_for_gene_symbol(gene_symbol_id):
         # TODO

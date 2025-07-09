@@ -115,7 +115,7 @@ class ImportVCFStepTask(Task):
 
     @staticmethod
     def _schedule_steps(child_task_class, parent_upload_step, multi_steps: list[tuple[str, int]],
-                        name: Optional[str]=None):
+                        name: Optional[str] = None):
         """ If name is None - will use simplified child class name """
         child_class_name = full_class_name(child_task_class)
         if name is None:

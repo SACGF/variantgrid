@@ -310,7 +310,6 @@ class HGVSMatcher:
         normalized_hgvs = self.hgvs_converter.normalize(hgvs_variant)
         return HgvsOriginallyNormalized(original_hgvs=hgvs_variant, normalized_hgvs=normalized_hgvs)
 
-
     def filter_best_transcripts_and_converter_type_by_accession(self, transcript_accession, prefer_local=True, closest=False) -> list[tuple[TranscriptVersion, HGVSConverterType]]:
         """ Get the best transcripts you'd want to match a HGVS against - assuming you will try multiple in order """
 

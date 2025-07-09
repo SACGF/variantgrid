@@ -8,7 +8,7 @@ def _ekey_allele_origin_germline_somatic_only(apps, _schema_editor):
     EvidenceKey.objects.filter(pk='allele_origin').update(
         mandatory=True,
         description="Indicate whether variant is Germline (heritable) or Somatic (non-heritable). To specify confidence, set field 'allele_origin_confirmation' to 'confirmed' or 'unconfirmed'",
-        options = [
+        options=[
             {'key': 'germline',
             'index': 1,
             'clinvar': 'germline',

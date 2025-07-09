@@ -213,5 +213,3 @@ def store_gene2pubmed_from_web(cached_web_resource: CachedWebResource):
         logging.info("Skipped %d genes: example: %s", len(skipped_genes), examples)
 
     logging.info(f"store_gene2pubmed_from_web - Finished: %s", cached_web_resource.description)
-
-

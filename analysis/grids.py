@@ -206,7 +206,7 @@ class VariantGrid(AbstractVariantGrid):
 
     @staticmethod
     def get_grid_genotype_columns_and_overrides(cohorts, visibility,
-                                                af_show_in_percent: bool, sample_formatter: Optional[Callable]=None):
+                                                af_show_in_percent: bool, sample_formatter: Optional[Callable] = None):
         available_format_columns = get_available_format_columns(cohorts)
         sample_columns = {
             'samples_zygosity': ('Zygosity', '%(sample)s %(label)s', 55),

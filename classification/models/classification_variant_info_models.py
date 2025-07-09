@@ -186,7 +186,7 @@ class ResolvedVariantInfo(TimeStampedModel):
         variant = self.variant
         genome_build = self.genome_build
         imported_transcript = self.allele_info.get_transcript
-        hgvs_matcher = HGVSMatcher(genome_build=genome_build) #
+        hgvs_matcher = HGVSMatcher(genome_build=genome_build)
         # hgvs_converter_type = hgvs_matcher.hgvs_converter.get_hgvs_converter_type()
         # version = hgvs_matcher.hgvs_converter.get_version()
 
@@ -506,7 +506,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         return {GenomeBuild.grch37(), GenomeBuild.grch38()}
 
     @staticmethod
-    def column_name_for_build(genome_build: GenomeBuild, prefix: str = "", suffix: str = 'c_hgvs'): #
+    def column_name_for_build(genome_build: GenomeBuild, prefix: str = "", suffix: str = 'c_hgvs'):
         build_str: str
         if genome_build.is_equivalent(GenomeBuild.grch37()):
             build_str = 'grch37'

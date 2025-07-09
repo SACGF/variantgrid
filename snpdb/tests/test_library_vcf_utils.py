@@ -94,10 +94,8 @@ class TestVCFUtils(TestCase):
             for in_vc, (out_vc, out_record) in zip(variant_coordinates, out):
                 self.assertEqual(out_record.INFO["END"], in_vc.end)
 
-
     def test_vcf_get_ref_alt_svlen_and_modification(self):
         filename = "snpdb/tests/test_data/svlen_split_multi_allele.vcf"
         for v in cyvcf2.Reader(filename):
             _ref, _alt, svlen, _modification = vcf_get_ref_alt_svlen_and_modification(v, old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
             self.assertTrue(isinstance(svlen, int))
-

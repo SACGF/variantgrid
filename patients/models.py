@@ -590,7 +590,6 @@ class PatientRecord(models.Model):
         return reverse('view_patient_record', kwargs={"pk": self.pk})
 
 
-
 @receiver(models.signals.post_save, sender=PatientAttachment)
 def patient_attachment_post_save(sender, instance, created, **kwargs):  # pylint: disable=unused-argument
     if created:

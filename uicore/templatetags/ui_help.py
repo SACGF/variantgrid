@@ -69,7 +69,7 @@ class PageHelpContent(template.Node):
     def __init__(self,
                  nodelist,
                  title: FilterExpression,
-                 help_url: Optional[str]=None):
+                 help_url: Optional[str] = None):
         self.nodelist = nodelist
         self.title = title
         if help_url is None:

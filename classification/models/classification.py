@@ -1503,7 +1503,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     initial_data=False,
                     revalidate_all=False,
                     ignore_if_only_patching: Optional[Set[str]] = None,
-                    patch_known_keys_only: Optional[bool]=None) -> ClassificationPatchResponse:
+                    patch_known_keys_only: Optional[bool] = None) -> ClassificationPatchResponse:
         """
             Creates a new ClassificationModification if the patch values are different to the current values
             Patching a value with the same value has no effect
@@ -2739,7 +2739,6 @@ class CuratedDate:
                     # an invalid date should already cause a warning on the classification form
                     pass
 
-
     @cached_property
     def curation_date(self) -> Optional[ClassificationDate]:
         if date_val := self.convert_date(SpecialEKeys.CURATION_DATE):
@@ -2799,7 +2798,7 @@ class CuratedDate:
                 return 1
             if date_1 is None and date_2 is None:
                 return 0
-            
+
             if date_1.value == date_2.value:
                 return 0
             elif date_1 < date_2:

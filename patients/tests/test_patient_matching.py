@@ -85,6 +85,3 @@ class TestPatientMatching(TestCase):
                      (dl_me, PatientRecordMatchType.EXACT))
         self.assertEqual(Patient.match(first_name="DAVID", last_name="LAWRENCE", date_of_birth='2020-01-01'),
                          (dl_other, PatientRecordMatchType.EXACT))
-
-
-

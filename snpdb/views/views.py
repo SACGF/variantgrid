@@ -609,7 +609,6 @@ def manual_variant_entry_collection_detail(request: HttpRequest, pk: int):
     return render(request, 'snpdb/data/manual_variant_entry_collection_detail.html', context={'mvec': mvec})
 
 
-
 def watch_manual_variant_entry(request, pk):
     mvec = ManualVariantEntryCollection.get_for_user(request.user, pk)
     # TODO: Quick redirect to variant if it's already ready
@@ -793,7 +792,6 @@ def view_group(request, pk):
         "users_qs": users_qs,
     }
     return render(request, 'snpdb/settings/view_group.html', context)
-
 
 
 def _add_read_only_settings_message(request, lab_list: Iterable[Lab]):

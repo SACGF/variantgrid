@@ -187,7 +187,6 @@ def view_patient_record(request, pk):
     return render(request, 'patients/view_patient_record.html', context)
 
 
-
 def example_upload_csv_empty(request):
     """ headers only """
     sample_qs = Sample.objects.none()

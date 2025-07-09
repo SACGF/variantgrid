@@ -529,7 +529,6 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
             error_msg = '\n'.join(errors)
             raise ValueError(f"Sample formatter function failed: {error_msg}")
 
-
     @staticmethod
     def _get_sample_formatter_func(sample_label_template, fallback=True):
         """ This is for rendering sample names on analysis grids """
@@ -544,7 +543,6 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
             # In theory this should be valid due to form validator, but just in case
             return sample.name
         return _sample_formatter_func
-
 
 
 class SampleFilePath(models.Model):
