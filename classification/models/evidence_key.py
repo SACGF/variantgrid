@@ -96,7 +96,7 @@ class EvidenceKeyOverrides(pydantic.BaseModel):
             if key == "namespaces":
                 namespaces = set(value)
                 continue
-            elif isinstance(value, bool):
+            if isinstance(value, bool):
                 value = {"hide": not value}
             elif not isinstance(value, dict):
                 raise ValueError(f"Received illegal value for classification config: {key}: {value}")
