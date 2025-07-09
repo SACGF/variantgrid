@@ -483,7 +483,7 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
             sample_require_zygosity = {sample : True/False} - defaults to True
             exclude - invert query (not equals)
         """
-        if all([not v for v in sample_zygosities.values()]):
+        if all(not v for v in sample_zygosities.values()):
             # nothing selected
             q_none = Q(pk__isnull=True)
             return q_none
