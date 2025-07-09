@@ -1,6 +1,4 @@
-import operator
 import os
-from functools import reduce
 from typing import Optional
 
 import nameparser

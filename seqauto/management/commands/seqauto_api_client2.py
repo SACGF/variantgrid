@@ -1,10 +1,9 @@
-import copy
 import dataclasses
 import json
 import logging
 import os
-from datetime import date, datetime
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from typing import Optional, List, Dict
 
 import requests

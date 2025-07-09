@@ -1,10 +1,8 @@
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect
-from django.urls.base import reverse
 from django.views.generic import TemplateView
 
 from annotation.models import patients_qs_for_ontology_term
-from genes.models import GeneSymbol
 from library.utils import LimitedCollection
 from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService, OntologySnake, OntologyRelation, \
     ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER

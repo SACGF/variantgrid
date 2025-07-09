@@ -8,7 +8,8 @@ from library.django_utils.jqgrid_view import JQGridView
 from library.preview_request import preview_view
 from snpdb.grids import CohortListGrid, CohortSampleListGrid, SamplesListGrid, GenomicIntervalsListGrid, \
     CustomColumnsCollectionColumns, TriosListGrid, VCFListGrid, TagColorsCollectionColumns, \
-    LiftoverRunColumns, LiftoverRunAlleleLiftoverColumns, AlleleLiftoverFailureColumns, ManualVariantEntryCollectionColumns
+    LiftoverRunColumns, LiftoverRunAlleleLiftoverColumns, AlleleLiftoverFailureColumns, \
+    ManualVariantEntryCollectionColumns
 from snpdb.views import views, views_json, views_rest, views_autocomplete
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path

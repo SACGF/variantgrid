@@ -4,7 +4,8 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from variantgrid.deployment_validation.annotation_files_check import annotation_data_exists, check_cdot_data
-from variantgrid.deployment_validation.annotation_status_checks import check_annotation_versions, check_variant_annotation_runs_status
+from variantgrid.deployment_validation.annotation_status_checks import check_annotation_versions, \
+    check_variant_annotation_runs_status
 from variantgrid.deployment_validation.celery_checks import check_celery_tasks
 from variantgrid.deployment_validation.classification_checks import check_classification_reports
 from variantgrid.deployment_validation.column_check import check_variantgrid_columns

@@ -43,7 +43,6 @@ from classification.models import ClassificationAttachment, Classification, \
 from classification.models.classification import ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRunStatus
 from classification.models.clinical_context_models import ClinicalContext
-from classification.models.discordance_models_utils import DiscordanceReportRowData
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from classification.views.classification_dashboard_view import ClassificationDashboard

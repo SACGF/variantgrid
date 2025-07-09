@@ -1,7 +1,5 @@
-import operator
 import re
 from datetime import datetime, timedelta
-from functools import reduce
 from typing import Optional
 from urllib.parse import unquote_plus
 

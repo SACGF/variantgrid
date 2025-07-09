@@ -35,7 +35,7 @@ from annotation.manual_variant_entry import create_manual_variants, can_create_v
 from annotation.models import AnnotationVersion, SampleVariantAnnotationStats, SampleGeneAnnotationStats, \
     SampleClinVarAnnotationStats, SampleVariantAnnotationStatsPassingFilter, SampleGeneAnnotationStatsPassingFilter, \
     SampleClinVarAnnotationStatsPassingFilter
-from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion, ManualVariantEntry
+from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion
 from annotation.models.models_gene_counts import GeneValueCountCollection, \
     GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
 from annotation.serializers import ManualVariantEntryCollectionSerializer

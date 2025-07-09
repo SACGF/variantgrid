@@ -1,7 +1,7 @@
 import operator
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import timezone, datetime, timedelta
+from datetime import datetime, timedelta
 from functools import cached_property, reduce
 from itertools import combinations
 from typing import Optional, Iterable, Union, Any

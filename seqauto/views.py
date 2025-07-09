@@ -8,9 +8,8 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
-from django.http.response import HttpResponseRedirect, JsonResponse, HttpResponse
+from django.http.response import JsonResponse, HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
-from django.urls.base import reverse
 from django.utils.decorators import method_decorator
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST

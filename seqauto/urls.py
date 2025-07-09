@@ -1,4 +1,4 @@
-from django.urls import include, path
+from django.urls import include
 from rest_framework import routers
 from rest_framework.urlpatterns import format_suffix_patterns
 
@@ -17,7 +17,7 @@ from seqauto.views import SequencerUpdate, LibraryUpdate, AssayUpdate, VariantCa
     AlignerUpdate, VariantCallingPipelineUpdate
 from seqauto.views_rest import SequencingRunViewSet, EnrichmentKitViewSet, SequencerModelViewSet, SequencerViewSet, \
     ExperimentViewSet, VariantCallerViewSet, VCFFileViewSet, SampleSheetCombinedVCFFileViewSet, FastQCViewSet, \
-    SampleSheetViewSet, IlluminaFlowcellQCViewSet, QCViewSet, QCGeneListViewSet, QCGeneCoverageViewSet, \
+    SampleSheetViewSet, IlluminaFlowcellQCViewSet, QCGeneListViewSet, QCGeneCoverageViewSet, \
     QCExecSummaryViewSet, QCGeneListBulkCreateView, SequencingFilesBulkCreateView, QCExecSummaryBulkCreateView, \
     QCGeneCoverageBulkCreateView
 from snpdb.views.datatable_view import DatabaseTableView

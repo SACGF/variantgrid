@@ -1,4 +1,5 @@
 from django.test.testcases import TestCase
+
 from annotation.regexes import db_ref_regexes, DbRegexes, db_citation_regexes
 
 

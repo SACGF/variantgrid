@@ -8,7 +8,6 @@ from annotation.models import VariantAnnotationVersion
 from annotation.vep_annotation import get_vep_variant_annotation_version_kwargs
 from snpdb.models import GenomeBuild
 
-
 INSTALL_VEP = "https://github.com/SACGF/variantgrid/wiki/Install-VEP"
 
 def check_vep() -> dict:

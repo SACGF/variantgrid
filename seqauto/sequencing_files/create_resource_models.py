@@ -21,12 +21,11 @@ from seqauto.illumina.run_parameters import get_run_parameters
 from seqauto.illumina.samplesheet import convert_sheet_to_df, samplesheet_is_valid
 from seqauto.models import Sequencer, SequencingRun, SequencingSample, SequencingSampleData, Fastq, SampleSheet, \
     UnalignedReads, BamFile, VCFFile, QC, SampleSheetCombinedVCFFile, IlluminaFlowcellQC, FastQC, Flagstats, \
-    DontAutoLoadException, Experiment, SequencingRunCurrentSampleSheet, SampleFromSequencingSample, QCGeneList, \
+    DontAutoLoadException, Experiment, SampleFromSequencingSample, QCGeneList, \
     get_samples_by_sequencing_sample, QCGeneCoverage, SeqAutoMessage, SeqAutoRecord, get_variant_caller_from_vcf_file
 from seqauto.models.models_enums import SequencingFileType
 from seqauto.signals.signals_list import sequencing_run_current_sample_sheet_changed_signal, \
-    sequencing_run_created_signal, \
-    sequencing_run_sample_sheet_created_signal
+    sequencing_run_created_signal
 from snpdb.models import DataState
 from upload.models import BackendVCF
 from upload.vcf.vcf_import import link_samples_and_vcfs_to_sequencing

@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from enum import Enum, IntEnum
+from enum import IntEnum
 from functools import cached_property
 from typing import Optional
+
 import django
 from django.contrib.auth.models import User
 

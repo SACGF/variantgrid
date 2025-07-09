@@ -1,13 +1,14 @@
 import collections.abc
 import datetime
 import json
+import math
 import re
 import urllib
 from datetime import date, timedelta
 from decimal import Decimal
 from html import escape
 from typing import Union, Any, Optional
-import math
+
 from django import template
 from django.db.models import TextChoices
 from django.utils.safestring import mark_safe, SafeString

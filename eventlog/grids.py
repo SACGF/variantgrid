@@ -2,7 +2,6 @@ from typing import Any
 
 from django.db.models import QuerySet
 from django.http import HttpRequest
-from rich.text import Text
 
 from eventlog.models import Event
 from library.enums.log_level import LogLevel
