@@ -50,12 +50,15 @@ def create_canonical_transcript_collection(genome_build: GenomeBuild, annotation
 
     # Comment at top is: gene, ChosenTranscript, CanonicalTranscript, AllTranscripts
     # "ChosenTranscript" is an override, if not specified use CanonicalTranscript
-    GENE_SYMBOL_COLUMN = "gene"
+    GENE_SYMBOL_COLUMN = "#gene"
     CHOSEN_TRANSCRIPT_COLUMN = "ChosenTranscript"
     CANONICAL_TRANSCRIPT_COLUMN = "CanonicalTranscript"
     COLUMNS = [GENE_SYMBOL_COLUMN, CHOSEN_TRANSCRIPT_COLUMN, CANONICAL_TRANSCRIPT_COLUMN, "AllTranscripts"]
 
-    df = pd.read_csv(filename, names=COLUMNS, index_col=None, sep='\t', comment='#', dtype=str)
+    df = pd.read_csv(filename, index_col=None, sep='\t', dtype=str)
+    df_columns = list(df.columns)
+    if df_columns != COLUMNS:
+        raise ValueError(f"Canonical Transcript columns {df_columns} do not match expected: {COLUMNS}")
 
     transcript_versions_by_id = TranscriptVersion.transcript_versions_by_id(genome_build, annotation_consortium)
     canonical_transcript_list = []
