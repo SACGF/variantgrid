@@ -3,7 +3,7 @@ from django.db.models import Q, QuerySet
 from django.db.models.aggregates import Count
 from django.utils.timezone import now
 
-from classification.enums import ShareLevel
+from classification.enums import ShareLevel, AlleleOriginBucket
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import DiscordanceReport, Classification, ClinVarExport, ClinVarExportStatus
 from snpdb.models import Lab, Allele, Organization
@@ -34,14 +34,13 @@ class ClassificationPublicSummaryData:
 
     @cached_property
     def overlapped_alleles(self) -> int:
-        # FIXME no distinction between germline and somatic
-        return Allele.objects.annotate(lab_count=Count("importedalleleinfo__classification__lab", distinct=True)).filter(lab_count__gte=2).count()
+        # TODO no distinction between germline and somatic
+        return Allele.objects.annotate(lab_count=Count("importedalleleinfo__classification__lab", filter=Q(importedalleleinfo__classification__withdrawn=False), distinct=True)).filter(lab_count__gte=2).count()
 
     @cached_property
     def discordant_alleles(self) -> int:
-        # FIXME no distinction between germline and somatic
-        # just in case there are multiple discordances on the same allele?
-        return Allele.objects.filter(pk__in=DiscordanceReport.objects.filter(resolution=DiscordanceReportResolution.ONGOING).values_list("clinical_context__allele_id", flat=True)).count()
+        # TODO no distinction between germline and somatic
+        return DiscordanceReport.objects.annotate(lab_count=Count("discordancereportclassification__classification_original__classification__lab", distinct=True)).filter(lab_count__gte=2).count()
 
     @cached_property
     def discordant_percentage(self) -> float:
