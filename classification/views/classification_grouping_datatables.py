@@ -5,7 +5,7 @@ from django.conf import settings
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from more_itertools import first
-from classification.enums import AlleleOriginBucket, EvidenceCategory, SpecialEKeys, ShareLevel
+from classification.enums import AlleleOriginBucket, EvidenceCategory, SpecialEKeys, ShareLevel, TestingContextBucket
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
     ClassificationGroupingSearchTermType, EvidenceKeyMap, ClassificationModification, ClassificationGroupingEntry, \
     Classification, DiscordanceReport, DiscordanceReportClassification
@@ -47,6 +47,15 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                         if (value := cm.get(id_key)) and id_filter in value.lower():
                             matches[id_key] = value
 
+        testing_context = row.get('allele_origin_grouping__testing_context_bucket')
+        testing_context_bucket_label: str
+        if testing_context == TestingContextBucket.OTHER.value:
+            testing_context_bucket_label = "Other Testing Context"
+        elif testing_context == TestingContextBucket.UNKNOWN.value:
+            testing_context_bucket_label = "Unknown Testing Context"
+        else:
+            testing_context_bucket_label = TestingContextBucket(testing_context).label
+
         return {
             "dirty": row.get("dirty"),
             "id": row.get("id"),
@@ -54,7 +63,9 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             "org_name": row.get('lab__organization__short_name') or row.get('lab__organization__name'),
             "lab_name": row.get('lab__name'),
             "share_level": row.get('share_level'),
-            "allele_origin_bucket": row.get('allele_origin_bucket'),
+            "allele_origin_bucket": row.get('allele_origin_grouping__allele_origin_bucket'),
+            "testing_context_bucket": testing_context,
+            "testing_context_bucket_label": testing_context_bucket_label,
             "matches": matches,
             "search": search
         }
@@ -66,7 +77,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
     #     }
 
     def render_somatic(self, row: CellData) -> JsonDataType:
-        if row["allele_origin_bucket"] != "G":
+        if row["allele_origin_grouping__allele_origin_bucket"] != "G":
             diff_value = row["somatic_difference"]
             if somatic_dict := row["latest_classification_modification__classification__summary__somatic"]:
                 somatic_dict["diff"] = diff_value
@@ -190,7 +201,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
         if allele_origin := self.get_query_param("allele_origin"):
             if allele_origin != "A":
-                filters.append(Q(allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
+                filters.append(Q(allele_origin_grouping__allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
 
         # for view gene symbol
         if protein_position := self.get_query_param("protein_position"):
@@ -328,7 +339,9 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 key='lab',
                 # share_level_sort annotated column
                 sort_keys=[
-                    'allele_origin_bucket',
+                    'allele_origin_grouping__allele_origin_bucket',
+                    'allele_origin_grouping__testing_context_bucket',
+                    'allele_origin_grouping__tumor_type_category',
                     'lab__organization__name',
                     'lab__name',
                     'share_level'
@@ -340,11 +353,13 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 client_renderer='VCTable.groupIdentifier',
                 extra_columns=[
                     'id',
+                    'allele_origin_grouping__testing_context_bucket',
+                    'allele_origin_grouping__tumor_type_category',
                     'classification_count',
                     'lab__organization__short_name',
                     'lab__organization__name',
                     'lab__name',
-                    'allele_origin_bucket',
+                    'allele_origin_grouping__allele_origin_bucket',
                     'share_level',
                     'dirty'
                 ]
@@ -400,7 +415,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 renderer=self.render_somatic,
                 extra_columns=[
                     "latest_classification_modification__classification__summary__somatic",
-                    "allele_origin_bucket",
+                    "allele_origin_grouping__allele_origin_bucket",
                     "somatic_difference"
                 ]
             ),

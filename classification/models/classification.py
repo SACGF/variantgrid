@@ -29,7 +29,7 @@ from guardian.shortcuts import assign_perm, get_objects_for_user
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
 from annotation.regexes import db_ref_regexes, DbRegexes
 from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
-    CRITERIA_NOT_MET, ValidationCode, CriteriaEvaluation, WithdrawReason, AlleleOriginBucket
+    CRITERIA_NOT_MET, ValidationCode, CriteriaEvaluation, WithdrawReason, AlleleOriginBucket, TestingContextBucket
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_patcher import patch_fuzzy_age
 from classification.models.classification_utils import \
@@ -694,6 +694,23 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             title=title,
             summary_extra=extras
         )
+
+    @property
+    def testing_context_bucket(self) -> TestingContextBucket:
+        """
+        Runs off the ClassificationSummary
+        """
+        if bucket := self.summary_typed.get("somatic", {}).get("testing_context_bucket"):
+            return TestingContextBucket(bucket)
+        else:
+            return TestingContextBucket.GERMLINE
+
+    @property
+    def tumor_type_category(self) -> Optional[str]:
+        """
+        Runs off the ClassificationSummary
+        """
+        return self.summary_typed.get("somatic", {}).get("tumor_type_category")
 
     @staticmethod
     def is_supported_transcript(transcript_or_hgvs: str):

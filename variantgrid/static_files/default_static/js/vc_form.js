@@ -2647,6 +2647,10 @@ VCTable.groupIdentifier = (data, type, row) => {
         $('<span>', {text: `${org_name} / ${lab_name}`})
     ]});
 
+    if (allele_origin_bucket === "S") {
+        dom.append($('<div>', {class:'testing-context', text: data.testing_context_bucket_label}))
+    }
+
     if (dirty) {
         dom.append($("<div class='mt-2'><i class=\"fa-solid fa-clock\"></i> Data is currently being updated</div>"))
     } else if (classification_count === 0) {

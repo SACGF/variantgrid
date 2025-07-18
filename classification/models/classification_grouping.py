@@ -2,7 +2,7 @@ import operator
 from collections import Counter
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
-from typing import Optional, Set, Self, Tuple
+from typing import Optional, Self, Tuple
 
 import django
 from django.contrib.auth.models import User
@@ -14,7 +14,7 @@ from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
 from more_itertools import last
 
-from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
+from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, TestingContextBucket
 from django.db import models, transaction
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
     ConditionResolved, ConditionReference
@@ -22,7 +22,6 @@ from classification.models.evidence_mixin_summary_cache import ClassificationSum
     ClassificationSummaryCacheDictPathogenicity, ClassificationSummaryCacheDictSomatic
 from genes.models import GeneSymbol
 from library.utils import strip_json
-from ontology.models import OntologyTerm
 from snpdb.models import Allele, Lab
 
 
@@ -69,7 +68,7 @@ def classification_sort_order(clin_sig: str) -> int:
 class OverlapStatus(IntegerChoices):
     NO_SHARED_RECORDS = 0, "No Shared Records"
     SINGLE_SUBMITTER = 10, "Single Shared Submitter"
-    NOT_COMPARABLE_OVERLAP = 20, "Multiple Submitters"  # e.g. no method to work out discordance
+    NOT_COMPARABLE_OVERLAP = 20, "Multiple Submitters"  # e.g., no method to work out discordance
     AGREEMENT = 30, "Agreement"
     CONFIDENCE = 40, "Confidence"
     DISCORDANCE = 50, "Discordance"
@@ -98,13 +97,22 @@ class AlleleGrouping(TimeStampedModel):
 class AlleleOriginGrouping(TimeStampedModel):
     allele_grouping = models.ForeignKey(AlleleGrouping, on_delete=models.CASCADE)
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, default=AlleleOriginBucket.UNKNOWN)
+    testing_context_bucket = models.CharField(max_length=1, choices=TestingContextBucket.choices, default=TestingContextBucket.UNKNOWN)
+    tumor_type_category = models.TextField(null=True, blank=True)
+
+    # class Meta:
+    #     unique_together = ("lab", "allele_origin_grouping", "allele_origin_bucket", "testing_context")
+    #     indexes = [
+    #         models.Index(fields=["allele_origin_grouping"]),
+    #         models.Index(fields=["testing_context_bucket", "tumor_type_category"])
+    #     ]
 
     @property
     def allele_origin_bucket_obj(self):
         return AlleleOriginBucket(self.allele_origin_bucket)
 
     class Meta:
-        unique_together = ("allele_grouping", "allele_origin_bucket")
+        unique_together = ("allele_grouping", "allele_origin_bucket", "testing_context_bucket", "tumor_type_category")
 
     overlap_status = models.IntegerField(choices=OverlapStatus.choices, default=OverlapStatus.NO_SHARED_RECORDS)
     dirty = models.BooleanField(default=True)
@@ -120,7 +128,7 @@ class AlleleOriginGrouping(TimeStampedModel):
         return reverse('allele_grouping_detail', kwargs={"allele_grouping_id": self.allele_grouping_id})
 
     def update(self):
-        # FIX-ME re-do this once we work out how we handle discordance within a single lab ClassificationGrouping
+        # FIX-ME redo this once we work out how we handle discordance within a single lab ClassificationGrouping
 
         # # not sure if this is the best solution, or if an AlleleOriginGrouping should just refuse to update if attached allele groupings are dirty
         # all_classification_values = set()
@@ -208,6 +216,7 @@ class ClassificationGrouping(TimeStampedModel):
     # key
     allele_origin_grouping = models.ForeignKey(AlleleOriginGrouping, on_delete=models.CASCADE)
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
+    # FIXME remove allele_origin_bucket from ClassificationGrouping, redundant to allele_origin_grouping
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices)
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices())
 
@@ -291,7 +300,12 @@ class ClassificationGrouping(TimeStampedModel):
         share_level = classification.share_level
         if allele:
             allele_grouping, _ = AlleleGrouping.objects.get_or_create(allele=allele)
-            allele_origin_grouping, _ = AlleleOriginGrouping.objects.get_or_create(allele_grouping=allele_grouping, allele_origin_bucket=classification.allele_origin_bucket)
+            allele_origin_grouping, _ = AlleleOriginGrouping.objects.get_or_create(
+                allele_grouping=allele_grouping,
+                allele_origin_bucket=classification.allele_origin_bucket,
+                testing_context_bucket=classification.testing_context_bucket,
+                tumor_type_category=classification.tumor_type_category
+            )
             allele_origin_grouping.dirty = True
             allele_origin_grouping.save(update_fields=["dirty"])
 

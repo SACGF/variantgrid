@@ -19,7 +19,7 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
     DiscordanceReportTriageStatus, ClassificationGrouping, ClassificationGroupingEntry, \
-    AlleleOriginGrouping, AlleleGrouping, ClassificationGroupingSearchTerm
+    AlleleOriginGrouping, AlleleGrouping, ClassificationGroupingSearchTerm, ClassificationSummaryCalculator
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -381,6 +381,23 @@ class ClassificationAdmin(ModelAdminBasics):
         else:
             ClassificationGrouping.update_all_dirty()
         self.message_user(request, f"{changed_count} of {qs_count} records assigned to groups")
+
+    @admin_action("Fixes: Update Classification Summary")
+    def update_classification_summary(self, request, queryset: QuerySet[Classification]):
+        qs_count = queryset.count()
+        changed_count = 0
+        for cr in queryset:
+            new_summary = ClassificationSummaryCalculator(cr.last_published_version).cache_dict()
+            if new_summary != cr.summary:
+                cr.summary = new_summary
+                cr.save(update_fields=["summary"])
+                changed_count += 1
+
+        if ClassificationImportRun.ongoing_imports():
+            pass
+        else:
+            ClassificationGrouping.update_all_dirty()
+        self.message_user(request, f"{changed_count} of {qs_count} records summaries have changed")
 
     @admin_action("Matching: Re-Match Variant")
     def admin_reattempt_variant_matching(self, request, queryset: QuerySet[Classification]):

@@ -17,7 +17,7 @@ from snpdb.models import Lab
 
 @total_ordering
 @dataclass(frozen=True)
-class ClassificationSummary:
+class ClassificationGraphSummary:
     at: datetime
     allele_id: int
     classification_id: int
@@ -32,13 +32,13 @@ class ClassificationSummary:
     def is_valid(self):
         return self.classification_id != 0
 
-    def merge(self, older: Optional['ClassificationSummary']) -> 'ClassificationSummary':
+    def merge(self, older: Optional['ClassificationGraphSummary']) -> 'ClassificationGraphSummary':
         if not older:
             return self
         if self.allele_id != older.allele_id or self.classification_id != older.classification_id:
             raise ValueError("Cannot merge summaries for two different classifications")
 
-        return ClassificationSummary(
+        return ClassificationGraphSummary(
             at=self.at,
             allele_id=self.allele_id,
             classification_id=self.classification_id,
@@ -85,12 +85,12 @@ class AlleleSummary:
 
     def __init__(self):
         # key is classification ID
-        self.classifications: dict[int, ClassificationSummary] = {}
+        self.classifications: dict[int, ClassificationGraphSummary] = {}
         self.biggest_status = AlleleStatus.Empty
         self.last_status = AlleleStatus.Empty
-        self.not_withdrawn: list[ClassificationSummary] = []
+        self.not_withdrawn: list[ClassificationGraphSummary] = []
 
-    def add_modification(self, summary: ClassificationSummary):
+    def add_modification(self, summary: ClassificationGraphSummary):
         self.classifications[summary.classification_id] = summary.merge(
             self.classifications.get(summary.classification_id))
         self.not_withdrawn = [cs for cs in self.classifications.values() if not cs.withdrawn]
@@ -152,7 +152,7 @@ class ClassificationAccumulationGraph:
             self.mode = mode
             self.allele_summaries: dict[int, AlleleSummary] = defaultdict(AlleleSummary)
 
-        def add_modification(self, summary: ClassificationSummary):
+        def add_modification(self, summary: ClassificationGraphSummary):
             allele_summary = self.allele_summaries[summary.allele_id]
             allele_summary.add_modification(summary=summary)
 
@@ -205,7 +205,7 @@ class ClassificationAccumulationGraph:
         else:
             return ShareLevel.ALL_LEVELS
 
-    def withdrawn_iterable(self) -> IterableTransformer[ClassificationSummary]:
+    def withdrawn_iterable(self) -> IterableTransformer[ClassificationGraphSummary]:
         flag_collection_id_to_allele_classification: dict[int, tuple[int, int, Optional[str]]] = {}
 
         flag_qs = FlagComment.objects.filter(flag__flag_type=classification_flag_types.classification_withdrawn) \
@@ -234,7 +234,7 @@ class ClassificationAccumulationGraph:
 
             withdrawn = status == 'O'
 
-            return ClassificationSummary(allele_id=allele_id, classification_id=classification_id, at=created,
+            return ClassificationGraphSummary(allele_id=allele_id, classification_id=classification_id, at=created,
                                          clinical_significance=None, withdrawn=withdrawn, lab_name=lab_name)
 
         return IterableTransformer(flag_qs, transformer)
@@ -261,7 +261,7 @@ class ClassificationAccumulationGraph:
             if clinical_significance and clinical_significance.startswith('VUS'):
                 clinical_significance = 'VUS'
 
-            return ClassificationSummary(allele_id=allele_id, classification_id=c_id, at=created,
+            return ClassificationGraphSummary(allele_id=allele_id, classification_id=c_id, at=created,
                                          clinical_significance=clinical_significance, lab_name=lab_name)
 
         return IterableTransformer(cm_qs_summary, classification_transformer)
@@ -272,7 +272,7 @@ class ClassificationAccumulationGraph:
         running_accum = self._RunningAccumulation(mode=self.mode)
         sub_totals: list[ClassificationAccumulationGraph._SummarySnapshot] = []
 
-        stitcher = IterableStitcher[ClassificationSummary](
+        stitcher = IterableStitcher[ClassificationGraphSummary](
             iterables=[
                 self.withdrawn_iterable(),
                 self.classification_iterable()
@@ -282,7 +282,7 @@ class ClassificationAccumulationGraph:
         start_date = None
         next_date = None
 
-        summary: ClassificationSummary
+        summary: ClassificationGraphSummary
         for summary in stitcher:
 
             if not summary.is_valid:

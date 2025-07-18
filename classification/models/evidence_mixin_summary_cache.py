@@ -1,8 +1,12 @@
 from dataclasses import dataclass
+from enum import StrEnum
 from functools import cached_property
 from typing import TypedDict, Optional, Self
+
+from django.db.models import TextChoices
+
 from classification.criteria_strengths import CriteriaStrength
-from classification.enums import AlleleOriginBucket, SpecialEKeys, CriteriaEvaluation
+from classification.enums import AlleleOriginBucket, SpecialEKeys, CriteriaEvaluation, TestingContextBucket
 from library.utils import strip_json
 
 """
@@ -27,6 +31,7 @@ return {
 }
 """
 
+
 class ClassificationSummaryCacheDictPathogenicity(TypedDict):
     classification: Optional[str]
     sort: int
@@ -35,6 +40,8 @@ class ClassificationSummaryCacheDictPathogenicity(TypedDict):
 
 
 class ClassificationSummaryCacheDictSomatic(TypedDict):
+    testing_context_bucket: Optional[str]
+    tumor_type_category: Optional[str]  # condition grouping if testing_contest is solid-tumor
     clinical_significance: Optional[str]
     amp_level: Optional[str]
     sort: int
@@ -93,25 +100,33 @@ class ClassificationSummaryCalculator:
         from classification.models import CuratedDate
         curated_date = CuratedDate(self.cm).relevant_date
 
-        # strip out None values as that makes sorting work more naturally
-        return strip_json({
+        pathology: ClassificationSummaryCacheDictPathogenicity = {
+            "classification": self.classification_value,
+            "sort": self.classification_sort,
+            "bucket": self.germline_bucket,
+            "pending": self.pending_classification_value
+        }
+        somatic: ClassificationSummaryCacheDictSomatic = {
+            "testing_context_bucket": self.testing_context_bucket,
+            "tumor_type_category": self.tumor_type_category,
+            "clinical_significance": self.somatic_clinical_significance,
+            "amp_level": self.somatic_amp_level,
+            "sort": self.somatic_sort
+        }
+        date_json: ClassificationSummaryCachedDictDate = {
+            "value": curated_date.date_str,
+            "type": curated_date.name,
+        }
+
+        full_json: ClassificationSummaryCacheDict = {
             "criteria_labels": self.criteria_labels,
-            "pathogenicity": {
-                "classification": self.classification_value,
-                "sort": self.classification_sort,
-                "bucket": self.germline_bucket,
-                "pending": self.pending_classification_value
-            },
-            "somatic": {
-                "clinical_significance": self.somatic_clinical_significance,
-                "amp_level": self.somatic_amp_level,
-                "sort": self.somatic_sort
-            },
-            "date": {
-                "value": curated_date.date_str,
-                "type": curated_date.name
-            }
-        })
+            "pathogenicity": pathology,
+            "somatic": somatic,
+            "date": date_json
+        }
+
+        # strip out None values as that makes sorting work more naturally
+        return strip_json(full_json)
 
     @cached_property
     def pending_classification_value(self) -> Optional[str]:
@@ -159,6 +174,24 @@ class ClassificationSummaryCalculator:
     def somatic_clinical_significance(self) -> Optional[str]:
         if self.is_possibly_somatic:
             return self.cm.get(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
+        return None
+
+    @cached_property
+    def testing_context_bucket(self) -> TestingContextBucket:
+        # TODO move this information into the testing context evidence key data
+        if self.is_possibly_somatic:
+            if testing_context_value := self.cm.get(SpecialEKeys.TESTING_CONTEXT):
+                from classification.models import EvidenceKeyMap
+                return EvidenceKeyMap.cached_key(SpecialEKeys.TESTING_CONTEXT).option_dictionary_property("testing_context_bucket").get(testing_context_value) or TestingContextBucket.OTHER
+            else:
+                return TestingContextBucket.UNKNOWN.value
+        else:
+            return TestingContextBucket.GERMLINE.value
+
+    @cached_property
+    def tumor_type_category(self) -> Optional[str]:
+        if self.testing_context_bucket == TestingContextBucket.SOLID_TUMOR:
+            return "other"
         return None
 
     @cached_property

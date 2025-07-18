@@ -15,6 +15,15 @@ CRITERIA_NOT_APPLICABLE = 'NA'
 CRITERIA_NEUTRAL = 'N'
 
 
+class TestingContextBucket(TextChoices):
+    NON_CANCER = "N", "Non-Cancer Somatic"
+    HAEMATOLOGY = "H", "Haematology"
+    SOLID_TUMOR = "S", "Solid Tumor"
+    OTHER = "O", "Other"
+    GERMLINE = "G", "Germline"
+    UNKNOWN = "U", "Unknown"
+
+
 class AlleleOriginBucket(TextChoices):
     GERMLINE = "G", "Germline"
     SOMATIC = "S", "Somatic"
@@ -55,6 +64,7 @@ class SpecialEKeys:
     CONDITION = 'condition'
     CLINICAL_SIGNIFICANCE = 'clinical_significance'
     SOMATIC_CLINICAL_SIGNIFICANCE = 'somatic:clinical_significance'
+    TESTING_CONTEXT = "testing_context"
     CURATED_BY = 'curated_by'
     CURATION_DATE = 'curation_date'
     CURATION_VERIFIED_DATE = 'curation_verified_date'

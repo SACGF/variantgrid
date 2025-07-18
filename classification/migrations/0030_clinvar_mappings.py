@@ -2,11 +2,11 @@
 
 from django.db import migrations
 
-from classification.autopopulate_evidence_keys.clinvar_option_updator import ClinVarOptionUpdator
+from classification.autopopulate_evidence_keys.clinvar_option_updator import EvidenceKeyOptionUpdator
 
 
 def clinical_significance(apps, _schema_editor):
-    options = ClinVarOptionUpdator(apps, "clinical_significance")
+    options = EvidenceKeyOptionUpdator(apps, "clinical_significance")
     options.set_clinvar_option("B", "Benign")
     options.set_clinvar_option("LB", "Likely benign")
     options.set_clinvar_option("VUS", "Uncertain significance")
@@ -36,7 +36,7 @@ imprinting : Imprinting
 
 
 def mode_of_inheritance(apps, _schema_editor):
-    options = ClinVarOptionUpdator(apps, "mode_of_inheritance")
+    options = EvidenceKeyOptionUpdator(apps, "mode_of_inheritance")
     options.set_clinvar_option("autosomal_dominant", "Autosomal dominant inheritance")
     options.set_clinvar_option("autosomal_recessive", "Autosomal recessive inheritance")
     options.set_clinvar_option("autosomal_unknown", "Autosomal unknown")
@@ -58,7 +58,7 @@ def mode_of_inheritance(apps, _schema_editor):
 
 
 def allele_origin(apps, _schema_editor):
-    options = ClinVarOptionUpdator(apps, "allele_origin")
+    options = EvidenceKeyOptionUpdator(apps, "allele_origin")
     options.set_clinvar_option("germline", "germline")
     options.set_clinvar_option("somatic", "somatic")
     options.set_clinvar_option("unknown", "unknown")
