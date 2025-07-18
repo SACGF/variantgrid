@@ -216,9 +216,11 @@ class ClassificationGrouping(TimeStampedModel):
     # key
     allele_origin_grouping = models.ForeignKey(AlleleOriginGrouping, on_delete=models.CASCADE)
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
-    # FIXME remove allele_origin_bucket from ClassificationGrouping, redundant to allele_origin_grouping
-    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices)
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices())
+
+    @property
+    def allele_origin_bucket(self):
+        return self.allele_origin_grouping.allele_origin_bucket
 
     @property
     def share_level_obj(self):
@@ -312,7 +314,6 @@ class ClassificationGrouping(TimeStampedModel):
             grouping, is_new = ClassificationGrouping.objects.get_or_create(
                 allele_origin_grouping=allele_origin_grouping,
                 lab=lab,
-                allele_origin_bucket=classification.allele_origin_bucket,
                 share_level=share_level
             )
             return grouping, is_new

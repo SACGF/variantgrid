@@ -779,6 +779,9 @@ class OntologyVersion(TimeStampedModel):
 
     @staticmethod
     def latest(validate=True) -> Optional['OntologyVersion']:
+        if not settings.ONTOLOGY_VERSION_STRICT:
+            return OntologyVersion.objects.latest('created')
+
         oi_qs = OntologyImport.objects.all()
         kwargs = {}
         missing_fields = set()

@@ -901,6 +901,9 @@ CLASSIFICATION_DOWNLOADABLE_JSON_LITERATURE_CITATIONS = False
 CLASSIFICATION_DOWNLOADABLE_NOTES_AND_EXPLAINS = True
 CLASSIFICATION_DOWNLOADABLE_FIELDS = "*"
 
+ONTOLOGY_VERSION_STRICT = True
+# Set to False if your dev environment doesn't have Ontology properly loaded
+
 # Bootstrapped themed messages
 from django.contrib.messages import constants as messages
 

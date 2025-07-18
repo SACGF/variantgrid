@@ -12,7 +12,7 @@ from django.utils.safestring import SafeString
 from annotation.models.models import AnnotationVersion
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
 from classification.classification_import import reattempt_variant_matching, variant_matching_dry_run
-from classification.enums import WithdrawReason
+from classification.enums import WithdrawReason, AlleleOriginBucket, TestingContextBucket
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
     ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
@@ -1387,12 +1387,23 @@ class ClassificationGroupingSearchTermAdmin(admin.TabularInline):
 @admin.register(ClassificationGrouping)
 class ClassificationGroupingAdmin(ModelAdminBasics):
     inlines = (ClassificationGroupingEntryAdmin, ClassificationGroupingSearchTermAdmin)
-    list_display = ("pk", "classification_count", "allele", "lab", "allele_origin_bucket", "pathogenic_difference", "somatic_difference", "dirty")
-    list_filter = ("lab", "allele_origin_bucket", "pathogenic_difference", "somatic_difference", "dirty")
+    list_display = ("pk", "classification_count", "allele", "lab", "grouping", "pathogenic_difference", "somatic_difference", "dirty")
+    list_filter = ("lab", "allele_origin_grouping__allele_origin_bucket", "pathogenic_difference", "somatic_difference", "dirty")
 
     # @admin_list_column("gene_symbols")
     # def gene_symbols(self, obj: ClassificationGrouping):
     #     return ", ".join(obj.classificationgroupinggenesymbol_set.values_list("gene_symbol", flat=True))
+
+    @admin_list_column("grouping", order_field="allele_origin_grouping__allele_origin_bucket")
+    def grouping(self, obj: ClassificationGrouping):
+        allele_origin_bucket = obj.allele_origin_bucket
+        parts = [AlleleOriginBucket(allele_origin_bucket).label]
+        if allele_origin_bucket == AlleleOriginBucket.SOMATIC:
+            parts.append(TestingContextBucket(obj.allele_origin_grouping.testing_context_bucket).label)
+            if obj.allele_origin_grouping.testing_context_bucket == TestingContextBucket.SOLID_TUMOR.value:
+                parts.append(obj.allele_origin_grouping.tumor_type_category)
+
+        return " : ".join(parts)
 
     @admin_action("Refresh")
     def refresh(self, request, queryset: QuerySet[ClassificationGrouping]):
