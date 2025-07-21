@@ -24,11 +24,11 @@ class AbstractZygosityCountNode(Model):
 
     def get_zygosity_count_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         COUNT_COLUMNS = [
-            # arg                               column                         MIN                 MAX
-            (self.any_zygosity_count_column, self.any_zygosity_count_column, self.min_het_or_hom_count, self.max_het_or_hom_count),
-            (self.count_annotation_arg,         self.ref_count_column, self.min_ref_count, self.max_ref_count),
-            (self.count_annotation_arg,         self.het_count_column, self.min_het_count, self.max_het_count),
-            (self.count_annotation_arg,         self.hom_count_column, self.min_hom_count, self.max_hom_count),
+            # arg                                       column                         MIN                 MAX
+            (self.non_ref_call_count_annotation_arg,    self.non_ref_call_count_column, self.min_het_or_hom_count,  self.max_het_or_hom_count),
+            (self.ref_count_annotation_arg,             self.ref_count_column,          self.min_ref_count,         self.max_ref_count),
+            (self.het_count_annotation_arg,             self.het_count_column,          self.min_het_count,         self.max_het_count),
+            (self.hom_count_annotation_arg,             self.hom_count_column,          self.min_hom_count,         self.max_hom_count),
         ]
         arg_q_dict = defaultdict(dict)
         for arg, column, min_count, max_count in COUNT_COLUMNS:

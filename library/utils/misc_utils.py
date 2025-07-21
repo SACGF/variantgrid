@@ -163,3 +163,13 @@ def iter_http_lines(url, timeout=60, attempts=5, backoff=2, encoding="utf-8", se
             if n + 1 >= attempts:
                 raise
             time.sleep(backoff * 2**n)
+
+
+def add_exception_note(exc: BaseException, note: str) -> BaseException:
+    """ Make equivalent helper for pre-3.11 add_note """
+    if hasattr(exc, 'add_note'):  # Py>=3.11
+        exc.add_note(note)
+    else:                         # Py<=3.10
+        head = exc.args[0] if exc.args else ''
+        exc.args = (f'{head}\nnote: {note}',) + exc.args[1:]
+    return exc

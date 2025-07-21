@@ -124,8 +124,23 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
         return VariantZygosityCountCollection.get_global_germline_counts()
 
     @property
-    def count_annotation_arg(self):
+    def non_ref_call_count_annotation_arg(self):
         """ key in annotation_kwargs """
+        return self.db_counts.non_ref_call_alias
+
+    @property
+    def ref_count_annotation_arg(self):
+        """ key in annotation_kwargs - this is column on DB table so doesn't need special arg just normal alias """
+        return self.db_counts.alias
+
+    @property
+    def het_count_annotation_arg(self):
+        """ key in annotation_kwargs - this is column on DB table so doesn't need special arg just normal alias """
+        return self.db_counts.alias
+
+    @property
+    def hom_count_annotation_arg(self):
+        """ key in annotation_kwargs - this is column on DB table so doesn't need special arg just normal alias """
         return self.db_counts.alias
 
     @property
@@ -141,8 +156,8 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
         return self.db_counts.het_alias
 
     @property
-    def any_zygosity_count_column(self):
-        return self.db_counts.germline_counts_alias
+    def non_ref_call_count_column(self):
+        return self.db_counts.non_ref_call_alias
 
 
 auditlog.register(AllVariantsNode)

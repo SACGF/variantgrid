@@ -62,16 +62,52 @@ class CohortMixin:
     def count_column_prefix(self):
         cohort = self._get_cohort()
         if cohort and cohort.is_sub_cohort():
-            column_prefix = "sub_cohort_"
+            column_prefix = f"sub_cohort_{cohort.pk}_"
         else:
             cgc = self.cohort_genotype_collection
             column_prefix = f"{cgc.cohortgenotype_alias}__"
         return column_prefix
 
     @property
-    def count_annotation_arg(self):
-        """ key in annotation_kwargs """
+    def non_ref_call_count_annotation_arg(self):
+        """
+            The ..._annotation_args are used to be able to put queries into the right q_arg_dict key
+            You need to be able to apply the Q after the right annotate() - in AllVariantsNode and Cohort
+            we just need to add to the same alias (that joins to the table) and then use the SQL columns
+            In sub cohorts, we need to build fake ones via annotate and then add Qs there
+
+            See AbstractZygosityCountNode.get_zygosity_count_arg_q_dict and
+            CohortNode._get_annotation_kwargs_for_node
+        """
+        cohort = self._get_cohort()
+        if cohort and cohort.is_sub_cohort():
+            return self.non_ref_call_count_column
         return self.cohort_genotype_collection.cohortgenotype_alias
+
+    @property
+    def ref_count_annotation_arg(self):
+        """ key in annotation_kwargs """
+        cohort = self._get_cohort()
+        if cohort and cohort.is_sub_cohort():
+            return self.ref_count_column
+        return self.cohort_genotype_collection.cohortgenotype_alias
+
+    @property
+    def het_count_annotation_arg(self):
+        """ key in annotation_kwargs """
+        cohort = self._get_cohort()
+        if cohort and cohort.is_sub_cohort():
+            return self.het_count_column
+        return self.cohort_genotype_collection.cohortgenotype_alias
+
+    @property
+    def hom_count_annotation_arg(self):
+        """ key in annotation_kwargs """
+        cohort = self._get_cohort()
+        if cohort and cohort.is_sub_cohort():
+            return self.hom_count_column
+        return self.cohort_genotype_collection.cohortgenotype_alias
+
 
     @property
     def ref_count_column(self):
@@ -86,12 +122,12 @@ class CohortMixin:
         return self.count_column_prefix + "het_count"
 
     @property
-    def any_zygosity_count_column(self):
-        return self.count_column_prefix + "any_zygosity"
+    def any_call_count_column(self):
+        return self.count_column_prefix + "any_call"
 
     @property
-    def any_germline_count_column(self):
-        return self.count_column_prefix + "any_germline"
+    def non_ref_call_count_column(self):
+        return self.count_column_prefix + "non_ref"
 
     def _get_q_and_list(self) -> list[Q]:
         """ Collects node editor filters. Overridden below """

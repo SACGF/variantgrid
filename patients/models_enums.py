@@ -15,8 +15,8 @@ class Mutation(models.TextChoices):
 
 
 class SimpleZygosity(models.TextChoices):
-    ANY_GERMLINE = 'A', 'Het or Hom Alt'
-    ANY_ZYGOSITY = 'Z', 'Any zygosity call'
+    NON_REF_CALL = 'A', 'Het or Hom Alt'
+    ANY_CALL = 'Z', 'Any zygosity call'
     HOM_ALT = 'O', "Hom alt"
     HET = 'E', "Het"
     REF = 'R', "Ref"
