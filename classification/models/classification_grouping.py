@@ -14,7 +14,8 @@ from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
 from more_itertools import last
 
-from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, TestingContextBucket
+from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, TestingContextBucket, ConflictSeverity, \
+    ConflictType
 from django.db import models, transaction
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
     ConditionResolved, ConditionReference
@@ -100,6 +101,21 @@ class AlleleOriginGrouping(TimeStampedModel):
     testing_context_bucket = models.CharField(max_length=1, choices=TestingContextBucket.choices, default=TestingContextBucket.UNKNOWN)
     tumor_type_category = models.TextField(null=True, blank=True)
 
+    def __str__(self):
+        return f"{self.allele_grouping.allele} {self.get_allele_origin_bucket_display()} Testing Context: {self.get_testing_context_bucket_display()} Tumor Type: {self.tumor_type_category}"
+
+    def labels(self, include_allele_origin=True) -> list[str]:
+        parts = []
+        if include_allele_origin:
+            parts.append(AlleleOriginBucket(self.allele_origin_bucket).label)
+        if self.allele_origin_bucket == AlleleOriginBucket.SOMATIC:
+            if self.testing_context_bucket in {TestingContextBucket.UNKNOWN.value, TestingContextBucket.OTHER.value}:
+                parts.append("Testing Context")
+            parts.append(TestingContextBucket(self.testing_context_bucket).label)
+            if self.testing_context_bucket == TestingContextBucket.SOLID_TUMOR:
+                parts.append(self.tumor_type_category)
+        return parts
+
     # class Meta:
     #     unique_together = ("lab", "allele_origin_grouping", "allele_origin_bucket", "testing_context")
     #     indexes = [
@@ -128,76 +144,10 @@ class AlleleOriginGrouping(TimeStampedModel):
         return reverse('allele_grouping_detail', kwargs={"allele_grouping_id": self.allele_grouping_id})
 
     def update(self):
-        # FIX-ME redo this once we work out how we handle discordance within a single lab ClassificationGrouping
-
-        # # not sure if this is the best solution, or if an AlleleOriginGrouping should just refuse to update if attached allele groupings are dirty
-        # all_classification_values = set()
-        # all_somatic_clinical_significance_values = set()
-        # classification_groupings: list[ClassificationGrouping] = list(self.classificationgrouping_set.all())
-        # for cg in classification_groupings:
-        #     if cg.dirty:
-        #         cg.update()
-        # shared_groupings = [cg for cg in classification_groupings if cg.share_level_obj.is_discordant_level]
-        # for cg in shared_groupings:
-        #     if classification_values := cg.classification_values:
-        #         all_classification_values |= set(classification_values)
-        #     if somatic_values := cg.somatic_clinical_significance_values:
-        #         all_somatic_clinical_significance_values |= set(somatic_values)
-        #
-        # self.classification_values = list(EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).sort_values(all_classification_values))
-        # self.somatic_clinical_significance_values = [sg.as_str for sg in sorted(SomaticClinicalSignificanceValue.from_str(sg) for sg in all_somatic_clinical_significance_values)]
-        #
-        # overlap_status: OverlapStatus
-        # if len(shared_groupings) == 0:
-        #     overlap_status = OverlapStatus.NO_SHARED_RECORDS
-        # elif len(shared_groupings) == 1:
-        #     overlap_status = OverlapStatus.SINGLE_SUBMITTER
-        # elif self.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
-        #     overlap_status = OverlapStatus.NOT_COMPARABLE_OVERLAP
-        # else:
-        #     bucket_mapping = EvidenceKeyMap.instance().get(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
-        #     buckets = {bucket_mapping.get(class_value) for class_value in self.classification_values}
-        #     if None in buckets:
-        #         buckets.remove(None)
-        #
-        #     if len(buckets) > 1:
-        #         # discordant
-        #         if "P" in all_classification_values or "LP" in all_classification_values:
-        #             overlap_status = OverlapStatus.DISCORDANCE_MEDICALLY_SIGNIFICANT
-        #         else:
-        #             overlap_status = OverlapStatus.DISCORDANCE
-        #     else:
-        #         if len(all_classification_values) > 1:
-        #             overlap_status = OverlapStatus.CONFIDENCE
-        #         else:
-        #             # complete agreement
-        #             overlap_status = OverlapStatus.AGREEMENT
-        #
-        # self.overlap_status = overlap_status
+        from classification.services.conflict_services import calculate_and_apply_conflicts_for
+        calculate_and_apply_conflicts_for(self)
         self.dirty = False
         self.save()
-
-        # TODO manage pending classifications
-
-
-# @dataclass
-# class ClassificationSubGrouping:
-#     latest_modification: ClassificationModification
-#     count: int
-#
-#     @staticmethod
-#     def from_modifications(modifications: list[ClassificationModification]) -> list['ClassificationSubGrouping']:
-#         # subgroup by classification value for germline and
-#         by_status: dict[str, ClassificationSubGrouping] = {}
-#         for mod in modifications:
-#             key = str(mod.somatic_clinical_significance_value) + str(mod.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
-#             if existing := by_status.get(key):
-#                 existing.count += 1
-#                 existing.latest_modification = max(mod, existing.latest_modification, key=lambda m: (m.curated_date_check, m.pk))
-#             else:
-#                 by_status[key] = ClassificationSubGrouping(latest_modification=mod, count=1)
-#         # FIXME sort
-#         return list(by_status.values())
 
 
 class ClassificationGroupingPathogenicDifference(IntegerChoices):
@@ -585,3 +535,63 @@ class ClassificationGroupingEntry(TimeStampedModel):
 
     class Meta:
         unique_together = ("grouping", "classification")
+
+
+@dataclass(frozen=True)
+class ConflictKey:
+    conflict_type: ConflictType
+    allele_origin_bucket: Optional[AlleleOriginBucket]
+    testing_context_bucket: Optional[TestingContextBucket] = None
+    tumor_type_category: Optional[str] = None
+
+
+class Conflict(TimeStampedModel):
+    allele = models.ForeignKey(Allele, on_delete=CASCADE)
+    conflict_type = models.CharField(max_length=1, choices=ConflictType.choices)
+    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, null=True, blank=True)
+    testing_context_bucket = models.CharField(max_length=1, choices=TestingContextBucket.choices, null=True, blank=True)
+    tumor_type_category = models.TextField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ("allele", "conflict_type", "allele_origin_bucket", "testing_context_bucket", "tumor_type_category")
+
+    @cached_property
+    def latest(self) -> 'ConflictHistory':
+        return ConflictHistory.objects.filter(conflict=self, is_latest=True).first()
+
+    @staticmethod
+    def log_history(allele: Allele, conflict_key: ConflictKey, data: dict, severity: ConflictSeverity):
+        conflict, created = Conflict.objects.get_or_create(
+            allele=allele,
+            conflict_type=conflict_key.conflict_type,
+            allele_origin_bucket=conflict_key.allele_origin_bucket,
+            testing_context_bucket=conflict_key.testing_context_bucket,
+            tumor_type_category=conflict_key.tumor_type_category,
+        )
+        latest: Optional[ConflictHistory] = None
+        if not created:
+            latest = ConflictHistory.objects.filter(conflict=conflict, is_latest=True).first()
+
+        if latest:
+            if latest.data == data:
+                return
+            else:
+                latest.is_latest = False
+                latest.save(update_fields=["is_latest"])
+
+        ConflictHistory(
+            conflict=conflict,
+            data=data,
+            severity=severity,
+            is_latest=True,
+        ).save()
+
+
+class ConflictHistory(TimeStampedModel):
+    conflict = models.ForeignKey(Conflict, on_delete=CASCADE)
+    data = models.JSONField(null=False, blank=False)
+    severity = models.IntegerField(choices=ConflictSeverity.choices)
+    is_latest = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [models.Index(fields=["conflict", "is_latest"])]

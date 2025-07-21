@@ -5,7 +5,7 @@ from typing import Optional, Union
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import TextChoices
+from django.db.models import TextChoices, IntegerChoices
 
 from library.guardian_utils import public_group, all_users_group
 from library.utils import ChoicesEnum
@@ -13,6 +13,20 @@ from library.utils import ChoicesEnum
 CRITERIA_NOT_MET = 'NM'
 CRITERIA_NOT_APPLICABLE = 'NA'
 CRITERIA_NEUTRAL = 'N'
+
+
+class ConflictType(TextChoices):
+    CLIN_SIG = "S", "ClinSig"
+    ONCPATH = "P", "OncPath"
+
+
+class ConflictSeverity(IntegerChoices):
+    NO_SUBMISSIONS = 0, "No Submissions"
+    SINGLE_SUBMISSION = 1, "Single Submission"
+    SAME = 2, "Same Values"  # LP and LP
+    MINOR = 3, "Minor Diffs"  # VUS and VUS_A
+    MEDIUM = 4, "Medium Diffs"  # B and LB
+    MAJOR = 5, "Major Diffs"  # P and VUS
 
 
 class TestingContextBucket(TextChoices):

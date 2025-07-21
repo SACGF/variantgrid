@@ -292,6 +292,7 @@
                     {{ allele_origin_grouping_desc.allele_origin_grouping.get_allele_origin_bucket_display }}
                 </div>
             </span>
+            <span class="testing-context">{{ allele_origin_grouping_desc.get_sub_label }}</span>
             {% if allele_origin_grouping_desc.discordance_report %}
                 <span class="pipe-sep">{% discordance_report allele_origin_grouping_desc.discordance_report %}</span>
             {% else %}

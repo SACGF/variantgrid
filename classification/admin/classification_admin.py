@@ -3,7 +3,8 @@ from datetime import timedelta
 from typing import Union, Optional
 
 from django.contrib import admin, messages
-from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter, DateFieldListFilter, TabularInline
+from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter, DateFieldListFilter, TabularInline, \
+    SimpleListFilter
 from django.db.models import QuerySet
 from django.forms import Widget
 from django.utils import timezone
@@ -12,14 +13,16 @@ from django.utils.safestring import SafeString
 from annotation.models.models import AnnotationVersion
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
 from classification.classification_import import reattempt_variant_matching, variant_matching_dry_run
-from classification.enums import WithdrawReason, AlleleOriginBucket, TestingContextBucket
-from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
+from classification.enums import WithdrawReason, AlleleOriginBucket, TestingContextBucket, ConflictSeverity
+from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel, \
+    ConflictType
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
     ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
     DiscordanceReportTriageStatus, ClassificationGrouping, ClassificationGroupingEntry, \
-    AlleleOriginGrouping, AlleleGrouping, ClassificationGroupingSearchTerm, ClassificationSummaryCalculator
+    AlleleOriginGrouping, AlleleGrouping, ClassificationGroupingSearchTerm, ClassificationSummaryCalculator, Conflict, \
+    ConflictHistory
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -1465,3 +1468,55 @@ class AlleleOriginGroupingTabularAdmin(TabularInline):
 @admin.register(AlleleGrouping)
 class AlleleGroupingAdmin(ModelAdminBasics):
     inlines = (AlleleOriginGroupingTabularAdmin,)
+
+
+class ConflictHistoryTabularAdmin(TabularInline):
+    model = ConflictHistory
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+class ConflictListFilter(SimpleListFilter):
+    title = "Conflict Severity"
+    parameter_name = "severity"
+
+    def lookups(self, request, model_admin):
+        return [(conflict.value, conflict.label) for conflict in ConflictSeverity]
+
+    def queryset(self, request, queryset: Conflict):
+        value = self.value()
+        if value is not None:
+            latest_qs = ConflictHistory.objects.filter(is_latest=True)
+            latest_qs = latest_qs.filter(severity=self.value())
+            queryset = queryset.filter(pk__in=latest_qs.values_list('conflict__id', flat=True))
+        return queryset
+
+
+@admin.register(Conflict)
+class ConflictAdmin(ModelAdminBasics):
+    inlines = (ConflictHistoryTabularAdmin,)
+    list_filter = (ConflictListFilter,)
+
+    """
+    allele = models.ForeignKey(Allele, on_delete=CASCADE)
+    conflict_type = models.CharField(max_length=1, choices=ConflictType.choices)
+    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, null=True, blank=True)
+    testing_context_bucket = models.CharField(max_length=1, choices=TestingContextBucket.choices, null=True, blank=True)
+    tumor_type_category = models.TextField(null=True, blank=True)
+
+    """
+    list_display = ("allele", "conflict_type", "allele_origin_bucket", "testing_context_bucket", "current_status")
+
+    @admin_list_column("current_status")
+    def current_status(self, obj: Conflict) -> str:
+        display = obj.latest.get_severity_display()
+        if obj.latest.severity in {ConflictSeverity.NO_SUBMISSIONS, ConflictSeverity.SINGLE_SUBMISSION}:
+            return SafeString(f'<i style="color:#888">{display}</i>')
+        return display

@@ -496,6 +496,11 @@ class AlleleOriginGroupingDescription:
         return OverlapStatus(self.overlap_status).label
 
     @property
+    def get_sub_label(self):
+        return " ".join(self.allele_origin_grouping.labels(include_allele_origin=False))
+
+
+    @property
     def should_show_diffs(self):
         return self.shared_counts + self.unshared_counts > 1
 
