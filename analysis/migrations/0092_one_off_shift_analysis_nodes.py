@@ -8,7 +8,7 @@ from django.db.models.expressions import F
 def _one_off_shift_analysis_nodes(apps, _schema_editor):
     Analysis = apps.get_model("analysis", "Analysis")
     AnalysisNode = apps.get_model("analysis", "AnalysisNode")
-    MIN_Y = 35
+    MIN_Y = 45
 
     modified_analyses = 0
     modified_nodes = 0

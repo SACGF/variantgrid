@@ -61,4 +61,3 @@ class TestZygosityNodes(TestCase):
         qs = node.get_queryset()
         count = qs.count()
         self.assertIsInstance(count, int)
-        
