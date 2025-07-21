@@ -1425,8 +1425,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
         elif self.version.gnomad.startswith("3"):
             if self.gnomad_af is not None:
                 gnomad_dataset = GNOMAD3
-            elif self.gnomad2_liftover_af is not None:
-                gnomad_dataset = GNOMAD2
         elif self.gnomad_af and self.version.gnomad.startswith("4"):
             gnomad_dataset = GNOMAD4
 
