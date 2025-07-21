@@ -79,10 +79,7 @@ class CohortMixin:
             See AbstractZygosityCountNode.get_zygosity_count_arg_q_dict and
             CohortNode._get_annotation_kwargs_for_node
         """
-        cohort = self._get_cohort()
-        if cohort and cohort.is_sub_cohort():
-            return self.non_ref_call_count_column
-        return self.cohort_genotype_collection.cohortgenotype_alias
+        return self.non_ref_call_count_column  # This is always an annotation
 
     @property
     def ref_count_annotation_arg(self):
@@ -107,7 +104,6 @@ class CohortMixin:
         if cohort and cohort.is_sub_cohort():
             return self.hom_count_column
         return self.cohort_genotype_collection.cohortgenotype_alias
-
 
     @property
     def ref_count_column(self):
