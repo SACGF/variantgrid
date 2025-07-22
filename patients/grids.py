@@ -138,7 +138,10 @@ class PatientRecordColumns(DatatableConfig[PatientRecord]):
 
     @staticmethod
     def _render_patient_match_type(column_name, row: CellData):
-        return PatientRecordMatchType(row[column_name]).label
+        match_type = None
+        if row.value:
+            match_type = PatientRecordMatchType(row.value).label
+        return match_type
 
     def get_initial_queryset(self) -> QuerySet[PatientRecord]:
         patient_records_id = self.get_query_param("patient_records")
