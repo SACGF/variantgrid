@@ -19,6 +19,7 @@
                 {% labelled label="ID" %}{{ patient_record.id }}{% endlabelled %}
                 {% labelled label="Record ID (line number)" %}{{ patient_record.record_id }}{% endlabelled %}
                 {% labelled label="Valid" %}{{ patient_record.get_valid_display }}{% endlabelled %}
+                {% labelled label="Validation Message" %}{{ patient_record.validation_message }}{% endlabelled %}
                 {% labelled label="Sample" %}
                     {% if patient_record.sample %}
                         <a href="{% url 'view_sample' patient_record.sample_id %}">{{ patient_record.sample }}</a>
