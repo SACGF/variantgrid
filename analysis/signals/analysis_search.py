@@ -15,4 +15,5 @@ ANALYSIS_PREFIX_PATTERN = re.compile(r"^an(\d+)$")
     )
 )
 def search_analysis(search_input: SearchInputInstance):
-    return Analysis.objects.filter(pk=int(search_input.match.group(1)))
+    qs = Analysis.filter_for_user(search_input.user)
+    return qs.filter(pk=int(search_input.match.group(1)))
