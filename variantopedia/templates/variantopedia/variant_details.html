@@ -797,7 +797,7 @@ function applyVariantValues() {
                                         {% labelled id='gnomad_sv_overlap_percent' label='SV Overlap %' help=annotation_description.gnomad_sv_overlap_percent hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_percent }}{% endlabelled %}
                                     {% endfor %}
                                 </div>
-                            {% else %}
+                            {% elif variant_annotation.gnomad_url %}
                                 {% labelled label="View in gnomAD" hint="tiny" %}
                                     <a target='_blank' class="hover-link" href='{{ variant_annotation.gnomad_url }}'>Click here</a>
                                 {% endlabelled %}
