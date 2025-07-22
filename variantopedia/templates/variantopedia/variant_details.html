@@ -747,7 +747,7 @@ function applyVariantValues() {
                         {% labelled id='topmed_af' label='TopMed' help=annotation_description.topmed_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.topmed_af|format_unit_as_percent }}{% endlabelled %}
                     {% endif %}
                         {% labelled label='gnomAD version' hint='tiny' %}{{ variant_annotation.version.gnomad }}{% endlabelled %}
-                        {% if variant_annotation.gnomad_af %}
+                        {% if variant_annotation.has_gnomad %}
                             {% labelled id='gnomad_af' label='gnomAD Allele Frequency' help=annotation_description.gnomad_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_af|format_unit_as_percent }}{% endlabelled %}
                             {% if variant_annotation.has_gnomad_faf %}
                                 {% labelled id='gnomad_fafmax_faf95_max' label='Grpmax Filtering AF (95% confidence)' help=annotation_description.gnomad_fafmax_faf95_max hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_fafmax_faf95_max|format_unit_as_percent }}{% endlabelled %}

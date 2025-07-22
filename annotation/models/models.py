@@ -1378,6 +1378,10 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return self.is_standard_annotation
 
     @property
+    def has_gnomad(self) -> bool:
+        return bool(self.gnomad_af or self.gnomad2_liftover_af)
+
+    @property
     def has_non_gnomad_population_frequency(self) -> bool:
         return self.is_standard_annotation
 
