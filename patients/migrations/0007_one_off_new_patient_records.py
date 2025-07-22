@@ -6,10 +6,14 @@ from django.db.models.query_utils import Q
 
 
 def _one_off_new_patient_records(apps, _schema_editor):
+    Sample = apps.get_model("snpdb", "Sample")
     PatientRecord = apps.get_model("patients", "PatientRecord")
 
+    sample_ids = set(str(s) for s in Sample.objects.values_list("id", flat=True))
+
     # Properly link to FK
-    PatientRecord.objects.filter(matched_sample_id__isnull=False).update(sample_id=F("matched_sample_id"))
+    pr_qs = PatientRecord.objects.filter(matched_sample_id__isnull=False)
+    pr_qs.filter(matched_sample_id__in=sample_ids).update(sample_id=F("matched_sample_id"))
 
     PATIENT_RECORD_MATCH_CREATED = 'C'
     PATIENT_RECORD_MATCH_EXACT = 'E'
