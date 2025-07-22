@@ -119,10 +119,14 @@
                             {{ worker_info.status }}
                             {% if worker_info.ok %}
                                 Jobs: {{ worker_info.active }}
+                                {% if worker_info.active_jobs %}
+                                    Tasks: {{ worker_info.active_jobs }}
+                                {% endif %}
                                 {% if worker_info.scheduled %}
                                     Scheduled: {{ worker_info.scheduled }}
                                 {% endif %}
                                 Total workers: {{ worker_info.num_workers }}
+
                             {% endif %}
                         </div>
                     {% endlabelled %}

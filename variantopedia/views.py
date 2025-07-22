@@ -3,7 +3,7 @@ import operator
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import timedelta, datetime
 from functools import reduce
 from typing import Any, Optional
 
@@ -15,6 +15,7 @@ from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.timesince import timesince
 from django.utils.timezone import localtime
 from django.views.decorators.http import require_POST
 
@@ -164,20 +165,39 @@ def server_status(request):
                 status = "OK"
                 ok = True
 
-            data = stats.get(worker)
-            if data:
+            if data := stats.get(worker):
                 processes = data.get("pool", {}).get("processes")
                 if processes:
                     num_workers = len(processes)
                     status = "OK"
                     ok = True
 
+            num_active = 0
+            active_jobs = []
+            if worker_active := active.get(worker):
+                num_active = len(worker_active)
+                print(f"{worker=} active: {worker_active}")
+                name_time_stamps = defaultdict(list)
+                for worker_data in worker_active:
+                    name = worker_data.get("name")
+                    time_start = worker_data.get("time_start")
+                    if name and time_start:
+                        name = name.split(".")[-1]  # remove prefix
+                        name_time_stamps[name].append(time_start)
+
+                for name, time_stamps in sorted(name_time_stamps.items(), key=lambda x: len(x[1]), reverse=True):
+                    earliest_ts = min(time_stamps)
+                    dt = datetime.fromtimestamp(earliest_ts)
+                    earliest = f"{timesince(dt)} ago"
+                    active_jobs.append(f"{name}: {len(time_stamps)} (earliest={earliest})")
+
             celery_workers[worker] = {
                 "status": status,
                 "ok": ok,
-                "active": len(active.get(worker, [])),
+                "active": num_active,
                 "scheduled": len(scheduled.get(worker, [])),
                 "num_workers": num_workers,
+                "active_jobs": ", ".join(active_jobs),
             }
 
     can_access_reference = True

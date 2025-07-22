@@ -6,6 +6,7 @@
 
 import logging
 import os
+from time import sleep
 
 import celery
 import rollbar
@@ -95,6 +96,13 @@ if settings.HEARTBEAT_URL:
 @app.task(bind=True)
 def debug_task(self):
     logging.info('Request: %r', self.request)
+
+
+@app.task(bind=True)
+def sleep_task(self, seconds: int):
+    logging.info('Sleeping for %d seconds', seconds)
+    sleep(seconds)
+    logging.info('Finished sleeping!')
 
 
 @app.task(bind=True)
