@@ -40,8 +40,8 @@ class VariantGridColumn(models.Model):
             css_classes.append("mandatory")
 
         if self.annotation_level:
-            annotation_level_class = ColumnAnnotationLevel(self.annotation_level).label
-            css_classes.append("%s-column" % annotation_level_class.lower())
+            annotation_level_class = ColumnAnnotationLevel(self.annotation_level).label.lower()
+            css_classes.append(f"{annotation_level_class}-column")
         return " ".join(css_classes)
 
     @cached_property

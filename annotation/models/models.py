@@ -719,7 +719,7 @@ class VariantAnnotationVersion(SubVersionPartition):
 
     @property
     def gnomad_major_version(self) -> int:
-        return int(self.gnomad.split(".")[0])
+        return int(self.gnomad.split(".", maxsplit=1)[0])
 
     @staticmethod
     def latest(genome_build, active=True) -> 'VariantAnnotationVersion':
@@ -1541,7 +1541,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
 
             sv_overlap['gnomad_sv_overlap_url'] = self.get_gnomad_url(gnomad_variant, dataset)
             if coords := sv_overlap.get("gnomad_sv_overlap_coords"):
-                chrom, start, end = parse_gnomad_coord(coords)
+                _chrom, start, end = parse_gnomad_coord(coords)
                 sv_overlap['gnomad_sv_overlap_length'] = end - start
 
             sv_overlap_list.append(sv_overlap)

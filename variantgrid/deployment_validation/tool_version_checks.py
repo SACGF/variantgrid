@@ -22,21 +22,14 @@ def _check_bcftools_version():
 
 
 def _check_bcftools_liftover_has_write_reject():
+    """Return True if `bcftools +liftover --help` mentions --write-reject."""
     env = os.environ.copy()
     env["BCFTOOLS_PLUGINS"] = settings.LIFTOVER_BCFTOOLS_PLUGIN_DIR
+    cmd = [settings.BCFTOOLS_COMMAND, "+liftover", "--help"]
 
-    p = subprocess.Popen([settings.BCFTOOLS_COMMAND, "+liftover", "--help"], env=env,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = p.communicate()
-    stdout = stdout.decode()
-    stderr = stderr.decode()
-    if p.returncode:
-        raise subprocess.CalledProcessError(
-            f"Error running '{settings.BCFTOOLS_COMMAND} --version': {stderr=}, returned: {p.returncode}")
-
-    # They may change whether help is in stderr or stdout
+    res = subprocess.run(cmd, env=env, capture_output=True, text=True, check=True)
     write_reject_opt = "--write-reject"
-    return write_reject_opt in stdout or write_reject_opt in stderr
+    return write_reject_opt in res.stdout or write_reject_opt in res.stderr
 
 
 def _run_ensure_success(command_list, **kwargs):

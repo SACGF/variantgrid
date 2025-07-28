@@ -9,7 +9,7 @@ def check_annotation_versions() -> dict:
     for genome_build in GenomeBuild.builds_with_annotation():
         build_av = {}
         try:
-            annotation_version = AnnotationVersion.latest(genome_build, validate=True)
+            AnnotationVersion.latest(genome_build, validate=True)
             build_av["valid"] = True
         except Exception as e:
             build_av["valid"] = False
