@@ -701,7 +701,6 @@ class Variant(PreviewModelMixin, models.Model):
 
     @property
     def can_have_clingen_allele(self) -> bool:
-        from snpdb.models.models_clingen_allele import ClinGenAllele
         return self._clingen_allele_size <= ClinGenAllele.CLINGEN_ALLELE_MAX_ALLELE_SIZE and self.can_make_g_hgvs
 
     @property
