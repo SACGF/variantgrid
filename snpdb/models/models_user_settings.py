@@ -97,13 +97,13 @@ class TagColor(TimeStampedModel):
     class Meta:
         unique_together = ('collection', 'tag')
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         self.collection.increment_version()
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
 
-    def delete(self, **kwargs):
+    def delete(self, *args, **kwargs):
         self.collection.increment_version()
-        super().delete(**kwargs)
+        super().delete(*args, **kwargs)
 
     def __str__(self):
         return f"{self.collection}/{self.tag}: {self.rgb}"

@@ -63,9 +63,9 @@ class SeqAutoRun(TimeStampedModel):
     class Meta:
         permissions = (('seqauto_scan_initiate', 'SeqAuto scan initiate'),)
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         self.status = self.get_status()
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
 
     def get_status(self):
         status = SeqAutoRunStatus.CREATED
@@ -124,11 +124,10 @@ class SeqAutoRecord(TimeStampedModel):
     # We will probably remove this field in the future as we go API only
     data_state = models.CharField(max_length=1, choices=DataState.choices)
 
-    def save(self, force_insert=False, force_update=False, using=None,
-             update_fields=None):
+    def save(self, *args, **kwargs):
         self.validate()
         self.is_valid = not SeqAutoMessage.objects.filter(record=self, open=True, severity=LogLevel.ERROR).exists()
-        super().save()
+        super().save(*args, **kwargs)
 
     def validate(self) -> bool:
         """ Creates SeqAutoMessage of severity=ERROR - or closes any that no longer apply """

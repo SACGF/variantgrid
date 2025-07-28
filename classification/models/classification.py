@@ -1048,12 +1048,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             **kwargs
         )[0]
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         """ The post_save event is fired after save(), for other logic that depends on Classifications
             but doesn't work with the Classification object itself.
         """
         fix_permissions = kwargs.pop('fix_permissions', None) or self.id is None
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
 
         # fix permissions removes previous permissions
         if fix_permissions:

@@ -249,10 +249,10 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
             match_type = None
         return patient, match_type
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         ensure_mutally_exclusive_fields_not_set(self, "date_of_death", "_deceased")
         pheno_kwargs = HasPhenotypeDescriptionMixin.pop_kwargs(kwargs)
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
         HasPhenotypeDescriptionMixin.save_phenotype(self, pheno_kwargs)
 
     def get_samples(self):

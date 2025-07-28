@@ -1637,8 +1637,8 @@ class ReleaseGeneSymbolGene(TimeStampedModel):
 class GeneSymbolWiki(Wiki):
     gene_symbol = models.OneToOneField(GeneSymbol, on_delete=CASCADE)
 
-    def save(self, **kwargs):
-        super().save(**kwargs)
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
         self.update_citations()
 
     def update_citations(self):
@@ -1774,10 +1774,10 @@ class GeneList(TimeStampedModel):
 
         return copy
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         assign_permissions = kwargs.pop("assign_permissions", False)
         initial_save = not self.pk
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
         if initial_save or assign_permissions:
             # logging.info("GeneList: assign_permission_to_user_and_groups")
             assign_permission_to_user_and_groups(self.user, self)

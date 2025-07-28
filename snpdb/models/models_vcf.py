@@ -146,8 +146,8 @@ class VCF(models.Model, PreviewModelMixin):
         write_perm = DjangoPermission.perm(VCF, DjangoPermission.WRITE)
         return user_or_group.has_perm(write_perm, self)
 
-    def save(self, **kwargs):
-        super().save(**kwargs)
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
         try:
             if self.cohort.name != self.name:
                 self.cohort.name = self.name

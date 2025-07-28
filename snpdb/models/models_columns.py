@@ -91,10 +91,10 @@ class CustomColumnsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStamp
     user = models.ForeignKey(User, null=True, on_delete=CASCADE)  # null = Public
     version_id = models.IntegerField(null=False, default=0)
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         # Add mandatory columns to all custom columns
         initial_save = not self.pk
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
         if initial_save:
             for i, grid_column_name in enumerate(CustomColumnsCollection.MANDATORY_COLUMNS):
                 column = VariantGridColumn.objects.get(grid_column_name=grid_column_name)
@@ -146,13 +146,13 @@ class CustomColumn(models.Model):
     class Meta:
         unique_together = ("custom_columns_collection", "column")
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         self.custom_columns_collection.increment_version()
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
 
-    def delete(self, **kwargs):
+    def delete(self, *args, **kwargs):
         self.custom_columns_collection.increment_version()
-        super().delete(**kwargs)
+        super().delete(*args, **kwargs)
 
     @property
     def variant_column(self):

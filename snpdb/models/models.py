@@ -120,10 +120,10 @@ class CachedGeneratedFile(TimeStampedModel):
             if async_result.result:
                 self.save_from_async_result(async_result)
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         if settings.CACHE_GENERATED_FILES:
             logging.debug("Save cachedgeneratedfile!")
-            super().save(**kwargs)
+            super().save(*args, **kwargs)
         else:
             logging.debug("Not caching generated files - skipped save!")
 
@@ -660,8 +660,8 @@ class Lab(models.Model, PreviewModelMixin):
             msg = f"You do not have WRITE permission for {self.pk}"
             raise PermissionDenied(msg)
 
-    def save(self, **kwargs):
-        super().save(**kwargs)
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
         if self.group_name:
             # pre-create the groups
             _ = self.group

@@ -104,8 +104,8 @@ class PathologyTestVersion(TimeStampedModel):
         copy.save()
         return copy
 
-    def save(self, **kwargs):
-        super().save(**kwargs)
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
 
         if self.gene_list.import_status != ImportStatus.SUCCESS:
             import_status = self.gene_list.get_import_status_display()

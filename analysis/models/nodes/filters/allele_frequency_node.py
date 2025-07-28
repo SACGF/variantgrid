@@ -45,10 +45,10 @@ class AlleleFrequencyNode(AncestorSampleMixin, AnalysisNode):
     def get_help_text() -> str:
         return "Variant Allele Frequency filter"
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         inital_save = not self.pk
 
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
         if inital_save:
             # Create a NodeAlleleFrequencyFilter so the filter shows
             naff, created = NodeAlleleFrequencyFilter.objects.get_or_create(node=self)
