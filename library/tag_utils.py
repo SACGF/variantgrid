@@ -6,8 +6,8 @@ def get_passed_object(token):
     tag_name = contents[0]
     try:
         obj = contents[1]
-    except ValueError:
-        raise template.TemplateSyntaxError(f"{tag_name} tag requires exactly one argument")
+    except ValueError as ve:
+        raise template.TemplateSyntaxError(f"{tag_name} tag requires exactly one argument") from ve
 
     return obj
 

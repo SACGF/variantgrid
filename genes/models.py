@@ -1178,7 +1178,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
             try:
                 _ = self.genome_build_data[key]
             except KeyError:
-                data_errors[key] = f"Field missing"
+                data_errors[key] = "Field missing"
 
         if error := (self.data.get("error") or self.genome_build_data.get("error")):
             data_errors["error"] = error

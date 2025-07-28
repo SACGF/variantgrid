@@ -1351,7 +1351,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 try:
                     Classification.to_date(value)
                 except ValueError as ve:
-                    message = f"Invalid date (expect yyyy-mm-dd)"
+                    message = "Invalid date (expected yyyy-mm-dd)"
                     cell.add_validation(code=ValidationCode.INVALID_DATE, severity='warning',
                                         message=message)
 

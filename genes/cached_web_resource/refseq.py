@@ -164,7 +164,7 @@ def store_refseq_sequence_info_from_web(cached_web_resource: CachedWebResource):
 
 
 def store_gene2pubmed_from_web(cached_web_resource: CachedWebResource):
-    print(f"store_gene2pubmed_from_web - starting")
+    print("store_gene2pubmed_from_web - starting")
     homo_sapiens_tax_id = "9606"
     expected_cols = ["#tax_id", "GeneID", "PubMed_ID"]
     url = "https://ftp.ncbi.nlm.nih.gov/gene/DATA/gene2pubmed.gz"
@@ -212,4 +212,4 @@ def store_gene2pubmed_from_web(cached_web_resource: CachedWebResource):
         examples = ", ".join(list(skipped_genes)[:10])
         logging.info("Skipped %d genes: example: %s", len(skipped_genes), examples)
 
-    logging.info(f"store_gene2pubmed_from_web - Finished: %s", cached_web_resource.description)
+    logging.info("store_gene2pubmed_from_web - Finished: %s", cached_web_resource.description)
