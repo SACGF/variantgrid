@@ -235,7 +235,7 @@ class OntologyImport(TimeStampedModel):
     class Meta:
         unique_together = ('import_source', 'filename', 'version')
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         created = not self.pk
         if created and not self.version:
             # Assign version to be next highest
@@ -244,7 +244,7 @@ class OntologyImport(TimeStampedModel):
             data = existing_ontology.aggregate(Max("version"))
             self.version = (data.get("version__max") or 0) + 1
 
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
         if created and OntologyVersion.in_ontology_version(self):
             logging.info("Creating new OntologyTermRelation partition")
             import_source_id = self.pk

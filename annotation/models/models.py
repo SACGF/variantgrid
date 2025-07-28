@@ -55,9 +55,9 @@ class SubVersionPartition(RelatedModelsPartitionModel):
     class Meta:
         abstract = True
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         created = not self.pk
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
         if created:
             genome_build = getattr(self, "genome_build", None)
             AnnotationVersion.new_sub_version(genome_build)
@@ -425,9 +425,9 @@ class DBNSFPGeneAnnotationVersion(TimeStampedModel):
     class Meta:
         unique_together = ('version', 'sha256_hash')
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         created = not self.pk
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
         if created:
             logging.info("Creating new DBNSFPGeneAnnotation partition")
             version = self.pk
@@ -973,9 +973,9 @@ class AnnotationRun(TimeStampedModel):
     def variant_annotation_version(self):
         return self.annotation_range_lock.version
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         self.status = self.get_status()
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
 
     def get_status(self):
         status = AnnotationStatus.CREATED

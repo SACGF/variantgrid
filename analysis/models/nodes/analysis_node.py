@@ -962,7 +962,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         if not updated:
             raise NodeOutOfDateException()
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         """ To avoid race conditions, don't use save() in a celery task (unless running in scheduling_single_worker)
             instead use update() method above """
         # logging.debug("save: pk=%s kwargs=%s", self.pk, str(kwargs))
@@ -989,7 +989,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         if self.parents_changed or self.queryset_dirty:
             self.bump_version()
 
-            super_save(**kwargs)
+            super_save(*args, **kwargs)
             if self.update_children:
                 # We also need to bump if node has it's own sample - as in templates, we set fields in toposort order
                 # So we could go from having multiple proband samples to only one later (thus can set descendants)
@@ -1000,7 +1000,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
                     kid.queryset_dirty = True
                     kid.save()  # Will bump versions
         else:
-            super_save(**kwargs)
+            super_save(*args, **kwargs)
 
         # Make sure this always exists
         NodeVersion.objects.get_or_create(node=self, version=self.version)

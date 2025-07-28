@@ -275,7 +275,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
 
         return extra_colmodel_overrides
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         is_new = self.version == 0
         vcf = self._get_vcf()
 
@@ -285,7 +285,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
                 # Somatic mode...
                 self.accordion_panel = self.SIMPLE_ZYGOSITY
 
-        return super().save(**kwargs)
+        return super().save(*args, **kwargs)
 
     def save_clone(self):
         filter_collections = list(self.cohortnodezygosityfilterscollection_set.all())

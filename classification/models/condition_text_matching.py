@@ -60,8 +60,8 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
         return self.normalized_text
 
     # TODO is this better done as an before save hook?
-    def save(self, **kwargs):
-        super().save(**kwargs)
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
         assign_perm(self.get_read_perm(), self.lab.group, self)
         assign_perm(self.get_write_perm(), self.lab.group, self)
 

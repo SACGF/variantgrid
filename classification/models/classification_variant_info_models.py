@@ -527,11 +527,11 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         return imported_vc, resolved_vc
 
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None, **kwargs):
+    def save(self, *args, **kwargs):
         if not self.imported_md5_hash:
             self.imported_md5_hash = md5sum_str(self.imported_c_hgvs or self.imported_g_hgvs)
 
-        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields, **kwargs)
+        super().save(*args, **kwargs)
 
     def _calculate_validation(self) -> ImportedAlleleInfoValidationTags:
 
