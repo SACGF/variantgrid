@@ -9,6 +9,8 @@ from requests.auth import HTTPBasicAuth
 from requests_oauthlib.oauth2_auth import OAuth2
 from requests_oauthlib.oauth2_session import OAuth2Session
 
+from library.constants import MINUTE_SECS
+
 
 class ServerAuth:
     """
@@ -64,17 +66,25 @@ class ServerAuth:
                 password=self.password
             )
 
-    def get(self, url_suffix: str, **kwargs) -> Response:
+    def get(self, url_suffix: str, timeout: Optional[int]=None, **kwargs) -> Response:
+        if timeout is None:
+            timeout = MINUTE_SECS
+
         return requests.get(
             url=self.url(url_suffix),
             auth=self.auth,
+            timeout=timeout,
             **kwargs
         )
 
-    def post(self, url_suffix: str, **kwargs) -> Response:
+    def post(self, url_suffix: str, timeout: Optional[int]=None, **kwargs) -> Response:
+        if timeout is None:
+            timeout = MINUTE_SECS
+
         return requests.post(
             url=self.url(url_suffix),
             auth=self.auth,
+            timeout=timeout,
             **kwargs
         )
 
