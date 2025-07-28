@@ -1,7 +1,6 @@
 from django.dispatch import receiver
 
-from classification.models import classification_flag_types, Classification, ClassificationSummaryCalculator, \
-    ClassificationModification
+from classification.models import classification_flag_types, Classification, ClassificationSummaryCalculator
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 
 

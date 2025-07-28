@@ -1,4 +1,3 @@
-import math
 from datetime import timedelta
 from functools import cached_property
 from typing import Optional

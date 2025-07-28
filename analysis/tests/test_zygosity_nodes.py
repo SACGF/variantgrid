@@ -1,19 +1,10 @@
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
-from analysis.models import Analysis, CohortNode, CohortNodeZygosityFiltersCollection, FilterNode, FilterNodeItem, \
-    SampleNode, GeneListNode, IntersectionNode, PhenotypeNode, PopulationNode, TagNode, VariantTag, \
-    AlleleFrequencyNode, NodeAlleleFrequencyFilter, NodeVCFFilter, TrioNode, MOINode, MergeNode, PedigreeNode, \
-    AnalysisNode, AllVariantsNode
-from annotation.fake_annotation import get_fake_annotation_version, create_fake_variants
-from annotation.models import VariantGeneOverlap, AnnotationRun
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version
-from genes.models import GeneList, GeneListGeneSymbol
-from ontology.models import OntologyTerm
-from patients.models_enums import GnomADPopulation
-from pedigree.models import PedigreeInheritance
-from snpdb.models import GenomeBuild, ImportStatus, Variant, GenomicInterval, Tag
-from snpdb.tests.utils.fake_cohort_data import create_fake_trio, create_fake_pedigree
+from analysis.models import Analysis, CohortNode, AnalysisNode, AllVariantsNode
+from annotation.fake_annotation import get_fake_annotation_version
+from snpdb.models import GenomeBuild
+from snpdb.tests.utils.fake_cohort_data import create_fake_trio
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)

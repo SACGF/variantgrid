@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, Any, TypedDict, Literal, Tuple
+from typing import Optional, Any, TypedDict, Literal
 
 import django.dispatch
 from django.conf import settings

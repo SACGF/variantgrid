@@ -439,6 +439,7 @@ disable=raw-checker-failed,
         modelform-uses-exclude,
         too-many-nested-blocks,
         too-many-positional-arguments,
+        import-outside-toplevel,
         cyclic-import
 
 
