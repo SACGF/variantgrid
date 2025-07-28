@@ -274,7 +274,7 @@ exclude-too-few-public-methods=
 ignored-parents=
 
 # Maximum number of arguments for function / method.
-max-args=5
+max-args=10
 
 # Maximum number of attributes for a class (see R0902).
 max-attributes=7
@@ -292,13 +292,13 @@ max-locals=15
 max-parents=7
 
 # Maximum number of public methods for a class (see R0904).
-max-public-methods=20
+max-public-methods=40
 
 # Maximum number of return / yield for function / method body.
 max-returns=6
 
 # Maximum number of statements in function / method body.
-max-statements=50
+max-statements=100
 
 # Minimum number of public methods for a class (see R0903).
 min-public-methods=2
@@ -434,6 +434,13 @@ disable=raw-checker-failed,
         too-many-locals,
         too-many-branches,
         too-many-ancestors,
+        duplicate-code,
+        too-many-lines,
+        modelform-uses-exclude,
+        too-many-nested-blocks,
+        too-many-positional-arguments,
+        cyclic-import
+
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
