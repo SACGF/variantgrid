@@ -23,6 +23,7 @@ from library.django_utils import SortByPKMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.django_postgres import PostgresRealField
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
+from library.guardian_utils import DjangoPermission
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import invert_dict
 from patients.models_enums import Zygosity
@@ -216,20 +217,27 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
                                         cohort_genotype_packed_field_index=field_index, sort_order=i)
         return sub_cohort
 
-    @staticmethod
-    def get_for_user(user, cohort_id):
-        cohort = get_object_or_404(Cohort, pk=cohort_id)
-        if cohort.vcf:
-            if user.has_perm('view_vcf', cohort.vcf):
-                return cohort
+    @classmethod
+    def get_for_user(cls, user, pk, write=False):
+        cohort = get_object_or_404(Cohort, pk=pk)
+        if write:
+            dp = DjangoPermission.WRITE
+        else:
+            dp = DjangoPermission.READ
 
-        elif user.has_perm('view_cohort', cohort):
-            return cohort
+        if cohort.vcf:
+            perm = DjangoPermission.perm(cohort.vcf, dp)
+            if user.has_perm(perm, cohort.vcf):
+                return cohort
+        else:
+            perm = DjangoPermission.perm(cohort, dp)
+            if user.has_perm(perm, cohort):
+                return cohort
 
         raise PermissionDenied(f"You do not have permissions to access cohort id {cohort.pk}")
 
     @classmethod
-    def filter_for_user(cls, user, queryset=None, group_data=True, success_status_only=True):
+    def filter_for_user(cls, user, queryset=None, group_data=True, success_status_only=True, **kwargs):
         if queryset is None:
             cohort_qs = get_objects_for_user(user, 'snpdb.view_cohort', accept_global_perms=False)
 
@@ -284,12 +292,12 @@ class CohortSample(models.Model):
     class Meta:
         unique_together = ('cohort', 'cohort_genotype_packed_field_index')
 
-    def save(self, **kwargs):
-        super().save(**kwargs)
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
         self.cohort.increment_version()
 
-    def delete(self, **kwargs):
-        super().delete(**kwargs)
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
         self.cohort.increment_version()
 
     @staticmethod
