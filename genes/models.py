@@ -67,7 +67,7 @@ class NoTranscript(ValueError):
     """
 
 class NoTranscriptVersion(NoTranscript):
-    """ """
+    pass
 
 
 class MissingTranscript(NoTranscript):
@@ -848,7 +848,6 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
 
     @cached_property
     def hgvs_ok(self) -> bool:
-        """ """
         if self.has_valid_data:
             if settings.HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH:
                 if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
@@ -1378,7 +1377,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             data = Entrez.efetch(db='nuccore', id=transcript_accession, rettype='gb', retmode='text')
         except HTTPError as e:
             if e.code == 400:
-                raise BadTranscript(f"Bad Transcript: Entrez API reports \"{transcript_accession}\" not found")
+                raise BadTranscript(f"Bad Transcript: Entrez API reports \"{transcript_accession}\" not found") from e
             raise e
         api_response = data.read()
         with StringIO(api_response) as f:
