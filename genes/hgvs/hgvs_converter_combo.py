@@ -75,6 +75,6 @@ class ComboCheckerHGVSConverter(HGVSConverter):
     def normalize(self, hgvs_variant: HGVSVariant) -> HGVSVariant:
         return self._call_converters("normalize", hgvs_variant)
 
-    def description(self) -> str:
+    def description(self, describe_fallback=True) -> str:
         # This will be different so just return the 1st one
-        return self._converters[0].description()
+        return self._converters[0].description(describe_fallback=describe_fallback)

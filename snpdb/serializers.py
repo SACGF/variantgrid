@@ -11,7 +11,7 @@ from snpdb.models.models_vcf import Project
 from snpdb.variant_links import variant_link_info
 
 
-class TimestampField(serializers.Field):
+class TimestampField(serializers.ReadOnlyField):
     """ Seconds since epoch """
     def to_representation(self, value):
         return value.timestamp()
