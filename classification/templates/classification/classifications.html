@@ -141,8 +141,7 @@
             filterGrid();
         });
 
-        debouncedFilterGrid = debounce(filterGrid);
-
+        let debouncedFilterGrid = debounce(filterGrid);
         $('#id_filter').keyup(function() {
             debouncedFilterGrid();
         });
