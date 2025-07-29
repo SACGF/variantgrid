@@ -269,6 +269,30 @@ def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE
 
 
 @register.inclusion_tag("classification/tags/clinical_significance_inline.html")
+def somatic_clinical_significance_inline(cs: str, amp_level: str):
+    key = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
+    colors = {
+        "tier_1": "#fcc",
+        "tier_1_or_2": "#ffd5d5",
+        "tier_2": "#ffdddd",
+        "tier_3": "#dddddd",
+        "tier_4": "#ccccff"
+    }
+    label = None
+    if cs:
+        label = key.option_dictionary.get(cs, cs)
+    else:
+        label = "No Data"
+    if amp_level:
+        label += f" {amp_level}"
+    return {
+        "key": cs.lower() if cs else "",
+        "color": colors.get(cs) or "#aaa",
+        "label": label
+    }
+
+
+@register.inclusion_tag("classification/tags/clinical_significance_inline.html")
 def clinical_significance_inline(value):
     key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
     colors = {
@@ -278,10 +302,16 @@ def clinical_significance_inline(value):
         "LP": "#d88",
         "P": "#d44"
     }
+    label = None
+    if value:
+        label = key.option_dictionary.get(value, value)
+    else:
+        label = "No Data"
+
     return {
-        "key": value.lower(),
+        "key": value.lower() if value else "",
         "color": colors.get(value) or "#aaa",
-        "label": key.option_dictionary.get(value, value) or "Unclassified"
+        "label": label
     }
 
 @register.inclusion_tag("classification/tags/lab.html")

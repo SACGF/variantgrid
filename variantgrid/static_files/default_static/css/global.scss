@@ -1351,6 +1351,9 @@ select[disabled] {
 	content: "| ";
 	color: #888;
 }
+.vertical-sep+.vertical-sep {
+	margin-top: 8px;
+}
 
 .semicolon-sep:not(.semicolon-sep:last-of-type):after {
 	font-family: monospace;

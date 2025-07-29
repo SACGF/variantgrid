@@ -32,7 +32,7 @@ class ConflictSeverity(IntegerChoices):
 class TestingContextBucket(TextChoices):
     NON_CANCER = "N", "Non-Cancer Somatic"
     HAEMATOLOGY = "H", "Haematology"
-    SOLID_TUMOR = "S", "Solid Tumor"
+    SOLID_TUMOR = "S", "Solid Tumour"
     OTHER = "O", "Other"
     GERMLINE = "G", "Germline"
     UNKNOWN = "U", "Unknown"

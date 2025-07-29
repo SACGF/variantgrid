@@ -595,13 +595,12 @@ TableFormat.repeat = function(settings, data, type, columns) {
         return "";
     }
     let subFormatter = eval(settings.formatter);
-    let cssClass = "repeat";
-    if (settings.groupCSS) {
-        cssClass = settings.groupCSS;
-    }
-    let dom = $('<div>', {"class": cssClass});
+    let dom = $('<div>');
     data.forEach((subData, index) => {
         let subDom = subFormatter(subData, type, columns);
+        if (settings.wrapperCSS) {
+            subDom = $('<div>', {class: settings.wrapperCSS, html: subDom});
+        }
         dom.append(subDom);
     });
     return dom;

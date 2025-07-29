@@ -95,7 +95,8 @@ class RichColumn:
                  visible: bool = True,
                  detail: bool = False,
                  css_class: str = None,
-                 extra_columns: Optional[list[str]] = None):
+                 extra_columns: Optional[list[str]] = None,
+                 template: Optional[str] = None):
         """
         #TODO consolidate, orderable, default_sort, sort_order_sequence
         :param key: A column name to be retrieved and returned and sorted on
@@ -156,6 +157,7 @@ class RichColumn:
         self.visible = visible
         self.css_class = css_class
         self.extra_columns = extra_columns
+        self.template = template
 
     @property
     def css_classes(self) -> str:

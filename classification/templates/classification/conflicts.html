@@ -1,0 +1,85 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load compress %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% load settings_tags %}
+{% load classification_tags %}
+{% load lab_tags %}
+{% block title %}Conflicts{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <style>
+        .dt-c_hgvs {
+            width: 25%;
+        }
+        .dt-context {
+            width: 25%;
+        }
+        .dt-severity {
+            width: 10%;
+        }
+        .dt-involved-labs {
+            width: 40%;
+        }
+    </style>
+    <script>
+        function renderContext(data, type, row) {
+            // return JSON.stringify(data);
+            let dom = $('<div>', { style: 'display:inline-block' } );
+            dom.append(VCTable.allele_origin_bucket_label(
+                data.allele_origin_bucket,
+                "",
+                "horizontal"));
+            if (data.testing_context_bucket !== "G") {
+                dom.append($("<span>", {"class": "testing-context", text: data.testing_context_bucket_label}));
+            }
+            dom.append(" - ")
+            dom.append($("<span>", {"class": "text-muted", text: data.conflict_type_label}));
+            return dom;
+        }
+        function conflictFilter(data) {
+            data.lab = "{{ dlab.lab_ids_str }}";
+            data.exclude_unknown = $('#filter_unknown').is(":checked");
+            data.multiple_submitters = $('#multiple_submitters').is(":checked");
+        }
+        function filterGrid() {
+            $('#conflicts-datatable').DataTable().ajax.reload();
+        }
+
+        let debouncedFilterGrid = debounce(filterGrid);
+        $(document).ready(() => {
+            $('.filter-input').change(() => {
+               debouncedFilterGrid();
+            }).keyup(() => {
+               debouncedFilterGrid();
+            });
+        });
+    </script>
+{% endblock %}
+{% block content %}
+    <div class="container">
+        {% lab_picker dlab.lab_picker %}
+        {% labelled label="Filter Out Unknown Contexts" %}
+            <div class="ml-4">
+                <input type="checkbox" id="filter_unknown" class="form-check-input filter-input" value="true" checked />
+                <label for="filter_unknown">Filters out overlaps for unknown allele origin / testing context</label>
+            </div>
+        {% endlabelled %}
+        {% labelled label="Multiple Submitters" %}
+            <div class="ml-4">
+                <input type="checkbox" id="multiple_submitters" class="form-check-input filter-input" value="true" checked />
+                <label for="multiple_submitters">Only include contexts with multiple shared submitters</label>
+            </div>
+        {% endlabelled %}
+        <table id="conflicts-datatable"
+               data-datatable-url="{% url 'conflicts_datatables' %}"
+               data-datatable-data='conflictFilter'
+               class="sticky-header classification-table"
+               data-adjust-columns="false"
+        ></table>
+    </div>
+{% endblock %}

@@ -2,13 +2,14 @@ import operator
 from collections import Counter
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
-from typing import Optional, Self, Tuple
+from typing import Optional, Self, Tuple, Iterable, Union
 
 import django
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
-from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, QuerySet
+from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, QuerySet, Subquery, OuterRef, Manager, \
+    PROTECT, Exists
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
@@ -80,6 +81,9 @@ class AlleleGrouping(TimeStampedModel):
     allele = models.OneToOneField(Allele, on_delete=models.CASCADE)
     # TODO probably some more summary fields ew could have here?
     # otherwise what is this serving that Allele isn't?
+
+    def __str__(self):
+        return f"({self.pk}) Allele Grouping for {self.allele}"
 
     def get_absolute_url(self) -> str:
         return reverse('allele_grouping_detail', kwargs={"allele_grouping_id": self.pk})
@@ -335,6 +339,9 @@ class ClassificationGrouping(TimeStampedModel):
     @transaction.atomic
     def update(self):
 
+        # FIXME there's a bunch of overlap calculation here that doesn't need to happen
+        # as that is now managed by Conflicts
+
         self.allele_origin_grouping.dirty = True
         self.allele_origin_grouping.save(update_fields=["dirty"])
 
@@ -545,12 +552,39 @@ class ConflictKey:
     tumor_type_category: Optional[str] = None
 
 
+
+class ConflictQuerySet(QuerySet['Conflict']):
+    def for_lab(self, lab: Lab):
+        return self.filter(
+            Exists(ConflictLab.objects.filter(conflict=OuterRef('pk'), lab=lab))
+        )
+
+    def for_labs(self, labs: Union[Iterable[int], Iterable[Lab]]):
+        return self.filter(
+            Exists(ConflictLab.objects.filter(conflict=OuterRef('pk'), lab__in=labs))
+        )
+
+class ConflictObjectManager(Manager):
+
+    def get_queryset(self):
+        qs = ConflictQuerySet(self.model, using=self._db)
+        qs = qs.annotate(severity=Subquery(ConflictHistory.objects.filter(conflict_id=OuterRef("pk"), is_latest=True).values('severity')))
+        qs = qs.annotate(data=Subquery(ConflictHistory.objects.filter(conflict_id=OuterRef("pk"), is_latest=True).values('data')))
+        return qs
+
+    # def with_severity(self):
+    #     return self.annotate(severity=Subquery(ConflictHistory.objects.filter(conflict_id=OuterRef("pk"), is_latest=True).values('severity')))
+
+
 class Conflict(TimeStampedModel):
+    objects = ConflictObjectManager()
+
     allele = models.ForeignKey(Allele, on_delete=CASCADE)
     conflict_type = models.CharField(max_length=1, choices=ConflictType.choices)
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, null=True, blank=True)
     testing_context_bucket = models.CharField(max_length=1, choices=TestingContextBucket.choices, null=True, blank=True)
     tumor_type_category = models.TextField(null=True, blank=True)
+    meta_data = models.JSONField(null=False, blank=False, default=dict)
 
     class Meta:
         unique_together = ("allele", "conflict_type", "allele_origin_bucket", "testing_context_bucket", "tumor_type_category")
@@ -559,32 +593,13 @@ class Conflict(TimeStampedModel):
     def latest(self) -> 'ConflictHistory':
         return ConflictHistory.objects.filter(conflict=self, is_latest=True).first()
 
-    @staticmethod
-    def log_history(allele: Allele, conflict_key: ConflictKey, data: dict, severity: ConflictSeverity):
-        conflict, created = Conflict.objects.get_or_create(
-            allele=allele,
-            conflict_type=conflict_key.conflict_type,
-            allele_origin_bucket=conflict_key.allele_origin_bucket,
-            testing_context_bucket=conflict_key.testing_context_bucket,
-            tumor_type_category=conflict_key.tumor_type_category,
-        )
-        latest: Optional[ConflictHistory] = None
-        if not created:
-            latest = ConflictHistory.objects.filter(conflict=conflict, is_latest=True).first()
-
-        if latest:
-            if latest.data == data:
-                return
-            else:
-                latest.is_latest = False
-                latest.save(update_fields=["is_latest"])
-
-        ConflictHistory(
-            conflict=conflict,
-            data=data,
-            severity=severity,
-            is_latest=True,
-        ).save()
+    def history(self, newest_to_oldest: bool = True) -> Iterable['ConflictHistory']:
+        qs = self.conflicthistory_set.all()
+        if newest_to_oldest:
+            qs = qs.order_by('-created')
+        else:
+            qs = qs.order_by('created')
+        return qs
 
 
 class ConflictHistory(TimeStampedModel):
@@ -595,3 +610,24 @@ class ConflictHistory(TimeStampedModel):
 
     class Meta:
         indexes = [models.Index(fields=["conflict", "is_latest"])]
+
+    def data_rows(self) -> list['ConflictDataRow']:
+        rows = self.data.get("rows")
+        from classification.services.conflict_services import ConflictDataRow
+        # TODO sort
+        return [ConflictDataRow.from_json(row) for row in rows]
+
+
+class ConflictLab(TimeStampedModel):
+    conflict = models.ForeignKey(Conflict, on_delete=CASCADE)
+    lab = models.ForeignKey(Lab, on_delete=CASCADE)
+    active = models.BooleanField(default=True)  # set to False if lab has withdrawn
+
+    class Meta:
+        unique_together = ("conflict", "lab")
+
+
+class ConflictLabComment(TimeStampedModel):
+    conflict_lab = models.ForeignKey(ConflictLab, on_delete=CASCADE)
+    user = models.ForeignKey(User, on_delete=PROTECT)
+    comment = models.TextField(null=False, blank=False)

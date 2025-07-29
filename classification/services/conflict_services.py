@@ -1,89 +1,237 @@
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Optional, TypeVar, Generic
+from functools import cached_property
+from typing import Optional
+from django.db import transaction
+from more_itertools.recipes import partition
 
 from classification.enums import AlleleOriginBucket, ConflictSeverity, ShareLevel, ConflictType
-from classification.models import AlleleOriginGrouping, EvidenceKeyMap, Conflict, ConflictKey
+from classification.models import AlleleOriginGrouping, EvidenceKeyMap, Conflict, ConflictKey, ConflictHistory, \
+    ConflictLab
+from genes.hgvs import CHGVS
+from library.utils import strip_json, first
+from snpdb.models import Allele, Lab
 
 """
-    classification: Optional[str]
-    sort: int
-    bucket: Optional[int]
-    pending: Optional[str]
+
+@dataclass(frozen=True)
+class ClinSigData(ConflictDataRow):
+    clin_sig: str
+    amp_level: int
+
+    @staticmethod
+    def from_data(lab_id: int, share_level: ShareLevel, row: dict) -> 'ClinSigData':
+        return ClinSigData(lab_id=lab_id, share_level=share_level, clin_sig=row.get("clinical_significance"), amp_level=row.get("amp_level"))
+
+    def to_json(self) -> dict:
+        return {
+            "lab_id": self.lab_id,
+            "clinical_significance": self.clin_sig,
+            "amp_level": self.amp_level
+        }
 """
 
 
 @dataclass(frozen=True)
-class ConflictDataRow(ABC):
+class ConflictDataRow:
     lab_id: int
     share_level: ShareLevel
+    classification: Optional[str]
+    clinical_significance: Optional[str]
+    amp_level: Optional[str]
+    exclude: bool = False
+    c_hgvs: Optional[CHGVS] = None
+
+    @cached_property
+    def lab(self):
+        # Lab uses Caching Object Manager
+        return Lab.objects.get(id=self.lab_id)
+
+    def with_exclude(self, exclude: bool) -> 'ConflictDataRow':
+        if self.exclude == exclude:
+            return self
+        return ConflictDataRow(
+            lab_id=self.lab_id,
+            share_level=self.share_level,
+            classification=self.classification,
+            clinical_significance=self.clinical_significance,
+            amp_level=self.amp_level,
+            exclude=exclude
+        )
+
+    def to_json(self) -> dict:
+        return strip_json({
+            "lab_id": self.lab_id,
+            "share_level": self.share_level.value,
+            "classification": self.classification,
+            "clinical_significance": self.clinical_significance,
+            "amp_level": self.amp_level,
+            "exclude": self.exclude
+        })
+
+    @staticmethod
+    def from_json(row: dict) ->'ConflictDataRow' :
+        return ConflictDataRow(
+            lab_id=row.get("lab_id"),
+            share_level=row.get("share_level"),
+            classification=row.get("classification"),
+            clinical_significance=row.get("clinical_significance"),
+            amp_level=row.get("amp_level"),
+            exclude=row.get("exclude")
+        )
+
+    @staticmethod
+    def from_data(row: dict, lab_id: int, share_level: ShareLevel, c_hgvs: CHGVS) -> 'ConflictDataRow':
+        return ConflictDataRow(
+            lab_id=lab_id,
+            share_level=share_level,
+            classification=row.get("classification"),
+            clinical_significance=row.get("clinical_significance"),
+            amp_level=row.get("amp_level"),
+            c_hgvs=c_hgvs
+        )
 
     @property
-    @abstractmethod
-    def to_json_value(self) -> dict:
-        raise NotImplementedError()
+    def bucket(self) -> Optional[int]:
+        if classification := self.classification:
+            return EvidenceKeyMap.clinical_significance_to_bucket().get(classification)
+        return None
+
+    def __lt__(self, other: 'ConflictDataRow') -> bool:
+        if self.lab_id != other.lab_id:
+            return self.lab_id < other.lab_id
+        return self.share_level < other.share_level
 
 
-T = TypeVar("T", bound=ConflictDataRow)
+class ConflictCalculator(ABC):
 
+    def __init__(self, allele: Allele, conflict_key: ConflictKey, conflict_data: list[ConflictDataRow]):
+        self.allele = allele
+        self.conflict_key = conflict_key
+        self.conflict_data = self.exclude_duplicates(conflict_data)
 
-class ConflictCalculator(ABC, Generic[T]):
+    @property
+    def included_conflict_data(self) -> list[ConflictDataRow]:
+        return [cd for cd in self.conflict_data if not cd.exclude]
 
     @abstractmethod
     def calculate_severity(self) -> ConflictSeverity:
         raise NotImplementedError()
 
-    @property
-    @abstractmethod
-    def data_list(self) -> list[T]:
-        raise NotImplementedError()
+    def should_exclude(self, row: ConflictDataRow) -> bool:
+        return not row.share_level.is_discordant_level
 
-    @staticmethod
-    def remove_duplicate_data(data_list: list[T]):
-        by_lab_id = {}
+    def exclude_duplicates(self, data_list: list[ConflictDataRow]) -> list[ConflictDataRow]:
+        by_lab_id: dict[int, list[ConflictDataRow]] = defaultdict(list)
         for row in data_list:
-            if existing := by_lab_id.get(row.lab_id):
-                if existing.share_level > row.share_level:
-                    by_lab_id[row.lab_id] = row
-                elif existing.share_level == row.share_level:
-                    raise ValueError(f"Lab ID {row.lab_id} {existing.share_level} found multiple times within a context")
-            else:
-                by_lab_id[row.lab_id] = row
-        return list(by_lab_id.values())
+            by_lab_id[row.lab_id].append(row)
+
+        updated_list: list[ConflictDataRow] = []
+        # TODO use Lab proper ordering
+        # but then need to work out efficient way to load Lab object
+        for key, values in by_lab_id.items():
+            for index, data_row in enumerate(sorted(list(values), reverse=True)):
+                if index == 0 and not self.should_exclude(data_row):
+                    updated_list.append(data_row)
+                else:
+                    updated_list.append(data_row.with_exclude(True))
+        return list(sorted(updated_list))
+
+    @cached_property
+    def involved_lab_ids(self) -> set[int]:
+        lab_ids = set()
+        for row in self.conflict_data:
+            lab_ids.add(row.lab_id)
+        return lab_ids
 
     def data_json(self) -> dict:
-        data_json = {}
-        for row in self.data_list:
-            data_json[row.lab_id] = row.to_json_value()
-        return data_json
-
-
-@dataclass(frozen=True)
-class OncPathData(ConflictDataRow):
-    classification: str
-
-    @staticmethod
-    def from_data(lab_id: int, share_level: ShareLevel, row: dict) -> 'OncPathData':
-        return OncPathData(lab_id=lab_id, share_level=share_level, classification=row.get("classification"))
-
-    @property
-    def bucket(self) -> Optional[int]:
-        return EvidenceKeyMap.clinical_significance_to_bucket().get(self.classification)
-
-    def to_json_value(self) -> dict:
+        data_rows = []
+        included, excluded = partition(lambda x: x.exclude, sorted(self.conflict_data))
+        for row in list(included) + list(excluded):
+            data_rows.append(row.to_json())
         return {
-            "classification": self.classification
+            "rows": data_rows
         }
+
+    @transaction.atomic
+    def log_history(self):
+        allele = self.allele
+        conflict_key = self.conflict_key
+        conflict: Conflict
+        created: bool
+        if not bool(self.included_conflict_data):
+            # if our calculation is empty (e.g. we worked out there's no contributing labs)
+            # don't make the conflict just for it to be empty
+            # BUT still need to call log_history in case there was data once and now we need to log
+            # it's no longer there
+            conflict = Conflict.objects.filter(
+                allele=allele,
+                conflict_type=conflict_key.conflict_type,
+                allele_origin_bucket=conflict_key.allele_origin_bucket,
+                testing_context_bucket=conflict_key.testing_context_bucket,
+                tumor_type_category=conflict_key.tumor_type_category,
+            ).first()
+            if not conflict:
+                return
+            created = False
+        else:
+            conflict, created = Conflict.objects.get_or_create(
+                allele=allele,
+                conflict_type=conflict_key.conflict_type,
+                allele_origin_bucket=conflict_key.allele_origin_bucket,
+                testing_context_bucket=conflict_key.testing_context_bucket,
+                tumor_type_category=conflict_key.tumor_type_category,
+            )
+
+        latest: Optional[ConflictHistory] = None
+        if not created:
+            latest = ConflictHistory.objects.filter(conflict=conflict, is_latest=True).first()
+
+        # also need to create ConflictLab
+        lab_ids = self.involved_lab_ids
+        ConflictLab.objects.bulk_create([
+            ConflictLab(
+                conflict=conflict,
+                lab_id=lab_id,
+                active=True
+            ) for lab_id in lab_ids
+        ], update_conflicts=True, update_fields=["active"], unique_fields=["conflict", "lab_id"])
+        ConflictLab.objects.filter(conflict=conflict).exclude(lab_id__in=lab_ids).update(active=False)
+
+        data = self.data_json()
+        if latest:
+            if latest.data == data:
+                return  # data is already up to date
+            else:
+                latest.is_latest = False
+                latest.save(update_fields=["is_latest"])
+
+        ConflictHistory(
+            conflict=conflict,
+            data=data,
+            severity=self.calculate_severity(),
+            is_latest=True,
+        ).save()
+
+        c_hgvs_source = self.included_conflict_data
+        if not c_hgvs_source:
+            c_hgvs_source = self.conflict_data
+
+        c_hgvs_set = [row.c_hgvs for row in c_hgvs_source]
+        c_hgvs_list = [c_hgvs.to_json_short() for c_hgvs in sorted(set(c_hgvs_set))]
+
+        conflict.meta_data["c_hgvs"] = c_hgvs_list
+        conflict.save(update_fields=["meta_data"])
 
 
 class OncPathCalculator(ConflictCalculator):
 
-    def __init__(self, conflict_key: ConflictKey, oncpath_data: list[OncPathData]):
-        self.conflict_key = conflict_key
-        self.oncpath_data = ConflictCalculator.remove_duplicate_data(oncpath_data)
+    def should_exclude(self, row: ConflictDataRow):
+        return super().should_exclude(row) or row.bucket is None
 
     def calculate_severity(self) -> ConflictSeverity:
-        oncpath_data = self.oncpath_data
+        oncpath_data = self.included_conflict_data
         if len(oncpath_data) == 0:
             return ConflictSeverity.NO_SUBMISSIONS
         elif len(oncpath_data) == 1:
@@ -106,79 +254,70 @@ class OncPathCalculator(ConflictCalculator):
             else:
                 return ConflictSeverity.SAME
 
-    @property
-    def data_list(self) -> list[T]:
-        return self.oncpath_data
-
-
-@dataclass(frozen=True)
-class ClinSigData(ConflictDataRow):
-    clin_sig: str
-    amp_level: int
-
-    @staticmethod
-    def from_data(lab_id: int, share_level: ShareLevel, row: dict) -> 'ClinSigData':
-        return ClinSigData(lab_id=lab_id, share_level=share_level, clin_sig=row.get("clinical_significance"), amp_level=row.get("amp_level"))
-
-    def to_json_value(self) -> dict:
-        return {
-            "clinical_significance": self.clin_sig,
-            "amp_level": self.amp_level
-        }
-
 
 class ClinSigCalculator(ConflictCalculator):
 
-    def __init__(self, conflicy_key: ConflictKey, clinsig_data: list[ClinSigData]):
-        self.conflicy_key = conflicy_key
-        self.clinsig_data = ConflictCalculator.remove_duplicate_data(clinsig_data)
+    def should_exclude(self, row: ConflictDataRow):
+        return super().should_exclude(row) or row.clinical_significance is None
 
     def calculate_severity(self) -> ConflictSeverity:
-        if len(self.clinsig_data) == 0:
+        clin_sig_data = self.included_conflict_data
+        if len(clin_sig_data) == 0:
             return ConflictSeverity.NO_SUBMISSIONS
-        elif len(self.clinsig_data) == 1:
+        elif len(clin_sig_data) == 1:
             return ConflictSeverity.SINGLE_SUBMISSION
         else:
-            return ConflictSeverity.MEDIUM
+            has_tier_1_and_2 = False
+            tiers = set()
+            for row in self.conflict_data:
+                # TODO this is hardcoding values expected in evidence keys
+                cs = row.clinical_significance
+                if cs == "tier_1_or_2":
+                    has_tier_1_and_2 = True
+                else:
+                    tiers.add(cs)
 
-    @property
-    def data_list(self) -> list[T]:
-        return self.clinsig_data
+                # for now ever difference in tier is a MAJOR diff
+                # the only exception being tier_1 vs tier_1_or_2 or tier_2 vs tier_1_or_2 which
+                # is considered minor
+                if len(tiers) > 1:
+                    return ConflictSeverity.MAJOR
+                elif len(tiers) == 1 and has_tier_1_and_2:
+                    only_tier = first(tiers)
+                    if only_tier in {"tier_1", "tier_2"}:
+                        return ConflictSeverity.MINOR
+                    else:
+                        return ConflictSeverity.MAJOR
+                return ConflictSeverity.SAME
 
 
 def calculate_and_apply_conflicts_for(allele_origin_grouping: AlleleOriginGrouping):
-    oncpath_data: list[OncPathData] = []
-    clinsig_data: list[ClinSigData] = []
+    oncpath_data: list[ConflictDataRow] = []
+    clinsig_data: list[ConflictDataRow] = []
     allele_origin_bucket = allele_origin_grouping.allele_origin_bucket
 
-    for cg in allele_origin_grouping.classificationgrouping_set.select_related("latest_classification_modification__classification").filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).all():
+    for cg in allele_origin_grouping.classificationgrouping_set.select_related("latest_classification_modification__classification"):
         lab_id = cg.latest_classification_modification.classification.lab_id
         summary_info = cg.latest_classification_modification.classification.summary_typed
+        c_hgvs = cg.latest_classification_modification.imported_c_hgvs_obj
 
-        oncpath_data.append(OncPathData.from_data(lab_id=lab_id, share_level=cg.share_level, row=summary_info.get("pathogenicity", {})))
-        clinsig_data.append(ClinSigData.from_data(lab_id=lab_id, share_level=cg.share_level, row=summary_info.get("clinical_significance", {})))
+        oncpath_data.append(ConflictDataRow.from_data(row=summary_info.get("pathogenicity", {}), lab_id=lab_id, share_level=cg.share_level_obj, c_hgvs=c_hgvs))
+        clinsig_data.append(ConflictDataRow.from_data(row=summary_info.get("clinical_significance", {}), lab_id=lab_id, share_level=cg.share_level_obj, c_hgvs=c_hgvs))
 
-    try:
-        if allele_origin_bucket == AlleleOriginBucket.SOMATIC:
-            conflict_key = ConflictKey(
-                conflict_type=ConflictType.CLIN_SIG,
-                allele_origin_bucket=allele_origin_bucket,
-                testing_context_bucket=allele_origin_grouping.testing_context_bucket,
-                tumor_type_category=allele_origin_grouping.tumor_type_category
-            )
-            clin_sig_calc = ClinSigCalculator(conflict_key, clinsig_data)
-            Conflict.log_history(allele=allele_origin_grouping.allele_grouping.allele, conflict_key=conflict_key, data=clin_sig_calc.data_json(), severity=clin_sig_calc.calculate_severity())
-
+    allele = allele_origin_grouping.allele_grouping.allele
+    if allele_origin_bucket == AlleleOriginBucket.SOMATIC:
         conflict_key = ConflictKey(
-            conflict_type=ConflictType.ONCPATH,
+            conflict_type=ConflictType.CLIN_SIG,
             allele_origin_bucket=allele_origin_bucket,
             testing_context_bucket=allele_origin_grouping.testing_context_bucket,
             tumor_type_category=allele_origin_grouping.tumor_type_category
         )
-        onc_path_calc = OncPathCalculator(conflict_key, oncpath_data)
-        Conflict.log_history(allele=allele_origin_grouping.allele_grouping.allele, conflict_key=conflict_key,
-                             data=onc_path_calc.data_json(), severity=onc_path_calc.calculate_severity())
-    except ValueError as ve:
-        print(oncpath_data)
-        print(clinsig_data)
-        raise ValueError(f"Multiple entries for lab found under {allele_origin_grouping.allele_grouping.allele} - {conflict_key} ({ve})")
+        ClinSigCalculator(allele, conflict_key, clinsig_data).log_history()
+
+    conflict_key = ConflictKey(
+        conflict_type=ConflictType.ONCPATH,
+        allele_origin_bucket=allele_origin_bucket,
+        testing_context_bucket=allele_origin_grouping.testing_context_bucket,
+        tumor_type_category=allele_origin_grouping.tumor_type_category
+    )
+    OncPathCalculator(allele, conflict_key, oncpath_data).log_history()

@@ -1,7 +1,7 @@
 from rest_framework import routers
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from classification.views import clinvar_export_view, search_view_metrics, clinvar_export_multi_view
+from classification.views import clinvar_export_view, search_view_metrics, clinvar_export_multi_view, conflict_view
 from classification.views import views, classification_dashboard_view, \
     classification_export_view, views_autocomplete, \
     classification_accumulation_graph
@@ -24,6 +24,8 @@ from classification.views.condition_match_test_view import condition_match_test_
     condition_match_test_download_view, condition_obsoletes_view
 from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
     ConditionTextColumns, ConditionTextMatchingAPI
+from classification.views.conflict_datatables import ConflictColumns
+from classification.views.conflict_view import conflicts_view, conflict_detail
 from classification.views.discordance_report_triage_view import DiscordanceReportTriageView
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report, \
     discordance_reports_view, discordance_reports_history_detail, discordance_reports_active_detail, \
@@ -107,6 +109,11 @@ urlpatterns = [
     path('clinvar_export_multi', clinvar_export_multi_view.view_multi_clinvar_exports_listing, name='clinvar_export_multi_listing'),
     path('clinvar_export_multi/<int:clinvar_allele_pk>', clinvar_export_multi_view.view_multi_clinvar_exports, name='clinvar_export_multi'),
     path('clinvar_export_multi/datatable', DatabaseTableView.as_view(column_class=clinvar_export_multi_view.ClinVarAlleleMultiExportColumns), name='clinvar_export_multi_datatables'),
+
+    path('conflicts', conflicts_view, name='conflicts'),
+    path('conflicts/datatable', DatabaseTableView.as_view(column_class=ConflictColumns), name='conflicts_datatables'),
+    path('conflicts/<str:lab_id>', conflicts_view, name='conflicts'),
+    path('conflicts/conflict/<int:conflict_id>', conflict_detail, name='conflict_detail'),
 
     path('condition_matchings', condition_matchings_view, name='condition_matchings'),
     path('condition_matchings/<str:lab_id>', condition_matchings_view, name='condition_matchings_lab'),

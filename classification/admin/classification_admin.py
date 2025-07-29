@@ -1443,7 +1443,7 @@ class ClassificationGroupingTabularAdmin(TabularInline):
 
 @admin.register(AlleleOriginGrouping)
 class AlleleOriginGroupingAdmin(ModelAdminBasics):
-    list_display = ("allele_grouping", "dirty")
+    list_display = ("allele_grouping", "allele_origin_bucket", "testing_context_bucket", "tumor_type_category", "dirty")
     inlines = (ClassificationGroupingTabularAdmin,)
 
     @admin_model_action(url_slug="refresh_all/", short_description="Refresh All", icon="fa-solid fa-arrows-rotate")
@@ -1467,6 +1467,7 @@ class AlleleOriginGroupingTabularAdmin(TabularInline):
 
 @admin.register(AlleleGrouping)
 class AlleleGroupingAdmin(ModelAdminBasics):
+    list_display = ("id", "allele")
     inlines = (AlleleOriginGroupingTabularAdmin,)
 
 

@@ -236,6 +236,19 @@ class CHGVS:
             "normalized": self.is_normalised
         }
 
+    def to_json_short(self):
+        return {
+            "full": self.full_c_hgvs,
+            "genome_build": self.genome_build.pk if self.genome_build else None
+        }
+
+    @staticmethod
+    def from_json_short(json_short: dict) -> 'CHGVS':
+        c_hgvs = CHGVS(json_short["full"])
+        if genome_build_str := json_short.get("genome_build"):
+            c_hgvs.genome_build = GenomeBuild.objects.get(pk=genome_build_str)
+        return c_hgvs
+
     @staticmethod
     def _clean_transcript(transcript: str) -> str:
         t_upper = transcript.upper()
@@ -332,7 +345,7 @@ class CHGVS:
             if parts := CHGVS.NUM_PART.match(c_part):
                 num_part = parts.group(1).rjust(10, '0')
                 extra = parts.group(2)
-                return sort_str + num_part + extra + self.transcript
+                sort_str += num_part + extra + self.transcript
 
         # if c.hgvs identical, sort by genome build
         if self.genome_build:
