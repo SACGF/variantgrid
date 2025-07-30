@@ -8,8 +8,9 @@
                 <img src="/static/icons/share_level/{{ row.share_level }}.png" style="width:12px; height: 12px; margin-right: 4px; top: -2px; position: relative;"/>
             {% endif %}
             {{ row.lab }}
+            {% if not row.exclude %}<br/><i class="text-secondary">Triage Pending</i>{% endif %}
         </div>
-        <div class="col-5">
+        <div class="col-5 align-self-center">
             {% if conflict_type == "P" %}
                 {% clinical_significance_inline row.classification %}
             {% elif conflict_type == "S" %}

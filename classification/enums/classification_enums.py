@@ -22,7 +22,7 @@ class ConflictType(TextChoices):
 
 class ConflictSeverity(IntegerChoices):
     NO_SUBMISSIONS = 0, "No Submissions"
-    SINGLE_SUBMISSION = 1, "Single Submission"
+    SINGLE_SUBMISSION = 1, "Single Submitter"
     SAME = 2, "Same Values"  # LP and LP
     MINOR = 3, "Minor Diffs"  # VUS and VUS_A
     MEDIUM = 4, "Medium Diffs"  # B and LB

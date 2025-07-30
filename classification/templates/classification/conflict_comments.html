@@ -1,0 +1,15 @@
+{% load user_tags %}
+{% load ui_utils %}
+    <div class="card-header">
+        Comments for {{ conflict }}
+    </div>
+    <div class="card-body">
+        {% labelled label="Comment" %}<textarea name="comment" class="form-control"></textarea>{% endlabelled %}
+        {% labelled label="Edit By" %}{% user user size="tiny" %}{% endlabelled %}
+        {% for conflict_lab in conflict.conflict_labs %}
+            {% labelled label=conflict_lab.lab %}Triange Pending{% endlabelled %}
+        {% endfor %}
+    </div>
+    <div class="card-footer">
+        <input type="submit" class="btn btn-primary" />
+    </div>

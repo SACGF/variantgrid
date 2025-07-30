@@ -10,7 +10,8 @@
             <div class="row mb-3">
                 <div class="col-5"></div>
                 <div class="col-7">
-                <span style="margin-left: 40px" class="mr-1">As of:</span> {% timestamp history.created %}
+                <span style="margin-left: 40px" class="mr-1">As of</span> {% timestamp history.created %}
+                {% if forloop.first %}(Current){% endif %}
                 </div>
             </div>
             {% for row in history.data_rows %}

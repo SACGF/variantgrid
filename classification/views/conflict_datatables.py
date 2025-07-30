@@ -35,10 +35,16 @@ class ConflictColumns(DatatableConfig[Conflict]):
                 label="c.HGVS",
                 extra_columns=["allele", "meta_data"],
                 renderer=self.render_c_hgvs,
-                client_renderer=RichColumn.client_renderer_repeat(
-                {"formatter": 'VCTable.hgvs', "wrapperCSS": "display-block vertical-sep"})
+                client_renderer=RichColumn.client_renderer_repeat({"formatter": 'VCTable.hgvs', "wrapperCSS": "display-block vertical-sep"})
             ),
-            RichColumn("severity", renderer=self.render_severity, order_sequence=[SortOrder.DESC, SortOrder.ASC], default_sort=SortOrder.DESC),
+            RichColumn(
+                "severity",
+                renderer=self.render_severity,
+                extra_columns=["pk"],
+                order_sequence=[SortOrder.DESC, SortOrder.ASC],
+                default_sort=SortOrder.DESC,
+                client_renderer='renderSeverity',
+            ),
             RichColumn(name="involved_labs", label="Involved Labs", extra_columns=["data", "conflict_type"], renderer=self.involved_labs),
             RichColumn("id", visible=False)
         ]
@@ -90,7 +96,8 @@ class ConflictColumns(DatatableConfig[Conflict]):
 
     def render_severity(self, row_data: CellData):
         if row_data.value:
-            return ConflictSeverity(row_data.value).label
+            cs = ConflictSeverity(row_data.value)
+            return {"code": cs.value, "label": cs.label, "conflict_id": row_data.get("pk")}
         return "-"
 
     def involved_labs(self, row_data: CellData):

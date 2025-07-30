@@ -13,14 +13,14 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
     <style>
-        .dt-c_hgvs {
-            width: 25%;
-        }
         .dt-context {
             width: 25%;
         }
+        .dt-c_hgvs {
+            width: 23%;
+        }
         .dt-severity {
-            width: 10%;
+            width: 12%;
         }
         .dt-involved-labs {
             width: 40%;
@@ -41,6 +41,15 @@
             dom.append($("<span>", {"class": "text-muted", text: data.conflict_type_label}));
             return dom;
         }
+        function renderSeverity(data, type, row) {
+            return $('<a>', {
+                "class": "modal-link-comments",
+                "data-toggle": "ajax-modal",
+                "data-title": "Comments",
+                "data-href": Urls.conflict_comments(data['conflict_id']),
+                "text": data['label']
+            });
+        }
         function conflictFilter(data) {
             data.lab = "{{ dlab.lab_ids_str }}";
             data.exclude_unknown = $('#filter_unknown').is(":checked");
@@ -50,7 +59,7 @@
             $('#conflicts-datatable').DataTable().ajax.reload();
         }
 
-        let debouncedFilterGrid = debounce(filterGrid);
+        const debouncedFilterGrid = debounce(filterGrid);
         $(document).ready(() => {
             $('.filter-input').change(() => {
                debouncedFilterGrid();

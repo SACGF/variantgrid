@@ -1,5 +1,5 @@
 import operator
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
 from typing import Optional, Self, Tuple, Iterable, Union
@@ -590,6 +590,10 @@ class Conflict(TimeStampedModel):
         unique_together = ("allele", "conflict_type", "allele_origin_bucket", "testing_context_bucket", "tumor_type_category")
 
     @cached_property
+    def conflict_labs(self):
+        return list(self.conflictlab_set.order_by('lab__organization__name', 'lab__name'))
+
+    @cached_property
     def latest(self) -> 'ConflictHistory':
         return ConflictHistory.objects.filter(conflict=self, is_latest=True).first()
 
@@ -600,6 +604,29 @@ class Conflict(TimeStampedModel):
         else:
             qs = qs.order_by('created')
         return qs
+
+    # def grouped_data(self) -> 'ConflictLabGrouped':
+    #     lab_comments: dict[Lab, list[ConflictLabComment]] = defaultdict(list)
+    #     for comment in self.conflictlab_set.select_related("lab").all():
+    #         lab_comments[comment.lab].append(comment)
+    #
+    #     excluded: list[ConflictDataRow] = []
+    #     lab_data: dict[Lab, list[ConflictDataRow]] = defaultdict(list)
+    #     if latest_history := self.conflicthistory_set.select_related("lab").filter(is_latest=True).first():
+    #         for data_row in latest_history.data_rows():
+    #             if data_row.exclude:
+    #                 excluded.append(data_row)
+    #             else:
+    #                 lab_data[data_row.lab].append(data_row)
+    #
+    #     lab_groupings: list[ConflictLabGrouping] = []
+    #     for lab, data_rows in lab_data.items():
+    #         lab_groupings.append(ConflictLabGrouping(
+    #             lab=lab,
+    #             data=data_rows,
+    #             comments=lab_comments[lab]
+    #         ))
+    #     return list(sorted(lab_groupings)), excluded
 
 
 class ConflictHistory(TimeStampedModel):
@@ -628,6 +655,20 @@ class ConflictLab(TimeStampedModel):
 
 
 class ConflictLabComment(TimeStampedModel):
-    conflict_lab = models.ForeignKey(ConflictLab, on_delete=CASCADE)
+    # conflict_lab = models.ForeignKey(ConflictLab, on_delete=CASCADE)
+    lab = models.ForeignKey(Conflict, on_delete=CASCADE, null=True, blank=True)
     user = models.ForeignKey(User, on_delete=PROTECT)
     comment = models.TextField(null=False, blank=False)
+
+
+# @dataclass
+# class ConflictLabGrouped:
+#     conflict_lab_groupings: list['ConflictLabGrouping']
+#     excluded: list[ConflictDataRow]
+#
+#
+# @dataclass
+# class ConflictLabGrouping:
+#     lab: Lab
+#     data: list[ConflictDataRow]
+#     comments: list[ConflictLabComment]
