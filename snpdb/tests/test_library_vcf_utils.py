@@ -101,15 +101,24 @@ class TestVCFUtils(TestCase):
             _ref, _alt, svlen, _modification = vcf_get_ref_alt_svlen_and_modification(v, old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
             self.assertTrue(isinstance(svlen, int))
 
+    def _assert_del_svlen(self, alt, svlen):
+        if Sequence.allele_is_symbolic(alt):
+            self.assertTrue(isinstance(svlen, int))
+            if alt == "<DEL>":
+                if settings.VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE:
+                    self.assertGreater(svlen, 0)
+                else:
+                    self.assertLess(svlen, 0)
+
     def test_vcf_manta_get_ref_alt_svlen_and_modification(self):
         filename = "snpdb/tests/test_data/manta.vcf"
         for v in cyvcf2.Reader(filename):
             _ref, alt, svlen, _modification = vcf_get_ref_alt_svlen_and_modification(v, old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
-            if Sequence.allele_is_symbolic(alt):
-                self.assertTrue(isinstance(svlen, int))
-                if alt == "<DEL>":
-                    if settings.VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE:
-                        self.assertGreater(svlen, 0)
-                    else:
-                        self.assertLess(svlen, 0)
+            self._assert_del_svlen(alt, svlen)
+
+    def test_vcf_no_svlen_del_only_end_get_ref_alt_svlen_and_modification(self):
+        filename = "snpdb/tests/test_data/symbolic_alt_del_no_svlen_only_end.vcf"
+        for v in cyvcf2.Reader(filename):
+            _ref, alt, svlen, _modification = vcf_get_ref_alt_svlen_and_modification(v, old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
+            self._assert_del_svlen(alt, svlen)
 

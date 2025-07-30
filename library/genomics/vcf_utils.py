@@ -7,6 +7,7 @@ from typing import Optional, Iterable, IO, Union
 
 import cyvcf2
 import vcf
+from django.conf import settings
 
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.utils import open_handle_gzip, open_file_or_filename
@@ -166,14 +167,20 @@ def vcf_get_ref_alt_svlen_and_modification(variant: cyvcf2.Variant, old_variant_
                                      f"expected split multi-allelic by bcftools with that as --old-rec-tag")
 
             svlen = int(svlen_info)
-            if alt == VCFSymbolicAllele.DEL and svlen > 0:
-                # issue #1245 - Manta SV produces <DEL> with positive SVLEN
-                svlen = -svlen
-                modification = f"SVLEN - inverted positive value for {alt=}"
         elif end_info := variant.INFO.get('END'):
             svlen = int(end_info) - variant.POS
         else:
             raise ValueError(f"SVLEN or END info field MUST be provided for symbolic (ie '<x>') {ref=},{alt=}")
+
+        if settings.VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE:
+            if svlen < 0:
+                svlen = -svlen
+                modification = f"SVLEN - inverted negative (to internal always positive) for {alt=}"
+        else:
+            if alt == VCFSymbolicAllele.DEL and svlen > 0:
+                # issue #1245 - Manta SV produces <DEL> with positive SVLEN
+                svlen = -svlen
+                modification = f"SVLEN - inverted positive value for {alt=}"
     else:
         svlen = None
     return ref, alt, svlen, modification
