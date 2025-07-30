@@ -1,0 +1,23 @@
+##fileformat=VCFv4.2
+##ALT=<ID=DEL,Description="Deletion">
+##ALT=<ID=DUP,Description="Duplication">
+##ALT=<ID=DUP:TANDEM,Description="Tandem duplication">
+##ALT=<ID=INS,Description="Insertion">
+##ALT=<ID=INV,Description="Inversion">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=FT,Number=1,Type=String,Description="Sample filter, 'PASS' indicates that all filters have passed for this sample">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
+##FORMAT=<ID=PL,Number=G,Type=Integer,Description="Phred-scaled genotype Likelihoods">
+##FORMAT=<ID=PR,Number=.,Type=Integer,Description="Spanning paired-read support for the ref and alt alleles in the order listed">
+##FORMAT=<ID=SR,Number=.,Type=Integer,Description="Split reads for the ref and alt alleles in the order listed, for reads where P(allele|read)>0.999">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End of an intra-chromosomal variant">
+##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Difference in length between REF and ALT alleles">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+##contig=<ID=chr1,length=248956422>
+##contig=<ID=chr11,length=135086622>
+##reference=file:///scratch/reference/index/reference.bin
+##source=Manta
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	sample1
+chr1	17124940	MantaINV:1445:0:1:1:3:0	C	<INV>	999	PASS	END=234919885;SVTYPE=INV;SVLEN=217794945	GT:FT:GQ:PL:PR:SR	0/1:PASS:999:999,0,999:65,8:15,51
+chr1	17124940	MantaDUP:2445:0:1:1:3:0	C	<DUP:TANDEM>	999	PASS	END=17126940;SVTYPE=DUP;SVLEN=2000	GT:FT:GQ:PL:PR:SR	0/1:PASS:999:999,0,999:65,8:15,51
+chr11	94975753	MantaDEL:0:1:2:0:0:0	T	<DEL>	.	PASS	END=94987865;SVTYPE=DEL;SVLEN=12112	GT:FT:GQ:PL:PR:SR	0/1:PASS:999:999,0,999:60,2:0,46

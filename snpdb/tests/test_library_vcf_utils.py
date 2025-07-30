@@ -1,11 +1,12 @@
 import tempfile
 
 import cyvcf2
+from django.conf import settings
 from django.test import TestCase
 
 from library.genomics.vcf_utils import write_vcf_from_variant_coordinates, vcf_to_variant_coordinates, \
     vcf_to_variant_coordinates_and_records, vcf_get_ref_alt_svlen_and_modification
-from snpdb.models import VariantCoordinate
+from snpdb.models import VariantCoordinate, Sequence
 from upload.models import ModifiedImportedVariant
 
 
@@ -94,8 +95,21 @@ class TestVCFUtils(TestCase):
             for in_vc, (out_vc, out_record) in zip(variant_coordinates, out):
                 self.assertEqual(out_record.INFO["END"], in_vc.end)
 
-    def test_vcf_get_ref_alt_svlen_and_modification(self):
+    def test_vcf_split_multi_get_ref_alt_svlen_and_modification(self):
         filename = "snpdb/tests/test_data/svlen_split_multi_allele.vcf"
         for v in cyvcf2.Reader(filename):
             _ref, _alt, svlen, _modification = vcf_get_ref_alt_svlen_and_modification(v, old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
             self.assertTrue(isinstance(svlen, int))
+
+    def test_vcf_manta_get_ref_alt_svlen_and_modification(self):
+        filename = "snpdb/tests/test_data/manta.vcf"
+        for v in cyvcf2.Reader(filename):
+            _ref, alt, svlen, _modification = vcf_get_ref_alt_svlen_and_modification(v, old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
+            if Sequence.allele_is_symbolic(alt):
+                self.assertTrue(isinstance(svlen, int))
+                if alt == "<DEL>":
+                    if settings.VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE:
+                        self.assertGreater(svlen, 0)
+                    else:
+                        self.assertLess(svlen, 0)
+

@@ -56,7 +56,7 @@ class AbstractBulkVCFProcessor(abc.ABC):
     def genome_build(self):
         return self.upload_pipeline.genome_build
 
-    def get_ref_alt_svlen(self, variant) -> tuple[str, str, Optional[int]]:
+    def get_ref_alt_svlen(self, variant: cyvcf2.Variant) -> tuple[str, str, Optional[int]]:
         """ Ensures SVLEN fits symbolic alt, some callers eg Manta (non-Dragen) write positive SVLEN for dels
             We don't do this in vcf_clean_and_filter as we don't pull apart the INFO there
         """
