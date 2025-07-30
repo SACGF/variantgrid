@@ -12,6 +12,7 @@ from variantgrid.deployment_validation.column_check import check_variantgrid_col
 from variantgrid.deployment_validation.library_version_checks import check_library_versions
 from variantgrid.deployment_validation.somalier_check import check_somalier
 from variantgrid.deployment_validation.tool_version_checks import check_tool_versions
+from variantgrid.deployment_validation.variant_check import check_symbolic_variants
 from variantgrid.deployment_validation.vep_check import check_vep
 
 
@@ -35,6 +36,7 @@ class Command(BaseCommand):
             "Classification Reports": check_classification_reports(),
             "Columns": check_variantgrid_columns(),
             "VEP": check_vep(),
+            "Symbolic variants": check_symbolic_variants(),
         }
         if settings.SOMALIER.get("enabled"):
             checks["somalier"] = check_somalier()
