@@ -165,7 +165,8 @@ class Command(BaseCommand):
                         va.symbol = tv.gene_version.gene_symbol.symbol
 
                         if klass == VariantAnnotation:
-                            va.overlapping_symbols = ",".join(sorted([tv_i.data.gene_version.gene_symbol.symbol for tv_i in tv_set]))
+                            # There is no overlapping_symbols column in VG3
+                            # va.overlapping_symbols = ",".join(sorted([tv_i.data.gene_version.gene_symbol.symbol for tv_i in tv_set]))
 
                             # This needs to go in the right partition - if this is run twice it will insert dupes and fail
                             gene = tv.gene_version.gene
