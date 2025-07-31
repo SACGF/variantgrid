@@ -14,6 +14,7 @@ from intervaltree import IntervalTree
 
 from annotation.models import VariantAnnotationVersion, VariantAnnotation, VariantTranscriptAnnotation
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
+from genes.hgvs import HGVSMatcher
 from genes.models import GeneAnnotationImport, GeneSymbol, Gene, GeneVersion, TranscriptVersion, HGNC, Transcript
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild, Contig
@@ -94,7 +95,10 @@ class Command(BaseCommand):
                                                                  annotation_consortium=AnnotationConsortium.REFSEQ)
                 td = transcript_data["genome_builds"][genome_build.name]
                 exons = [[e[0], e[1]] for e in td["exons"]]
+                version = 1  # Fake always 1
                 pyhgvs_data = {
+                    # We need "id" to be recognised as new format
+                    "id": TranscriptVersion.get_accession(transcript_id, version),
                     "chrom": td["contig"],
                     "start": exons[0][0],
                     "end": exons[-1][1],
@@ -105,7 +109,7 @@ class Command(BaseCommand):
                 }
 
                 tv = TranscriptVersion(transcript=transcript,
-                                       version=1,
+                                       version=version,
                                        gene_version=gv,
                                        genome_build=genome_build,
                                        import_source=gai,
@@ -127,10 +131,10 @@ class Command(BaseCommand):
             print("-" * 40)
             print(f"{genome_build=}")
 
+            matcher = HGVSMatcher(genome_build)
             mt_tx_transcripts = IntervalTree()  # Will only be chrMT
             tv_qs = TranscriptVersion.objects.filter(data__icontains=mt_contig_accession, genome_build=genome_build)
             for tv in tv_qs:
-                contig_str = tv.data["chrom"]
                 start = tv.data["start"]
                 end = tv.data["end"]
                 mt_tx_transcripts[start:end] = tv
@@ -163,6 +167,14 @@ class Command(BaseCommand):
                         va.transcript = tv.transcript
                         va.transcript_version = tv
                         va.symbol = tv.gene_version.gene_symbol.symbol
+                        try:
+                            hgvs_extra = matcher.variant_to_hgvs_extra(v, tv.accession)
+                            # We don't want COX1.1(COX1):c.96T>C - so remove gene
+                            hgvs_name = hgvs_extra._hgvs_name
+                            hgvs_name.gene = None
+                            va.hgvs_c = hgvs_name.format()
+                        except:
+                            pass
 
                         if klass == VariantAnnotation:
                             # There is no overlapping_symbols column in VG3
