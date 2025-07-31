@@ -8,7 +8,7 @@ from django.db.models import Q
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import NodeVCFFilter, NodeAlleleFrequencyFilter
 from patients.models_enums import Zygosity
-from snpdb.models import VCFFilter, Cohort
+from snpdb.models import VCFFilter, Cohort, Sample
 from upload.models import UploadedVCF
 
 
@@ -254,13 +254,25 @@ class AncestorSampleMixin(SampleMixin):
     def _set_sample(self, sample):
         self.sample = sample
 
-    def handle_ancestor_input_samples_changed(self):
-        """ Auto-set to single sample ancestor (or remove if no longer ancestor) """
+    def _get_configuration_errors(self) -> list:
+        errors = super()._get_configuration_errors()
+        if self.sample:
+            parent_sample_set = self._get_ancestor_samples()
+            if self.sample not in parent_sample_set:
+                errors.append(f"Sample: {self.sample} is not set as a sample in any ancestors of this node")
+        return errors
 
+    def _get_ancestor_samples(self) -> set[Sample]:
         parent_sample_set = set()
         parents, _errors = self.get_parent_subclasses_and_errors()
         for parent in parents:  # Use parent samples not own as own inserts self.sample
             parent_sample_set.update(parent.get_samples())
+        return parent_sample_set
+
+    def handle_ancestor_input_samples_changed(self):
+        """ Auto-set to single sample ancestor (or remove if no longer ancestor) """
+
+        parent_sample_set = self._get_ancestor_samples()
 
         modified = False
         # Don't do anything if new as the get_samples won't work
