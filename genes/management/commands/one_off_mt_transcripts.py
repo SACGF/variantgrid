@@ -12,12 +12,10 @@ from collections import defaultdict
 from django.core.management.base import BaseCommand
 from intervaltree import IntervalTree
 
-from annotation.models import VariantAnnotationVersion, VariantAnnotation, VariantGeneOverlap, AnnotationRun, \
-    AbstractVariantAnnotation, VariantTranscriptAnnotation
+from annotation.models import VariantAnnotationVersion, VariantAnnotation, VariantTranscriptAnnotation
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from genes.models import GeneAnnotationImport, GeneSymbol, Gene, GeneVersion, TranscriptVersion, HGNC, Transcript
 from genes.models_enums import AnnotationConsortium
-from library.utils import get_single_element
 from snpdb.models import GenomeBuild, Contig
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
@@ -129,13 +127,13 @@ class Command(BaseCommand):
             print("-" * 40)
             print(f"{genome_build=}")
 
-            tx_transcripts = defaultdict(IntervalTree)
+            mt_tx_transcripts = IntervalTree()  # Will only be chrMT
             tv_qs = TranscriptVersion.objects.filter(data__icontains=mt_contig_accession, genome_build=genome_build)
             for tv in tv_qs:
                 contig_str = tv.data["chrom"]
                 start = tv.data["start"]
                 end = tv.data["end"]
-                tx_transcripts[contig_str][start:end] = tv
+                mt_tx_transcripts[start:end] = tv
 
             vav = VariantAnnotationVersion.latest(genome_build)
             mt_contig = Contig.objects.get(refseq_accession=mt_contig_accession)
@@ -154,8 +152,7 @@ class Command(BaseCommand):
 
                 for va in va_qs.select_related("variant", "variant__locus"):
                     v = va.variant
-                    contig_str = v.locus.contig.refseq_accession
-                    tv_set = tx_transcripts[contig_str][v.start:v.end]
+                    tv_set = mt_tx_transcripts[v.start:v.end]
                     if tv_set:
                         array.append(va)  # Will be modified
 
@@ -196,7 +193,7 @@ class Command(BaseCommand):
                     klass.objects.bulk_update(array, fields)
 
             if variant_gene_overlaps:
-                # This needs to go in own partition
+                # This needs to go in own partition, so use SQL command line
                 print(f"Creating {len(variant_gene_overlaps)} variant_gene_overlaps")
                 base_table_name = VariantAnnotationVersion.VARIANT_GENE_OVERLAP
                 header = [
