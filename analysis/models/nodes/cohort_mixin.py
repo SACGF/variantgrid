@@ -9,7 +9,6 @@ from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import NodeVCFFilter, NodeAlleleFrequencyFilter
 from patients.models_enums import Zygosity
 from snpdb.models import VCFFilter, Cohort, Sample
-from upload.models import UploadedVCF
 
 
 class CohortMixin:
@@ -262,7 +261,7 @@ class AncestorSampleMixin(SampleMixin):
                 errors.append(f"Sample: {self.sample} is not set as a sample in any ancestors of this node")
         return errors
 
-    def _get_ancestor_samples(self) -> set[Sample]:
+    def _get_ancestor_samples(self) -> Set[Sample]:
         parent_sample_set = set()
         parents, _errors = self.get_parent_subclasses_and_errors()
         for parent in parents:  # Use parent samples not own as own inserts self.sample
