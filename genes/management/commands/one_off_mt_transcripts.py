@@ -188,10 +188,8 @@ class Command(BaseCommand):
 
             for klass, array in annotation_classes.items():
                 if array:
-                    if klass == VariantAnnotation:
-                        fields = ava_fields + ["overlapping_symbols"]
                     print(f"Updating {klass}: {len(array)}")
-                    klass.objects.bulk_update(array, fields)
+                    klass.objects.bulk_update(array, ava_fields)
 
             if variant_gene_overlaps:
                 # This needs to go in own partition, so use SQL command line
