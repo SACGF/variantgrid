@@ -285,6 +285,11 @@
             data.allele_id = {{ allele.pk }};
         }
     </script>
+    <h4>Conficts</h4>
+    {% for conflict in conflicts %}
+        <div>{% conflict conflict %}</div>
+    {% endfor %}
+    <hr/>
     {% for allele_origin_grouping_desc in allele_origin_groupings_desc %}
         <div>
             <span class="allele-origin-box horizontal allele-origin-{{ allele_origin_grouping_desc.allele_origin_grouping.allele_origin_bucket }}">

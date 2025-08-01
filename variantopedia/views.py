@@ -24,7 +24,7 @@ from annotation.models import AnnotationRun, AnnotationVersion, ClassificationMo
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
 from classification.models import ClassificationGrouping, AlleleOriginGrouping, DiscordanceReport, OverlapStatus, \
-    EvidenceKeyMap, ClassificationGroupingEntry
+    EvidenceKeyMap, ClassificationGroupingEntry, Conflict
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.variant_card import AlleleCard
 from classification.views.exports import ClassificationExportFormatterCSV
@@ -578,6 +578,7 @@ def view_allele(request, allele_id: int):
     show_overall_diff = len(aogs) > 1
 
     context = {
+        "conflicts": Conflict.objects.filter(allele=allele),
         "allele_origin_groupings_desc": aogs,
         "show_overall_diff": show_overall_diff,
         "allele_card": AlleleCard(user=request.user, allele=allele),

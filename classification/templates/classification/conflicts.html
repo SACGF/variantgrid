@@ -42,12 +42,16 @@
             return dom;
         }
         function renderSeverity(data, type, row) {
+            if (data.code <= 1) {
+                return data.label;
+            }
             return $('<a>', {
                 "class": "modal-link-comments",
                 "data-toggle": "ajax-modal",
+                "data-size": "lg",
                 "data-title": "Comments",
-                "data-href": Urls.conflict_comments(data['conflict_id']),
-                "text": data['label']
+                "data-href": Urls.conflict_comments(data.conflict_id),
+                "text": data.label
             });
         }
         function conflictFilter(data) {

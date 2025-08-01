@@ -1796,6 +1796,13 @@ nav ol.breadcrumb .breadcrumb-item a:hover,
   max-width: 300px;
 }
 
+pre.user-text {
+  font-family: 'Raleway', serif;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 10pt;
+}
+
 .formatted-text {
   white-space: pre-wrap;
   word-break: break-word;

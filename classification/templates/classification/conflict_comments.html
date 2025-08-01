@@ -1,15 +1,59 @@
 {% load user_tags %}
 {% load ui_utils %}
-    <div class="card-header">
-        Comments for {{ conflict }}
-    </div>
+{% load js_tags %}
+
+<div class="card-header">{{ conflict }}</div>
+<form data-toggle="ajax-form" method="POST" action="{% url 'conflict_comments' conflict.pk %}">
     <div class="card-body">
-        {% labelled label="Comment" %}<textarea name="comment" class="form-control"></textarea>{% endlabelled %}
-        {% labelled label="Edit By" %}{% user user size="tiny" %}{% endlabelled %}
-        {% for conflict_lab in conflict.conflict_labs %}
-            {% labelled label=conflict_lab.lab %}Triange Pending{% endlabelled %}
-        {% endfor %}
+        <div>
+            {% if conflict.comments %}
+                <div style="overflow: auto; display: flex; flex-direction: column-reverse; max-height: 400px">
+                    {% for comment in conflict.comments %}
+                        <div class="row mb-4">
+                            <div class="col-3 text-right">
+                                <div style="font-size:0.8rem" class="mb-2">{% timestamp conflict.created %}</div>
+                                {% user comment.user size="tiny" show_group=True align_right=True %}
+                            </div>
+                            <div class="col-9">
+                                <div style="border:1px solid lightgray;padding:5px; border-radius: 8px; ">
+                                    <pre class="user-text">{{ comment.comment }}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                <hr/>
+            {% endif %}
+            {% labelled label="Comment" %}<textarea name="comment" class="form-control"></textarea>{% endlabelled %}
+            {% comment %}
+            {% labelled label="Edit By" %}{% user user size="tiny" %}{% endlabelled %}
+            {% endcomment %}
+            {% for conflict_lab in conflict.conflict_labs %}
+                {% if conflict_lab.active %}
+                    {% labelled label=conflict_lab.lab %}
+                        {% for triage_option in triage_options %}
+                            <div class="custom-control custom-radio custom-control-inline">
+                              <input
+                                      type="radio"
+                                      name="lab-{{ conflict_lab.lab.pk }}-triage"
+                                      id="lab-{{ conflict_lab.lab.pk }}-{{ triage_option.value }}"
+                                      class="custom-control-input"
+                                      value="{{ triage_option.value }}"
+                                      {% if conflict_lab.status == triage_option.value %}checked{% endif %}
+                              >
+                              <label
+                                      class="custom-control-label"
+                                      for="lab-{{ conflict_lab.lab.pk }}-{{ triage_option.value }}">
+                                  {{ triage_option.label }}
+                              </label>
+                            </div>
+                        {% endfor %}
+                    {% endlabelled %}
+                {% endif %}
+            {% endfor %}
+        </div>
     </div>
     <div class="card-footer">
         <input type="submit" class="btn btn-primary" />
     </div>
+</form>

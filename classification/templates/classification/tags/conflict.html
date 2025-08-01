@@ -1,0 +1,13 @@
+<div class="pipe-sep d-inline-block">
+    <div class="allele-origin-box horizontal allele-origin-{{ conflict.allele_origin_bucket }}">
+        <div class="allele-origin-text">{{ conflict.get_allele_origin_bucket_display }}</div>
+    </div>
+    {% if conflict.testing_context_bucket != "G" %}
+        <span class="testing-context">{{ conflict.get_testing_context_bucket_display }}</span>
+    {% endif %}
+    - <span class="text-muted">{{ conflict.get_conflict_type_display }}</span>
+    &nbsp;
+</div>
+<div class="pipe-sep d-inline-block">
+    {{ conflict.latest.get_severity_display }}
+</div>

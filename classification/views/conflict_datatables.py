@@ -1,11 +1,13 @@
+from dataclasses import dataclass
 from functools import cached_property
+from typing import Optional
 
 from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.template.loader import render_to_string
 
 from classification.enums import ConflictSeverity, TestingContextBucket, AlleleOriginBucket, ConflictType
-from classification.models import Conflict
+from classification.models import Conflict, ConflictLab, DiscordanceReportTriageStatus
 from classification.services.conflict_services import ConflictDataRow
 from genes.hgvs import CHGVS
 from snpdb.lab_picker import LabPickerData
@@ -13,11 +15,16 @@ from snpdb.models import Allele, Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, DatatableConfigQuerySetMode, SortOrder, CellData, DC
 
 
+@dataclass(frozen=True)
+class ConflictRowWithStatus:
+    conflict_row: ConflictDataRow
+    status: DiscordanceReportTriageStatus
+
 class ConflictColumns(DatatableConfig[Conflict]):
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('conflict_detail', expected_height=108)
+        # self.expand_client_renderer = DatatableConfig._row_expand_ajax('conflict_detail', expected_height=108)
 
         self.allele_map: dict[int, Allele] = {}
 
@@ -45,7 +52,7 @@ class ConflictColumns(DatatableConfig[Conflict]):
                 default_sort=SortOrder.DESC,
                 client_renderer='renderSeverity',
             ),
-            RichColumn(name="involved_labs", label="Involved Labs", extra_columns=["data", "conflict_type"], renderer=self.involved_labs),
+            RichColumn(name="involved_labs", label="Involved Labs", extra_columns=["data", "conflict_type", "pk"], renderer=self.involved_labs),
             RichColumn("id", visible=False)
         ]
 
@@ -108,9 +115,24 @@ class ConflictColumns(DatatableConfig[Conflict]):
         # return "-"
         # TODO sort
         conflict_rows = [ConflictDataRow.from_json(row) for row in row_data.get("data").get("rows")]
+        conflict_labs = list(ConflictLab.objects.select_related("lab").filter(conflict=row_data.get("pk")))
+        conflict_labs_dict = {cl.lab: cl for cl in conflict_labs}
+        combined_rows = []
+        for conflict_row in conflict_rows:
+            conflict_lab: Optional[ConflictLab] = None
+            if found_conflict_lab := conflict_labs_dict.get(conflict_row.lab):
+                conflict_labs_dict.pop(conflict_row.lab)
+                conflict_lab = found_conflict_lab
+
+            combined_rows.append(ConflictRowWithStatus(
+                conflict_row,
+                conflict_lab
+            ))
+
         return render_to_string('classification/conflict_summary_cell.html', {
+            "conflict_id": row_data.get("pk"),
             "conflict_type": ConflictType(row_data.get("conflict_type")),
-            "conflict_rows": conflict_rows
+            "combined_rows": combined_rows
         }).strip()
 
     def get_initial_queryset(self) -> QuerySet[Conflict]:

@@ -19,7 +19,7 @@ from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, T
     ConflictType
 from django.db import models, transaction
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
-    ConditionResolved, ConditionReference
+    ConditionResolved, ConditionReference, DiscordanceReportTriageStatus
 from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheDict, \
     ClassificationSummaryCacheDictPathogenicity, ClassificationSummaryCacheDictSomatic
 from genes.models import GeneSymbol
@@ -589,9 +589,24 @@ class Conflict(TimeStampedModel):
     class Meta:
         unique_together = ("allele", "conflict_type", "allele_origin_bucket", "testing_context_bucket", "tumor_type_category")
 
+    def __str__(self):
+        parts = [f"{self.allele:CA}", self.get_allele_origin_bucket_display()]
+        if self.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
+            parts.append(self.get_testing_context_bucket_display())
+        if self.tumor_type_category:
+            parts.append(self.tumor_type_category)
+        parts.append("-")
+        parts.append(self.latest.get_severity_display())
+
+        return " ".join(parts)
+
     @cached_property
-    def conflict_labs(self):
+    def conflict_labs(self) -> list['ConflictLab']:
         return list(self.conflictlab_set.order_by('lab__organization__name', 'lab__name'))
+
+    @cached_property
+    def comments(self):
+        return list(self.conflictcomment_set.order_by('-created'))
 
     @cached_property
     def latest(self) -> 'ConflictHistory':
@@ -649,16 +664,18 @@ class ConflictLab(TimeStampedModel):
     conflict = models.ForeignKey(Conflict, on_delete=CASCADE)
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
     active = models.BooleanField(default=True)  # set to False if lab has withdrawn
+    status = models.TextField(choices=DiscordanceReportTriageStatus.choices, default=DiscordanceReportTriageStatus.PENDING)
 
     class Meta:
         unique_together = ("conflict", "lab")
 
 
-class ConflictLabComment(TimeStampedModel):
-    # conflict_lab = models.ForeignKey(ConflictLab, on_delete=CASCADE)
-    lab = models.ForeignKey(Conflict, on_delete=CASCADE, null=True, blank=True)
+class ConflictComment(TimeStampedModel):
+    conflict = models.ForeignKey(Conflict, on_delete=CASCADE)
+    lab = models.ForeignKey(Lab, on_delete=CASCADE, null=True, blank=True)
     user = models.ForeignKey(User, on_delete=PROTECT)
     comment = models.TextField(null=False, blank=False)
+    meta_data = models.JSONField(null=False, blank=False, default=dict)
 
 
 # @dataclass

@@ -1,0 +1,36 @@
+{% load js_tags %}
+{% load ui_utils %}
+{% load classification_tags %}
+<div class="modalable">
+<div class="card-header">{{ conflict }} - History</div>
+<div class="card-body">
+    {% admin_link conflict %}
+    {% for history in conflict.history %}
+        {% if not forloop.first %}<hr/>{% endif %}
+        <div class="row mb-3">
+            <div class="col-5"></div>
+            <div class="col-7">
+            <span style="margin-left: 40px" class="mr-1">As of</span> {% timestamp history.created %}
+            {% if forloop.first %}(Current){% endif %}
+            </div>
+        </div>
+        {% for row in history.data_rows %}
+            <div class="row mb-2" {% if row.exclude %}style="opacity:0.6"{% endif %}>
+                <div class="col-8 text-right">
+                    {% if row.share_level != 'logged_in_users' %}
+                        <img src="/static/icons/share_level/{{ row.share_level }}.png" style="width:12px; height: 12px; margin-right: 4px; top: -2px; position: relative;"/>
+                    {% endif %}
+                    {{ row.lab }}
+                </div>
+                <div class="col-4">
+                    {% if conflict.conflict_type == "P" %}
+                        {% clinical_significance_inline row.classification %}
+                    {% else %}
+                        {% somatic_clinical_significance_inline row.clinical_significance row.amp_level %}
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+    {% endfor %}
+</div>
+</div>

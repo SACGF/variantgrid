@@ -117,6 +117,10 @@ function enhanceAndMonitor() {
         {test: 'form[data-toggle="ajax-form"]', func: (node) => {
             let $node = $(node);
             let wrapper = $node.closest(".modal-content, .embed-wrapper");
+            if ($node.attr("data-submitted")) {
+                return false;
+            }
+            $node.attr('data-submitted', true);
             $node.submit(function() { // catch the form's submit event
                 let $this = $(this);
                 $.ajax({ // create an AJAX call...
@@ -558,9 +562,7 @@ function enhanceAndMonitor() {
 function cardToModal(content) {
     let modalContentDiv = content.closest('.modal-content');
     if (modalContentDiv.length) {
-        console.log("Looking to convert card to modal");
         if (content.find('.card .modalable')) {
-            console.log("Converting to card to modal");
             content.find('.card').removeClass('card');
             let cardHeader = content.find(".card-header");
             let h5 = $("<h5>", {"class": "modal-title"}).append(cardHeader.contents());

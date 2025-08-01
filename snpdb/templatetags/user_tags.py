@@ -40,7 +40,7 @@ def _group_str_for_user(user: User):
 
 
 @register.inclusion_tag("snpdb/tags/user.html", takes_context=True)
-def user(context, u: User, show_avatar=False, show_email=False, show_last_login=False, show_group=False, role='user', size='normal'):
+def user(context, u: User, show_avatar=False, show_email=False, show_last_login=False, show_group=False, align_right=False, role='user', size='normal'):
 
     @dataclass(frozen=True)
     class UserDetails:
@@ -52,6 +52,7 @@ def user(context, u: User, show_avatar=False, show_email=False, show_last_login=
         show_avatar: bool
         show_email: bool
         show_last_login: bool
+        align_right: bool
 
         @cached_property
         def avatar(self):
@@ -99,7 +100,17 @@ def user(context, u: User, show_avatar=False, show_email=False, show_last_login=
             return self.user_settings.email_discordance_updates
 
     return {
-        "user_details": UserDetails(context=context, user=u, show_avatar=show_avatar, show_group=show_group, show_email=show_email, show_last_login=show_last_login, role=role, size=size)
+        "user_details": UserDetails(
+            context=context,
+            user=u,
+            show_avatar=show_avatar,
+            show_group=show_group,
+            show_email=show_email,
+            show_last_login=show_last_login,
+            role=role,
+            size=size,
+            align_right=align_right
+        )
     }
 
 

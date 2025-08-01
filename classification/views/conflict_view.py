@@ -2,16 +2,16 @@ from typing import Optional, Union
 
 from django.shortcuts import render, get_object_or_404
 
-from classification.models import Conflict, ConflictLabComment
+from classification.models import Conflict, ConflictComment, DiscordanceReportTriageStatus
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from library.utils.django_utils import render_ajax_view
 from snpdb.lab_picker import LabPickerData
 from uicore.views.ajax_form_view import AjaxFormView, LazyRender
 
 
-def conflict_detail(request, conflict_id: int):
+def conflict_history(request, conflict_id: int):
     conflict = Conflict.objects.get(id=conflict_id)
-    return render_ajax_view(request, 'classification/conflict_detail.html', context={'conflict': conflict})
+    return render_ajax_view(request, 'classification/conflict_history.html', context={'conflict': conflict})
 
 
 # def allele_groupings(request, lab_id: Optional[Union[str, int]] = None):
@@ -28,7 +28,7 @@ def conflicts_view(request, lab_id: Optional[Union[str, int]] = None):
 #     return render(request, 'classification/conflict_comments.html', context={'conflict': conflict})
 
 
-class ConflictLabCommentView(AjaxFormView[Conflict]):
+class ConflictCommentView(AjaxFormView[Conflict]):
 
     @classmethod
     def lazy_render(cls, obj: Conflict, context: Optional[dict] = None) -> LazyRender[Conflict]:
@@ -59,12 +59,31 @@ class ConflictLabCommentView(AjaxFormView[Conflict]):
 
     def handle(self, request, conflict_id: int):
         conflict = get_object_or_404(Conflict, pk=conflict_id)
-        context = {}
+        context = {"triage_options": [
+            DiscordanceReportTriageStatus.PENDING,
+            DiscordanceReportTriageStatus.REVIEWED_WILL_FIX,
+            DiscordanceReportTriageStatus.REVIEWED_WILL_DISCUSS,
+            DiscordanceReportTriageStatus.REVIEWED_SATISFACTORY,
+            DiscordanceReportTriageStatus.COMPLEX
+        ]}
         saved = False
 
         if comment_text := request.POST.get("comment"):
+            for conflict_lab in conflict.conflict_labs:
+                # check if user has permission
+                if param := request.POST.get(f"lab-{conflict_lab.lab_id}-triage"):
+                    conflict_lab.status = DiscordanceReportTriageStatus(param)
+                    conflict_lab.save()
+
             if comment_text := comment_text.strip():
-                pass
+                ConflictComment(
+                    conflict_id=conflict_id,
+                    user=request.user,
+                    comment=comment_text
+                ).save()
+                context["saved"] = True
+                saved = True
+
 
         # if request.GET.get("edit") == "true":
         #     if not conflict.can_write(request.user):
@@ -86,4 +105,4 @@ class ConflictLabCommentView(AjaxFormView[Conflict]):
         #     else:
         #         context["form"] = form
 
-        return ConflictLabCommentView.lazy_render(conflict, context).render(request, saved=saved)
+        return ConflictCommentView.lazy_render(conflict, context).render(request, saved=saved)

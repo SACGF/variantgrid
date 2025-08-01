@@ -16,7 +16,7 @@ from classification.criteria_strengths import CriteriaStrength, CriteriaPointSco
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo, \
-    EvidenceMixin, ClassificationSummaryCacheDictPathogenicity
+    EvidenceMixin, ClassificationSummaryCacheDictPathogenicity, Conflict
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
     ClassificationGroupUtils
@@ -272,11 +272,11 @@ def clinical_significance(value, evidence_key=SpecialEKeys.CLINICAL_SIGNIFICANCE
 def somatic_clinical_significance_inline(cs: str, amp_level: str):
     key = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
     colors = {
-        "tier_1": "#fcc",
+        "tier_1": "#ff9999",
         "tier_1_or_2": "#ffd5d5",
-        "tier_2": "#ffdddd",
-        "tier_3": "#dddddd",
-        "tier_4": "#ccccff"
+        "tier_2": "#cc9999",
+        "tier_3": "#999999",
+        "tier_4": "#aaaaff"
     }
     label = None
     if cs:
@@ -733,3 +733,8 @@ def user_view_events(user: User, days: int = 1):
 def evidence_key_input(key: str):
     e_key = EvidenceKeyMap.cached_key(key)
     return {"e_key": e_key}
+
+
+@register.inclusion_tag("classification/tags/conflict.html")
+def conflict(conflict: Conflict):
+    return {"conflict": conflict}

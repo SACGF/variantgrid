@@ -145,6 +145,13 @@ class ConflictCalculator(ABC):
             lab_ids.add(row.lab_id)
         return lab_ids
 
+    @cached_property
+    def active_labs(self) -> dict[Lab, bool]:
+        lab_ids = defaultdict(lambda: False)
+        for row in self.conflict_data:
+            lab_ids[row.lab] |= not row.exclude
+        return dict(lab_ids)
+
     def data_json(self) -> dict:
         data_rows = []
         included, excluded = partition(lambda x: x.exclude, sorted(self.conflict_data))
@@ -189,15 +196,16 @@ class ConflictCalculator(ABC):
             latest = ConflictHistory.objects.filter(conflict=conflict, is_latest=True).first()
 
         # also need to create ConflictLab
-        lab_ids = self.involved_lab_ids
+        active_labs = self.active_labs
         ConflictLab.objects.bulk_create([
             ConflictLab(
                 conflict=conflict,
-                lab_id=lab_id,
-                active=True
-            ) for lab_id in lab_ids
+                lab=lab,
+                active=active
+            ) for lab, active in active_labs.items()
         ], update_conflicts=True, update_fields=["active"], unique_fields=["conflict", "lab_id"])
-        ConflictLab.objects.filter(conflict=conflict).exclude(lab_id__in=lab_ids).update(active=False)
+        # TODO have something different from withdrawn
+        ConflictLab.objects.filter(conflict=conflict).exclude(lab__in=active_labs.keys()).update(active=False)
 
         data = self.data_json()
         if latest:
@@ -302,7 +310,7 @@ def calculate_and_apply_conflicts_for(allele_origin_grouping: AlleleOriginGroupi
         c_hgvs = cg.latest_classification_modification.imported_c_hgvs_obj
 
         oncpath_data.append(ConflictDataRow.from_data(row=summary_info.get("pathogenicity", {}), lab_id=lab_id, share_level=cg.share_level_obj, c_hgvs=c_hgvs))
-        clinsig_data.append(ConflictDataRow.from_data(row=summary_info.get("clinical_significance", {}), lab_id=lab_id, share_level=cg.share_level_obj, c_hgvs=c_hgvs))
+        clinsig_data.append(ConflictDataRow.from_data(row=summary_info.get("somatic", {}), lab_id=lab_id, share_level=cg.share_level_obj, c_hgvs=c_hgvs))
 
     allele = allele_origin_grouping.allele_grouping.allele
     if allele_origin_bucket == AlleleOriginBucket.SOMATIC:
