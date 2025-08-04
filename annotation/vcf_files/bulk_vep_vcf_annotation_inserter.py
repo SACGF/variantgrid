@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import Tuple, Optional
 
 from django.conf import settings
+from intervaltree import IntervalTree
 from lazy import lazy
 import logging
 import shutil
@@ -14,14 +15,16 @@ from annotation.models.models import ColumnVEPField, VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion
 from annotation.models.models_enums import VariantClass
 from annotation.vep_annotation import VEPConfig
+from genes.hgvs import HGVSMatcher
 from genes.models import TranscriptVersion, GeneVersion, UniProt
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import get_model_fields
 from library.django_utils.django_file_utils import get_import_processing_filename, get_import_processing_dir
 from library.log_utils import log_traceback
 from library.utils import invert_dict
-from snpdb.models import GenomeBuild
+from snpdb.models import GenomeBuild, VariantCoordinate, Variant
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
+
 
 VEP_SEPARATOR = '&'
 EMPTY_VALUES = {'', '.'}
@@ -108,6 +111,7 @@ class BulkVEPVCFAnnotationInserter:
         self.vep_columns = self._get_vep_columns_from_csq(infos)
         logging.debug("CSQ: %s", self.vep_columns)
         self._setup_vep_fields_and_db_columns(validate_columns)
+        self.hgvs_matcher = HGVSMatcher(annotation_run.genome_build)
 
     @staticmethod
     def _get_vep_columns_from_csq(infos):
@@ -332,9 +336,10 @@ class BulkVEPVCFAnnotationInserter:
                     return uv
         return None
 
-    def add_calculated_columns(self, transcript_data):
+    def add_calculated_columns(self, variant_coordinate, transcript_data):
         self._add_calculated_num_predictions(transcript_data)
         self._add_calculated_maxentscan(transcript_data)
+        self._add_mt_data(variant_coordinate, transcript_data)
 
     def _add_calculated_num_predictions(self, transcript_data):
         num_pathogenic = 0
@@ -359,6 +364,46 @@ class BulkVEPVCFAnnotationInserter:
             if maxentscan_ref:
                 transcript_data["maxentscan_percent_diff_ref"] = 100 * maxentscan_diff / maxentscan_ref
 
+    def _add_mt_data(self, variant_coordinate: VariantCoordinate, transcript_data):
+        """
+            VG3 - MT transcripts can't have gene list filter
+            @see https://github.com/SACGF/variantgrid_sapath/issues/330
+
+            This is VG3 only to make up for missing functionality.
+
+            This is somewhat duplicated in one_off_mt_transcripts
+        """
+
+        # This is VG3 only so can work in VG3 vep chroms (MT)
+        if variant_coordinate.chrom == "MT":
+            # There should only ever be called once per MT variant as there are no transcripts to give diff calls
+
+            if transcript_id := transcript_data.get("transcript_id"):
+                logging.warning("MT variant already annotated!")
+                return
+
+            variant = Variant.get_from_tuple(variant_coordinate, self.genome_build)  # VG3 expects to work in Variant
+            mt_tx_transcripts = self._get_mt_interval_tree()
+            tv_set = mt_tx_transcripts[variant.start:variant.end]
+            if tv_set:
+                # Just get the 1st one out
+                tv = next(iter(tv_set)).data
+                transcript_data["consequence"] = "unknown MT exon change"
+                transcript_data["gene_id"] = tv.gene_version.gene.pk
+                transcript_data["transcript_id"] = tv.transcript.pk
+                transcript_data["transcript_version_id"] = tv.pk
+                transcript_data["symbol"] = tv.gene_version.gene_symbol.symbol
+                try:
+                    hgvs_extra = self.hgvs_matcher.variant_to_hgvs_extra(variant, tv.accession)
+                    # We don't want COX1.1(COX1):c.96T>C - so remove gene
+                    hgvs_name = hgvs_extra._hgvs_name
+                    hgvs_name.gene = None
+                    transcript_data["hgvs_c"] = hgvs_name.format()
+                except:
+                    pass
+
+
+
     @staticmethod
     def _merge_cosmic_ids(transcript_data, custom_vcf_cosmic_id):
         """ VEP ships w/COSMIC so we always try and pull it out of the existing variation field
@@ -376,6 +421,9 @@ class BulkVEPVCFAnnotationInserter:
         if csq is None:  # Legacy data error, VEP failed to annotate as something like C>C
             logging.warning(f"Skipped {v} as no CSQ")
             return
+
+        # This is already normalized (written internally)
+        variant_coordinate = VariantCoordinate(chrom=v.CHROM, pos=v.POS, ref=v.REF, alt=v.ALT[0])
 
         try:
             variant_id = v.INFO["variant_id"]
@@ -403,7 +451,7 @@ class BulkVEPVCFAnnotationInserter:
                     overlapping_symbols.add(symbol)
                 if gene_id:
                     overlapping_gene_ids.add(gene_id)
-                self.add_calculated_columns(transcript_data)
+                self.add_calculated_columns(variant_coordinate, transcript_data)
                 self.variant_transcript_annotation_list.append(transcript_data)
 
                 representative_transcript = vep_transcript_data.get(VEPColumns.PICK, False)
@@ -505,6 +553,17 @@ class BulkVEPVCFAnnotationInserter:
     def uniprot_identifiers(self):
         return set(UniProt.objects.all().values_list("pk", flat=True))
 
+    @lazy
+    def _get_mt_interval_tree(self):
+        mt_contig_accession = 'NC_012920.1'
+        mt_tx_transcripts = IntervalTree()  # Will only be chrMT
+        tv_qs = TranscriptVersion.objects.filter(data__icontains=mt_contig_accession,
+                                                 genome_build=self.genome_build)
+        for tv in tv_qs:
+            start = tv.data["start"]
+            end = tv.data["end"]
+            mt_tx_transcripts[start:end] = tv
+        return mt_tx_transcripts
 
 def empty_to_none(it):
     return [v if v not in EMPTY_VALUES else None
