@@ -45,25 +45,37 @@
             if (data.code <= 1) {
                 return data.label;
             }
-            return $('<a>', {
-                "class": "modal-link-comments",
-                "data-toggle": "ajax-modal",
-                "data-size": "lg",
-                "data-title": "Comments",
-                "data-href": Urls.conflict_comments(data.conflict_id),
-                "text": data.label
-            });
+            return $("<div>", {html: [
+                $('<a>', {
+                    "class": "modal-link-comments",
+                    "data-toggle": "ajax-modal",
+                    "data-size": "lg",
+                    "data-title": "Comments",
+                    "data-href": Urls.conflict_comments(data.conflict_id),
+                    "text": data.label
+                }),
+                    $("<div>", {"text": data.overall_status_label})
+            ]});
         }
-        function conflictFilter(data) {
-            data.lab = "{{ dlab.lab_ids_str }}";
-            data.exclude_unknown = $('#filter_unknown').is(":checked");
-            data.multiple_submitters = $('#multiple_submitters').is(":checked");
-        }
+
+        const debouncedFilterGrid = debounce(filterGrid);
         function filterGrid() {
             $('#conflicts-datatable').DataTable().ajax.reload();
         }
 
-        const debouncedFilterGrid = debounce(filterGrid);
+        function conflictFilter(data) {
+            data.lab = "{{ dlab.lab_ids_str }}";
+            data.status = $('#status-tab').val();
+            data.exclude_unknown = $('#filter_unknown').is(":checked");
+            data.multiple_submitters = $('#multiple_submitters').is(":checked");
+            console.log(data);
+        }
+
+        function updateStatus(status) {
+            $('#status-tab').val(status);
+            debouncedFilterGrid();
+        }
+
         $(document).ready(() => {
             $('.filter-input').change(() => {
                debouncedFilterGrid();
@@ -76,6 +88,7 @@
 {% block content %}
     <div class="container">
         {% lab_picker dlab.lab_picker %}
+
         {% labelled label="Filter Out Unknown Contexts" %}
             <div class="ml-4">
                 <input type="checkbox" id="filter_unknown" class="form-check-input filter-input" value="true" checked />
@@ -88,6 +101,31 @@
                 <label for="multiple_submitters">Only include contexts with multiple shared submitters</label>
             </div>
         {% endlabelled %}
+        <input id="status-tab" type="hidden" value="T" />
+
+        <div id="conflict_tabs">
+            <ul class="nav nav-tabs" role="tablist" style="position: relative; bottom: -6px;">
+                <li class="nav-item"><a class="nav-link show active" data-tab-set="conflict_tabs" data-toggle="tab" id="tawaiting-triage-tab" role="tab" onclick="updateStatus('T')">
+                    Awaiting Triage <span class="d-inline-block ml-1 badge badge-info">{{ status_counts.T }}</span>
+                </a></li>
+                <li class="nav-item"><a class="nav-link" data-tab-set="conflict_tabs" data-toggle="tab" id="tready-to-discuss-tab" role="tab" onclick="updateStatus('D')">
+                    Ready to Discuss <span class="d-inline-block ml-1 badge badge-info">{{ status_counts.D }}</span>
+                </a></li>
+                <li class="nav-item"><a class="nav-link" data-tab-set="conflict_tabs" data-toggle="tab" id="tawaiting-amendment-tab" role="tab" onclick="updateStatus('A')">
+                    Awaiting Amendment <span class="d-inline-block ml-1 badge badge-info">{{ status_counts.A }}</span>
+                </a></li>
+                <li class="nav-item"><a class="nav-link not-important" data-tab-set="conflict_tabs" data-toggle="tab" id="twaiting-on-other-lab-tab" role="tab" onclick="updateStatus('O')">
+                    Waiting on Other Lab <span class="d-inline-block ml-1 badge badge-info">{{ status_counts.O }}</span>
+                </a></li>
+                <li class="nav-item"><a class="nav-link not-important" data-tab-set="conflict_tabs" data-toggle="tab" id="tcomplex-tab" role="tab" onclick="updateStatus('C')">
+                    Complex <span class="d-inline-block ml-1 badge badge-info">{{ status_counts.C }}</span>
+                </a></li>
+                <li class="nav-item"><a class="nav-link not-important" data-tab-set="conflict_tabs" data-toggle="tab" id="discordance_reports_history_detail-tab" role="tab">
+                    Resolved
+                </a></li>
+            </ul>
+        </div>
+
         <table id="conflicts-datatable"
                data-datatable-url="{% url 'conflicts_datatables' %}"
                data-datatable-data='conflictFilter'

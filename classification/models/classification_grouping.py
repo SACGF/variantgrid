@@ -9,8 +9,9 @@ from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db.models import CASCADE, TextChoices, SET_NULL, IntegerChoices, Q, QuerySet, Subquery, OuterRef, Manager, \
-    PROTECT, Exists
+    PROTECT, Exists, When, Value, Case
 from django.urls import reverse
+from django.utils.safestring import SafeString
 from django_extensions.db.models import TimeStampedModel
 from frozendict import frozendict
 from more_itertools import last
@@ -19,12 +20,13 @@ from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys, T
     ConflictType
 from django.db import models, transaction
 from classification.models import Classification, ImportedAlleleInfo, EvidenceKeyMap, ClassificationModification, \
-    ConditionResolved, ConditionReference, DiscordanceReportTriageStatus
+    ConditionResolved, ConditionReference, DiscordanceReportTriageStatus, DiscordanceReportNextStep
 from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheDict, \
     ClassificationSummaryCacheDictPathogenicity, ClassificationSummaryCacheDictSomatic
 from genes.models import GeneSymbol
 from library.utils import strip_json
 from snpdb.models import Allele, Lab
+import html
 
 
 classification_grouping_search_term_signal = django.dispatch.Signal()  # args: "grouping", expects iterable of ClassificationGroupingSearchTermStub
@@ -559,8 +561,64 @@ class ConflictQuerySet(QuerySet['Conflict']):
             Exists(ConflictLab.objects.filter(conflict=OuterRef('pk'), lab=lab))
         )
 
-    def for_labs(self, labs: Union[Iterable[int], Iterable[Lab]]):
-        return self.filter(
+    def for_labs(self, labs: Union[Iterable[int], Iterable[Lab]]) -> Self:
+        lab_ids = labs
+        when_not_active = When(
+            ~Q(Exists(Subquery(ConflictLab.objects.filter(
+                conflict=OuterRef('pk'),
+                active=True,
+                lab__in=lab_ids
+            )))),
+            then=Value(DiscordanceReportNextStep.NOT_INVOLVED)
+        )
+
+        when_waiting_on_your_triage = When(
+            Exists(Subquery(ConflictLab.objects.filter(
+                conflict=OuterRef('pk'),
+                status=DiscordanceReportTriageStatus.PENDING,
+                active=True,
+                lab__in=lab_ids
+            ))),
+            then=Value(DiscordanceReportNextStep.AWAITING_YOUR_TRIAGE)
+        )
+
+        when_waiting_on_your_amend = When(
+            Exists(Subquery(ConflictLab.objects.filter(
+                conflict=OuterRef('pk'),
+                status=DiscordanceReportTriageStatus.REVIEWED_WILL_FIX,
+                active=True,
+                lab__in=lab_ids
+            ))),
+            then=Value(DiscordanceReportNextStep.AWAITING_YOUR_AMEND)
+        )
+
+        when_waiting_on_other_lab = When(
+            Exists(Subquery(ConflictLab.objects.filter(
+                conflict=OuterRef('pk'),
+                status__in={DiscordanceReportTriageStatus.REVIEWED_WILL_FIX, DiscordanceReportTriageStatus.PENDING},
+                active=True
+            ).exclude(lab__in=lab_ids))),
+            then=Value(DiscordanceReportNextStep.AWAITING_OTHER_LAB)
+        )
+
+        when_complex = When(
+            ~Q(
+                Exists(Subquery(ConflictLab.objects.filter(
+                    conflict=OuterRef('pk'),
+                    active=True
+                ).exclude(status=DiscordanceReportTriageStatus.COMPLEX)))
+            ), then=Value(DiscordanceReportNextStep.UNANIMOUSLY_COMPLEX)
+        )
+
+        qs = self.annotate(overall_status=Case(
+            when_not_active,
+            when_waiting_on_your_triage,
+            when_waiting_on_your_amend,
+            when_waiting_on_other_lab,
+            when_complex,
+            default=Value(DiscordanceReportNextStep.TO_DISCUSS)))
+
+        return qs.filter(
             Exists(ConflictLab.objects.filter(conflict=OuterRef('pk'), lab__in=labs))
         )
 
@@ -677,6 +735,17 @@ class ConflictComment(TimeStampedModel):
     comment = models.TextField(null=False, blank=False)
     meta_data = models.JSONField(null=False, blank=False, default=dict)
 
+    @property
+    def meta_data_html(self) -> Optional[str]:
+        if not self.meta_data:
+            return None
+        else:
+            parts = []
+            for lab_id, status in self.meta_data.items():
+                lab = Lab.objects.get(pk=lab_id)
+                status_obj = DiscordanceReportTriageStatus(status)
+                parts.append(f"{html.escape(str(lab))} -> {status_obj.label}")
+            return SafeString("<br/>".join(parts))
 
 # @dataclass
 # class ConflictLabGrouped:

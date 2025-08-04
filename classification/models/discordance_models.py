@@ -440,12 +440,30 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
 # TODO all the below classes are utilities, consider moving them out
 
 class DiscordanceReportNextStep(str, Enum):
-    UNANIMOUSLy_COMPLEX = "C"
+    UNANIMOUSLY_COMPLEX = "C"
     AWAITING_YOUR_TRIAGE = "T"
     AWAITING_YOUR_AMEND = "A"
     AWAITING_OTHER_LAB = "O"
     TO_DISCUSS = "D"
+    NOT_INVOLVED = "X"
 
+    @property
+    def label(self) -> str:
+        match self:
+            case DiscordanceReportNextStep.UNANIMOUSLY_COMPLEX:
+                return "Complex"
+            case DiscordanceReportNextStep.AWAITING_YOUR_TRIAGE:
+                return "Awaiting Triage"
+            case DiscordanceReportNextStep.AWAITING_YOUR_AMEND:
+                return "Awaiting Amendment"
+            case DiscordanceReportNextStep.AWAITING_OTHER_LAB:
+                return "Waiting on Other Lab"
+            case DiscordanceReportNextStep.TO_DISCUSS:
+                return "Ready to Discuss"
+            case DiscordanceReportNextStep.NOT_INVOLVED:
+                return "Not Involved"
+            case _:
+                return self
 
 class DiscordanceReportClassificationRelationManager(models.Manager):
 

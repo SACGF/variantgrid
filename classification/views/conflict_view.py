@@ -1,11 +1,15 @@
 from typing import Optional, Union
 
+from django.db.models import QuerySet
+from django.db.models.aggregates import Sum, Count
 from django.shortcuts import render, get_object_or_404
 
-from classification.models import Conflict, ConflictComment, DiscordanceReportTriageStatus
+from classification.enums import AlleleOriginBucket, TestingContextBucket, ConflictSeverity
+from classification.models import Conflict, ConflictComment, DiscordanceReportTriageStatus, DiscordanceReportNextStep
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from library.utils.django_utils import render_ajax_view
 from snpdb.lab_picker import LabPickerData
+from snpdb.models import Lab
 from uicore.views.ajax_form_view import AjaxFormView, LazyRender
 
 
@@ -18,8 +22,18 @@ def conflict_history(request, conflict_id: int):
 
 def conflicts_view(request, lab_id: Optional[Union[str, int]] = None):
     lab_picker = LabPickerData.from_request(request, lab_id, 'conflicts')
+
+    lab_ids = lab_picker.lab_ids
+    qs: QuerySet['Conflict'] = Conflict.objects.all().for_labs(lab_ids)
+    qs = qs.exclude(allele_origin_bucket=AlleleOriginBucket.UNKNOWN).exclude(testing_context_bucket=TestingContextBucket.UNKNOWN)
+    qs = qs.filter(severity__gt=ConflictSeverity.SINGLE_SUBMISSION)
+    status_counts = {status: 0 for status in DiscordanceReportNextStep}
+    for entry in qs.order_by("overall_status").values("overall_status").annotate(the_count=Count("overall_status")):
+        status_counts[entry.get("overall_status")] = entry.get("the_count")
+
     return render(request, 'classification/conflicts.html', context={
-        "dlab": ClassificationDashboard(lab_picker=lab_picker)
+        "dlab": ClassificationDashboard(lab_picker=lab_picker),
+        "status_counts": status_counts
     })
 
 
@@ -69,17 +83,26 @@ class ConflictCommentView(AjaxFormView[Conflict]):
         saved = False
 
         if comment_text := request.POST.get("comment"):
-            for conflict_lab in conflict.conflict_labs:
-                # check if user has permission
-                if param := request.POST.get(f"lab-{conflict_lab.lab_id}-triage"):
-                    conflict_lab.status = DiscordanceReportTriageStatus(param)
-                    conflict_lab.save()
-
             if comment_text := comment_text.strip():
+                meta_data = {}
+                for conflict_lab in conflict.conflict_labs:
+                    # check if user has permission
+                    if param := request.POST.get(f"lab-{conflict_lab.lab_id}-triage"):
+                        if Lab.valid_labs_qs(request.user, admin_check=True).contains(conflict_lab.lab):
+                            param_enum = DiscordanceReportTriageStatus(param)
+                            if conflict_lab.status != param_enum:
+                                meta_data[conflict_lab.lab_id] = param_enum.value
+                                conflict_lab.status = param_enum
+                                conflict_lab.save()
+                                # TODO add information to comment
+                        else:
+                            raise PermissionError(f"User does not have access to lab {conflict_lab.lab}")
+
                 ConflictComment(
                     conflict_id=conflict_id,
                     user=request.user,
-                    comment=comment_text
+                    comment=comment_text,
+                    meta_data=meta_data
                 ).save()
                 context["saved"] = True
                 saved = True

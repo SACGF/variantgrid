@@ -284,7 +284,7 @@ def somatic_clinical_significance_inline(cs: str, amp_level: str):
     else:
         label = "No Data"
     if amp_level:
-        label += f" {amp_level}"
+        label += amp_level
     return {
         "key": cs.lower() if cs else "",
         "color": colors.get(cs) or "#aaa",
@@ -738,3 +738,10 @@ def evidence_key_input(key: str):
 @register.inclusion_tag("classification/tags/conflict.html")
 def conflict(conflict: Conflict):
     return {"conflict": conflict}
+
+
+@register.filter()
+def access_to_lab(user: User, lab: Lab):
+    if not lab:
+        raise ValueError("Lab not provided")
+    return Lab.valid_labs_qs(user, admin_check=True).contains(lab)

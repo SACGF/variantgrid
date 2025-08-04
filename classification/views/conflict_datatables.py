@@ -2,12 +2,12 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Subquery, Exists, OuterRef, Case, When, Value, Q
 from django.http import HttpRequest
 from django.template.loader import render_to_string
 
 from classification.enums import ConflictSeverity, TestingContextBucket, AlleleOriginBucket, ConflictType
-from classification.models import Conflict, ConflictLab, DiscordanceReportTriageStatus
+from classification.models import Conflict, ConflictLab, DiscordanceReportTriageStatus, DiscordanceReportNextStep
 from classification.services.conflict_services import ConflictDataRow
 from genes.hgvs import CHGVS
 from snpdb.lab_picker import LabPickerData
@@ -19,6 +19,7 @@ from snpdb.views.datatable_view import DatatableConfig, RichColumn, DatatableCon
 class ConflictRowWithStatus:
     conflict_row: ConflictDataRow
     status: DiscordanceReportTriageStatus
+
 
 class ConflictColumns(DatatableConfig[Conflict]):
 
@@ -47,7 +48,8 @@ class ConflictColumns(DatatableConfig[Conflict]):
             RichColumn(
                 "severity",
                 renderer=self.render_severity,
-                extra_columns=["pk"],
+                extra_columns=["pk",
+                               "overall_status"],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 default_sort=SortOrder.DESC,
                 client_renderer='renderSeverity',
@@ -102,18 +104,39 @@ class ConflictColumns(DatatableConfig[Conflict]):
         # return {"text": f"A{allele.pk} {allele:CA}", "url": allele.get_absolute_url()}
 
     def render_severity(self, row_data: CellData):
+        # is_active_participant = row_data["is_active_participant"]
+        # waiting_on_your_triage = row_data["waiting_on_your_triage"]
+        # waiting_on_your_amend = row_data["waiting_on_your_amend"]
+        # waiting_on_other_lab = row_data["waiting_on_other_lab"]
+        # not_complex = row_data["not_complex"]
+        overall_status = DiscordanceReportNextStep(row_data["overall_status"])
+
+        # overall_status: DiscordanceReportNextStep
+        # if is_active_participant:
+        #     if waiting_on_your_triage:
+        #         overall_status = DiscordanceReportNextStep.AWAITING_YOUR_TRIAGE
+        #     elif waiting_on_your_amend:
+        #         overall_status = DiscordanceReportNextStep.AWAITING_YOUR_AMEND
+        #     elif waiting_on_other_lab:
+        #         overall_status = DiscordanceReportNextStep.AWAITING_OTHER_LAB
+        #     elif not not_complex:
+        #         overall_status = DiscordanceReportNextStep.UNANIMOUSLY_COMPLEX
+        #     else:
+        #         overall_status = DiscordanceReportNextStep.TO_DISCUSS
+        # else:
+        #     overall_status = DiscordanceReportNextStep.NOT_INVOLVED
+
         if row_data.value:
             cs = ConflictSeverity(row_data.value)
-            return {"code": cs.value, "label": cs.label, "conflict_id": row_data.get("pk")}
+            return {
+                "code": cs.value,
+                "label": cs.label,
+                "conflict_id": row_data.get("pk"),
+                "overall_status_label": overall_status.label
+            }
         return "-"
 
     def involved_labs(self, row_data: CellData):
-        # if data := row_data.get("data"):
-        #     if involved_labs := data.get("involved_labs"):
-        #         labs = list(sorted(self.lab_map[lab_id] for lab_id in involved_labs))
-        #         return ", ".join(str(lab) for lab in labs)
-        # return "-"
-        # TODO sort
         conflict_rows = [ConflictDataRow.from_json(row) for row in row_data.get("data").get("rows")]
         conflict_labs = list(ConflictLab.objects.select_related("lab").filter(conflict=row_data.get("pk")))
         conflict_labs_dict = {cl.lab: cl for cl in conflict_labs}
@@ -137,7 +160,6 @@ class ConflictColumns(DatatableConfig[Conflict]):
 
     def get_initial_queryset(self) -> QuerySet[Conflict]:
         lab_ids = LabPickerData.for_user(self.user, self.get_query_param("lab")).lab_ids
-        # TODO optimise so if admin with no selection we don't filter like this
         return Conflict.objects.all().for_labs(lab_ids)
 
     def filter_queryset(self, qs: QuerySet[Conflict]) -> QuerySet[Conflict]:
@@ -145,4 +167,7 @@ class ConflictColumns(DatatableConfig[Conflict]):
             qs = qs.exclude(allele_origin_bucket=AlleleOriginBucket.UNKNOWN).exclude(testing_context_bucket=TestingContextBucket.UNKNOWN)
         if self.get_query_param("multiple_submitters") == "true":
             qs = qs.filter(severity__gt=ConflictSeverity.SINGLE_SUBMISSION)
+        if status := self.get_query_param("status"):
+            print(status)
+            qs = qs.filter(overall_status=status)
         return qs

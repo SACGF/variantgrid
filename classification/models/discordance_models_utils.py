@@ -228,7 +228,7 @@ class DiscordanceReportRowData(ExportRow):
                     awaiting_other_lab = True
 
         if is_unanimously_complex:
-            return DiscordanceReportNextStep.UNANIMOUSLy_COMPLEX
+            return DiscordanceReportNextStep.UNANIMOUSLY_COMPLEX
         elif awaiting_your_triage:
             return DiscordanceReportNextStep.AWAITING_YOUR_TRIAGE
         elif awaiting_your_amend:
@@ -423,7 +423,7 @@ class DiscordanceReportCategories:
 
     @cached_property
     def to_complex_table(self) -> DiscordanceReportTableData:
-        return DiscordanceReportTableData(perspective=self.perspective, summaries=self.active_by_next_step.get(DiscordanceReportNextStep.UNANIMOUSLy_COMPLEX))
+        return DiscordanceReportTableData(perspective=self.perspective, summaries=self.active_by_next_step.get(DiscordanceReportNextStep.UNANIMOUSLY_COMPLEX))
 
     @cached_property
     def to_discuss_table(self) -> DiscordanceReportTableData:

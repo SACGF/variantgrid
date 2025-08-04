@@ -3,13 +3,14 @@
 {% load classification_tags %}
 {% for combined_row in combined_rows %}
     {% with row=combined_row.conflict_row %}
-    <div class="row mb-2" {% if row.exclude %}style="opacity:0.6"{% endif %}>
+    <div class="row mb-3" {% if row.exclude %}style="opacity:0.6"{% endif %}>
         <div class="col-7 text-right">
             {% if row.share_level != 'logged_in_users' %}
                 <img src="/static/icons/share_level/{{ row.share_level }}.png" style="width:12px; height: 12px; margin-right: 4px; top: -2px; position: relative;"/>
             {% endif %}
             {{ row.lab }}
-            {% if not row.exclude %}<br/><i class="text-secondary">{{ combined_row.status.get_status_display }}</i>{% endif %}
+            {% if not row.exclude %}<br/><i class="text-secondary">{{ combined_row.status.get_status_display }}</i>
+            {% else %}<br/><span class="no-value">Not counted for overlap</span>{% endif %}
         </div>
         <div class="col-5 align-self-center">
             {% if conflict_type == "P" %}
@@ -23,9 +24,11 @@
     </div>
     {% endwith %}
 {% endfor %}
+{% comment %}
 <div class="row">
     <div class="col-2"></div>
     <div class="col-10">
         <div class="text-muted center"><a href="{% url 'conflict_history' conflict_id %}" data-toggle="ajax-modal" data-size="lg">Show History</a></div>
     </div>
 </div>
+{% endcomment %}
