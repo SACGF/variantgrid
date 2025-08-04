@@ -8,7 +8,6 @@ import gzip
 import json
 import logging
 
-from collections import defaultdict
 from django.core.management.base import BaseCommand
 from intervaltree import IntervalTree
 
@@ -156,6 +155,8 @@ class Command(BaseCommand):
 
                 for va in va_qs.select_related("variant", "variant__locus"):
                     v = va.variant
+
+                    # This is duplicated in BulkVEPVCFAnnotationInserter._add_mt_data
                     tv_set = mt_tx_transcripts[v.start:v.end]
                     if tv_set:
                         array.append(va)  # Will be modified
