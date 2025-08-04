@@ -383,7 +383,7 @@ class BulkVEPVCFAnnotationInserter:
                 return
 
             variant = Variant.get_from_tuple(variant_coordinate, self.genome_build)  # VG3 expects to work in Variant
-            mt_tx_transcripts = self._get_mt_interval_tree()
+            mt_tx_transcripts = self._mt_interval_tree
             tv_set = mt_tx_transcripts[variant.start:variant.end]
             if tv_set:
                 # Just get the 1st one out
@@ -554,7 +554,7 @@ class BulkVEPVCFAnnotationInserter:
         return set(UniProt.objects.all().values_list("pk", flat=True))
 
     @lazy
-    def _get_mt_interval_tree(self):
+    def _mt_interval_tree(self):
         mt_contig_accession = 'NC_012920.1'
         mt_tx_transcripts = IntervalTree()  # Will only be chrMT
         tv_qs = TranscriptVersion.objects.filter(data__icontains=mt_contig_accession,
