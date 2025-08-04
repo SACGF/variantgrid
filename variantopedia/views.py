@@ -344,15 +344,16 @@ def database_statistics(request):
     num_vcfs = VCF.objects.count()
     num_samples = Sample.objects.count()
 
-    vcf_variant_stats_df = get_vcf_variant_upload_stats()
-    variant_stats = {}
-    for col in ["cumulative_samples", "cumulative_variants", "percent_known"]:
-        variant_stats[col] = vcf_variant_stats_df[col].tolist()
+    variant_stats_per_build = defaultdict(dict)
+    for genome_build in GenomeBuild.builds_with_annotation():
+        vcf_variant_stats_df = get_vcf_variant_upload_stats(genome_build)
+        for col in ["cumulative_samples", "cumulative_variants", "cumulative_genotypes", "percent_known"]:
+            variant_stats_per_build[genome_build.name][col] = vcf_variant_stats_df[col].tolist()
 
     context = {"max_variant_id": max_variant_id,
                "num_vcfs": num_vcfs,
                "num_samples": num_samples,
-               "variant_stats": variant_stats}
+               "variant_stats_per_build": dict(variant_stats_per_build)}
     return render(request, "variantopedia/database_statistics_detail.html", context)
 
 
