@@ -218,7 +218,12 @@ def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = Fa
 
 def shariant_upload_status(classification):
     destination_status_and_url = {}
-    for sd in SyncDestination.objects.filter(config__direction='upload', enabled=True):
+    sync_enabled = True
+    # TODO: Remove this code after testing
+    if socket.gethostname() == "sapathtest":
+        sync_enabled = False  # Special case testing code
+
+    for sd in SyncDestination.objects.filter(config__direction='upload', enabled=sync_enabled):
         uploader = ClassificationUploader(sd)
         sync_match, sync_success, remote_url = uploader.get_sync_match_status_and_remote_url(classification)
         if sync_match:
