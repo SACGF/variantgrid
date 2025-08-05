@@ -1068,6 +1068,8 @@ const VCForm = (function() {
             
             this.otherClassificationsSummary = params.otherClassificationsSummary;
             this.reportEnabled = params.reportEnabled;
+            this.remoteUrls = params.remoteUrls;
+            this.remoteSummary = params.remoteSummary;
 
             this.initData(record);
             // Create the sections
@@ -1111,10 +1113,6 @@ const VCForm = (function() {
                 );
                 $('#upload-section').detach().appendTo($(`#section-${familyKey}`));
             }
-
-            this.remoteUrls = params.remoteUrls;
-            this.remoteSummary = params.remoteSummary;
-
 
             jContent.find('[data-parent]').on('shown.bs.collapse', function() {
                 if (!filtering) {
