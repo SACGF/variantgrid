@@ -303,8 +303,6 @@ const VCForm = (function() {
                                 let urlsConstainer = $("<ul>");
                                 urlsConstainer.appendTo(shareSuccess);
                                 this.remoteUrls.forEach(urlDesc => {
-                                    console.log("urlDesc: ");
-                                    console.log(urlDesc);
                                     let url = urlDesc[0];
                                     let desc = urlDesc[1];
                                     $('<a>', {href: url, target: '_blank', text: desc}).appendTo(urlsConstainer);
