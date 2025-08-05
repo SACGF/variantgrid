@@ -305,7 +305,9 @@ const VCForm = (function() {
                                 this.remoteUrls.forEach(urlDesc => {
                                     let url = urlDesc[0];
                                     let desc = urlDesc[1];
-                                    $('<a>', {href: url, target: '_blank', text: desc}).appendTo(urlsConstainer);
+                                    let urlLi = $("<li>");
+                                    urlLi.appendTo(urlsConstainer);
+                                    $('<a>', {href: url, target: '_blank', text: desc}).appendTo(urlLi);
                                 });
                             } else if (this.remoteSummary) {
                                 $('<div>', {class: 'text-center mt-3 mb-2 font-weight-bold text-danger', style:'font-size:14px', html: '<i class="fas fa-exclamation-triangle text-warning"></i>' + this.remoteSummary}).appendTo(quickSubmitWrapper);
