@@ -224,16 +224,19 @@ def shariant_upload_status(classification):
         sync_enabled = False  # Special case testing code
 
     for sd in SyncDestination.objects.filter(config__direction='upload', enabled=sync_enabled):
-        uploader = ClassificationUploader(sd)
-        sync_match, sync_success, remote_url = uploader.get_sync_match_status_and_remote_url(classification)
-        if sync_match:
-            if sync_success is None:
-                status = "Awaiting Sync"
-            elif sync_success:
-                status = "Success"
+        try:
+            uploader = ClassificationUploader(sd)
+            sync_match, sync_success, remote_url = uploader.get_sync_match_status_and_remote_url(classification)
+            if sync_match:
+                if sync_success is None:
+                    status = "Awaiting Sync"
+                elif sync_success:
+                    status = "Success"
+                else:
+                    status = "Failed"
+                destination_status_and_url[sd.name] = (status, remote_url)
             else:
-                status = "Failed"
-            destination_status_and_url[sd.name] = (status, remote_url)
-        else:
-            destination_status_and_url[sd.name] = (None, None)
+                destination_status_and_url[sd.name] = (None, None)
+        except KeyError:
+            pass
     return destination_status_and_url
