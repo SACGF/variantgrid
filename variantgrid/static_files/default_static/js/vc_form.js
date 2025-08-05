@@ -300,12 +300,14 @@ const VCForm = (function() {
                             shareSuccess.appendTo(quickSubmitWrapper);
 
                             if (this.remoteUrls.length) {
+                                let urlsConstainer = $("<ul>");
+                                urlsConstainer.appendTo(shareSuccess);
                                 this.remoteUrls.forEach(urlDesc => {
                                     console.log("urlDesc: ");
                                     console.log(urlDesc);
                                     let url = urlDesc[0];
                                     let desc = urlDesc[1];
-                                    $('<a>', {href: url, target: '_blank', text: desc}).appendTo(shareSuccess);
+                                    $('<a>', {href: url, target: '_blank', text: desc}).appendTo(urlsConstainer);
                                 });
                             } else if (this.remoteSummary) {
                                 $('<div>', {class: 'text-center mt-3 mb-2 font-weight-bold text-danger', style:'font-size:14px', html: '<i class="fas fa-exclamation-triangle text-warning"></i>' + this.remoteSummary}).appendTo(quickSubmitWrapper);
