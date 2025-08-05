@@ -275,9 +275,9 @@ def view_classification(request, record_id):
     vc: Classification = ref.record
     # If remote_urls is populated, show that, otherwise show a summary note
     remote_urls = []
-    remote_summary = "No enabled sync uploads"
     destination_status_and_url = shariant_upload_status(vc)
     if destination_status_and_url:
+        remote_summary = None
         non_success = []
         for sd_name, (status, remote_url) in destination_status_and_url.items():
             if remote_url:
@@ -290,6 +290,8 @@ def view_classification(request, record_id):
                 remote_summary = ", ".join(non_success)
             else:
                 remote_summary = f"Not handled by any sync upload: {', '.join(destination_status_and_url.keys())}"
+    else:
+        remote_summary = "No enabled sync uploads"
 
     context = {
         'vc': vc,
