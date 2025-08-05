@@ -296,7 +296,21 @@ const VCForm = (function() {
                             message = `This record is only visible to users in your organisation.`;
                         } else {
                             let message_suffix = VcSettings.LOGGED_IN_USERS_MESSAGE || "This record is shared to Shariant users.";
-                            $('<div>', {class: 'text-center mt-3 mb-2', style:'font-size:14px', html: `<i class="fas fa-check-circle text-success"></i> ${message_suffix}`}).appendTo(quickSubmitWrapper);
+                            let shareSuccess = $('<div>', {class: 'text-center mt-3 mb-2', style:'font-size:14px', html: `<i class="fas fa-check-circle text-success"></i> ${message_suffix}`});
+                            shareSuccess.appendTo(quickSubmitWrapper);
+
+                            if (this.remoteUrls) {
+                                this.remoteUrls.forEach(urlDesc => {
+                                    console.log("urlDesc: ");
+                                    console.log(urlDesc);
+                                    let url = urlDesc[0];
+                                    let desc = urlDesc[1];
+                                    $('<a>', {href: url, target: '_blank', text: desc}).appendTo(shareSuccess);
+                                });
+                            } else if (this.remoteSummary) {
+                                $('<div>', {class: 'text-center mt-3 mb-2 font-weight-bold text-danger', style:'font-size:14px', html: '<i class="fas fa-exclamation-triangle text-warning"></i>' + this.remoteSummary}).appendTo(quickSubmitWrapper);
+                            }
+
                         }
                     }
                     if (message) {
@@ -1097,6 +1111,10 @@ const VCForm = (function() {
                 );
                 $('#upload-section').detach().appendTo($(`#section-${familyKey}`));
             }
+
+            this.remoteUrls = params.remoteUrls;
+            this.remoteSummary = params.remoteSummary;
+
 
             jContent.find('[data-parent]').on('shown.bs.collapse', function() {
                 if (!filtering) {

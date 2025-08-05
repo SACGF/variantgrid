@@ -34,7 +34,9 @@
                     shareButtons: $('#share-buttons'),
                     otherClassificationsSummary: "{{ other_classifications_summary | default_if_none:'' }}",
                     reportEnabled: {{ report_enabled | jsonify }},
-                    attachmentsEnabled: {{ attachments_enabled | jsonify }}
+                    attachmentsEnabled: {{ attachments_enabled | jsonify }},
+                    remoteUrls: {{ remote_urls  }},
+                    remoteSummary: {{ remote_summary  }}
                 },
                 keys,
                 {{ record | jsonify }}

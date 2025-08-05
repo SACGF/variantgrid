@@ -34,6 +34,7 @@ from library.log_utils import log_traceback, report_event
 from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm
 from snpdb.models import Variant, UserSettings, Sample, Allele, Lab
 from snpdb.models.models_genome import GenomeBuild
+from sync.shariant.shariant_upload import shariant_upload_status
 from uicore.utils.form_helpers import form_helper_horizontal
 from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import \
     create_classification_for_sample_and_variant_objects, generate_auto_populate_data
@@ -272,6 +273,23 @@ def view_classification(request, record_id):
         genome_build = user_settings.default_genome_build
 
     vc: Classification = ref.record
+    # If remote_urls is populated, show that, otherwise show a summary note
+    remote_urls = []
+    remote_summary = "No enabled sync uploads"
+    destination_status_and_url = shariant_upload_status(vc)
+    if destination_status_and_url:
+        non_success = []
+        for sd_name, (status, remote_url) in destination_status_and_url.items():
+            if remote_url:
+                description = f"{vc.lab_record_id} ({sd_name})"
+                remote_urls.append((remote_url, description))
+            elif status:
+                non_success.append(f"{sd_name}: {status=}")
+        if not remote_urls:
+            if non_success:
+                remote_summary = ", ".join(non_success)
+            else:
+                remote_summary = f"Not handled by any sync upload: {', '.join(destination_status_and_url.keys())}"
 
     context = {
         'vc': vc,
@@ -279,6 +297,8 @@ def view_classification(request, record_id):
         'genome_build': genome_build,
         'existing_files': existing_files,
         'other_classifications_summary': other_classifications_summary,
+        'remote_urls': remote_urls,
+        'remote_summary': remote_summary,
         'report_enabled': ClassificationReportTemplate.objects.filter(name=ReportNames.DEFAULT_REPORT).exclude(template__iexact='').exists(),
         'attachments_enabled': settings.VARIANT_CLASSIFICATION_FILE_ATTACHMENTS
     }
