@@ -299,7 +299,7 @@ const VCForm = (function() {
                             let shareSuccess = $('<div>', {class: 'text-center mt-3 mb-2', style:'font-size:14px', html: `<i class="fas fa-check-circle text-success"></i> ${message_suffix}`});
                             shareSuccess.appendTo(quickSubmitWrapper);
 
-                            if (this.remoteUrls) {
+                            if (this.remoteUrls.length) {
                                 this.remoteUrls.forEach(urlDesc => {
                                     console.log("urlDesc: ");
                                     console.log(urlDesc);
