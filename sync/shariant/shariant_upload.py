@@ -1,5 +1,5 @@
 import socket
-from typing import Dict, Optional, Iterable, List, TypeVar, Union
+from typing import Dict, Optional, Iterable, List, TypeVar, Union, Tuple
 
 import requests
 from django.db.models import QuerySet
@@ -189,7 +189,46 @@ class ClassificationUploader:
 
         return run
 
+    def get_sync_match_status_and_remote_url(self, classification) -> Tuple[bool, Optional[bool], Optional[str]]:
+        """
+            :return:
+                * sync_match - True/False if sync will collect classification or filter it out
+                * sync_success - status of last sync run
+                * remote_url - Url on remote system
+        """
+        qs = self.records_to_sync(full_sync=True).filter(classification=classification)
+        sync_match = False
+        sync_success = None
+        remote_url = None
+        if cm := qs.first():  # Should only be 1
+            sync_match = True
+            if cm_sync_record := ClassificationModificationSyncRecord.objects.filter(run__destination=self.sync_destination,
+                                                                                    classification_modification=cm).latest():
+                if sync_success := cm_sync_record.success:
+                    # Search is a bit of a hack as we don't have a way to access it directly
+                    remote_url = self.shariant.url(f'variantopedia/search?search={classification.lab_record_id}')
+
+        return sync_match, sync_success, remote_url
+
 
 # method is here for backwards compatibility, prefer to use ClassificationUploader directly
 def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = False, max_rows: Optional[int] = None) -> SyncRun:
     return ClassificationUploader(sync_destination).sync(full_sync=full_sync, max_rows=max_rows)
+
+
+def shariant_upload_status(classification):
+    destination_status_and_url = {}
+    for sd in SyncDestination.objects.filter(config__direction='upload', enabled=True):
+        uploader = ClassificationUploader(sd)
+        sync_match, sync_success, remote_url = uploader.get_sync_match_status_and_remote_url(classification)
+        if sync_match:
+            if sync_success is None:
+                status = "Awaiting Sync"
+            elif sync_success:
+                status = "Success"
+            else:
+                status = "Failed"
+            destination_status_and_url[sd.name] = (status, remote_url)
+        else:
+            destination_status_and_url[sd.name] = (None, None)
+    return destination_status_and_url
