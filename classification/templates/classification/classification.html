@@ -36,7 +36,7 @@
                     reportEnabled: {{ report_enabled | jsonify }},
                     attachmentsEnabled: {{ attachments_enabled | jsonify }},
                     remoteUrls: {{ remote_urls | jsonify }},
-                    remoteSummary: {{ remote_summary  }}
+                    remoteSummary: "{{ remote_summary|default_if_none:'' }}"
                 },
                 keys,
                 {{ record | jsonify }}
