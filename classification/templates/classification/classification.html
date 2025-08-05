@@ -35,7 +35,7 @@
                     otherClassificationsSummary: "{{ other_classifications_summary | default_if_none:'' }}",
                     reportEnabled: {{ report_enabled | jsonify }},
                     attachmentsEnabled: {{ attachments_enabled | jsonify }},
-                    remoteUrls: {{ remote_urls  }},
+                    remoteUrls: {{ remote_urls | jsonify }},
                     remoteSummary: {{ remote_summary  }}
                 },
                 keys,
