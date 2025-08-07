@@ -285,10 +285,11 @@
             data.allele_id = {{ allele.pk }};
         }
     </script>
-    <h4>Conficts</h4>
     {% for conflict in conflicts %}
         <div>{% conflict conflict %}</div>
     {% endfor %}
+
+    {% comment %}
     <hr/>
     {% for allele_origin_grouping_desc in allele_origin_groupings_desc %}
         <div>
@@ -318,6 +319,8 @@
             {% endif %}
         </div>
     {% endfor %}
+    {% endcomment %}
+
     {% if show_overall_diff %}
         <div>
             <span class="allele-origin-box horizontal allele-origin-A">
@@ -326,6 +329,8 @@
             <a class="hover-link" href="{% url 'classification_diff' %}?allele={{ allele.id }}&latest=true" title="Show differences between labs latest classifications across all allele origins">Show Diffs</a></div>
     {% endif %}
     {% classification_groupings %}
+
+
 
     <div class="mt-4">
         {% clinvar allele=allele expert_panel_only=True %}

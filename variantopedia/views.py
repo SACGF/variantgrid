@@ -26,6 +26,7 @@ from classification.enums import AlleleOriginBucket, ShareLevel, SpecialEKeys
 from classification.models import ClassificationGrouping, AlleleOriginGrouping, DiscordanceReport, OverlapStatus, \
     EvidenceKeyMap, ClassificationGroupingEntry, Conflict
 from classification.models.classification_import_run import ClassificationImportRun
+from classification.services.conflict_services import ConflictMerge
 from classification.variant_card import AlleleCard
 from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
@@ -573,13 +574,14 @@ def view_allele(request, allele_id: int):
             ClassificationGrouping.objects.filter(allele_origin_grouping__allele_grouping__allele=allele_id)
         ).values_list("allele_origin_grouping")
     )
-    aogs = [AlleleOriginGroupingDescription.describe(aog, request.user) for aog in sorted(aog_qs.all())]
+    # aogs = [AlleleOriginGroupingDescription.describe(aog, request.user) for aog in sorted(aog_qs.all())]
 
-    show_overall_diff = len(aogs) > 1
+    conflicts = ConflictMerge.merge(Conflict.objects.filter(allele=allele))
+    show_overall_diff = len(conflicts) > 1
 
     context = {
-        "conflicts": Conflict.objects.filter(allele=allele),
-        "allele_origin_groupings_desc": aogs,
+        "conflicts": conflicts,
+        # "allele_origin_groupings_desc": aogs,
         "show_overall_diff": show_overall_diff,
         "allele_card": AlleleCard(user=request.user, allele=allele),
         "allele": allele,

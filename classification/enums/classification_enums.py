@@ -2,11 +2,9 @@ import typing
 from enum import Enum
 from functools import total_ordering
 from typing import Optional, Union
-
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import TextChoices, IntegerChoices
-
 from library.guardian_utils import public_group, all_users_group
 from library.utils import ChoicesEnum
 
@@ -18,6 +16,17 @@ CRITERIA_NEUTRAL = 'N'
 class ConflictType(TextChoices):
     CLIN_SIG = "S", "ClinSig"
     ONCPATH = "P", "OncPath"
+
+    def label_for_context(self, allele_origin_bucket: 'AlleleOriginBucket'):
+        if self == ConflictType.ONCPATH:
+            if allele_origin_bucket == AlleleOriginBucket.GERMLINE:
+                return "Pathogenicity"
+            elif allele_origin_bucket == AlleleOriginBucket.SOMATIC:
+                return "Oncogenicity"
+            else:
+                return "Onco-Path"
+        else:
+            return "Clin-Sig"
 
 
 class ConflictSeverity(IntegerChoices):

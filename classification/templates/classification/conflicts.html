@@ -30,38 +30,6 @@
         }
     </style>
     <script>
-        function renderContext(data, type, row) {
-            // return JSON.stringify(data);
-            let dom = $('<div>', { style: 'display:inline-block' } );
-            dom.append(VCTable.allele_origin_bucket_label(
-                data.allele_origin_bucket,
-                "",
-                "horizontal"));
-            if (data.testing_context_bucket !== "G") {
-                dom.append($("<span>", {"class": "testing-context", text: data.testing_context_bucket_label}));
-            }
-            dom.append(" - ")
-            dom.append($("<span>", {"class": "text-muted", text: data.conflict_type_label}));
-            return dom;
-        }
-        function renderSeverity(data, type, row) {
-            if (data.code == 2) {
-                return data.label;
-            } else if (data.code <= 1) {
-                return $("<span>", {class: 'no-value', text: data.label});
-            }
-            return $("<div>", {html: [
-                $('<a>', {
-                    "class": "modal-link-comments",
-                    "data-toggle": "ajax-modal",
-                    "data-size": "lg",
-                    "data-title": "Comments",
-                    "data-href": Urls.conflict_comments(data.conflict_id),
-                    "text": data.label
-                })
-            ]});
-        }
-
         const debouncedFilterGrid = debounce(filterGrid);
         function filterGrid() {
             $('#conflicts-datatable').DataTable().ajax.reload();

@@ -553,6 +553,8 @@ class ConflictKey:
     testing_context_bucket: Optional[TestingContextBucket] = None
     tumor_type_category: Optional[str] = None
 
+    severity: Optional[ConflictSeverity] = None  # just used when we're determining if we can merge 2 conflicts
+
 
 class ConflictQuerySet(QuerySet['Conflict']):
     def for_lab(self, lab: Lab):
@@ -675,6 +677,21 @@ class Conflict(TimeStampedModel):
     tumor_type_category = models.TextField(null=True, blank=True)
     meta_data = models.JSONField(null=False, blank=False, default=dict)
 
+    @property
+    def _sort_key(self):
+        # put testing conflict_type bucket last so we group conflicts that are for the same data but different contexts e.g.
+        return (
+            self.allele,
+            self.allele_origin_bucket or AlleleOriginBucket.UNKNOWN,
+            self.testing_context_bucket or TestingContextBucket.UNKNOWN,
+            self.tumor_type_category or "",
+            self.conflict_type,
+        )
+
+    def __lt__(self, other):
+        return self._sort_key < other._sort_key
+
+
     class Meta:
         unique_together = ("allele", "conflict_type", "allele_origin_bucket", "testing_context_bucket", "tumor_type_category")
 
@@ -684,6 +701,7 @@ class Conflict(TimeStampedModel):
             parts.append(self.get_testing_context_bucket_display())
         if self.tumor_type_category:
             parts.append(self.tumor_type_category)
+        parts.append(self.get_conflict_type_display())
         parts.append("-")
         parts.append(self.latest.get_severity_display())
 

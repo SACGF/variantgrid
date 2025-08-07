@@ -1,14 +1,14 @@
+import itertools
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional
+from typing import Optional, Iterable, Callable
 from django.db import transaction
 from more_itertools.recipes import partition
-
 from classification.enums import AlleleOriginBucket, ConflictSeverity, ShareLevel, ConflictType
 from classification.models import AlleleOriginGrouping, EvidenceKeyMap, Conflict, ConflictKey, ConflictHistory, \
-    ConflictLab
+    ConflictLab, ClassificationGrouping, ClassificationModification
 from genes.hgvs import CHGVS
 from library.utils import strip_json, first
 from snpdb.models import Allele, Lab
@@ -329,3 +329,64 @@ def calculate_and_apply_conflicts_for(allele_origin_grouping: AlleleOriginGroupi
         tumor_type_category=allele_origin_grouping.tumor_type_category
     )
     OncPathCalculator(allele, conflict_key, oncpath_data).log_history()
+
+
+def latest_classifications_for_conflict(conflict: Conflict) -> Optional[ClassificationModification]:
+    # easy case before we get into
+    if grouping := AlleleOriginGrouping.objects.filter(
+        allele_grouping__allele=conflict.allele,
+        allele_origin_bucket=conflict.allele_origin_bucket,
+        testing_context_bucket=conflict.testing_context_bucket,
+        tumor_type_category=conflict.tumor_type_category
+    ).first():
+        # TODO filter out records that don't have a relevant value? Still probably pretty useful to include them
+        return [cg.latest_classification_modification for cg in ClassificationGrouping.objects.filter(allele_origin_grouping=grouping)]
+    else:
+        raise ValueError(f"Can't find AlleleOriginGrouping for conflict {conflict}")
+
+
+@dataclass(frozen=True)
+class ConflictMerge:
+    conflicts: list[Conflict]
+
+    @cached_property
+    def conflict(self) -> Conflict:
+        return first(self.conflicts)
+
+    @cached_property
+    def conflict_types(self) -> list[ConflictType]:
+        conflict_types = set()
+        for conflict in self.conflicts:
+            conflict_types.add(ConflictType(conflict.conflict_type))
+        return list(sorted(conflict_types))
+
+    @cached_property
+    def conflict_type_labels(self) -> list[str]:
+        # conflict type label can change depending on allele origin (even if calculated the same)
+        return [conflict_type.label_for_context(self.conflict.allele_origin_bucket) for conflict_type in self.conflict_types]
+
+    @staticmethod
+    def merge(conflicts: Iterable[Conflict]) -> list['ConflictMerge']:
+        # groupby conflict key but with testing context hardcoded to None, so records with the same everything else will be grouped together
+        all_merged: list[ConflictMerge] = []
+        for group, conflicts in itertools.groupby(sorted(conflicts), lambda c: ConflictKey(
+                None,
+                c.allele_origin_bucket,
+                c.testing_context_bucket,
+                c.tumor_type_category,
+                c.latest.severity
+            )):
+            conflict_merge = ConflictMerge(list(conflicts))
+            all_merged.append(conflict_merge)
+        return all_merged
+
+    def __getattr__(self, method_name):
+        # delegate to first conflict object if we get a method we're not familiar with
+        def method(*args, **kwargs):
+            result = getattr(self.conflict, method_name)
+            if isinstance(result, Callable):
+                return result(*args, **kwargs)
+            else:
+                return result
+
+        return method

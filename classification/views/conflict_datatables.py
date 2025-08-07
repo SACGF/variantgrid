@@ -33,10 +33,10 @@ class ConflictColumns(DatatableConfig[Conflict]):
             RichColumn(
                 name="context",
                 label="Context",
-                extra_columns=["allele_origin_bucket", "testing_context_bucket", "conflict_type"],
+                extra_columns=["allele_origin_bucket", "testing_context_bucket", "conflict_type", "severity", "pk"],
                 sort_keys=["allele_origin_bucket", "testing_context_bucket", "conflict_type"],
                 renderer=self.render_context,
-                client_renderer='renderContext',
+                client_renderer='ConflictTable.renderContext',
             ),
             RichColumn(
                 name="c_hgvs",
@@ -51,7 +51,7 @@ class ConflictColumns(DatatableConfig[Conflict]):
                 extra_columns=["pk"],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 default_sort=SortOrder.DESC,
-                client_renderer='renderSeverity',
+                client_renderer='ConflictTable.renderSeverity',
             ),
             RichColumn(name="involved_labs", label="Involved Labs", extra_columns=["data", "conflict_type", "pk", "severity"], renderer=self.involved_labs),
             RichColumn("id", visible=False)
@@ -70,16 +70,11 @@ class ConflictColumns(DatatableConfig[Conflict]):
         allele_origin_bucket = AlleleOriginBucket(row_data.get("allele_origin_bucket"))
         testing_context_bucket = TestingContextBucket(row_data.get("testing_context_bucket"))
         conflict_type = ConflictType(row_data.get("conflict_type"))
-        conflict_type_label = conflict_type.label
-        if conflict_type == ConflictType.ONCPATH:
-            if allele_origin_bucket == AlleleOriginBucket.GERMLINE:
-                conflict_type_label = "Pathogenicity"
-            elif allele_origin_bucket == AlleleOriginBucket.SOMATIC:
-                conflict_type_label = "Oncogenicity"
-            else:
-                conflict_type_label = "Onco-Path"
+        conflict_type_label = conflict_type.label_for_context(allele_origin_bucket)
 
         return {
+            "conflict_id": row_data.get("pk"),
+            "severity": row_data.get("severity"),
             "allele_origin_bucket": allele_origin_bucket.value,
             "allele_origin_bucket_label": allele_origin_bucket.label,
             "testing_context_bucket": testing_context_bucket.value,

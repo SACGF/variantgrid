@@ -26,6 +26,7 @@ from classification.models.discordance_models import DiscordanceReport
 from classification.models.discordance_models_utils import DiscordanceReportRowData, DiscordanceReportTableData
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
+from classification.services.conflict_services import ConflictMerge
 from eventlog.models import ViewEvent
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
@@ -736,7 +737,7 @@ def evidence_key_input(key: str):
 
 
 @register.inclusion_tag("classification/tags/conflict.html")
-def conflict(conflict: Conflict):
+def conflict(conflict: Conflict | ConflictMerge):
     return {"conflict": conflict}
 
 

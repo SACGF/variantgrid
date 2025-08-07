@@ -5,8 +5,14 @@
     {% if conflict.testing_context_bucket != "G" %}
         <span class="testing-context">{{ conflict.get_testing_context_bucket_display }}</span>
     {% endif %}
-    - <span class="text-muted">{{ conflict.get_conflict_type_display }}</span>
-    &nbsp;
+    -
+    {% if conflict.conflict_type_labels %}
+        {% for conflict_type_label in conflict.conflict_type_labels %}
+            <span class="text-muted comma-sep">{{ conflict_type_label }}</span>
+        {% endfor %}<span class="mr-1"></span>
+    {% else %}
+        <span class="text-muted">{{ conflict.get_conflict_type_display }}</span>
+    {% endif %}
 </div>
 <div class="pipe-sep d-inline-block">
     {{ conflict.latest.get_severity_display }}

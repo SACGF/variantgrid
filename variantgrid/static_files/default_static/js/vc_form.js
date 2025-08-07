@@ -2756,3 +2756,58 @@ VCTable.sample = (sample_name, type, row) => {
     return dom;
 };
 
+let ConflictTable = (function() {
+    let ConflictTable = function() {};
+    ConflictTable.prototype = {};
+    return ConflictTable;
+})();
+
+
+ConflictTable.renderContext = (data, type, row) => {
+    // return JSON.stringify(data);
+    let dom = $('<div>', { style: 'display:inline-block' } );
+    dom.append(VCTable.allele_origin_bucket_label(
+        data.allele_origin_bucket,
+        "",
+        "horizontal"));
+    if (data.testing_context_bucket !== "G") {
+        dom.append($("<span>", {"class": "testing-context", text: data.testing_context_bucket_label}));
+    }
+    dom.append(" - ")
+    dom.append($("<span>", {"class": "text-muted", text: data.conflict_type_label}));
+
+    if (data.severity >= 2) {
+        dom.append($("<br/><br/>"));
+        dom.append($("<a>", {
+            "class": "hover-link",
+            "href": Urls.classification_diff() + `?conflict=${data.conflict_id}`,
+            "text": "Show Diffs"
+        }));
+    }
+
+    return dom;
+};
+
+
+ConflictTable.renderSeverity = (data, type, row) => {
+    let dom = $("<div>");
+    if (data.code == 2) {
+        dom.append(data.label);
+    } else if (data.code <= 1) {
+        dom.append($("<span>", {class: 'no-value', text: data.label}));
+    } else {
+        dom.append($("<div>", {
+            html: [
+                $('<a>', {
+                    "class": "modal-link-comments",
+                    "data-toggle": "ajax-modal",
+                    "data-size": "lg",
+                    "data-title": "Comments",
+                    "data-href": Urls.conflict_comments(data.conflict_id),
+                    "text": data.label
+                })
+            ]
+        }));
+    }
+    return dom;
+};
