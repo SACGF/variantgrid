@@ -446,6 +446,8 @@ class DiscordanceReportNextStep(str, Enum):
     AWAITING_OTHER_LAB = "O"
     TO_DISCUSS = "D"
     NOT_INVOLVED = "X"
+    RESOLVED = "Z"
+    NO_CONFLICT = "N"
 
     @property
     def label(self) -> str:
@@ -462,6 +464,10 @@ class DiscordanceReportNextStep(str, Enum):
                 return "Ready to Discuss"
             case DiscordanceReportNextStep.NOT_INVOLVED:
                 return "Not Involved"
+            case DiscordanceReportNextStep.RESOLVED:
+                return "Resolved"
+            case DiscordanceReportNextStep.NO_CONFLICT:
+                return "No Conflict"
             case _:
                 return self
 

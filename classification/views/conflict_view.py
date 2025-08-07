@@ -1,7 +1,8 @@
 from typing import Optional, Union
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 from django.db.models.aggregates import Sum, Count
+from django.http import HttpRequest, HttpResponseBase
 from django.shortcuts import render, get_object_or_404
 
 from classification.enums import AlleleOriginBucket, TestingContextBucket, ConflictSeverity
@@ -26,7 +27,7 @@ def conflicts_view(request, lab_id: Optional[Union[str, int]] = None):
     lab_ids = lab_picker.lab_ids
     qs: QuerySet['Conflict'] = Conflict.objects.all().for_labs(lab_ids)
     qs = qs.exclude(allele_origin_bucket=AlleleOriginBucket.UNKNOWN).exclude(testing_context_bucket=TestingContextBucket.UNKNOWN)
-    qs = qs.filter(severity__gt=ConflictSeverity.SINGLE_SUBMISSION)
+    # qs = qs.filter(Q(severity__gte=ConflictSeverity.MEDIUM) | Q(overall_status=DiscordanceReportNextStep.RESOLVED))
     status_counts = {status: 0 for status in DiscordanceReportNextStep}
     for entry in qs.order_by("overall_status").values("overall_status").annotate(the_count=Count("overall_status")):
         status_counts[entry.get("overall_status")] = entry.get("the_count")
@@ -35,6 +36,21 @@ def conflicts_view(request, lab_id: Optional[Union[str, int]] = None):
         "dlab": ClassificationDashboard(lab_picker=lab_picker),
         "status_counts": status_counts
     })
+
+
+def overlaps_view(request: HttpRequest, lab_id=None) -> HttpResponseBase:
+    lab_picker = LabPickerData.from_request(request, lab_id, 'overlaps')
+    return render(request, "classification/overlaps.html", {
+        "lab_picker_data": lab_picker,
+        "dlab": ClassificationDashboard(lab_picker=lab_picker)
+    })
+
+
+# def view_overlaps_detail(request: HttpRequest, lab_id: Optional[Union[str, int]] = None) -> HttpResponseBase:
+#     return render(request, "classification/overlaps_detail.html", {
+#         "overlaps": OverlapsCalculator(perspective=LabPickerData.from_request(request, lab_id))
+#     })
+
 
 
 # def conflict_comments_view(request, conflict_id: int):

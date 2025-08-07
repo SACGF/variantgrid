@@ -554,7 +554,6 @@ class ConflictKey:
     tumor_type_category: Optional[str] = None
 
 
-
 class ConflictQuerySet(QuerySet['Conflict']):
     def for_lab(self, lab: Lab):
         return self.filter(
@@ -563,6 +562,29 @@ class ConflictQuerySet(QuerySet['Conflict']):
 
     def for_labs(self, labs: Union[Iterable[int], Iterable[Lab]]) -> Self:
         lab_ids = labs
+
+        # when_resolved = When(
+        #     Q(Exists(Subquery(ConflictHistory.objects.filter(
+        #         conflict=OuterRef('pk'),
+        #         severity__gte=ConflictSeverity.MEDIUM,
+        #     )))) &
+        #     Q(severity__lt=ConflictSeverity.MEDIUM),
+        #     then=Value("X")
+        # )
+
+        when_resolved = When(
+            Q(Exists(Subquery(ConflictLab.objects.filter(
+                conflict=OuterRef('pk'),
+                lab__in=lab_ids
+            )))) &
+            Q(severity__lt=ConflictSeverity.MEDIUM) &
+            Q(Exists(Subquery(ConflictHistory.objects.filter(
+                conflict=OuterRef('pk'),
+                severity__gte=ConflictSeverity.MEDIUM
+            )))),
+            then=Value(DiscordanceReportNextStep.RESOLVED)
+        )
+
         when_not_active = When(
             ~Q(Exists(Subquery(ConflictLab.objects.filter(
                 conflict=OuterRef('pk'),
@@ -570,6 +592,11 @@ class ConflictQuerySet(QuerySet['Conflict']):
                 lab__in=lab_ids
             )))),
             then=Value(DiscordanceReportNextStep.NOT_INVOLVED)
+        )
+
+        when_no_conflict = When(
+            severity__lt=ConflictSeverity.MEDIUM,
+            then=Value(DiscordanceReportNextStep.NO_CONFLICT)
         )
 
         when_waiting_on_your_triage = When(
@@ -612,6 +639,8 @@ class ConflictQuerySet(QuerySet['Conflict']):
 
         qs = self.annotate(overall_status=Case(
             when_not_active,
+            when_resolved,
+            when_no_conflict,
             when_waiting_on_your_triage,
             when_waiting_on_your_amend,
             when_waiting_on_other_lab,
@@ -622,12 +651,14 @@ class ConflictQuerySet(QuerySet['Conflict']):
             Exists(ConflictLab.objects.filter(conflict=OuterRef('pk'), lab__in=labs))
         )
 
+
 class ConflictObjectManager(Manager):
 
     def get_queryset(self):
         qs = ConflictQuerySet(self.model, using=self._db)
         qs = qs.annotate(severity=Subquery(ConflictHistory.objects.filter(conflict_id=OuterRef("pk"), is_latest=True).values('severity')))
         qs = qs.annotate(data=Subquery(ConflictHistory.objects.filter(conflict_id=OuterRef("pk"), is_latest=True).values('data')))
+        qs = qs.annotate(past_issue=Exists(Subquery(ConflictHistory.objects.filter(conflict_id=OuterRef("pk"), severity__gte=ConflictSeverity.MEDIUM))))
         return qs
 
     # def with_severity(self):

@@ -12,8 +12,8 @@ from classification.views.classification_email_view import summary_email_preview
     summary_email_preview_text
 from classification.views.classification_export_view import ClassificationApiExportView
 from classification.views.classification_grouping_datatables import ClassificationGroupingColumns
-from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
-    view_clinical_context, view_overlaps_detail
+from classification.views.classification_overlaps_view import post_clinical_context, \
+    view_clinical_context
 from classification.views.classification_overlaps_vus_view import view_overlaps_vus, view_overlaps_vus_detail
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
 from classification.views.classification_view_metrics import view_classification_metrics, \
@@ -25,7 +25,7 @@ from classification.views.condition_match_test_view import condition_match_test_
 from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
     ConditionTextColumns, ConditionTextMatchingAPI
 from classification.views.conflict_datatables import ConflictColumns
-from classification.views.conflict_view import conflicts_view, conflict_history, ConflictCommentView
+from classification.views.conflict_view import conflicts_view, conflict_history, ConflictCommentView, overlaps_view
 from classification.views.discordance_report_triage_view import DiscordanceReportTriageView
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report, \
     discordance_reports_view, discordance_reports_history_detail, discordance_reports_active_detail, \
@@ -182,9 +182,9 @@ urlpatterns = [
     path('hgvs_resolution_tool', hgvs_resolution_tool, name='hgvs_resolution_tool'),
 
     path('clinical_context', post_clinical_context, name='clinical_context'),
-    path('overlaps', view_overlaps, name='overlaps'),
-    path('overlaps/<str:lab_id>', view_overlaps, name='overlaps'),
-    path('overlaps_detail/<str:lab_id>', view_overlaps_detail, name='overlaps_detail'),
+    path('overlaps', overlaps_view, name='overlaps'),
+    path('overlaps/<str:lab_id>', overlaps_view, name='overlaps'),
+    # path('overlaps_detail/<str:lab_id>', view_overlaps_detail, name='overlaps_detail'),
     path('vus', view_overlaps_vus, name='vus'),
     path('vus/<str:lab_id>', view_overlaps_vus, name='vus'),
     path('vus_detail/<str:lab_id>', view_overlaps_vus_detail, name='vus_detail'),

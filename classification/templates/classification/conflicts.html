@@ -25,6 +25,9 @@
         .dt-involved-labs {
             width: 40%;
         }
+        .table thead th {
+            border-top: none;
+        }
     </style>
     <script>
         function renderContext(data, type, row) {
@@ -42,8 +45,10 @@
             return dom;
         }
         function renderSeverity(data, type, row) {
-            if (data.code <= 1) {
+            if (data.code == 2) {
                 return data.label;
+            } else if (data.code <= 1) {
+                return $("<span>", {class: 'no-value', text: data.label});
             }
             return $("<div>", {html: [
                 $('<a>', {
@@ -53,8 +58,7 @@
                     "data-title": "Comments",
                     "data-href": Urls.conflict_comments(data.conflict_id),
                     "text": data.label
-                }),
-                    $("<div>", {"text": data.overall_status_label})
+                })
             ]});
         }
 
@@ -68,7 +72,6 @@
             data.status = $('#status-tab').val();
             data.exclude_unknown = $('#filter_unknown').is(":checked");
             data.multiple_submitters = $('#multiple_submitters').is(":checked");
-            console.log(data);
         }
 
         function updateStatus(status) {
@@ -95,10 +98,10 @@
                 <label for="filter_unknown">Filters out overlaps for unknown allele origin / testing context</label>
             </div>
         {% endlabelled %}
-        {% labelled label="Multiple Submitters" %}
+        {% labelled label="Relevant Differences" %}
             <div class="ml-4">
-                <input type="checkbox" id="multiple_submitters" class="form-check-input filter-input" value="true" checked />
-                <label for="multiple_submitters">Only include contexts with multiple shared submitters</label>
+                <input type="checkbox" id="relevant_diff" class="form-check-input filter-input" value="true" checked />
+                <label for="relevant_diff">Only include overlaps with relevant differences (e.g. exclude LB vs B)</label>
             </div>
         {% endlabelled %}
         <input id="status-tab" type="hidden" value="T" />
@@ -120,8 +123,8 @@
                 <li class="nav-item"><a class="nav-link not-important" data-tab-set="conflict_tabs" data-toggle="tab" id="tcomplex-tab" role="tab" onclick="updateStatus('C')">
                     Complex <span class="d-inline-block ml-1 badge badge-info">{{ status_counts.C }}</span>
                 </a></li>
-                <li class="nav-item"><a class="nav-link not-important" data-tab-set="conflict_tabs" data-toggle="tab" id="discordance_reports_history_detail-tab" role="tab">
-                    Resolved
+                <li class="nav-item"><a class="nav-link not-important" data-tab-set="conflict_tabs" data-toggle="tab" id="discordance_reports_history_detail-tab" role="tab" onclick="updateStatus('Z')">
+                    Resolved <span class="d-inline-block ml-1 badge badge-info">{{ status_counts.Z }}</span>
                 </a></li>
             </ul>
         </div>

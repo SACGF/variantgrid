@@ -20,20 +20,6 @@ from snpdb.models import Allele
 from snpdb.models.models_variant import Variant
 
 
-def view_overlaps(request: HttpRequest, lab_id=None) -> HttpResponseBase:
-    lab_picker = LabPickerData.from_request(request, lab_id, 'overlaps')
-    if redirect_response := lab_picker.check_redirect():
-        return redirect_response
-
-    return render(request, "classification/overlaps.html", {"lab_picker_data": lab_picker})
-
-
-def view_overlaps_detail(request: HttpRequest, lab_id: Optional[Union[str, int]] = None) -> HttpResponseBase:
-    return render(request, "classification/overlaps_detail.html", {
-        "overlaps": OverlapsCalculator(perspective=LabPickerData.from_request(request, lab_id))
-    })
-
-
 # POST only
 
 @transaction.atomic()

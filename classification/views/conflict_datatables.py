@@ -48,13 +48,12 @@ class ConflictColumns(DatatableConfig[Conflict]):
             RichColumn(
                 "severity",
                 renderer=self.render_severity,
-                extra_columns=["pk",
-                               "overall_status"],
+                extra_columns=["pk"],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 default_sort=SortOrder.DESC,
                 client_renderer='renderSeverity',
             ),
-            RichColumn(name="involved_labs", label="Involved Labs", extra_columns=["data", "conflict_type", "pk"], renderer=self.involved_labs),
+            RichColumn(name="involved_labs", label="Involved Labs", extra_columns=["data", "conflict_type", "pk", "severity"], renderer=self.involved_labs),
             RichColumn("id", visible=False)
         ]
 
@@ -101,38 +100,13 @@ class ConflictColumns(DatatableConfig[Conflict]):
 
         return hgvs_list
 
-        # return {"text": f"A{allele.pk} {allele:CA}", "url": allele.get_absolute_url()}
-
     def render_severity(self, row_data: CellData):
-        # is_active_participant = row_data["is_active_participant"]
-        # waiting_on_your_triage = row_data["waiting_on_your_triage"]
-        # waiting_on_your_amend = row_data["waiting_on_your_amend"]
-        # waiting_on_other_lab = row_data["waiting_on_other_lab"]
-        # not_complex = row_data["not_complex"]
-        overall_status = DiscordanceReportNextStep(row_data["overall_status"])
-
-        # overall_status: DiscordanceReportNextStep
-        # if is_active_participant:
-        #     if waiting_on_your_triage:
-        #         overall_status = DiscordanceReportNextStep.AWAITING_YOUR_TRIAGE
-        #     elif waiting_on_your_amend:
-        #         overall_status = DiscordanceReportNextStep.AWAITING_YOUR_AMEND
-        #     elif waiting_on_other_lab:
-        #         overall_status = DiscordanceReportNextStep.AWAITING_OTHER_LAB
-        #     elif not not_complex:
-        #         overall_status = DiscordanceReportNextStep.UNANIMOUSLY_COMPLEX
-        #     else:
-        #         overall_status = DiscordanceReportNextStep.TO_DISCUSS
-        # else:
-        #     overall_status = DiscordanceReportNextStep.NOT_INVOLVED
-
         if row_data.value:
             cs = ConflictSeverity(row_data.value)
             return {
                 "code": cs.value,
                 "label": cs.label,
-                "conflict_id": row_data.get("pk"),
-                "overall_status_label": overall_status.label
+                "conflict_id": row_data.get("pk")
             }
         return "-"
 
@@ -153,6 +127,7 @@ class ConflictColumns(DatatableConfig[Conflict]):
             ))
 
         return render_to_string('classification/conflict_summary_cell.html', {
+            "is_conflict": ConflictSeverity(row_data.get("severity")) >= ConflictSeverity.MINOR,
             "conflict_id": row_data.get("pk"),
             "conflict_type": ConflictType(row_data.get("conflict_type")),
             "combined_rows": combined_rows
@@ -165,9 +140,10 @@ class ConflictColumns(DatatableConfig[Conflict]):
     def filter_queryset(self, qs: QuerySet[Conflict]) -> QuerySet[Conflict]:
         if self.get_query_param("exclude_unknown") == "true":
             qs = qs.exclude(allele_origin_bucket=AlleleOriginBucket.UNKNOWN).exclude(testing_context_bucket=TestingContextBucket.UNKNOWN)
-        if self.get_query_param("multiple_submitters") == "true":
-            qs = qs.filter(severity__gt=ConflictSeverity.SINGLE_SUBMISSION)
+        # if self.get_query_param("relevant_diff") == "true":
+        #     qs = qs.filter(severity__gte=ConflictSeverity.MEDIUM)
+        # else:
+        #     qs = qs.filter(severity__gte=ConflictSeverity.MINOR)
         if status := self.get_query_param("status"):
-            print(status)
             qs = qs.filter(overall_status=status)
         return qs
