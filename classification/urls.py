@@ -50,6 +50,7 @@ urlpatterns = [
     path('activity/lab/<int:lab_id>', views.activity, name='activity_lab'),
     path('activity/user/<int:user_id>', views.activity, name='activity_user'),
     path('activity/report/<int:discordance_report_id>', views.activity, name='activity_discordance'),
+    path('activity/allele/<int:allele_id>', views.activity, name='activity_allele'),
     path('classifications', views.classifications, name='classifications'),
 
     path('groupings', views.classification_groupings, name='classification_groupings'),

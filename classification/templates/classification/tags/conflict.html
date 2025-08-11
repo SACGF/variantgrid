@@ -15,5 +15,7 @@
     {% endif %}
 </div>
 <div class="pipe-sep d-inline-block">
+    {% if conflict.latest.severity <= 1 %}<span class="no-value">{{ conflict.latest.get_severity_display }}</span>{% else %}
     {{ conflict.latest.get_severity_display }}
+    {% endif %}
 </div>

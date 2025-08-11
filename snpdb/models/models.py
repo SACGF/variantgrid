@@ -413,6 +413,7 @@ class Lab(models.Model, PreviewModelMixin):
                 inst_group_name = '/'.join(parts[:-1])
                 group, _ = Group.objects.get_or_create(name=inst_group_name)
                 return group
+        return None
 
     @cached_property
     def active_users(self) -> QuerySet[User]:

@@ -1,0 +1,266 @@
+from dataclasses import dataclass, field
+from functools import cached_property
+from typing import Iterable, Optional
+
+from django.core.management import BaseCommand
+
+from classification.enums import TestingContextBucket, AlleleOriginBucket, ShareLevel, SpecialEKeys, ConflictType
+from classification.models import classification_flag_types, Classification, ClassificationModification, \
+    ClassificationSummaryCacheDict, ClassificationSummaryCalculator, ConflictKey, Conflict, \
+    AlleleOriginGrouping
+from classification.services.conflict_services import ConflictDataRow, ClinSigCalculator, OncPathCalculator
+from flags.models import FlagComment
+from datetime import datetime, timedelta
+
+from library.utils import IterableStitcher
+from snpdb.models import Allele, Lab
+
+
+@dataclass
+class ClassificationChange:
+    classification_id: int
+    change_date: datetime
+    lab: Optional[Lab] = None
+    allele: Optional[Allele] = None
+    withdrawn: Optional[bool] = None
+    summary_data: Optional[ClassificationSummaryCacheDict] = None
+    share_level: Optional[ShareLevel] = None
+
+    current_grouping: Optional['AlleleOriginGroupingKey'] = None
+
+    def merge_into(self, other: 'ClassificationChange'):
+        if self.classification_id != other.classification_id:
+            raise ValueError("Can't merge records with different IDs")
+
+        self.change_date = other.change_date
+        if other.withdrawn is not None:
+            self.withdrawn = other.withdrawn
+        if other.allele is not None:
+            self.allele = other.allele
+        if other.summary_data is not None:
+            self.summary_data = other.summary_data
+        if other.share_level is not None:
+            self.share_level = other.share_level
+        if other.lab is not None:
+            self.lab = other.lab
+
+    def __lt__(self, other):
+        return self.change_date < other.change_date
+
+    def calc_grouping_key(self) -> 'AlleleOriginGroupingKey':
+        if self.withdrawn:
+            return None
+        if not (self.allele and self.summary_data and self.share_level):
+            print(f"MISSING DATA FOR CALC GROUP allale = {bool(self.allele)}, summary = {bool(self.summary_data)}, share_level = {bool(self.share_level)}")
+            return None
+        allele_origin_bucket = self.summary_data.get("allele_origin_bucket")
+        testing_context_bucket = TestingContextBucket(self.summary_data.get("somatic", {}).get("testing_context_bucket") or "G")
+        return AlleleOriginGroupingKey(
+            allele=self.allele,
+            allele_origin_bucket=AlleleOriginBucket(allele_origin_bucket),
+            testing_context_bucket=testing_context_bucket,
+            tumor_type_category=self.summary_data.get("tumor_type_category")
+        )
+
+
+class ClassificationSummaryCalculatorHistoric(ClassificationSummaryCalculator):
+
+    @property
+    def allele_origin_bucket(self) -> AlleleOriginBucket:
+        return AlleleOriginBucket.bucket_for_allele_origin(self.cm.get(SpecialEKeys.ALLELE_ORIGIN))
+
+    @cached_property
+    def pending_classification_value(self) -> Optional[str]:
+        # default pending calculation works on latest flag value rather than current value
+        return None
+
+
+@dataclass(frozen=True)
+class AlleleOriginGroupingKey:
+    allele: Allele
+    allele_origin_bucket: AlleleOriginBucket
+    testing_context_bucket: TestingContextBucket
+    tumor_type_category: Optional[str]
+
+
+@dataclass
+class AlleleOriginGroupingInfo:
+    grouping_key: AlleleOriginGroupingKey
+    classification_changes: dict[int, ClassificationChange] = field(default_factory=dict)
+
+    def remove_classification(self, classification_id: int):
+        if self.grouping_key.allele.pk == 18494 and self.grouping_key.allele_origin_bucket == AlleleOriginBucket.GERMLINE:
+            print(f"Removing {classification_id}")
+        self.classification_changes.pop(classification_id)
+
+    def add_classification(self, classification_change: ClassificationChange):
+        if self.grouping_key.allele.pk == 18494 and self.grouping_key.allele_origin_bucket == AlleleOriginBucket.GERMLINE:
+            print(f"Adding {classification_change.classification_id}")
+        self.classification_changes[classification_change.classification_id] = classification_change
+
+    def calculate_and_log_history(self, override_date: datetime):
+        if self.grouping_key.allele.pk == 18494 and self.grouping_key.allele_origin_bucket == AlleleOriginBucket.GERMLINE:
+            print(list([cc.classification_id, cc.lab] for cc in self.classification_changes.values()))
+        lab_id_to_latest: dict[Lab, ClassificationChange] = {}
+        for value in self.classification_changes.values():
+            existing_value_for_lab = lab_id_to_latest.get(value.lab)
+            if existing_value_for_lab is None or existing_value_for_lab < value:
+                lab_id_to_latest[value.lab] = value
+
+        oncpath_data: list[ConflictDataRow] = []
+        clinsig_data: list[ConflictDataRow] = []
+        for latest_summary in lab_id_to_latest.values():
+            lab_id = latest_summary.lab.pk
+            summary_info = latest_summary.summary_data
+            share_level = latest_summary.share_level
+
+            oncpath_data.append(ConflictDataRow.from_data(
+                row=summary_info.get("pathogenicity", {}),
+                lab_id=lab_id,
+                share_level=share_level))
+            clinsig_data.append(ConflictDataRow.from_data(
+                row=summary_info.get("somatic", {}),
+                lab_id=lab_id,
+                share_level=share_level))
+
+            if self.grouping_key.allele_origin_bucket == AlleleOriginBucket.SOMATIC:
+                conflict_key = ConflictKey(
+                    conflict_type=ConflictType.CLIN_SIG,
+                    allele_origin_bucket=self.grouping_key.allele_origin_bucket,
+                    testing_context_bucket=self.grouping_key.testing_context_bucket,
+                    tumor_type_category=self.grouping_key.tumor_type_category
+                )
+                ClinSigCalculator(self.grouping_key.allele, conflict_key, clinsig_data).log_history(override_date)
+
+        conflict_key = ConflictKey(
+            conflict_type=ConflictType.ONCPATH,
+            allele_origin_bucket=self.grouping_key.allele_origin_bucket,
+            testing_context_bucket=self.grouping_key.testing_context_bucket,
+            tumor_type_category=self.grouping_key.tumor_type_category
+        )
+        OncPathCalculator(self.grouping_key.allele, conflict_key, oncpath_data).log_history(override_date)
+
+    @property
+    def latest_change_data(self) -> Optional[ClassificationSummaryCacheDict]:
+        return max(self.classification_changes.values(), default=None)
+
+
+@dataclass
+class Populate:
+
+    classification_id_to_change: dict[int, ClassificationChange] = field(default_factory=dict)
+    grouping_key_to_grouping: dict[AlleleOriginGroupingKey, AlleleOriginGroupingInfo] = field(default_factory=dict)
+    classification_id_dirty: set[int] = field(default_factory=set)
+
+    def apply_update(self, change: ClassificationChange):
+        if existing := self.classification_id_to_change.get(change.classification_id):
+            existing.merge_into(change)
+        else:
+            self.classification_id_to_change[change.classification_id] = change
+        self.classification_id_dirty.add(change.classification_id)
+
+    def grouping_for_key(self, allele_origin_grouping_key: AlleleOriginGroupingKey) -> AlleleOriginGroupingInfo:
+        origin_grouping_info = self.grouping_key_to_grouping.get(allele_origin_grouping_key)
+        if not origin_grouping_info:
+            if allele_origin_grouping_key.allele.pk == 18494 and allele_origin_grouping_key.allele_origin_bucket == AlleleOriginBucket.GERMLINE:
+                print("Creating grouping for allele")
+
+            origin_grouping_info = AlleleOriginGroupingInfo(grouping_key=allele_origin_grouping_key)
+            self.grouping_key_to_grouping[allele_origin_grouping_key] = origin_grouping_info
+        return origin_grouping_info
+
+    def log_and_update(self, override_date: datetime):
+        dirty_groups: set[AlleleOriginGroupingKey] = set()
+        for dirty_id in self.classification_id_dirty:
+            cc = self.classification_id_to_change[dirty_id]
+            if last_grouping := cc.current_grouping:
+                dirty_groups.add(last_grouping)
+                self.grouping_for_key(last_grouping).remove_classification(dirty_id)
+            cc.current_grouping = cc.calc_grouping_key()
+            if cc.current_grouping:
+                self.grouping_for_key(cc.current_grouping).add_classification(cc)
+                dirty_groups.add(cc.current_grouping)
+
+        self.classification_id_dirty.clear()
+        for dirty_group in dirty_groups:
+            self.grouping_for_key(dirty_group).calculate_and_log_history(override_date)
+
+    @cached_property
+    def flag_collection_id_to_classification(self) -> dict[int, int]:
+        flag_collection_map = {}
+        for classification_id, flag_collection_id in Classification.objects.values_list("pk", "flag_collection_id").iterator():
+            flag_collection_map[flag_collection_id] = classification_id
+        return flag_collection_map
+
+    def flag_collection_to_classification_id(self, flag_collection_id: int) -> Optional[int]:
+        return self.flag_collection_id_to_classification.get(flag_collection_id)
+
+    def withdrawn_iterable(self) -> Iterable[ClassificationChange]:
+        flag_qs = FlagComment.objects.filter(flag__flag_type=classification_flag_types.classification_withdrawn) \
+            .order_by("created") \
+            .values_list("resolution__status", "created", "flag__collection_id")
+
+        for res_status, created, flag_collection_id in flag_qs.iterator():
+            if classification_id := self.flag_collection_to_classification_id(flag_collection_id):
+                withdrawn = res_status == "O"
+                yield ClassificationChange(
+                    classification_id=classification_id,
+                    change_date=created,
+                    withdrawn=withdrawn
+                )
+
+    def classification_iterable(self) -> Iterable[ClassificationChange]:
+        for cm in ClassificationModification.objects.filter(
+            published=True,
+            classification__allele_info__allele__isnull=False
+        ).order_by("created").iterator():
+            summary = ClassificationSummaryCalculator(cm).cache_dict()
+            yield ClassificationChange(
+                classification_id=cm.classification_id,
+                change_date=cm.modified,
+                lab=cm.lab,
+                allele=cm.classification.allele_object,
+                summary_data=summary,
+                share_level=cm.share_level_enum
+            )
+
+    def stitch_iterable(self):
+        return IterableStitcher[ClassificationChange](
+            iterables=[
+                # self.withdrawn_iterable(),
+                self.classification_iterable()
+            ]
+        )
+
+    def full_clean(self):
+        Conflict.objects.all().delete()
+
+    def run(self, time_delta: timedelta = timedelta(days=1)):
+        end_time: Optional[datetime] = None
+        for cc in self.stitch_iterable():
+            if end_time is None:
+                end_time = cc.change_date.replace(hour=0, minute=0, second=0, microsecond=0) + time_delta
+            if cc.change_date > end_time:
+                self.log_and_update(end_time)
+                end_time = end_time + time_delta
+            self.apply_update(cc)
+        self.log_and_update(end_time)
+
+    def run_latest(self):
+        # now do latest
+        for aog in AlleleOriginGrouping.objects.iterator():
+            aog.update()
+
+
+class Command(BaseCommand):
+
+    def add_arguments(self, parser):
+        pass
+
+    def handle(self, *args, **options):
+        populate = Populate()
+        populate.full_clean()
+        populate.run()
+        populate.run_latest()
+
+

@@ -4,6 +4,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Iterable, Callable
+from datetime import datetime
+from django.contrib.auth.models import User
 from django.db import transaction
 from more_itertools.recipes import partition
 from classification.enums import AlleleOriginBucket, ConflictSeverity, ShareLevel, ConflictType
@@ -48,6 +50,9 @@ class ConflictDataRow:
         # Lab uses Caching Object Manager
         return Lab.objects.get(id=self.lab_id)
 
+    def can_view(self, user: User) -> bool:
+        return self.share_level.has_access(self.lab, user)
+
     def with_exclude(self, exclude: bool) -> 'ConflictDataRow':
         if self.exclude == exclude:
             return self
@@ -74,7 +79,7 @@ class ConflictDataRow:
     def from_json(row: dict) ->'ConflictDataRow' :
         return ConflictDataRow(
             lab_id=row.get("lab_id"),
-            share_level=row.get("share_level"),
+            share_level=ShareLevel(row.get("share_level")),
             classification=row.get("classification"),
             clinical_significance=row.get("clinical_significance"),
             amp_level=row.get("amp_level"),
@@ -82,7 +87,7 @@ class ConflictDataRow:
         )
 
     @staticmethod
-    def from_data(row: dict, lab_id: int, share_level: ShareLevel, c_hgvs: CHGVS) -> 'ConflictDataRow':
+    def from_data(row: dict, lab_id: int, share_level: ShareLevel, c_hgvs: Optional[CHGVS] = None) -> 'ConflictDataRow':
         return ConflictDataRow(
             lab_id=lab_id,
             share_level=share_level,
@@ -162,7 +167,7 @@ class ConflictCalculator(ABC):
         }
 
     @transaction.atomic
-    def log_history(self):
+    def log_history(self, override_date: Optional[datetime] = None):
         allele = self.allele
         conflict_key = self.conflict_key
         conflict: Conflict
@@ -215,21 +220,28 @@ class ConflictCalculator(ABC):
                 latest.is_latest = False
                 latest.save(update_fields=["is_latest"])
 
-        ConflictHistory(
-            conflict=conflict,
-            data=data,
-            severity=self.calculate_severity(),
-            is_latest=True,
-        ).save()
+        conflict_history_data = {
+            "conflict": conflict,
+            "data": data,
+            "severity": self.calculate_severity(),
+            "is_latest": True
+        }
+
+        ch = ConflictHistory(**conflict_history_data)
+        ch.save()
+        if override_date:
+            ch.created = override_date
+            ch.modified = override_date
+            ch.save(update_fields=["created", "modified"], update_modified=False)
 
         c_hgvs_source = self.included_conflict_data
         if not c_hgvs_source:
             c_hgvs_source = self.conflict_data
 
         c_hgvs_set = [row.c_hgvs for row in c_hgvs_source]
-        c_hgvs_list = [c_hgvs.to_json_short() for c_hgvs in sorted(set(c_hgvs_set))]
+        if c_hgvs_list := [c_hgvs.to_json_short() for c_hgvs in sorted(set(c_hgvs_set)) if c_hgvs]:
+            conflict.meta_data["c_hgvs"] = c_hgvs_list
 
-        conflict.meta_data["c_hgvs"] = c_hgvs_list
         conflict.save(update_fields=["meta_data"])
 
 

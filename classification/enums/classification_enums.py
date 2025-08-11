@@ -312,6 +312,17 @@ class ShareLevel(ChoicesEnum):
     def is_discordant_level(self) -> bool:
         return self.value in ShareLevel.DISCORDANT_LEVEL_KEYS
 
+    def has_access(self, lab: 'Lab', user: User) -> bool:
+        match self:
+            case _ if self.is_discordant_level:
+                return True
+            case ShareLevel.INSTITUTION:
+                return user.groups.filter(name=lab.group_institution).exists()
+            case ShareLevel.LAB:
+                return user.groups.filter(name=lab.group).exists()
+            case _:
+                raise ValueError(f"Unhandled share level {self}")
+
     def group(self, lab: 'Lab', user: User = None):
         groups = {
             ShareLevel.CURRENT_USER: user,

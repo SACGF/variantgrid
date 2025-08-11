@@ -72,7 +72,7 @@ from uicore.utils.form_helpers import form_helper_horizontal
 from variantopedia.forms import SearchAndClassifyForm
 
 
-def activity(request, user_id: Optional[int] = None, lab_id: Optional[int] = None, discordance_report_id: Optional[int] = None):
+def activity(request, user_id: Optional[int] = None, lab_id: Optional[int] = None, discordance_report_id: Optional[int] = None, allele_id: Optional[int] = None):
 
     if latest_timestamp := request.GET.get('latest_timestamp'):
         latest_timestamp = datetime.fromtimestamp(float(latest_timestamp))
@@ -106,7 +106,9 @@ def activity(request, user_id: Optional[int] = None, lab_id: Optional[int] = Non
         else:
             raise PermissionDenied()
         classifications = [cm.classification for cm in report.all_classification_modifications]
-
+    elif allele_id:
+        classifications = list(cm.classification for cm in ClassificationModification.latest_for_user(request.user, allele=Allele.objects.get(pk=allele_id)))
+        base_url = reverse('activity_allele', kwargs={"allele_id": allele_id})
     else:
         if request.user.is_superuser:
             base_url = reverse('activity')

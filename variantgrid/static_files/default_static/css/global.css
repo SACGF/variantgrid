@@ -458,6 +458,15 @@ a {
   margin-left: 4px;
 }
 
+.modal-link-custom {
+  opacity: 0.4;
+  font-weight: 900;
+}
+
+.modal-link-custom::after {
+  content: none !important;
+}
+
 .modal-link-comments::after {
   display: inline-block;
   font-style: normal;

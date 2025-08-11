@@ -5,7 +5,7 @@
     {% with row=combined_row.conflict_row %}
     <div class="row mb-3" {% if row.exclude %}style="opacity:0.6"{% endif %}>
         <div class="col-7 text-right">
-            {% if row.share_level != 'logged_in_users' %}
+            {% if row.share_level.value != 'logged_in_users' %}
                 <img src="/static/icons/share_level/{{ row.share_level }}.png" style="width:12px; height: 12px; margin-right: 4px; top: -2px; position: relative;"/>
             {% endif %}
             {{ row.lab }}

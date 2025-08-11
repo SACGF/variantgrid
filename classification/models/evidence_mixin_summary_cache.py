@@ -56,6 +56,7 @@ class ClassificationSummaryCacheDict(TypedDict):
     criteria_labels: list[str]
     pathogenicity: ClassificationSummaryCacheDictPathogenicity
     somatic: ClassificationSummaryCacheDictSomatic
+    allele_origin_bucket: str
 
 
 @dataclass(frozen=True)
@@ -121,6 +122,7 @@ class ClassificationSummaryCalculator:
         full_json: ClassificationSummaryCacheDict = {
             "criteria_labels": self.criteria_labels,
             "pathogenicity": pathology,
+            "allele_origin_bucket": self.allele_origin_bucket,
             "somatic": somatic,
             "date": date_json
         }
@@ -146,8 +148,13 @@ class ClassificationSummaryCalculator:
         return EvidenceKeyMap.clinical_significance_to_bucket().get(self.classification_value)
 
     @cached_property
+    def allele_origin_bucket(self) -> AlleleOriginBucket:
+        return self.cm.classification.allele_origin_bucket
+
+    @cached_property
     def is_possibly_somatic(self) -> bool:
-        return self.cm.classification.allele_origin_bucket != AlleleOriginBucket.GERMLINE
+        # TODO grab allele origin as it is per the modification
+        return self.allele_origin_bucket != AlleleOriginBucket.GERMLINE
 
     @cached_property
     def somatic_amp_level(self) -> Optional[str]:

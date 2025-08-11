@@ -85,7 +85,7 @@ class ConflictColumns(DatatableConfig[Conflict]):
 
     def render_c_hgvs(self, row_data: CellData):
         allele = self.allele_map.get(row_data.get("allele"))
-        c_hgvses = [CHGVS.from_json_short(hgvs) for hgvs in row_data.get("meta_data").get("c_hgvs")]
+        c_hgvses = [CHGVS.from_json_short(hgvs) for hgvs in row_data.get("meta_data").get("c_hgvs") or []]
         hgvs_list = []
         for c_hgvs in c_hgvses:
             c_hgvs_json = c_hgvs.to_json()
@@ -107,6 +107,7 @@ class ConflictColumns(DatatableConfig[Conflict]):
 
     def involved_labs(self, row_data: CellData):
         conflict_rows = [ConflictDataRow.from_json(row) for row in row_data.get("data").get("rows")]
+        conflict_rows = [cr for cr in conflict_rows if cr.can_view(self.user)]
         conflict_labs = list(ConflictLab.objects.select_related("lab").filter(conflict=row_data.get("pk")))
         conflict_labs_dict = {cl.lab: cl for cl in conflict_labs}
         combined_rows = []
@@ -130,7 +131,11 @@ class ConflictColumns(DatatableConfig[Conflict]):
 
     def get_initial_queryset(self) -> QuerySet[Conflict]:
         lab_ids = LabPickerData.for_user(self.user, self.get_query_param("lab")).lab_ids
-        return Conflict.objects.all().for_labs(lab_ids)
+        qs = Conflict.objects.all().for_labs(lab_ids)
+        if allele_id_str := self.get_query_param("allele_id"):
+            qs = qs.filter(allele__id=int(allele_id_str))
+
+        return qs
 
     def filter_queryset(self, qs: QuerySet[Conflict]) -> QuerySet[Conflict]:
         if self.get_query_param("exclude_unknown") == "true":
