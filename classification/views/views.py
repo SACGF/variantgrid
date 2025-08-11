@@ -290,7 +290,11 @@ def view_classification(request, record_id):
                 if non_success:
                     remote_summary = ", ".join(non_success)
                 else:
-                    remote_summary = f"Not handled by any sync upload: {', '.join(destination_status_and_url.keys())}"
+                    remote_summary = f"Not handled by any sync upload: {', '.join(destination_status_and_url.keys())}."
+                    ao_value = vc.evidence.get("allele_origin", {}).get("value")
+                    if ao_value is None:
+                        remote_summary += " Allele origin not set."
+
         else:
             remote_summary = "No enabled sync uploads"
 
