@@ -312,6 +312,7 @@ class RunningQuery:
 def long_running_sql(min_age_in_seconds: int = 30):
     with connection.cursor() as cursor:
         db_name = connection.settings_dict['NAME']
+        # We exclude "idle" state - as they are from connection pool and not actually running
         cursor.execute(
             """
             SELECT
@@ -322,6 +323,7 @@ def long_running_sql(min_age_in_seconds: int = 30):
             FROM pg_stat_activity
             WHERE (now() - pg_stat_activity.query_start) > interval %s
             AND datname = %s
+            AND state <> 'idle'                
             ORDER BY now() - pg_stat_activity.query_start desc;
             """,
             [f"{min_age_in_seconds} seconds", db_name]
