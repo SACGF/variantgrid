@@ -13,7 +13,7 @@
 
 
                 <div class="card-body">
-                    <h4>HotFix 28 (Deployed 6 Aug 2025)</h4>
+                    <h4>HotFix 28 (Deployed 13 Aug 2025)</h4>
                     <ul>
                         <li><a href="https://github.com/SACGF/variantgrid/issues/76">#76 - Sequencing Files API</a> Diagnostic pipelines can communicate via API, we can begin phase out of disk scans - runs appear sooner and we improve performance</li>
                         <li><a href="https://github.com/SACGF/variantgrid_sapath/issues/330">Mito/MT gene lists</a> Limited info, assign transcript/gene so it can be filtered</li>
@@ -25,6 +25,9 @@
                         <li><a href="https://github.com/SACGF/variantgrid_private/issues/3464">#3464 - Speed up classification create</a> and reduce chance of 'MultipleObjectsReturned ConditionTextMatch</li>
                         <li><a href="https://github.com/SACGF/variantgrid/issues/1230">#1230 - Fix error with 'node updated while loading</a> - If you load a node that got reloaded, you get redirected to new node view</li>
                         <li><a href="https://github.com/SACGF/variantgrid/issues/1264">#1264 - Stop notifying about blank condition text</a> - reduce spurious developer warnings</li>
+                        {% if user.is_superuser %}
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/1341">#1341 - Server stats - sql queries don't show idle</a> - these weren't running, just idle in connection pool</li>
+                        {% endif %}
                     </ul>
                 </div>
 
