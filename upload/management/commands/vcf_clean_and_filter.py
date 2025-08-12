@@ -19,6 +19,11 @@ class Command(BaseCommand):
         parser.add_argument('--skipped-contigs-stats-file', help='File name')
         parser.add_argument('--skipped-records-stats-file', help='File name')
 
+    @staticmethod
+    def _write_header(vcf_header_lines: list[str]):
+        for header_line in vcf_header_lines:
+            sys.stdout.write(header_line)
+
     def handle(self, *args, **options):
         vcf_filename = options["vcf"]
         build_name = options["genome_build"]
@@ -46,8 +51,17 @@ class Command(BaseCommand):
             for name, regex in skip_regex.items():
                 skip_patterns[name] = re.compile(regex)
 
+        vcf_header_lines = []
+        first_non_header_line = True
         for line in f:
-            if line and line[0] != '#':
+            if line[0] == '#':
+                vcf_header_lines.append(line)
+            else:
+                if first_non_header_line:
+                    self._write_header(vcf_header_lines)
+                    first_non_header_line = False
+
+
                 chrom, rest_of_line = line.split("\t", 1)
                 contig_id = chrom_to_contig_id.get(chrom)
                 fasta_chrom = None
@@ -84,8 +98,10 @@ class Command(BaseCommand):
                         continue
 
                 sys.stdout.write("\t".join([fasta_chrom, rest_of_line]))
-            else:
-                sys.stdout.write(line)
+
+        if first_non_header_line:
+            # Handle case where there were no records at all - still need to write header
+            self._write_header(vcf_header_lines)
 
         self._write_skip_counts(skipped_contigs, skipped_contigs_stats_file)
         self._write_skip_counts(skipped_records, skipped_records_stats_file)
