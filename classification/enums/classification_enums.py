@@ -313,6 +313,8 @@ class ShareLevel(ChoicesEnum):
         return self.value in ShareLevel.DISCORDANT_LEVEL_KEYS
 
     def has_access(self, lab: 'Lab', user: User) -> bool:
+        if user.is_superuser:
+            return True
         match self:
             case _ if self.is_discordant_level:
                 return True

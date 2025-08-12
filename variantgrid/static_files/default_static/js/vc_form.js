@@ -2365,7 +2365,11 @@ VCTable.format_hgvs = (parts) => {
     let dom = $('<div>').appendTo(outterDom);
 
     if (allele) {
-        outterDom.prepend($('<dom>', {class: 'font-weight-bold', text: allele}));
+        let alleleDom = $('<span>', {class: 'font-weight-bold', text: allele})
+        if (url && !transcript && !cNomen && (!parts || !parts.full)) {
+            alleleDom = $('<a>', {href: url, html: alleleDom, class: 'hover-link'});
+        }
+        outterDom.prepend($('<div>', {html: alleleDom}));
     }
 
     if (genomeBuild && (parts.desired === false || parts.normalized === false || parts.always_show_genome_build)) {
@@ -2775,6 +2779,10 @@ ConflictTable.renderContext = (data, type, row) => {
     }
     dom.append(" - ")
     dom.append($("<span>", {"class": "text-muted", text: data.conflict_type_label}));
+    if (data.tumor_type_category) {
+        dom.append(" - ");
+        dom.append($("<span>", {"class": "text-muted", text: data.tumor_type_category}));
+    }
 
     if (data.severity >= 2) {
         dom.append($("<br/><br/>"));
@@ -2787,7 +2795,6 @@ ConflictTable.renderContext = (data, type, row) => {
 
     return dom;
 };
-
 
 ConflictTable.renderSeverity = (data, type, row) => {
     let dom = $("<div>");

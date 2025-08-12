@@ -9,9 +9,8 @@
         {% if not forloop.first %}<hr/>{% endif %}
         <div class="row mb-3">
             <div class="col-5"></div>
-            <div class="col-7">
-            <span style="margin-left: 40px" class="mr-1">As of</span> {% timestamp history.created %}
-            {% if forloop.first %}(Current){% endif %}
+            <div class="col-7" style="font-size:0.9rem">
+            <span style="margin-left: 40px" class="mr-1">from</span> {% timestamp history.created %} - {{ history.get_severity_display }} {% if forloop.first %}(Current){% endif %}
             </div>
         </div>
         {% for row in history.data_rows %}
@@ -30,6 +29,7 @@
                     {% endif %}
                 </div>
             </div>
+            {% empty %}<div class="row"><div class="col-8 no-value text-right">No relevant records</div></div>
         {% endfor %}
     {% endfor %}
 </div>

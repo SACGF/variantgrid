@@ -33,7 +33,7 @@ class ConflictColumns(DatatableConfig[Conflict]):
             RichColumn(
                 name="context",
                 label="Context",
-                extra_columns=["allele_origin_bucket", "testing_context_bucket", "conflict_type", "severity", "pk"],
+                extra_columns=["allele_origin_bucket", "testing_context_bucket", "conflict_type", "tumor_type_category", "severity", "pk"],
                 sort_keys=["allele_origin_bucket", "testing_context_bucket", "conflict_type"],
                 renderer=self.render_context,
                 client_renderer='ConflictTable.renderContext',
@@ -72,6 +72,15 @@ class ConflictColumns(DatatableConfig[Conflict]):
         conflict_type = ConflictType(row_data.get("conflict_type"))
         conflict_type_label = conflict_type.label_for_context(allele_origin_bucket)
 
+        tumor_type_category = row_data.get("tumor_type_category")
+        if testing_context_bucket == TestingContextBucket.SOLID_TUMOR:
+            if not tumor_type_category:
+                tumor_type_category = "Unclassified Tumour Type"
+
+        #
+        # FIXME - add tumor type to calculation
+        #
+
         return {
             "conflict_id": row_data.get("pk"),
             "severity": row_data.get("severity"),
@@ -80,7 +89,8 @@ class ConflictColumns(DatatableConfig[Conflict]):
             "testing_context_bucket": testing_context_bucket.value,
             "testing_context_bucket_label": testing_context_bucket.label,
             "conflict_type": conflict_type.value,
-            "conflict_type_label": conflict_type_label
+            "conflict_type_label": conflict_type_label,
+            "tumor_type_category": tumor_type_category
         }
 
     def render_c_hgvs(self, row_data: CellData):
@@ -93,17 +103,23 @@ class ConflictColumns(DatatableConfig[Conflict]):
             c_hgvs_json["always_show_genome_build"] = True
             hgvs_list.append(c_hgvs_json)
 
+        if not hgvs_list:
+            hgvs_list.append({
+                "allele": str(allele),
+                "allele_id": allele.id
+            })
+
         return hgvs_list
 
     def render_severity(self, row_data: CellData):
-        if row_data.value:
+        if row_data.value is not None:
             cs = ConflictSeverity(row_data.value)
             return {
                 "code": cs.value,
                 "label": cs.label,
                 "conflict_id": row_data.get("pk")
             }
-        return "-"
+        return {"code": -1, "label": "Link error"}
 
     def involved_labs(self, row_data: CellData):
         conflict_rows = [ConflictDataRow.from_json(row) for row in row_data.get("data").get("rows")]
@@ -116,6 +132,8 @@ class ConflictColumns(DatatableConfig[Conflict]):
             if found_conflict_lab := conflict_labs_dict.get(conflict_row.lab):
                 conflict_labs_dict.pop(conflict_row.lab)
                 conflict_lab = found_conflict_lab
+            else:
+                print(f"ConflictRow could not find ConflictLab {conflict_row.lab}")
 
             combined_rows.append(ConflictRowWithStatus(
                 conflict_row,
@@ -134,6 +152,9 @@ class ConflictColumns(DatatableConfig[Conflict]):
         qs = Conflict.objects.all().for_labs(lab_ids)
         if allele_id_str := self.get_query_param("allele_id"):
             qs = qs.filter(allele__id=int(allele_id_str))
+
+        # always filter out No Submissions
+        qs = qs.filter(severity__gte=ConflictSeverity.SINGLE_SUBMISSION)
 
         return qs
 

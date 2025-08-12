@@ -198,7 +198,8 @@ class ClassificationSummaryCalculator:
     @cached_property
     def tumor_type_category(self) -> Optional[str]:
         if self.testing_context_bucket == TestingContextBucket.SOLID_TUMOR:
-            return "other"
+            # TODO actually calculate
+            return None
         return None
 
     @cached_property

@@ -22,7 +22,7 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
     DiscordanceReportTriageStatus, ClassificationGrouping, ClassificationGroupingEntry, \
     AlleleOriginGrouping, AlleleGrouping, ClassificationGroupingSearchTerm, ClassificationSummaryCalculator, Conflict, \
-    ConflictHistory
+    ConflictHistory, ConflictLab
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -1500,10 +1500,25 @@ class ConflictListFilter(SimpleListFilter):
         return queryset
 
 
+class ConflictLabAdmin(TabularInline):
+    list_display = ("lab", "active", "status")
+    model = ConflictLab
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_change_permission(self, request, obj):
+        return False
+
+    def has_delete_permission(self, request, obj):
+        return False
+
+
 @admin.register(Conflict)
 class ConflictAdmin(ModelAdminBasics):
-    inlines = (ConflictHistoryTabularAdmin,)
+    inlines = (ConflictHistoryTabularAdmin, ConflictLabAdmin)
     list_filter = (ConflictListFilter,)
+    search_fields = ("pk",)
 
     """
     allele = models.ForeignKey(Allele, on_delete=CASCADE)
@@ -1513,7 +1528,7 @@ class ConflictAdmin(ModelAdminBasics):
     tumor_type_category = models.TextField(null=True, blank=True)
 
     """
-    list_display = ("allele", "conflict_type", "allele_origin_bucket", "testing_context_bucket", "current_status")
+    list_display = ("pk", "allele", "conflict_type", "allele_origin_bucket", "testing_context_bucket", "current_status")
 
     @admin_list_column("current_status")
     def current_status(self, obj: Conflict) -> str:

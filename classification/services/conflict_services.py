@@ -212,6 +212,15 @@ class ConflictCalculator(ABC):
         # TODO have something different from withdrawn
         ConflictLab.objects.filter(conflict=conflict).exclude(lab__in=active_labs.keys()).update(active=False)
 
+        c_hgvs_source = self.included_conflict_data
+        if not c_hgvs_source:
+            c_hgvs_source = self.conflict_data
+
+        c_hgvs_set = [row.c_hgvs for row in c_hgvs_source]
+        if c_hgvs_list := [c_hgvs.to_json_short() for c_hgvs in sorted(set(c_hgvs_set)) if c_hgvs]:
+            conflict.meta_data["c_hgvs"] = c_hgvs_list
+            conflict.save(update_fields=["meta_data"], update_modified=False)
+
         data = self.data_json()
         if latest:
             if latest.data == data:
@@ -220,29 +229,17 @@ class ConflictCalculator(ABC):
                 latest.is_latest = False
                 latest.save(update_fields=["is_latest"])
 
-        conflict_history_data = {
-            "conflict": conflict,
-            "data": data,
-            "severity": self.calculate_severity(),
-            "is_latest": True
-        }
-
-        ch = ConflictHistory(**conflict_history_data)
+        ch = ConflictHistory(
+            conflict=conflict,
+            data=data,
+            severity=self.calculate_severity(),
+            is_latest=True
+        )
         ch.save()
         if override_date:
             ch.created = override_date
             ch.modified = override_date
             ch.save(update_fields=["created", "modified"], update_modified=False)
-
-        c_hgvs_source = self.included_conflict_data
-        if not c_hgvs_source:
-            c_hgvs_source = self.conflict_data
-
-        c_hgvs_set = [row.c_hgvs for row in c_hgvs_source]
-        if c_hgvs_list := [c_hgvs.to_json_short() for c_hgvs in sorted(set(c_hgvs_set)) if c_hgvs]:
-            conflict.meta_data["c_hgvs"] = c_hgvs_list
-
-        conflict.save(update_fields=["meta_data"])
 
 
 class OncPathCalculator(ConflictCalculator):
