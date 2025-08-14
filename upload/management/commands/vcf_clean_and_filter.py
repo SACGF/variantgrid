@@ -3,6 +3,7 @@ Uploaded VCFs are first passed through this command to fix things that will caus
 """
 import re
 from collections import Counter
+from typing import List
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -20,7 +21,7 @@ class Command(BaseCommand):
         parser.add_argument('--skipped-records-stats-file', help='File name')
 
     @staticmethod
-    def _write_header(vcf_header_lines: list[str]):
+    def _write_header(vcf_header_lines: List[str]):
         for header_line in vcf_header_lines:
             sys.stdout.write(header_line)
 
