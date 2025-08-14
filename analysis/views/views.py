@@ -317,7 +317,8 @@ def node_view(request, analysis_id, analysis_version, node_id, node_version, ext
     try:
         node = get_node_subclass_or_404(request.user, node_id, version=node_version)
     except NodeOutOfDateException:
-        return HttpResponseRedirect(reverse("node_load", kwargs={"node_id": node_id}))
+        return HttpResponseRedirect(reverse("node_load",
+                                            kwargs={"analysis_id": analysis_id, "node_id": node_id}))
     view = NODE_DISPATCHER[node.__class__]
     return view(request, pk=node_id, version_id=node_version, extra_filters=extra_filters)
 
