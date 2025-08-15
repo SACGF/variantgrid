@@ -7,13 +7,56 @@ from django.core.management import BaseCommand
 from classification.enums import TestingContextBucket, AlleleOriginBucket, ShareLevel, SpecialEKeys, ConflictType
 from classification.models import classification_flag_types, Classification, ClassificationModification, \
     ClassificationSummaryCacheDict, ClassificationSummaryCalculator, ConflictKey, Conflict, \
-    AlleleOriginGrouping
+    AlleleOriginGrouping, DiscordanceReport, ConflictComment, DiscordanceReportTriage, ConflictLab
 from classification.services.conflict_services import ConflictDataRow, ClinSigCalculator, OncPathCalculator
 from flags.models import FlagComment
 from datetime import datetime, timedelta
 
+from library.guardian_utils import admin_bot
 from library.utils import IterableStitcher
+from review.models import Review
 from snpdb.models import Allele, Lab
+
+
+
+@dataclass
+class ReviewWrapper:
+    review: Review
+
+    @property
+    def change_date(self):
+        return self.review.created
+
+
+@dataclass
+class TriageWrapper:
+    """
+    discordance_report = models.ForeignKey(DiscordanceReport, on_delete=CASCADE)
+    lab = models.ForeignKey(Lab, on_delete=CASCADE)
+    triage_status = models.TextField(max_length=1, choices=DiscordanceReportTriageStatus.choices, default=DiscordanceReportTriageStatus.PENDING)
+    note = models.TextField(null=True, blank=True)
+    triage_date = models.DateField(null=True, blank=True)
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=PROTECT)
+    closed = models.BooleanField(default=False)
+    """
+    triage: DiscordanceReportTriage
+
+    @property
+    def change_date(self) -> datetime:
+        return self.triage.created
+
+
+@dataclass
+class DiscordanceReportWrapper:
+    is_open_mode: bool
+    discordance_report: DiscordanceReport
+
+    @property
+    def change_date(self) -> datetime:
+        if self.is_open_mode:
+            return self.discordance_report.report_started_date
+        else:
+            return self.discordance_report.report_completed_date
 
 
 @dataclass
@@ -30,7 +73,6 @@ class ClassificationChange:
     withdrawn: Optional[bool] = None
     summary_data: Optional[ClassificationSummaryCacheDict] = None
     share_level: Optional[ShareLevel] = None
-
     current_grouping: Optional['AlleleOriginGroupingKey'] = None
     """
     The grouping this was last put into, there may have been subsequence calls to merge which will change what the new grouping should be
@@ -194,12 +236,118 @@ class Populate:
     All classification IDs that have had a chance since log_and_update was last called
     """
 
-    def apply_update(self, change: ClassificationChange):
+    def apply_discordance_report_update(self, drw: DiscordanceReportWrapper):
+        dr = drw.discordance_report
+        allele = dr.clinical_context.allele
+        conflict, created = Conflict.objects.get_or_create(
+            allele=allele,
+            conflict_type=ConflictType.ONCPATH,
+            allele_origin_bucket=AlleleOriginBucket.GERMLINE,
+            testing_context_bucket=TestingContextBucket.GERMLINE
+        )
+
+        if created:
+            # print(f"Just created the conflict, why didn't it already exist??")
+            pass
+
+        """
+            conflict = models.ForeignKey(Conflict, on_delete=CASCADE)
+    lab = models.ForeignKey(Lab, on_delete=CASCADE, null=True, blank=True)
+    user = models.ForeignKey(User, on_delete=PROTECT)
+    comment = models.TextField(null=False, blank=False)
+    meta_data = models.JSONField(null=False, blank=False, default=dict)
+        """
+
+        comment_text: str
+        if drw.is_open_mode:
+            comment = f"DR_{dr.pk} : Discordance Report Opened\nTriggered by: {dr.cause_text}"
+        else:
+            comment = f"DR_{dr.pk} : Closed\nStatus: {dr.status}"
+
+        cc = ConflictComment(
+            conflict=conflict,
+            user=admin_bot(),
+            comment=comment
+        )
+        cc.save()
+        cc.modified = drw.change_date
+        cc.created = drw.change_date
+        cc.save(update_modified=False)
+
+
+    def apply_classification_update(self, change: ClassificationChange):
         if existing := self.classification_id_to_change.get(change.classification_id):
             existing.merge(change)
         else:
             self.classification_id_to_change[change.classification_id] = change
         self.classification_id_dirty.add(change.classification_id)
+
+    def apply_review(self, review: Review):
+        reviewing = review.reviewing.source_object
+        if isinstance(reviewing, DiscordanceReport):
+            allele = reviewing.clinical_context.allele
+            conflict, created = Conflict.objects.filter(
+                allele=allele,
+                conflict_type=ConflictType.ONCPATH,
+                allele_origin_bucket=AlleleOriginBucket.GERMLINE,
+                testing_context_bucket=TestingContextBucket.GERMLINE
+            ).get_or_create()
+
+            cc = ConflictComment.objects.create(
+                conflict=conflict,
+                lab=None,
+                user=review.user,
+                comment="A REVIEW WAS SONE",
+                meta_data={}
+            )
+            cc.created = review.created
+            cc.modified = review.modified
+            cc.save(update_modified=False)
+        else:
+            print("We have a review for something other than a Discordance Report??")
+            print(reviewing)
+
+    def apply_triage(self, triage: DiscordanceReportTriage):
+        allele = triage.discordance_report.clinical_context.allele
+        conflict, created = Conflict.objects.filter(
+            allele=allele,
+            conflict_type=ConflictType.ONCPATH,
+            allele_origin_bucket=AlleleOriginBucket.GERMLINE,
+            testing_context_bucket=TestingContextBucket.GERMLINE
+        ).get_or_create()
+
+        if created:
+            print("Just created the conflict for triage, why didn't is already exist?")
+
+        # conflict = models.ForeignKey(Conflict, on_delete=CASCADE)
+        #     lab = models.ForeignKey(Lab, on_delete=CASCADE, null=True, blank=True)
+        #     user = models.ForeignKey(User, on_delete=PROTECT)
+        #     comment = models.TextField(null=False, blank=False)
+        #     meta_data = models.JSONField(null=False, blank=False, default=dict)
+
+        # meta_data[conflict_lab.lab_id] = param_enum.value
+        #                                 conflict_lab.status = param_enum
+        #
+
+        cc = ConflictComment.objects.create(
+            conflict=conflict,
+            lab=triage.lab,
+            user=triage.user,
+            comment=triage.note or "(No comment provided)",
+            meta_data={triage.lab.pk: triage.triage_status}
+        )
+        cc.created = triage.created
+        cc.modified = triage.modified
+        cc.save(update_modified=False)
+
+        conflict_lab, _ = ConflictLab.objects.get_or_create(
+            conflict=conflict,
+            lab=triage.lab
+        )
+        conflict_lab.status = triage.triage_status
+        conflict_lab.save()
+
+        #FIXME now find ConflictLab
 
     def grouping_for_key(self, allele_origin_grouping_key: AlleleOriginGroupingKey) -> AlleleOriginGroupingInfo:
         origin_grouping_info = self.grouping_key_to_grouping.get(allele_origin_grouping_key)
@@ -280,27 +428,62 @@ class Populate:
                 share_level=cm.share_level_enum
             )
 
+    def discordance_report_iterable_open(self) -> Iterable[DiscordanceReport]:
+        for dr in DiscordanceReport.objects.order_by("report_started_date").iterator():
+            yield DiscordanceReportWrapper(is_open_mode=True, discordance_report=dr)
+
+    def discordance_report_iterable_closed(self) -> Iterable[DiscordanceReport]:
+        for dr in DiscordanceReport.objects.filter(report_completed_date__isnull=False).order_by("report_completed_date").iterator():
+            yield DiscordanceReportWrapper(is_open_mode=False, discordance_report=dr)
+            """
+            report_closed_by = models.ForeignKey(User, on_delete=PROTECT, null=True)
+            report_started_date = models.DateTimeField(auto_now_add=True)
+            report_completed_date = models.DateTimeField(null=True, blank=True)
+
+            cause_text = models.TextField(null=False, blank=True, default='')
+            resolved_text = models.TextField(null=False, blank=True, default='')
+            """
+
+    def review_iterable(self) -> Iterable[ReviewWrapper]:
+        for rev in Review.objects.order_by("created").iterator():
+            yield ReviewWrapper(rev)
+
+    def triage_iterable(self) -> Iterable[TriageWrapper]:
+        for tr in DiscordanceReportTriage.objects.filter(user__isnull=False).order_by("created").iterator():
+            yield TriageWrapper(tr)
+
     def stitch_iterable(self):
         return IterableStitcher[ClassificationChange](
             iterables=[
+                self.review_iterable(),
+                self.triage_iterable(),
                 self.withdrawn_iterable(),
-                self.classification_iterable()
-            ]
+                self.classification_iterable(),
+                self.discordance_report_iterable_open(),
+                self.discordance_report_iterable_closed()
+            ],
+            comparison=lambda x, y: x.change_date < y.change_date
         )
 
     def full_clean(self):
         Conflict.objects.all().delete()
 
-    def run(self, time_delta: timedelta = timedelta(days=1)):
+    def run(self, time_delta: timedelta = timedelta(minutes=1)):
         end_time: Optional[datetime] = None
+        last_time: Optional[datetime] = None
         for cc in self.stitch_iterable():
-            if end_time is None:
-                end_time = cc.change_date.replace(hour=0, minute=0, second=0, microsecond=0) + time_delta
-            if cc.change_date > end_time:
-                self.log_and_update(end_time)
-                end_time = end_time + time_delta
-            self.apply_update(cc)
-        self.log_and_update(end_time)
+            if isinstance(cc, DiscordanceReportWrapper):
+                self.apply_discordance_report_update(cc)
+            elif isinstance(cc, TriageWrapper):
+                self.apply_triage(cc.triage)
+            elif isinstance(cc, ReviewWrapper):
+                self.apply_review(cc.review)
+            else:
+                self.apply_classification_update(cc)
+                self.log_and_update(cc.change_date)
+
+
+        # self.log_and_update(end_time)
 
     def run_latest(self):
         # now do latest
