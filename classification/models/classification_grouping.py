@@ -784,6 +784,9 @@ class ConflictComment(TimeStampedModel):
     comment = models.TextField(null=False, blank=False)
     meta_data = models.JSONField(null=False, blank=False, default=dict)
 
+    def __str__(self):
+        return f"{self.user}: {self.comment}"
+
     @property
     def meta_data_html(self) -> Optional[str]:
         if not self.meta_data:

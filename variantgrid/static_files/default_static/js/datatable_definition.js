@@ -847,7 +847,6 @@ TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
 				return;
 			}
 
-            console.log(`Total rows = ${oSettings._iRecordsTotal}`);
             let lengthId = `#${oSettings.sTableId}_length`;
             let lengthDom = $(lengthId);
             if (oSettings._iRecordsTotal <= 10) {
@@ -856,14 +855,8 @@ TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
                 lengthDom.show();
             }
 
-            console.log("Records to display");
-            console.log(oSettings._iRecordsTotal);
-            console.log(oSettings);
             if (oSettings._iRecordsTotal <= 10) {
                 // now point in letting the user choose to show 10, 25, 50, 100 rows
-
-                console.log("< 10 rows");
-                console.log(lengthId);
                 window.setTimeout(() => {
                     $(lengthId).hide();
                 });

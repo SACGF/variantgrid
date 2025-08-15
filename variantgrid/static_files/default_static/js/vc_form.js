@@ -2797,30 +2797,20 @@ ConflictTable.renderContext = (data, type, row) => {
 };
 
 ConflictTable.renderSeverity = (data, type, row) => {
-    let dom = $("<div>");
-    if (data.code == 2) {
-        dom.append(data.label);
-    } else if (data.code <= 1) {
-        dom.append($("<span>", {class: 'no-value', text: data.label}));
+    let dom;
+
+    if (data.code <= 1) {
+        dom = $("<span>", {class: 'no-value', text: data.label});
     } else {
-        dom.append(
-            $('<a>', {
-                "class": "modal-link-comments",
-                "data-toggle": "ajax-modal",
-                "data-size": "lg",
-                "data-title": "Comments",
-                "data-href": Urls.conflict_comments(data.conflict_id),
-                "text": data.label
-            })
-        );
+        dom = $("<span>", {text: data.label});
     }
-    dom.append($('<a>', {
-        "class": "ml-2 modal-link-custom",
+
+    return $('<a>', {
+        "class": "modal-link",
         "data-toggle": "ajax-modal",
         "data-size": "lg",
-        "data-title": "History",
-        "data-href": Urls.conflict_history(data.conflict_id),
-        "html": "<i class=\"fa-regular fa-calendar\"></i>"
-    }));
-    return dom;
+        "data-title": "Comments",
+        "data-href": Urls.conflict_comments(data.conflict_id),
+        "html": dom
+    });
 };

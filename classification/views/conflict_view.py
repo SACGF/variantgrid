@@ -1,25 +1,22 @@
-from typing import Optional, Union
+from dataclasses import dataclass
+from typing import Optional, Union, Iterable
 
+from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
 from django.db.models.aggregates import Sum, Count
 from django.http import HttpRequest, HttpResponseBase
 from django.shortcuts import render, get_object_or_404
 
 from classification.enums import AlleleOriginBucket, TestingContextBucket, ConflictSeverity
-from classification.models import Conflict, ConflictComment, DiscordanceReportTriageStatus, DiscordanceReportNextStep
+from classification.models import Conflict, ConflictComment, DiscordanceReportTriageStatus, DiscordanceReportNextStep, \
+    ConflictHistory
 from classification.views.classification_dashboard_view import ClassificationDashboard
+from library.utils import IterableStitcher
 from library.utils.django_utils import render_ajax_view
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
 from uicore.views.ajax_form_view import AjaxFormView, LazyRender
 
-
-def conflict_history(request, conflict_id: int):
-    conflict = Conflict.objects.get(id=conflict_id)
-    return render_ajax_view(request, 'classification/conflict_history.html', context={'conflict': conflict})
-
-
-# def allele_groupings(request, lab_id: Optional[Union[str, int]] = None):
 
 def conflicts_view(request, lab_id: Optional[Union[str, int]] = None):
     lab_picker = LabPickerData.from_request(request, lab_id, 'conflicts')
@@ -46,22 +43,51 @@ def overlaps_view(request: HttpRequest, lab_id=None) -> HttpResponseBase:
     })
 
 
-# def view_overlaps_detail(request: HttpRequest, lab_id: Optional[Union[str, int]] = None) -> HttpResponseBase:
-#     return render(request, "classification/overlaps_detail.html", {
-#         "overlaps": OverlapsCalculator(perspective=LabPickerData.from_request(request, lab_id))
-#     })
+
+@dataclass(frozen=True)
+class ConflictFeedItem:
+    conflict_history: Optional[ConflictHistory] = None
+    conflict_comment: Optional[ConflictComment] = None
+
+    @property
+    def date(self):
+        if conflict_history := self.conflict_history:
+            return conflict_history.created
+        if conflict_comment := self.conflict_comment:
+            return conflict_comment.created
+        raise Exception("No object in conflict feed item")
+
+    def __str__(self):
+        return f"{self.date} {self.conflict_history or self.conflict_comment}"
+
+    def __lt__(self, other):
+        return self.date < other.date
 
 
+class ConflictFeed:
 
-# def conflict_comments_view(request, conflict_id: int):
-#     conflict = Conflict.objects.get(id=conflict_id)
-#     return render(request, 'classification/conflict_comments.html', context={'conflict': conflict})
+    def __init__(self, conflict: Conflict, user: User):
+        self.conflict = conflict
+        self.user = user
+
+    def history_iterator(self):
+        for history in ConflictHistory.objects.filter(conflict=self.conflict).order_by("created"):
+            yield ConflictFeedItem(conflict_history=history)
+
+    def comment_iterator(self):
+        for comment in ConflictComment.objects.filter(conflict=self.conflict).order_by("created"):
+            yield ConflictFeedItem(conflict_comment=comment)
+
+    def feed(self):
+        return IterableStitcher([self.history_iterator(), self.comment_iterator()])
+
 
 
 class ConflictCommentView(AjaxFormView[Conflict]):
 
     @classmethod
     def lazy_render(cls, obj: Conflict, context: Optional[dict] = None) -> LazyRender[Conflict]:
+        # TODO rework out how all the static context work
         def dynamic_context_gen(request):
             if context and context.get("saved") is True:
                 user = request.user
@@ -143,5 +169,10 @@ class ConflictCommentView(AjaxFormView[Conflict]):
         #         saved = True
         #     else:
         #         context["form"] = form
+
+
+        feed = ConflictFeed(conflict, request.user)
+        context["feed"] = feed
+        context["show_triage"] = conflict.latest.severity >= ConflictSeverity.MEDIUM
 
         return ConflictCommentView.lazy_render(conflict, context).render(request, saved=saved)

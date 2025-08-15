@@ -1,7 +1,7 @@
 from rest_framework import routers
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from classification.views import clinvar_export_view, search_view_metrics, clinvar_export_multi_view, conflict_view
+from classification.views import clinvar_export_view, search_view_metrics, clinvar_export_multi_view
 from classification.views import views, classification_dashboard_view, \
     classification_export_view, views_autocomplete, \
     classification_accumulation_graph
@@ -25,7 +25,7 @@ from classification.views.condition_match_test_view import condition_match_test_
 from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
     ConditionTextColumns, ConditionTextMatchingAPI
 from classification.views.conflict_datatables import ConflictColumns
-from classification.views.conflict_view import conflicts_view, conflict_history, ConflictCommentView, overlaps_view
+from classification.views.conflict_view import conflicts_view, ConflictCommentView, overlaps_view
 from classification.views.discordance_report_triage_view import DiscordanceReportTriageView
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report, \
     discordance_reports_view, discordance_reports_history_detail, discordance_reports_active_detail, \
@@ -114,7 +114,6 @@ urlpatterns = [
     path('conflicts', conflicts_view, name='conflicts'),
     path('conflicts/datatable', DatabaseTableView.as_view(column_class=ConflictColumns), name='conflicts_datatables'),
     path('conflicts/comments/<int:conflict_id>', ConflictCommentView.as_view(), name='conflict_comments'),
-    path('conflicts/history/<int:conflict_id>', conflict_history, name='conflict_history'),
     path('conflicts/<str:lab_id>', conflicts_view, name='conflicts'),
 
     path('condition_matchings', condition_matchings_view, name='condition_matchings'),
