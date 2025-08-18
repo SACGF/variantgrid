@@ -1,5 +1,5 @@
 from dataclasses import dataclass, Field, field
-from typing import Optional, Union, Iterable
+from typing import Optional, Union, Iterable, Callable
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
@@ -54,17 +54,16 @@ class ConflictHistoryWrapper:
     def __str__(self):
         return str(self.history)
 
-    @property
-    def conflict(self):
-        return self.history.conflict
+    def __getattr__(self, method_name):
+        # delegate to first conflict object if we get a method we're not familiar with
+        def method(*args, **kwargs):
+            result = getattr(self.history, method_name)
+            if isinstance(result, Callable):
+                return result(*args, **kwargs)
+            else:
+                return result
 
-    @property
-    def severity(self):
-        return self.history.severity
-
-    @property
-    def is_latest(self):
-        return self.history.is_latest
+        return method
 
 
 @dataclass(frozen=True)
