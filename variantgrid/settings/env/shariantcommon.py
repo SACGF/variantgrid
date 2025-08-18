@@ -220,6 +220,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
 
     # discordance
     "discordance_reports": True,
+    "conflicts": True,
 
     "classification_upload_unmapped": True,
     "condition_matchings": True,
