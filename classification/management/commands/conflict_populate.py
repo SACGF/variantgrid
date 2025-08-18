@@ -196,14 +196,14 @@ class AlleleOriginGroupingInfo:
                 lab_id=lab_id,
                 share_level=share_level))
 
-            if self.grouping_key.allele_origin_bucket == AlleleOriginBucket.SOMATIC:
-                conflict_key = ConflictKey(
-                    conflict_type=ConflictType.CLIN_SIG,
-                    allele_origin_bucket=self.grouping_key.allele_origin_bucket,
-                    testing_context_bucket=self.grouping_key.testing_context_bucket,
-                    tumor_type_category=self.grouping_key.tumor_type_category
-                )
-                ClinSigCalculator(self.grouping_key.allele, conflict_key, clinsig_data).log_history(override_date)
+        if self.grouping_key.allele_origin_bucket == AlleleOriginBucket.SOMATIC:
+            conflict_key = ConflictKey(
+                conflict_type=ConflictType.CLIN_SIG,
+                allele_origin_bucket=self.grouping_key.allele_origin_bucket,
+                testing_context_bucket=self.grouping_key.testing_context_bucket,
+                tumor_type_category=self.grouping_key.tumor_type_category
+            )
+            ClinSigCalculator(self.grouping_key.allele, conflict_key, clinsig_data).log_history(override_date)
 
         conflict_key = ConflictKey(
             conflict_type=ConflictType.ONCPATH,
@@ -272,7 +272,7 @@ class Populate:
         cc.save()
         cc.modified = drw.change_date
         cc.created = drw.change_date
-        cc.save(update_modified=False)
+        cc.save(update_fields=("created", "modified"), update_modified=False)
 
 
     def apply_classification_update(self, change: ClassificationChange):
@@ -302,7 +302,7 @@ class Populate:
             )
             cc.created = review.created
             cc.modified = review.modified
-            cc.save(update_modified=False)
+            cc.save(update_fields=("created", "modified"), update_modified=False)
         else:
             print("We have a review for something other than a Discordance Report??")
             print(reviewing)
