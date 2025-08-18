@@ -10,7 +10,7 @@
         background-color: #f7f7f7;
     }
 </style>
-<div class="card-header">{{ conflict }}</div>
+<div class="card-header">{{ conflict }} {% admin_link conflict %}</div>
 <form data-toggle="ajax-form" method="POST" action="{% url 'conflict_comments' conflict.pk %}">
     <div class="card-body">
         <div>
