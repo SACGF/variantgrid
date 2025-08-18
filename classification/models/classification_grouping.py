@@ -760,11 +760,17 @@ class ConflictHistory(TimeStampedModel):
     class Meta:
         indexes = [models.Index(fields=["conflict", "is_latest"])]
 
+    # TODO, caching this and letting other methods annotate it is a bit messy in some places
+    # but a lot cleaner in others
     def data_rows(self) -> list['ConflictDataRow']:
         rows = self.data.get("rows")
         from classification.services.conflict_services import ConflictDataRow
         # TODO sort
         return [ConflictDataRow.from_json(row) for row in rows]
+
+    def data_rows_for_user(self, user: User):
+        data_rows = self.data_rows()
+        return [dr for dr in data_rows if dr.can_view(user)]
 
 
 class ConflictLab(TimeStampedModel):

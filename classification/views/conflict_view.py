@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, Field, field
 from typing import Optional, Union, Iterable
 
 from django.contrib.auth.models import User
@@ -7,10 +7,12 @@ from django.db.models.aggregates import Sum, Count
 from django.http import HttpRequest, HttpResponseBase
 from django.shortcuts import render, get_object_or_404
 
-from classification.enums import AlleleOriginBucket, TestingContextBucket, ConflictSeverity
+from classification.enums import AlleleOriginBucket, TestingContextBucket, ConflictSeverity, ShareLevel, SpecialEKeys
 from classification.models import Conflict, ConflictComment, DiscordanceReportTriageStatus, DiscordanceReportNextStep, \
-    ConflictHistory
+    ConflictHistory, EvidenceKeyMap
+from classification.services.conflict_services import ConflictDataRow
 from classification.views.classification_dashboard_view import ClassificationDashboard
+from library import cache
 from library.utils import IterableStitcher
 from library.utils.django_utils import render_ajax_view
 from snpdb.lab_picker import LabPickerData
@@ -43,16 +45,37 @@ def overlaps_view(request: HttpRequest, lab_id=None) -> HttpResponseBase:
     })
 
 
+@dataclass
+class ConflictHistoryWrapper:
+    history: ConflictHistory
+    data_rows: list[ConflictDataRow]
+    extra_comments: list[str]
+
+    def __str__(self):
+        return str(self.history)
+
+    @property
+    def conflict(self):
+        return self.history.conflict
+
+    @property
+    def severity(self):
+        return self.history.severity
+
+    @property
+    def is_latest(self):
+        return self.history.is_latest
+
 
 @dataclass(frozen=True)
 class ConflictFeedItem:
-    conflict_history: Optional[ConflictHistory] = None
+    conflict_history: Optional[ConflictHistoryWrapper] = None
     conflict_comment: Optional[ConflictComment] = None
 
     @property
     def date(self):
         if conflict_history := self.conflict_history:
-            return conflict_history.created
+            return conflict_history.history.created
         if conflict_comment := self.conflict_comment:
             return conflict_comment.created
         raise Exception("No object in conflict feed item")
@@ -64,6 +87,99 @@ class ConflictFeedItem:
         return self.date < other.date
 
 
+@dataclass(frozen=True)
+class ConflictHistoryChunk:
+    lab_id: int
+    share_level_to_values: dict[ShareLevel, dict] = field(default_factory=dict)
+
+    @property
+    def max_share_level(self) -> ShareLevel:
+        return max(self.share_level_to_values.keys())
+
+    @property
+    def share_level_count(self) -> int:
+        return len(self.share_level_to_values)
+
+    @staticmethod
+    def populate_from(raw_data: list[dict], user: User) -> dict[int, 'ConflictHistoryChunk']:
+        chunked: dict[int, ConflictHistoryChunk] = {}
+        for row in raw_data:
+            row_copy = dict(row)
+            lab_id = row_copy.pop("lab_id")
+            share_level = ShareLevel(row_copy.pop("share_level"))
+            if share_level.has_access(Lab.objects.get(pk=lab_id), user):
+                use_chunk: ConflictHistoryChunk
+                if chunk := chunked.get(lab_id):
+                    use_chunk = chunk
+                else:
+                    use_chunk = ConflictHistoryChunk(lab_id=lab_id)
+                    chunked[lab_id] = use_chunk
+                use_chunk.share_level_to_values[share_level] = row_copy
+        return chunked
+
+
+@cache.timed_cache(ttl=60)
+def data_row_to_label() -> dict[str, str]:
+    return {
+        "classification": EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_label,
+        "clinical_significance": EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_label,
+        "amp_level": "AMP Level"
+    }
+
+
+def calculate_differences_between_history(
+        conflict_data: list[ConflictDataRow],
+        old_history: dict[int, ConflictHistoryChunk],
+        new_history: dict[int, ConflictHistoryChunk]):
+    # TODO sort differences by lab name
+
+    confict_data_dict = {(cdr.lab_id, cdr.share_level): cdr for cdr in conflict_data}
+
+    no_conflict_data = []
+    for lab_id in set(old_history.keys()) | new_history.keys():
+        old_chunk = old_history.get(lab_id)
+        new_chunk = new_history.get(lab_id)
+        if not old_chunk:
+            confict_data_dict[(lab_id, new_chunk.max_share_level)].message = "New submission"
+        elif not new_chunk:
+            no_conflict_data.append(f"{Lab.objects.get(pk=lab_id)} withdrew records")
+        else:
+            old_min_max_share_level = old_chunk.max_share_level
+            new_min_max_share_level = new_chunk.max_share_level
+            if new_min_max_share_level > old_min_max_share_level:
+                confict_data_dict[(lab_id, new_chunk.max_share_level)].message = "Published"
+            elif new_min_max_share_level < old_min_max_share_level:
+                confict_data_dict[(lab_id, new_chunk.max_share_level)].message = "Withdrawn and re-submitted"
+            else:
+                old_value = old_chunk.share_level_to_values[old_min_max_share_level]
+                new_value = new_chunk.share_level_to_values[new_min_max_share_level]
+                if old_value != new_value:
+
+                    different_values = []
+                    for value_type in ("classification", "clinical_significance", "amp_level"):
+                        old_sub_value = old_value.get(value_type)
+                        new_sub_value = new_value.get(value_type)
+                        if old_sub_value != new_sub_value:
+
+                            if value_type == "clinical_significance":
+                                # rather than tier_1 show Tier 1, whereas for classification P, VUS etc look just fine as raw values
+                                old_sub_value = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(old_sub_value)
+                                new_sub_value = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE).pretty_value(new_sub_value)
+
+                            if not old_sub_value:
+                                old_sub_value = "No Data"
+                            if not new_sub_value:
+                                new_sub_value = "No Data"
+
+                            # FIXME better rendering of AMP level
+                            different_values.append(f"{data_row_to_label()[value_type]} {old_sub_value} -> {new_sub_value}")
+
+                    confict_data_dict[(lab_id, new_chunk.max_share_level)].message = f"Updated {', '.join(different_values)}"
+                elif old_chunk.share_level_count != new_chunk.share_level_count:
+                    confict_data_dict[(lab_id, new_chunk.max_share_level)].message = "Changes to unshared records"
+    return no_conflict_data
+
+
 class ConflictFeed:
 
     def __init__(self, conflict: Conflict, user: User):
@@ -71,8 +187,27 @@ class ConflictFeed:
         self.user = user
 
     def history_iterator(self):
+        old_history: Optional[dict[int, ConflictHistoryChunk]] = {}
         for history in ConflictHistory.objects.filter(conflict=self.conflict).order_by("created"):
-            yield ConflictFeedItem(conflict_history=history)
+            new_history = ConflictHistoryChunk.populate_from(history.data.get("rows"), self.user)
+            if new_history:
+                data_rows = history.data_rows_for_user(self.user)
+                # FIXME filter out entry where the user can't see any differences
+                explanations = calculate_differences_between_history(data_rows, old_history=old_history, new_history=new_history)
+                if new_history == old_history:
+                    # from this user's POV nothing has changed, though likely another lab's unshared classifications have changed
+                    # so skip this entry
+                    continue
+
+                old_history = new_history
+
+                yield ConflictFeedItem(
+                    conflict_history=ConflictHistoryWrapper(
+                        history=history,
+                        data_rows=data_rows,
+                        extra_comments=explanations
+                    )
+                )
 
     def comment_iterator(self):
         for comment in ConflictComment.objects.filter(conflict=self.conflict).order_by("created"):
@@ -80,7 +215,6 @@ class ConflictFeed:
 
     def feed(self):
         return IterableStitcher([self.history_iterator(), self.comment_iterator()])
-
 
 
 class ConflictCommentView(AjaxFormView[Conflict]):

@@ -34,8 +34,7 @@ class ClinSigData(ConflictDataRow):
         }
 """
 
-
-@dataclass(frozen=True)
+@dataclass
 class ConflictDataRow:
     lab_id: int
     share_level: ShareLevel
@@ -44,6 +43,7 @@ class ConflictDataRow:
     amp_level: Optional[str]
     exclude: bool = False
     c_hgvs: Optional[CHGVS] = None
+    message: Optional[str] = None
 
     @cached_property
     def lab(self):

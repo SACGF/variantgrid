@@ -20,7 +20,7 @@
                         {% with comment=feed_item.conflict_comment %}
                             <div class="row mb-4">
                                 <div class="col-3 text-right">
-                                    <div style="font-size:0.8rem" class="mb-2">{% timestamp conflict.created %}</div>
+                                    <div style="font-size:0.8rem" class="mb-2">{% timestamp comment.created %}</div>
                                     {% user comment.user size="tiny" show_group=True align_right=True %}
                                 </div>
                                 <div class="col-9">
@@ -42,10 +42,18 @@
                                 <div class="col-3 text-right">
                                     <div style="font-size:0.8rem" class="mb-2">
                                         {% if history.is_latest %}Current:{% endif %}
-                                        {% timestamp history.created %}</div>
-                                    <div> {{ history.get_severity_display }}</div>
+                                        {% timestamp history.created %}
+                                    </div>
+                                    <div>{{ history.get_severity_display }}</div>
                                 </div>
                                 <div class="col-9">
+                                    {% if feed_item.explanations %}
+                                        <div class="no-value text-right">
+                                            {% for explain in feed_item.explanations %}
+                                                <div class="mb-2 mr-4">{{ explain }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
                                     {% for row in history.data_rows %}
                                         <div class="row mb-2" {% if row.exclude %}style="opacity:0.6"{% endif %}>
                                             <div class="col-8 text-right">
@@ -53,6 +61,10 @@
                                                     <img src="/static/icons/share_level/{{ row.share_level }}.png" style="width:12px; height: 12px; margin-right: 4px; top: -2px; position: relative;"/>
                                                 {% endif %}
                                                 {{ row.lab }}
+                                                {% if row.message %}
+                                                    <br/><span class="text-secondary" style="font-size:0.9rem">{{ row.message }}</span>
+                                                {% endif %}
+                                                {% if row.exclude %}<br/><span class="no-value">Not counted for overlap</span>{% endif %}
                                             </div>
                                             <div class="col-4">
                                                 {% if conflict.conflict_type == "P" %}
@@ -73,7 +85,7 @@
             </div>
 
             {% if show_triage %}
-                <hr style="margin-top:0"/>
+                <hr style="margin-top:0; border-top-width: 3px"/>
                 {% labelled label="Comment *" %}<textarea id="conflict_comment" name="comment" class="form-control"></textarea>{% endlabelled %}
 
                 {% for conflict_lab in conflict.conflict_labs %}
