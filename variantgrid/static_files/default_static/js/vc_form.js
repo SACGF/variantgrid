@@ -2777,12 +2777,12 @@ ConflictTable.renderContext = (data, type, row) => {
     if (data.testing_context_bucket !== "G") {
         dom.append($("<span>", {"class": "testing-context", text: data.testing_context_bucket_label}));
     }
+    if (data.tumor_type_category) {
+        dom.append(" : ");
+        dom.append($("<span>", {"class": "testing-context", text: data.tumor_type_category}));
+    }
     dom.append(" - ")
     dom.append($("<span>", {"class": "text-muted", text: data.conflict_type_label}));
-    if (data.tumor_type_category) {
-        dom.append(" - ");
-        dom.append($("<span>", {"class": "text-muted", text: data.tumor_type_category}));
-    }
 
     if (data.severity >= 2) {
         dom.append($("<br/><br/>"));
