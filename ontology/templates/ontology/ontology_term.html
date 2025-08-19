@@ -9,19 +9,6 @@
 {% load ui_tabs_builder %}
 {% block title %}{{ term.id }}{% endblock title %}
 {% block content %}
-    <script>
-        function classificationGroupingFilterExtra(data, type) {
-            data.ontology_term_id = "{{ term.id }}";
-            return data;
-        }
-
-        $(document).ready(function() {
-            let tableDom = $('#vc-datatable').on('draw.dt', () => {
-                Flags.instance.init({userId: '{{user.id}}'});
-            });
-        });
-    </script>
-
     <div class="current-record-menu-item">
      {% if not term.is_stub %}
         {% if is_ontology %}
@@ -185,7 +172,7 @@
 
     {% if is_ontology %}
         <script>
-        function classificationGroupingFilter(data) {
+        function classificationGroupingFilterExtra(data) {
             data.ontology_term_id = {{ term.id | jsonify }};
         }
         </script>
