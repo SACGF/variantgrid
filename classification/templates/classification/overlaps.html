@@ -52,11 +52,10 @@
             }
             return $("<div>", {html: [
                 $('<a>', {
-                    "class": "modal-link-comments",
                     "data-toggle": "ajax-modal",
                     "data-size": "lg",
-                    "data-title": "Comments",
-                    "data-href": Urls.conflict_comments(data.conflict_id),
+                    "data-title": "Feed",
+                    "data-href": Urls.conflict_feed(data.conflict_id),
                     "text": data.label
                 })
             ]});

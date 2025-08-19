@@ -11,7 +11,7 @@
     }
 </style>
 <div class="card-header">{{ conflict }} {% admin_link conflict %}</div>
-<form data-toggle="ajax-form" method="POST" action="{% url 'conflict_comments' conflict.pk %}">
+<form data-toggle="ajax-form" method="POST" action="{% url 'conflict_feed' conflict.pk %}">
     <div class="card-body">
         <div>
             <div id="conflict-feed" style="overflow-y: auto; max-height: 600px">

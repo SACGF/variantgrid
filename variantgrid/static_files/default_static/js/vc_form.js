@@ -2810,7 +2810,7 @@ ConflictTable.renderSeverity = (data, type, row) => {
         "data-toggle": "ajax-modal",
         "data-size": "lg",
         "data-title": "Comments",
-        "data-href": Urls.conflict_comments(data.conflict_id),
+        "data-href": Urls.conflict_feed(data.conflict_id),
         "html": dom
     });
 };

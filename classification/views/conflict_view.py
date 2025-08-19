@@ -216,7 +216,7 @@ class ConflictFeed:
         return IterableStitcher([self.history_iterator(), self.comment_iterator()])
 
 
-class ConflictCommentView(AjaxFormView[Conflict]):
+class ConflictFeedView(AjaxFormView[Conflict]):
 
     @classmethod
     def lazy_render(cls, obj: Conflict, context: Optional[dict] = None) -> LazyRender[Conflict]:
@@ -233,7 +233,7 @@ class ConflictCommentView(AjaxFormView[Conflict]):
             return None
 
         return LazyRender(
-            template_name="classification/conflict_comments.html",
+            template_name="classification/conflict_feed.html",
             core_object=obj,
             core_object_name="conflict",
             static_context=context,
@@ -308,4 +308,4 @@ class ConflictCommentView(AjaxFormView[Conflict]):
         context["feed"] = feed
         context["show_triage"] = conflict.latest.severity >= ConflictSeverity.MEDIUM
 
-        return ConflictCommentView.lazy_render(conflict, context).render(request, saved=saved)
+        return ConflictFeedView.lazy_render(conflict, context).render(request, saved=saved)
