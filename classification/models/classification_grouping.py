@@ -23,10 +23,12 @@ from classification.models import Classification, ImportedAlleleInfo, EvidenceKe
     ConditionResolved, ConditionReference, DiscordanceReportTriageStatus, DiscordanceReportNextStep
 from classification.models.evidence_mixin_summary_cache import ClassificationSummaryCacheDict, \
     ClassificationSummaryCacheDictPathogenicity, ClassificationSummaryCacheDictSomatic
+from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
 from library.utils import strip_json
 from snpdb.models import Allele, Lab
 import html
+from datetime import datetime
 
 
 classification_grouping_search_term_signal = django.dispatch.Signal()  # args: "grouping", expects iterable of ClassificationGroupingSearchTermStub
@@ -677,6 +679,9 @@ class Conflict(TimeStampedModel):
     tumor_type_category = models.TextField(null=True, blank=True)
     meta_data = models.JSONField(null=False, blank=False, default=dict)
 
+    def get_conflict_type_display(self):
+        return ConflictType(self.conflict_type).label_for_context(AlleleOriginBucket(self.allele_origin_bucket))
+
     @property
     def _sort_key(self):
         # put testing conflict_type bucket last so we group conflicts that are for the same data but different contexts e.g.
@@ -691,6 +696,10 @@ class Conflict(TimeStampedModel):
     def __lt__(self, other):
         return self._sort_key < other._sort_key
 
+    def c_hgvses(self) -> list[CHGVS]:
+        if c_hgvs_values := self.meta_data.get("c_hgvs"):
+            return [CHGVS.from_json_short(c_hgvs_value) for c_hgvs_value in c_hgvs_values]
+        return []
 
     class Meta:
         unique_together = ("allele", "conflict_type", "allele_origin_bucket", "testing_context_bucket", "tumor_type_category")
@@ -718,6 +727,21 @@ class Conflict(TimeStampedModel):
     @cached_property
     def latest(self) -> 'ConflictHistory':
         return ConflictHistory.objects.filter(conflict=self, is_latest=True).first()
+
+    @property
+    def current_severity_as_of(self) -> datetime:
+        severity: Optional[ConflictSeverity] = None
+        severity_date: Optional[datetime] = None
+        for history in self.conflicthistory_set.order_by('-created'):
+            if severity is None:
+                severity = history.severity
+                severity_date = history.created
+            else:
+                if severity == history.severity:
+                    severity_date = history.created
+                else:
+                    return severity_date
+        return None  # shouldn't happen
 
     def history(self, newest_to_oldest: bool = True) -> Iterable['ConflictHistory']:
         qs = self.conflicthistory_set.all()

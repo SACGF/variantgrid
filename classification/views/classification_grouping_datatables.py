@@ -8,7 +8,7 @@ from more_itertools import first
 from classification.enums import AlleleOriginBucket, EvidenceCategory, SpecialEKeys, ShareLevel, TestingContextBucket
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
     ClassificationGroupingSearchTermType, EvidenceKeyMap, ClassificationModification, ClassificationGroupingEntry, \
-    Classification, DiscordanceReport, DiscordanceReportClassification
+    Classification, DiscordanceReport, DiscordanceReportClassification, Conflict
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType
@@ -165,6 +165,16 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         filters: List[Q] = []
 
         # run the filters that are perma-applied on certain pages
+
+        if conflict_id := self.get_query_param('conflict_id'):
+            conflict = Conflict.objects.get(pk=conflict_id)
+            filters.append(Q(allele_origin_grouping__allele_grouping__allele_id=int(conflict.allele.id)))
+            filters.append(Q(allele_origin_grouping__allele_origin_bucket=conflict.allele_origin_bucket))
+            filters.append(Q(allele_origin_grouping__testing_context_bucket=conflict.testing_context_bucket))
+            if tumor_type_category := conflict.tumor_type_category:
+                filters.append(Q(allele_origin_grouping__tumor_type_category=tumor_type_category))
+            # FIXME more to do
+
 
         if allele_id := self.get_query_param('allele_id'):
             filters.append(Q(allele_origin_grouping__allele_grouping__allele_id=int(allele_id)))

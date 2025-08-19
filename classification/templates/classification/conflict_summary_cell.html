@@ -10,7 +10,7 @@
             {% endif %}
             {{ row.lab }}
             {% if is_conflict and not row.exclude %}<br/><i class="text-secondary">{{ combined_row.status.get_status_display }}</i>{% endif %}
-            {% if row.exclude %}<br/><span class="no-value">Not counted for overlap</span>{% endif %}
+            {% if row.exclude %}<br/><span class="no-value">Not counted towards overlap</span>{% endif %}
         </div>
         <div class="col-5 align-self-center">
             {% if conflict_type == "P" %}

@@ -45,6 +45,13 @@ def overlaps_view(request: HttpRequest, lab_id=None) -> HttpResponseBase:
     })
 
 
+def conflict_view(request: HttpRequest, conflict_id: int) -> HttpResponseBase:
+    # FIXME security check
+    return render(request, 'classification/conflict.html', {
+        "conflict": Conflict.objects.get(pk=conflict_id)
+    })
+
+
 @dataclass
 class ConflictHistoryWrapper:
     history: ConflictHistory
@@ -196,6 +203,7 @@ class ConflictFeed:
                 if new_history == old_history:
                     # from this user's POV nothing has changed, though likely another lab's unshared classifications have changed
                     # so skip this entry
+                    # FIXME, if we skip over the latest record, then we don't get is_latest True,
                     continue
 
                 old_history = new_history

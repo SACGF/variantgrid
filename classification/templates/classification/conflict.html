@@ -1,0 +1,62 @@
+{% extends "uicore/page/base.html" %}
+{% load guardian_tags %}
+{% load clinvar_tags %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load classification_tags %}
+{% load ui_tabs_builder %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% load user_tags %}
+{% block title %}Overlap{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+{% endblock %}
+{% block content %}
+    <div class="container">
+        {% page_help_embedded title="Overlap" %}
+        {% end_page_help_embedded %}
+
+        <div class="card">
+            <div class="card-body">
+                {% labelled label="Status" %}{{ conflict.latest.get_severity_display }}{% endlabelled %}
+                {% labelled label="As of" %}{% timestamp conflict.current_severity_as_of %}{% endlabelled %}
+                {% labelled label="Context" %}
+                    <div class="allele-origin-box horizontal allele-origin-{{ conflict.allele_origin_bucket }}">
+                        <div class="allele-origin-text">{{ conflict.get_allele_origin_bucket_display }}</div>
+                    </div>
+                    {% if conflict.testing_context_bucket != "G" %}
+                        <span class="testing-context">{{ conflict.get_testing_context_bucket_display }}</span>
+                    {% endif %}
+                    -
+                    {% if conflict.conflict_type_labels %}
+                        {% for conflict_type_label in conflict.conflict_type_labels %}
+                            <span class="text-muted comma-sep">{{ conflict_type_label }}</span>
+                        {% endfor %}<span class="mr-1"></span>
+                    {% else %}
+                        <span class="text-muted">{{ conflict.get_conflict_type_display }}</span>
+                    {% endif %}
+                {% endlabelled %}
+                {% labelled label="Allele" %}<a href="{{ conflict.allele.get_absolute_url }}">{{ conflict.allele }}</a>{% endlabelled %}
+                {% labelled label="c.HGVS" %}
+                    {% for c_hgvs in conflict.c_hgvses %}<div>{% c_hgvs c_hgvs %}</div>{% endfor %}
+                {% endlabelled %}
+            </div>
+        </div>
+
+        <script>
+        function classificationGroupingFilterExtra(data) {
+            console.log("SETTING CONFLICT ID")
+            data.conflict_id = {{ conflict.id | jsonify }};
+        }
+        </script>
+
+        <div class="container mt-4">
+            <h4>Classification Records</h4>
+            {% classification_groupings show_allele_origin_filter=False %}
+        </div>
+
+    </div>
+{% endblock %}
