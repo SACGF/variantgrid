@@ -15,7 +15,6 @@
 <form data-toggle="ajax-form" method="POST" action="{% url 'conflict_feed' conflict.pk %}">
     {% if mode == "inline" %}<input type="hidden" name="mode" value="inline">{% endif %}
     <div class="card-body">
-        MODE = {{ mode }}<br/>
         <div>
             <div id="conflict-feed" {% if mode != "inline" %}style="overflow-y: auto; max-height: 600px"{% endif %}>
                 {% for feed_item in feed.feed %}

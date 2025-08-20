@@ -15,8 +15,19 @@
 {% block head %}
 {% endblock %}
 {% block content %}
+
+    <div class="current-record-menu-item">
+        <div class="text-small text-muted">viewing</div>
+        <div><i class="fa-solid fa-circle main-icon mr-1" style="color:#bbb; font-size:8pt"></i><span class="text-monospace">Overlap</span></div>
+        <a class="hover-link" href="#overlap-summary">Summary</a><br/>
+        <a class="hover-link" href="#triage-feed">Feed</a><br/>
+        {% if conflict.show_triage %}
+        <a class="hover-link" href="#triage-status">Triage</a><br/>
+        {% endif %}
+    </div>
+
     <div class="container">
-        <div class="card">
+        <div class="card" id="overlap-summary" style="scroll-margin-top: 60px;">
             <div class="card-header">Overlap Summary</div>
             <div class="card-body">
                 {% labelled label="Status" %}{{ conflict.latest.get_severity_display }}{% endlabelled %}
@@ -55,9 +66,10 @@
             <a class="hover-link" href="{% url 'classification_diff' %}?conflict={{ conflict.pk }}">Show Diffs</a>
             {% classification_groupings show_allele_origin_filter=False %}
         </div>
-        <div class="my-4">
+        <div class="my-4" id="triage-feed" style="scroll-margin-top: 60px;">
             {% embed feed mode="inline" %}
         </div>
+        <div id="triage-status"></div>
 
     </div>
 {% endblock %}
