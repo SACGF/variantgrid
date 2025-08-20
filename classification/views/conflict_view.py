@@ -47,8 +47,11 @@ def overlaps_view(request: HttpRequest, lab_id=None) -> HttpResponseBase:
 
 def conflict_view(request: HttpRequest, conflict_id: int) -> HttpResponseBase:
     # FIXME security check
+    conflict = Conflict.objects.get(pk=conflict_id)
+    feed = ConflictFeedView.lazy_render(conflict)
     return render(request, 'classification/conflict.html', {
-        "conflict": Conflict.objects.get(pk=conflict_id)
+        "conflict": Conflict.objects.get(pk=conflict_id),
+        "feed": feed
     })
 
 
@@ -230,6 +233,17 @@ class ConflictFeedView(AjaxFormView[Conflict]):
     def lazy_render(cls, obj: Conflict, context: Optional[dict] = None) -> LazyRender[Conflict]:
         # TODO rework out how all the static context work
         def dynamic_context_gen(request):
+            return {
+                "triage_options": [
+                    DiscordanceReportTriageStatus.PENDING,
+                    DiscordanceReportTriageStatus.REVIEWED_WILL_FIX,
+                    DiscordanceReportTriageStatus.REVIEWED_WILL_DISCUSS,
+                    DiscordanceReportTriageStatus.REVIEWED_SATISFACTORY,
+                    DiscordanceReportTriageStatus.COMPLEX
+                ],
+                "feed": ConflictFeed(obj, request.user),
+                "show_triage": obj.latest.severity >= ConflictSeverity.MEDIUM
+            }
             if context and context.get("saved") is True:
                 user = request.user
                 # discordance_report = obj.discordance_report
@@ -256,13 +270,7 @@ class ConflictFeedView(AjaxFormView[Conflict]):
 
     def handle(self, request, conflict_id: int):
         conflict = get_object_or_404(Conflict, pk=conflict_id)
-        context = {"triage_options": [
-            DiscordanceReportTriageStatus.PENDING,
-            DiscordanceReportTriageStatus.REVIEWED_WILL_FIX,
-            DiscordanceReportTriageStatus.REVIEWED_WILL_DISCUSS,
-            DiscordanceReportTriageStatus.REVIEWED_SATISFACTORY,
-            DiscordanceReportTriageStatus.COMPLEX
-        ]}
+        context = {}
         saved = False
 
         if comment_text := request.POST.get("comment"):
@@ -289,31 +297,5 @@ class ConflictFeedView(AjaxFormView[Conflict]):
                 ).save()
                 context["saved"] = True
                 saved = True
-
-
-        # if request.GET.get("edit") == "true":
-        #     if not conflict.can_write(request.user):
-        #         raise PermissionError("User does not have permission to edit this triage")
-        #
-        #     form = DiscordanceReportTriageForm(
-        #         data=request.POST or None,
-        #         instance=triage,
-        #         initial={"triage_date": datetime.now().date()},
-        #         prefix=f"drt{discordance_report_triage_id}"
-        #     )
-        #     if form.is_valid():
-        #         triage.user = request.user
-        #         form.save()
-        #         log_saved_form(form)
-        #         messages.add_message(request, level=messages.SUCCESS, message="Discordance triage saved successfully")
-        #         context["saved"] = True
-        #         saved = True
-        #     else:
-        #         context["form"] = form
-
-
-        feed = ConflictFeed(conflict, request.user)
-        context["feed"] = feed
-        context["show_triage"] = conflict.latest.severity >= ConflictSeverity.MEDIUM
 
         return ConflictFeedView.lazy_render(conflict, context).render(request, saved=saved)

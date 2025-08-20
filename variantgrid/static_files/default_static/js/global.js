@@ -117,11 +117,21 @@ function enhanceAndMonitor() {
         {test: 'form[data-toggle="ajax-form"]', func: (node) => {
             let $node = $(node);
             let wrapper = $node.closest(".modal-content, .embed-wrapper");
+            if (wrapper.length == 0) {
+                console.log("No .modal-content or .embed-wrapper for ajax-form");
+                return;
+            }
             if ($node.attr("data-submitted")) {
                 return false;
             }
             $node.attr('data-submitted', true);
+            let $loadingOverlay = $node.find(".loading-overlay-target");
+            if ($loadingOverlay.length == 0) {
+                $loadingOverlay = $node;
+            }
+
             $node.submit(function() { // catch the form's submit event
+                $loadingOverlay.LoadingOverlay('show', {zIndex: 100000});
                 let $this = $(this);
                 $.ajax({ // create an AJAX call...
                     data: $this.serialize(), // get the form data
@@ -132,6 +142,9 @@ function enhanceAndMonitor() {
                         if (wrapper.hasClass("modal-content")) {
                             cardToModal(wrapper);
                         }
+                    },
+                    complete: function() {
+                        $loadingOverlay.LoadingOverlay('hide');
                     }
                 });
                 return false;

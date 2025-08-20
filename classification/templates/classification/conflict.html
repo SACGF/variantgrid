@@ -16,10 +16,8 @@
 {% endblock %}
 {% block content %}
     <div class="container">
-        {% page_help_embedded title="Overlap" %}
-        {% end_page_help_embedded %}
-
         <div class="card">
+            <div class="card-header">Overlap Summary</div>
             <div class="card-body">
                 {% labelled label="Status" %}{{ conflict.latest.get_severity_display }}{% endlabelled %}
                 {% labelled label="As of" %}{% timestamp conflict.current_severity_as_of %}{% endlabelled %}
@@ -48,14 +46,17 @@
 
         <script>
         function classificationGroupingFilterExtra(data) {
-            console.log("SETTING CONFLICT ID")
             data.conflict_id = {{ conflict.id | jsonify }};
         }
         </script>
 
         <div class="container mt-4">
             <h4>Classification Records</h4>
+            <a class="hover-link" href="{% url 'classification_diff' %}?conflict={{ conflict.pk }}">Show Diffs</a>
             {% classification_groupings show_allele_origin_filter=False %}
+        </div>
+        <div class="my-4">
+            {% embed feed mode="inline" %}
         </div>
 
     </div>

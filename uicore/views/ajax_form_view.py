@@ -35,9 +35,9 @@ class AjaxFormMode(str, Enum):
 @dataclass
 class LazyRender(Generic[T]):
     """
-    A delayed rendering, that may be delayed, so a template can include it
+    A rendering, that may be delayed, so a template can include it
     or we might call render() on it right after.
-    It helps in reducing the duplication of code, your AJAX
+    It helps in reducing the duplication of code and your AJAX
     """
 
     core_object: T
@@ -79,7 +79,7 @@ class LazyRender(Generic[T]):
         """
         if mode == "inline":
             return (
-                f'<div class="d-inline-block" id="{self.core_object_name}-{ self.core_object.pk }">',
+                f'<div class="d-inline-block w-100 embed-wrapper" id="{self.core_object_name}-{ self.core_object.pk }">',
                 AjaxFormMode.INLINE,
                 '</div>'
             )
@@ -109,7 +109,7 @@ class LazyRender(Generic[T]):
         return parts[0] + template_output + parts[2]
 
     def render(self, request, saved: bool = False) -> HttpResponse:
-        mode = AjaxFormMode(request.GET.get("mode", "card"))
+        mode = AjaxFormMode(request.GET.get("mode") or request.POST.get("mode") or "card")
         use_context = self._context(request)
         content_str = self._render_to_string(request, use_context, mode=mode, saved=saved)
         return HttpResponse(bytes(content_str, "utf-8"))

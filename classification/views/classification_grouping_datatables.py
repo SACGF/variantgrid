@@ -173,8 +173,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             filters.append(Q(allele_origin_grouping__testing_context_bucket=conflict.testing_context_bucket))
             if tumor_type_category := conflict.tumor_type_category:
                 filters.append(Q(allele_origin_grouping__tumor_type_category=tumor_type_category))
-            # FIXME more to do
-
 
         if allele_id := self.get_query_param('allele_id'):
             filters.append(Q(allele_origin_grouping__allele_grouping__allele_id=int(allele_id)))

@@ -10,11 +10,14 @@
         background-color: #f7f7f7;
     }
 </style>
-<div class="card-header">{{ conflict }} {% admin_link conflict %}</div>
+<div class="card">
+<div class="card-header">{% if mode == "inline" %}Changes / Triage Feed{% else %}{{ conflict }} {% admin_link conflict %}{% endif %}</div>
 <form data-toggle="ajax-form" method="POST" action="{% url 'conflict_feed' conflict.pk %}">
+    {% if mode == "inline" %}<input type="hidden" name="mode" value="inline">{% endif %}
     <div class="card-body">
+        MODE = {{ mode }}<br/>
         <div>
-            <div id="conflict-feed" style="overflow-y: auto; max-height: 600px">
+            <div id="conflict-feed" {% if mode != "inline" %}style="overflow-y: auto; max-height: 600px"{% endif %}>
                 {% for feed_item in feed.feed %}
                     {% if feed_item.conflict_comment %}
                         {% with comment=feed_item.conflict_comment %}
@@ -85,6 +88,7 @@
             </div>
 
             {% if show_triage %}
+                <div class="loading-overlay-target">
                 <hr style="margin-top:0; border-top-width: 3px"/>
                 {% labelled label="Comment *" %}<textarea id="conflict_comment" name="comment" class="form-control"></textarea>{% endlabelled %}
 
@@ -116,6 +120,7 @@
                         {% endlabelled %}
                     {% endif %}
                 {% endfor %}
+                </div>
 
             {% endif %}
         </div>
@@ -126,6 +131,7 @@
         </div>
     {% endif %}
 </form>
+</div>
 <script>
     $("#conflict_comment").keyup(event => {
         let text = $("#conflict_comment").val().trim();
@@ -136,8 +142,9 @@
             $("#conflict_submit").setAttribute("disabled", "disabled");
         }
     });
+    {% if mode != "inline" %}
     $(document).ready(function() {
         $("#conflict-feed").scrollTop(function() { return this.scrollHeight; });
     })
-
+    {% endif %}
 </script>
