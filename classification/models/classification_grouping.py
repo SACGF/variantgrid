@@ -740,8 +740,9 @@ class Conflict(TimeStampedModel):
                 if severity == history.severity:
                     severity_date = history.created
                 else:
-                    return severity_date
-        return None  # shouldn't happen
+                    break
+
+        return severity_date
 
     def history(self, newest_to_oldest: bool = True) -> Iterable['ConflictHistory']:
         qs = self.conflicthistory_set.all()
