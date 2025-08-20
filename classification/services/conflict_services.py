@@ -294,18 +294,18 @@ class ClinSigCalculator(ConflictCalculator):
                 else:
                     tiers.add(cs)
 
-                # for now ever difference in tier is a MAJOR diff
-                # the only exception being tier_1 vs tier_1_or_2 or tier_2 vs tier_1_or_2 which
-                # is considered minor
-                if len(tiers) > 1:
+            # for now ever difference in tier is a MAJOR diff
+            # the only exception being tier_1 vs tier_1_or_2 or tier_2 vs tier_1_or_2 which
+            # is considered minor
+            if len(tiers) > 1:
+                return ConflictSeverity.MAJOR
+            elif len(tiers) == 1 and has_tier_1_and_2:
+                only_tier = first(tiers)
+                if only_tier in {"tier_1", "tier_2"}:
+                    return ConflictSeverity.MINOR
+                else:
                     return ConflictSeverity.MAJOR
-                elif len(tiers) == 1 and has_tier_1_and_2:
-                    only_tier = first(tiers)
-                    if only_tier in {"tier_1", "tier_2"}:
-                        return ConflictSeverity.MINOR
-                    else:
-                        return ConflictSeverity.MAJOR
-                return ConflictSeverity.SAME
+            return ConflictSeverity.SAME
 
 
 def calculate_and_apply_conflicts_for(allele_origin_grouping: AlleleOriginGrouping):
