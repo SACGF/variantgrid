@@ -1403,7 +1403,7 @@ class ClassificationGroupingAdmin(ModelAdminBasics):
         parts = [AlleleOriginBucket(allele_origin_bucket).label]
         if allele_origin_bucket == AlleleOriginBucket.SOMATIC:
             parts.append(TestingContextBucket(obj.allele_origin_grouping.testing_context_bucket).label)
-            if obj.allele_origin_grouping.testing_context_bucket == TestingContextBucket.SOLID_TUMOR.value:
+            if TestingContextBucket(obj.allele_origin_grouping.testing_context_bucket).should_have_subdivide:
                 parts.append(obj.allele_origin_grouping.tumor_type_category)
 
         return " : ".join(parts)

@@ -46,6 +46,10 @@ class TestingContextBucket(TextChoices):
     GERMLINE = "G", "Germline"
     UNKNOWN = "U", "Unknown"
 
+    @property
+    def should_have_subdivide(self) -> bool:
+        return self in {TestingContextBucket.SOLID_TUMOR, TestingContextBucket.HAEMATOLOGY}
+
 
 class AlleleOriginBucket(TextChoices):
     GERMLINE = "G", "Germline"

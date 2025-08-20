@@ -110,7 +110,7 @@ class AlleleOriginGrouping(TimeStampedModel):
     tumor_type_category = models.TextField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.allele_grouping.allele} {self.get_allele_origin_bucket_display()} Testing Context: {self.get_testing_context_bucket_display()} Tumor Type: {self.tumor_type_category}"
+        return f"{self.allele_grouping.allele} {self.get_allele_origin_bucket_display()} Testing Context: {self.get_testing_context_bucket_display()} Sub-Type: {self.tumor_type_category}"
 
     def labels(self, include_allele_origin=True) -> list[str]:
         parts = []
@@ -120,7 +120,7 @@ class AlleleOriginGrouping(TimeStampedModel):
             if self.testing_context_bucket in {TestingContextBucket.UNKNOWN.value, TestingContextBucket.OTHER.value}:
                 parts.append("Testing Context")
             parts.append(TestingContextBucket(self.testing_context_bucket).label)
-            if self.testing_context_bucket == TestingContextBucket.SOLID_TUMOR:
+            if TestingContextBucket(self.testing_context_bucket).should_have_subdivide:
                 parts.append(self.tumor_type_category)
         return parts
 
@@ -678,6 +678,10 @@ class Conflict(TimeStampedModel):
     testing_context_bucket = models.CharField(max_length=1, choices=TestingContextBucket.choices, null=True, blank=True)
     tumor_type_category = models.TextField(null=True, blank=True)
     meta_data = models.JSONField(null=False, blank=False, default=dict)
+
+    @property
+    def show_triage(self) -> bool:
+        return self.latest.severity >= ConflictSeverity.MEDIUM
 
     def get_conflict_type_display(self):
         return ConflictType(self.conflict_type).label_for_context(AlleleOriginBucket(self.allele_origin_bucket))

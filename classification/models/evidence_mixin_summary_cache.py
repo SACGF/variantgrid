@@ -200,6 +200,9 @@ class ClassificationSummaryCalculator:
         if self.testing_context_bucket == TestingContextBucket.SOLID_TUMOR:
             # TODO actually calculate
             return None
+        elif self.testing_context_bucket == TestingContextBucket.HAEMATOLOGY:
+            # TODO actually calculate
+            return None
         return None
 
     @cached_property

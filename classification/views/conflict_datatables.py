@@ -73,9 +73,9 @@ class ConflictColumns(DatatableConfig[Conflict]):
         conflict_type_label = conflict_type.label_for_context(allele_origin_bucket)
 
         tumor_type_category = row_data.get("tumor_type_category")
-        if testing_context_bucket == TestingContextBucket.SOLID_TUMOR:
+        if testing_context_bucket.should_have_subdivide:
             if not tumor_type_category:
-                tumor_type_category = "Unclassified Tumour Type"
+                tumor_type_category = "Indeterminate Sub-Type"
 
         #
         # FIXME - add tumor type to calculation
