@@ -1,18 +1,19 @@
 import itertools
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import StrEnum
 from functools import cached_property
-from typing import Optional, Iterable, Callable
+from typing import Optional, Iterable, Callable, Any
 from datetime import datetime
 from django.contrib.auth.models import User
 from django.db import transaction
 from more_itertools.recipes import partition
-from classification.enums import AlleleOriginBucket, ConflictSeverity, ShareLevel, ConflictType
+from classification.enums import AlleleOriginBucket, ConflictSeverity, ShareLevel, ConflictType, TestingContextBucket
 from classification.models import AlleleOriginGrouping, EvidenceKeyMap, Conflict, ConflictKey, ConflictHistory, \
     ConflictLab, ClassificationGrouping, ClassificationModification
 from genes.hgvs import CHGVS
-from library.utils import strip_json, first
+from library.utils import strip_json, first, sort_and_group_by, RowSpanTable
 from snpdb.models import Allele, Lab
 
 """
@@ -399,3 +400,31 @@ class ConflictMerge:
                 return result
 
         return method
+
+
+@staticmethod
+def group_conflicts(conflicts: Iterable[Conflict]) -> 'RowSpanTable':
+    conflicts = sorted(conflicts, key=lambda c: c.conflict_type)
+
+    table = RowSpanTable(5)
+
+    for allele_origin, sub_conflicts in sort_and_group_by(conflicts, lambda c: c.allele_origin_bucket):
+        table.add_cell(0, AlleleOriginBucket(allele_origin).label)
+
+        for testing_context, sub_sub_conflicts in sort_and_group_by(sub_conflicts, lambda c: c.testing_context_bucket):
+
+            table.add_cell(1, TestingContextBucket(testing_context).label)
+
+            for condition, sub_sub_sub_conflicts in sort_and_group_by(sub_sub_conflicts, lambda c: c.tumor_type_category or "Undetermined condition"):
+
+                table.add_cell(2, condition)
+
+                for value_type, sub_sub_sub_sub_conflicts in sort_and_group_by(sub_sub_sub_conflicts, lambda c: ConflictType(c.conflict_type).label):
+                    sub_sub_sub_sub_conflicts_list = list(sub_sub_sub_sub_conflicts)
+                    if len(sub_sub_sub_sub_conflicts_list) != 1:
+                        raise ValueError(f"Multiple conflicts found for {allele_origin} {testing_context} {condition} {sub_sub_sub_sub_conflicts_list}")
+
+                    table.add_cell(3, value_type)
+                    table.add_cell(4, sub_sub_sub_sub_conflicts_list[0].latest.get_severity_display)
+
+    return table

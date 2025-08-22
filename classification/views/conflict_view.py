@@ -10,7 +10,7 @@ from django.shortcuts import render, get_object_or_404
 from classification.enums import AlleleOriginBucket, TestingContextBucket, ConflictSeverity, ShareLevel, SpecialEKeys
 from classification.models import Conflict, ConflictComment, DiscordanceReportTriageStatus, DiscordanceReportNextStep, \
     ConflictHistory, EvidenceKeyMap
-from classification.services.conflict_services import ConflictDataRow
+from classification.services.conflict_services import ConflictDataRow, group_conflicts
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from library import cache
 from library.utils import IterableStitcher
@@ -49,9 +49,14 @@ def conflict_view(request: HttpRequest, conflict_id: int) -> HttpResponseBase:
     # FIXME security check
     conflict = Conflict.objects.get(pk=conflict_id)
     feed = ConflictFeedView.lazy_render(conflict)
+
+    conflicts_for_allele = Conflict.objects.filter(allele=conflict.allele)
+    # grouped_conflicts_for_allele = ConflictGroup.group_conflicts(conflicts_for_allele)
+
     return render(request, 'classification/conflict.html', {
         "conflict": Conflict.objects.get(pk=conflict_id),
-        "feed": feed
+        "feed": feed,
+        "conflicts_for_allele": group_conflicts(conflicts_for_allele)
     })
 
 

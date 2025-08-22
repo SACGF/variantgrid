@@ -1,4 +1,5 @@
 import abc
+import itertools
 import operator
 import re
 from abc import ABC
@@ -132,6 +133,7 @@ def group_data(data: Iterable[Data], key_func: Callable[[Data], tuple[Key, Value
 
 
 def group_by_key(qs: Iterable, key: Callable) -> Iterator[tuple[Any, list]]:
+    # DEPRECATED - use itertoool.group_by instead
     """
     Provide a sorted iterable value (like a queryset) and an attrgetter for getting values from it.
     Each time the attrgetter returns a value different from before, it will return a list
@@ -155,6 +157,11 @@ def group_by_key(qs: Iterable, key: Callable) -> Iterator[tuple[Any, list]]:
         records.append(record)
     if records:
         yield last_value, records
+
+
+def sort_and_group_by(collection, key_func: Callable[[Any], Any]) -> Iterable[tuple[Any, list]]:
+    sorted_data = sorted(collection, key=key_func)
+    return itertools.groupby(sorted_data, key=key_func)
 
 
 def all_equal(iterable):
@@ -412,3 +419,53 @@ class FormerTuple(ABC):
         if not type(self) is type(other):
             return False
         return self.as_tuple == other.as_tuple
+
+
+@dataclass
+class RowSpanCell:
+    repeat_of: Optional['RowSpanCell'] = None
+    value: Any = None
+    row_span: int = 1
+    start_tr: bool = False
+    end_tr: bool = False
+
+    def add_row_span(self):
+        if repeat_of := self.repeat_of:
+            repeat_of.add_row_span()
+        else:
+            self.row_span += 1
+
+class RowSpanTable:
+
+    def __init__(self, column_count: int):
+        self.column_count = column_count
+        self.rows = []
+        self.last_row = None
+
+    def add_cell(self, column: int, value: Any):
+        end_tr = column == self.column_count - 1
+        if self.last_row is None:
+            self.last_row = [None] * self.column_count
+            self.last_row[column] = RowSpanCell(value=value, start_tr=True, end_tr=end_tr)
+            self.rows.append(self.last_row)
+            return
+
+        if self.last_row[column] is None:
+            self.last_row[column] = RowSpanCell(value=value, end_tr=end_tr)
+        else:
+            new_row = [None] * self.column_count
+            for i in range(0, column):
+                target = RowSpanCell(repeat_of=self.last_row[i])
+                target.add_row_span()
+                new_row[i] = target
+
+            new_row[column] = RowSpanCell(value=value, start_tr=True, end_tr=end_tr)
+            self.last_row = new_row
+            self.rows.append(new_row)
+
+    def cells(self):
+        for row in self.rows:
+            for cell in row:
+                if cell.repeat_of is None:
+                    yield cell
+

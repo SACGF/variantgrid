@@ -52,6 +52,27 @@
                 {% labelled label="c.HGVS" %}
                     {% for c_hgvs in conflict.c_hgvses %}<div>{% c_hgvs c_hgvs %}</div>{% endfor %}
                 {% endlabelled %}
+
+                {% labelled label="All Overlaps for Allele" %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Allele Origin</th>
+                                <th>Testing Context</th>
+                                <th>Condition</th>
+                                <th>Value Type</th>
+                                <th>Severity</th>
+                            </tr>
+                        </thead>
+                    <tbody>
+                    {% for cell in conflicts_for_allele.cells %}
+                        {% if cell.start_tr %}<tr>{% endif %}
+                            <td rowspan="{{ cell.row_span }}">{{ cell.value }}</td>
+                        {% if cell.end_tr %}</tr>{% endif %}
+                    {% endfor %}
+                    </tbody>
+                    </table>
+                {% endlabelled %}
             </div>
         </div>
 
@@ -66,6 +87,11 @@
             <a class="hover-link" href="{% url 'classification_diff' %}?conflict={{ conflict.pk }}">Show Diffs</a>
             {% classification_groupings show_allele_origin_filter=False %}
         </div>
+
+        <div class="mt-4">
+            {% clinvar allele=conflict.allele expert_panel_only=True %}
+        </div>
+
         <div class="my-4" id="triage-feed" style="scroll-margin-top: 60px;">
             {% embed feed mode="inline" %}
         </div>
