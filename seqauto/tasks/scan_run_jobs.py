@@ -45,6 +45,7 @@ def scan_resources(seqauto_run, seqauto_scripts):
         output_filename = os.path.join(seqauto_run.scan_resources_dir, "%s.txt" % name_from_filename(script_name))
         cmd_args = [script, seqauto_run.scan_resources_dir]
         if script_runner := settings.SEQAUTO_SCRIPT_RUNNER:
+            script_runner = os.path.join(settings.SEQAUTO_SCRIPTS_DIR, script_runner)
             cmd_args = [script_runner] + cmd_args
         with open(output_filename, "w") as out_f:
             logging.info("Executing %s", " ".join(cmd_args))
