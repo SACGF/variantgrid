@@ -1,5 +1,7 @@
+import glob
 import logging
 import os
+import shutil
 import subprocess
 
 import celery
@@ -47,7 +49,8 @@ def scan_resources(seqauto_run, seqauto_scripts):
 
 
 @celery.shared_task(track_started=True, queue="seqauto_single_worker")
-def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None, run_launch_script=None, fake_data=None):
+def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None,
+                  run_launch_script=None, reuse_prev_scan_id=None, fake_data=None):
     if not settings.SEQAUTO_ENABLED:
         raise ValueError("settings.SEQAUTO_ENABLED=False")
 
@@ -72,7 +75,15 @@ def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None, run
         seqauto_run.save()
 
         process_seqauto_scripts = get_seqauto_scripts(only_process_file_types)
-        scan_resources(seqauto_run, process_seqauto_scripts)
+        if reuse_prev_scan_id:
+            logging.info("reuse previous scan id: %s", reuse_prev_scan_id)
+            prev_scan = SeqAutoRun.objects.get(pk=reuse_prev_scan_id)
+            prev_run_dir = prev_scan.get_scan_resources_dir()
+            for filename in glob.glob(f"{prev_run_dir}/*"):
+                logging.info("Copying: %s to %s", filename, scan_resources_dir)
+                shutil.copy2(filename, scan_resources_dir)
+        else:
+            scan_resources(seqauto_run, process_seqauto_scripts)
 
         # Create Models
         seqauto_run.create_models_start = timezone.now()

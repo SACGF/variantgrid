@@ -150,12 +150,16 @@ def convert_sheet_to_df(sheet, date_on_file: str = None):
     else:
         lane = None
     df['lane'] = lane
-    index_names = ["Index", 'index']
-    barcode = None
-    for i in index_names:
-        if i in df.columns:
-            barcode = df[i]
-            break
+    def get_first_col(column_names):
+        for c in column_names:
+            if c in df.columns:
+                return df[c]
+        return None
+
+    barcode = get_first_col(["Index", 'index'])
+    index2 = get_first_col(["Index2", 'index2'])
+    if index2 is not None:
+        barcode += "|" + index2  # Concat them together
     df['barcode'] = barcode
     df['date'] = date
     df['platform'] = platform
