@@ -17,7 +17,8 @@ from seqauto.sequencing_files.create_resource_models import create_resource_mode
 
 SEQAUTO_SCRIPTS = [
     (SequencingFileType.SAMPLE_SHEET, settings.SEQAUTO_FLOWCELL_SCRIPT),
-    (SequencingFileType.ILLUMINA_FLOWCELL_QC, settings.SEQAUTO_ILLUMINATE_QC),
+    # Illuminate doesn't run well anymore - disable to save some time
+    # (SequencingFileType.ILLUMINA_FLOWCELL_QC, settings.SEQAUTO_ILLUMINATE_QC),
     (SequencingFileType.FASTQ, settings.SEQAUTO_FASTQ_SCRIPT),
     (SequencingFileType.FASTQC, settings.SEQAUTO_FASTQC_SCRIPT),
     (SequencingFileType.BAM, settings.SEQAUTO_BAM_SCRIPT),
