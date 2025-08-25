@@ -160,8 +160,9 @@ def convert_sheet_to_df(sheet, date_on_file: str = None):
         return None
 
     barcode = get_first_col(["Index", 'index'])
-    if index2 := get_first_col(["Index2", 'index2']):
-        barcode = "|".join([barcode, index2])
+    index2 = get_first_col(["Index2", 'index2'])
+    if index2 is not None:
+        barcode += "|" + index2  # Concat them together
     df['barcode'] = barcode
     return df
 
