@@ -47,6 +47,7 @@ def scan_resources(seqauto_run, seqauto_scripts):
         if script_runner := settings.SEQAUTO_SCRIPT_RUNNER:
             cmd_args = [script_runner] + cmd_args
         with open(output_filename, "w") as out_f:
+            logging.info("Executing %s", " ".join(cmd_args))
             subprocess.check_call(cmd_args, stdout=out_f)
 
     #shutil.rmtree(scan_resources_dir)
