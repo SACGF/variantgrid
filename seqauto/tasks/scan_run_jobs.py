@@ -43,8 +43,11 @@ def scan_resources(seqauto_run, seqauto_scripts):
     for _, script_name in seqauto_scripts:
         script = os.path.join(settings.SEQAUTO_SCRIPTS_DIR, script_name)
         output_filename = os.path.join(seqauto_run.scan_resources_dir, "%s.txt" % name_from_filename(script_name))
+        cmd_args = [script, seqauto_run.scan_resources_dir]
+        if script_runner := settings.SEQAUTO_SCRIPT_RUNNER:
+            cmd_args = [script_runner] + cmd_args
         with open(output_filename, "w") as out_f:
-            subprocess.check_call([script, seqauto_run.scan_resources_dir], stdout=out_f)
+            subprocess.check_call(cmd_args, stdout=out_f)
 
     #shutil.rmtree(scan_resources_dir)
 

@@ -18,6 +18,7 @@ SEQAUTO_SCRIPT_PARAMS = {"virtualenv_runner": SEQAUTO_VIRTUALENV_RUNNER or '',
                          "pythonpath": TAU_DIR}
 
 SEQAUTO_SCAN_RUN_SCRIPTS = False
+SEQAUTO_SCRIPT_RUNNER = "ssh_runner.sh"  # Executes on host not VM
 SEQAUTO_FLOWCELL_SCRIPT = 'find_flowcells.sh'
 SEQAUTO_FASTQ_SCRIPT = 'find_fastqs.sh'
 SEQAUTO_FASTQC_SCRIPT = 'find_fastqc.sh'
