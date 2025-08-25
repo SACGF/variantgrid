@@ -15,8 +15,8 @@ class Command(BaseCommand):
         only_process_file_types = options.get("process_types")
         only_launch_file_types = options.get("launch_types")
         run_launch_script = options.get("run_launch_script", False)
-        reuse_prev_id = options.get("reuse_prev_id")
+        reuse_prev_scan_id = options.get("reuse_prev_scan_id")
 
         scan_run_jobs(only_process_file_types=only_process_file_types,  # @UndefinedVariable
                       only_launch_file_types=only_launch_file_types,
-                      run_launch_script=run_launch_script, reuse_prev_id=reuse_prev_id)
+                      run_launch_script=run_launch_script, reuse_prev_scan_id=reuse_prev_scan_id)
