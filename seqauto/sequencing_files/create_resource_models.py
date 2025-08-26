@@ -701,6 +701,7 @@ def process_bam_files_and_records(seqauto_run, existing_bam_files, existing_bam_
     expected_bams_and_unaligned_reads = get_expected_bams_and_unaligned_reads(unaligned_reads_list)
     bam_files = set()
 
+    logging.info("Looping through bams")
     for bam_path, unaligned_reads in expected_bams_and_unaligned_reads.items():
         exists = bam_path in existing_bam_files
         data_state = get_data_state(unaligned_reads.data_state, exists)
@@ -770,6 +771,7 @@ def get_expected_vcf_and_bams(bams):
 
 
 def process_single_sample_vcfs(seqauto_run, existing_files, results):
+    logging.info("Setting up single sample VCFs")
     existing_vcf_files = stripped_lines_set(existing_files)
     existing_vcf_records = returning_existing_records_by_path(VCFFile)
 
@@ -777,6 +779,7 @@ def process_single_sample_vcfs(seqauto_run, existing_files, results):
     expected_vcf_and_bams = get_expected_vcf_and_bams(bams)
     vcf_files = set()
 
+    logging.info("Looping through single sample VCFs")
     for vcf_path, bam_file in expected_vcf_and_bams.items():
         exists = vcf_path in existing_vcf_files
         data_state = get_data_state(bam_file.data_state, exists)
@@ -804,11 +807,13 @@ def process_single_sample_vcfs(seqauto_run, existing_files, results):
 
 
 def process_combo_vcfs(seqauto_run, existing_files, results):
+    logging.info("Setting up combo VCFs")
     existing_combo_vcf_files = stripped_lines_set(existing_files)
     existing_combo_vcf_records = returning_existing_records_by_path(SampleSheetCombinedVCFFile)
 
     combined_vcf_files = set()
     sequencing_runs = results[SequencingFileType.SAMPLE_SHEET]
+    logging.info("Looping through combo VCFs")
     for sequencing_run in sequencing_runs.values():
         try:
             sample_sheet = sequencing_run.get_current_sample_sheet()
@@ -866,6 +871,7 @@ def get_expected_qc_and_vcfs(vcfs):
 
 
 def process_qc(seqauto_run, existing_files, results):
+    logging.info("Setting up QC")
     existing_qcs = stripped_lines_set(existing_files)
     existing_qc_records = returning_existing_records_by_path(QC)
 
@@ -874,6 +880,7 @@ def process_qc(seqauto_run, existing_files, results):
     expected_qc_and_vcfs = get_expected_qc_and_vcfs(vcfs)
     qc_set = set()
 
+    logging.info("Looping through expected qc and vcfs")
     for qc_path, vcf_file in expected_qc_and_vcfs.items():
         exists = qc_path in existing_qcs
         data_state = get_data_state(vcf_file.data_state, exists)
@@ -905,13 +912,16 @@ def process_qc(seqauto_run, existing_files, results):
 
 
 def process_other_qc(seqauto_run, existing_qcs, qc_set):
+    logging.info("Process other QC")
     gene_matcher = GeneSymbolMatcher()
     canonical_transcript_manager = CanonicalTranscriptManager()
     transcript_versions_by_id = TranscriptVersion.transcript_versions_by_id()  # Don't know build - just get all
 
+    logging.info("Loading QC GeneLists.")
     process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manager, transcript_versions_by_id,
                            existing_qcs, qc_set, QCGeneList)
     if settings.SEQAUTO_LOAD_GENE_COVERAGE:
+        logging.info("Loading gene coverage data.")
         process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manager, transcript_versions_by_id,
                                existing_qcs, qc_set, QCGeneCoverage, delete_out_of_date_records=True)
 
