@@ -20,7 +20,8 @@ SEQAUTO_SCRIPTS = [
     # Illuminate doesn't run well anymore - disable to save some time
     # (SequencingFileType.ILLUMINA_FLOWCELL_QC, settings.SEQAUTO_ILLUMINATE_QC),
     (SequencingFileType.FASTQ, settings.SEQAUTO_FASTQ_SCRIPT),
-    (SequencingFileType.FASTQC, settings.SEQAUTO_FASTQC_SCRIPT),
+    # Slow - and don't really use
+    # (SequencingFileType.FASTQC, settings.SEQAUTO_FASTQC_SCRIPT),
     (SequencingFileType.BAM, settings.SEQAUTO_BAM_SCRIPT),
     (SequencingFileType.FLAGSTATS, settings.SEQAUTO_FLAGSTATS_SCRIPT),
     (SequencingFileType.VCF, settings.SEQAUTO_VCF_SCRIPT),
