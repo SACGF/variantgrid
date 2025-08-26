@@ -6,7 +6,7 @@ from variantgrid import celery
 import requests
 
 
-@celery.task
+@celery.shared_task
 def warn_low_disk_space():
     DIRECTORIES_WE_CARE_ABOUT = [settings.BASE_DIR]
     minimum_gigs = settings.ROLLBAR_MIN_DISK_WARNING_GIGS
@@ -30,7 +30,7 @@ def warn_low_disk_space():
     report_message(message=message, level='warning')
 
 
-@celery.task
+@celery.shared_task
 def heartbeat():
     if settings.HEARTBEAT_URL:
         r = requests.get(settings.HEARTBEAT_URL)

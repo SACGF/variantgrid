@@ -3,7 +3,7 @@ import celery
 from library.log_utils import report_message
 from snpdb.models.models_variant import Allele
 
-@celery.task(track_started=True)
+@celery.shared_task(track_started=True)
 def validate_variant_data():
     report_message("Running automated allele validation", level="info")
     allele: Allele

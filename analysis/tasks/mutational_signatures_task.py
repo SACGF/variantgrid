@@ -11,7 +11,7 @@ from snpdb.models.models_enums import ImportStatus
 import numpy as np
 
 
-@celery.task
+@celery.shared_task
 def calculate_mutational_signature(sample_id):
     sample = Sample.objects.get(pk=sample_id)
 

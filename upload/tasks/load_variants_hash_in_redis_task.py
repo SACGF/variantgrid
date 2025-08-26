@@ -3,7 +3,7 @@ import celery
 from snpdb.variant_pk_lookup import VariantPKLookup
 
 
-@celery.task
+@celery.shared_task
 def load_variants_hash_in_redis():
     """ Make this a task so that we can run it in a queue and guarantee only 1 copy is doing this """
 
