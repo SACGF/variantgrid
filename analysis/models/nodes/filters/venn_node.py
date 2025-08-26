@@ -225,7 +225,7 @@ def post_delete_intersection_cache(sender, instance, *args, **kwargs):
         instance.variant_collection.delete()
 
 
-@celery.task
+@celery.shared_task
 def venn_cache_count(vennode_cache_id):
     print(f"venn_cache_count: {vennode_cache_id}")
     try:

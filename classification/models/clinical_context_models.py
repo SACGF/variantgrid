@@ -22,7 +22,7 @@ from classification.models.flag_types import classification_flag_types
 from classification.models.classification import Classification, \
     ClassificationModification
 
-clinical_context_signal = django.dispatch.Signal(providing_args=["clinical_context", "status", "is_significance_change", "cause"])
+clinical_context_signal = django.dispatch.Signal() # providing_args=["clinical_context", "status", "is_significance_change", "cause"])
 
 CS_TO_NUMBER = {
     'B': 1,

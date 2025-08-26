@@ -6,8 +6,8 @@ from annotation.forms import HPOSynonymForm, MIMAliasForm
 from genes.forms import GeneListCategoryAutocompleteForm, NamedCustomGeneListForm, GeneSymbolForm, \
     GeneAnnotationReleaseForm, panel_app_server_autocomplete_form_factory
 from genes.models import GeneInfo, GeneListCategory, PanelAppServer, GeneAnnotationRelease
-from pathtests.forms import ActivePathologyTestForm, SelectPathologyTestVersionForm
-from pathtests.models import PathologyTest
+# from pathtests.forms import ActivePathologyTestForm, SelectPathologyTestVersionForm
+# from pathtests.models import PathologyTest
 from seqauto.forms import EnrichmentKitForm
 from seqauto.models import EnrichmentKit
 from snpdb.forms import LabSelectForm
@@ -55,27 +55,6 @@ def gene_grid(context, columns_from_url=None,
     categories = []
 
     gene_list_category_filter = None
-    company = Company.get_our_company()
-    if company:
-        if PathologyTest.objects.exists():  # add test categories
-            try:
-                company_name = str(company).replace("_", " ")
-                category = company.genelistcategory
-                css_classes = ' '.join([category.icon_css_class, "pathology-test"])
-                test_data = {"icon_css_class": css_classes,
-                             "description": f"{company_name} current test",
-                             "form": ActivePathologyTestForm(),
-                             "form_css_class": "pathology-test-form"}
-                categories.append(test_data)
-                historical_test_data = {"icon_css_class": css_classes,
-                                        "description": f"{company_name} historical test",
-                                        "form": SelectPathologyTestVersionForm(),
-                                        "form_css_class": "pathology-test-version-form"}
-                categories.append(historical_test_data)
-            except:
-                pass
-
-        gene_list_category_filter = ~Q(company=company)  # Skip as already added
 
     for category in GeneListCategory.get_gene_list_categories(gene_list_category_filter):
         initial = {"category": category.get("instance")}
