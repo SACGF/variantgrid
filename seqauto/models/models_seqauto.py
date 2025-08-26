@@ -2,6 +2,7 @@ import pathlib
 from datetime import datetime
 from typing import List, Optional
 
+from cache_memoize import cache_memoize
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
@@ -718,10 +719,10 @@ class UnalignedReads(models.Model):
     def sequencing_run(self):
         return self.sequencing_sample.sample_sheet.sequencing_run
 
+    @cache_memoize(DAY_SECS, args_rewrite=lambda p: (p.pk, ))
     def get_params(self):
-        fastq_params = self.fastq_r1.sequencing_sample.get_params()
-        sequencing_run = self.sequencing_sample.sample_sheet.sequencing_run
-        data_naming_convention = sequencing_run.sequencer.sequencer_model.data_naming_convention
+        fastq_params = self.sequencing_sample.get_params()
+        data_naming_convention = self.sequencing_run.sequencer.sequencer_model.data_naming_convention
         if data_naming_convention == DataGeneration.HISEQ:
             aligned_pattern = settings.SEQAUTO_HISEQ_ALIGNED_PATTERN
         elif data_naming_convention == DataGeneration.MISEQ:
@@ -896,13 +897,14 @@ class VCFFile(SeqAutoRecord):
 
     @staticmethod
     def get_path_from_bam(bam):
+        bam_params = bam.get_params()
         vcf_pattern = None
-        if enrichment_kit := bam.sequencing_sample.enrichment_kit:
-            vcf_pattern = settings.SEQAUTO_VCF_PATTERNS_FOR_KIT.get(enrichment_kit.name)
+        if enrichment_kit_name := bam_params.get("enrichment_kit"):
+            vcf_pattern = settings.SEQAUTO_VCF_PATTERNS_FOR_KIT.get(enrichment_kit_name)
         if vcf_pattern is None:
             vcf_pattern = settings.SEQAUTO_VCF_PATTERNS_FOR_KIT["default"]
         pattern = os.path.join(settings.SEQAUTO_VCF_DIR_PATTERN, vcf_pattern)
-        vcf_path = pattern % bam.get_params()
+        vcf_path = pattern % bam_params
         return os.path.abspath(vcf_path)
 
     def __str__(self):
