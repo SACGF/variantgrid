@@ -4,7 +4,6 @@ from collections import defaultdict
 from datetime import timedelta
 from typing import Optional
 
-from celery.task.control import inspect  # @UnresolvedImport
 from django.conf import settings
 from django.contrib import messages
 from django.db.models import Q
@@ -34,6 +33,7 @@ from snpdb.serializers import VariantAlleleSerializer
 from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.variant_sample_information import VariantSampleInformation
 from upload.upload_stats import get_vcf_variant_upload_stats
+from variantgrid.celery import app
 from variantopedia import forms
 from variantopedia.interesting_nearby import get_nearby_qs
 from variantopedia.search import search_data, SearchResults
@@ -127,7 +127,7 @@ def server_status(request):
     if settings.SEQAUTO_ENABLED:
         worker_names.extend(settings.CELERY_SEQAUTO_WORKER_NAMES)
 
-    i = inspect()
+    i = app.control.inspect()
     pong = strip_celery_from_keys(i.ping())
     active = strip_celery_from_keys(i.active())
     scheduled = strip_celery_from_keys(i.scheduled())
