@@ -1115,7 +1115,7 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
 
     style = text_df.style.apply(set_style)
     style = style.set_table_attributes('class="sample-gene-matrix"')
-    text_table_html = style.render()
+    text_table_html = style.to_html()
 
     context = {"text_table_html": text_table_html,
                "gene_values": gene_values}
