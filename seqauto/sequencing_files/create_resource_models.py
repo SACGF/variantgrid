@@ -932,15 +932,22 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
         exists = other_qc_path in existing_qcs
         data_state = get_data_state(qc.data_state, exists)
 
+        if exists:
+            file_last_modified = SeqAutoRecord.get_file_last_modified(other_qc_path)
+        else:
+            file_last_modified = 0.0
+
+        def _create_new_record():
+            return klass.objects.create(path=other_qc_path,
+                                        sequencing_run=qc.sequencing_run,
+                                        qc=qc,
+                                        data_state=data_state,
+                                        file_last_modified=file_last_modified)
+
         record = existing_other_qc_records.get(other_qc_path)
         if record:
             if record.data_state == DataState.ERROR:  # Leave errored ones alone.
                 continue
-
-            if exists:
-                file_last_modified = SeqAutoRecord.get_file_last_modified(other_qc_path)
-            else:
-                file_last_modified = 0.0
 
             if record.data_state != data_state:
                 updated += 1
@@ -967,12 +974,7 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
                         # Can only have 1 QCGeneCoverage for QC
                         record.delete()
 
-                    record = klass.objects.create(path=other_qc_path,
-                                                  sequencing_run=qc.sequencing_run,
-                                                  qc=qc,
-                                                  data_state=data_state,
-                                                  file_last_modified=file_last_modified)
-
+                    record = _create_new_record()
                     load_from_file_if_complete(seqauto_run,
                                                record,
                                                gene_matcher=gene_matcher,
@@ -984,15 +986,7 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
         else:
             if DataState.should_create_new_record(data_state):
                 created += 1
-                if exists:
-                    file_last_modified = SeqAutoRecord.get_file_last_modified(other_qc_path)
-                else:
-                    file_last_modified = 0.0
-                record = klass.objects.create(path=other_qc_path,
-                                              sequencing_run=qc.sequencing_run,
-                                              qc=qc,
-                                              data_state=data_state,
-                                              file_last_modified=file_last_modified)
+                record = _create_new_record()
                 load_from_file_if_complete(seqauto_run,
                                            record,
                                            gene_matcher=gene_matcher,
