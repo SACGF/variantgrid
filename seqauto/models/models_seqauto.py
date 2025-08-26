@@ -973,13 +973,13 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
 
     @staticmethod
     def get_paths_from_sample_sheet(sample_sheet) -> List[str]:
-        enrichment_kit = sample_sheet.sequencing_run.enrichment_kit
+        ss_params = sample_sheet.get_params()
         pattern_list = None
-        if enrichment_kit:
-            kit_name = enrichment_kit.name
-            if "ffpe" not in kit_name.lower() and "_FFPE_" in sample_sheet.sequencing_run.name:
-                kit_name += "_ffpe"
-            pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT.get(kit_name)
+        if enrichment_kit_name := ss_params.get("enrichment_kit"):
+            sequencing_run_name = ss_params["sequencing_run_name"]
+            if "ffpe" not in enrichment_kit_name.lower() and "_FFPE_" in sequencing_run_name:
+                enrichment_kit_name += "_ffpe"
+            pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT.get(enrichment_kit_name)
 
         if pattern_list is None:
             pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT["default"]
