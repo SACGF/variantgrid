@@ -976,7 +976,7 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
         ss_params = sample_sheet.get_params()
         pattern_list = None
         if enrichment_kit_name := ss_params.get("enrichment_kit"):
-            sequencing_run_name = ss_params["sequencing_run_name"]
+            sequencing_run_name = ss_params["sequencing_run"]
             if "ffpe" not in enrichment_kit_name.lower() and "_FFPE_" in sequencing_run_name:
                 enrichment_kit_name += "_ffpe"
             pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT.get(enrichment_kit_name)
