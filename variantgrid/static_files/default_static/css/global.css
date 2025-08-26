@@ -251,8 +251,20 @@ i.fas, i.fa-solid {
   transform: scale(0.7);
 }
 
-strong {
-  font-weight: 500;
+strong, .strong {
+  font-weight: 500 !important;
+}
+
+.currently-viewing {
+  font-weight: 500 !important;
+}
+.currently-viewing::before {
+  font-style: normal;
+  color: #8888bb;
+  position: relative;
+  left: -4px;
+  content: '\f0da';
+  font-family: 'Font Awesome 6 Free', 'FontAwesome';
 }
 
 .mono {
@@ -367,6 +379,22 @@ a.no-link-style {
 .hover-link:hover {
   cursor: pointer;
   text-decoration: underline;
+}
+
+.filter-link {
+  color: #4444bb !important;
+  text-decoration: none;
+}
+.filter-link:hover {
+  cursor: pointer;
+  text-decoration: underline;
+}
+.filter-link::before {
+  color: #8888bb;
+  position: relative;
+  left: -4px;
+  content: '\f0b0';
+  font-family: 'Font Awesome 6 Free', 'FontAwesome';
 }
 
 h3 .hover-link {
@@ -1041,6 +1069,21 @@ h3.admin:before {
   padding: 2px 4px 2px 4px;
   border: 1px solid gray;
   border-radius: 4px;
+}
+
+.filter-box {
+  font-weight: bold;
+  color: white;
+  background-color: #aaaaff;
+  display: inline-block;
+  padding: 4px 8px 2px 8px;
+  border-radius: 12px;
+}
+.filter-box:after {
+  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-weight: 900;
+  content: "\f057";
+  padding-left: 0.5rem;
 }
 
 .pills a {
@@ -2603,6 +2646,16 @@ a.clinical-context {
   position: relative;
   left: -83px;
   bottom: -28px;
+}
+
+.conflicts .allele-origin-G {
+  background-color: #efe;
+}
+.conflicts .allele-origin-S {
+  background-color: #f6f0ff;
+}
+.conflicts .allele-origin-U {
+  background-color: #f8f8f8;
 }
 
 a .c-hgvs-body .c-hgvs-transcript,

@@ -1,0 +1,21 @@
+<table class="table conflicts">
+    <thead>
+        <tr>
+            <th>Allele Origin</th>
+            <th>Testing Context</th>
+            <th>Condition</th>
+            <th>Value Type</th>
+            <th>Severity</th>
+            <th>Values</th>
+        </tr>
+    </thead>
+<tbody>
+{% for cell in conflicts_for_allele.cells %}
+    {% if cell.start_tr %}<tr>{% endif %}
+        <td rowspan="{{ cell.row_span }}" {% if cell.css_class %}class="{{ cell.css_class }}"{% endif %}>
+        {% if cell.href %}<a {{ cell.link_contents }}>{{ cell.value }}</a>{% else %}{{ cell.value }}{% endif %}
+        </td>
+    {% if cell.end_tr %}</tr>{% endif %}
+{% endfor %}
+</tbody>
+</table>

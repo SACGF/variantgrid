@@ -26,7 +26,7 @@ from classification.models.discordance_models import DiscordanceReport
 from classification.models.discordance_models_utils import DiscordanceReportRowData, DiscordanceReportTableData
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
-from classification.services.conflict_services import ConflictMerge
+from classification.services.conflict_services import ConflictMerge, group_conflicts, GroupConflictsLinks
 from eventlog.models import ViewEvent
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
@@ -739,6 +739,13 @@ def evidence_key_input(key: str):
 @register.inclusion_tag("classification/tags/conflict.html")
 def conflict(conflict: Conflict | ConflictMerge):
     return {"conflict": conflict}
+
+
+@register.inclusion_tag("classification/tags/conflicts.html")
+def conflicts(allele: Allele, currently_viewing: Optional[Conflict] = None):
+    conflicts_for_allele = Conflict.objects.filter(allele=allele)
+    conflict_group = group_conflicts(conflicts_for_allele, link_types=GroupConflictsLinks.OVERLAP_LINK if currently_viewing else GroupConflictsLinks.FILTER_LINK, currently_viewing=currently_viewing)
+    return {"conflicts_for_allele": conflict_group}
 
 
 @register.filter()

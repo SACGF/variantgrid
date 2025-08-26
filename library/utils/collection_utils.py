@@ -4,11 +4,13 @@ import operator
 import re
 from abc import ABC
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from html import escape
 from itertools import islice
 from typing import Iterable, Iterator, TypeVar, Any, Generic, Callable, Optional, Sequence, Union
 
 from django.utils.functional import SimpleLazyObject
+from django.utils.safestring import SafeString
 
 DictKey = TypeVar("DictKey")
 DictVal = TypeVar("DictVal")
@@ -421,10 +423,17 @@ class FormerTuple(ABC):
         return self.as_tuple == other.as_tuple
 
 
+@dataclass(frozen=True)
+class RowSpanCellValue:
+    value: Any = None
+    css_classes: list[str] = field(default_factory=list)
+    href: Optional[str] = None
+
+
 @dataclass
 class RowSpanCell:
     repeat_of: Optional['RowSpanCell'] = None
-    value: Any = None
+    cell: RowSpanCellValue = None
     row_span: int = 1
     start_tr: bool = False
     end_tr: bool = False
@@ -435,6 +444,30 @@ class RowSpanCell:
         else:
             self.row_span += 1
 
+    @property
+    def link_contents(self):
+        if self.href:
+            href_escaped = self.href.replace("\"", "'")
+            if self.href.startswith("http") or self.href.startswith("/"):
+                return SafeString(f""" class="modal-link" data-toggle="ajax-modal" data-size="lg" data-title="Comments" data-href="{href_escaped}" """)
+            else:
+                return SafeString(f"onclick=\"{href_escaped}\" class=\"filter-link\" ")
+
+    @property
+    def value(self):
+        return self.cell.value
+
+    @property
+    def css_class(self):
+        if self.cell.css_classes:
+            return " ".join(self.cell.css_classes)
+        return ""
+
+    @property
+    def href(self):
+        return self.cell.href
+
+
 class RowSpanTable:
 
     def __init__(self, column_count: int):
@@ -442,16 +475,16 @@ class RowSpanTable:
         self.rows = []
         self.last_row = None
 
-    def add_cell(self, column: int, value: Any):
+    def add_cell(self, column: int, cell: RowSpanCellValue):
         end_tr = column == self.column_count - 1
         if self.last_row is None:
             self.last_row = [None] * self.column_count
-            self.last_row[column] = RowSpanCell(value=value, start_tr=True, end_tr=end_tr)
+            self.last_row[column] = RowSpanCell(cell=cell, start_tr=True, end_tr=end_tr)
             self.rows.append(self.last_row)
             return
 
         if self.last_row[column] is None:
-            self.last_row[column] = RowSpanCell(value=value, end_tr=end_tr)
+            self.last_row[column] = RowSpanCell(cell=cell, end_tr=end_tr)
         else:
             new_row = [None] * self.column_count
             for i in range(0, column):
@@ -459,7 +492,7 @@ class RowSpanTable:
                 target.add_row_span()
                 new_row[i] = target
 
-            new_row[column] = RowSpanCell(value=value, start_tr=True, end_tr=end_tr)
+            new_row[column] = RowSpanCell(cell=cell, start_tr=True, end_tr=end_tr)
             self.last_row = new_row
             self.rows.append(new_row)
 

@@ -325,6 +325,7 @@
     {% endif %}
     {% endcomment %}
 
+    {% comment %}
     <a class="toggle-link" data-toggle="collapse" href="#conflicts-datatable-section"><h4 style="display:inline-block">Context Summaries</h4></a>
         <div id="conflicts-datatable-section" class="collapse">
         <script>
@@ -342,14 +343,55 @@
                data-adjust-columns="false"
         ></table>
     </div>
+    {% endcomment %}
+    <script>
+        window.filter_parts = []
+        function overlap_filter(parts) {
+            window.filter_parts = parts;
+
+            if (parts) {
+                let text_parts = [];
+                if (parts.length >= 2) {
+                    text_parts.push(parts[1]);
+                    if (parts.length >= 4) {
+                        text_parts.push(parts[3]);
+                    }
+                }
+                let part_text = text_parts.join(" / ");
+                let filter_summary_dom = $(`<a class="filter-box" onclick="clearOverlapFilter()">${part_text}</a>`);
+                $("#filter-summary").html(filter_summary_dom);
+            }
+
+            $('#vc-datatable').DataTable().ajax.reload();
+        }
+    </script>
+    <div class="mt-4">
+        <h4>Overlaps for Allele</h4>
+        {% conflicts allele %}
+    </div>
 
     <h4>Classification Records</h4>
     <script>
         function classificationGroupingFilterExtra(data) {
             data.allele_id = {{ allele.pk }};
+            let filter_parts = window.filter_parts;
+            if (filter_parts) {
+                if (filter_parts.length >= 1) {
+                    data.allele_origin = filter_parts[0];
+                    if (filter_parts.length >= 3) {
+                        data.testing_context = filter_parts[2];
+                    }
+                }
+            }
+        }
+        function clearOverlapFilter() {
+            $("#filter-summary").empty().html('<span class="no-value">Click above to filter the classifications</span> <i class="fa-solid fa-filter text-secondary"></i>');
+            window.filter_parts = [];
+            $('#vc-datatable').DataTable().ajax.reload();
         }
     </script>
-    {% classification_groupings %}
+    <div id="filter-summary"><span class="no-value">Click above to filter the classifications</span> <i class="fa-solid fa-filter text-secondary"></i></div>
+    {% classification_groupings show_allele_origin_filter=False %}
 
     <div class="mt-4">
         {% clinvar allele=allele expert_panel_only=True %}

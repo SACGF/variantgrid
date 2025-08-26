@@ -679,6 +679,9 @@ class Conflict(TimeStampedModel):
     tumor_type_category = models.TextField(null=True, blank=True)
     meta_data = models.JSONField(null=False, blank=False, default=dict)
 
+    def get_absolute_url(self) -> str:
+        return reverse('conflict', kwargs={"conflict_id": self.pk})
+
     @property
     def show_triage(self) -> bool:
         return self.latest.severity >= ConflictSeverity.MEDIUM

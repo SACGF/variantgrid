@@ -210,6 +210,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         if allele_origin := self.get_query_param("allele_origin"):
             if allele_origin != "A":
                 filters.append(Q(allele_origin_grouping__allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
+        if testing_context := self.get_query_param("testing_context"):
+            filters.append(Q(allele_origin_grouping__testing_context_bucket=testing_context))
 
         # for view gene symbol
         if protein_position := self.get_query_param("protein_position"):

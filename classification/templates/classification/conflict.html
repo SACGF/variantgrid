@@ -53,25 +53,8 @@
                     {% for c_hgvs in conflict.c_hgvses %}<div>{% c_hgvs c_hgvs %}</div>{% endfor %}
                 {% endlabelled %}
 
-                {% labelled label="All Overlaps for Allele" %}
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Allele Origin</th>
-                                <th>Testing Context</th>
-                                <th>Condition</th>
-                                <th>Value Type</th>
-                                <th>Severity</th>
-                            </tr>
-                        </thead>
-                    <tbody>
-                    {% for cell in conflicts_for_allele.cells %}
-                        {% if cell.start_tr %}<tr>{% endif %}
-                            <td rowspan="{{ cell.row_span }}">{{ cell.value }}</td>
-                        {% if cell.end_tr %}</tr>{% endif %}
-                    {% endfor %}
-                    </tbody>
-                    </table>
+                {% labelled label="All Overlaps for Allele" hint="chunky" %}
+                    {% conflicts conflict.allele currently_viewing=conflict %}
                 {% endlabelled %}
             </div>
         </div>

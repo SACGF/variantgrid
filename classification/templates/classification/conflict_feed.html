@@ -11,7 +11,7 @@
     }
 </style>
 <div class="card">
-<div class="card-header">{% if mode == "inline" %}Changes / Triage Feed{% else %}{{ conflict }} {% admin_link conflict %}{% endif %}</div>
+<div class="card-header">{% if mode == "inline" %}Changes / Triage Feed{% else %}{{ conflict }} - <a href="{{ conflict.get_absolute_url }}">click for full detail</a> {% admin_link conflict %}{% endif %}</div>
 <form data-toggle="ajax-form" method="POST" action="{% url 'conflict_feed' conflict.pk %}">
     {% if mode == "inline" %}<input type="hidden" name="mode" value="inline">{% endif %}
     <div class="card-body">

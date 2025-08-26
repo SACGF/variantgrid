@@ -1,19 +1,21 @@
 import itertools
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from dataclasses import dataclass, field
-from enum import StrEnum
+from dataclasses import dataclass
+from enum import IntEnum
 from functools import cached_property
-from typing import Optional, Iterable, Callable, Any
+from typing import Optional, Iterable, Callable
 from datetime import datetime
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.urls import reverse
 from more_itertools.recipes import partition
-from classification.enums import AlleleOriginBucket, ConflictSeverity, ShareLevel, ConflictType, TestingContextBucket
+from classification.enums import AlleleOriginBucket, ConflictSeverity, ShareLevel, ConflictType, TestingContextBucket, \
+    SpecialEKeys
 from classification.models import AlleleOriginGrouping, EvidenceKeyMap, Conflict, ConflictKey, ConflictHistory, \
     ConflictLab, ClassificationGrouping, ClassificationModification
 from genes.hgvs import CHGVS
-from library.utils import strip_json, first, sort_and_group_by, RowSpanTable
+from library.utils import strip_json, first, sort_and_group_by, RowSpanTable, RowSpanCellValue
 from snpdb.models import Allele, Lab
 
 """
@@ -34,6 +36,7 @@ class ClinSigData(ConflictDataRow):
             "amp_level": self.amp_level
         }
 """
+
 
 @dataclass
 class ConflictDataRow:
@@ -77,7 +80,7 @@ class ConflictDataRow:
         })
 
     @staticmethod
-    def from_json(row: dict) ->'ConflictDataRow' :
+    def from_json(row: dict) -> 'ConflictDataRow':
         return ConflictDataRow(
             lab_id=row.get("lab_id"),
             share_level=ShareLevel(row.get("share_level")),
@@ -402,29 +405,137 @@ class ConflictMerge:
         return method
 
 
-@staticmethod
-def group_conflicts(conflicts: Iterable[Conflict]) -> 'RowSpanTable':
+class GroupConflictsLinks(IntEnum):
+    NO_LINKS = 0
+    OVERLAP_LINK = 1
+    FILTER_LINK = 2
+
+
+def group_conflicts(
+        conflicts: Iterable[Conflict],
+        link_types: GroupConflictsLinks = GroupConflictsLinks.NO_LINKS,
+        currently_viewing: Optional[Conflict] = None
+    ) -> 'RowSpanTable':
+
+    def href_for_parts(parts: list[str]):
+        nonlocal link_types
+        if link_types == GroupConflictsLinks.FILTER_LINK:
+            parts_array = ",".join(f"'{p}'" for p in parts)
+            return f"overlap_filter([{ parts_array }])"
+        return None
+
     conflicts = sorted(conflicts, key=lambda c: c.conflict_type)
 
-    table = RowSpanTable(5)
+    table = RowSpanTable(6)
+    classification_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+    clin_sig_key = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
 
     for allele_origin, sub_conflicts in sort_and_group_by(conflicts, lambda c: c.allele_origin_bucket):
-        table.add_cell(0, AlleleOriginBucket(allele_origin).label)
+        allele_origin_bucket = AlleleOriginBucket(allele_origin)
+        link_parts = [allele_origin_bucket.value, allele_origin_bucket.label]
 
-        for testing_context, sub_sub_conflicts in sort_and_group_by(sub_conflicts, lambda c: c.testing_context_bucket):
+        allele_origin_css = f"allele-origin-{allele_origin_bucket.value}"
+        allele_origin_full_css = [allele_origin_css]
+        allele_origin_matches = False
+        if currently_viewing and currently_viewing.allele_origin_bucket == allele_origin_bucket:
+            allele_origin_matches = True
+            allele_origin_full_css += ["currently-viewing"]
 
-            table.add_cell(1, TestingContextBucket(testing_context).label)
+        table.add_cell(0, RowSpanCellValue(allele_origin_bucket.label, css_classes=allele_origin_full_css, href=href_for_parts(link_parts)))
 
-            for condition, sub_sub_sub_conflicts in sort_and_group_by(sub_sub_conflicts, lambda c: c.tumor_type_category or "Undetermined condition"):
+        for testing_context_str, sub_sub_conflicts in sort_and_group_by(sub_conflicts, lambda c: c.testing_context_bucket):
 
-                table.add_cell(2, condition)
+            testing_context = TestingContextBucket(testing_context_str)
+            testing_link_parts = link_parts + [testing_context.value, testing_context.label]
 
-                for value_type, sub_sub_sub_sub_conflicts in sort_and_group_by(sub_sub_sub_conflicts, lambda c: ConflictType(c.conflict_type).label):
+            testing_context_css = [allele_origin_css]
+            testing_context_matches = False
+            if allele_origin_matches and currently_viewing and currently_viewing.testing_context_bucket == testing_context:
+                testing_context_matches = True
+                testing_context_css += ["currently-viewing"]
+
+            href: Optional[str] = None
+            if allele_origin_bucket != AlleleOriginBucket.GERMLINE:
+                href = href_for_parts(testing_link_parts)
+
+            table.add_cell(1, RowSpanCellValue(testing_context.label, css_classes=testing_context_css, href=href))
+
+            for condition, sub_sub_sub_conflicts in sort_and_group_by(sub_sub_conflicts, lambda c: c.tumor_type_category or "PLACEHOLDER"):
+                condition_css = [allele_origin_css]
+                condition_matches = False
+                if testing_context_matches and currently_viewing and (currently_viewing.tumor_type_category or "PLACEHOLDER") == condition:
+                    condition_matches = True
+                    condition_css += ["currently-viewing"]
+
+                if condition == "PLACEHOLDER":
+                    condition_css += ["no-value"]
+                    condition = "N/A"
+                    if testing_context.should_have_subdivide:
+                        condition = "Indeterminate condition"
+
+                table.add_cell(2, RowSpanCellValue(condition, css_classes=condition_css))
+
+                for value_type, sub_sub_sub_sub_conflicts in sort_and_group_by(sub_sub_sub_conflicts, lambda c: ConflictType(c.conflict_type)):
                     sub_sub_sub_sub_conflicts_list = list(sub_sub_sub_sub_conflicts)
                     if len(sub_sub_sub_sub_conflicts_list) != 1:
                         raise ValueError(f"Multiple conflicts found for {allele_origin} {testing_context} {condition} {sub_sub_sub_sub_conflicts_list}")
 
-                    table.add_cell(3, value_type)
-                    table.add_cell(4, sub_sub_sub_sub_conflicts_list[0].latest.get_severity_display)
+                    conflict = sub_sub_sub_sub_conflicts_list[0]
+                    value_type_label = ConflictType(value_type).label_for_context(allele_origin_bucket)
+                    value_type_css = [allele_origin_css]
+                    if condition_matches and currently_viewing and (currently_viewing.conflict_type == value_type):
+                        value_type_css += ["currently-viewing"]
+
+                    href = None
+                    if link_types != GroupConflictsLinks.NO_LINKS and not (
+                            currently_viewing and currently_viewing == conflict):
+                        href = reverse("conflict_feed", kwargs={"conflict_id": conflict.pk})
+                    table.add_cell(3, RowSpanCellValue(value_type_label, css_classes=value_type_css, href=href))
+
+                    severity = ConflictSeverity(conflict.latest.severity)
+                    severity_type_css = [allele_origin_css]
+                    if severity < ConflictSeverity.SAME:
+                        severity_type_css += ["no-value"]
+                    elif severity == ConflictSeverity.SAME:
+                        pass
+                    elif severity < ConflictSeverity.MAJOR:
+                        severity_type_css += ["strong", "text-warning"]
+                    else:
+                        severity_type_css += ["strong", "text-danger"]
+
+
+                    if currently_viewing == conflict:
+                         severity_type_css += ["strong"]
+
+                    table.add_cell(4, RowSpanCellValue(conflict.latest.get_severity_display, css_classes=severity_type_css))
+
+                    conflict_history: ConflictHistory = conflict.latest
+                    unique_classifications = set()
+                    unique_clin_sigs = set()
+                    for row in conflict_history.data_rows():
+                        if not row.exclude:
+                            if classification := row.classification:
+                                unique_classifications.add(classification)
+                            if clinical_sig := row.clinical_significance:
+                                unique_clin_sigs.add(clinical_sig)
+                                # TODO optionally add
+                                #values.append(EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(clinical_sig))
+
+                    values = []
+                    value_css = [allele_origin_css]
+                    if currently_viewing == conflict:
+                        value_css += ["strong"]
+                    if unique_classifications:
+                        values.extend(classification_key.sort_values(unique_classifications))
+
+                    if unique_clin_sigs:
+                        values.extend(clin_sig_key.pretty_value(val) for val in clin_sig_key.sort_values(unique_clin_sigs))
+
+                    values_str: str
+                    if values:
+                        values_str = ", ".join(values)
+                        table.add_cell(5, RowSpanCellValue(values_str, css_classes=value_css))
+                    else:
+                        table.add_cell(5, RowSpanCellValue("-", css_classes=value_css + ["no-value"]))
 
     return table

@@ -14,7 +14,6 @@ from classification.services.conflict_services import ConflictDataRow, group_con
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from library import cache
 from library.utils import IterableStitcher
-from library.utils.django_utils import render_ajax_view
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
 from uicore.views.ajax_form_view import AjaxFormView, LazyRender
