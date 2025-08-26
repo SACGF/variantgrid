@@ -59,7 +59,7 @@ def create_samplesheet_samples(sample_sheet):
     try:
         date_on_file = None
         # Handle having prefixes added to SequencingRun dir - get off original path
-        if original_sequencing_run := sample_sheet.sequencing_run.get_params().get("original_sequencing_run"):
+        if original_sequencing_run := sample_sheet.sequencing_run.original_sequencing_run:
             filename_parts = original_sequencing_run.split('_')
             date_on_file = filename_parts[0]
 

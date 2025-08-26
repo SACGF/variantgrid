@@ -268,13 +268,18 @@ class SequencingRun(SeqAutoRecord):
             date = make_aware(dt).date()
         return date
 
+    @property
+    def original_sequencing_run(self):
+        return self.get_original_illumina_sequencing_run(self.name)
+
+    @cache_memoize(DAY_SECS, args_rewrite=lambda p: (p.pk, ))
     def get_params(self):
         """ This allows chaining down names etc - in case a level changes it, will cascade down """
         params = {
             "sequencing_run": self.name,
             "sequencing_run_dir": self.path,
             "flowcell_id": self.get_flowcell_id(),
-            "original_sequencing_run": self.get_original_illumina_sequencing_run(self.name),
+            "original_sequencing_run": self.original_sequencing_run,
         }
         if self.enrichment_kit:
             params["enrichment_kit"] = self.enrichment_kit.name
@@ -437,6 +442,7 @@ class SequencingSample(models.Model):
     failed = models.BooleanField(default=False)
     automatically_process = models.BooleanField(default=True)
 
+    @cache_memoize(DAY_SECS, args_rewrite=lambda p: (p.pk, ))
     def get_params(self):
         params = self.sample_sheet.get_params()
         indexes = self.barcode.split("|")
