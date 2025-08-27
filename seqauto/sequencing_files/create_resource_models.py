@@ -2,7 +2,6 @@ import logging
 import os
 import re
 import sys
-import time
 import traceback
 from collections import Counter, defaultdict
 from typing import Iterable, Optional
@@ -937,7 +936,6 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
     reloaded = 0
     missing = 0
     unchanged = 0
-    stat_time = 0.0
 
     for qc in qc_set:
         other_qc_path = klass.get_path_from_qc(qc)
@@ -945,9 +943,7 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
         data_state = get_data_state(qc.data_state, exists)
 
         if exists:
-            start = time.time()
             file_last_modified = SeqAutoRecord.get_file_last_modified(other_qc_path)
-            stat_time += time.time() - start
         else:
             file_last_modified = 0.0
 
@@ -1009,7 +1005,6 @@ def process_other_qc_class(seqauto_run, gene_matcher, canonical_transcript_manag
             else:
                 missing += 1
 
-    logging.info("%s: stat_time=%.2f seconds", klass, stat_time)
     logging.info("%s: created: %d, updated: %d, reloaded: %d, missing: %d, unchanged: %d",
                  klass, created, updated, reloaded, missing, unchanged)
 
