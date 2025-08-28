@@ -95,17 +95,17 @@ def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None,
 
         create_resource_models(seqauto_run, process_seqauto_scripts)
 
-        # Jobs
-        all_sequencing_file_types = set(dict(SEQAUTO_SCRIPTS)) | {SequencingFileType.COMBINED_VCF}
-        launch_file_types = only_launch_file_types or all_sequencing_file_types
-        seqauto_run.scripts_and_jobs_start = timezone.now()
+        if run_launch_script:
+            # Jobs
+            all_sequencing_file_types = set(dict(SEQAUTO_SCRIPTS)) | {SequencingFileType.COMBINED_VCF}
+            launch_file_types = only_launch_file_types or all_sequencing_file_types
+            seqauto_run.scripts_and_jobs_start = timezone.now()
 
-        job_launch_script_filename = create_jobs_and_launch_script(seqauto_run, launch_file_types)
-        if job_launch_script_filename:
-            logging.info("Wrote launch script %s", job_launch_script_filename)
+            job_launch_script_filename = create_jobs_and_launch_script(seqauto_run, launch_file_types)
+            if job_launch_script_filename:
+                logging.info("Wrote launch script %s", job_launch_script_filename)
 
-            seqauto_run.job_launch_script_filename = job_launch_script_filename
-            if run_launch_script:
+                seqauto_run.job_launch_script_filename = job_launch_script_filename
                 try:
                     logging.info("Running launch script %s", job_launch_script_filename)
                     subprocess.check_output([job_launch_script_filename], stderr=subprocess.STDOUT)
