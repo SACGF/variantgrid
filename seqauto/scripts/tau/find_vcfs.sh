@@ -1,5 +1,12 @@
 #!/bin/sh
 
-# We want to be able to skip entire directories with .variantgrid_skip_flowcell in them - ie not descend any further
-find /tau/data/clinical_hg38 -mindepth 1 -maxdepth 1 -type d ! -exec test -e '{}/.variantgrid_skip_flowcell' \; -print0 \
-| xargs -0 -I{} find '{}' \( -name \*.vcf -o -name \*.vcf.gz \)
+#!/bin/sh
+
+
+OUTPUT_DIR=$1
+FLOWCELL_DIRS=${OUTPUT_DIR}/find_flowcells.txt
+
+while read -r line
+do
+	ls -d -1 ${line}/2_variants/**/*.vcf ${line}/2_variants/**/*.vcf.gz 2> /dev/null || true
+done < "${FLOWCELL_DIRS}"
