@@ -76,6 +76,8 @@ BACKEND_ENGINE = "postgres"
 
 CONN_MAX_AGE = 60  # Reuse DB connections
 
+DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -535,7 +537,6 @@ INSTALLED_APPS = [
     'avatar',
     'vcauth',
     'datetimeutc',
-    'django_admin_json_editor',
     'django.contrib.humanize',
     'django.contrib.sites',
     'registration',

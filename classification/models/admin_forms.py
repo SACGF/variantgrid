@@ -1,6 +1,5 @@
 from django.contrib import admin, messages
 from django.contrib.auth.models import User
-from django_admin_json_editor.admin import JSONEditorWidget
 import json
 from django.conf import settings
 from django_extensions.management.commands.admin_generator import AdminModel
@@ -458,8 +457,6 @@ class EvidenceKeyAdmin(admin.ModelAdmin):
             'sub_label': admin.widgets.AdminTextInputWidget(),
             'see': admin.widgets.AdminURLFieldWidget(),
             'if_key': admin.widgets.AdminTextInputWidget(),
-            'options': JSONEditorWidget(options_schema, True),
-            'examples': JSONEditorWidget(examples_schema, True),
 
         }, **kwargs)
 

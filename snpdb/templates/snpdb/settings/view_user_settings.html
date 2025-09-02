@@ -19,7 +19,7 @@
                 $("#avatar-preview").hide();
                 $("input[type=submit]", editAvatar).button()
             }
-            editAvatar.load("{% url 'avatar_change' %}", changeAvatarLoaded);
+            editAvatar.load("{% url 'avatar:change' %}", changeAvatarLoaded);
         }
     </script>
 {% endblock %}
