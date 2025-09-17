@@ -5,7 +5,7 @@ from django.conf import settings
 from django.contrib.auth.models import Group, User
 
 from email_manager.models import EmailLog
-from library.log_utils import NotificationBuilder, send_notification
+from library.log_utils import NotificationBuilder, send_notification, AdminNotificationBuilder
 from library.utils import empty_to_none
 from snpdb.models import Lab, UserSettings, Tag, TagColorsCollection
 
@@ -87,6 +87,8 @@ class LabNotificationBuilder(NotificationBuilder):
                     recipient_list=[admin_email],
                     allow_users_to_see_others=True
                 )
+        else:
+            AdminNotificationBuilder(f"No recipients for lab {self.lab.name}").add_markdown("Have email to send to lab but no active users with email enabled as recipients").send()
 
     @property
     def webhook_url(self) -> Optional[str]:

@@ -50,7 +50,6 @@ def conflict_view(request: HttpRequest, conflict_id: int) -> HttpResponseBase:
     feed = ConflictFeedView.lazy_render(conflict)
 
     conflicts_for_allele = Conflict.objects.filter(allele=conflict.allele)
-    # grouped_conflicts_for_allele = ConflictGroup.group_conflicts(conflicts_for_allele)
 
     return render(request, 'classification/conflict.html', {
         "conflict": Conflict.objects.get(pk=conflict_id),

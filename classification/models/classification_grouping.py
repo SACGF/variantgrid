@@ -1,5 +1,5 @@
 import operator
-from collections import Counter, defaultdict
+from collections import Counter
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
 from typing import Optional, Self, Tuple, Iterable, Union
@@ -733,7 +733,9 @@ class Conflict(TimeStampedModel):
 
     @cached_property
     def latest(self) -> 'ConflictHistory':
-        return ConflictHistory.objects.filter(conflict=self, is_latest=True).first()
+        if the_latest := ConflictHistory.objects.filter(conflict=self, is_latest=True).first():
+            return the_latest
+        raise ConflictHistory.DoesNotExist(f"Conflict {self.pk} has no ConflictHistory marked as is_latest")
 
     @property
     def current_severity_as_of(self) -> datetime:
@@ -792,6 +794,14 @@ class ConflictHistory(TimeStampedModel):
     class Meta:
         indexes = [models.Index(fields=["conflict", "is_latest"])]
 
+    @cached_property
+    def involved_lab_ids(self) -> set[int]:
+        lab_ids: set[int] = set()
+        for row in self.data_rows():
+            if row.exclude:
+                lab_ids.add(row.lab_id)
+        return lab_ids
+
     # TODO, caching this and letting other methods annotate it is a bit messy in some places
     # but a lot cleaner in others
     def data_rows(self) -> list['ConflictDataRow']:
@@ -837,6 +847,25 @@ class ConflictComment(TimeStampedModel):
                 parts.append(f"{html.escape(str(lab))} -> {status_obj.label}")
             return SafeString("<br/>".join(parts))
 
+
+class ConflictNotificationStatus(TextChoices):
+    QUEUED = "Q", "Queued"
+    PROCESSING = "P", "Processing"
+    COMPLETE = "C", "Complete"
+
+
+class ConflictNotificationRun(TimeStampedModel):
+    status = models.TextField(choices=ConflictNotificationStatus.choices, default=ConflictNotificationStatus.QUEUED)
+    # TODO maybe add some overall stats
+
+
+class ConflictNotification(TimeStampedModel):
+    conflict = models.ForeignKey(Conflict, on_delete=CASCADE)
+    current_state = models.ForeignKey(ConflictHistory, on_delete=CASCADE, related_name='+')
+    previous_state = models.ForeignKey(ConflictHistory, on_delete=CASCADE, related_name='+', null=True, blank=True)
+    notification_run = models.ForeignKey(ConflictNotificationRun, on_delete=SET_NULL, null=True, blank=True)
+
+
 # @dataclass
 # class ConflictLabGrouped:
 #     conflict_lab_groupings: list['ConflictLabGrouping']
@@ -848,3 +877,10 @@ class ConflictComment(TimeStampedModel):
 #     lab: Lab
 #     data: list[ConflictDataRow]
 #     comments: list[ConflictLabComment]
+
+"""
+    ConflictUpdate:
+        original_conflict_history
+        new_conflict_history
+        notification_status
+"""

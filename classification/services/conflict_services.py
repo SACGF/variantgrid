@@ -1,22 +1,26 @@
 import itertools
 from abc import ABC, abstractmethod
-from collections import defaultdict
+from collections import defaultdict, Counter
 from dataclasses import dataclass
 from enum import IntEnum
 from functools import cached_property
+from html import escape
 from typing import Optional, Iterable, Callable
 from datetime import datetime
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.urls import reverse
+from django.utils.safestring import SafeString
 from more_itertools.recipes import partition
 from classification.enums import AlleleOriginBucket, ConflictSeverity, ShareLevel, ConflictType, TestingContextBucket, \
     SpecialEKeys
 from classification.models import AlleleOriginGrouping, EvidenceKeyMap, Conflict, ConflictKey, ConflictHistory, \
-    ConflictLab, ClassificationGrouping, ClassificationModification
+    ConflictLab, ClassificationGrouping, ClassificationModification, ConflictNotification, ConflictNotificationStatus, \
+    ConflictNotificationRun
 from genes.hgvs import CHGVS
 from library.utils import strip_json, first, sort_and_group_by, RowSpanTable, RowSpanCellValue
 from snpdb.models import Allele, Lab
+from snpdb.utils import LabNotificationBuilder
 
 """
 
@@ -245,6 +249,126 @@ class ConflictCalculator(ABC):
             ch.modified = override_date
             ch.save(update_fields=["created", "modified"], update_modified=False)
 
+        if not override_date:
+            # don't log notifications when filling in the backlog of data
+            ConflictCompare(latest, ch).store_to_db()
+
+
+class ConflictCompareType(IntEnum):
+    NO_CHANGE = 0
+    BECAME_CONFLICT = 1
+    BECAME_AGREED = 2
+    CHANGE_OF_LABS = 3
+
+    def label(self):
+        match self:
+            case ConflictCompareType.NO_CHANGE: return "No change"
+            case ConflictCompareType.CHANGE_OF_LABS: return "Change of labels"
+            case ConflictCompareType.BECAME_CONFLICT: return "Now in conflict"
+            case ConflictCompareType.BECAME_CONFLICT: return "Now resolved"
+
+
+@dataclass(frozen=True)
+class ConflictCompare:
+    previous_state: Optional[ConflictHistory]
+    current_state: ConflictHistory
+
+    @property
+    def conflict(self) -> Conflict:
+        return self.current_state.conflict
+
+    @staticmethod
+    def from_conflict_notification(cn: ConflictNotification):
+        return ConflictCompare(previous_state=cn.previous_state, current_state=cn.current_state)
+
+    @cached_property
+    def notification_change_type(self) -> ConflictCompareType:
+        if self.previous_state == self.current_state:
+            # FIXME check to see if other labs have joined in, but only if otherwise in reportable state
+            return ConflictCompareType.NO_CHANGE
+
+        was_reportable = False
+        if self.previous_state:
+            was_reportable = self.previous_state.severity >= ConflictSeverity.MEDIUM
+
+        is_reportable_now = self.current_state.severity >= ConflictSeverity.MEDIUM
+        if was_reportable != is_reportable_now:
+            if was_reportable:
+                return ConflictCompareType.BECAME_AGREED
+            else:
+                return ConflictCompareType.BECAME_CONFLICT
+        else:
+            return ConflictCompareType.NO_CHANGE
+
+    @property
+    def is_notifiable_difference(self):
+        return bool(self.notification_change_type)
+
+    def store_to_db(self):
+        if ConflictNotification.objects.filter(
+                conflict=self.current_state.conflict,
+                notification_run__isnull=True).update(current_state=self.current_state):
+            # ConflictNotification already existed for this conflict, update its state
+            return
+
+        if self.is_notifiable_difference:
+            # didn't already exist, only create it if it'll be a notifiable difference
+            # as an optimisation
+            ConflictNotification.objects.create(
+                conflict=self.current_state.conflict,
+                previous_state=self.previous_state,
+                current_state=self.current_state,
+            )
+
+    @property
+    def involved_lab_ids(self) -> set[int]:
+        all_lab_ids = self.current_state.involved_lab_ids
+        if previous_state := self.previous_state:
+            all_lab_ids |= previous_state.involved_lab_ids
+        return all_lab_ids
+
+
+def process_outstanding_conflict_notifications():
+    if ConflictNotification.objects.filter(notification_run__isnull=True).exists():
+        notification_run = ConflictNotificationRun.objects.create()
+        ConflictNotification.objects.filter(notification_run__isnull=True).update(notification_run=notification_run)
+
+        lab_to_conflict_compares: dict[int, list[ConflictCompare]] = defaultdict(list)
+        for cn in ConflictNotification.objects.filter(notification_run=notification_run):
+            cc = ConflictCompare.from_conflict_notification(cn)
+            if cc.is_notifiable_difference:
+                for lab_id in cc.involved_lab_ids:
+                    lab_to_conflict_compares[lab_id].append(cc)
+
+        # now we have the notifications to send...
+        for lab_id, compares in lab_to_conflict_compares.items():
+
+            change_types: dict[ConflictCompareType, int] = Counter()
+            gene_symbols: set[str] = set()
+            for conflict_compare in compares:
+                if c_hgvses := conflict_compare.conflict.c_hgvses():
+                    for c_hgvs in c_hgvses:
+                        if gene_symbol := c_hgvs.gene_symbol:
+                            gene_symbols.add(gene_symbol)
+                            break
+                    gene_symbols.add("Unknown Gene Symbol")
+
+            lab = Lab.objects.get(id=lab_id)
+
+            title_parts = []
+            if len(compares) == 1:
+                title_parts.append(f"Discordance update for gene symbol: {gene_symbols} - ")
+
+            lab_notification = LabNotificationBuilder(lab, "Discordance Updates")
+
+
+
+            lab_notification.add_markdown("TODO: implementation on the discordance messages")
+            lab_notification.send()
+
+        notification_run.status = ConflictNotificationStatus.COMPLETE
+        notification_run.save()
+
 
 class OncPathCalculator(ConflictCalculator):
 
@@ -414,7 +538,8 @@ class GroupConflictsLinks(IntEnum):
 def group_conflicts(
         conflicts: Iterable[Conflict],
         link_types: GroupConflictsLinks = GroupConflictsLinks.NO_LINKS,
-        currently_viewing: Optional[Conflict] = None
+        currently_viewing: Optional[Conflict] = None,
+        user: Optional[User] = None,
     ) -> 'RowSpanTable':
 
     def href_for_parts(parts: list[str]):
@@ -423,6 +548,10 @@ def group_conflicts(
             parts_array = ",".join(f"'{p}'" for p in parts)
             return f"overlap_filter([{ parts_array }])"
         return None
+
+    user_lab_ids = None
+    if user:
+        user_lab_ids = set(lab.pk for lab in Lab.valid_labs_qs(user, admin_check=False))
 
     conflicts = sorted(conflicts, key=lambda c: c.conflict_type)
 
@@ -503,23 +632,46 @@ def group_conflicts(
                     else:
                         severity_type_css += ["strong", "text-danger"]
 
-
                     if currently_viewing == conflict:
-                         severity_type_css += ["strong"]
-
-                    table.add_cell(4, RowSpanCellValue(conflict.latest.get_severity_display, css_classes=severity_type_css))
+                        severity_type_css += ["strong"]
 
                     conflict_history: ConflictHistory = conflict.latest
                     unique_classifications = set()
                     unique_clin_sigs = set()
+                    your_lab_ids = set()
+                    other_lab_ids = set()
                     for row in conflict_history.data_rows():
                         if not row.exclude:
+                            if user_lab_ids is not None:
+                                if row.lab_id in user_lab_ids:
+                                    your_lab_ids.add(row.lab_id)
+                                else:
+                                    other_lab_ids.add(row.lab_id)
+
                             if classification := row.classification:
                                 unique_classifications.add(classification)
                             if clinical_sig := row.clinical_significance:
                                 unique_clin_sigs.add(clinical_sig)
-                                # TODO optionally add
-                                #values.append(EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(clinical_sig))
+
+
+                    # now check the labs
+
+                    severity_parts = []
+                    if user_lab_ids is not None:
+                        your_lab_count = len(your_lab_ids)
+                        other_lab_count = len(other_lab_ids)
+
+                        if your_lab_count:
+                            severity_parts.append('<i class="fa-solid fa-user-doctor text-success" title="Your lab is involved"></i>')
+                        if other_lab_count == 1:
+                            severity_parts.append('<i class="fa-solid fa-user text-secondary" title="Another lab is involved"></i>')
+                        elif other_lab_count > 1:
+                            severity_parts.append('<i class="fa-solid fa-users text-secondary" title="Multiple other labs are involved"></i>')
+
+                    severity_parts.append(escape(severity.label))
+                    severity_str = SafeString("".join(severity_parts))
+
+                    table.add_cell(4, RowSpanCellValue(severity_str, css_classes=severity_type_css))
 
                     values = []
                     value_css = [allele_origin_css]

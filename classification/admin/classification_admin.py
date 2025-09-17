@@ -22,7 +22,7 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
     DiscordanceReportTriageStatus, ClassificationGrouping, ClassificationGroupingEntry, \
     AlleleOriginGrouping, AlleleGrouping, ClassificationGroupingSearchTerm, ClassificationSummaryCalculator, Conflict, \
-    ConflictHistory, ConflictLab
+    ConflictHistory, ConflictLab, ConflictNotification
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -30,6 +30,7 @@ from classification.models.clinical_context_models import ClinicalContextRecalcT
 from classification.models.clinical_context_utils import update_clinical_contexts
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from classification.models.discordance_models_utils import DiscordanceReportRowDataTriagesRowData
+from classification.services.conflict_services import process_outstanding_conflict_notifications
 from classification.signals import send_prepared_discordance_notifications
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.cache import timed_cache
@@ -1536,3 +1537,17 @@ class ConflictAdmin(ModelAdminBasics):
         if obj.latest.severity in {ConflictSeverity.NO_SUBMISSIONS, ConflictSeverity.SINGLE_SUBMISSION}:
             return SafeString(f'<i style="color:#888">{display}</i>')
         return display
+
+
+@admin.register(ConflictNotification)
+class ConflictNotificationAdmin(ModelAdminBasics):
+    list_display = ("conflict", "previous_state", "current_state", "notification_run")
+
+    @admin_action("Queue for re-sending")
+    def queue_for_resend(self, request, queryset: QuerySet[ConflictNotification]):
+        queryset.update(notification_run=None)
+
+    @admin_model_action(url_slug="send_pending/", short_description="Send Pending Notifications Now", icon="fa-solid fa-mail")
+    def create_dummy(self, request):
+        process_outstanding_conflict_notifications()
+        self.message_user(request, "Sent any outstanding notifications")

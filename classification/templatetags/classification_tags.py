@@ -741,10 +741,15 @@ def conflict(conflict: Conflict | ConflictMerge):
     return {"conflict": conflict}
 
 
-@register.inclusion_tag("classification/tags/conflicts.html")
-def conflicts(allele: Allele, currently_viewing: Optional[Conflict] = None):
+@register.inclusion_tag("classification/tags/conflicts.html", takes_context=True)
+def conflicts(context, allele: Allele, currently_viewing: Optional[Conflict] = None):
     conflicts_for_allele = Conflict.objects.filter(allele=allele)
-    conflict_group = group_conflicts(conflicts_for_allele, link_types=GroupConflictsLinks.OVERLAP_LINK if currently_viewing else GroupConflictsLinks.FILTER_LINK, currently_viewing=currently_viewing)
+    conflict_group = group_conflicts(
+        conflicts_for_allele,
+        link_types=GroupConflictsLinks.OVERLAP_LINK if currently_viewing else GroupConflictsLinks.FILTER_LINK,
+        currently_viewing=currently_viewing,
+        user=context.request.user
+    )
     return {"conflicts_for_allele": conflict_group}
 
 
