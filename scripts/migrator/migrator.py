@@ -8,11 +8,11 @@ from typing import List, Optional, Dict
 
 from library.git import Git
 
-PYTHON_CMD = "python3.8"
+PYTHON_CMD = "python3"
 PYTHON_ALIAS = "python"
 
 COMMAND_ALIASES = {
-    "python": "python3.8"
+    "python": "python3"
 }
 
 def print_red(skk): print("\033[91m{}\033[00m" .format(skk))
