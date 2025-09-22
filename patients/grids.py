@@ -1,5 +1,6 @@
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.db.models.aggregates import Count
+from django.db.models.fields import TextField
 from django.db.models.query_utils import Q
 from django.shortcuts import get_object_or_404
 
@@ -48,12 +49,17 @@ class PatientListGrid(JqGridUserRowConfig):
             queryset = queryset.filter(pk__in=patient_id_qs)
 
         # Add sample_count to queryset
-        annotation_kwargs = {"reference_id": StringAgg("specimen__reference_id", ',', distinct=True),
-                             "phenotype_matches": StringAgg(PATIENT_HPO_PATH + "__name", '|', distinct=True),
-                             "omim": StringAgg(PATIENT_OMIM_PATH + "__description", '|', distinct=True),
-                             "genes": StringAgg(PATIENT_GENE_SYMBOL_PATH, '|', distinct=True),
+        annotation_kwargs = {"reference_id": StringAgg("specimen__reference_id", ',',
+                                                       distinct=True, output_field=TextField()),
+                             "phenotype_matches": StringAgg(PATIENT_HPO_PATH + "__name", '|',
+                                                            distinct=True, output_field=TextField()),
+                             "omim": StringAgg(PATIENT_OMIM_PATH + "__description", '|',
+                                               distinct=True, output_field=TextField()),
+                             "genes": StringAgg(PATIENT_GENE_SYMBOL_PATH, '|',
+                                                distinct=True, output_field=TextField()),
                              "sample_count": Count("sample", distinct=True),
-                             "samples": StringAgg("sample__name", ", ", distinct=True)}
+                             "samples": StringAgg("sample__name", ", ",
+                                                  distinct=True, output_field=TextField())}
         queryset = queryset.annotate(**annotation_kwargs)
         field_names = self.get_field_names() + list(annotation_kwargs.keys())
         self.queryset = queryset.values(*field_names)

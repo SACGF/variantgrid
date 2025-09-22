@@ -1,6 +1,7 @@
 from collections import Counter
 from collections import defaultdict
 from django.contrib.postgres.aggregates.general import StringAgg
+from django.db.models.fields import TextField
 from lazy import lazy
 
 from annotation.models.models_phenotype_match import PATIENT_TPM_PATH, PATIENT_HPO_PATH, PATIENT_OMIM_PATH
@@ -106,8 +107,8 @@ class VariantSampleInformation:
             cgc = CohortGenotypeCollection.objects.get(pk=cgc_id)
             samples_qs = cgc.cohort.get_samples()
 
-            annotation_kwargs = {"patient_phenotype": StringAgg("patient__" + PATIENT_HPO_PATH + "__name", '|', distinct=True),
-                                 "patient_omim": StringAgg("patient__" + PATIENT_OMIM_PATH + "__description", '|', distinct=True)}
+            annotation_kwargs = {"patient_phenotype": StringAgg("patient__" + PATIENT_HPO_PATH + "__name", '|', distinct=True, output_field=TextField()),
+                                 "patient_omim": StringAgg("patient__" + PATIENT_OMIM_PATH + "__description", '|', distinct=True, output_field=TextField())}
             samples_qs = samples_qs.annotate(**annotation_kwargs)
 
             COPY_SAMPLE_FIELDS = ["id", "name", "patient", SAMPLE_ENRICHMENT_KIT_PATH]
