@@ -16,4 +16,4 @@ curl https://api.rollbar.com/api/1/deploy/ \
   -F revision=$REVISION \
   -F local_username=$LOCAL_USERNAME
 
-python3.8 manage.py deployed
+python3 manage.py deployed
