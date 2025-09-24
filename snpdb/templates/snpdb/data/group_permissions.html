@@ -67,9 +67,9 @@ $(document).ready(function() {
         
     {% for form in permission_forms %}
     <tr>
-        <td>{{ form.group }}
-        <td>{{ form.read }}
-        <td>{{ form.write }}
+        <td><a href="{% url 'view_group' form.group.pk %}">{{ form.group }}</a> </td>
+        <td>{{ form.read }}</td>
+        <td>{{ form.write }}</td>
     </tr>
     {% endfor %}
     

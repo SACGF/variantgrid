@@ -32,7 +32,7 @@ class PopulationNode(AnalysisNode):
     af_1kg = models.BooleanField(default=True)
     af_uk10k = models.BooleanField(default=True)
     topmed_af = models.BooleanField(default=False)
-    zygosity = models.CharField(max_length=1, choices=SimpleZygosity.choices, default=SimpleZygosity.ANY_GERMLINE)
+    zygosity = models.CharField(max_length=1, choices=SimpleZygosity.choices, default=SimpleZygosity.NON_REF_CALL)
     use_internal_counts = models.BooleanField(default=False)
     max_samples = models.IntegerField(null=True, blank=True)
     internal_percent = models.FloatField(default=EVERYTHING)
@@ -136,14 +136,14 @@ class PopulationNode(AnalysisNode):
             # an OR - so need to put into the standard node_arg_q_dict[None] later
 
             vzcc = VariantZygosityCountCollection.get_global_germline_counts()
-            # Max germline can be applied either by percent or from max_samples and zygosity = ANY_GERMLINE
+            # Max germline can be applied either by percent or from max_samples and zygosity = NON_REF
             max_germline_list = []
             if self.max_samples is not None:
-                if self.zygosity == SimpleZygosity.ANY_GERMLINE:
+                if self.zygosity == SimpleZygosity.NON_REF_CALL:
                     max_germline_list.append(self.max_samples)
                 else:
-                    if self.zygosity == SimpleZygosity.ANY_ZYGOSITY:
-                        column = vzcc.all_zygosity_counts_alias
+                    if self.zygosity == SimpleZygosity.ANY_CALL:
+                        column = vzcc.any_call_counts_alias
                     elif self.zygosity == SimpleZygosity.HET:
                         column = vzcc.het_alias
                     elif self.zygosity == SimpleZygosity.HOM_ALT:
@@ -169,13 +169,13 @@ class PopulationNode(AnalysisNode):
 
             if max_germline_list:
                 max_germline = min(max_germline_list)
-                less_than = Q(**{vzcc.germline_counts_alias + "__lte": max_germline})
-                is_null = Q(**{vzcc.germline_counts_alias + "__isnull": True})
+                less_than = Q(**{vzcc.non_ref_call_alias + "__lte": max_germline})
+                is_null = Q(**{vzcc.non_ref_call_alias + "__isnull": True})
                 q = less_than | is_null
                 if self.keep_internally_classified_pathogenic:
                     and_q.append(q)
                 else:
-                    node_arg_q_dict[vzcc.germline_counts_alias] = {str(q): q}
+                    node_arg_q_dict[vzcc.non_ref_call_alias] = {str(q): q}
 
         if node_q := self._get_node_q():
             and_q.append(node_q)

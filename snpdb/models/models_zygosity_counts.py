@@ -42,18 +42,18 @@ class VariantZygosityCountCollection(RelatedModelsPartitionModel):
         return f"{self.alias}__hom_count"
 
     @cached_property
-    def germline_counts_alias(self) -> str:
-        return f"germline_counts_{self.pk}"
+    def non_ref_call_alias(self) -> str:
+        return f"non_ref_call_counts_{self.pk}"
 
     @cached_property
-    def all_zygosity_counts_alias(self) -> str:
-        return f"all_zygosity_counts_{self.pk}"
+    def any_call_counts_alias(self) -> str:
+        return f"any_call_counts_{self.pk}"
 
     def get_annotation_kwargs(self, **kwargs):
         q_collection = Q(variantzygositycount__collection=self)
         return {self.alias: FilteredRelation('variantzygositycount', condition=q_collection),
-                self.germline_counts_alias: F(self.het_alias) + F(self.hom_alias),
-                self.all_zygosity_counts_alias: F(self.ref_alias) + F(self.het_alias) + F(self.hom_alias)}
+                self.non_ref_call_alias: F(self.het_alias) + F(self.hom_alias),
+                self.any_call_counts_alias: F(self.ref_alias) + F(self.het_alias) + F(self.hom_alias)}
 
     @staticmethod
     def get_global_germline_counts() -> 'VariantZygosityCountCollection':

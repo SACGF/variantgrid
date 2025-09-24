@@ -192,10 +192,10 @@ class Experiment(PreviewModelMixin, models.Model):
         experiment_name = re.sub("RPT$", "", experiment_name)
         return experiment_name
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         old_name = self.name
         self.name = Experiment.clean_experiment_name(old_name)
-        return super().save(**kwargs)
+        return super().save(*args, **kwargs)
 
     def can_write(self, user) -> bool:
         """ can't delete once you've linked to SequencingRun """

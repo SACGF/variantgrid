@@ -1,6 +1,4 @@
-import operator
 import os
-from functools import reduce
 from typing import Optional
 
 import nameparser
@@ -22,7 +20,7 @@ from library.enums.file_attachments import AttachmentFileType
 from library.enums.titles import Title
 from library.preview_request import PreviewData, PreviewModelMixin, PreviewKeyValue
 from library.utils import calculate_age
-from patients.models_enums import NucleicAcid, Mutation, Sex, PopulationGroup
+from patients.models_enums import NucleicAcid, Mutation, Sex, PopulationGroup, PatientRecordMatchType
 
 TEST_PATIENT_KWARGS = {"first_name": "PATIENT", "last_name": "TESTPATIENT"}
 
@@ -220,23 +218,19 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         return args
 
     @staticmethod
-    def match(first_name, last_name, sex=None, date_of_birth=None, user=None) -> Optional['Patient']:
+    def match(first_name, last_name, sex=None, date_of_birth=None, user=None) -> tuple['Patient', Optional[PatientRecordMatchType]]:
         """" We need to be able to match incomplete info, eg Male if provided matches Sex = M or Unknown """
+
         if not last_name:
             msg = "Last name must be non-null!"
             raise ValueError(msg)
-        last_name = last_name.upper()
+        q = Q(last_name__iexact=last_name)
         if first_name:
-            first_name = first_name.upper()
-
-        patient_q_list = []
-        patient_kwargs = {"last_name": last_name,
-                          "first_name": first_name}
-        if date_of_birth:
-            patient_q_list.append(Q(date_of_birth=date_of_birth) | Q(date_of_birth__isnull=True))
-
+            q &= Q(first_name__iexact=first_name)
+        if date_of_birth is not None:
+            q &= (Q(date_of_birth=date_of_birth) | Q(date_of_birth__isnull=True))
         if sex in Sex.FILLED_IN_CHOICES:
-            patient_q_list.append(Sex.get_q_handling_unknown("sex", sex))
+            q &= Sex.get_q_handling_unknown('sex', sex)
 
         try:
             if user:
@@ -244,21 +238,21 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
             else:
                 patients_queryset = Patient.objects.all()
 
-            patient_args = []
-            if patient_q_list:
-                q = reduce(operator.and_, patient_q_list)
-                patient_args.append(q)
-            patient = patients_queryset.get(*patient_args, **patient_kwargs)
+            patient = patients_queryset.get(q)
+            if (date_of_birth and patient.date_of_birth is None) or (sex in Sex.FILLED_IN_CHOICES and patient.sex == Sex.UNKNOWN):
+                match_type = PatientRecordMatchType.PARTIAL
+            else:
+                match_type = PatientRecordMatchType.EXACT
         except Patient.DoesNotExist:
             # TODO: Handle multiple patients - ie put in errors?
             patient = None
+            match_type = None
+        return patient, match_type
 
-        return patient
-
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         ensure_mutally_exclusive_fields_not_set(self, "date_of_death", "_deceased")
         pheno_kwargs = HasPhenotypeDescriptionMixin.pop_kwargs(kwargs)
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
         HasPhenotypeDescriptionMixin.save_phenotype(self, pheno_kwargs)
 
     def get_samples(self):
@@ -321,7 +315,10 @@ class Specimen(models.Model):
         return age
 
     def __str__(self):
-        return f"Specimen {self.reference_id}"
+        s = self.reference_id
+        if self.description:
+            s += f" ({self.description})"
+        return s
 
 
 class PatientAttachment(models.Model):
@@ -385,6 +382,12 @@ class PatientModification(models.Model):
     origin = models.CharField(max_length=1, choices=PatientRecordOriginType.CHOICES)
     patient_import = models.ForeignKey(PatientImport, null=True, on_delete=CASCADE)
 
+    def get_import_url(self):
+        try:
+            url = self.patient_import.patientrecords.get_absolute_url()
+        except PatientRecords.DoesNotExist:
+            url = None
+        return url
 
 class PatientComment(models.Model):
     patient = models.ForeignKey(Patient, on_delete=CASCADE)
@@ -526,6 +529,9 @@ class Clinician(models.Model):
 class PatientRecords(models.Model):
     patient_import = models.OneToOneField(PatientImport, on_delete=CASCADE)
 
+    def can_view(self, user) -> bool:
+        return user.is_superuser or user == self.user
+
     @property
     def user(self):
         return self.uploaded_file.user
@@ -535,7 +541,7 @@ class PatientRecords(models.Model):
         return self.uploadedpatientrecords.uploaded_file
 
     def get_absolute_url(self):
-        return reverse('view_patient_records', kwargs={"patient_records_id": self.pk})
+        return reverse('view_patient_import', kwargs={"patient_records_id": self.pk})
 
 
 class PatientRecord(models.Model):
@@ -546,17 +552,15 @@ class PatientRecord(models.Model):
     valid = models.BooleanField(default=False)
     validation_message = models.TextField(blank=True, null=True)
 
-    # For each sample/patient/specimen there will be
-    # EITHER a matched_ OR a created_ non null FK depending
-    # On whether existing match or created with import
-    matched_sample_id = models.IntegerField(null=True)  # Can't be a proper link due to cyclical dependencies
-    matched_patient = models.ForeignKey(Patient, null=True, related_name='matched_patient', on_delete=CASCADE)
-    matched_specimen = models.ForeignKey(Specimen, null=True, related_name='matched_specimen', on_delete=CASCADE)
-    created_patient = models.ForeignKey(Patient, null=True, related_name='created_patient', on_delete=CASCADE)
-    created_specimen = models.ForeignKey(Specimen, null=True, related_name='created_specimen', on_delete=CASCADE)
+    # Data from match/create
+    sample = models.ForeignKey('snpdb.Sample', null=True, on_delete=SET_NULL)
+    patient = models.ForeignKey(Patient, null=True, related_name='related_patient', on_delete=SET_NULL)
+    patient_match = models.CharField(max_length=1, choices=PatientRecordMatchType.choices, null=True)
+    specimen = models.ForeignKey(Specimen, null=True, related_name='related_specimen', on_delete=SET_NULL)
+    specimen_match = models.CharField(max_length=1, choices=PatientRecordMatchType.choices, null=True)
 
     # These are filled in from spreadsheet or manually entered
-    sample_id = models.IntegerField(null=True)
+    sample_identifier = models.IntegerField(null=True)
     sample_name = models.TextField(null=True)
     patient_family_code = models.TextField(null=True)
     patient_first_name = models.TextField(null=True)
@@ -579,6 +583,9 @@ class PatientRecord(models.Model):
 
     # Methods on this can include save / isvalid etc -
     # call out to helper funcs etc
+
+    def get_absolute_url(self):
+        return reverse('view_patient_record', kwargs={"pk": self.pk})
 
 
 @receiver(models.signals.post_save, sender=PatientAttachment)

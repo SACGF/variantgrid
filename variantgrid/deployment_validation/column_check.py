@@ -9,7 +9,7 @@ def check_variantgrid_columns() -> dict:
     # These are added via annotate so won't be in a standard variant query
     # TODO: could build proper querby via get_variantgrid_extra_annotate
     SPECIAL_COLUMNS = {
-        "", # Blank
+        "",  # Blank
         "internally_classified", "internally_classified_labs", "max_internal_classification",
         "tags", "tags_global",
         "global_variant_zygosity__hom_count", "global_variant_zygosity__ref_count",

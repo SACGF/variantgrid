@@ -15,6 +15,7 @@ from cache_memoize import cache_memoize
 from celery.canvas import Signature
 from django.conf import settings
 from django.core.cache import cache
+from django.core.exceptions import FieldError
 from django.db import connection, models
 from django.db.models import Value, IntegerField, QuerySet
 from django.db.models.aggregates import Count
@@ -37,7 +38,7 @@ from classification.models import Classification
 from library.constants import DAY_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.log_utils import report_event, log_traceback
-from library.utils import format_percent
+from library.utils import format_percent, add_exception_note
 from library.utils.database_utils import queryset_to_sql
 from library.utils.django_utils import get_model_content_type_dict
 from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, \
@@ -567,7 +568,11 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
                 qs = qs.annotate(**{k: v})
                 if q_and_list := list(arg_q_dict.pop(k, {}).values()):
                     q = reduce(operator.and_, q_and_list)
-                    qs = qs.filter(q)
+                    try:
+                        qs = qs.filter(q)
+                    except FieldError as fe:
+                        add_exception_note(fe, f"annotation kwarg: {k}: {q=}.")
+                        raise
 
         q_list = []
         # Anything stored under None means filters that don't rely on annotation - do afterwards
@@ -957,7 +962,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         if not updated:
             raise NodeOutOfDateException()
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         """ To avoid race conditions, don't use save() in a celery task (unless running in scheduling_single_worker)
             instead use update() method above """
         # logging.debug("save: pk=%s kwargs=%s", self.pk, str(kwargs))
@@ -984,7 +989,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
         if self.parents_changed or self.queryset_dirty:
             self.bump_version()
 
-            super_save(**kwargs)
+            super_save(*args, **kwargs)
             if self.update_children:
                 # We also need to bump if node has it's own sample - as in templates, we set fields in toposort order
                 # So we could go from having multiple proband samples to only one later (thus can set descendants)
@@ -995,7 +1000,7 @@ class AnalysisNode(NodeAuditLogMixin, node_factory('AnalysisEdge', base_model=Ti
                     kid.queryset_dirty = True
                     kid.save()  # Will bump versions
         else:
-            super_save(**kwargs)
+            super_save(*args, **kwargs)
 
         # Make sure this always exists
         NodeVersion.objects.get_or_create(node=self, version=self.version)

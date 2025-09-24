@@ -1,20 +1,20 @@
 import operator
 from functools import cached_property, reduce
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from django.conf import settings
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from more_itertools import first
-from classification.enums import AlleleOriginBucket, EvidenceCategory, SpecialEKeys, ShareLevel, TestingContextBucket
+from classification.enums import AlleleOriginBucket, EvidenceCategory, SpecialEKeys, ShareLevel
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
     ClassificationGroupingSearchTermType, EvidenceKeyMap, ClassificationModification, ClassificationGroupingEntry, \
-    Classification, DiscordanceReport, DiscordanceReportClassification, Conflict
+    Classification, DiscordanceReport, DiscordanceReportClassification
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType
 from ontology.models import OntologyTerm, OntologyTermRelation, OntologySnake
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import GenomeBuild, Variant
+from snpdb.models import UserSettings, GenomeBuild, Variant
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, DC, SortOrder, CellData
 
 
@@ -24,7 +24,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
     This is taking over from ClassificationGroup (in memory merging of rows that then have to be all rendered client side)
     ClassificationColumns - the one classification per row
 
-    Filters are done between a combination of get_initial_query (when on the gene symbol page and if we want the maximum
+    Filters are done between a combination of get_initial_query (when on the gene symbol page and we want the maximum
     number of results to be how many groupings for that gene symbol, rather than presenting the user with
     showing 6 out of 30,000 records)
     and then on filter_query_set when it's a filter that the user can do above and beyond what the page initially loads
@@ -47,15 +47,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                         if (value := cm.get(id_key)) and id_filter in value.lower():
                             matches[id_key] = value
 
-        testing_context = row.get('allele_origin_grouping__testing_context_bucket')
-        testing_context_bucket_label: str
-        if testing_context == TestingContextBucket.OTHER.value:
-            testing_context_bucket_label = "Other Testing Context"
-        elif testing_context == TestingContextBucket.UNKNOWN.value:
-            testing_context_bucket_label = "Unknown Testing Context"
-        else:
-            testing_context_bucket_label = TestingContextBucket(testing_context).label
-
         return {
             "dirty": row.get("dirty"),
             "id": row.get("id"),
@@ -63,9 +54,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             "org_name": row.get('lab__organization__short_name') or row.get('lab__organization__name'),
             "lab_name": row.get('lab__name'),
             "share_level": row.get('share_level'),
-            "allele_origin_bucket": row.get('allele_origin_grouping__allele_origin_bucket'),
-            "testing_context_bucket": testing_context,
-            "testing_context_bucket_label": testing_context_bucket_label,
+            "allele_origin_bucket": row.get('allele_origin_bucket'),
             "matches": matches,
             "search": search
         }
@@ -77,12 +66,11 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
     #     }
 
     def render_somatic(self, row: CellData) -> JsonDataType:
-        if row["allele_origin_grouping__allele_origin_bucket"] != "G":
+        if row["allele_origin_bucket"] != "G":
             diff_value = row["somatic_difference"]
             if somatic_dict := row["latest_classification_modification__classification__summary__somatic"]:
                 somatic_dict["diff"] = diff_value
                 return somatic_dict
-        return None
 
     def render_pathogenic(self, row: CellData) -> JsonDataType:
         diff_value = row["pathogenic_difference"]
@@ -166,14 +154,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
         # run the filters that are perma-applied on certain pages
 
-        if conflict_id := self.get_query_param('conflict_id'):
-            conflict = Conflict.objects.get(pk=conflict_id)
-            filters.append(Q(allele_origin_grouping__allele_grouping__allele_id=int(conflict.allele.id)))
-            filters.append(Q(allele_origin_grouping__allele_origin_bucket=conflict.allele_origin_bucket))
-            filters.append(Q(allele_origin_grouping__testing_context_bucket=conflict.testing_context_bucket))
-            if tumor_type_category := conflict.tumor_type_category:
-                filters.append(Q(allele_origin_grouping__tumor_type_category=tumor_type_category))
-
         if allele_id := self.get_query_param('allele_id'):
             filters.append(Q(allele_origin_grouping__allele_grouping__allele_id=int(allele_id)))
 
@@ -209,9 +189,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
         if allele_origin := self.get_query_param("allele_origin"):
             if allele_origin != "A":
-                filters.append(Q(allele_origin_grouping__allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
-        if testing_context := self.get_query_param("testing_context"):
-            filters.append(Q(allele_origin_grouping__testing_context_bucket=testing_context))
+                filters.append(Q(allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
 
         # for view gene symbol
         if protein_position := self.get_query_param("protein_position"):
@@ -243,7 +221,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             dr = DiscordanceReport.objects.get(pk=discordance_report_id)
             dr.check_can_view(self.user)
             return dr
-        return None
 
     @cached_property
     def id_columns(self) -> List[str]:
@@ -279,29 +256,27 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 ).values_list('grouping_id', flat=True)
         )
 
-    def gene_symbol_filter(self, gene_symbol: str) -> Optional[Q]:
+    def gene_symbol_filter(self, gene_symbol: str):
         if gene_symbol := GeneSymbol.objects.filter(symbol=gene_symbol).first():
             all_strs = [gene_symbol.symbol] + gene_symbol.alias_meta.alias_symbol_strs
             all_strs = [gs.upper() for gs in all_strs]
             return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.GENE_SYMBOL, all_strs)
-        return None
         # FIXME add support for gene symbol alias
 
-    def scv_filter(self, scv: str) -> Optional[Q]:
+    def scv_filter(self, scv: str):
         if scv.startswith("SCV"):
             return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.CLINVAR_SCV, scv)
-        return None
 
-    def condition_filter(self, text, must_exist: bool = False) -> Optional[Q]:
+    def condition_filter(self, text, must_exist: bool = False):
         try:
             term = OntologyTerm.get_or_stub(text)
             if must_exist and term.is_stub:
-                return None
+                return False
 
             all_terms = {term}
             if mondo_term := OntologyTermRelation.as_mondo(term):
-                # if we have (or can translate) into a mondo term.
-                # get all the direct parent terms and all the direct children terms
+                # if we have (or can translate) into a mondo term
+                # get all the direct parent and all the direct children terms
                 # and then the OMIM equiv of them
                 mondo_terms = {mondo_term}
                 mondo_terms |= OntologySnake.get_children(mondo_term)
@@ -316,16 +291,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                                                              all_strs)
         except ValueError:
             pass
-        return None
-
-    def row_columns(self) -> list[str]:
-        return ["share_level"]
-
-    def row_css(self, row: CellData) -> Optional[str]:
-        share_level = ShareLevel(row["share_level"])
-        if not share_level.is_discordant_level:
-            return "unshared"
-        return None
 
     def row_columns(self) -> list[str]:
         return ["share_level"]
@@ -349,9 +314,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 key='lab',
                 # share_level_sort annotated column
                 sort_keys=[
-                    'allele_origin_grouping__allele_origin_bucket',
-                    'allele_origin_grouping__testing_context_bucket',
-                    'allele_origin_grouping__tumor_type_category',
+                    'allele_origin_bucket',
                     'lab__organization__name',
                     'lab__name',
                     'share_level'
@@ -363,20 +326,18 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 client_renderer='VCTable.groupIdentifier',
                 extra_columns=[
                     'id',
-                    'allele_origin_grouping__testing_context_bucket',
-                    'allele_origin_grouping__tumor_type_category',
                     'classification_count',
                     'lab__organization__short_name',
                     'lab__organization__name',
                     'lab__name',
-                    'allele_origin_grouping__allele_origin_bucket',
+                    'allele_origin_bucket',
                     'share_level',
                     'dirty'
                 ]
             ),
             RichColumn(
                 key=ImportedAlleleInfo.column_name_for_build(genome_build_preferred, "latest_allele_info"),
-                # sort_keys=['variant_sort', 'c_hgvs'], # annotated column
+                # sort_keys=['variant_sort', 'c_hgvs'],  # annotated column
                 sort_keys=[ImportedAlleleInfo.column_name_for_build(genome_build_preferred, "latest_allele_info",
                                                                     "genomic_sort")],
                 name='c_hgvs',
@@ -425,7 +386,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 renderer=self.render_somatic,
                 extra_columns=[
                     "latest_classification_modification__classification__summary__somatic",
-                    "allele_origin_grouping__allele_origin_bucket",
+                    "allele_origin_bucket",
                     "somatic_difference"
                 ]
             ),

@@ -146,8 +146,8 @@ class VCF(models.Model, PreviewModelMixin):
         write_perm = DjangoPermission.perm(VCF, DjangoPermission.WRITE)
         return user_or_group.has_perm(write_perm, self)
 
-    def save(self, **kwargs):
-        super().save(**kwargs)
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
         try:
             if self.cohort.name != self.name:
                 self.cohort.name = self.name
@@ -496,6 +496,53 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
     def get_bam_files(self) -> list[str]:
         sfp_qs = SampleFilePath.objects.filter(sample=self, file_type=SampleFileType.BAM)
         return list(sfp_qs.values_list("file_path", flat=True))
+
+    def _get_sample_formatter_params(self) -> dict[str, str]:
+        params = {
+            "sample_id": self.pk,
+            "sample": self.name,
+        }
+        if patient := self.patient:
+            params["patient_id"] = patient.pk
+            params["patient_code"] = patient.last_name
+            params["patient"] = str(patient)
+
+        if specimen := self.specimen:
+            params["specimen_id"] = specimen.pk
+            params["specimen"] = str(specimen)
+        return params
+
+    @staticmethod
+    def _validate_sample_formatter_func(sample_label_template):
+        """ Throws error if invalid """
+        specimen = Specimen(reference_id='refId', description='description')
+        patient = Patient(pk=2, first_name='first_name', last_name='last_name')
+        sample = Sample(pk=1, name="sample", patient=patient, specimen=specimen)
+        params = sample._get_sample_formatter_params()
+        errors = []
+        for i, t in enumerate(sample_label_template.split("||")):
+            try:
+                t % params
+            except (ValueError, KeyError) as exception:
+                errors.append(f"{i+1}: '{t}: {exception=}'")
+        if errors:
+            error_msg = '\n'.join(errors)
+            raise ValueError(f"Sample formatter function failed: {error_msg}")
+
+    @staticmethod
+    def _get_sample_formatter_func(sample_label_template, fallback=True):
+        """ This is for rendering sample names on analysis grids """
+        def _sample_formatter_func(sample):
+            if sample_label_template:
+                params = sample._get_sample_formatter_params()
+                for t in sample_label_template.split("||"):
+                    try:
+                        return t % params
+                    except (ValueError, KeyError) as e:
+                        pass
+            # In theory this should be valid due to form validator, but just in case
+            return sample.name
+        return _sample_formatter_func
 
 
 class SampleFilePath(models.Model):

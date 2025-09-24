@@ -4,13 +4,15 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from variantgrid.deployment_validation.annotation_files_check import annotation_data_exists, check_cdot_data
-from variantgrid.deployment_validation.annotation_status_checks import check_annotation_versions, check_variant_annotation_runs_status
+from variantgrid.deployment_validation.annotation_status_checks import check_annotation_versions, \
+    check_variant_annotation_runs_status
 from variantgrid.deployment_validation.celery_checks import check_celery_tasks
 from variantgrid.deployment_validation.classification_checks import check_classification_reports
 from variantgrid.deployment_validation.column_check import check_variantgrid_columns
 from variantgrid.deployment_validation.library_version_checks import check_library_versions
 from variantgrid.deployment_validation.somalier_check import check_somalier
 from variantgrid.deployment_validation.tool_version_checks import check_tool_versions
+from variantgrid.deployment_validation.variant_check import check_symbolic_variants
 from variantgrid.deployment_validation.vep_check import check_vep
 
 
@@ -34,6 +36,7 @@ class Command(BaseCommand):
             "Classification Reports": check_classification_reports(),
             "Columns": check_variantgrid_columns(),
             "VEP": check_vep(),
+            "Symbolic variants": check_symbolic_variants(),
         }
         if settings.SOMALIER.get("enabled"):
             checks["somalier"] = check_somalier()

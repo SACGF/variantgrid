@@ -19,6 +19,7 @@
         {% load ui_help %}
         {% page_help page_id='annotation/annotation_help' title='Annotations' %}
 
+        {% if user.is_superuser %}
         <div id="installation-instructions" class='card hidden'>
             <div class="card-header"><h5>Installation Instructions</h5></div>
                 <div class="card-body">
@@ -42,7 +43,7 @@
                 </p>
             </div>
         </div>
-
+        {% endif %}
 
         {% for genome_build in genome_build_list %}
             <div data-toggle="ajax" href="{% url 'annotation_build_detail' genome_build.name %}">

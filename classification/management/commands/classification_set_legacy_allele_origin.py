@@ -27,8 +27,8 @@ class Command(BaseCommand):
             classification.patch_value(
                 patch=patch,
                 user=user,
-                source=SubmissionSource.FORM, # set this to form so as to not make it immutable
-                # leave_existing_values=True, # safety just in case you set this on a record that already has allele origin
+                source=SubmissionSource.FORM,  # set this to form so it's not immutable
+                # leave_existing_values=True,  # safety in case you set this on record that has allele origin
                 save=True
             )
             if not has_outstanding_changes:

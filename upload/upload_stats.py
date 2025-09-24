@@ -74,11 +74,12 @@ def get_upload_stats_from_durations(step_name_durations):
     return total_times, time_per_kilo_variant
 
 
-def get_vcf_variant_upload_stats() -> pd.DataFrame:
+def get_vcf_variant_upload_stats(genome_build) -> pd.DataFrame:
     """ df index of vcf_ids, cols = [cumulative_samples, total_variants, percent_known] """
+    vcf_qs = VCF.objects.filter(genome_build=genome_build)
 
     def get_totals_per_vcf(ups_name) -> dict[int, int]:
-        qs = VCF.objects.filter(uploadedvcf__upload_pipeline__uploadstep__name=ups_name)
+        qs = vcf_qs.filter(uploadedvcf__upload_pipeline__uploadstep__name=ups_name)
         qs = qs.annotate(total_items_processed=Sum("uploadedvcf__upload_pipeline__uploadstep__items_processed"))
         totals: dict[int, int] = {}
         for vcf_id, total_items_processed in qs.order_by("pk").values_list("pk", "total_items_processed"):
@@ -87,8 +88,16 @@ def get_vcf_variant_upload_stats() -> pd.DataFrame:
         return totals
 
     samples_per_vcf = {}
-    for pk, num_samples in VCF.objects.annotate(num_samples=Count("sample")).values_list("pk", "num_samples"):
+    variants_per_vcf_record = {}
+    for pk, num_samples, importer_name, importer_version in vcf_qs.annotate(num_samples=Count("sample")).values_list(
+        "pk", "num_samples", "uploadedvcf__vcf_importer__name", "uploadedvcf__vcf_importer__version"
+    ):
         samples_per_vcf[pk] = num_samples
+        variants_per_record = 1
+        if importer_name == "PythonKnownVariantsImporter" and importer_version < 16:
+            # Before version 16 we used to insert a Ref variant for each VCF record - need to adjust for this
+            variants_per_record = 2
+        variants_per_vcf_record[pk] = variants_per_record
 
     unknown = get_totals_per_vcf(UploadStep.CREATE_UNKNOWN_LOCI_AND_VARIANTS_TASK_NAME)
     total = get_totals_per_vcf(UploadStep.PROCESS_VCF_TASK_NAME)
@@ -96,22 +105,22 @@ def get_vcf_variant_upload_stats() -> pd.DataFrame:
     new_genotypes = get_totals_per_vcf("CohortGenotypeCollection SQL COPY")
 
     data = {"num_samples": samples_per_vcf,
+            "variants_per_vcf_record": variants_per_vcf_record,
             "total": total,
             "unknown": unknown,
             "old_genotypes": old_genotypes,  # This copied each genotype individually
             "new_genotypes": new_genotypes}  # This has 1 genotype per variant - needs to be multiplied by samples
 
-    df = pd.DataFrame(data=data)
+    df = pd.DataFrame(data=data).sort_index()
     df = df.replace(np.nan, 0)
 
     df["total_genotypes"] = df["old_genotypes"] + df["new_genotypes"] * df["num_samples"]
-    df["unknown"] = df["unknown"] / 2  # We create ref and alt for unknowns
+    df["unknown"] = df["unknown"] / df["variants_per_vcf_record"]  # adjust counts for refs in older versions
     df["cumulative_samples"] = np.cumsum(df["num_samples"])
     df["cumulative_variants"] = np.cumsum(df["total"])
     df["cumulative_genotypes"] = np.cumsum(df["total_genotypes"])
     known = df["total"] - df["unknown"]
     df["percent_known"] = 100.0 * known / df["total"]
-
     return df
 
 

@@ -5,8 +5,8 @@ from django.contrib.auth.models import User
 from django.http.response import HttpResponseRedirectBase
 from django.urls import resolve
 
-from oidc_auth.session_refresh import VariantGridSessionRefresh
 from eventlog.models import ViewEvent
+from oidc_auth.session_refresh import VariantGridSessionRefresh
 
 IGNORE_SEGMENTS = {"api", "datatable", "citations_json"}  # this should be mostly redundant to is_ajax call
 IGNORE_TEXT = {"detail", "metrics"}

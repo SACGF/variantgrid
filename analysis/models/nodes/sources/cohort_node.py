@@ -58,7 +58,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
     PER_SAMPLE_ZYGOSITY = 2
 
     cohort = models.ForeignKey(Cohort, null=True, on_delete=SET_NULL)
-    zygosity = models.CharField(max_length=1, choices=SimpleZygosity.choices, default=SimpleZygosity.ANY_GERMLINE)
+    zygosity = models.CharField(max_length=1, choices=SimpleZygosity.choices, default=SimpleZygosity.NON_REF_CALL)
     zygosity_op = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ALL)
     accordion_panel = models.IntegerField(default=0)
     # /zygosity count
@@ -114,8 +114,9 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
 
             # Just add all annotations (only those used will be actually executed)
             hom_and_het = F(self.hom_count_column) + F(self.het_count_column)
-            annotation_kwargs[self.any_germline_count_column] = hom_and_het
-            annotation_kwargs[self.any_zygosity_count_column] = hom_and_het + F(self.ref_count_column)
+            annotation_kwargs[self.non_ref_call_count_column] = hom_and_het
+            annotation_kwargs[self.any_call_count_column] = hom_and_het + F(self.ref_count_column)
+
         return annotation_kwargs
 
     def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
@@ -144,8 +145,8 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
             SimpleZygosity.REF: self.ref_count_column,
             SimpleZygosity.HET: self.het_count_column,
             SimpleZygosity.HOM_ALT: self.hom_count_column,
-            SimpleZygosity.ANY_GERMLINE: self.any_germline_count_column,
-            SimpleZygosity.ANY_ZYGOSITY: self.any_zygosity_count_column,
+            SimpleZygosity.NON_REF_CALL: self.non_ref_call_count_column,
+            SimpleZygosity.ANY_CALL: self.any_call_count_column,
         }
 
     def _get_simple_zygosity_min_count(self) -> int:
@@ -255,26 +256,26 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
 
     def _get_node_extra_columns(self):
         extra_columns = super()._get_node_extra_columns()
-
-#        extra_columns.append(self.hom_count_column)
-#        extra_columns.append(self.het_count_column)
+        if self.cohort:
+            extra_columns.append(self.hom_count_column)
+            extra_columns.append(self.het_count_column)
         return extra_columns
 
     def _get_node_extra_colmodel_overrides(self):
         extra_colmodel_overrides = super()._get_node_extra_colmodel_overrides()
-        if self.cohort and self.cohort.is_sub_cohort():
-            labels = ["hom_count", "het_count"]
+        if self.cohort:
+            labels = ["Cohort Hom Count", "Cohort Het Count"]
             for c, l in zip([self.hom_count_column, self.het_count_column], labels):
                 override = extra_colmodel_overrides.get(c, {})
                 override["label"] = l
                 override["name"] = c
-                override["model_fields"] = False
-                override["queryset_fields"] = True
+                override["model_field"] = False
+                override["queryset_field"] = True
                 extra_colmodel_overrides[c] = override
 
         return extra_colmodel_overrides
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         is_new = self.version == 0
         vcf = self._get_vcf()
 
@@ -284,7 +285,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
                 # Somatic mode...
                 self.accordion_panel = self.SIMPLE_ZYGOSITY
 
-        return super().save(**kwargs)
+        return super().save(*args, **kwargs)
 
     def save_clone(self):
         filter_collections = list(self.cohortnodezygosityfilterscollection_set.all())

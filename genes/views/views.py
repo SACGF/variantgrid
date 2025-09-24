@@ -1,7 +1,7 @@
 import operator
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import timezone, datetime, timedelta
+from datetime import datetime, timedelta
 from functools import cached_property, reduce
 from itertools import combinations
 from typing import Optional, Iterable, Union, Any
@@ -234,7 +234,7 @@ class GeneSymbolViewInfo:
             gene_variant_qs = get_variant_queryset_for_gene_symbol(self.gene_symbol, annotation_version,
                                                                    traverse_aliases=True)
             gene_variant_qs, vzcc = VariantZygosityCountCollection.annotate_global_germline_counts(gene_variant_qs)
-            has_observed_variants = gene_variant_qs.filter(**{f"{vzcc.germline_counts_alias}__gt": 0}).exists()
+            has_observed_variants = gene_variant_qs.filter(**{f"{vzcc.non_ref_call_alias}__gt": 0}).exists()
 
             has_tagged_variants = VariantTag.get_for_build(self.genome_build, variant_qs=gene_variant_qs).exists()
 

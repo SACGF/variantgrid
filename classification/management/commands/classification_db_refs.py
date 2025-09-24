@@ -60,4 +60,3 @@ class Command(BaseCommand):
             if i % 100 == 0:
                 print(f"processing classification {i}")
         print(f"Changes = {change_count}")
-

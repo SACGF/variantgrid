@@ -175,7 +175,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
 
     # Selected patient urls
     "cohorts": False,
-    "patient_record_imports": False,
+    "patient_imports": False,
     "patient_term_approvals": False,
     "patients": False,
 

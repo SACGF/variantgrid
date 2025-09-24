@@ -858,12 +858,18 @@ VARIANT_DETAILS_QUICK_LINKS_BLOCK_LIST = []
 VARIANT_VCF_DB_PREFIX = "vg"
 VARIANT_MANUAL_CREATE = True
 VARIANT_MANUAL_CREATE_BY_NON_ADMIN = True
+
 # Below this size, variants are stored with ref/alt sequences. Above this threshold, they become
 # structural variants and use symbolic
 VARIANT_SYMBOLIC_ALT_ENABLED = True
 VARIANT_SYMBOLIC_ALT_SIZE = 1000
 VARIANT_SYMBOLIC_ALT_VALID_TYPES = {VCFSymbolicAllele.CNV, VCFSymbolicAllele.DEL,
                                     VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
+
+# VCF 4.3 defines SVLEN as negative for DELs, but 4.4+ it's always positive
+# This is for our internal storage in Variant records
+# See https://github.com/SACGF/variantgrid/issues/1344
+VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE = False
 
 VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS = False
 VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS_PREFER_CANONICAL_WITH_DIFF_VERSION = True
@@ -897,6 +903,7 @@ BASH_ZCAT = 'zcat'
 # If True, will run a series of bash commands as one long string with Shell=True
 # otherwise will pipe each command into the next more safely with Shell=False
 VCF_IMPORT_PREPROCESS_POPEN_SHELL = True  # For vcf split
+VCF_EXPORT_VERSION = "4.3"
 
 CLASSIFICATION_DOWNLOADABLE_JSON_LITERATURE_CITATIONS = False
 CLASSIFICATION_DOWNLOADABLE_NOTES_AND_EXPLAINS = True

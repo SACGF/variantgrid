@@ -58,4 +58,3 @@ class Command(BaseCommand):
                 fixed = num_missing - still_missing
                 logging.info("ImportedAlleleInfo - refresh matched %d, %d still missing resolved variants for %s",
                              fixed, still_missing, genome_build)
-

@@ -3,23 +3,21 @@ import operator
 import os
 import re
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from functools import cached_property, reduce
 from typing import Optional, Callable, Iterable
 
-from Bio import Entrez
 from Bio.Data.IUPACData import protein_letters_1to3
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction, connection
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Subquery, OuterRef
 from django.db.models.deletion import PROTECT, CASCADE, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.urls import reverse
-from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
@@ -57,9 +55,9 @@ class SubVersionPartition(RelatedModelsPartitionModel):
     class Meta:
         abstract = True
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         created = not self.pk
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
         if created:
             genome_build = getattr(self, "genome_build", None)
             AnnotationVersion.new_sub_version(genome_build)
@@ -427,9 +425,9 @@ class DBNSFPGeneAnnotationVersion(TimeStampedModel):
     class Meta:
         unique_together = ('version', 'sha256_hash')
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         created = not self.pk
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
         if created:
             logging.info("Creating new DBNSFPGeneAnnotation partition")
             version = self.pk
@@ -721,12 +719,25 @@ class VariantAnnotationVersion(SubVersionPartition):
 
     @property
     def gnomad_major_version(self) -> int:
-        return int(self.gnomad.split(".")[0])
+        return int(self.gnomad.split(".", maxsplit=1)[0])
 
     @staticmethod
     def latest(genome_build, active=True) -> 'VariantAnnotationVersion':
         qs = VariantAnnotationVersion.objects.filter(genome_build=genome_build, active=active)
         return qs.order_by("annotation_date").last()
+
+    @staticmethod
+    def latest_for_all_builds(active=True) -> QuerySet:
+        # Default to latest
+        latest_qs = VariantAnnotationVersion.objects.filter(
+            genome_build=OuterRef('genome_build'),
+            active=active
+        ).order_by('-annotation_date')
+
+        return VariantAnnotationVersion.objects.filter(
+            pk__in=Subquery(latest_qs.values('pk')[:1]),
+            genome_build__in=GenomeBuild.builds_with_annotation()
+        )
 
     def get_any_annotation_version(self):
         """ Often you don't care what annotation version you use, only that variant annotation version is this one """
@@ -962,9 +973,9 @@ class AnnotationRun(TimeStampedModel):
     def variant_annotation_version(self):
         return self.annotation_range_lock.version
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         self.status = self.get_status()
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
 
     def get_status(self):
         status = AnnotationStatus.CREATED
@@ -1367,6 +1378,10 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return self.is_standard_annotation
 
     @property
+    def has_gnomad(self) -> bool:
+        return bool(self.gnomad_af or self.gnomad2_liftover_af)
+
+    @property
     def has_non_gnomad_population_frequency(self) -> bool:
         return self.is_standard_annotation
 
@@ -1414,8 +1429,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
         elif self.version.gnomad.startswith("3"):
             if self.gnomad_af is not None:
                 gnomad_dataset = GNOMAD3
-            elif self.gnomad2_liftover_af is not None:
-                gnomad_dataset = GNOMAD2
         elif self.gnomad_af and self.version.gnomad.startswith("4"):
             gnomad_dataset = GNOMAD4
 
@@ -1528,7 +1541,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
 
             sv_overlap['gnomad_sv_overlap_url'] = self.get_gnomad_url(gnomad_variant, dataset)
             if coords := sv_overlap.get("gnomad_sv_overlap_coords"):
-                chrom, start, end = parse_gnomad_coord(coords)
+                _chrom, start, end = parse_gnomad_coord(coords)
                 sv_overlap['gnomad_sv_overlap_length'] = end - start
 
             sv_overlap_list.append(sv_overlap)
@@ -1870,28 +1883,43 @@ class GeneSymbolCitation(models.Model):
         unique_together = ('gene_symbol', 'citation')
 
 
-class GeneSymbolPubMedCount(TimeStampedModel):
-    gene_symbol = models.OneToOneField(GeneSymbol, on_delete=CASCADE)
+class GenePubMedCount(models.Model):
+    """ From https://ftp.ncbi.nlm.nih.gov/gene/DATA/gene2pubmed.gz """
+    gene = models.ForeignKey(Gene, on_delete=CASCADE)
     count = models.IntegerField()
+    cached_web_resource = models.ForeignKey(CachedWebResource, on_delete=CASCADE)
+
+    @staticmethod
+    def get_count_and_note_for_gene_symbol(gene_symbol_id) -> tuple[int, str]:
+        gene_symbol = GeneSymbol.objects.get(pk=gene_symbol_id)
+        genes_qs = gene_symbol.get_genes().filter(annotation_consortium=AnnotationConsortium.REFSEQ)
+        notes = []
+        count = 0
+        if gene_counts := list(GenePubMedCount.objects.filter(gene__in=genes_qs)):
+            for gc in gene_counts:
+                count = max(count, gc.count)
+                notes.append(f"{gc.gene}={gc.count}")
+            modified = gene_counts[0].retrieved_date
+        else:
+            if first_gpmc := GenePubMedCount.objects.first():
+                count = 0
+                notes.append(f"No results (could be no RefSeq gene for {gene_symbol=})")
+                modified = first_gpmc.retrieved_date
+            else:
+                raise ValueError("No GenePubMedCount entries")
+
+        retrieved = modified.date().isoformat()
+        notes.insert(0, f"NCBI curated gene2pubmed retrieved {retrieved}. Homo Sapien only. ")
+        return count, " ".join(notes)
 
     @staticmethod
     def get_for_gene_symbol(gene_symbol_id):
-        max_days = settings.ANNOTATION_PUBMED_GENE_SYMBOL_COUNT_CACHE_DAYS
-        latest_time = timezone.now() - timedelta(days=max_days)
-        try:
-            return GeneSymbolPubMedCount.objects.get(gene_symbol_id=gene_symbol_id,
-                                                     modified__gte=latest_time)
-        except GeneSymbolPubMedCount.DoesNotExist:
-            pass
+        # TODO
+        pass
 
-        h = Entrez.esearch(db="pubmed", term=gene_symbol_id, rettype='count')
-        record = Entrez.read(h)
-        count = record["Count"]
-        return GeneSymbolPubMedCount.objects.get_or_create(gene_symbol_id=gene_symbol_id,
-                                                           defaults={"count": count})[0]
-
-    def __str__(self):
-        return f"{self.gene_symbol_id}: {self.count}"
+    @property
+    def retrieved_date(self):
+        return self.cached_web_resource.created
 
 
 class MutationalSignatureInfo(models.Model):

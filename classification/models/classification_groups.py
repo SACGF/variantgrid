@@ -493,8 +493,7 @@ class ClassificationGroups:
         Returns all classifications contained in this group, not just the latest
         """
         for group in self.groups:
-            for record in group.modifications:
-                yield record
+            yield from group.modifications
 
     @property
     def latest(self) -> Iterable[ClassificationModification]:

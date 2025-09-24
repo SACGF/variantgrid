@@ -9,7 +9,7 @@ from genes.gene_matching import GeneSymbolMatcher
 from genes.models import GeneCoverageCollection, AnnotationConsortium, TranscriptVersion
 from library.log_utils import log_traceback
 from library.utils.file_utils import name_from_filename
-from snpdb.models import Sample, GenomeBuild, DataState, ImportSource
+from snpdb.models import Sample, GenomeBuild, DataState
 from upload.models import UploadedGeneCoverage
 from upload.tasks.import_task import ImportTask
 from variantgrid.celery import app

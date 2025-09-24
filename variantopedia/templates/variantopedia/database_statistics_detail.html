@@ -4,12 +4,33 @@
 {% load ui_utils %}
 <div class="container">
 
-    <div id='variant-totals-graph'></div>
-    <div id='variant-genotypes-graph'></div>
-    <div id='variant-percent-known-graph'></div>
+        {% labelled label="Genome Build" %}
+        <div class="btn-group btn-group-toggle vep-pipeline-radio" data-toggle="buttons">
+            {% for build_name in variant_stats_per_build %}
+                <label class="btn btn-outline-primary {% if forloop.first %}active{% endif %}">
+                    <input class="table-filter" type="radio" name="pt-filter-{{ build_name|slugify }}" value="{{ build_name|slugify }}" autocomplete="off" {% if forloop.first %}checked{% endif %} onchange="toggleShowVariantStats('{{ build_name|slugify }}')"> {{ build_name }}
+                </label>
+            {% endfor %}
+        </div>
+        {% endlabelled %}
+
+        <div>
+        {% for build_name in variant_stats_per_build %}
+            <div id="variant-stats-{{ build_name|slugify }}" class="variant-stats-for-build {% if not forloop.first %}d-none{% endif %}">
+                <div id='variant-totals-graph-{{ build_name|slugify }}'></div>
+                <div id='variant-genotypes-graph-{{ build_name|slugify }}'></div>
+                <div id='variant-percent-known-graph-{{ build_name|slugify }}'></div>
+            </div>
+        {% endfor %}
+        </div>
 </div>
 <script>
-    function plotVariantTotalsGraph(variantStats) {
+    function toggleShowVariantStats(buildName) {
+        $(".variant-stats-for-build").addClass("d-none");
+        $("#variant-stats-" + buildName).removeClass("d-none");
+    }
+
+    function plotVariantTotalsGraph(buildNameSlug, buildName, variantStats) {
         const x = variantStats["cumulative_samples"];
 
         const data = [
@@ -17,19 +38,19 @@
                 x: x,
                 y: variantStats["cumulative_variants"],
                 type: 'line'
-            },
+            }
         ];
 
         const layout = {
-            title: "Total Variants / samples",
+            title: "Total Variants / samples " + `(${buildName})`,
             xaxis: {title: "Samples"},
             yaxis: {title: "Variants"}
         };
 
-        Plotly.newPlot('variant-totals-graph', data, layout);
+        Plotly.newPlot('variant-totals-graph-' + buildNameSlug, data, layout);
     }
 
-    function plotVariantGenotypesGraph(variantStats) {
+    function plotVariantGenotypesGraph(buildNameSlug, buildName, variantStats) {
         const x = variantStats["cumulative_genotypes"];
 
         const data = [
@@ -37,44 +58,52 @@
                 x: x,
                 y: variantStats["cumulative_variants"],
                 type: 'line'
-            },
+            }
         ];
 
         const layout = {
-            title: "Total Variants / genotypes",
+            title: "Total Variants / genotypes" + `(${buildName})`,
             xaxis: {title: "Genotypes"},
             yaxis: {title: "Variants"}
         };
 
-        Plotly.newPlot('variant-genotypes-graph', data, layout);
+        Plotly.newPlot('variant-genotypes-graph-' + buildNameSlug, data, layout);
     }
 
-    function plotVariantPercentKnownGraph(variantStats) {
+    function plotVariantPercentKnownGraph(buildNameSlug, buildName, variantStats) {
         const x = variantStats["cumulative_samples"];
 
         const data = [
             {
                 x: x,
                 y: variantStats["percent_known"],
-                type: 'line'
-            },
+                mode: 'markers',
+                type: 'scatter'
+            }
         ];
 
         const layout = {
-            title: "Percent of imported variants already seen.",
+            title: "Percent of imported variants already seen " + `(${buildName})`,
             xaxis: {title: "Samples"},
             yaxis: {title: "Variants"}
         };
 
-        Plotly.newPlot('variant-percent-known-graph', data, layout);
+        Plotly.newPlot('variant-percent-known-graph-' + buildNameSlug, data, layout);
     }
 
     $(document).ready(() => {
-        const variantStats = {{ variant_stats | jsonify }};
         {% if num_samples %}
-        plotVariantTotalsGraph(variantStats);
-        plotVariantGenotypesGraph(variantStats);
-        plotVariantPercentKnownGraph(variantStats);
+            let variantStats;
+            let buildName;
+            let buildNameSlug;
+            {% for build_name, variant_stats in variant_stats_per_build.items %}
+                buildNameSlug = "{{ build_name|slugify }}";
+                buildName = "{{ build_name }}";
+                variantStats = {{ variant_stats | jsonify }};
+                plotVariantTotalsGraph(buildNameSlug, buildName, variantStats);
+                plotVariantGenotypesGraph(buildNameSlug, buildName, variantStats);
+                plotVariantPercentKnownGraph(buildNameSlug, buildName, variantStats);
+            {% endfor %}
         {% endif %}
     });
 

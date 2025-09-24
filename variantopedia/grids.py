@@ -72,7 +72,7 @@ class AllVariantsGrid(AbstractVariantGrid):
         update_dict_of_dict_values(self._overrides, override)
         self.vzcc = VariantZygosityCountCollection.get_global_germline_counts()
         self.extra_filters = kwargs.pop("extra_filters", {})
-        self.extra_config.update({'sortname': self.vzcc.germline_counts_alias,
+        self.extra_config.update({'sortname': self.vzcc.non_ref_call_alias,
                                   'sortorder': "desc",
                                   'shrinkToFit': False})
 
@@ -85,13 +85,13 @@ class AllVariantsGrid(AbstractVariantGrid):
         ]
         if self.extra_filters:
             if min_count := int(self.extra_filters.get("min_count", 0)):
-                filter_list.append(Q(**{f"{self.vzcc.germline_counts_alias}__gte": min_count}))
+                filter_list.append(Q(**{f"{self.vzcc.non_ref_call_alias}__gte": min_count}))
         else:
             # benchmarking - I found it much faster to do both of these queries (seems redundant)
             hom_nonzero = Q(**{f"{self.vzcc.hom_alias}__gt": 0})
             het_nonzero = Q(**{f"{self.vzcc.het_alias}__gt": 0})
             filter_list.append(hom_nonzero | het_nonzero)
-            filter_list.append(Q(**{f"{self.vzcc.germline_counts_alias}__gt": 0}))
+            filter_list.append(Q(**{f"{self.vzcc.non_ref_call_alias}__gt": 0}))
 
         return reduce(operator.and_, filter_list)
 

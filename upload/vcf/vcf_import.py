@@ -375,7 +375,7 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
             existing = VCFFromSequencingRun.objects.filter(vcf__sample__in=sequencing_sample.samplefromsequencingsample_set.values_list("sample"),
                                                            variant_caller__isnull=True)
             if existing.exists():
-                existing_vcfs = ", ".join([vfsr.vcf for vfsr in existing])
+                existing_vcfs = ", ".join([str(vfsr.vcf) for vfsr in existing])
                 logging.info("Removing existing VCFs linked against run: %s / sequencing_sample=%s",
                              existing_vcfs, sequencing_sample)
                 existing.delete()

@@ -8,7 +8,8 @@ from library.django_utils.jqgrid_view import JQGridView
 from library.preview_request import preview_view
 from snpdb.grids import CohortListGrid, CohortSampleListGrid, SamplesListGrid, GenomicIntervalsListGrid, \
     CustomColumnsCollectionColumns, TriosListGrid, VCFListGrid, TagColorsCollectionColumns, \
-    LiftoverRunColumns, LiftoverRunAlleleLiftoverColumns, AlleleLiftoverFailureColumns, ManualVariantEntryCollectionColumns
+    LiftoverRunColumns, LiftoverRunAlleleLiftoverColumns, AlleleLiftoverFailureColumns, \
+    ManualVariantEntryCollectionColumns
 from snpdb.views import views, views_json, views_rest, views_autocomplete
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
@@ -79,6 +80,7 @@ urlpatterns = [
     path('settings/node_counts_tab/organization/<int:pk>', views.organization_settings_node_counts_tab, name='organization_settings_node_counts_tab'),
 
     path('user/<pk>', views.view_user, name='view_user'),
+    path('group/<pk>', views.view_group, name='view_group'),
     path('lab/<int:lab_id>', views.view_lab, name='view_lab'),
     path('clinvar_key/<str:pk>', views.view_clinvar_key, name='clinvar_key'),
     path('organization/<int:organization_id>', views.view_organization, name='view_organization'),

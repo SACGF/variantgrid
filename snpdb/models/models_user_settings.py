@@ -97,13 +97,13 @@ class TagColor(TimeStampedModel):
     class Meta:
         unique_together = ('collection', 'tag')
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         self.collection.increment_version()
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
 
-    def delete(self, **kwargs):
+    def delete(self, *args, **kwargs):
         self.collection.increment_version()
-        super().delete(**kwargs)
+        super().delete(*args, **kwargs)
 
     def __str__(self):
         return f"{self.collection}/{self.tag}: {self.rgb}"
@@ -159,6 +159,8 @@ class SettingsOverride(models.Model):
                                 help_text="Initial custom columns when creating analysis")
     default_sort_by_column = models.ForeignKey(CustomColumn, on_delete=SET_NULL, null=True, blank=True,
                                                help_text="Default value to sort analysis grids (can be changed per analysis)")
+    grid_sample_label_template = models.TextField(null=True, blank=True,
+                                                  help_text="Python string template, eg: '%(patient)s (%(sample)s/%(specimen_id)s)||%(patient)s (%(sample)s)||%(sample)s'. Multiple values separated by '||', the first one to succeed will be used. Variables: sample_id, sample (name), patient_id, patient_code, patient (full name), specimen_id, specimen (name).")
     tag_colors = models.ForeignKey(TagColorsCollection, on_delete=SET_NULL, null=True, blank=True,
                                    help_text="Set of colors assigned to tags (modify/create these in 'Tag settings')")
     variant_link_in_analysis_opens_new_tab = models.BooleanField(null=True,
@@ -348,6 +350,7 @@ class UserSettings:
     email_discordance_updates: bool
     columns: CustomColumnsCollection
     default_sort_by_column: CustomColumn
+    grid_sample_label_template: str
     tag_colors: TagColorsCollection
     variant_link_in_analysis_opens_new_tab: bool
     tool_tips: bool

@@ -15,8 +15,8 @@ class Mutation(models.TextChoices):
 
 
 class SimpleZygosity(models.TextChoices):
-    ANY_GERMLINE = 'A', 'Het or Hom Alt'
-    ANY_ZYGOSITY = 'Z', 'Any zygosity call'
+    NON_REF_CALL = 'A', 'Het or Hom Alt'
+    ANY_CALL = 'Z', 'Any zygosity call'
     HOM_ALT = 'O', "Hom alt"
     HET = 'E', "Het"
     REF = 'R', "Ref"
@@ -140,3 +140,10 @@ class PopulationGroup(models.TextChoices):
     SOUTH_ASIAN = 'SAS', 'South Asian'
     SOUTH_EAST_ASIAN = 'SEA', 'South East Asian'
     OTHER = 'OTH', 'Other'
+
+
+class PatientRecordMatchType(models.TextChoices):
+    CREATED = 'C', 'CREATED'  # Created new patient
+    # Matched existing
+    EXACT = 'E', 'MATCHED EXACT'
+    PARTIAL = 'P', 'MATCHED PARTIAL'

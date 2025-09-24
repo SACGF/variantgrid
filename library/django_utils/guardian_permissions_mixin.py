@@ -100,10 +100,10 @@ class GuardianPermissionsAutoInitialSaveMixin(GuardianPermissionsMixin):
     """ Automatically assigns permissions on initial save (unless you specify 'assign_permissions')
         This *must* be inherited from before Model in the class definition to call this save not model's """
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         assign_permissions = kwargs.pop("assign_permissions", None)
         initial_save = not self.pk
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
         if assign_permissions is None:
             assign_permissions = initial_save
         if assign_permissions:

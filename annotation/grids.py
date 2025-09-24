@@ -76,6 +76,10 @@ class AnnotationRunColumns(DatatableConfig):
         if variant_annotation_version_id := self.get_query_param("variant_annotation_version_id"):
             variant_annotation_version = VariantAnnotationVersion.objects.get(pk=variant_annotation_version_id)
             qs = qs.filter(annotation_range_lock__version=variant_annotation_version)
+        else:
+
+            qs = qs.filter(annotation_range_lock__version__in=VariantAnnotationVersion.latest_for_all_builds())
+
         if status_str := self.get_query_param("status"):
             if status_str == "outstanding":
                 qs = qs.exclude(status__in={AnnotationStatus.FINISHED})

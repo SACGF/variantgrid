@@ -9,7 +9,7 @@ from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import NodeVCFFilter, NodeAlleleFrequencyFilter
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
 from patients.models_enums import Zygosity
-from snpdb.models import VCFFilter, Cohort
+from snpdb.models import VCFFilter, Cohort, Sample
 from upload.models import UploadedVCF
 
 
@@ -62,15 +62,47 @@ class CohortMixin:
     def count_column_prefix(self):
         cohort = self._get_cohort()
         if cohort and cohort.is_sub_cohort():
-            column_prefix = "sub_cohort_"
+            column_prefix = f"sub_cohort_{cohort.pk}_"
         else:
             cgc = self.cohort_genotype_collection
             column_prefix = f"{cgc.cohortgenotype_alias}__"
         return column_prefix
 
     @property
-    def count_annotation_arg(self):
+    def non_ref_call_count_annotation_arg(self):
+        """
+            The ..._annotation_args are used to be able to put queries into the right q_arg_dict key
+            You need to be able to apply the Q after the right annotate() - in AllVariantsNode and Cohort
+            we just need to add to the same alias (that joins to the table) and then use the SQL columns
+            In sub cohorts, we need to build fake ones via annotate and then add Qs there
+
+            See AbstractZygosityCountNode.get_zygosity_count_arg_q_dict and
+            CohortNode._get_annotation_kwargs_for_node
+        """
+        return self.non_ref_call_count_column  # This is always an annotation
+
+    @property
+    def ref_count_annotation_arg(self):
         """ key in annotation_kwargs """
+        cohort = self._get_cohort()
+        if cohort and cohort.is_sub_cohort():
+            return self.ref_count_column
+        return self.cohort_genotype_collection.cohortgenotype_alias
+
+    @property
+    def het_count_annotation_arg(self):
+        """ key in annotation_kwargs """
+        cohort = self._get_cohort()
+        if cohort and cohort.is_sub_cohort():
+            return self.het_count_column
+        return self.cohort_genotype_collection.cohortgenotype_alias
+
+    @property
+    def hom_count_annotation_arg(self):
+        """ key in annotation_kwargs """
+        cohort = self._get_cohort()
+        if cohort and cohort.is_sub_cohort():
+            return self.hom_count_column
         return self.cohort_genotype_collection.cohortgenotype_alias
 
     @property
@@ -86,12 +118,12 @@ class CohortMixin:
         return self.count_column_prefix + "het_count"
 
     @property
-    def any_zygosity_count_column(self):
-        return self.count_column_prefix + "any_zygosity"
+    def any_call_count_column(self):
+        return self.count_column_prefix + "any_call"
 
     @property
-    def any_germline_count_column(self):
-        return self.count_column_prefix + "any_germline"
+    def non_ref_call_count_column(self):
+        return self.count_column_prefix + "non_ref"
 
     def _get_q_and_list(self) -> list[Q]:
         """ Collects node editor filters. Overridden below """
@@ -272,13 +304,25 @@ class AncestorSampleMixin(SampleMixin):
     def _set_sample(self, sample):
         self.sample = sample
 
-    def handle_ancestor_input_samples_changed(self):
-        """ Auto-set to single sample ancestor (or remove if no longer ancestor) """
+    def _get_configuration_errors(self) -> list:
+        errors = super()._get_configuration_errors()
+        if self.sample:
+            parent_sample_set = self._get_ancestor_samples()
+            if self.sample not in parent_sample_set:
+                errors.append(f"Sample: {self.sample} is not set as a sample in any ancestors of this node")
+        return errors
 
+    def _get_ancestor_samples(self) -> set[Sample]:
         parent_sample_set = set()
         parents, _errors = self.get_parent_subclasses_and_errors()
         for parent in parents:  # Use parent samples not own as own inserts self.sample
             parent_sample_set.update(parent.get_samples())
+        return parent_sample_set
+
+    def handle_ancestor_input_samples_changed(self):
+        """ Auto-set to single sample ancestor (or remove if no longer ancestor) """
+
+        parent_sample_set = self._get_ancestor_samples()
 
         modified = False
         # Don't do anything if new as the get_samples won't work

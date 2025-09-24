@@ -150,7 +150,7 @@ class IntersectionNode(AnalysisNode):
     def get_help_text() -> str:
         return "Filter to genomic ranges including BED files or HGVS"
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         # HGVS name is validated in IntersectionNodeForm, and linked to a variant if one is found
         # But it's possible a variant isn't there at form save time, but will appear later
         # Thus if hgvs_string is set, but hgvs_variant isn't - recheck in save (eg re-connected to diff source node)
@@ -158,7 +158,7 @@ class IntersectionNode(AnalysisNode):
             # May need to re-match if analysis template was different genome build
             if self.hgvs_variant is None or (self.analysis.genome_build not in self.hgvs_variant.genome_builds):
                 self.hgvs_variant = get_hgvs_variant(self.hgvs_string, self.analysis.genome_build)
-        return super().save(**kwargs)
+        return super().save(*args, **kwargs)
 
     def save_clone(self):
         orig_genomic_interval = self.genomic_interval

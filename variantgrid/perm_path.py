@@ -12,10 +12,9 @@ from collections import defaultdict
 from typing import Mapping
 
 from django.conf import settings
+from django.urls.conf import path as django_path
 from django.urls.conf import re_path
 from django.urls.resolvers import get_resolver
-
-from django.urls.conf import path as django_path
 
 from library.cache import timed_cache
 from library.django_utils import require_superuser

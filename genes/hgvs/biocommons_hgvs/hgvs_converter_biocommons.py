@@ -283,7 +283,6 @@ class BioCommonsHGVSConverter(HGVSConverter):
                 transcript_accession = sequence_variant.ac
         return transcript_accession
 
-
     @staticmethod
     def _strip_common_prefix(ref: str, alt: str) -> tuple[str, str]:
         if common_prefix := os.path.commonprefix((ref, alt)):
@@ -325,7 +324,6 @@ class BioCommonsHGVSConverter(HGVSConverter):
 
         # didn't provide anything so won't say anything
         return var_x, HgvsMatchRefAllele(provided_ref='', calculated_ref='')
-
 
     def _hgvs_to_g_hgvs(self, hgvs_string: str) -> tuple[SequenceVariant, HgvsMatchRefAllele, HgvsOriginallyNormalized]:
         CONVERT_TO_G = {

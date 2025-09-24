@@ -362,8 +362,8 @@ $(document).ready(function() {
             {% if url_name_visible.upload %}
                 Go to the <a href="{% url 'upload' %}" class="hover-link">Upload</a> page to import new patient records.<br>
             {% endif %}
-            {% if url_name_visible.patient_record_imports %}
-                View <a href="{% url 'patient_record_imports' %}" class="hover-link">Existing patient records imports</a>
+            {% if url_name_visible.patient_imports %}
+                View <a href="{% url 'patient_imports' %}" class="hover-link">Patient imports</a>
             {% endif %}
             {% if phenotype_match_graphs %}
                 {% if url_name_visible.patient_term_matches %}

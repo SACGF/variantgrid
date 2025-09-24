@@ -7,6 +7,7 @@ from dal import forward
 from django import forms
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.forms import EmailInput, URLInput, inlineformset_factory, ALL_FIELDS
 from django.forms.forms import DeclarativeFieldsMetaclass
 from django.forms.widgets import TextInput, HiddenInput, NullBooleanSelect
@@ -290,12 +291,13 @@ class SettingsInitialGroupPermissionForm(forms.Form):
 
 
 class SampleForm(forms.ModelForm, ROFormMixin):
-    genome_build = forms.CharField()
+    genome_build = forms.CharField()  # From VCF.genome_build
+    grid_sample_label = forms.CharField(help_text="Calculated from your current user settings. May be different in analysis due to analysis settings")
 
     class Meta:
         model = models.Sample
         exclude = ['vcf', 'has_genotype']
-        read_only = ('genome_build', 'vcf_sample_name', 'import_status')
+        read_only = ('genome_build', 'vcf_sample_name', 'import_status', 'grid_sample_label')
         widgets = {'vcf_sample_name': TextInput(),
                    'name': TextInput(),
                    'patient': ModelSelect2(url='patient_autocomplete',
@@ -305,10 +307,19 @@ class SampleForm(forms.ModelForm, ROFormMixin):
                                             attrs={'data-placeholder': 'Specimen...'})}
 
     def __init__(self, *args, **kwargs):
+        user = kwargs.pop("user")
         super().__init__(*args, **kwargs)
         fields = ["genome_build"] + [f for f in self.fields if f != 'genome_build']
         self.order_fields(fields)
         self.fields['genome_build'].initial = self.instance.vcf.genome_build
+        self.fields['grid_sample_label'].initial = self._get_sample_label(user, self.instance)
+
+    @staticmethod
+    def _get_sample_label(user, sample):
+        user_settings = UserSettings.get_for_user(user)
+        grid_sample_label_template = user_settings.grid_sample_label_template
+        sample_formatter = Sample._get_sample_formatter_func(grid_sample_label_template)
+        return sample_formatter(sample)
 
     def clean(self):
         cleaned_data = super().clean()
@@ -403,18 +414,20 @@ class SettingsOverrideForm(BaseModelForm):
     class Meta:
         model = models.SettingsOverride
         fields = "__all__"
-        widgets = {"email_weekly_updates": BlankNullBooleanSelect(),
-                   "email_discordance_updates": BlankNullBooleanSelect(),
-                   "variant_link_in_analysis_opens_new_tab": BlankNullBooleanSelect(),
-                   "tool_tips": BlankNullBooleanSelect(),
-                   "node_debug_tab": BlankNullBooleanSelect(),
-                   "import_messages": BlankNullBooleanSelect(),
-                   'default_sort_by_column': ModelSelect2(url='custom_column_autocomplete',
-                                                          forward=['columns'],
-                                                          attrs={'data-placeholder': 'Column...'}),
-                   'timezone': forms.Select(choices=[(None, "")] + [(tz, tz) for tz in settings.AVAILABLE_TZS], attrs={}),
-                   "allele_origin_exclude_filter": BlankNullBooleanSelect()
-                   }
+        widgets = {
+            "email_weekly_updates": BlankNullBooleanSelect(),
+            "email_discordance_updates": BlankNullBooleanSelect(),
+            "variant_link_in_analysis_opens_new_tab": BlankNullBooleanSelect(),
+            "tool_tips": BlankNullBooleanSelect(),
+            "node_debug_tab": BlankNullBooleanSelect(),
+            "import_messages": BlankNullBooleanSelect(),
+            'default_sort_by_column': ModelSelect2(url='custom_column_autocomplete',
+                                                  forward=['columns'],
+                                                  attrs={'data-placeholder': 'Column...'}),
+            'timezone': forms.Select(choices=[(None, "")] + [(tz, tz) for tz in settings.AVAILABLE_TZS], attrs={}),
+            "allele_origin_exclude_filter": BlankNullBooleanSelect(),
+            "grid_sample_label_template": TextInput(),
+        }
         labels = {
             "email_weekly_updates": "Email Regular Updates",
             "email_discordance_updates": "Email Discordance Updates",
@@ -430,7 +443,8 @@ class SettingsOverrideForm(BaseModelForm):
             "default_lab": "Default Lab",
             "timezone": "TimeZone (for downloads)",
             "allele_origin_focus": "Allele Origin focus",
-            "allele_origin_exclude_filter": "Allele Origin (filter by default)"
+            "allele_origin_exclude_filter": "Allele Origin (filter by default)",
+            "grid_sample_label_template": "Grid Sample Label Template",
         }
 
     def __init__(self, *args, **kwargs):
@@ -438,6 +452,15 @@ class SettingsOverrideForm(BaseModelForm):
         self.fields['columns'].queryset = CustomColumnsCollection.filter_public()
         self.fields['default_genome_build'].queryset = GenomeBuild.builds_with_annotation()
         self._hide_unused_fields()
+
+    def clean_grid_sample_label_template(self):
+        data = self.cleaned_data["grid_sample_label_template"]
+        if data:
+            try:
+                Sample._validate_sample_formatter_func(data)
+            except (ValueError, KeyError) as e:
+                raise ValidationError(e)
+        return data
 
     def _hide_unused_fields(self):
         settings_config = get_settings_form_features()
@@ -452,6 +475,7 @@ class SettingsOverrideForm(BaseModelForm):
             "tag_colors": settings_config.analysis_enabled,
             "import_messages": settings_config.upload_enabled,
             "igv_port": settings_config.igv_links_enabled,
+            "grid_sample_label_template": settings_config.analysis_enabled,
         }
 
         for f, visible in field_visibility.items():

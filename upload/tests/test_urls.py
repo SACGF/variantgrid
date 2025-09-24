@@ -27,7 +27,7 @@ class Test(URLTestCase):
                                                     import_source=ImportSource.COMMAND_LINE)
         upload_pipeline = UploadPipeline.objects.create(status=ProcessingStatus.PROCESSING,
                                                         uploaded_file=uploaded_file)
-        upload_step = upload_pipeline.uploadstep_set.create(name="fake step", sort_order=0)
+        _upload_step = upload_pipeline.uploadstep_set.create(name="fake step", sort_order=0)
         vcf = VCF.objects.create(name="fake_vcf.vcf", date=localdate(), user=cls.user_owner,
                                  genotype_samples=0, genome_build=cls.grch37)
         UploadedVCF.objects.create(uploaded_file=uploaded_file,

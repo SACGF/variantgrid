@@ -13,6 +13,8 @@
     <div style="line-height:1.3">
         {% if user_details.show_email and user_details.email %}
             <a class="hover-link" href="mailto:{{user_details.email}}" title="{{ user_details.email }}">{{ user_details.preferred_label }}</a>
+        {% elif user_details.show_user_page_link %}
+            <a class="hover-link" href="{% url 'view_user' user_details.user.pk %}">{{ user_details.preferred_label }}</a>
         {% else %}
             {{ user_details.preferred_label }}
         {% endif %}

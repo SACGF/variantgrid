@@ -112,7 +112,7 @@
                     <tbody>
                     {% for group, gip_form in group_initial_perm_forms.items %}
                         <tr>
-                            <td>{{ group }}</td>
+                            <td><a href="{% url 'view_group' group.pk %}">{{ group }}</a></td>
                             <td class="text-center">{{ gip_form.read }}</td>
                             <td class="text-center">{{ gip_form.write }}</td>
                         {% if labs_by_group_name %}

@@ -431,7 +431,6 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         self.batch_process_check()
         return variant_coordinate, variant_hash
 
-
     def check_pipeline_for_failures(self):
         """ If a pipeline has already died, quit the Reading early to save doing useless work
             Check it before we write files / create new jobs, and once every settings.VCF_IMPORT_PROCESS_CHECK_PIPELINE_FAIL_ROWS

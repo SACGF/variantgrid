@@ -1,3 +1,4 @@
+import html
 from enum import Enum
 from functools import cached_property
 from typing import Optional, Any, Union
@@ -12,7 +13,6 @@ from django.db.models.deletion import PROTECT, CASCADE
 from django.urls.base import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
-from lxml.html.diff import html_escape  # pylint: disable=no-name-in-module
 
 from classification.enums.classification_enums import SpecialEKeys
 from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
@@ -28,8 +28,6 @@ from library.utils.django_utils import refresh_for_update
 from review.models import ReviewableModelMixin, Review
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, GenomeBuild
-
-# note pycharm says html_escape doesn't exist, it does, but it's imported with a try/catch
 
 
 discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report", "clinical_context_change_data:ClinicalContextChangeData"
@@ -570,7 +568,7 @@ class DiscordanceReportTriage(PreviewModelMixin, TimeStampedModel):
             parts.append(f"On: { triage_date }")
         parts.append(f"To: {self.get_triage_status_display()}")
         if note := self.note:
-            parts.append("Note: " + html_escape(note))
+            parts.append("Note: " + html.escape(note, quote=True))
         if parts:
             return "<br/>".join(parts)
 

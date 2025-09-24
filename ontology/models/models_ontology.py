@@ -235,7 +235,7 @@ class OntologyImport(TimeStampedModel):
     class Meta:
         unique_together = ('import_source', 'filename', 'version')
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         created = not self.pk
         if created and not self.version:
             # Assign version to be next highest
@@ -244,7 +244,7 @@ class OntologyImport(TimeStampedModel):
             data = existing_ontology.aggregate(Max("version"))
             self.version = (data.get("version__max") or 0) + 1
 
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
         if created and OntologyVersion.in_ontology_version(self):
             logging.info("Creating new OntologyTermRelation partition")
             import_source_id = self.pk
@@ -1250,13 +1250,10 @@ class OntologySnake:
             if term.ontology_service in {OntologyService.MONDO, OntologyService.OMIM}:
                 if term.ontology_service == OntologyService.MONDO:
                     if omim := OntologyTermRelation.as_omim(term):
-                        for relation in OntologySnake.get_all_term_to_gene_relationships(omim, gene_symbol, try_related_terms=False):
-                            yield relation
-
+                        yield from OntologySnake.get_all_term_to_gene_relationships(omim, gene_symbol, try_related_terms=False)
                 elif term.ontology_service == OntologyService.OMIM:
                     if mondo := OntologyTermRelation.as_mondo(term):
-                        for relation in OntologySnake.get_all_term_to_gene_relationships(mondo, gene_symbol, try_related_terms=False):
-                            yield relation
+                        yield from OntologySnake.get_all_term_to_gene_relationships(mondo, gene_symbol, try_related_terms=False)
         except ValueError:
             report_exc_info()
             return None

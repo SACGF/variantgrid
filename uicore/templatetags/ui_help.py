@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 from django import template
 from django.conf import settings
@@ -24,7 +25,7 @@ def page_help(page_id: str = None, title=None, show_title=True, header_tag="h3")
     :param title: The title for the heading and the help drop down
     :param show_title: Should we show a heading at all - deprecated, generally always show title (use page_help instead
     of header if page help is available).
-    :param header: Default header if there's no attached help
+    :param header_tag: Default header if there's no attached help
     """
     suffix_help = True
 
@@ -57,24 +58,29 @@ def page_help_embedded(parser, token):
     tag_name, args, kwargs = parse_tag(token, parser)
     nodelist = parser.parse(('end_page_help_embedded',))
     parser.delete_first_token()
-    if title := kwargs.get("title") or args[0]:
-        return PageHelpContent(nodelist, title=title)
-    else:
+    title = kwargs.get("title") or args[0]
+    if not title:
         raise ValueError("page_help_embedded must have attribute 'title'")
+    return PageHelpContent(nodelist, title=title, help_url=kwargs.get("help_url"))
 
 
 class PageHelpContent(template.Node):
 
     def __init__(self,
                  nodelist,
-                 title: FilterExpression):
+                 title: FilterExpression,
+                 help_url: Optional[str] = None):
         self.nodelist = nodelist
         self.title = title
+        if help_url is None:
+            help_url = settings.HELP_URL
+        self.help_url = help_url
 
     def render(self, context):
 
         title = TagUtils.value_str(context, self.title)
         page_id = html_id_safe(title)
+        help_url = TagUtils.value_str(context, self.help_url)
         content = self.nodelist.render(context).strip()
 
         return loader.render_to_string("uicore/tags/help.html", context={
@@ -82,5 +88,5 @@ class PageHelpContent(template.Node):
             'page_title': title,
             'page_help_html': content,
             'header_tag': 'h4',  # can revert back to just a tag if there's no help content
-            'help_url': settings.HELP_URL
+            'help_url': help_url
         })

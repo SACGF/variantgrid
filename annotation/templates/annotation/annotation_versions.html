@@ -5,8 +5,16 @@
 {% load ui_tabs_builder %}
 {% block title %}Annotation Version{% endblock title %}
 {% block content %}
+    <script>
+    function toggleVariantAnnotationPipelineType(buildName, value) {
+        $(`.pre-${buildName}-vep-command`).addClass("d-none");
+        document.getElementById(`pre-${buildName}-${value}`).classList.remove('d-none');
+    }
+    </script>
     <div class="container">
         {% load ui_help %}
+        {% load ui_utils %}
+
         {% page_help page_id='annotation/annotation_versions_help' title='Annotation Versions'%}
 
         {% ui_register_tabs tab_set="annotation_versions" %}
@@ -80,9 +88,21 @@
                 <div class='mt-4'>
                     <h4>Variant Annotation Versions</h4>
 
-                    <a href="#vep-command-{{ build_name }}" class="toggle-link" data-toggle="collapse">Show VEP command</a>
-                    <div id="vep-command-{{ build_name }}" class="collapse">
-                        <pre class="border border-info p-2">{{ av_data.0 }}</pre>
+                    <a href="#vep-command-{{ build_name|slugify }}" class="toggle-link" data-toggle="collapse">Show VEP command</a>
+                    <div id="vep-command-{{ build_name|slugify }}" class="collapse">
+                        {% labelled label="VEP type" %}
+                        <div class="btn-group btn-group-toggle vep-pipeline-radio" data-toggle="buttons">
+                            {% for pt in pipeline_types %}
+                                <label class="btn btn-outline-primary {% if forloop.first %}active{% endif %}">
+                                    <input class="table-filter" type="radio" name="pt-filter-{{ build_name|slugify }}" value="{{ pt.value }}" autocomplete="off" {% if forloop.first %}checked{% endif %} onchange="toggleVariantAnnotationPipelineType('{{ build_name|slugify }}', '{{ pt.value }}')"> {{ pt.label }}
+                                </label>
+                            {% endfor %}
+                        </div>
+                        {% endlabelled %}
+
+                        {% for pt in pipeline_types %}
+                            <pre id="pre-{{ build_name|slugify }}-{{ pt.value }}" class="border border-info p-2 pre-{{ build_name|slugify }}-vep-command {% if not forloop.first %}d-none{% endif %}">{{ av_data.0|get_item:pt.value }}</pre>
+                        {% endfor %}
                     </div>
 
                     <table id="vav-{{ build_name|slugify }}" data-datatable-url="{% url 'variant_annotation_version_datatable' build_name %}" class="sticky-header responsive"></table>

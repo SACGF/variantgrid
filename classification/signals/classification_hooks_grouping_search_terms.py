@@ -2,7 +2,6 @@ from collections import defaultdict
 from typing import Iterable, Optional, Set
 from django.dispatch import receiver
 from annotation.models import AnnotationVersion, VariantAnnotation
-from classification.enums import SpecialEKeys
 from classification.models import ClassificationGroupingSearchTermStub, ClassificationGroupingSearchTermType, \
     ClassificationGrouping, ImportedAlleleInfo, classification_grouping_search_term_signal, \
     ClassificationGroupingSearchTermBuilder, ClinVarExport

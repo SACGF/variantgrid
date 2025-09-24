@@ -7,6 +7,7 @@ from typing import Optional, Iterable, IO, Union
 
 import cyvcf2
 import vcf
+from django.conf import settings
 
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.utils import open_handle_gzip, open_file_or_filename
@@ -146,7 +147,7 @@ def vcf_get_ref_alt_svlen_and_modification(variant: cyvcf2.Variant, old_variant_
             # issue #1268 - bcftools norm doesn't split multi-allelic SVLEN
             if isinstance(svlen_info, tuple):
                 if not old_variant_info:
-                    raise ValueError(f"SVLEN is a tuple, you need to pass in 'old_variant_info' to resolve these")
+                    raise ValueError("SVLEN is a tuple, you need to pass in 'old_variant_info' to resolve these")
 
                 if old_variant := variant.INFO.get(old_variant_info):
                     old_index_str = old_variant.split("|")[-1]
@@ -157,22 +158,29 @@ def vcf_get_ref_alt_svlen_and_modification(variant: cyvcf2.Variant, old_variant_
                                          f" old alt index from INFO/{old_variant_info}='{old_variant}'") from ve
                     try:
                         svlen_info = svlen_info[old_index - 1]
-                    except IndexError:
+                    except IndexError as ie:
                         raise ValueError(f"SVLEN is a tuple of length={len(svlen_info)}. Obtained 1 based index "
-                                         f"{old_index=} from INFO/{old_variant_info}='{old_variant}' which was out of range")
+                                         f"{old_index=} from INFO/{old_variant_info}='{old_variant}' "
+                                         f"which was out of range") from ie
                 else:
                     raise ValueError(f"SVLEN is a tuple. This requires INFO='{old_variant_info}', "
                                      f"expected split multi-allelic by bcftools with that as --old-rec-tag")
 
             svlen = int(svlen_info)
-            if alt == VCFSymbolicAllele.DEL and svlen > 0:
-                # issue #1245 - Manta SV produces <DEL> with positive SVLEN
-                svlen = -svlen
-                modification = f"SVLEN - inverted positive value for {alt=}"
         elif end_info := variant.INFO.get('END'):
             svlen = int(end_info) - variant.POS
         else:
             raise ValueError(f"SVLEN or END info field MUST be provided for symbolic (ie '<x>') {ref=},{alt=}")
+
+        if settings.VARIANT_SYMBOLIC_ALT_SVLEN_ALWAYS_POSITIVE:
+            if svlen < 0:
+                svlen = -svlen
+                modification = f"SVLEN - inverted negative (to internal always positive) for {alt=}"
+        else:
+            if alt == VCFSymbolicAllele.DEL and svlen > 0:
+                # issue #1245 - Manta SV produces <DEL> with positive SVLEN
+                svlen = -svlen
+                modification = f"SVLEN - inverted positive value for {alt=}"
     else:
         svlen = None
     return ref, alt, svlen, modification

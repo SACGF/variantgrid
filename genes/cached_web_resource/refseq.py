@@ -7,13 +7,13 @@ import pandas as pd
 import requests
 from Bio import Entrez, SeqIO
 
-from annotation.models import CachedWebResource
+from annotation.models import CachedWebResource, GenePubMedCount
 from genes.models import Gene, GeneSymbol, GeneSymbolAlias, TranscriptVersionSequenceInfoFastaFileImport, Transcript, \
     TranscriptVersionSequenceInfo, TranscriptVersion
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import MINUTE_SECS
 from library.django_utils import chunked_queryset
-from library.utils import sha256sum_str
+from library.utils import sha256sum_str, iter_http_lines
 
 
 def store_refseq_gene_summary_from_web(cached_web_resource: CachedWebResource):
@@ -161,3 +161,55 @@ def store_refseq_sequence_info_from_web(cached_web_resource: CachedWebResource):
 
     cached_web_resource.description = f"{num_records} TranscriptVersionSequenceInfo records"
     cached_web_resource.save()
+
+
+def store_gene2pubmed_from_web(cached_web_resource: CachedWebResource):
+    print("store_gene2pubmed_from_web - starting")
+    homo_sapiens_tax_id = "9606"
+    expected_cols = ["#tax_id", "GeneID", "PubMed_ID"]
+    url = "https://ftp.ncbi.nlm.nih.gov/gene/DATA/gene2pubmed.gz"
+    found_human = False
+    found_header = False
+    gene_counts = Counter()
+
+    known_gene_ids = Gene.known_gene_ids(annotation_consortium=AnnotationConsortium.REFSEQ)
+    if not known_gene_ids:
+        raise ValueError("No RefSeq GeneIDs found.")
+
+    skipped_genes = set()
+    for line in iter_http_lines(url, timeout=60):
+        if not found_header:
+            # Make sure header is correct
+            header_cols = line.split("\t")
+            if header_cols != expected_cols:
+                raise ValueError(f"Expected columns '{expected_cols}' but got '{header_cols}'")
+            found_header = True
+
+        tax_id, gene_id, _pubmed_id = line.strip().split("\t")
+        if tax_id != homo_sapiens_tax_id:
+            if found_human:
+                break  # Sorted so no more human
+            continue
+
+        if gene_id not in known_gene_ids:
+            skipped_genes.add(gene_id)
+            continue
+
+        found_human = True
+        gene_counts[gene_id] += 1
+
+    if gene_counts:
+        gene_pubmed_count_records = []
+        for gene_id, count in gene_counts.items():
+            gpmc = GenePubMedCount(gene_id=gene_id, count=count, cached_web_resource=cached_web_resource)
+            gene_pubmed_count_records.append(gpmc)
+        GenePubMedCount.objects.bulk_create(gene_pubmed_count_records, batch_size=2000)
+
+    cached_web_resource.description = f"GenePubMedCount {len(gene_counts)} genes, total count={gene_counts.total()}"
+    cached_web_resource.save()
+
+    if skipped_genes:
+        examples = ", ".join(list(skipped_genes)[:10])
+        logging.info("Skipped %d genes: example: %s", len(skipped_genes), examples)
+
+    logging.info("store_gene2pubmed_from_web - Finished: %s", cached_web_resource.description)

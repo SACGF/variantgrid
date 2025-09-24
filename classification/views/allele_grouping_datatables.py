@@ -1,13 +1,11 @@
-import json
 from functools import cached_property
-from typing import Any, Optional
+from typing import Optional
 
 from django.db.models import QuerySet, OuterRef, Subquery
 from django.http import HttpRequest
 
 from classification.enums import AlleleOriginBucket
 from classification.models import AlleleOriginGrouping, ClassificationGrouping, OverlapStatus, AlleleGrouping
-from classification.templatetags.classification_tags import classification
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.utils import JsonDataType

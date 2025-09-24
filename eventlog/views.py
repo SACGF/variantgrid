@@ -5,7 +5,6 @@ from django.http.response import HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
-from django.views.generic import ListView
 
 from eventlog.models import Event
 from library.enums.log_level import LogLevel

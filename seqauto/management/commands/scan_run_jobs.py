@@ -8,12 +8,17 @@ class Command(BaseCommand):
         parser.add_argument('--process-types', action='append')
         parser.add_argument('--launch-types', action='append')
         parser.add_argument('--run-launch-script', action='store_true')
+        parser.add_argument('--reuse-prev-scan-id', type=int, required=False,
+                            help="Reused previous scanned files from run ID")
+
 
     def handle(self, *args, **options):
         only_process_file_types = options.get("process_types")
         only_launch_file_types = options.get("launch_types")
         run_launch_script = options.get("run_launch_script", False)
+        reuse_prev_scan_id = options.get("reuse_prev_scan_id")
 
         scan_run_jobs(only_process_file_types=only_process_file_types,  # @UndefinedVariable
                       only_launch_file_types=only_launch_file_types,
-                      run_launch_script=run_launch_script)
+                      run_launch_script=run_launch_script,
+                      reuse_prev_scan_id=reuse_prev_scan_id)

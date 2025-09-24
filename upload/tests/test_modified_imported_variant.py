@@ -37,13 +37,13 @@ class TestModifiedImportedVariant(TestCase):
         OLD_VARIANT_MULTI_1 = "19|536068|G|GA,GTCCTCGTCCTTCCGGGACCCGGGGCGCTGGGAGCCTCACG|1"
         old_variant_formatted = ModifiedImportedVariant.bcftools_format_old_variant(OLD_VARIANT_MULTI_1,
                                                                                     svlen=None, genome_build=grch37)
-        alt = old_variant_formatted[0].split("/")[-1]
+        alt = old_variant_formatted[0].rsplit("/", maxsplit=1)[-1]
         self.assertEqual(alt, "GA")
 
         OLD_VARIANT_MULTI_2 = "19|536068|G|GA,GTCCTCGTCCTTCCGGGACCCGGGGCGCTGGGAGCCTCACG|2"
         old_variant_formatted = ModifiedImportedVariant.bcftools_format_old_variant(OLD_VARIANT_MULTI_2,
                                                                                     svlen=None, genome_build=grch37)
-        alt = old_variant_formatted[0].split("/")[-1]
+        alt = old_variant_formatted[0].rsplit("/", maxsplit=1)[-1]
         self.assertEqual(alt, "GTCCTCGTCCTTCCGGGACCCGGGGCGCTGGGAGCCTCACG")
 
     def test_vt_format_old_variant_non_decomposed_multi(self):

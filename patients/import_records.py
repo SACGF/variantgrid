@@ -23,7 +23,7 @@ from library.guardian_utils import assign_permission_to_user_and_groups
 from library.pandas_utils import df_nan_to_none
 from patients.models import PatientColumns, PatientRecord, Specimen, Patient, \
     PatientModification, PatientRecordOriginType
-from patients.models_enums import Sex, NucleicAcid, Mutation
+from patients.models_enums import Sex, NucleicAcid, Mutation, PatientRecordMatchType
 from snpdb.models import Sample
 
 UNKNOWN_STRING = 'UNKNOWN'  # Upper
@@ -237,19 +237,12 @@ def process_record(patient_records, record_id, row):
     sample_id = row[PatientColumns.SAMPLE_ID] or None
     sample_name = row[PatientColumns.SAMPLE_NAME]
 
-    matched_sample = match_sample(user, sample_id, sample_name, validation_messages)
-    if matched_sample:
-        matched_sample_id = int(matched_sample.pk)
-    else:
-        matched_sample_id = None
+    sample = match_sample(user, sample_id, sample_name, validation_messages)
+    patient, patient_match_type = Patient.match(first_name, last_name, sex, date_of_birth, user=user)
+    if patient is None:
+        patient = create_patient(patient_records.patient_import, first_name, last_name, sex, date_of_birth, user)
+        patient_match_type = PatientRecordMatchType.CREATED
 
-    matched_patient = Patient.match(first_name, last_name, sex, date_of_birth, user=user)
-    if matched_patient:
-        created_patient = None
-    else:
-        created_patient = create_patient(patient_records.patient_import, first_name, last_name, sex, date_of_birth, user)
-
-    patient = matched_patient or created_patient
     # update date of death if not already set
     # set _deceased back to False if DOD is being set
     # print('Deceased = %s AND Date of Death = %s' % (patient_deceased, date_of_death))
@@ -335,8 +328,6 @@ def process_record(patient_records, record_id, row):
         patient.save(check_patient_text_phenotype=False)  # Will do bulk at the end
 
     specimen = None
-    matched_specimen = None
-    created_specimen = None
     # print("specimen_reference_id=%s" %(specimen_reference_id))
     if specimen_reference_id:
         # print("process specimen id=%s" %(specimen_reference_id))
@@ -346,11 +337,11 @@ def process_record(patient_records, record_id, row):
 
                 msg = f"{specimen} had patient {patient}, tried to assign to patient {specimen.patient}"
                 raise ValueError(msg)
-            matched_specimen = specimen
+            specimen_match_type = PatientRecordMatchType.EXACT
         except Specimen.DoesNotExist:
             specimen = Specimen.objects.create(reference_id=specimen_reference_id,
                                                patient=patient)
-            created_specimen = specimen
+            specimen_match_type = PatientRecordMatchType.CREATED
 
         field_values = {
             "reference_id": specimen_reference_id,
@@ -377,16 +368,15 @@ def process_record(patient_records, record_id, row):
             specimen.age_at_collection = specimen_age_at_collection
 
             specimen.save()
-
     else:
-        created_specimen = None
+        specimen_match_type = None
 
-    if matched_sample:
+    if sample:
         origin = PatientRecordOriginType.UPLOADED_CSV
-        assign_patient_to_sample(patient_records.patient_import, user, matched_sample, patient, origin)
+        assign_patient_to_sample(patient_records.patient_import, user, sample, patient, origin)
 
         if specimen:
-            assign_specimen_to_sample(patient_records.patient_import, user, matched_sample, specimen, origin)
+            assign_specimen_to_sample(patient_records.patient_import, user, sample, specimen, origin)
 
     validation_message = '\n'.join(validation_messages)
     valid = not validation_messages
@@ -394,12 +384,12 @@ def process_record(patient_records, record_id, row):
                                  record_id=record_id,
                                  valid=valid,
                                  validation_message=validation_message,
-                                 matched_sample_id=matched_sample_id,
-                                 matched_patient=matched_patient,
-                                 matched_specimen=matched_specimen,
-                                 created_patient=created_patient,
-                                 created_specimen=created_specimen,
-                                 sample_id=sample_id,
+                                 sample=sample,
+                                 patient=patient,
+                                 patient_match=patient_match_type,
+                                 specimen=specimen,
+                                 specimen_match=specimen_match_type,
+                                 sample_identifier=sample_id,
                                  sample_name=sample_name,
                                  patient_family_code=family_code,
                                  patient_first_name=first_name,

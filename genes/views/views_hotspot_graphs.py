@@ -45,12 +45,12 @@ class HotspotGraphView(TemplateView):
         """ :returns hgvs_p, pp, consequence, count, gnomad_af """
         qs = self._get_variant_queryset(transcript_version)
         qs, vzcc = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
-        qs = qs.filter(**{f"{vzcc.germline_counts_alias}__gt": 0})
+        qs = qs.filter(**{f"{vzcc.non_ref_call_alias}__gt": 0})
         return qs.values_list("varianttranscriptannotation__hgvs_p",
                               "varianttranscriptannotation__protein_position",
                               "varianttranscriptannotation__consequence",
                               "variantannotation__gnomad_af",
-                              vzcc.germline_counts_alias)
+                              vzcc.non_ref_call_alias)
 
     @cached_property
     def genome_build(self):

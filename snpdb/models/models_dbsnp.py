@@ -6,6 +6,7 @@ from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from requests import request
 
+from library.constants import MINUTE_SECS
 from snpdb.models import GenomeBuild
 
 DBSNP_PATTERN = re.compile(r"^rs(\d+)$", re.IGNORECASE)
@@ -31,7 +32,7 @@ class DbSNP(TimeStampedModel):
             dbsnp = DbSNP.objects.get(pk=dbsnp_id)
         except DbSNP.DoesNotExist:
             url = f"https://api.ncbi.nlm.nih.gov/variation/v0/refsnp/{dbsnp_id}"
-            r = request(url=url, method='get')
+            r = request(url=url, method='get', timeout=MINUTE_SECS)
             api_response = r.json()
             dbsnp = DbSNP.objects.create(pk=dbsnp_id, api_response=api_response)
 

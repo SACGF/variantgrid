@@ -67,7 +67,7 @@ class NoTranscript(ValueError):
     """
 
 class NoTranscriptVersion(NoTranscript):
-    """ """
+    pass
 
 
 class MissingTranscript(NoTranscript):
@@ -848,7 +848,6 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
 
     @cached_property
     def hgvs_ok(self) -> bool:
-        """ """
         if self.has_valid_data:
             if settings.HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH:
                 if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
@@ -1178,7 +1177,7 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
             try:
                 _ = self.genome_build_data[key]
             except KeyError:
-                data_errors[key] = f"Field missing"
+                data_errors[key] = "Field missing"
 
         if error := (self.data.get("error") or self.genome_build_data.get("error")):
             data_errors["error"] = error
@@ -1378,7 +1377,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             data = Entrez.efetch(db='nuccore', id=transcript_accession, rettype='gb', retmode='text')
         except HTTPError as e:
             if e.code == 400:
-                raise BadTranscript(f"Bad Transcript: Entrez API reports \"{transcript_accession}\" not found")
+                raise BadTranscript(f"Bad Transcript: Entrez API reports \"{transcript_accession}\" not found") from e
             raise e
         api_response = data.read()
         with StringIO(api_response) as f:
@@ -1638,8 +1637,8 @@ class ReleaseGeneSymbolGene(TimeStampedModel):
 class GeneSymbolWiki(Wiki):
     gene_symbol = models.OneToOneField(GeneSymbol, on_delete=CASCADE)
 
-    def save(self, **kwargs):
-        super().save(**kwargs)
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
         self.update_citations()
 
     def update_citations(self):
@@ -1775,10 +1774,10 @@ class GeneList(TimeStampedModel):
 
         return copy
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         assign_permissions = kwargs.pop("assign_permissions", False)
         initial_save = not self.pk
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
         if initial_save or assign_permissions:
             # logging.info("GeneList: assign_permission_to_user_and_groups")
             assign_permission_to_user_and_groups(self.user, self)

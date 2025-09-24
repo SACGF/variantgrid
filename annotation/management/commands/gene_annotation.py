@@ -41,7 +41,6 @@ class Command(BaseCommand):
         group.add_argument('--add-missing-omim', action="store_true",
                            help="Add omim terms if missing due to no direct OMIM import and snake max_depth=0")
 
-
     def handle(self, *args, **options):
         if not settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED:
             raise ValueError("settings.ANNOTATION_GENE_ANNOTATION_VERSION is disabled.")
@@ -266,7 +265,6 @@ class Command(BaseCommand):
             if update_records:
                 print(f"{gav} - Updating {len(update_records)} records....")
                 GeneAnnotation.objects.bulk_update(update_records, ["omim_terms"], batch_size=1000)
-
 
     @staticmethod
     def _get_gene_disease(ontology_version, gene_symbol, delimiter: str):

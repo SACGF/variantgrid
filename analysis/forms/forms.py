@@ -176,10 +176,12 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
         fields = ("user", 'genome_build',
                   "name", "description", "analysis_type",
                   "custom_columns_collection", "default_sort_by_column", "canonical_transcript_collection",
+                  "grid_sample_label_template",
                   "show_igv_links", "annotation_version", "lock_input_sources", "node_queryset_filter_contigs")
         read_only = ('user', 'genome_build')
         model = Analysis
         widgets = {'name': TextInput(),
+                   'grid_sample_label_template': TextInput(),
                    'default_sort_by_column': ModelSelect2(url='custom_column_autocomplete',
                                                           forward=['custom_columns_collection'],
                                                           attrs={'data-placeholder': 'Column...'})}

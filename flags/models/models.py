@@ -418,7 +418,8 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             reopen: bool = False,
             reopen_if_bot_closed: bool = False,
             add_comment_if_open: bool = False,
-            data: Optional[dict] = None,
+            old_data: Optional[dict] = None,
+            new_data: Optional[dict] = None,
             close_other_data: bool = False,
             only_if_new: bool = False) -> tuple[Flag, bool]:
         """
@@ -431,20 +432,27 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         :param reopen: If True will re-open a closed flag (if there is one) rather than create a new flag. Will be treated as True for only_one types of flags.
         :param reopen_if_bot_closed: If True, and there's an existing flag that was closed by admin_bot, act as if reopen=True (but will not re-open if a user closed)
         :param add_comment_if_open: If re-opening a closed flag, should the comment still be added?
-        :param data: data for the flag, when looking for existing flags we check to see if they have this data.
+        :param old_data: when looking for existing flags we check to see if they have this data.
+        :param new_data: flag will be created or updated with this data, does not affect finding the flag
         :param close_other_data: If we find a flag of the same type that has data different to the data provided, close it
         :param only_if_new: Only create a new flag if there isn't an existing one (in any state) for this type, data etc. Exclusive with reopen
         :return: A tuple of the flag and a boolean indicating if the flag was newly created
         """
+
+        def apply_data_to_existing_flag(flag: Flag):
+            nonlocal new_data
+            if new_data is not None:
+                flag.data = new_data
+                flag.save()
 
         if flag_type.only_one and not only_if_new:
             reopen = True
 
         relevant_qs = Flag.objects.filter(collection=self, flag_type=flag_type).order_by('-created')
 
-        if data:
+        if old_data:
             data_filters = []
-            for key, value in data.items():
+            for key, value in old_data.items():
                 data_filters.append(Q(**{f'data__{key}': value}))
             data_fitlers_q = reduce(__and__, data_filters)
 
@@ -456,24 +464,25 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
 
             relevant_qs = relevant_qs.filter(data_fitlers_q)
 
-        existing = relevant_qs.filter(FlagCollection.Q_OPEN_FLAGS).first()
-        if existing:
+        if existing := relevant_qs.filter(FlagCollection.Q_OPEN_FLAGS).first():
+            apply_data_to_existing_flag(existing)
             if add_comment_if_open:
                 existing.flag_action(user=user, comment=comment)
             return existing, False
 
-        existing = relevant_qs.first()
-        if existing:
+        if existing := relevant_qs.first():
             if not reopen and reopen_if_bot_closed:
                 # see if existing is closed, and was last closed by a bot
                 if FlagComment.last(existing).user == admin_bot():
                     reopen = True
 
             if reopen:
+                apply_data_to_existing_flag(existing)
                 resolution = existing.flag_type.resolution_for_status(FlagStatus.OPEN)
                 existing.flag_action(user=user, resolution=resolution, comment=comment, permission_check=permission_check)
                 return existing, False
             if only_if_new:
+                apply_data_to_existing_flag(existing)
                 return existing, False
 
         return (self.add_flag(
@@ -482,7 +491,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             comment=comment,
             user_private=user_private,
             permission_check=permission_check,
-            data=data), True)
+            data=new_data), True)
 
     def add_flag(
             self,

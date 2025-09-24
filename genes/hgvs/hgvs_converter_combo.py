@@ -72,6 +72,9 @@ class ComboCheckerHGVSConverter(HGVSConverter):
     def get_transcript_accession(self, hgvs_string: str) -> str:
         return self._call_converters("get_transcript_accession", hgvs_string)
 
-    def description(self) -> str:
+    def normalize(self, hgvs_variant: HGVSVariant) -> HGVSVariant:
+        return self._call_converters("normalize", hgvs_variant)
+
+    def description(self, describe_fallback=True) -> str:
         # This will be different so just return the 1st one
-        return self._converters[0].description()
+        return self._converters[0].description(describe_fallback=describe_fallback)

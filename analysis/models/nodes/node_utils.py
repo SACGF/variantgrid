@@ -12,6 +12,7 @@ from toposort import toposort
 from analysis.models import Analysis, NodeStatus, NodeColors
 from analysis.models.nodes.analysis_node import AnalysisEdge, NodeVersion
 from analysis.tasks.node_update_tasks import delete_analysis_old_node_versions
+from library.utils import add_exception_note
 
 
 def get_nodes_by_id(nodes_qs):
@@ -131,7 +132,8 @@ def get_rendering_dict(node):
         node_class_label = node.get_node_class_label()
         # This has happened a few times, help debug problem
     except NotImplementedError as e:
-        raise NotImplementedError(f"Node {node_id=}: {e}")
+        add_exception_note(e, f"Node {node_id=}: {e}")
+        raise e
 
     style = f"left: {node.x}px; top: {node.y}px"
     attributes = {

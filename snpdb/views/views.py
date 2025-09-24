@@ -394,7 +394,7 @@ def view_sample(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
     has_write_permission = sample.can_write(request.user)
 
-    form = forms.SampleForm(request.POST or None, instance=sample)
+    form = forms.SampleForm(request.POST or None, user=request.user, instance=sample)
     if not has_write_permission:
         set_form_read_only(form)
         messages.add_message(request, messages.WARNING, "You can view but not modify this data.")
@@ -609,7 +609,6 @@ def manual_variant_entry_collection_detail(request: HttpRequest, pk: int):
     return render(request, 'snpdb/data/manual_variant_entry_collection_detail.html', context={'mvec': mvec})
 
 
-
 def watch_manual_variant_entry(request, pk):
     mvec = ManualVariantEntryCollection.get_for_user(request.user, pk)
     # TODO: Quick redirect to variant if it's already ready
@@ -768,16 +767,31 @@ def _settings_override_node_counts_tab(request, settings_override, has_write_per
 def view_user(request, pk):
     user = get_object_or_404(User, pk=pk)
     user_contact = UserContact.get_for_user(user)
-    user_groups = set(user.groups.all().values_list("name", flat=True))
-    my_groups = set(request.user.groups.all().values_list("name", flat=True))
-    common_groups = user_groups & my_groups
+    common_groups = Group.objects.filter(user=user.pk).filter(user=request.user.pk).order_by("name")
 
     context = {
         "other_user": user,
         'user_contact': user_contact,
-        'common_groups': sorted(common_groups),
+        'common_groups': common_groups,
     }
     return render(request, 'snpdb/settings/view_user.html', context)
+
+
+def view_group(request, pk):
+    group = get_object_or_404(Group, pk=pk)
+    lab = Lab.objects.filter(group_name=group.name).first()  # group_name is unique so at most only 1
+    users_qs = group.user_set.all().order_by("username")
+    user_is_in_group = users_qs.filter(pk=request.user.pk).exists()
+    public_groups = (settings.PUBLIC_GROUP_NAME, settings.LOGGED_IN_USERS_GROUP_NAME)
+
+    context = {
+        "group": group,
+        "lab": lab,
+        "public_group": group.name in public_groups,
+        "user_is_in_group": user_is_in_group,
+        "users_qs": users_qs,
+    }
+    return render(request, 'snpdb/settings/view_group.html', context)
 
 
 def _add_read_only_settings_message(request, lab_list: Iterable[Lab]):
@@ -1369,7 +1383,7 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
 
     style = text_df.style.apply(set_style)
     style = style.set_table_attributes('class="sample-gene-matrix"')
-    text_table_html = style.render()
+    text_table_html = style.to_html()
 
     context = {"text_table_html": text_table_html,
                "gene_values": gene_values}

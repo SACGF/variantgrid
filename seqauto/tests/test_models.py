@@ -17,11 +17,10 @@ from snpdb.models import Manufacturer, GenomeBuild, DataState
 
 
 class TestSeqAutoModels(TestCase):
-    TEST_DATA = os.path.join(settings.BASE_DIR, "seqauto", "test_data", "clinical_hg38")
-    GENES_TEST_DATA = os.path.join(settings.BASE_DIR, "genes", "tests", "test_data")
-
+    SEQAUTO_TEST_BASE_DIR = os.path.join(settings.BASE_DIR, "seqauto", "test_data")
+    TEST_DATA = os.path.join(SEQAUTO_TEST_BASE_DIR, "clinical_hg38")
     SEQUENCING_RUN_CAPTURE = "Exome_20_022_200920_NB501009_0410_AHNLYFBGXG"
-    CANONICAL_TRANSCRIPTS = os.path.join(GENES_TEST_DATA, "canonical_transcripts.tsv")
+    CANONICAL_TRANSCRIPTS = os.path.join(SEQAUTO_TEST_BASE_DIR, "reference_data", "canonical", "fake_kit.GeneTable.tsv")
 
     @staticmethod
     def _create_sequencing_run(sequencing_run_name, enrichment_kit=None):

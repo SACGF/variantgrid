@@ -1,11 +1,13 @@
 from library.django_utils.jqgrid_view import JQGridView
 from patients import views, views_autocomplete
-from patients.grids import PatientListGrid, PatientRecordsGrid, PatientRecordGrid, PatientOntologyGenesGrid
+from patients.grids import PatientListGrid, PatientOntologyGenesGrid, PatientRecordColumns, PatientRecordsColumns
+from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
 
 urlpatterns = [
-    path('patient_record_imports', views.patient_record_imports, name='patient_record_imports'),
-    path('view_patient_records/<int:patient_records_id>', views.view_patient_records, name='view_patient_records'),
+    path('patient_imports', views.patient_imports, name='patient_imports'),
+    path('patient_import/<int:patient_records_id>', views.view_patient_import, name='view_patient_import'),
+    path('patient_import/view_patient_record/<int:pk>', views.view_patient_record, name='view_patient_record'),
     path('help/import_patient_records_details', views.import_patient_records_details, name='import_patient_records_details'),
     path('example_upload_csv/empty', views.example_upload_csv_empty, name='example_upload_csv_empty'),
     path('example_upload_csv/all', views.example_upload_csv_all, name='example_upload_csv_all'),
@@ -35,8 +37,10 @@ urlpatterns = [
 
     # Grids
     path('patient/grid/<slug:op>/', JQGridView.as_view(grid=PatientListGrid, delete_row=True), name='patient_grid'),
-    path('patient_records/grid/<slug:op>/', JQGridView.as_view(grid=PatientRecordsGrid), name='patient_records_grid'),
-    path('patient_record/grid/<int:patient_records_id>/<slug:op>/', JQGridView.as_view(grid=PatientRecordGrid), name='patient_record_grid'),
+    path('patient_records/datatables/', DatabaseTableView.as_view(column_class=PatientRecordsColumns),
+         name='patient_records_datatables'),
+    path('patient_record/datatables/', DatabaseTableView.as_view(column_class=PatientRecordColumns),
+         name='patient_record_datatables'),
     path('patient/ontology/genes/grid/<int:patient_id>/<slug:op>/', JQGridView.as_view(grid=PatientOntologyGenesGrid),
          name='patient_ontology_genes_grid'),
 

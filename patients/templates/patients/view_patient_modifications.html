@@ -7,7 +7,15 @@
     <tr><td>{{ pm.user }}
         <td>{{ pm.date | localtime }}
         <td>{{ pm.description }}
-        <td>{{ pm.get_origin_display }}
+        <td>
+            {% with import_url=pm.get_import_url %}
+                {% if import_url %}
+                    <a href="{{ import_url }}">{{ pm.get_origin_display }}</a>
+                {% else %}
+                    {{ pm.get_origin_display }}
+                {% endif %}
+
+            {% endwith %}
         <!-- link to import? -->
     {% endfor %}
     </table>

@@ -12,7 +12,7 @@ from genes.models import GeneSymbol
 from library.utils import ExportRow, export_column, delimited_row
 from ontology.models import OntologyTerm, OntologyRelation, OntologyImportSource, \
     PanelAppClassification, OntologySnake, OntologyService, GeneDiseaseClassification, \
-    ONTOLOGY_RELATIONSHIP_MINIMUM_QUALITY_FILTER, ONTOLOGY_RELATIONSHIP_NO_QUALITY_FILTER
+    ONTOLOGY_RELATIONSHIP_NO_QUALITY_FILTER
 
 
 @dataclass(frozen=True)

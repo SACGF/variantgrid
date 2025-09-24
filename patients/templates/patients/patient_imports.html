@@ -12,7 +12,7 @@
 {% block submenu_page_content %}
     <div class="chunk borderless">
         <div id='patient-header'>
-            <h3>Previous Patient Record Imports</h3>
+            <h3>Patient Imports</h3>
 
             <div>
             Go to the <a class="hover-link" href="{% url 'upload' %}">Upload</a> page to import new patient records.<br>
@@ -24,9 +24,9 @@
                 <a class="hover-link" href="{% url 'example_upload_csv_no_patients' %}">Samples without patients</a>
             </div>
         </div>
-        <div>
-            {% load jqgrid_tags %}
-            {% jqgrid 'patient_records_grid' 'patient-records' False None 'patients/grids/patient_records_grid.html' %}
+        <div class="container-table">
+            <table id="patient-record-datatable" data-datatable-url="{% url 'patient_records_datatables' %}" ></table>
+            <div id='upload-steps-graph'></div>
         </div>
     </div>
 {% endblock submenu_page_content %}

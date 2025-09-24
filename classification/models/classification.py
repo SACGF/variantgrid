@@ -461,21 +461,43 @@ class ConditionResolved:
         else:
             return self.to_json()['display_text']
 
-    def to_json(self, include_join: bool = True) -> ConditionResolvedDict:
+     def to_json(self, include_join: bool = True) -> ConditionResolvedDict:
         jsoned: ConditionResolvedDict
-        display_text = ", ".join((reference.full_text for reference in self.references))
-        sort_text = ", ".join([term.name for term in self.terms] + self.plain_text_terms).lower()
-        join = None
-        if len(self.references) > 1 and include_join:
+        if self.terms:
             from classification.models import MultiCondition
-            join = self.join or MultiCondition.NOT_DECIDED
-            display_text = f"{display_text}; {join.label}"
-        jsoned: ConditionResolvedDict = {
-            "references": [r.to_json() for r in self.references],
-            "resolved_join": join,
-            "display_text": display_text or self.plain_text,
-            "sort_text": sort_text
-        }
+
+            def format_term(term: OntologyTerm) -> str:
+                if name := term.name:
+                    return f"{term.id} {name}"
+                return term.id
+
+            terms = self.terms
+            text = ", ".join([format_term(term) for term in terms])
+            if self.plain_text_terms:
+                text += ",".join(self.plain_text_terms)
+
+            sort_text = ", ".join([term.name for term in terms]).lower()
+            join: Optional[MultiCondition] = None
+            if len(terms) > 1 and include_join:
+                join = self.join or MultiCondition.NOT_DECIDED
+                text = f"{text}; {join.label}"
+
+            resolved_term_dicts: List[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in
+                                                                    self.terms]
+            jsoned: ConditionResolvedDict = {
+                "resolved_terms": resolved_term_dicts,
+                "resolved_join": join,
+                "plain_text_terms": self.plain_text_terms,
+                "display_text": text,
+                "sort_text": sort_text
+            }
+            return jsoned
+        else:
+            jsoned: ConditionResolvedDict = {
+                "plain_text_terms": self.plain_text_terms,
+                "display_text": ", ".join(pt.lower() for pt in self.plain_text) if self.plain_text else None,
+                "sort_text": ", ".join(pt.lower() for pt in self.plain_text) if self.plain_text else None
+            }
         return jsoned
 
         #
@@ -1200,12 +1222,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             **kwargs
         )[0]
 
-    def save(self, **kwargs):
+    def save(self, *args, **kwargs):
         """ The post_save event is fired after save(), for other logic that depends on Classifications
             but doesn't work with the Classification object itself.
         """
         fix_permissions = kwargs.pop('fix_permissions', None) or self.id is None
-        super().save(**kwargs)
+        super().save(*args, **kwargs)
 
         # fix permissions removes previous permissions
         if fix_permissions:
@@ -1502,8 +1524,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             elif e_key.value_type == EvidenceKeyValueType.DATE:
                 try:
                     Classification.to_date(value)
-                except ValueError:
-                    message = f"Invalid date (expect yyyy-mm-dd)"
+                except ValueError as ve:
+                    message = "Invalid date (expected yyyy-mm-dd)"
                     cell.add_validation(code=ValidationCode.INVALID_DATE, severity='warning',
                                         message=message)
 
@@ -2961,7 +2983,7 @@ class CuratedDate:
                 return 1
             if date_1 is None and date_2 is None:
                 return 0
-            
+
             if date_1.value == date_2.value:
                 return 0
             elif date_1 < date_2:

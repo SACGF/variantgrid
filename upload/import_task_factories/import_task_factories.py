@@ -198,7 +198,6 @@ class ManualVariantEntryImportFactory(AbstractVCFImportTaskFactory):
         return [VCFCheckAnnotationTask]
 
 
-
 class LiftoverImportFactory(AbstractVCFImportTaskFactory):
     """ Converts variants to a different genome build, linking via Allele records
         The Allele PK is written into VCF record column #3 (ID) which BulkAlleleLinkingVCFProcessor uses to

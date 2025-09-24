@@ -99,6 +99,7 @@ def get_analysis_settings(user, analysis):
         "annotation_version": analysis.annotation_version_id,
         "node_count_types": analysis.get_node_count_types(),
         "canonical_transcript_collection": canonical_transcript_collection,
+        "grid_sample_label_template": analysis.grid_sample_label_template,
         "show_igv_links": analysis.show_igv_links,
         "igv_data": igv_data,
         "open_variant_details_in_new_window": user_settings.variant_link_in_analysis_opens_new_tab,
@@ -316,7 +317,8 @@ def node_view(request, analysis_id, analysis_version, node_id, node_version, ext
     try:
         node = get_node_subclass_or_404(request.user, node_id, version=node_version)
     except NodeOutOfDateException:
-        return HttpResponseRedirect(reverse("node_load", kwargs={"node_id": node_id}))
+        return HttpResponseRedirect(reverse("node_load",
+                                            kwargs={"analysis_id": analysis_id, "node_id": node_id}))
     view = NODE_DISPATCHER[node.__class__]
     return view(request, pk=node_id, version_id=node_version, extra_filters=extra_filters)
 

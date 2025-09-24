@@ -29,7 +29,7 @@
 
         <div id='seqauto-run-history'>
             {% load jqgrid_tags %}
-            {% jqgrid 'seqauto_runs_grid' 'seqauto-runs-grid' template_name='seqauto/grids/seqauto_runs_grid.html' search=False delete=False %}
+            {% jqgrid 'seqauto_runs_grid' 'seqauto-runs-grid' template_name='seqauto/grids/seqauto_runs_grid.html' search=False delete=False download_grid_json_as_csv=True %}
         </div>
 
     </div>

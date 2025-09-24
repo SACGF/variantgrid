@@ -11,6 +11,7 @@ from typing import Optional, Callable
 
 import requests
 
+from library.constants import MINUTE_SECS
 from library.git import Git
 
 COMMAND_ALIASES = {
@@ -211,7 +212,7 @@ class Migrator:
         }
 
         try:
-            response = requests.post("https://api.rollbar.com/api/1/deploy/", data=data)
+            response = requests.post("https://api.rollbar.com/api/1/deploy/", data=data, timeout=MINUTE_SECS)
 
             if response.status_code == 200:
                 subprocess.run(substitute_aliases(["python", "manage.py", "deployed"]))

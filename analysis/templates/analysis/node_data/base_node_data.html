@@ -6,22 +6,43 @@
 
 <script type="text/javascript">
     function on_error_function(errors) {
-        console.log("on_error_function:");
-        console.log(errors);
+        console.log("on_error_function:", errors);
         hideLoadingOverlay();
 
-        let html = "<div>Node errors:</div><ul class='messages'>";
-        for (let i=0 ; i<errors.length ; ++i) {
-            let errorMessage = errors[i];
-            if (errorMessage && errorMessage.startsWith("Analysis:")) {
-                errorMessage += `<div><div style="margin-right: 2px" class="left">Fix this in </div> <a href="javascript:analysisSettings()"><div class="left icon16 settings-icon"></div><div class="left">Analysis settings</div></a><div class="clear"></div></div>`;
+        const $list = $("<ul>", { class: "messages" });
+
+        errors.forEach(msg => {
+            const $li = $("<li>", { class: "error" });
+
+            if (msg?.startsWith("Analysis:")) {
+                $li.append(document.createTextNode(msg));
+                $li.append(
+                    $("<div>").append(
+                        $("<div>", { class: "left", css: { marginRight: 2 }, text: "Fix this in " }),
+                        $("<a>", { href: "javascript:analysisSettings()" }).append(
+                            $("<div>", { class: "left icon16 settings-icon" }),
+                            $("<div>", { class: "left", text: "Analysis settings" })
+                        ),
+                        $("<div>", { class: "clear" })
+                    )
+                );
+            } else if (msg && msg.includes(": Traceback (")) {
+                $li.append($("<pre>", { text: msg }));
+            } else {
+                $li.text(msg);      // auto‑escapes < > &
             }
-            html += "<li class='error'>" + errorMessage + "</li>";
-        }
-        html += "</ul>"
+
+            $list.append($li);
+        });
+
         $("#node-data-container").empty();
-        $("#error-container").html(html).show();
+        $("#error-container")
+            .empty()
+            .append($("<div>", { text: "Node errors:" }))
+            .append($list)
+            .show();
     }
+
 
 	function load_node_editor(node_edit_url) {
 	    $("#node-editor-container").empty();

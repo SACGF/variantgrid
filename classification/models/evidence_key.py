@@ -62,12 +62,12 @@ class EvidenceKeyOption(TypedDict):
 
 
 class EvidenceKeyOverrides(pydantic.BaseModel):
-    evidence_key_config: dict[str, dict[str, Any]] = field(default_factory=dict)
+    evidence_key_config: dict[str, dict[str, Any]] = pydantic.Field(default_factory=dict)
     """
     Entries should confirm to the EvidenceKey JSON but only the elements that require overriding
     """
 
-    namespaces: set[str] = field(default_factory=set)
+    namespaces: set[str] = pydantic.Field(default_factory=set)
 
     def to_json(self):
         data = self.evidence_key_config.copy()
@@ -96,7 +96,7 @@ class EvidenceKeyOverrides(pydantic.BaseModel):
             if key == "namespaces":
                 namespaces = set(value)
                 continue
-            elif isinstance(value, bool):
+            if isinstance(value, bool):
                 value = {"hide": not value}
             elif not isinstance(value, dict):
                 raise ValueError(f"Received illegal value for classification config: {key}: {value}")
