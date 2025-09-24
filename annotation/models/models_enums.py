@@ -187,9 +187,11 @@ class ClinVarReviewStatus(models.TextChoices):
         'no_interpretation_for_the_single_variant': NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT[0],  # Old value
         'no_classification_for_the_single_variant': NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT[0],  # New one
         'no_classification_provided': None,  # New one - we can't do schema migration in SA Path so just store None
+        'no_classifications_from_unflagged_records': None,  # new for oncogenic - store as None
         'criteria_provided,_conflicting_interpretations': CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0],
         'criteria_provided,_conflicting_classifications': CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0],
         'criteria_provided,_single_submitter': CRITERIA_PROVIDED_SINGLE_SUBMITTER[0],
+        'criteria_provided,_multiple_submitters': None,  # new for somatic - store as None
         'criteria_provided,_multiple_submitters,_no_conflicts': CRITERIA_PROVIDED_MULTIPLE_SUBMITTERS_NO_CONFLICTS[0],
         'reviewed_by_expert_panel': REVIEWED_BY_EXPERT_PANEL[0],
         'practice_guideline': PRACTICE_GUIDELINE[0],
