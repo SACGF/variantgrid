@@ -1,6 +1,9 @@
 #!/bin/sh
 
-# This needs to return all QC objects
-TAU_DATA_DIR=/tau/data/clinical_hg38
+OUTPUT_DIR=$1
+FLOWCELL_DIRS=${OUTPUT_DIR}/find_flowcells.txt
 
-find -L ${TAU_DATA_DIR} -name "*_stats.txt" -o -name "*_qc_summary.txt" -o -name "*.per_gene_coverage.tsv.gz" -o  -path "*/0_goi/*.txt"
+while read -r line
+do
+	ls -d -1 ${line}/4_QC/exec_stats/*qc_summary.txt ${line}/4_QC/bam_stats/samples/*.per_gene_coverage.tsv.gz ${line}/0_goi/*.txt 2> /dev/null || true
+done < "${FLOWCELL_DIRS}"

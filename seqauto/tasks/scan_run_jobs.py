@@ -17,9 +17,11 @@ from seqauto.sequencing_files.create_resource_models import create_resource_mode
 
 SEQAUTO_SCRIPTS = [
     (SequencingFileType.SAMPLE_SHEET, settings.SEQAUTO_FLOWCELL_SCRIPT),
-    (SequencingFileType.ILLUMINA_FLOWCELL_QC, settings.SEQAUTO_ILLUMINATE_QC),
+    # Illuminate doesn't run well anymore - disable to save some time
+    # (SequencingFileType.ILLUMINA_FLOWCELL_QC, settings.SEQAUTO_ILLUMINATE_QC),
     (SequencingFileType.FASTQ, settings.SEQAUTO_FASTQ_SCRIPT),
-    (SequencingFileType.FASTQC, settings.SEQAUTO_FASTQC_SCRIPT),
+    # Slow - and don't really use
+    # (SequencingFileType.FASTQC, settings.SEQAUTO_FASTQC_SCRIPT),
     (SequencingFileType.BAM, settings.SEQAUTO_BAM_SCRIPT),
     (SequencingFileType.FLAGSTATS, settings.SEQAUTO_FLAGSTATS_SCRIPT),
     (SequencingFileType.VCF, settings.SEQAUTO_VCF_SCRIPT),
@@ -42,8 +44,13 @@ def scan_resources(seqauto_run, seqauto_scripts):
     for _, script_name in seqauto_scripts:
         script = os.path.join(settings.SEQAUTO_SCRIPTS_DIR, script_name)
         output_filename = os.path.join(seqauto_run.scan_resources_dir, "%s.txt" % name_from_filename(script_name))
+        cmd_args = [script, seqauto_run.scan_resources_dir]
+        if script_runner := settings.SEQAUTO_SCRIPT_RUNNER.get(script_name):
+            script_runner = os.path.join(settings.SEQAUTO_SCRIPTS_DIR, script_runner)
+            cmd_args = [script_runner] + cmd_args
         with open(output_filename, "w") as out_f:
-            subprocess.check_call([script, seqauto_run.scan_resources_dir], stdout=out_f)
+            logging.info("Executing %s", " ".join(cmd_args))
+            subprocess.check_call(cmd_args, stdout=out_f)
 
     #shutil.rmtree(scan_resources_dir)
 
@@ -91,17 +98,17 @@ def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None,
 
         create_resource_models(seqauto_run, process_seqauto_scripts)
 
-        # Jobs
-        all_sequencing_file_types = set(dict(SEQAUTO_SCRIPTS)) | {SequencingFileType.COMBINED_VCF}
-        launch_file_types = only_launch_file_types or all_sequencing_file_types
-        seqauto_run.scripts_and_jobs_start = timezone.now()
+        if run_launch_script:
+            # Jobs
+            all_sequencing_file_types = set(dict(SEQAUTO_SCRIPTS)) | {SequencingFileType.COMBINED_VCF}
+            launch_file_types = only_launch_file_types or all_sequencing_file_types
+            seqauto_run.scripts_and_jobs_start = timezone.now()
 
-        job_launch_script_filename = create_jobs_and_launch_script(seqauto_run, launch_file_types)
-        if job_launch_script_filename:
-            logging.info("Wrote launch script %s", job_launch_script_filename)
+            job_launch_script_filename = create_jobs_and_launch_script(seqauto_run, launch_file_types)
+            if job_launch_script_filename:
+                logging.info("Wrote launch script %s", job_launch_script_filename)
 
-            seqauto_run.job_launch_script_filename = job_launch_script_filename
-            if run_launch_script:
+                seqauto_run.job_launch_script_filename = job_launch_script_filename
                 try:
                     logging.info("Running launch script %s", job_launch_script_filename)
                     subprocess.check_output([job_launch_script_filename], stderr=subprocess.STDOUT)

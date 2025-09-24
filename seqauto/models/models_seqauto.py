@@ -7,6 +7,7 @@ from datetime import datetime
 from functools import cached_property
 from typing import Optional
 
+from cache_memoize import cache_memoize
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
@@ -264,6 +265,10 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
             original_sequencing_run = m.group(0)
         return original_sequencing_run
 
+    def get_flowcell_id(self) -> str:
+        run_name = self.get_original_illumina_sequencing_run(self.name)
+        return run_name.split("_")[-1]
+
     @staticmethod
     def get_date_from_name(name) -> Optional[datetime.date]:
         date = None
@@ -273,12 +278,18 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
             date = make_aware(dt).date()
         return date
 
+    @property
+    def original_sequencing_run(self):
+        return self.get_original_illumina_sequencing_run(self.name)
+
+    @cache_memoize(DAY_SECS, args_rewrite=lambda p: (p.pk, ))
     def get_params(self):
         """ This allows chaining down names etc - in case a level changes it, will cascade down """
         params = {
             "sequencing_run": self.name,
             "sequencing_run_dir": self.path,
-            "original_sequencing_run": self.get_original_illumina_sequencing_run(self.name),
+            "flowcell_id": self.get_flowcell_id(),
+            "original_sequencing_run": self.original_sequencing_run,
         }
         if self.enrichment_kit:
             params["enrichment_kit"] = self.enrichment_kit.name
@@ -434,21 +445,34 @@ class SequencingSample(models.Model):
     sample_project = models.TextField(null=True)
     sample_number = models.IntegerField()  # Row from sample sheet
     lane = models.IntegerField(null=True)
-    barcode = models.TextField()
+    barcode = models.TextField()  # historically we stored 'index' in here. Now we store index1|index2
     enrichment_kit = models.ForeignKey(EnrichmentKit, null=True, on_delete=CASCADE)
     is_control = models.BooleanField(default=False)
     failed = models.BooleanField(default=False)
     automatically_process = models.BooleanField(default=True)
 
+    @cache_memoize(DAY_SECS, args_rewrite=lambda p: (p.pk, ))
     def get_params(self):
         params = self.sample_sheet.get_params()
-        params.update({"lane": self.lane or 1,
+        indexes = self.barcode.split("|")
+        index = indexes[0]
+        if len(indexes) > 1:
+            index2 = indexes[1]
+        else:
+            index2 = "NO_INDEX2_STORED"
+        lane_num = self.lane or 1
+        params.update({"lane": lane_num,
+                       "lane_code": f"L{lane_num:03d}",
                        "sample_number": self.sample_number,
                        "sample_id": self.sample_id,
                        "sample_name": self.sample_name,
                        "sample_project": self.sample_project or '',
                        "sample_name_underscores": self.sample_name.replace("-", "_"),
-                       "barcode": self.barcode})
+                       "barcode": index,
+                       "index": index,
+                       "index2": index2})
+        if len(indexes) == 2:
+            params["index2"] = indexes[1]
 
         if self.enrichment_kit is not None:
             params['enrichment_kit'] = self.enrichment_kit.name
@@ -634,7 +658,10 @@ class Fastq(SeqAutoRecord):
         #     raise ValueError(msg)
 
         # New Diagnostic pipeline all FastQs have this simple format
-        patterns = ["%(sample_id)s_R%(read)d.fastq.gz"]
+        patterns = [
+            "%(sample_id)s_R%(read)d.fastq.gz",
+            "%(sample_id)s_%(flowcell_id)s_%(index)s-%(index2)s_%(lane_code)s_%(read)s.fastq.gz",
+        ]
 
         params = sequencing_sample.get_params()
         r1_params = {"read": 1}
@@ -648,7 +675,7 @@ class Fastq(SeqAutoRecord):
                              "%(sequencing_run_dir)s/Data/Intensities/BaseCalls/%(sample_project)s/%(sample_id)s"]
             unaligned_dir_patterns.extend(fastq_subdirs)
         unaligned_dir_patterns.append("%(sequencing_run_dir)s/Data/Intensities/BaseCalls")
-        unaligned_dir_patterns.append(settings.SEQAUTO_FASTQ_DIR_PATTERN)
+        unaligned_dir_patterns.append(settings.SEQAUTO_FASTQ_DIR_PATTERN % sequencing_sample.get_params())
 
         pair_paths = []
         for unaligned_dir_pattern in unaligned_dir_patterns:
@@ -714,10 +741,10 @@ class UnalignedReads(models.Model):
     def sequencing_run(self):
         return self.sequencing_sample.sample_sheet.sequencing_run
 
+    @cache_memoize(DAY_SECS, args_rewrite=lambda p: (p.pk, ))
     def get_params(self):
-        fastq_params = self.fastq_r1.sequencing_sample.get_params()
-        sequencing_run = self.sequencing_sample.sample_sheet.sequencing_run
-        data_naming_convention = sequencing_run.sequencer.sequencer_model.data_naming_convention
+        fastq_params = self.sequencing_sample.get_params()
+        data_naming_convention = self.sequencing_run.sequencer.sequencer_model.data_naming_convention
         if data_naming_convention == DataGeneration.HISEQ:
             aligned_pattern = settings.SEQAUTO_HISEQ_ALIGNED_PATTERN
         elif data_naming_convention == DataGeneration.MISEQ:
@@ -893,13 +920,14 @@ class VCFFile(SeqAutoRecord):
 
     @staticmethod
     def get_path_from_bam(bam):
+        bam_params = bam.get_params()
         vcf_pattern = None
-        if enrichment_kit := bam.sequencing_sample.enrichment_kit:
-            vcf_pattern = settings.SEQAUTO_VCF_PATTERNS_FOR_KIT.get(enrichment_kit.name)
+        if enrichment_kit_name := bam_params.get("enrichment_kit"):
+            vcf_pattern = settings.SEQAUTO_VCF_PATTERNS_FOR_KIT.get(enrichment_kit_name)
         if vcf_pattern is None:
             vcf_pattern = settings.SEQAUTO_VCF_PATTERNS_FOR_KIT["default"]
         pattern = os.path.join(settings.SEQAUTO_VCF_DIR_PATTERN, vcf_pattern)
-        vcf_path = pattern % bam.get_params()
+        vcf_path = pattern % bam_params
         return os.path.abspath(vcf_path)
 
     def __str__(self):
@@ -968,13 +996,13 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
 
     @staticmethod
     def get_paths_from_sample_sheet(sample_sheet) -> list[str]:
-        enrichment_kit = sample_sheet.sequencing_run.enrichment_kit
+        ss_params = sample_sheet.get_params()
         pattern_list = None
-        if enrichment_kit:
-            kit_name = enrichment_kit.name
-            if "ffpe" not in kit_name.lower() and "_FFPE_" in sample_sheet.sequencing_run.name:
-                kit_name += "_ffpe"
-            pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT.get(kit_name)
+        if enrichment_kit_name := ss_params.get("enrichment_kit"):
+            sequencing_run_name = ss_params["sequencing_run"]
+            if "ffpe" not in enrichment_kit_name.lower() and "_FFPE_" in sequencing_run_name:
+                enrichment_kit_name += "_ffpe"
+            pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT.get(enrichment_kit_name)
 
         if pattern_list is None:
             pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT["default"]

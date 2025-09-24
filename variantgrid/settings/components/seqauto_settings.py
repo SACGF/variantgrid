@@ -28,6 +28,13 @@ SEQAUTO_FLAGSTATS_SCRIPT = None  # Don't do this anymore 'find_flagstats.sh'
 SEQAUTO_VCF_SCRIPT = 'find_vcfs.sh'
 SEQAUTO_QC_SCRIPT = 'find_qc.sh'
 
+# Speed up to execute on host not VM
+# The ones that read eg 'find_flowcells.txt we DON'T want to run on other system as those files won't be there
+SEQAUTO_SCRIPT_RUNNER = {
+    SEQAUTO_FLOWCELL_SCRIPT: "ssh_runner.sh",
+}
+
+
 SEQAUTO_SKIP_FLOWCELLS_FILE = None
 SEQAUTO_SKIP_FLOWCELLS_PATTERNS = []
 SEQAUTO_SKIP_INDIVIDUAL_FLOWCELL_FILE = ".variantgrid_skip_flowcell"
