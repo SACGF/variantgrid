@@ -461,7 +461,7 @@ class ConditionResolved:
         else:
             return self.to_json()['display_text']
 
-     def to_json(self, include_join: bool = True) -> ConditionResolvedDict:
+    def to_json(self, include_join: bool = True) -> ConditionResolvedDict:
         jsoned: ConditionResolvedDict
         if self.terms:
             from classification.models import MultiCondition
