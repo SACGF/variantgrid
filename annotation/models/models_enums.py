@@ -184,7 +184,9 @@ class ClinVarReviewStatus(models.TextChoices):
     VCF_MAPPINGS = Constant({
         'no_assertion_provided': NO_ASSERTION_PROVIDED[0],
         'no_assertion_criteria_provided': NO_ASSERTION_CRITERIA_PROVIDED[0],
-        'no_interpretation_for_the_single_variant': NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT[0],
+        'no_interpretation_for_the_single_variant': NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT[0],  # Old value
+        'no_classification_for_the_single_variant': NO_INTERPRETATION_FOR_THE_SINGLE_VARIANT[0],  # New one
+        'no_classification_provided': None,  # New one - we can't do schema migration in SA Path so just store None
         'criteria_provided,_conflicting_interpretations': CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0],
         'criteria_provided,_conflicting_classifications': CRITERIA_PROVIDED_CONFLICTING_INTERPRETATIONS[0],
         'criteria_provided,_single_submitter': CRITERIA_PROVIDED_SINGLE_SUBMITTER[0],
