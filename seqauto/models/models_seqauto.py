@@ -649,8 +649,8 @@ class Fastq(SeqAutoRecord):
 
         # New Diagnostic pipeline all FastQs have this simple format
         patterns = [
-            "%(sample_id)s_R%(read)d.fastq.gz",
             "%(sample_id)s_%(flowcell_id)s_%(index)s-%(index2)s_%(lane_code)s_%(read)s.fastq.gz",
+            "%(sample_id)s_R%(read)d.fastq.gz",
         ]
 
         params = sequencing_sample.get_params()
