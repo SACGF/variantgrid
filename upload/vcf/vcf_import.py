@@ -313,11 +313,13 @@ def create_backend_vcf_links(uploaded_vcf):
             combo_vcf = None
             vcf_file = None
             try:
+                # Throw exception if multiple exist
                 combo_vcf = SampleSheetCombinedVCFFile.objects.get(path=path)
-            except:
+            except SampleSheetCombinedVCFFile.DoesNotExist:
                 try:
+                    # Throw exception if multiple exist
                     vcf_file = VCFFile.objects.get(path=path)
-                except:
+                except VCFFile.DoesNotExist:
                     msg = f"Couldn't find Combo or single VCF for path '{path}'"
                     raise ValueError(msg)
 
