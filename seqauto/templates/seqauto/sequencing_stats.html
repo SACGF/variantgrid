@@ -62,6 +62,7 @@
 
             showGraph('sequencing-run-model', 'Sequencer Model', sequencingRunInfo['sequencer_model']);
             showGraph('sequencing-run-sequencer', 'Sequencer', sequencingRunInfo['sequencer']);
+            showGraph('sequencing-run-enrichment_kit', 'Sequencer EnrichmentKit', sequencingRunInfo['enrichment_kit']);
 
             showGraph('samples-model', 'Sequencer Model', sequencingSampleInfo['sequencer_model']);
             showGraph('samples-sequencer', 'Sequencer', sequencingSampleInfo['sequencer']);
@@ -77,31 +78,35 @@
 
     {% if num_sequencing_runs %}
         <div id='link-and-graph-container'>
-            <div id='graph-links'>
-                <table class="table">
-                    <tr>
-                        <td>{% sample_enrichment_kits_graph sample_enrichment_kits_df 'Samples By Year' "year" %}</td>
-                        <td>{% sample_enrichment_kits_graph sample_enrichment_kits_df 'Samples By Month' "month_offset" %}</td>
-                    </tr>
-                </table>
+            <div id='graph-links container w-100'>
+                <div class="container w-100">
+                    {% sample_enrichment_kits_graph sample_enrichment_kits_df 'Samples By Year' "year" %}
+                </div>
+                <div>
+                    {% sample_enrichment_kits_graph sample_enrichment_kits_df 'Samples By Month' "month_offset" %}
+                </div>
 
                 <h3>{{ num_sequencing_runs }} Sequencing Runs</h3>
-                <table class="table">
-                    <tr>
-                        <td><div id='sequencing-run-model'></div></td>
-                        <td><div id='sequencing-run-sequencer'></div></td>
-                    </tr>
-                </table>
+
+                <div class="container-fluid">
+                    <div class="row g-3 row-cols-auto">
+                        <div class="col-auto"><div id='sequencing-run-model'></div></div>
+                        <div class="col-auto"><div id='sequencing-run-sequencer'></div></div>
+                        <div class="col-auto"><div id='sequencing-run-enrichment_kit'></div></div>
+                    </div>
+                  </div>
+                </div>
 
                 <h3>{{ num_samples }} Samples</h3>
 
-                <table class="table">
-                    <tr>
-                        <td><div id='samples-model'></div></td>
-                        <td><div id='samples-sequencer'></div></td>
-                        <td><div id='samples-enrichment_kit'></div></td>
-                    </tr>
-                </table>
+                <div class="container-fluid">
+                    <div class="row g-3 row-cols-auto">
+                        <div class="col-auto"><div id='samples-model'></div></div>
+                        <div class="col-auto"><div id='samples-sequencer'></div></div>
+                        <div class="col-auto"><div id='samples-enrichment_kit'></div></div>
+                    </div>
+                  </div>
+                </div>
             </div>
         </div>
         {% else %}

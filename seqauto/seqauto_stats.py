@@ -1,13 +1,21 @@
+import logging
 import operator
 from functools import reduce
 
+import numpy as np
+import pandas as pd
+from django.conf import settings
+
 from library.date_utils import get_month_and_year, get_months_since, month_range
 from seqauto.models import SequencingSample, SequencingRun
-import pandas as pd
-import numpy as np
 
 
 def get_sample_enrichment_kits_df():
+    if settings.SEQAUTO_FAKE_SAMPLE_ENRICHMENT_KITS_DF:
+        logging.info("Loading FAKE sample enrichment kits DF: %s", settings.SEQAUTO_FAKE_SAMPLE_ENRICHMENT_KITS_DF)
+        df = pd.read_csv(settings.SEQAUTO_FAKE_SAMPLE_ENRICHMENT_KITS_DF)
+        return df
+
     SEQUENCING_RUN_COL = "sample_sheet__sequencing_run"
     values_qs = SequencingSample.get_current().values(SEQUENCING_RUN_COL, "enrichment_kit__name")
     df = pd.DataFrame.from_records(values_qs)
@@ -46,7 +54,7 @@ def year_month_formatter_start_to_end(start, end, year_month_start):
     return month_range(start_month, start_year, start, end)
 
 
-def group_enrichment_kits_df(df, by_column, max_groups=None):
+def group_enrichment_kits_df(df, by_column, max_groups=None, max_years=None):
     """ returns (array of (enrichment_kit_name, data), labels)
         max_groups=10 gives 9 groups with everything else as "other" """
     LABELS_FOR_COLUMNS = {"year": year_formatter_start_to_end,
@@ -56,6 +64,11 @@ def group_enrichment_kits_df(df, by_column, max_groups=None):
     labels = []
 
     if not df.empty:
+        if max_years is not None:
+            last_year = df["year"].max()
+            year_idx = df["year"] >= last_year - max_years
+            df = df[year_idx]
+
         start = int(df[by_column].min())
         end = int(df[by_column].max())
         year_month_start = df["year_month"].min()

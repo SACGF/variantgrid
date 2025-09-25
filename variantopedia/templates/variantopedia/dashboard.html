@@ -43,7 +43,7 @@
     {% if seqauto_enabled %}
         <div>
         {% load seqauto_graph_tags %}
-        {% sample_enrichment_kits_graph sample_enrichment_kits_df 'Sequencing Samples By Month' "month_offset" %}
+        {% sample_enrichment_kits_graph sample_enrichment_kits_df 'Sequencing Samples By Month' "month_offset" max_years=3 %}
         </div>
         {% if url_name_visible.sequencing_stats %}
         <a href="{% url 'sequencing_stats' %}">More sequencing graphs</a>

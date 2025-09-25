@@ -107,3 +107,4 @@ SEQAUTO_LOAD_GENE_COVERAGE = True
 SEQAUTO_SAMPLE_SHEET_EXTRA_COLUMNS = []
 
 SEQAUTO_COVERAGE_ENRICHMENT_KITS = []
+SEQAUTO_FAKE_SAMPLE_ENRICHMENT_KITS_DF = None  # Used to be able to load gake test data - leave None to load from system
