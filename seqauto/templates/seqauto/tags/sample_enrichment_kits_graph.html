@@ -6,7 +6,10 @@ $(document).ready(function() {
     let enrichment_kit_labels = {{ enrichment_kit_labels | jsonify }};
     let title = "{{ title }}";
 
-    showStackedBar('enrichment_kits-by-time-{{ uuid }}', title, 500, 500, enrichment_kits_over_time, enrichment_kit_labels)
+    let container = 'enrichment_kits-by-time-{{ uuid }}';
+    let width = $(`#${container}`).width();
+
+    showStackedBar(container, title, width, 500, enrichment_kits_over_time, enrichment_kit_labels)
 });
 </script>
 <div id='enrichment_kits-by-time-{{ uuid }}'></div>

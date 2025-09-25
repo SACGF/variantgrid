@@ -438,6 +438,7 @@ def sequencing_stats(request):
     sequencing_run_info = {
         'sequencer': sr_sequencer,
         'sequencer_model': count_values(SequencingRun, "sequencer__sequencer_model"),
+        'enrichment_kit': count_values(SequencingRun, "enrichment_kit__name"),
     }
 
     ss_sequencer = count_values(SequencingSample, "sample_sheet__sequencing_run__sequencer")
