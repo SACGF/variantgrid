@@ -5,6 +5,7 @@ import re
 from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass, field
+from enum import StrEnum
 from html import escape
 from itertools import islice
 from typing import Iterable, Iterator, TypeVar, Any, Generic, Callable, Optional, Sequence, Union
@@ -423,11 +424,19 @@ class FormerTuple(ABC):
         return self.as_tuple == other.as_tuple
 
 
+class LinkType(StrEnum):
+    JAVASCRIPT = "javascript"
+    MODAL = "modal"
+    LINK = "link"
+
+
+
 @dataclass(frozen=True)
 class RowSpanCellValue:
     value: Any = None
     css_classes: list[str] = field(default_factory=list)
     href: Optional[str] = None
+    link_type: LinkType = LinkType.LINK
 
 
 @dataclass
@@ -448,10 +457,12 @@ class RowSpanCell:
     def link_contents(self):
         if self.href:
             href_escaped = self.href.replace("\"", "'")
-            if self.href.startswith("http") or self.href.startswith("/"):
+            if self.link_type == LinkType.MODAL:
                 return SafeString(f""" class="modal-link" data-toggle="ajax-modal" data-size="lg" data-title="Comments" data-href="{href_escaped}" """)
-            else:
+            elif self.link_type == LinkType.JAVASCRIPT:
                 return SafeString(f"onclick=\"{href_escaped}\" class=\"filter-link\" ")
+            else:
+                return SafeString(f"href=\"{href_escaped}\" class=\"hover-link\" ")
 
     @property
     def value(self):
@@ -466,6 +477,10 @@ class RowSpanCell:
     @property
     def href(self):
         return self.cell.href
+
+    @property
+    def link_type(self):
+        return self.cell.link_type
 
 
 class RowSpanTable:

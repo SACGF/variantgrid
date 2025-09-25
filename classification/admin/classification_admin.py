@@ -21,8 +21,8 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
     DiscordanceReportTriageStatus, ClassificationGrouping, ClassificationGroupingEntry, \
-    AlleleOriginGrouping, AlleleGrouping, ClassificationGroupingSearchTerm, ClassificationSummaryCalculator, Conflict, \
-    ConflictHistory, ConflictLab, ConflictNotification
+    AlleleOriginGrouping, AlleleGrouping, ClassificationGroupingSearchTerm, ClassificationSummaryCalculator, \
+    ConflictHistory, Conflict, ConflictLab, ConflictNotification
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation

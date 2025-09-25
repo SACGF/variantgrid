@@ -263,7 +263,16 @@ strong, .strong {
   color: #8888bb;
   position: relative;
   left: -4px;
-  content: '\f0da';
+  content: '\f192';
+  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+}
+
+.not-viewing::before {
+  font-style: normal;
+  color: #8888bb;
+  position: relative;
+  left: -4px;
+  content: '\f111';
   font-family: 'Font Awesome 6 Free', 'FontAwesome';
 }
 

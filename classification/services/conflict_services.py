@@ -18,7 +18,7 @@ from classification.models import AlleleOriginGrouping, EvidenceKeyMap, Conflict
     ConflictLab, ClassificationGrouping, ClassificationModification, ConflictNotification, ConflictNotificationStatus, \
     ConflictNotificationRun
 from genes.hgvs import CHGVS
-from library.utils import strip_json, first, sort_and_group_by, RowSpanTable, RowSpanCellValue
+from library.utils import strip_json, first, sort_and_group_by, RowSpanTable, RowSpanCellValue, LinkType
 from snpdb.models import Allele, Lab
 from snpdb.utils import LabNotificationBuilder
 
@@ -570,7 +570,12 @@ def group_conflicts(
             allele_origin_matches = True
             allele_origin_full_css += ["currently-viewing"]
 
-        table.add_cell(0, RowSpanCellValue(allele_origin_bucket.label, css_classes=allele_origin_full_css, href=href_for_parts(link_parts)))
+        table.add_cell(0, RowSpanCellValue(
+            allele_origin_bucket.label,
+            css_classes=allele_origin_full_css,
+            href=href_for_parts(link_parts),
+            link_type=LinkType.JAVASCRIPT
+       ))
 
         for testing_context_str, sub_sub_conflicts in sort_and_group_by(sub_conflicts, lambda c: c.testing_context_bucket):
 
@@ -585,9 +590,10 @@ def group_conflicts(
 
             href: Optional[str] = None
             if allele_origin_bucket != AlleleOriginBucket.GERMLINE:
+                # TODO what does germline or not have to do with it??
                 href = href_for_parts(testing_link_parts)
 
-            table.add_cell(1, RowSpanCellValue(testing_context.label, css_classes=testing_context_css, href=href))
+            table.add_cell(1, RowSpanCellValue(testing_context.label, css_classes=testing_context_css, href=href, link_type=LinkType.JAVASCRIPT))
 
             for condition, sub_sub_sub_conflicts in sort_and_group_by(sub_sub_conflicts, lambda c: c.tumor_type_category or "PLACEHOLDER"):
                 condition_css = [allele_origin_css]
@@ -612,14 +618,24 @@ def group_conflicts(
                     conflict = sub_sub_sub_sub_conflicts_list[0]
                     value_type_label = ConflictType(value_type).label_for_context(allele_origin_bucket)
                     value_type_css = [allele_origin_css]
-                    if condition_matches and currently_viewing and (currently_viewing.conflict_type == value_type):
-                        value_type_css += ["currently-viewing"]
+                    if currently_viewing:
+                        if condition_matches and currently_viewing and (currently_viewing.conflict_type == value_type):
+                            value_type_css += ["currently-viewing"]
+                        else:
+                            value_type_css += ["not-viewing"]
 
                     href = None
-                    if link_types != GroupConflictsLinks.NO_LINKS and not (
-                            currently_viewing and currently_viewing == conflict):
+                    link_type = LinkType.JAVASCRIPT
+                    if link_types == GroupConflictsLinks.NO_LINKS:
+                        pass
+                    elif not currently_viewing:
                         href = reverse("conflict_feed", kwargs={"conflict_id": conflict.pk})
-                    table.add_cell(3, RowSpanCellValue(value_type_label, css_classes=value_type_css, href=href))
+                        link_type = LinkType.MODAL
+                    elif currently_viewing != conflict:
+                        href = reverse("conflict", kwargs={"conflict_id": conflict.pk})
+                        link_type = LinkType.LINK
+
+                    table.add_cell(3, RowSpanCellValue(value_type_label, css_classes=value_type_css, href=href, link_type=link_type))
 
                     severity = ConflictSeverity(conflict.latest.severity)
                     severity_type_css = [allele_origin_css]

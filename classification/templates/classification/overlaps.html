@@ -61,44 +61,6 @@
         <h4>Classification Record Overlaps</h4>
         {% lab_picker dlab.lab_picker %}
 
-    {% comment %}
-        {% labelled label="Filter Out Unknown Contexts" %}
-            <div class="ml-4">
-                <input type="checkbox" id="filter_unknown" class="form-check-input filter-input" value="true" checked />
-                <label for="filter_unknown">Filters out overlaps for unknown allele origin / testing context</label>
-            </div>
-        {% endlabelled %}
-        {% labelled label="Relevant Differences" %}
-            <div class="ml-4">
-                <input type="checkbox" id="relevant_diff" class="form-check-input filter-input" value="true" checked />
-                <label for="relevant_diff">Only include overlaps with relevant differences (e.g. exclude LB vs B)</label>
-            </div>
-        {% endlabelled %}
-        <input id="status-tab" type="hidden" value="T" />
-
-        <div id="conflict_tabs">
-            <ul class="nav nav-tabs" role="tablist" style="position: relative; bottom: -6px;">
-                <li class="nav-item"><a class="nav-link show active" data-tab-set="conflict_tabs" data-toggle="tab" id="tawaiting-triage-tab" role="tab" onclick="updateStatus('T')">
-                    Awaiting Triage <span class="d-inline-block ml-1 badge badge-info">{{ status_counts.T }}</span>
-                </a></li>
-                <li class="nav-item"><a class="nav-link" data-tab-set="conflict_tabs" data-toggle="tab" id="tready-to-discuss-tab" role="tab" onclick="updateStatus('D')">
-                    Ready to Discuss <span class="d-inline-block ml-1 badge badge-info">{{ status_counts.D }}</span>
-                </a></li>
-                <li class="nav-item"><a class="nav-link" data-tab-set="conflict_tabs" data-toggle="tab" id="tawaiting-amendment-tab" role="tab" onclick="updateStatus('A')">
-                    Awaiting Amendment <span class="d-inline-block ml-1 badge badge-info">{{ status_counts.A }}</span>
-                </a></li>
-                <li class="nav-item"><a class="nav-link not-important" data-tab-set="conflict_tabs" data-toggle="tab" id="twaiting-on-other-lab-tab" role="tab" onclick="updateStatus('O')">
-                    Waiting on Other Lab <span class="d-inline-block ml-1 badge badge-info">{{ status_counts.O }}</span>
-                </a></li>
-                <li class="nav-item"><a class="nav-link not-important" data-tab-set="conflict_tabs" data-toggle="tab" id="tcomplex-tab" role="tab" onclick="updateStatus('C')">
-                    Complex <span class="d-inline-block ml-1 badge badge-info">{{ status_counts.C }}</span>
-                </a></li>
-                <li class="nav-item"><a class="nav-link not-important" data-tab-set="conflict_tabs" data-toggle="tab" id="discordance_reports_history_detail-tab" role="tab" onclick="updateStatus('Z')">
-                    Resolved <span class="d-inline-block ml-1 badge badge-info">{{ status_counts.Z }}</span>
-                </a></li>
-            </ul>
-        </div>
-{% endcomment %}
         <table id="conflicts-datatable"
                data-datatable-url="{% url 'conflicts_datatables' %}"
                data-datatable-data='conflictFilter'
