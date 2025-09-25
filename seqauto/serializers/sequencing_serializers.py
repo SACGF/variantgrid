@@ -375,6 +375,34 @@ class VCFFilePathSerializer(serializers.ModelSerializer):
         fields = ("path", )
 
 
+def validate_unique_vcf_path(klass, path, **kwargs):
+    """ We need to ensure there is only 1 backend/sequencing VCF model with path
+        as we need it as a unique result lookup in upload.vcf.vcf_import.create_backend_vcf_links
+
+        We want the API to be idempotent (can be called multiple times) so ok if the lookup is the same
+        (hence exists call if passed in same class below)
+    """
+    for vcf_class in [VCFFile, SampleSheetCombinedVCFFile]:
+        qs = vcf_class.objects.filter(path=path)
+        if klass == vcf_class:
+            qs = qs.exclude(**kwargs)  # Allow for same object/lookup
+        if obj := qs.first():
+            if klass == vcf_class:
+                diff = []
+                for k, v in kwargs.items():
+                    o_v = getattr(obj, k)
+                    if o_v != v:
+                        diff.append(f"{k} = {v}/{o_v}")
+                diff_str = ", ".join(diff)
+                msg = f"Cannot make record for {klass.__name__} with same path but different fields: {diff_str}"
+            else:
+                msg = f"Cannot make record for {klass.__name__}, when other sequencing VCF file type {vcf_class.__name__} with {path=} exists"
+
+            raise serializers.ValidationError({
+                "path": f"Existing {vcf_class.__name__}(pk={obj.pk}) with {path=} exists: {msg}",
+            })
+
+
 class VCFFileSerializer(serializers.ModelSerializer):
     bam_file = BamFileSerializer(required=False)
     variant_caller = VariantCallerSerializer()
@@ -388,11 +416,16 @@ class VCFFileSerializer(serializers.ModelSerializer):
         variant_caller_data = validated_data['variant_caller']
         bam_file = BamFileSerializer().create(bam_file_data)
         variant_caller = VariantCallerSerializer().create(variant_caller_data)
-        vcf_file, _ = VCFFile.objects.update_or_create(sequencing_run=bam_file.sequencing_run,
-                                                       bam_file=bam_file,
-                                                       variant_caller=variant_caller,
+        path = validated_data["path"]
+        kwargs = {
+            "sequencing_run": bam_file.sequencing_run,
+            "bam_file": bam_file,
+            "variant_caller": variant_caller,
+        }
+        validate_unique_vcf_path(VCFFile, path, **kwargs)
+        vcf_file, _ = VCFFile.objects.update_or_create(**kwargs,
                                                        defaults={
-                                                           "path": validated_data['path'],
+                                                           "path": path,
                                                            "data_state": DataState.COMPLETE
                                                        })
         return vcf_file
@@ -466,12 +499,18 @@ class SampleSheetCombinedVCFFileSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         sample_sheet = SampleSheetLookupSerializer.get_object(validated_data.pop('sample_sheet'))
         variant_caller = VariantCallerSerializer().create(validated_data.pop('variant_caller'))
-        defaults = {"data_state": DataState.COMPLETE}
-        sscvcf, _ = SampleSheetCombinedVCFFile.objects.update_or_create(sequencing_run=sample_sheet.sequencing_run,
-                                                                        sample_sheet=sample_sheet,
-                                                                        variant_caller=variant_caller,
-                                                                        path=validated_data["path"],
-                                                                        defaults=defaults)
+        path = validated_data["path"]
+        kwargs = {
+            "sequencing_run": sample_sheet.sequencing_run,
+            "sample_sheet": sample_sheet,
+            "variant_caller": variant_caller,
+        }
+        validate_unique_vcf_path(SampleSheetCombinedVCFFile, path, **kwargs)
+        sscvcf, _ = SampleSheetCombinedVCFFile.objects.update_or_create(**kwargs,
+                                                                        defaults={
+                                                                            "path": validated_data["path"],
+                                                                            "data_state": DataState.COMPLETE,
+                                                                        })
         return sscvcf
 
 
