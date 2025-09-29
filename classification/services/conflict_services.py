@@ -18,6 +18,7 @@ from classification.models import AlleleOriginGrouping, EvidenceKeyMap, Conflict
     ConflictLab, ClassificationGrouping, ClassificationModification, ConflictNotification, ConflictNotificationStatus, \
     ConflictNotificationRun
 from genes.hgvs import CHGVS
+from library.django_utils import get_url_from_view_path
 from library.utils import strip_json, first, sort_and_group_by, RowSpanTable, RowSpanCellValue, LinkType
 from snpdb.models import Allele, Lab
 from snpdb.utils import LabNotificationBuilder
@@ -260,12 +261,13 @@ class ConflictCompareType(IntEnum):
     BECAME_AGREED = 2
     CHANGE_OF_LABS = 3
 
+    @property
     def label(self):
         match self:
             case ConflictCompareType.NO_CHANGE: return "No change"
-            case ConflictCompareType.CHANGE_OF_LABS: return "Change of labels"
+            case ConflictCompareType.CHANGE_OF_LABS: return "Change of labs"
             case ConflictCompareType.BECAME_CONFLICT: return "Now in conflict"
-            case ConflictCompareType.BECAME_CONFLICT: return "Now resolved"
+            case ConflictCompareType.BECAME_AGREED: return "Now resolved"
 
 
 @dataclass(frozen=True)
@@ -283,21 +285,23 @@ class ConflictCompare:
 
     @cached_property
     def notification_change_type(self) -> ConflictCompareType:
-        if self.previous_state == self.current_state:
-            # FIXME check to see if other labs have joined in, but only if otherwise in reportable state
-            return ConflictCompareType.NO_CHANGE
 
         was_reportable = False
         if self.previous_state:
             was_reportable = self.previous_state.severity >= ConflictSeverity.MEDIUM
 
         is_reportable_now = self.current_state.severity >= ConflictSeverity.MEDIUM
+
         if was_reportable != is_reportable_now:
             if was_reportable:
                 return ConflictCompareType.BECAME_AGREED
             else:
                 return ConflictCompareType.BECAME_CONFLICT
         else:
+            if self.previous_state:
+                if self.previous_state.involved_lab_ids != self.current_state.involved_lab_ids:
+                    return ConflictCompareType.CHANGE_OF_LABS
+
             return ConflictCompareType.NO_CHANGE
 
     @property
@@ -327,25 +331,43 @@ class ConflictCompare:
             all_lab_ids |= previous_state.involved_lab_ids
         return all_lab_ids
 
+    def __lt__(self, other):
+        return self.current_state.conflict < other.current_state.conflict
 
-def process_outstanding_conflict_notifications():
+
+def combine_outstanding_conflict_notifications() -> Optional[ConflictNotificationRun]:
     if ConflictNotification.objects.filter(notification_run__isnull=True).exists():
         notification_run = ConflictNotificationRun.objects.create()
         ConflictNotification.objects.filter(notification_run__isnull=True).update(notification_run=notification_run)
+        return notification_run
+    return None
 
-        lab_to_conflict_compares: dict[int, list[ConflictCompare]] = defaultdict(list)
-        for cn in ConflictNotification.objects.filter(notification_run=notification_run):
-            cc = ConflictCompare.from_conflict_notification(cn)
-            if cc.is_notifiable_difference:
-                for lab_id in cc.involved_lab_ids:
-                    lab_to_conflict_compares[lab_id].append(cc)
 
-        # now we have the notifications to send...
-        for lab_id, compares in lab_to_conflict_compares.items():
+def process_outstanding_conflict_notifications():
+    if notification_run := combine_outstanding_conflict_notifications():
+        send_emails_for_run(notification_run)
 
-            change_types: dict[ConflictCompareType, int] = Counter()
-            gene_symbols: set[str] = set()
-            for conflict_compare in compares:
+
+def send_emails_for_run(notification_run: ConflictNotificationRun):
+    conflict_notifications = sorted(ConflictNotification.objects.filter(notification_run=notification_run))
+
+    lab_to_conflict_compares: dict[int, list[ConflictCompare]] = defaultdict(list)
+    for cn in conflict_notifications:
+        cc = ConflictCompare.from_conflict_notification(cn)
+        if cc.is_notifiable_difference:
+            for lab_id in cc.involved_lab_ids:
+                lab_to_conflict_compares[lab_id].append(cc)
+
+    # now we have the notifications to send...
+    for lab_id, compares in lab_to_conflict_compares.items():
+        change_types: dict[ConflictCompareType, int] = Counter()
+        gene_symbols: set[str] = set()
+        allele_origins: set[AlleleOriginBucket] = set()
+        for conflict_compare in compares:
+            notification_change_type = conflict_compare.notification_change_type
+            if notification_change_type != ConflictCompareType.NO_CHANGE:
+                allele_origins.add(conflict_compare.current_state.conflict.allele_origin_bucket)
+                change_types[conflict_compare.notification_change_type] += 1
                 if c_hgvses := conflict_compare.conflict.c_hgvses():
                     for c_hgvs in c_hgvses:
                         if gene_symbol := c_hgvs.gene_symbol:
@@ -353,21 +375,43 @@ def process_outstanding_conflict_notifications():
                             break
                     gene_symbols.add("Unknown Gene Symbol")
 
-            lab = Lab.objects.get(id=lab_id)
+        lab = Lab.objects.get(id=lab_id)
+        if len(compares) > 0:
 
-            title_parts = []
+            gene_symbol_str = ", ".join(sorted(gene_symbols))
+            allele_origin_str = ", ".join(ao.label for ao in sorted(allele_origins))
+            title: str
             if len(compares) == 1:
-                title_parts.append(f"Discordance update for gene symbol: {gene_symbols} - ")
+                title = f"Discordance update for {allele_origin_str} gene symbol: ({gene_symbol_str}) - {compares[0].notification_change_type.label}"
+            else:
+                update_parts = []
+                for change in ConflictCompareType:
+                    if change_count := change_types.get(change):
+                        update_parts.append(f"{change_count} : {change.label}")
+                update_parts_str = ", ".join(update_parts)
+                title = f"Discordance updates for {allele_origin_str} gene symbols: ({gene_symbol_str}) - {update_parts_str}"
 
-            lab_notification = LabNotificationBuilder(lab, "Discordance Updates")
+            lab_notification = LabNotificationBuilder(lab, title)
 
+            for compare in compares:
+                lab_notification.add_header(f"Discordance Report (CR_{compare.conflict.pk}) Update")
 
+                conflict_link = get_url_from_view_path(
+                    reverse('conflict', kwargs={'conflict_id': compare.conflict.pk})
+                )
+                parts = []
+                parts.append(f"<{conflict_link}|CR_{compare.conflict.pk}>")
+                parts.append(compare.conflict.context_summary)
+                parts.append(compare.notification_change_type.label)
 
-            lab_notification.add_markdown("TODO: implementation on the discordance messages")
+                lab_notification.add_field("Discordance Detail", " - ".join(parts))
+                lab_notification.add_field("TODO")
+
+                pass
             lab_notification.send()
 
-        notification_run.status = ConflictNotificationStatus.COMPLETE
-        notification_run.save()
+    notification_run.status = ConflictNotificationStatus.COMPLETE
+    notification_run.save()
 
 
 class OncPathCalculator(ConflictCalculator):

@@ -34,7 +34,7 @@ def notify_discordance_change(discordance_report: DiscordanceReport, clinical_co
             NotificationBuilder("Send Notifications Triggered")\
                 .add_markdown(f"Detected discordance change outside of an import for DR_{discordance_report.pk} caused by *{clinical_context_change_data.cause_code.value}* - will send out notifications now.")\
                 .send()
-            send_prepared_discordance_notifications()
+            send_discordance_notifications()
 
 
 def prepare_discordance_notification(discordance_report: DiscordanceReport, cause: Optional[str] = None):
@@ -47,7 +47,7 @@ def prepare_discordance_notification(discordance_report: DiscordanceReport, caus
         )
 
 
-def send_prepared_discordance_notifications(outstanding_notifications: Optional[QuerySet[DiscordanceNotification]] = None):
+def send_discordance_notifications(outstanding_notifications: Optional[QuerySet[DiscordanceNotification]] = None):
     if outstanding_notifications is None:
         outstanding_notifications = DiscordanceNotification.objects.filter(notification_sent_date__isnull=True).order_by('pk')
 

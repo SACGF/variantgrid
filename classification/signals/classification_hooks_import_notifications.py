@@ -5,7 +5,6 @@ from classification.models import ClinicalContext
 from classification.models.classification_import_run import ClassificationImportRun, \
     classification_imports_complete_signal
 from classification.models.clinical_context_models import ClinicalContextRecalcTrigger
-from classification.signals import send_prepared_discordance_notifications
 from flags.models.models import FlagCollection, \
     flag_collection_extra_info_signal, FlagInfos
 
@@ -27,4 +26,4 @@ def import_complete(**kwargs):
         # cause should automatically be loaded from pending cause anyway
         cc.recalc_and_save(cause=cc.pending_cause, cause_code=ClinicalContextRecalcTrigger.DELAYED)
 
-    send_prepared_discordance_notifications()
+    # send_prepared_discordance_notifications()

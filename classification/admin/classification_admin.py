@@ -22,7 +22,7 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     classification_flag_types, DiscordanceReportTriage, ensure_discordance_report_triages_bulk, \
     DiscordanceReportTriageStatus, ClassificationGrouping, ClassificationGroupingEntry, \
     AlleleOriginGrouping, AlleleGrouping, ClassificationGroupingSearchTerm, ClassificationSummaryCalculator, \
-    ConflictHistory, Conflict, ConflictLab, ConflictNotification
+    ConflictHistory, Conflict, ConflictLab, ConflictNotification, ConflictNotificationRun
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -30,8 +30,7 @@ from classification.models.clinical_context_models import ClinicalContextRecalcT
 from classification.models.clinical_context_utils import update_clinical_contexts
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from classification.models.discordance_models_utils import DiscordanceReportRowDataTriagesRowData
-from classification.services.conflict_services import process_outstanding_conflict_notifications
-from classification.signals import send_prepared_discordance_notifications
+from classification.services.conflict_services import process_outstanding_conflict_notifications, send_emails_for_run
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.cache import timed_cache
 from library.django_utils import get_url_from_view_path
@@ -1059,9 +1058,9 @@ class DiscordanceNotificationAdmin(ModelAdminBasics):
     def has_delete_permission(self, request, obj=None):
         return False
 
-    @admin_action("Send Notification")
-    def send_lab_discordance_notification(self, request, queryset):
-        send_prepared_discordance_notifications(queryset)
+    # @admin_action("Send Notification")
+    # def send_lab_discordance_notification(self, request, queryset):
+    #     send_prepared_discordance_notifications(queryset)
 
 
 @admin.register(UploadedClassificationsUnmapped)
@@ -1551,3 +1550,12 @@ class ConflictNotificationAdmin(ModelAdminBasics):
     def create_dummy(self, request):
         process_outstanding_conflict_notifications()
         self.message_user(request, "Sent any outstanding notifications")
+
+
+@admin.register(ConflictNotificationRun)
+class ConflictNotificationRunAdmin(ModelAdminBasics):
+
+    @admin_action("Re-send emails")
+    def send_emails(self, request, queryset: QuerySet[ConflictNotificationRun]):
+        for notification_run in queryset:
+            send_emails_for_run(notification_run)

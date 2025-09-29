@@ -711,6 +711,16 @@ class Conflict(TimeStampedModel):
     class Meta:
         unique_together = ("allele", "conflict_type", "allele_origin_bucket", "testing_context_bucket", "tumor_type_category")
 
+    @property
+    def context_summary(self):
+        parts = [self.get_allele_origin_bucket_display()]
+        if self.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
+            parts.append(self.get_testing_context_bucket_display())
+        if self.tumor_type_category:
+            parts.append(self.tumor_type_category)
+        parts.append(self.get_conflict_type_display())
+        return " ".join(parts)
+
     def __str__(self):
         parts = [f"{self.allele:CA}", self.get_allele_origin_bucket_display()]
         if self.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
@@ -865,22 +875,5 @@ class ConflictNotification(TimeStampedModel):
     previous_state = models.ForeignKey(ConflictHistory, on_delete=CASCADE, related_name='+', null=True, blank=True)
     notification_run = models.ForeignKey(ConflictNotificationRun, on_delete=SET_NULL, null=True, blank=True)
 
-
-# @dataclass
-# class ConflictLabGrouped:
-#     conflict_lab_groupings: list['ConflictLabGrouping']
-#     excluded: list[ConflictDataRow]
-#
-#
-# @dataclass
-# class ConflictLabGrouping:
-#     lab: Lab
-#     data: list[ConflictDataRow]
-#     comments: list[ConflictLabComment]
-
-"""
-    ConflictUpdate:
-        original_conflict_history
-        new_conflict_history
-        notification_status
-"""
+    def __lt__(self, other):
+        return self.conflict < other.conflict
