@@ -123,7 +123,9 @@ class ClinVar(models.Model):
 
     @property
     def stars(self):
-        return ClinVarReviewStatus(self.clinvar_review_status).stars()
+        if self.clinvar_review_status is not None:
+            return ClinVarReviewStatus(self.clinvar_review_status).stars()
+        return None
 
     def get_origin_display(self):
         return ClinVar.ALLELE_ORIGIN.get(self.clinvar_origin)

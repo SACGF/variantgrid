@@ -4,11 +4,15 @@
 }
 </style>
 <div class="clinvar-stars">
-    {%  for star in stars %}
-        {% if star %}
-            <span class="filled-star">&#x2605;</span>
-        {%  else %}
-            <span>&#x2605;</span>
-        {%  endif %}
-    {%  endfor %}
+    {% if stars is None %}
+        <span>Unknown</span>
+    {% else %}
+        {%  for star in stars %}
+            {% if star %}
+                <span class="filled-star">&#x2605;</span>
+            {%  else %}
+                <span>&#x2605;</span>
+            {%  endif %}
+        {%  endfor %}
+    {% endif %}
 </div>
