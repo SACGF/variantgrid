@@ -712,7 +712,7 @@ class Conflict(TimeStampedModel):
         unique_together = ("allele", "conflict_type", "allele_origin_bucket", "testing_context_bucket", "tumor_type_category")
 
     @property
-    def context_summary(self):
+    def context_summary(self) -> str:
         parts = [self.get_allele_origin_bucket_display()]
         if self.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
             parts.append(self.get_testing_context_bucket_display())
@@ -721,7 +721,7 @@ class Conflict(TimeStampedModel):
         parts.append(self.get_conflict_type_display())
         return " ".join(parts)
 
-    def __str__(self):
+    def __str__(self) -> str:
         parts = [f"{self.allele:CA}", self.get_allele_origin_bucket_display()]
         if self.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
             parts.append(self.get_testing_context_bucket_display())
@@ -738,7 +738,7 @@ class Conflict(TimeStampedModel):
         return list(self.conflictlab_set.order_by('lab__organization__name', 'lab__name'))
 
     @cached_property
-    def comments(self):
+    def comments(self) -> list['ConflictComment']:
         return list(self.conflictcomment_set.order_by('-created'))
 
     @cached_property
@@ -770,6 +770,24 @@ class Conflict(TimeStampedModel):
         else:
             qs = qs.order_by('created')
         return qs
+
+    """
+    allele_grouping = models.ForeignKey(AlleleGrouping, on_delete=models.CASCADE)
+    allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, default=AlleleOriginBucket.UNKNOWN)
+    testing_context_bucket = models.CharField(max_length=1, choices=TestingContextBucket.choices, default=TestingContextBucket.UNKNOWN)
+    tumor_type_category = models.TextField(null=True, blank=True)
+    """
+
+    def allele_origin_grouping(self) -> Optional[AlleleOriginGrouping]:
+        if allele_grouping := AlleleGrouping.objects.filter(allele=self.allele).get():
+            if allele_origin_grouping := AlleleOriginGrouping.objects.filter(
+                allele_grouping=allele_grouping,
+                allele_origin_bucket=self.allele_origin_bucket,
+                testing_context_bucket=self.testing_context_bucket,
+                tumor_type_category=self.tumor_type_category
+            ).get():
+                return allele_origin_grouping
+        return None
 
     # def grouped_data(self) -> 'ConflictLabGrouped':
     #     lab_comments: dict[Lab, list[ConflictLabComment]] = defaultdict(list)

@@ -377,6 +377,11 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
     def recalc_and_save(self,
                         cause: str,
                         cause_code: ClinicalContextRecalcTrigger = ClinicalContextRecalcTrigger.OTHER):
+
+        print("Clinical Context - RECALC AND SAVE called")
+        print("This method is deprecated")
+
+
         """
         Updates this ClinicalContext with the new status and applies flags where appropriate.
         :param cause: A human-readable string to be showed to the users as to what started or stopped a discordance (if relevant)

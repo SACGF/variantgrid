@@ -49,7 +49,7 @@
                                     <div>{{ history.get_severity_display }}</div>
                                 </div>
                                 <div class="col-9">
-                                    {% if feed_item.explanations %}
+                                    {% if feed_item.extra_comments %}
                                         <div class="no-value text-right">
                                             {% for explain in feed_item.explanations %}
                                                 <div class="mb-2 mr-4">{{ explain }}</div>

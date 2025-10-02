@@ -2769,20 +2769,22 @@ let ConflictTable = (function() {
 
 ConflictTable.renderContext = (data, type, row) => {
     // return JSON.stringify(data);
-    let dom = $('<div>', { style: 'display:inline-block' } );
+    let dom = $('<div>', { style: 'display:inline-block; line-height: 1.3rem' } );
     dom.append(VCTable.allele_origin_bucket_label(
         data.allele_origin_bucket,
         "",
         "horizontal"));
     if (data.testing_context_bucket !== "G") {
-        dom.append($("<span>", {"class": "testing-context", text: data.testing_context_bucket_label}));
+        dom.append($("<div>", {"class": "testing-context", text: data.testing_context_bucket_label}));
     }
     if (data.tumor_type_category) {
-        dom.append(" : ");
-        dom.append($("<span>", {"class": "testing-context", text: data.tumor_type_category}));
+        //dom.append(" : ");
+        dom.append($("<div>", {"class": "testing-context", text: data.tumor_type_category}));
     }
-    dom.append(" - ")
-    dom.append($("<a>", {"class": "text-muted", text: data.conflict_type_label, href: Urls.conflict(data.conflict_id)}));
+    //dom.append(" - ")
+    dom.append($("<div>", {html: [
+        $("<a>", {"class": "text-muted", text: data.conflict_type_label, href: Urls.conflict(data.conflict_id)})
+    ]}));
 
     if (data.severity >= 2) {
         dom.append($("<br/><br/>"));

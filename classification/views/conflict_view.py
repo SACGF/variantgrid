@@ -1,23 +1,26 @@
-from dataclasses import dataclass, Field, field
-from typing import Optional, Union, Iterable, Callable
-
+from dataclasses import dataclass, field
+from typing import Optional, Union, Counter, Callable, Iterable
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
 from django.db.models.aggregates import Sum, Count
 from django.http import HttpRequest, HttpResponseBase
 from django.shortcuts import render, get_object_or_404
+from pysam.libcvcf import defaultdict
+from rest_framework.reverse import reverse
 
 from classification.enums import AlleleOriginBucket, TestingContextBucket, ConflictSeverity, ShareLevel, SpecialEKeys
 from classification.models import Conflict, ConflictComment, DiscordanceReportTriageStatus, DiscordanceReportNextStep, \
-    ConflictHistory, EvidenceKeyMap
-from classification.services.conflict_services import ConflictDataRow, group_conflicts
+    ConflictHistory, EvidenceKeyMap, ConflictNotificationRun, ConflictNotification, ConflictNotificationStatus
+from classification.services.conflict_services import ConflictDataRow, group_conflicts, ConflictCompare, \
+    ConflictCompareType
 from classification.views.classification_dashboard_view import ClassificationDashboard
-from library import cache
+from library.django_utils import get_url_from_view_path
 from library.utils import IterableStitcher
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
+from snpdb.utils import LabNotificationBuilder
 from uicore.views.ajax_form_view import AjaxFormView, LazyRender
-
+from library import cache
 
 def conflicts_view(request, lab_id: Optional[Union[str, int]] = None):
     lab_picker = LabPickerData.from_request(request, lab_id, 'conflicts')
@@ -113,13 +116,13 @@ class ConflictHistoryChunk:
         return len(self.share_level_to_values)
 
     @staticmethod
-    def populate_from(raw_data: list[dict], user: User) -> dict[int, 'ConflictHistoryChunk']:
+    def populate_from(raw_data: list[dict], user: Optional[User]) -> dict[int, 'ConflictHistoryChunk']:
         chunked: dict[int, ConflictHistoryChunk] = {}
         for row in raw_data:
             row_copy = dict(row)
             lab_id = row_copy.pop("lab_id")
             share_level = ShareLevel(row_copy.pop("share_level"))
-            if share_level.has_access(Lab.objects.get(pk=lab_id), user):
+            if share_level.is_discordant_level or (user and share_level.has_access(Lab.objects.get(pk=lab_id), user)):
                 use_chunk: ConflictHistoryChunk
                 if chunk := chunked.get(lab_id):
                     use_chunk = chunk
@@ -142,8 +145,14 @@ def data_row_to_label() -> dict[str, str]:
 def calculate_differences_between_history(
         conflict_data: list[ConflictDataRow],
         old_history: dict[int, ConflictHistoryChunk],
-        new_history: dict[int, ConflictHistoryChunk]):
-    # TODO sort differences by lab name
+        new_history: dict[int, ConflictHistoryChunk]) -> list[str]:
+    """
+    Populates conflict_data messages as well as return a list of non-lab specific messages (if any)
+    :param conflict_data:
+    :param old_history:
+    :param new_history:
+    :return:
+    """
 
     confict_data_dict = {(cdr.lab_id, cdr.share_level): cdr for cdr in conflict_data}
 
@@ -194,40 +203,43 @@ def calculate_differences_between_history(
 
 class ConflictFeed:
 
-    def __init__(self, conflict: Conflict, user: User):
+    def __init__(self, conflict: Conflict, user: Optional[User]):
         self.conflict = conflict
         self.user = user
 
-    def history_iterator(self):
+    def history_generator(self) -> Iterable[ConflictHistory]:
+        return ConflictHistory.objects.filter(conflict=self.conflict).order_by("created")
+
+    def history_iterator(self) -> Iterable[ConflictHistoryWrapper]:
         old_history: Optional[dict[int, ConflictHistoryChunk]] = {}
-        for history in ConflictHistory.objects.filter(conflict=self.conflict).order_by("created"):
+        for history in self.history_generator():
             new_history = ConflictHistoryChunk.populate_from(history.data.get("rows"), self.user)
             if new_history:
                 data_rows = history.data_rows_for_user(self.user)
-                # FIXME filter out entry where the user can't see any differences
-                explanations = calculate_differences_between_history(data_rows, old_history=old_history, new_history=new_history)
                 if new_history == old_history:
                     # from this user's POV nothing has changed, though likely another lab's unshared classifications have changed
                     # so skip this entry
                     # FIXME, if we skip over the latest record, then we don't get is_latest True,
                     continue
 
+                explanations = calculate_differences_between_history(data_rows, old_history=old_history, new_history=new_history)
+
                 old_history = new_history
 
-                yield ConflictFeedItem(
-                    conflict_history=ConflictHistoryWrapper(
-                        history=history,
-                        data_rows=data_rows,
-                        extra_comments=explanations
-                    )
+                yield ConflictHistoryWrapper(
+                    history=history,
+                    data_rows=data_rows,
+                    extra_comments=explanations
                 )
 
-    def comment_iterator(self):
-        for comment in ConflictComment.objects.filter(conflict=self.conflict).order_by("created"):
-            yield ConflictFeedItem(conflict_comment=comment)
+    def comment_iterator(self) -> Iterable[ConflictComment]:
+        return ConflictComment.objects.filter(conflict=self.conflict).order_by("created")
 
-    def feed(self):
-        return IterableStitcher([self.history_iterator(), self.comment_iterator()])
+    def feed(self) -> Iterable[ConflictFeedItem]:
+        return IterableStitcher([
+            map(lambda x: ConflictFeedItem(conflict_history=x), self.history_iterator()),
+            map(lambda x: ConflictFeedItem(conflict_comment=x), self.comment_iterator())
+        ])
 
 
 class ConflictFeedView(AjaxFormView[Conflict]):

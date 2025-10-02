@@ -14,8 +14,7 @@ from annotation.models.models import AnnotationVersion
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
 from classification.classification_import import reattempt_variant_matching, variant_matching_dry_run
 from classification.enums import WithdrawReason, AlleleOriginBucket, TestingContextBucket, ConflictSeverity
-from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel, \
-    ConflictType
+from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
     ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
     UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
@@ -27,11 +26,11 @@ from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
 from classification.models.clinical_context_models import ClinicalContextRecalcTrigger, DiscordanceNotification
-from classification.models.clinical_context_utils import update_clinical_contexts
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from classification.models.discordance_models_utils import DiscordanceReportRowDataTriagesRowData
-from classification.services.conflict_services import process_outstanding_conflict_notifications, send_emails_for_run
+from classification.services.conflict_services import combine_outstanding_conflict_notifications
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
+from classification.views.conflict_emails import send_emails_for_conflict_notification_run
 from library.cache import timed_cache
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import admin_bot
@@ -360,9 +359,9 @@ class ClassificationAdmin(ModelAdminBasics):
         for c in queryset:
             c.fix_permissions(fix_modifications=True)
 
-    @admin_action("Fixes: Clinical Context Germline/Somatic")
-    def fix_clinical_context(self, request, queryset: QuerySet[Classification]):
-        update_clinical_contexts(list(queryset.all()))
+    # @admin_action("Fixes: Clinical Context Germline/Somatic")
+    # def fix_clinical_context(self, request, queryset: QuerySet[Classification]):
+    #     update_clinical_contexts(list(queryset.all()))
 
     @admin_action("Fixes: Revalidate")
     def revalidate(self, request, queryset):
@@ -1547,9 +1546,12 @@ class ConflictNotificationAdmin(ModelAdminBasics):
         queryset.update(notification_run=None)
 
     @admin_model_action(url_slug="send_pending/", short_description="Send Pending Notifications Now", icon="fa-solid fa-mail")
-    def create_dummy(self, request):
-        process_outstanding_conflict_notifications()
-        self.message_user(request, "Sent any outstanding notifications")
+    def send_pending(self, request):
+        if outstanding_notifications := combine_outstanding_conflict_notifications():
+            send_emails_for_conflict_notification_run(outstanding_notifications)
+            self.message_user(request, "Sent outstanding notifications")
+        else:
+            self.message_user(request, "No outstanding notifications")
 
 
 @admin.register(ConflictNotificationRun)
@@ -1558,4 +1560,4 @@ class ConflictNotificationRunAdmin(ModelAdminBasics):
     @admin_action("Re-send emails")
     def send_emails(self, request, queryset: QuerySet[ConflictNotificationRun]):
         for notification_run in queryset:
-            send_emails_for_run(notification_run)
+            send_emails_for_conflict_notification_run(notification_run)
