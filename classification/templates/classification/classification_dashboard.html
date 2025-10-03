@@ -116,9 +116,25 @@
         {% page_help_embedded title="Discordance Reports Awaiting Triage" %}
             <p>Below is a sample of discordances where your lab has a triage pending.</p>
         {% end_page_help_embedded %}
+        {% comment %}
         <div data-toggle="ajax" href="{% url 'classification_dashboard_discordance_detail' dlab.lab_picker.selection %}">
             <div class="loading-message" style="height:381px">Loading...</div>
         </div>
+        {% endcomment %}
+        <script>
+            function conflictFilter(data) {
+                data.status = "T";
+                data.exclude_unknown = true;
+                data.multiple_submitters = true;
+            }
+        </script>
+        <a class="hover-link" href="{% url 'conflicts' %}"><span class="form-text">Click here to review all discordances</span></a>
+        <table id="conflicts-datatable"
+               data-datatable-url="{% url 'conflicts_datatables' %}"
+               data-datatable-data='conflictFilter'
+               class="sticky-header classification-table"
+               data-adjust-columns="false"
+        ></table>
     {% endif %}
 
 
