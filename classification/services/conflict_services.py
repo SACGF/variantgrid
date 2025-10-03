@@ -135,6 +135,17 @@ class ConflictDataRow:
             return EvidenceKeyMap.clinical_significance_to_bucket().get(classification)
         return None
 
+    @staticmethod
+    def pathogenic_buckets() -> set[int]:
+        # Note, that all of these should be the same bucket
+        # but just in case
+        path_buckets: set[int] = set()
+        clin_sig_buckets = EvidenceKeyMap.clinical_significance_to_bucket()
+        for value in ("LP", "P", "LO", "O"):
+            if bucket := clin_sig_buckets.get(value):
+                path_buckets.add(bucket)
+        return path_buckets
+
     def __lt__(self, other: 'ConflictDataRow') -> bool:
         if self.lab_id != other.lab_id:
             return self.lab_id < other.lab_id
@@ -370,9 +381,9 @@ class ConflictCompare:
 
         was_reportable = False
         if self.previous_state:
-            was_reportable = self.previous_state.severity >= ConflictSeverity.MEDIUM
+            was_reportable = self.previous_state.severity >= ConflictSeverity.MAJOR
 
-        is_reportable_now = self.current_state.severity >= ConflictSeverity.MEDIUM
+        is_reportable_now = self.current_state.severity >= ConflictSeverity.MAJOR
 
         if was_reportable != is_reportable_now:
             if was_reportable:
@@ -445,12 +456,15 @@ class OncPathCalculator(ConflictCalculator):
                 values.add(row.classification)
 
             if len(buckets) > 1:
-                if 3 in buckets:  # don't like this hardcoding, 3 = LP, P
+                if buckets.intersection(ConflictDataRow.pathogenic_buckets()):
+                    return ConflictSeverity.MEDICALLY_SIGNIFICANT
+                else:
                     return ConflictSeverity.MAJOR
+            if len(values) > 1:
+                if len(values) == 2 and "VUS" in values and all(x.startswith("VUS") for x in values):
+                    return ConflictSeverity.MINOR # Is VUS_A vs VUS
                 else:
                     return ConflictSeverity.MEDIUM
-            if len(values) > 1:
-                return ConflictSeverity.MINOR
             else:
                 return ConflictSeverity.SAME
 
@@ -481,13 +495,13 @@ class ClinSigCalculator(ConflictCalculator):
             # the only exception being tier_1 vs tier_1_or_2 or tier_2 vs tier_1_or_2 which
             # is considered minor
             if len(tiers) > 1:
-                return ConflictSeverity.MAJOR
+                return ConflictSeverity.MEDICALLY_SIGNIFICANT
             elif len(tiers) == 1 and has_tier_1_and_2:
                 only_tier = first(tiers)
                 if only_tier in {"tier_1", "tier_2"}:
-                    return ConflictSeverity.MINOR
+                    return ConflictSeverity.MINOR # tier 1 vs tier 1_or_2
                 else:
-                    return ConflictSeverity.MAJOR
+                    return ConflictSeverity.MEDICALLY_SIGNIFICANT
             return ConflictSeverity.SAME
 
 

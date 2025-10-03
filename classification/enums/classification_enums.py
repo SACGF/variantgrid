@@ -33,9 +33,10 @@ class ConflictSeverity(IntegerChoices):
     NO_SUBMISSIONS = 0, "No Submissions"
     SINGLE_SUBMISSION = 1, "Single Submitter"
     SAME = 2, "Same Values"  # LP and LP
-    MINOR = 3, "Minor Diffs"  # VUS and VUS_A
-    MEDIUM = 4, "Medium Diffs"  # B and LB
-    MAJOR = 5, "Major Diffs"  # P and VUS
+    MINOR = 3, "Resolution Differences"  # VUS and VUS_A, generally a resolution issue
+    MEDIUM = 4, "Small Diffs"  # B and LB
+    MAJOR = 5, "Discordance"  # B and VUS
+    MEDICALLY_SIGNIFICANT = 6, "Medical Significance Discordance"  # P and VUS
 
 
 class TestingContextBucket(TextChoices):
