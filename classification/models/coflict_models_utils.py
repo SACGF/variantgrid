@@ -12,7 +12,7 @@ from snpdb.models import Lab
 
 
 @dataclass
-class ConflictCategoriesUtils:
+class ConflictReportCategoriesCounts:
     active: int = 0
     medical: int = 0
     waiting_for_triage: int = 0
@@ -46,8 +46,7 @@ class ConflictReportCategories:
             return "your assigned labs"
 
     @cached_property
-    def all_counts(self) -> ConflictCategoriesUtils:
-        lab_ids = LabPickerData.for_user(self.user, self.get_query_param("lab")).lab_ids
+    def all_counts(self) -> ConflictReportCategoriesCounts:
         qs = Conflict.objects.all().for_labs(self.perspective.selected_labs)
 
         # TODO need to distinguish medically significant
@@ -63,13 +62,13 @@ class ConflictReportCategories:
         # NO_CONFLICT = "N"
 
         active = qs.count()
-        medical = qs.count(severity__gte=ConflictSeverity.MEDICALLY_SIGNIFICANT)
+        medical = qs.filter(severity__gte=ConflictSeverity.MEDICALLY_SIGNIFICANT).count()
         waiting_for_triage = qs.filter(overall_status=DiscordanceReportNextStep.AWAITING_YOUR_TRIAGE).count()
         waiting_for_triage_medical = qs.filter(overall_status=DiscordanceReportNextStep.AWAITING_YOUR_TRIAGE, severity__gte=ConflictSeverity.MEDICALLY_SIGNIFICANT).count()
         waiting_for_amend = qs.filter(overall_status=DiscordanceReportNextStep.AWAITING_YOUR_AMEND).count()
         ready_to_discuss = qs.filter(overall_status=DiscordanceReportNextStep.TO_DISCUSS).count()
 
-        return ConflictCategoriesUtils(
+        return ConflictReportCategoriesCounts(
             active=active,
             medical=medical,
             waiting_for_triage=waiting_for_triage,

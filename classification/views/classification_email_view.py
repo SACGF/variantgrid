@@ -15,6 +15,7 @@ from django.utils.timesince import timesince
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import Classification, classification_flag_types, \
     DiscordanceReportClassification, DiscordanceReport
+from classification.models.coflict_models_utils import ConflictReportCategories
 from classification.models.discordance_models_utils import DiscordanceReportCategories
 from email_manager.models import EmailLog
 from flags.models import FlagCollection, Flag
@@ -61,7 +62,12 @@ class EmailLabSummaryData:
 
     @cached_property
     def discordance_report_categories(self) -> DiscordanceReportCategories:
+        # Deprecated, use conflict_report_categories instead
         return DiscordanceReportCategories(perspective=LabPickerData.for_lab(self.lab))
+
+    @cached_property
+    def conflict_report_categories(self) -> ConflictReportCategories:
+        return ConflictReportCategories(perspective=LabPickerData.for_lab(self.lab))
 
     @cached_property
     def flagged_variants(self) -> QuerySet[Flag]:
