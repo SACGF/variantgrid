@@ -33,7 +33,7 @@ class ConflictSeverity(IntegerChoices):
     NO_SUBMISSIONS = 0, "No Submissions"
     SINGLE_SUBMISSION = 1, "Single Submitter"
     SAME = 2, "Same Values"  # LP and LP
-    MINOR = 3, "Resolution Differences"  # VUS and VUS_A, generally a resolution issue
+    MINOR = 3, "Resolution Differences"  # VUS and VUS_A, Tier I vs Tier I/II generally a resolution issue
     MEDIUM = 4, "Small Diffs"  # B and LB
     MAJOR = 5, "Discordance"  # B and VUS
     MEDICALLY_SIGNIFICANT = 6, "Medical Significance Discordance"  # P and VUS

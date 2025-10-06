@@ -28,8 +28,8 @@ from genes.models import GeneSymbol
 from library.utils import strip_json
 from snpdb.models import Allele, Lab
 import html
-from datetime import datetime
-
+from datetime import datetime, timedelta
+from django.utils import timezone
 
 classification_grouping_search_term_signal = django.dispatch.Signal()  # args: "grouping", expects iterable of ClassificationGroupingSearchTermStub
 
@@ -661,6 +661,7 @@ class ConflictObjectManager(Manager):
     def get_queryset(self):
         qs = ConflictQuerySet(self.model, using=self._db)
         qs = qs.annotate(severity=Subquery(ConflictHistory.objects.filter(conflict_id=OuterRef("pk"), is_latest=True).values('severity')))
+        qs = qs.annotate(change_date=Subquery(ConflictHistory.objects.filter(conflict_id=OuterRef("pk"), is_latest=True).values('created')))
         qs = qs.annotate(data=Subquery(ConflictHistory.objects.filter(conflict_id=OuterRef("pk"), is_latest=True).values('data')))
         qs = qs.annotate(past_issue=Exists(Subquery(ConflictHistory.objects.filter(conflict_id=OuterRef("pk"), severity__gte=ConflictSeverity.MEDIUM))))
         return qs
@@ -829,6 +830,13 @@ class ConflictHistory(TimeStampedModel):
             if row.exclude:
                 lab_ids.add(row.lab_id)
         return lab_ids
+
+    @property
+    def date_detected_str(self) -> str:
+        date_str = f"{self.created:%Y-%m-%d}"
+        if (timezone.now() - self.created) <= timedelta(days=1):
+            date_str = f"{date_str} (NEW)"
+        return date_str
 
     # TODO, caching this and letting other methods annotate it is a bit messy in some places
     # but a lot cleaner in others

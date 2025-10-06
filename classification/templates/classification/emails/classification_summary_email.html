@@ -97,7 +97,49 @@ Hello Shariant User,
                 </table>
             {% endwith %}
 
-            Triage table coming back soon
+            {% with pending_triages=lab_summary.conflict_report_categories.medically_significant_awaiting_triage %}
+                {% if pending_triages %}
+                    <div style="padding-left: 24px; margin-top:16px">
+                        <div style="color: #444; margin-bottom: 10px">Medically significant discordances awaiting triage:</div>
+                        <table style="border-collapse: collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="padding: 10px;font-weight:600; text-align:left; padding-right: 8px">Shariant ID</th>
+                                    <th style="padding: 10px;font-weight:600; text-align:left; padding-right: 8px">Context</th>
+                                    <th style="padding: 10px;font-weight:600; text-align:left; padding-right: 8px">Discordance Detected</th>
+                                    <th style="padding: 10px;font-weight:600; text-align:left; padding-right: 8px">c.HGVS</th>
+                                    <th style="padding: 10px;font-weight:600; text-align:left; padding-right: 8px">Lab / Classification</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% comment %}
+                                TODO - provide indicator of which row belongs to the lab
+                                TODO - Sort data rows by severity rather than Lab
+                                TODO - Have colour highlighting of the values
+                                {% endcomment %}
+                                {% for conflict in pending_triages %}
+                                    <tr>
+                                        <td style="padding: 10px;"><a href="{% absolute_url 'conflict' conflict.pk %}">CR_{{ conflict.pk }}</a></td>
+                                        <td style="padding: 10px;">{{ conflict.context_summary }}</td>
+                                        <td style="padding: 10px;">{{ conflict.latest.date_detected_str }}</td>
+                                        <td style="padding: 10px;">
+                                            {% for c_hgvs_val in conflict.c_hgvses %}
+                                                {% c_hgvs c_hgvs_val show_genome_build=True %}
+                                            {% endfor %}
+                                        </td>
+                                        <td style="padding: 10px;">
+                                            {% for data_row in conflict.latest.data_rows %}
+                                                <div>{% lab data_row.lab %} - {{ data_row.value_label }}</div>
+                                            {% endfor %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            {% endwith %}
+
             {% comment %}
             {% with pending_triage=lab_summary.discordance_report_categories.to_triage_table %}
                 {% with pending_triage_medical=pending_triage.medically_significant_only %}

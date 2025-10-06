@@ -3,6 +3,7 @@ Copying the Discordance Model Utils but for conflicts
 """
 from dataclasses import dataclass
 from functools import cached_property
+from typing import Iterable
 
 from classification.enums import ConflictSeverity
 from classification.models import Conflict, DiscordanceReportNextStep
@@ -44,6 +45,13 @@ class ConflictReportCategories:
             return str(first(self.perspective.selected_labs))
         else:
             return "your assigned labs"
+
+    def medically_significant_awaiting_triage(self) -> Iterable[Conflict]:
+        qs = Conflict.objects.all().for_labs(self.perspective.selected_labs).filter(
+            severity__gte=ConflictSeverity.MEDICALLY_SIGNIFICANT,
+            overall_status=DiscordanceReportNextStep.AWAITING_YOUR_TRIAGE
+        ).order_by("-change_date")
+        return qs[0:50]
 
     @cached_property
     def all_counts(self) -> ConflictReportCategoriesCounts:

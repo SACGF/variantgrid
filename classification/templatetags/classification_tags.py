@@ -315,6 +315,7 @@ def clinical_significance_inline(value):
         "label": label
     }
 
+
 @register.inclusion_tag("classification/tags/lab.html")
 def lab(lab: Lab, your_lab: Optional[Lab] = None):
     return {

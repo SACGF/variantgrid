@@ -147,8 +147,9 @@ class ConflictDataRow:
         return path_buckets
 
     def __lt__(self, other: 'ConflictDataRow') -> bool:
+        # sort by labs by default to keep ordering consistent over entries
         if self.lab_id != other.lab_id:
-            return self.lab_id < other.lab_id
+            return self.lab < other.lab
         return self.share_level < other.share_level
 
 
