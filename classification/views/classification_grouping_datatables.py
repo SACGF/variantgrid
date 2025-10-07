@@ -81,6 +81,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             diff_value = row["somatic_difference"]
             if somatic_dict := row["latest_classification_modification__classification__summary__somatic"]:
                 somatic_dict["diff"] = diff_value
+                somatic_dict["pending_change"] = row["pending_change_clin_sig"];
+
                 return somatic_dict
         return None
 
@@ -88,19 +90,25 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         diff_value = row["pathogenic_difference"]
         result_dict = row["latest_classification_modification__classification__summary__pathogenicity"] or {}
         result_dict["diff"] = diff_value
+        result_dict["pending_change"] = row["pending_change_onc_path"]
 
-        if dr := self.discordance_report:
-            if drc := DiscordanceReportClassification.objects.filter(report_id=dr.pk,
-                                                                     classification_original__classification=row[
-                                                                         "latest_classification_modification__classification_id"]).first():
-                old_cs = drc.classification_original.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-                if result_dict and result_dict.get("classification") != old_cs:
-                    result_dict["old"] = old_cs
-                if "pending" not in result_dict:
-                    effective_cs = drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-                    if effective_cs != result_dict.get("classification"):
-                        result_dict["new"] = result_dict.get("classification")
-                        result_dict["classification"] = effective_cs
+        # Old code that would track discordances by discordance reports
+
+        # if dr := self.discordance_report:
+        #     if drc := DiscordanceReportClassification.objects.filter(report_id=dr.pk,
+        #                                                              classification_original__classification=row[
+        #                                                                  "latest_classification_modification__classification_id"]).first():
+        #         effective_cs = drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+        #         result_dict["classification"] = effective_cs
+        #
+        #         old_cs = drc.classification_original.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+        #         if result_dict and result_dict.get("classification") != old_cs:
+        #             result_dict["old"] = old_cs
+        #         if "pending" not in result_dict:
+        #             effective_cs = drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+        #             if effective_cs != result_dict.get("classification"):
+        #                 result_dict["new"] = result_dict.get("classification")
+        #                 result_dict["classification"] = effective_cs
 
         return result_dict
 
@@ -410,7 +418,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 extra_columns=[
                     "latest_classification_modification__classification_id",
                     "latest_classification_modification__classification__summary__pathogenicity",
-                    "pathogenic_difference"
+                    "pathogenic_difference",
+                    "pending_change_onc_path"
                 ]
             ),
             RichColumn(
@@ -419,14 +428,15 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 client_renderer="VCTable.somatic_clinical_significance",
                 sort_keys=[
                     'latest_classification_modification__classification__summary__somatic__sort',
-                    'latest_classification_modification__classification__summary__pathogenicity__sort'
+                    'latest_classification_modification__classification__summary__pathogenicity__sort',
                 ],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 renderer=self.render_somatic,
                 extra_columns=[
                     "latest_classification_modification__classification__summary__somatic",
                     "allele_origin_grouping__allele_origin_bucket",
-                    "somatic_difference"
+                    "somatic_difference",
+                    "pending_change_clin_sig"
                 ]
             ),
             RichColumn(

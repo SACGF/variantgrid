@@ -2,8 +2,10 @@ import argparse
 
 from django.core.management import BaseCommand
 
-from classification.models import Classification, ClassificationModification, ClassificationSummaryCalculator
+from classification.models import Classification, ClassificationModification, ClassificationSummaryCalculator, \
+    ConflictLab
 from classification.models.classification_grouping import ClassificationGrouping, AlleleOriginGrouping
+from classification.services.conflict_services import apply_conflict_lab_to_grouping
 
 
 class Command(BaseCommand):
@@ -44,14 +46,19 @@ class Command(BaseCommand):
             if not refresh:
                 qs = qs.filter(dirty=True)
 
+            index = -1
             for index, dirty in enumerate(qs.iterator()):
                 dirty.update()
                 if index % 1000 == 0 and index:
                     print(f"Updating {index} classification groupings")
             print(f"Updated {index+1} classification groupings")
 
+            index = -1
             for index, dirty in enumerate(AlleleOriginGrouping.objects.filter(dirty=True).iterator()):
                 dirty.update()
                 if index % 1000 == 0 and index:
                     print(f"Updating {index} allele groupings")
             print(f"Updated {index+1} allele groupings")
+
+            for conflict_lab in ConflictLab.objects.iterator():
+                apply_conflict_lab_to_grouping(conflict_lab)

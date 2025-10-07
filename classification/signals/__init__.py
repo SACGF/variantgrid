@@ -15,3 +15,4 @@ from classification.signals.classification_liftover import *  # so we load the r
 from classification.signals.classification_hooks_grouping import *  # so we load the receivers
 from classification.signals.classification_hooks_grouping_search_terms import *  # so we load the receivers
 from classification.signals.classification_hooks_pending_flags import *  # so we load the receivers
+from classification.signals.classification_hooks_conflicts import *  # so we load the receivers

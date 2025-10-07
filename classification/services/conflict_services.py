@@ -16,12 +16,10 @@ from classification.enums import AlleleOriginBucket, ConflictSeverity, ShareLeve
     SpecialEKeys
 from classification.models import AlleleOriginGrouping, EvidenceKeyMap, Conflict, ConflictKey, ConflictHistory, \
     ConflictLab, ClassificationGrouping, ClassificationModification, ConflictNotification, ConflictNotificationStatus, \
-    ConflictNotificationRun, ClassificationDate
+    ConflictNotificationRun, AlleleGrouping, DiscordanceReportTriageStatus
 from genes.hgvs import CHGVS
-from library.django_utils import get_url_from_view_path
 from library.utils import strip_json, first, sort_and_group_by, RowSpanTable, RowSpanCellValue, LinkType
 from snpdb.models import Allele, Lab
-from snpdb.utils import LabNotificationBuilder
 
 """
 
@@ -777,3 +775,34 @@ def group_conflicts(
                         table.add_cell(5, RowSpanCellValue("-", css_classes=value_css + ["no-value"]))
 
     return table
+
+
+def classification_grouping_for_conflict_lab(conflict_lab: ConflictLab) -> Optional[ClassificationGrouping]:
+    # TODO could do this in a single filter but easier to debug this way
+    conflict = conflict_lab.conflict
+    if ag := AlleleGrouping.objects.filter(allele=conflict.allele).first():
+        if aog := AlleleOriginGrouping.objects.filter(
+            allele_grouping=ag,
+            allele_origin_bucket=conflict.allele_origin_bucket,
+            testing_context_bucket=conflict.testing_context_bucket,
+            tumor_type_category=conflict.tumor_type_category
+        ).first():
+            if cg := ClassificationGrouping.objects.filter(allele_origin_grouping=aog, lab=conflict_lab.lab).first():
+                return cg
+    return None
+
+
+def apply_conflict_lab_to_grouping(conflict_lab: ConflictLab):
+    if classification_grouping := classification_grouping_for_conflict_lab(conflict_lab):
+        will_amend = conflict_lab.status == DiscordanceReportTriageStatus.REVIEWED_WILL_FIX
+        match conflict_lab.conflict.conflict_type:
+            case ConflictType.ONCPATH:
+                if classification_grouping.pending_change_onc_path != will_amend:
+                    classification_grouping.pending_change_onc_path = will_amend
+                    classification_grouping.save()
+            case ConflictType.CLIN_SIG:
+                if classification_grouping.pending_change_clin_sig != will_amend:
+                    classification_grouping.pending_change_clin_sig = will_amend
+                    classification_grouping.save()
+            case _:
+                pass

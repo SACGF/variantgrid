@@ -2465,8 +2465,7 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
     let value = null;
     if (data === null) {
         return "";
-    }
-    if (typeof(data) === "string") {
+    } else if (typeof(data) === "string") {
         let parts = data.split("|");
         value = {};
         value[SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE] = parts[0];
@@ -2494,6 +2493,10 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
             dom.append(`<span class="amp-level">${highest_level}</span>`);
         }
         dom.append(diffHtml);
+        if (value["pending_change"]) {
+            dom.addClass("strike");
+            dom.append('<i class="fa-solid fa-clock ml-1" title="These records have been marked as having pending changes to the clinical significance value shown"></i>');
+        }
         return dom;
     } else {
         return $('<div>', {class: 'c-pill scs-none no-value', html: 'No Data' + diffHtml});
@@ -2504,8 +2507,8 @@ VCTable.classification = (data, type, row) => {
     if (data === null) {
         return "" // support for dirty groups still processing
     }
-    let cs = data;
-    let csVal = cs;
+    console.log(data);
+    let csVal = null;
     let diff = 0;
     let is_pending = false;
     let old = null;
@@ -2513,21 +2516,11 @@ VCTable.classification = (data, type, row) => {
     let newValue = null;
     let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
 
-    if (typeof(cs) !== "string") {
-        csVal = cs["classification"] || cs[SpecialEKeys.CLINICAL_SIGNIFICANCE];
-        newValue = cs["new"]
-        let pending = cs["pending"];
-        if (pending) {
-            old = csVal;
-            csVal = pending;
-            is_pending = true;
-        } else {
-            old = cs["old"];
-        }
-        diff = cs["diff"];
-        if (old) {
-            oldLabel = csKey.prettyValue(old).val;
-        }
+    if (typeof(data) == "string") {
+        csVal = data;
+    } else {
+        csVal = data["classification"] || data[SpecialEKeys.CLINICAL_SIGNIFICANCE];
+        is_pending = data["pending_change"]
     }
 
     let label = csKey.prettyValue(csVal).val;
@@ -2538,40 +2531,15 @@ VCTable.classification = (data, type, row) => {
     }
     let pendingHtml = "";
     if (is_pending) {
-        pendingHtml = ' <i class="fa-solid fa-clock" title="Some or all of these classifications have been marked as having pending changes to classification to the value shown"></i>';
+        csClass += " strike"
+        pendingHtml = '<i class="fa-solid fa-clock" ml-1 title="These records have been marked as having pending changes to the classification value shown"></i>';
     }
-    let newHtml = "";
-
-    // {% if group.clinical_significance_old %}
-    //         <div><del>{% if group.clinical_significance_old %}{{ group.clinical_significance_old | ekey:"clinical_significance" }}{% else %}No Data{% endif %}</del></div>
-    //     {% endif %}
-    //     {% if group.clinical_significance_pending %}
-    //         <div title="Some or all of these classifications have been marked as having pending changes to classification" data-toggle="tooltip">
-    //             <div>
-    //                 <del>{% if group.clinical_significance %}{{ group.clinical_significance | ekey:"clinical_significance" }}{% else %}No Data{% endif %}</del>
-    //             </div>
-    //             <div class="c-pill cs cs-{{ group.clinical_significance }}">
-    //                 <div class="mb-1">{{ group.clinical_significance_pending | ekey:"clinical_significance" }}</div>
-    //                 <div class="flag flag-classification_pending_changes hover-detail mx-1"></div>
-    //             </div>
-    //         </div>
-    //     {% else %}
 
     let fullDom = $('<div>');
-    if (old) {
-        fullDom.append($('<div>', {html: $('<del>', {class: 'c-pill cs cs-none no-value', text: oldLabel})}));
-    }
-
     if (csVal && csVal.length) {
-        fullDom.append($('<span>', {class: `c-pill cs ${csClass}`, html:label + diffHtml + pendingHtml + newHtml}));
+        fullDom.append($('<span>', {class: `c-pill cs ${csClass}`, html:label + diffHtml + pendingHtml}));
     } else {
-        fullDom.append($('<span>', {class: 'c-pill cs-none no-value', html: 'No Data' + diffHtml + pendingHtml + newHtml}));
-    }
-
-    if (newValue) {
-        let newLabel = csKey.prettyValue(newValue).val;
-        newHtml = `<span class="c-pill cs" title="This is the classification value at the time the discordance was resolved. This record is now ${newLabel}">Updated <i class="fa-solid fa-circle-exclamation"></i></span>`;
-        fullDom.append(newHtml);
+        fullDom.append($('<span>', {class: 'c-pill cs-none no-value', html: 'No Data' + diffHtml + pendingHtml}));
     }
 
     return fullDom;

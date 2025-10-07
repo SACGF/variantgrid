@@ -1403,8 +1403,8 @@ class ClassificationGroupingAdmin(ModelAdminBasics):
         if allele_origin_bucket == AlleleOriginBucket.SOMATIC:
             parts.append(TestingContextBucket(obj.allele_origin_grouping.testing_context_bucket).label)
             if TestingContextBucket(obj.allele_origin_grouping.testing_context_bucket).should_have_subdivide:
-                parts.append(obj.allele_origin_grouping.tumor_type_category)
-
+                # FIXME, make a constant for unspecified tumor type category
+                parts.append(obj.allele_origin_grouping.tumor_type_category or "Unspecified")
         return " : ".join(parts)
 
     @admin_action("Refresh")

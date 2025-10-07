@@ -2,7 +2,7 @@ import operator
 from collections import Counter
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
-from typing import Optional, Self, Tuple, Iterable, Union
+from typing import Optional, Self, Tuple, Iterable, Union, TypedDict
 
 import django
 from django.contrib.auth.models import User
@@ -175,6 +175,18 @@ class ClassificationGrouping(TimeStampedModel):
     allele_origin_grouping = models.ForeignKey(AlleleOriginGrouping, on_delete=models.CASCADE)
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
     share_level = models.CharField(max_length=16, choices=ShareLevel.choices())
+    classification_count = models.IntegerField(default=0)
+    # these differences are internal within a lab, even if it's medical significant the overall
+    pathogenic_difference = models.IntegerField(choices=ClassificationGroupingPathogenicDifference.choices, default=ClassificationGroupingPathogenicDifference.NO_DIFF)
+    somatic_difference = models.IntegerField(choices=ClassificationGroupingSomaticDifference.choices, default=ClassificationGroupingSomaticDifference.NO_DIFF)
+    dirty = models.BooleanField(default=True)
+    conditions = models.JSONField(null=True, blank=True)
+    zygosity_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
+    latest_classification_modification = models.ForeignKey(ClassificationModification, on_delete=SET_NULL, null=True, blank=True)
+    latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
+    # these values are synced from LabConflict
+    pending_change_onc_path = models.BooleanField(default=False)
+    pending_change_clin_sig = models.BooleanField(default=False)
 
     @property
     def allele_origin_bucket(self):
@@ -206,11 +218,8 @@ class ClassificationGrouping(TimeStampedModel):
         else:
             return qs
 
-    classification_count = models.IntegerField(default=0)
-    pathogenic_difference = models.IntegerField(choices=ClassificationGroupingPathogenicDifference.choices, default=ClassificationGroupingPathogenicDifference.NO_DIFF)
-    somatic_difference = models.IntegerField(choices=ClassificationGroupingSomaticDifference.choices, default=ClassificationGroupingSomaticDifference.NO_DIFF)
 
-    dirty = models.BooleanField(default=True)
+
 
     def dirty_up(self):
         self.dirty = True
@@ -221,9 +230,7 @@ class ClassificationGrouping(TimeStampedModel):
     # def sub_groupings(self) -> list[ClassificationSubGrouping]:
     #     return ClassificationSubGrouping.from_modifications(self.classification_modifications)
 
-    conditions = models.JSONField(null=True, blank=True)
 
-    zygosity_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
     # # for discordances
     # classification_bucket
     #
@@ -238,8 +245,6 @@ class ClassificationGrouping(TimeStampedModel):
     # summary_somatic_clinical_significance
     # summary_c_hgvses
     # summary_criteria
-    latest_classification_modification = models.ForeignKey(ClassificationModification, on_delete=SET_NULL, null=True, blank=True)
-    latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
 
     def __lt__(self, other):
         def _sort_value(obj: ClassificationGrouping):

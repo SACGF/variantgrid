@@ -62,6 +62,9 @@
                 {% endif %}
             </div>
             <div class="card-body">
+                {% if user.is_superuser %}
+                    {% labelled label="Admin" %}{% admin_link conflict %}{% endlabelled %}
+                {% endif %}
                 {% labelled label="Status" %}{{ conflict.latest.get_severity_display }}{% endlabelled %}
                 {% labelled label="As of" %}{% timestamp conflict.current_severity_as_of %}{% endlabelled %}
                 {% labelled label="Context" %}

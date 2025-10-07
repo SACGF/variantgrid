@@ -105,7 +105,7 @@ class ClassificationSummaryCalculator:
             "classification": self.classification_value,
             "sort": self.classification_sort,
             "bucket": self.germline_bucket,
-            "pending": self.pending_classification_value
+            # "pending": self.pending_classification_value
         }
         somatic: ClassificationSummaryCacheDictSomatic = {
             "testing_context_bucket": self.testing_context_bucket,
