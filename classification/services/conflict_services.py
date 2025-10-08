@@ -777,6 +777,23 @@ def group_conflicts(
     return table
 
 
+def conflict_lab_for_grouping(classification_grouping: ClassificationGrouping, conflict_type: ConflictType) -> Optional[ConflictLab]:
+    # TODO could do this in a single filter but easier to debug this way
+    if conflict := Conflict.objects.filter(
+            allele=classification_grouping.allele,
+            conflict_type=conflict_type,
+            allele_origin_bucket=classification_grouping.allele_origin_bucket,
+            testing_context_bucket=classification_grouping.allele_origin_grouping.testing_context_bucket,
+            tumor_type_category=classification_grouping.allele_origin_grouping.tumor_type_category,
+        ).first():
+        if conflict_lab := ConflictLab.objects.filter(
+            conflict=conflict,
+            lab=classification_grouping.lab
+        ).first():
+            return conflict_lab
+    return None
+
+
 def classification_grouping_for_conflict_lab(conflict_lab: ConflictLab) -> Optional[ClassificationGrouping]:
     # TODO could do this in a single filter but easier to debug this way
     conflict = conflict_lab.conflict

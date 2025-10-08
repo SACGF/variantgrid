@@ -25,7 +25,8 @@ from classification.views.condition_match_test_view import condition_match_test_
 from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
     ConditionTextColumns, ConditionTextMatchingAPI
 from classification.views.conflict_datatables import ConflictColumns
-from classification.views.conflict_view import conflicts_view, ConflictFeedView, overlaps_view, conflict_view
+from classification.views.conflict_view import conflicts_view, ConflictFeedView, overlaps_view, conflict_view, \
+    conflict_review_new
 from classification.views.discordance_report_triage_view import DiscordanceReportTriageView
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report, \
     discordance_reports_view, discordance_reports_history_detail, discordance_reports_active_detail, \
@@ -114,6 +115,7 @@ urlpatterns = [
     path('conflicts', conflicts_view, name='conflicts'),
     path('conflicts/datatable', DatabaseTableView.as_view(column_class=ConflictColumns), name='conflicts_datatables'),
     path('conflicts/<int:conflict_id>/feed', ConflictFeedView.as_view(), name='conflict_feed'),
+    path('conflicts/<int:conflict_id>/review/new', conflict_review_new, name='conflict_review_new'),
     path('conflicts/<int:conflict_id>/detail', conflict_view, name='conflict'),
     path('conflicts/lab/<str:lab_id>', conflicts_view, name='conflicts'),
 

@@ -2,7 +2,7 @@ import operator
 from collections import Counter
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
-from typing import Optional, Self, Tuple, Iterable, Union, TypedDict
+from typing import Optional, Self, Tuple, Iterable, Union
 
 import django
 from django.contrib.auth.models import User
@@ -25,14 +25,17 @@ from classification.models.evidence_mixin_summary_cache import ClassificationSum
     ClassificationSummaryCacheDictPathogenicity, ClassificationSummaryCacheDictSomatic
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
+from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import strip_json
+from review.models import ReviewableModelMixin
 from snpdb.models import Allele, Lab
 import html
 from datetime import datetime, timedelta
 from django.utils import timezone
 
 classification_grouping_search_term_signal = django.dispatch.Signal()  # args: "grouping", expects iterable of ClassificationGroupingSearchTermStub
-
+classification_grouping_onc_path_signal = django.dispatch.Signal()  # args: "instance", expects Classification
+classification_grouping_clin_sig_signal = django.dispatch.Signal()  # args: "instance", expects Classification
 
 # TODO this needs to be moved to Classification
 # class ClassificationQualityLevel(TextChoices):
@@ -183,6 +186,7 @@ class ClassificationGrouping(TimeStampedModel):
     conditions = models.JSONField(null=True, blank=True)
     zygosity_values = ArrayField(models.CharField(max_length=30), null=True, blank=True)
     latest_classification_modification = models.ForeignKey(ClassificationModification, on_delete=SET_NULL, null=True, blank=True)
+    latest_cached_summary = models.JSONField(null=False, blank=True, default=dict)
     latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
     # these values are synced from LabConflict
     pending_change_onc_path = models.BooleanField(default=False)
@@ -218,9 +222,6 @@ class ClassificationGrouping(TimeStampedModel):
         else:
             return qs
 
-
-
-
     def dirty_up(self):
         self.dirty = True
         self.save(update_fields=["dirty"])
@@ -229,7 +230,6 @@ class ClassificationGrouping(TimeStampedModel):
 
     # def sub_groupings(self) -> list[ClassificationSubGrouping]:
     #     return ClassificationSubGrouping.from_modifications(self.classification_modifications)
-
 
     # # for discordances
     # classification_bucket
@@ -358,7 +358,19 @@ class ClassificationGrouping(TimeStampedModel):
             # FIND THE MOST RECENT CLASSIFICATION
             best_classification = last(all_modifications)
 
+            primary_onc_path_change = False
+            primary_clin_sig_change = False
+            previous_summary: ClassificationSummaryCacheDict
+            if previous_summary := self.latest_cached_summary:
+                new_summary: ClassificationSummaryCacheDict = best_classification.classification.summary
+                if previous_summary.get("pathogenicity", {}).get("classification") != new_summary.get("pathogenicity", {}).get("classification"):
+                    primary_onc_path_change = True
+                if previous_summary.get("somatic", {}).get("clinical_significance", {}) != new_summary.get("somatic", {}).get("clinical_significance"):
+                    primary_clin_sig_change = True
+
             self.latest_classification_modification = best_classification
+            # TODO now see if there's a change in overall classification / clinical significance - for the grouping
+            self.latest_cached_summary = best_classification.classification.summary
             self.latest_allele_info = best_classification.classification.allele_info
 
             # TODO check for dirty values
@@ -453,6 +465,10 @@ class ClassificationGrouping(TimeStampedModel):
 
             self.dirty = False
             self.save()
+            if primary_clin_sig_change:
+                classification_grouping_clin_sig_signal.send(sender=ClassificationGrouping, instance=self)
+            if primary_onc_path_change:
+                classification_grouping_onc_path_signal.send(sender=ClassificationGrouping, instance=self)
         else:
             # there are no classifications, time to die
             self.delete()
@@ -675,7 +691,7 @@ class ConflictObjectManager(Manager):
     #     return self.annotate(severity=Subquery(ConflictHistory.objects.filter(conflict_id=OuterRef("pk"), is_latest=True).values('severity')))
 
 
-class Conflict(TimeStampedModel):
+class Conflict(ReviewableModelMixin, PreviewModelMixin, TimeStampedModel):
     objects = ConflictObjectManager()
 
     allele = models.ForeignKey(Allele, on_delete=CASCADE)
@@ -687,6 +703,34 @@ class Conflict(TimeStampedModel):
 
     def get_absolute_url(self) -> str:
         return reverse('conflict', kwargs={"conflict_id": self.pk})
+
+    @classmethod
+    def preview_category(cls) -> str:
+        return "Overlap"
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-arrow-down-up-across-line"
+
+    @property
+    def preview(self) -> 'PreviewData':
+
+        c_hgvs_key_values = []
+        for c_hgvs in self.c_hgvses():
+            c_hgvs_key_values.append(
+                PreviewKeyValue(key=f"{c_hgvs.genome_build} c.HGVS", value=str(c_hgvs), dedicated_row=True)
+            )
+
+        status_text=ConflictSeverity(self.latest.severity).label
+
+        # note there's also preview_extra_signal that provides the lab data
+        return self.preview_with(
+            identifier=f"CR_{self.pk}",
+            summary_extra=
+                [PreviewKeyValue(key="Status", value=status_text, dedicated_row=True)] +
+                [PreviewKeyValue(key="Allele", value=f"{self.allele:CA}", dedicated_row=True)] +
+                c_hgvs_key_values
+        )
 
     @property
     def show_triage(self) -> bool:
@@ -794,6 +838,12 @@ class Conflict(TimeStampedModel):
             ).get():
                 return allele_origin_grouping
         return None
+
+    # Methods for review
+
+    @property
+    def reviewing_labs(self) -> list[Lab]:
+        return [cl.lab for cl in ConflictLab.objects.filter(conflict=self, active=True).select_related("lab")]
 
     # def grouped_data(self) -> 'ConflictLabGrouped':
     #     lab_comments: dict[Lab, list[ConflictLabComment]] = defaultdict(list)

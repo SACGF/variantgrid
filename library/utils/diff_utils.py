@@ -4,9 +4,7 @@ import re
 from dataclasses import dataclass, field
 from html import escape
 from typing import Optional, Any, Pattern
-
 from django.utils.safestring import SafeString
-
 from library.utils import first
 
 

@@ -119,8 +119,19 @@
                         {% endlabelled %}
                     {% endif %}
                 {% endfor %}
-                </div>
-
+                <hr style="border-top: dashed 1px lightgrey" />
+                {% labelled label="Reviews" %}
+                    <div><a class="hover-link" href="{% url 'conflict_review_new' conflict_id=conflict.pk %}"><i class="fa-solid fa-circle-plus"></i> Start New Review</a></div>
+                    {% for review in conflict.reviews_all %}
+                        {% comment %} TODO make sure user can edit review
+                        {% endcomment %}
+                        {% if review.is_complete %}
+                            <div><a class="hover-link" href="{% url 'review_detail' review.pk %}">View Review</a> Started on {% timestamp review.review_date %} by {{ review.user }}</div>
+                        {% else %}
+                            <div><a class="hover-link" href="{% url 'edit_review' review.pk %}"><i class="fa-solid fa-pen-to-square"></i> Resume Review</a> Started on - {% timestamp review.review_date %} by {{ review.user }}</div>
+                        {% endif %}
+                    {% endfor %}
+                {% endlabelled %}
             {% endif %}
         </div>
     </div>

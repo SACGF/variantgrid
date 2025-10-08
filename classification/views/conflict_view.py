@@ -3,8 +3,8 @@ from typing import Optional, Union, Counter, Callable, Iterable
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
 from django.db.models.aggregates import Sum, Count
-from django.http import HttpRequest, HttpResponseBase
-from django.shortcuts import render, get_object_or_404
+from django.http import HttpRequest, HttpResponseBase, HttpResponse
+from django.shortcuts import render, get_object_or_404, redirect
 from pysam.libcvcf import defaultdict
 from rest_framework.reverse import reverse
 
@@ -314,3 +314,21 @@ class ConflictFeedView(AjaxFormView[Conflict]):
                 saved = True
 
         return ConflictFeedView.lazy_render(conflict, context).render(request, saved=saved)
+
+
+def conflict_review_new(request: HttpRequest, conflict_id: int) -> HttpResponse:
+    # data = DiscordanceReportTemplateData(discordance_report_id, user=request.user)
+    # if not data.is_user_editable:
+    #    raise PermissionDenied("User is not involved with lab that's involved with discordance")
+    conflict = Conflict.objects.get(pk=conflict_id)
+    # FIXME do a check to see if the user belongs to this conflict and if this conflict can have a review
+
+    discussed_object = conflict.reviews_safe
+    return redirect(reverse('start_review', kwargs={"reviewed_object_id": discussed_object.pk, "topic_id": "discordance_report"}))
+
+    if existing := data.report.reviews_all().first():
+        return redirect(reverse('edit_review', kwargs={"review_id": existing.pk}))
+    else:
+        discussed_object = data.report.reviews_safe
+        return redirect(reverse('start_review',
+                                kwargs={"reviewed_object_id": discussed_object.pk, "topic_id": "discordance_report"}))
