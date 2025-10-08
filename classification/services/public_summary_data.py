@@ -3,9 +3,9 @@ from django.db.models import Q, QuerySet
 from django.db.models.aggregates import Count
 from django.utils.timezone import now
 
-from classification.enums import ShareLevel, AlleleOriginBucket
+from classification.enums import ShareLevel, AlleleOriginBucket, ConflictSeverity
 from classification.enums.discordance_enums import DiscordanceReportResolution
-from classification.models import DiscordanceReport, Classification, ClinVarExport, ClinVarExportStatus
+from classification.models import DiscordanceReport, Classification, ClinVarExport, ClinVarExportStatus, Conflict
 from snpdb.models import Lab, Allele, Organization
 
 
@@ -44,7 +44,10 @@ class ClassificationPublicSummaryData:
 
     @cached_property
     def discordant_percentage(self) -> float:
-        return 100 * float(self.discordant_alleles) / float(self.overlapped_alleles)
+        # TODO - break this into Germline vs Somatic?
+        total_relevant_overlaps = Conflict.objects.filter(severity__gte=ConflictSeverity.SAME).count()  # contexts with at least 1 or more records
+        total_discordant_overlaps = Conflict.objects.filter(severity__gte=ConflictSeverity.MAJOR).count()
+        return 100 * float(total_discordant_overlaps) / float(total_relevant_overlaps)
 
     @cached_property
     def classification_count(self) -> int:
