@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 
 from library.guardian_utils import admin_bot
 from library.utils import IterableStitcher
-from review.models import Review
+from review.models import Review, ReviewedObject
 from snpdb.models import Allele, Lab
 
 
@@ -239,40 +239,31 @@ class Populate:
     def apply_discordance_report_update(self, drw: DiscordanceReportWrapper):
         dr = drw.discordance_report
         allele = dr.clinical_context.allele
-        conflict, created = Conflict.objects.get_or_create(
+        # FIXME need to create Conflict the proper way to get ConflictHistory and ConflictLabs
+        # or maybe just skip if conflict doesn;'t already exist
+        if conflict := Conflict.objects.filter(
             allele=allele,
             conflict_type=ConflictType.ONCPATH,
             allele_origin_bucket=AlleleOriginBucket.GERMLINE,
             testing_context_bucket=TestingContextBucket.GERMLINE
-        )
+        ).first():
+            comment_text: str
+            if drw.is_open_mode:
+                comment = f"DR_{dr.pk} : Discordance Report Opened\nTriggered by: {dr.cause_text}"
+            else:
+                comment = f"DR_{dr.pk} : Closed\nStatus: {dr.status}"
 
-        if created:
-            # print(f"Just created the conflict, why didn't it already exist??")
-            pass
-
-        """
-            conflict = models.ForeignKey(Conflict, on_delete=CASCADE)
-    lab = models.ForeignKey(Lab, on_delete=CASCADE, null=True, blank=True)
-    user = models.ForeignKey(User, on_delete=PROTECT)
-    comment = models.TextField(null=False, blank=False)
-    meta_data = models.JSONField(null=False, blank=False, default=dict)
-        """
-
-        comment_text: str
-        if drw.is_open_mode:
-            comment = f"DR_{dr.pk} : Discordance Report Opened\nTriggered by: {dr.cause_text}"
+            cc = ConflictComment(
+                conflict=conflict,
+                user=admin_bot(),
+                comment=comment
+            )
+            cc.save()
+            cc.modified = drw.change_date
+            cc.created = drw.change_date
+            cc.save(update_fields=("created", "modified"), update_modified=False)
         else:
-            comment = f"DR_{dr.pk} : Closed\nStatus: {dr.status}"
-
-        cc = ConflictComment(
-            conflict=conflict,
-            user=admin_bot(),
-            comment=comment
-        )
-        cc.save()
-        cc.modified = drw.change_date
-        cc.created = drw.change_date
-        cc.save(update_fields=("created", "modified"), update_modified=False)
+            print(f"Conflict didn't exist yet for DiscordanceReport, why didn't it already exist??!!")
 
 
     def apply_classification_update(self, change: ClassificationChange):
@@ -283,71 +274,78 @@ class Populate:
         self.classification_id_dirty.add(change.classification_id)
 
     def apply_review(self, review: Review):
-        reviewing = review.reviewing.source_object
-        if isinstance(reviewing, DiscordanceReport):
-            allele = reviewing.clinical_context.allele
-            conflict, created = Conflict.objects.filter(
+        source_object = review.reviewing.source_object
+        if isinstance(source_object, DiscordanceReport):
+            allele = source_object.clinical_context.allele
+            conflict: Conflict
+            if conflict := Conflict.objects.filter(
                 allele=allele,
                 conflict_type=ConflictType.ONCPATH,
                 allele_origin_bucket=AlleleOriginBucket.GERMLINE,
                 testing_context_bucket=TestingContextBucket.GERMLINE
-            ).get_or_create()
+            ).first():
+                # TODO create a comment about conflict
+                # cc = ConflictComment.objects.create(
+                #     conflict=conflict,
+                #     lab=None,
+                #     user=review.user,
+                #     comment="A REVIEW WAS DONE",
+                #     meta_data={}
+                # )
+                # cc.created = review.created
+                # cc.modified = review.modified
+                # cc.save(update_fields=("created", "modified"), update_modified=False)
 
-            cc = ConflictComment.objects.create(
-                conflict=conflict,
-                lab=None,
-                user=review.user,
-                comment="A REVIEW WAS SONE",
-                meta_data={}
-            )
-            cc.created = review.created
-            cc.modified = review.modified
-            cc.save(update_fields=("created", "modified"), update_modified=False)
+                # Duplicate review object so we can save it against the Conflict
+                # preferably just switch the existing one over but we want to leave
+                # the old stuff in place so we can re-run conflict_populate
+                review.pk = None
+                review.reviewing = conflict.reviews_safe
+                review.save()
+            else:
+                print("Couldn't find conflict for review")
         else:
-            print("We have a review for something other than a Discordance Report??")
-            print(reviewing)
+            # print("We have a review for something other than a Discordance Report??")
+            pass
 
     def apply_triage(self, triage: DiscordanceReportTriage):
         allele = triage.discordance_report.clinical_context.allele
-        conflict, created = Conflict.objects.filter(
+        if conflict := Conflict.objects.filter(
             allele=allele,
             conflict_type=ConflictType.ONCPATH,
             allele_origin_bucket=AlleleOriginBucket.GERMLINE,
             testing_context_bucket=TestingContextBucket.GERMLINE
-        ).get_or_create()
+        ).first():
 
-        if created:
-            print("Just created the conflict for triage, why didn't is already exist?")
+            # conflict = models.ForeignKey(Conflict, on_delete=CASCADE)
+            #     lab = models.ForeignKey(Lab, on_delete=CASCADE, null=True, blank=True)
+            #     user = models.ForeignKey(User, on_delete=PROTECT)
+            #     comment = models.TextField(null=False, blank=False)
+            #     meta_data = models.JSONField(null=False, blank=False, default=dict)
 
-        # conflict = models.ForeignKey(Conflict, on_delete=CASCADE)
-        #     lab = models.ForeignKey(Lab, on_delete=CASCADE, null=True, blank=True)
-        #     user = models.ForeignKey(User, on_delete=PROTECT)
-        #     comment = models.TextField(null=False, blank=False)
-        #     meta_data = models.JSONField(null=False, blank=False, default=dict)
+            # meta_data[conflict_lab.lab_id] = param_enum.value
+            #                                 conflict_lab.status = param_enum
+            #
 
-        # meta_data[conflict_lab.lab_id] = param_enum.value
-        #                                 conflict_lab.status = param_enum
-        #
+            cc = ConflictComment.objects.create(
+                conflict=conflict,
+                lab=triage.lab,
+                user=triage.user,
+                comment=triage.note or "-no triage note provided-",
+                meta_data={triage.lab.pk: triage.triage_status}
+            )
+            cc.created = triage.created
+            cc.modified = triage.modified
+            cc.save(update_modified=False)
 
-        cc = ConflictComment.objects.create(
-            conflict=conflict,
-            lab=triage.lab,
-            user=triage.user,
-            comment=triage.note or "(No comment provided)",
-            meta_data={triage.lab.pk: triage.triage_status}
-        )
-        cc.created = triage.created
-        cc.modified = triage.modified
-        cc.save(update_modified=False)
-
-        conflict_lab, _ = ConflictLab.objects.get_or_create(
-            conflict=conflict,
-            lab=triage.lab
-        )
-        conflict_lab.status = triage.triage_status
-        conflict_lab.save()
-
-        #FIXME now find ConflictLab
+            conflict_lab, _ = ConflictLab.objects.get_or_create(
+                conflict=conflict,
+                lab=triage.lab
+            )
+            conflict_lab.status = triage.triage_status
+            conflict_lab.save()
+        else:
+            print("Couldn't find conflict for triage")
 
     def grouping_for_key(self, allele_origin_grouping_key: AlleleOriginGroupingKey) -> AlleleOriginGroupingInfo:
         origin_grouping_info = self.grouping_key_to_grouping.get(allele_origin_grouping_key)
@@ -467,6 +465,9 @@ class Populate:
 
     def full_clean(self):
         Conflict.objects.all().delete()
+        for reviewed_object in ReviewedObject.objects.all():
+            if reviewed_object.source_object is None:
+                reviewed_object.delete()
 
     def run(self, time_delta: timedelta = timedelta(minutes=1)):
         end_time: Optional[datetime] = None

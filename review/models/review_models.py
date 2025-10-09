@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Union, Type
+from typing import Union, Type, Optional
 
 import django.dispatch
 from django.contrib.auth.models import User, Group
@@ -123,7 +123,7 @@ class ReviewedObject(TimeStampedModel):
         )
 
     @cached_property
-    def source_object(self) -> 'ReviewableModelMixin':
+    def source_object(self) -> Optional['ReviewableModelMixin']:
         """
         The object that the FlagCollection is attached to, will be responsible for determining the user's permissions
         in relation to the FlagCollection
@@ -131,15 +131,18 @@ class ReviewedObject(TimeStampedModel):
 
         # ._source_object could be set either via getting FlagInfo (via a hook)
         # or by us directly going through the
-        foreign_sets = [m for m in dir(self) if m.endswith('_set') and not m.startswith('reviews')]
+        foreign_sets = [m for m in dir(self) if m.endswith('_set') and not m.startswith('review')]
+        candidates = []
         for foreign_set in foreign_sets:
-            source_object = getattr(self, foreign_set).first()
-            if source_object:
-                return source_object
+            if source_object := getattr(self, foreign_set):
+                candidates.extend(source_object.all())
 
-        logging.warning('Could not find source object for FlagCollection %s', self.id)
-
-        raise ValueError(f"Review {self.pk} does not appear to be attached to an object")
+        if candidates:
+            return max(candidates, key=lambda c: c.created)
+        else:
+            logging.warning('Could not find source object for Reviewable %s', self.id)
+            # raise ValueError(f"Review {self.pk} does not appear to be attached to an object")
+            return None
 
 
 @dataclass
@@ -179,10 +182,12 @@ class Review(TimeStampedModel):
         }
 
     def can_view(self, user_or_group: Union[User, Group]) -> bool:
-        source_object = self.reviewing.source_object
-        if hasattr(source_object, "can_view"):
-            return source_object.can_view(user_or_group)
-        return True
+        if isinstance(user_or_group, User) and user_or_group.is_superuser:
+            return True
+        if source_object := self.reviewing.source_object:
+            if hasattr(source_object, "can_view"):
+                return source_object.can_view(user_or_group)
+            return True
 
     def check_can_view(self, user):
         if not self.can_view(user):
@@ -190,10 +195,7 @@ class Review(TimeStampedModel):
             raise PermissionDenied(msg)
 
     def __str__(self):
-        try:
-            return f"Review \"{self.topic}\" on \"{self.reviewing.source_object}\" by {self.user} on {self.review_date}"
-        except:
-            return f"Review \"{self.topic}\" on ??? by {self.user} on {self.review_date}"
+        return f"Review \"{self.topic}\" by {self.user} on {self.review_date}"
 
     def get_absolute_url(self):
         return reverse("edit_review", kwargs={"review_id": self.pk})

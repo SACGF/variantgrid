@@ -41,7 +41,7 @@
                 </div>
             {% endfor %}
         {% endlabelled %}
-        {% if show_outcome %}
+        {% if show_outcome and review.post_review_data_formatted %}
             <hr class="dashed" />
             {{ review.post_review_data_formatted }}
         {% endif %}

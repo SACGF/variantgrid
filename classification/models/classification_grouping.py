@@ -188,9 +188,6 @@ class ClassificationGrouping(TimeStampedModel):
     latest_classification_modification = models.ForeignKey(ClassificationModification, on_delete=SET_NULL, null=True, blank=True)
     latest_cached_summary = models.JSONField(null=False, blank=True, default=dict)
     latest_allele_info = models.ForeignKey(ImportedAlleleInfo, on_delete=SET_NULL, null=True, blank=True)
-    # these values are synced from LabConflict
-    pending_change_onc_path = models.BooleanField(default=False)
-    pending_change_clin_sig = models.BooleanField(default=False)
 
     @property
     def allele_origin_bucket(self):
@@ -779,7 +776,10 @@ class Conflict(ReviewableModelMixin, PreviewModelMixin, TimeStampedModel):
             parts.append(self.tumor_type_category)
         parts.append(self.get_conflict_type_display())
         parts.append("-")
-        parts.append(self.latest.get_severity_display())
+        try:
+            parts.append(self.latest.get_severity_display())
+        except ConflictHistory.DoesNotExist:
+            pass
 
         return " ".join(parts)
 
@@ -908,6 +908,7 @@ class ConflictHistory(TimeStampedModel):
 
 class ConflictLab(TimeStampedModel):
     conflict = models.ForeignKey(Conflict, on_delete=CASCADE)
+    classification_grouping = models.ForeignKey(ClassificationGrouping, on_delete=CASCADE, null=True)
     lab = models.ForeignKey(Lab, on_delete=CASCADE)
     active = models.BooleanField(default=True)  # set to False if lab has withdrawn
     status = models.TextField(choices=DiscordanceReportTriageStatus.choices, default=DiscordanceReportTriageStatus.PENDING)

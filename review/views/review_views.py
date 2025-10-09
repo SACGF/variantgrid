@@ -55,7 +55,8 @@ class ReviewForm(Form):
         else:
             reviewing_labs = initial.get("reviewing_labs")
 
-        self.fields["reviewing_labs"] = MultiChoiceLabField(labs=review.reviewing.source_object.reviewing_labs, initial=reviewing_labs)
+        if source_object := review.reviewing.source_object:
+            self.fields["reviewing_labs"] = MultiChoiceLabField(labs=source_object.reviewing_labs, initial=reviewing_labs)
 
         question: ReviewQuestion
         for question in review.topic.questions:

@@ -705,7 +705,10 @@ def enrich(text: str):
 
 @register.inclusion_tag("uicore/tags/preview_tag.html")
 def preview(obj: PreviewModelMixin):
-    return {"preview": obj.preview}
+    if obj:
+        return {"preview": obj.preview}
+    else:
+        return {}
 
 
 @register.filter(name="field_errors")

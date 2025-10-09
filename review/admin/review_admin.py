@@ -44,4 +44,9 @@ class ReviewTopicAdmin(ModelAdminBasics):
 
 @admin.register(Review)
 class ReviewAdmin(ModelAdminBasics):
-    pass
+    list_display = ('pk', 'topic', 'user', 'review_date', 'source_object')
+
+    @admin.display()
+    def source_object(self, obj: Review):
+        return obj.reviewing.source_object
+

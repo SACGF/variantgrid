@@ -81,7 +81,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             diff_value = row["somatic_difference"]
             if somatic_dict := row["latest_classification_modification__classification__summary__somatic"]:
                 somatic_dict["diff"] = diff_value
-                somatic_dict["pending_change"] = row["pending_change_clin_sig"];
+                # somatic_dict["pending_change"] = row["pending_change_clin_sig"]
 
                 return somatic_dict
         return None
@@ -90,7 +90,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         diff_value = row["pathogenic_difference"]
         result_dict = row["latest_classification_modification__classification__summary__pathogenicity"] or {}
         result_dict["diff"] = diff_value
-        result_dict["pending_change"] = row["pending_change_onc_path"]
+        # FIXME look at lab
+        # result_dict["pending_change"] = row["pending_change_onc_path"]
 
         # Old code that would track discordances by discordance reports
 
@@ -419,7 +420,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     "latest_classification_modification__classification_id",
                     "latest_classification_modification__classification__summary__pathogenicity",
                     "pathogenic_difference",
-                    "pending_change_onc_path"
                 ]
             ),
             RichColumn(
@@ -436,7 +436,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     "latest_classification_modification__classification__summary__somatic",
                     "allele_origin_grouping__allele_origin_bucket",
                     "somatic_difference",
-                    "pending_change_clin_sig"
                 ]
             ),
             RichColumn(

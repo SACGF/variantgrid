@@ -247,8 +247,9 @@ class ConflictCalculator(ABC):
         ConflictLab.objects.bulk_create([
             ConflictLab(
                 conflict=conflict,
+                classification_grouping=classification_grouping_for_conflict(conflict, lab),
                 lab=lab,
-                active=active
+                active=active,
             ) for lab, active in active_labs.items()
         ], update_conflicts=True, update_fields=["active"], unique_fields=["conflict", "lab_id"])
         # TODO have something different from withdrawn
@@ -794,9 +795,8 @@ def conflict_lab_for_grouping(classification_grouping: ClassificationGrouping, c
     return None
 
 
-def classification_grouping_for_conflict_lab(conflict_lab: ConflictLab) -> Optional[ClassificationGrouping]:
+def classification_grouping_for_conflict(conflict: Conflict, lab: Lab) -> Optional[ClassificationGrouping]:
     # TODO could do this in a single filter but easier to debug this way
-    conflict = conflict_lab.conflict
     if ag := AlleleGrouping.objects.filter(allele=conflict.allele).first():
         if aog := AlleleOriginGrouping.objects.filter(
             allele_grouping=ag,
@@ -804,22 +804,22 @@ def classification_grouping_for_conflict_lab(conflict_lab: ConflictLab) -> Optio
             testing_context_bucket=conflict.testing_context_bucket,
             tumor_type_category=conflict.tumor_type_category
         ).first():
-            if cg := ClassificationGrouping.objects.filter(allele_origin_grouping=aog, lab=conflict_lab.lab).first():
+            if cg := ClassificationGrouping.objects.filter(allele_origin_grouping=aog, lab=lab).first():
                 return cg
     return None
 
 
-def apply_conflict_lab_to_grouping(conflict_lab: ConflictLab):
-    if classification_grouping := classification_grouping_for_conflict_lab(conflict_lab):
-        will_amend = conflict_lab.status == DiscordanceReportTriageStatus.REVIEWED_WILL_FIX
-        match conflict_lab.conflict.conflict_type:
-            case ConflictType.ONCPATH:
-                if classification_grouping.pending_change_onc_path != will_amend:
-                    classification_grouping.pending_change_onc_path = will_amend
-                    classification_grouping.save()
-            case ConflictType.CLIN_SIG:
-                if classification_grouping.pending_change_clin_sig != will_amend:
-                    classification_grouping.pending_change_clin_sig = will_amend
-                    classification_grouping.save()
-            case _:
-                pass
+# def apply_conflict_lab_to_grouping(conflict_lab: ConflictLab):
+#     if classification_grouping := classification_grouping_for_conflict_lab(conflict_lab):
+#         will_amend = conflict_lab.status == DiscordanceReportTriageStatus.REVIEWED_WILL_FIX
+#         match conflict_lab.conflict.conflict_type:
+#             case ConflictType.ONCPATH:
+#                 if classification_grouping.pending_change_onc_path != will_amend:
+#                     classification_grouping.pending_change_onc_path = will_amend
+#                     classification_grouping.save()
+#             case ConflictType.CLIN_SIG:
+#                 if classification_grouping.pending_change_clin_sig != will_amend:
+#                     classification_grouping.pending_change_clin_sig = will_amend
+#                     classification_grouping.save()
+#             case _:
+#                 pass

@@ -126,9 +126,9 @@
                         {% comment %} TODO make sure user can edit review
                         {% endcomment %}
                         {% if review.is_complete %}
-                            <div><a class="hover-link" href="{% url 'review_detail' review.pk %}">View Review</a> Started on {% timestamp review.review_date %} by {{ review.user }}</div>
+                            <div><a class="hover-link" href="{% url 'review_detail' review.pk %}">View Review</a> @ {% timestamp review.review_date %} by <div style="display:inline-block; position:relative; top:4px; left: 6px">{% user review.user size="tiny" %}</div></div>
                         {% else %}
-                            <div><a class="hover-link" href="{% url 'edit_review' review.pk %}"><i class="fa-solid fa-pen-to-square"></i> Resume Review</a> Started on - {% timestamp review.review_date %} by {{ review.user }}</div>
+                            <div><a class="hover-link" href="{% url 'edit_review' review.pk %}"><i class="fa-solid fa-pen-to-square"></i> Resume Review</a> @ {% timestamp review.review_date %} by <div style="display:inline-block; position:relative; top:4px; left: 6px">{% user review.user size="tiny" %}</div></div>
                         {% endif %}
                     {% endfor %}
                 {% endlabelled %}
