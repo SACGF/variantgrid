@@ -332,8 +332,18 @@ let VCLinks = (function() {
                 let varsomeType = "variant";
                 let searchFor;
                 if (this.variant_coordinate_symbolic_parts) {
-                    varsomeType = "cnv";
-                    searchFor = this.variant_coordinate_symbolic_parts.slice(1).join("-");
+                    let alt = this.variant_coordinate_symbolic_parts[4];
+                    if (["DEL", "DUP"].includes(alt)) {
+                        varsomeType = "cnv";
+                        searchFor = this.variant_coordinate_symbolic_parts.slice(1).join("-");
+                    } else {
+                        // Can't search for
+                        varsomeType = "position";
+                        let chrom = this.variant_coordinate_symbolic_parts[1];
+                        let start = this.variant_coordinate_symbolic_parts[2];
+                        let end = this.variant_coordinate_symbolic_parts[3];
+                        searchFor = `${chrom}-${start}..${end}`;
+                    }
                 } else {
                     searchFor = this.data[SpecialEKeys.VARIANT_COORDINATE];
                 }
