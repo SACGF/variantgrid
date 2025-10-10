@@ -1,14 +1,16 @@
 import operator
 from functools import cached_property, reduce
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from django.conf import settings
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from more_itertools import first
-from classification.enums import AlleleOriginBucket, EvidenceCategory, SpecialEKeys, ShareLevel, TestingContextBucket
+from classification.enums import AlleleOriginBucket, EvidenceCategory, SpecialEKeys, ShareLevel, TestingContextBucket, \
+    ConflictSeverity, ConflictType
 from classification.models import ClassificationGrouping, ImportedAlleleInfo, ClassificationGroupingSearchTerm, \
     ClassificationGroupingSearchTermType, EvidenceKeyMap, ClassificationModification, ClassificationGroupingEntry, \
-    Classification, DiscordanceReport, DiscordanceReportClassification, Conflict
+    Classification, DiscordanceReport, DiscordanceReportClassification, Conflict, ConflictLab, \
+    DiscordanceReportTriageStatus
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol, TranscriptVersion
 from library.utils import JsonDataType
@@ -30,6 +32,25 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
     and then on filter_query_set when it's a filter that the user can do above and beyond what the page initially loads
     e.g. allele origin filter
     """
+
+    def pre_render(self, qs: QuerySet[ClassificationGrouping]):
+        # Keep a set of classification_grouping, lab to indicate these having pending changes
+        conflict_ids = set()
+        conflict_lab_tuples = list()
+        for cl in ConflictLab.objects.filter(classification_grouping__in=qs, active=True).values_list(
+                "conflict_id",
+                "classification_grouping_id",
+                "lab_id",
+                "status",
+                "conflict__conflict_type"
+        ):
+            conflict_ids.add(cl[0])
+            conflict_lab_tuples.append(cl)
+
+        major_conflicts = set(Conflict.objects.filter(pk__in=conflict_ids, severity__gte=ConflictSeverity.MAJOR).values_list("pk", flat=True))
+        self.pending_conflict_labs_onc_path = {(c[1], c[2]): c[3] for c in conflict_lab_tuples if c[0] in major_conflicts and c[4] == ConflictType.ONCPATH}
+        self.pending_conflict_labs_clin_sig = {(c[1], c[2]): c[3] for c in conflict_lab_tuples if c[0] in major_conflicts and c[4] == ConflictType.CLIN_SIG}
+
 
     def render_row_header(self, row: CellData) -> JsonDataType:
 
@@ -77,11 +98,15 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
     #     }
 
     def render_somatic(self, row: CellData) -> JsonDataType:
+        diff_value = row["somatic_difference"]
         if row["allele_origin_grouping__allele_origin_bucket"] != "G":
-            diff_value = row["somatic_difference"]
             if somatic_dict := row["latest_classification_modification__classification__summary__somatic"]:
                 somatic_dict["diff"] = diff_value
                 # somatic_dict["pending_change"] = row["pending_change_clin_sig"]
+                if ShareLevel(row["share_level"]).is_discordant_level:
+                    if discordance_status := self.pending_conflict_labs_clin_sig.get((row["pk"], row["lab_id"])):
+                        somatic_dict["conflict_status"] = discordance_status
+                        print(somatic_dict)
 
                 return somatic_dict
         return None
@@ -90,6 +115,11 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         diff_value = row["pathogenic_difference"]
         result_dict = row["latest_classification_modification__classification__summary__pathogenicity"] or {}
         result_dict["diff"] = diff_value
+        if ShareLevel(row["share_level"]).is_discordant_level:
+            if discordance_status := self.pending_conflict_labs_onc_path.get((row["pk"], row["lab_id"])):
+                result_dict["conflict_status"] = discordance_status
+                print(result_dict)
+
         # FIXME look at lab
         # result_dict["pending_change"] = row["pending_change_onc_path"]
 
@@ -350,9 +380,10 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
 
         genome_build_preferred = first(self.genome_build_prefs)
 
+        self.pending_conflict_labs_onc_path: dict[Tuple[int, int], DiscordanceReportTriageStatus] = {}
+        self.pending_conflict_labs_clin_sig: dict[Tuple[int, int], DiscordanceReportTriageStatus] = {}
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('classification_grouping_detail',
                                                                        expected_height=108)
-
         self.rich_columns = [
             RichColumn(
                 key='lab',
@@ -420,6 +451,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                     "latest_classification_modification__classification_id",
                     "latest_classification_modification__classification__summary__pathogenicity",
                     "pathogenic_difference",
+                    'share_level'
                 ]
             ),
             RichColumn(
@@ -433,9 +465,12 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 renderer=self.render_somatic,
                 extra_columns=[
+                    "pk",
+                    "lab_id",
                     "latest_classification_modification__classification__summary__somatic",
                     "allele_origin_grouping__allele_origin_bucket",
                     "somatic_difference",
+                    'share_level'
                 ]
             ),
             RichColumn(

@@ -693,6 +693,7 @@ class Conflict(ReviewableModelMixin, PreviewModelMixin, TimeStampedModel):
 
     allele = models.ForeignKey(Allele, on_delete=CASCADE)
     conflict_type = models.CharField(max_length=1, choices=ConflictType.choices)
+    # FIXME while is allele origin bucket and testing context bucket nullable?
     allele_origin_bucket = models.CharField(max_length=1, choices=AlleleOriginBucket.choices, null=True, blank=True)
     testing_context_bucket = models.CharField(max_length=1, choices=TestingContextBucket.choices, null=True, blank=True)
     tumor_type_category = models.TextField(null=True, blank=True)

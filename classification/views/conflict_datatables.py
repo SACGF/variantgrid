@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional
+from typing import Optional, Tuple
 
 from django.db.models import QuerySet, Subquery, Exists, OuterRef, Case, When, Value, Q
 from django.http import HttpRequest
@@ -76,10 +76,6 @@ class ConflictColumns(DatatableConfig[Conflict]):
         if testing_context_bucket.should_have_subdivide:
             if not tumor_type_category:
                 tumor_type_category = "Indeterminate Sub-Type"
-
-        #
-        # FIXME - add tumor type to calculation
-        #
 
         return {
             "conflict_id": row_data.get("pk"),

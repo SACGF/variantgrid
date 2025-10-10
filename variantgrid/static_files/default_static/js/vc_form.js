@@ -2477,12 +2477,6 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
     }
 
     let scs = value["clinical_significance"];
-    let diff = value["diff"];
-    let diffHtml = "";
-    if (diff) {
-        diffHtml = ' <i class="fa-solid fa-asterisk" title="Multiple values have been recorded - showing latest"></i>';
-    }
-
     if (scs) {
         let scsKey = EKeys.cachedKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
         let scsLabel = scsKey.prettyValue(scs);
@@ -2492,57 +2486,55 @@ VCTable.somatic_clinical_significance = (data, type, row) => {
         if (highest_level) {
             dom.append(`<span class="amp-level">${highest_level}</span>`);
         }
-        dom.append(diffHtml);
-        if (value["pending_change"]) {
-            dom.addClass("strike");
-            dom.append('<i class="fa-solid fa-clock ml-1" title="These records have been marked as having pending changes to the clinical significance value shown"></i>');
+        if (value["diff"]) {
+            dom.append('<i class="fa-solid fa-asterisk ml-1" title="Multiple values have been recorded - showing latest"></i>');
+        }
+        if (value.conflict_status) {
+            if (value.conflict_status == "F") {
+                dom.addClass("strike");
+                dom.append('<i class="fa-solid fa-arrow-down-up-across-line ml-1" title="This value is in conflict with another lab but has been marked as pending a change"></i>');
+            } else {
+                dom.append('<i class="fa-solid fa-arrow-down-up-across-line ml-1" title="This value is in conflict with another lab"></i>');
+            }
         }
         return dom;
     } else {
-        return $('<div>', {class: 'c-pill scs-none no-value', html: 'No Data' + diffHtml});
+        // FIXME can still have different values with no-value
+        return $('<div>', {class: 'c-pill scs-none no-value', html: 'No Data'});
     }
 }
 
 VCTable.classification = (data, type, row) => {
+    // as in render the "classification" known as clinical_significance value
     if (data === null) {
         return "" // support for dirty groups still processing
     }
-    console.log(data);
-    let csVal = null;
-    let diff = 0;
-    let is_pending = false;
-    let old = null;
-    let oldLabel = null;
-    let newValue = null;
-    let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
-
+    let value = data;
     if (typeof(data) == "string") {
-        csVal = data;
+        value = {"classification": data};
+    }
+
+    let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
+    let csVal = value["classification"] || value[SpecialEKeys.CLINICAL_SIGNIFICANCE];
+
+    let dom;
+    if (!csVal || !csVal.length) {
+        dom = $('<span>', {class: 'c-pill cs-none no-value', html: 'No Data'});
     } else {
-        csVal = data["classification"] || data[SpecialEKeys.CLINICAL_SIGNIFICANCE];
-        is_pending = data["pending_change"]
+        dom = $('<span>', {class: `cs c-pill cs-${csVal.toLowerCase()}`, html: csKey.prettyValue(csVal).val});
     }
-
-    let label = csKey.prettyValue(csVal).val;
-    let csClass = `cs-` + (csVal || '').toLowerCase()
-    let diffHtml = "";
-    if (diff) {
-        diffHtml = ' <i class="fa-solid fa-asterisk" title="Multiple values have been recorded - showing latest"></i>';
+    if (value["diff"]) {
+        dom.append(' <i class="fa-solid fa-asterisk ml-1" title="Multiple values have been recorded - showing latest"></i>');
     }
-    let pendingHtml = "";
-    if (is_pending) {
-        csClass += " strike"
-        pendingHtml = '<i class="fa-solid fa-clock" ml-1 title="These records have been marked as having pending changes to the classification value shown"></i>';
+    if (value.conflict_status) {
+        if (value.conflict_status == "F") {
+            dom.addClass("strike");
+            dom.append('<i class="fa-solid fa-arrow-down-up-across-line ml-1" title="This value is in conflict with another lab but has been marked as pending a change"></i>');
+        } else {
+            dom.append('<i class="fa-solid fa-arrow-down-up-across-line ml-1" title="This value is in conflict with another lab"></i>');
+        }
     }
-
-    let fullDom = $('<div>');
-    if (csVal && csVal.length) {
-        fullDom.append($('<span>', {class: `c-pill cs ${csClass}`, html:label + diffHtml + pendingHtml}));
-    } else {
-        fullDom.append($('<span>', {class: 'c-pill cs-none no-value', html: 'No Data' + diffHtml + pendingHtml}));
-    }
-
-    return fullDom;
+    return dom;
 };
 
 VCTable.evidence_key = (key_name, data, type, row) => {
