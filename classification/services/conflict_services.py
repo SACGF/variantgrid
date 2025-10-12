@@ -806,6 +806,7 @@ def classification_grouping_for_conflict(conflict: Conflict, lab: Lab) -> Option
         ).first():
             if cg := ClassificationGrouping.objects.filter(allele_origin_grouping=aog, lab=lab).first():
                 return cg
+    print(f"Couldn't find classification grouping for {conflict} {lab}")
     return None
 
 

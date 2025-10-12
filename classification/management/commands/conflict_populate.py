@@ -263,7 +263,8 @@ class Populate:
             cc.created = drw.change_date
             cc.save(update_fields=("created", "modified"), update_modified=False)
         else:
-            print(f"Conflict didn't exist yet for DiscordanceReport, why didn't it already exist??!!")
+            print(f"** Conflict didn't exist yet for DiscordanceReport, why didn't it already exist??!!")
+            pass
 
 
     def apply_classification_update(self, change: ClassificationChange):
@@ -303,9 +304,9 @@ class Populate:
                 review.reviewing = conflict.reviews_safe
                 review.save()
             else:
-                print("Couldn't find conflict for review")
+                print("** Couldn't find conflict for review")
         else:
-            # print("We have a review for something other than a Discordance Report??")
+            print("We have a review for something other than a Discordance Report??")
             pass
 
     def apply_triage(self, triage: DiscordanceReportTriage):
@@ -345,7 +346,8 @@ class Populate:
             conflict_lab.status = triage.triage_status
             conflict_lab.save()
         else:
-            print("Couldn't find conflict for triage")
+            print("** Couldn't find conflict for triage")
+            pass
 
     def grouping_for_key(self, allele_origin_grouping_key: AlleleOriginGroupingKey) -> AlleleOriginGroupingInfo:
         origin_grouping_info = self.grouping_key_to_grouping.get(allele_origin_grouping_key)
@@ -415,7 +417,7 @@ class Populate:
         for cm in ClassificationModification.objects.filter(
             published=True,
             classification__allele_info__allele__isnull=False
-        ).order_by("created").iterator():
+        ).order_by("modified").iterator():
             summary = ClassificationSummaryCalculator(cm).cache_dict()
             yield ClassificationChange(
                 classification_id=cm.classification_id,
@@ -433,14 +435,6 @@ class Populate:
     def discordance_report_iterable_closed(self) -> Iterable[DiscordanceReport]:
         for dr in DiscordanceReport.objects.filter(report_completed_date__isnull=False).order_by("report_completed_date").iterator():
             yield DiscordanceReportWrapper(is_open_mode=False, discordance_report=dr)
-            """
-            report_closed_by = models.ForeignKey(User, on_delete=PROTECT, null=True)
-            report_started_date = models.DateTimeField(auto_now_add=True)
-            report_completed_date = models.DateTimeField(null=True, blank=True)
-
-            cause_text = models.TextField(null=False, blank=True, default='')
-            resolved_text = models.TextField(null=False, blank=True, default='')
-            """
 
     def review_iterable(self) -> Iterable[ReviewWrapper]:
         for rev in Review.objects.order_by("created").iterator():
@@ -472,14 +466,24 @@ class Populate:
     def run(self, time_delta: timedelta = timedelta(minutes=1)):
         end_time: Optional[datetime] = None
         last_time: Optional[datetime] = None
-        for cc in self.stitch_iterable():
+        last_date = None
+        for count, cc in enumerate(self.stitch_iterable()):
+            if not last_date:
+                last_date = cc.change_date
+            elif last_date > cc.change_date:
+                print("!!Got date out of order")
+
             if isinstance(cc, DiscordanceReportWrapper):
+                print(f"{cc.change_date} DiscordanceWrapper {cc.is_open_mode}")
                 self.apply_discordance_report_update(cc)
             elif isinstance(cc, TriageWrapper):
+                print(f"{cc.change_date} TriageWrapper")
                 self.apply_triage(cc.triage)
             elif isinstance(cc, ReviewWrapper):
+                print(f"{cc.change_date} ReviewWrapper")
                 self.apply_review(cc.review)
             else:
+                print(f"{cc.change_date} ClassificationUpdate")
                 self.apply_classification_update(cc)
                 self.log_and_update(cc.change_date)
 
