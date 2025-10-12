@@ -615,7 +615,7 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     def __lt__(self, other: 'ImportedAlleleInfo'):
         def sort_key(obj: ImportedAlleleInfo):
-            return obj.imported_genome_build_patch_version, obj.imported_c_hgvs
+            return obj.imported_genome_build_patch_version, obj.imported_c_hgvs or obj.imported_g_hgvs or ""
         return sort_key(self) < sort_key(other)
 
     @property
