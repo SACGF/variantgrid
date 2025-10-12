@@ -14,7 +14,7 @@ from django.utils.timezone import localtime
 
 from classification.criteria_strengths import CriteriaStrength, CriteriaPointScore
 from classification.enums import SpecialEKeys
-from classification.enums.classification_enums import ShareLevel
+from classification.enums.classification_enums import ShareLevel, ConflictSeverity
 from classification.models import ConditionTextMatch, ConditionResolved, ClassificationLabSummary, ImportedAlleleInfo, \
     EvidenceMixin, ClassificationSummaryCacheDictPathogenicity, Conflict
 from classification.models.classification import ClassificationModification, Classification
@@ -744,7 +744,7 @@ def conflict(conflict: Conflict | ConflictMerge):
 
 @register.inclusion_tag("classification/tags/conflicts.html", takes_context=True)
 def conflicts(context, allele: Allele, currently_viewing: Optional[Conflict] = None):
-    conflicts_for_allele = Conflict.objects.filter(allele=allele)
+    conflicts_for_allele = Conflict.objects.filter(allele=allele, severity__gt=ConflictSeverity.NO_SUBMISSIONS)
     conflict_group = group_conflicts(
         conflicts_for_allele,
         link_types=GroupConflictsLinks.OVERLAP_LINK if currently_viewing else GroupConflictsLinks.FILTER_LINK,
