@@ -237,5 +237,5 @@ class SampleGeneListView(APIView):
 
         sample_gene_list.save()
 
-        data = SampleGeneListSerializer(sample_gene_list).data
+        data = SampleGeneListSerializer(sample_gene_list, context={'request': request}).data
         return Response(data)

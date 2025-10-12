@@ -774,4 +774,8 @@ def debug(obj: Any):
 
 @register.filter(name='pretty_label')
 def _pretty_label(code: str):
+<<<<<<< HEAD
     return pretty_label(code)
+=======
+    return pretty_label(code)
+>>>>>>> refs/heads/master
