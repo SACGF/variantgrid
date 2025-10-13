@@ -114,6 +114,10 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         user_settings = UserSettings.get_for_user(self.user)
         return GenomeBuild.builds_with_annotation_priority(user_settings.default_genome_build)
 
+    @cached_property
+    def genome_build_preferred(self) -> GenomeBuild:
+        return self.genome_build_prefs[0]
+
     def __init__(self, request: HttpRequest):
         self.term_cache: Dict[str, OntologyTerm] = {}
         super().__init__(request)
