@@ -143,60 +143,15 @@ class Assay(models.Model):
         return f"Seq: {self.sequencer}, Lib: {self.library}, EnrichmentKit: {self.enrichment_kit}"
 
 
-# ExperimentManager manages the Experiment objects
-# to ensure that experiment names are cleaned before creation or updating
-class ExperimentManager(models.Manager):
-
-    @staticmethod
-    def fix_kwargs(kwargs):
-        try:
-            old_name = kwargs["name"]
-            name = Experiment.clean_experiment_name(old_name)
-            kwargs["name"] = name
-        except:
-            pass
-        return kwargs
-
-    def get(self, *args, **kwargs):
-        self.fix_kwargs(kwargs)
-        return super().get(*args, **kwargs)
-
-    def get_or_create(self, default=None, **kwargs):
-        self.fix_kwargs(kwargs)
-        return super().get_or_create(default, **kwargs)
-
-
 class Experiment(PreviewModelMixin, models.Model):
     """ What was sequenced in the flowcell - ie you can resequence something and 2 SequencingRuns will have the
-        same Experiment. Set from RunParameters.xml ExperimentName in the SequencingRun directory """
+        same Experiment. Set from RunParameters.xml ExperimentName in the SequencingRun directory
+
+        From 2017 (which fixed historical) until October 2025 - we used to strip the "RPT" off the end of experiment
+        names. We now just leave them alone
+        """
     name = models.TextField(primary_key=True)
     created = models.DateTimeField(auto_now_add=True)
-    objects = ExperimentManager()
-
-    @classmethod
-    def preview_icon(cls) -> str:
-        return "fa-solid fa-flask-vial"
-
-    @classmethod
-    def preview_if_url_visible(cls) -> Optional[str]:
-        return 'data'
-
-    @staticmethod
-    def clean_experiment_name(experiment_name):
-        experiment_name = experiment_name.upper()
-        experiment_name = experiment_name.replace("-", "_")
-        experiment_name = experiment_name.replace(" ", "_")
-
-        # Remove RPT off the end...
-        experiment_name = re.sub("_RPT$", "", experiment_name)
-        experiment_name = re.sub("RPT$", "", experiment_name)
-        return experiment_name
-
-    def save(self, *args, **kwargs):
-        old_name = self.name
-        self.name = Experiment.clean_experiment_name(old_name)
-        return super().save(*args, **kwargs)
-
     def can_write(self, user) -> bool:
         """ can't delete once you've linked to SequencingRun """
         return user.is_superuser and not self.sequencingrun_set.exists()
