@@ -1260,7 +1260,7 @@ class NodeVCFFilter(NodeAuditLogMixin, models.Model):
     @staticmethod
     def get_filter_ids(node):
         """ Returns PASS as None """
-        all_nvf_qs = NodeVCFFilter.objects.filter(node=node)
+        all_nvf_qs = NodeVCFFilter.objects.filter(node_id=node.pk)
         return set(all_nvf_qs.values_list("vcf_filter__filter_id", flat=True))
 
     @staticmethod

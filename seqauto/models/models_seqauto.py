@@ -127,7 +127,11 @@ class SeqAutoRecord(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         self.validate()
-        self.is_valid = not SeqAutoMessage.objects.filter(record=self, open=True, severity=LogLevel.ERROR).exists()
+        if self.pk:
+            valid = not SeqAutoMessage.objects.filter(record=self, open=True, severity=LogLevel.ERROR).exists()
+        else:
+            valid = True  # No messages will exist yet
+        self.is_valid = valid
         super().save(*args, **kwargs)
 
     def validate(self) -> bool:
