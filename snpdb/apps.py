@@ -57,3 +57,27 @@ class SnpdbConfig(AppConfig):
 
         # So static serve of MEDIA_ROOT just prompts to download VCF (used to rename to vcf.vcf)
         mimetypes.add_type("application/octet-stream", ".vcf", strict=True)
+
+        if settings.DEBUG:
+            # override print statement to include line number
+            import traceback
+
+            def dprint(*args, **kwargs):
+                '''Pre-pends the filename and linenumber to the print
+                statement'''
+                stack = traceback.extract_stack()[:-1]
+                last = stack[-1]
+
+                # Handle different versions of the traceback module
+                if hasattr(last, 'filename'):
+                    out_str = "{}:{}\n".format(last.filename, last.lineno)
+                else:
+                    out_str = "{}:{}\n".format(last[0], last[1])
+
+                # Prepend the filename and linenumber
+                __builtins__['oldprint'](out_str, *args, **kwargs)
+
+
+            if 'oldprint' not in __builtins__:
+                __builtins__['oldprint'] = __builtins__['print']
+            __builtins__['print'] = dprint
