@@ -52,11 +52,12 @@ def conflict_view(request: HttpRequest, conflict_id: int) -> HttpResponseBase:
     conflict = Conflict.objects.get(pk=conflict_id)
     feed = ConflictFeedView.lazy_render(conflict)
 
-    conflicts_for_allele = Conflict.objects.filter(allele=conflict.allele)
+    conflicts_for_allele = list(Conflict.objects.filter(allele=conflict.allele))
 
     return render(request, 'classification/conflict.html', {
         "conflict": Conflict.objects.get(pk=conflict_id),
         "feed": feed,
+        "conflict_list": conflicts_for_allele,
         "conflicts_for_allele": group_conflicts(conflicts_for_allele)
     })
 
@@ -236,10 +237,10 @@ class ConflictFeed:
         return ConflictComment.objects.filter(conflict=self.conflict).order_by("created")
 
     def feed(self) -> Iterable[ConflictFeedItem]:
-        return IterableStitcher([
+        return reversed(list(IterableStitcher([
             map(lambda x: ConflictFeedItem(conflict_history=x), self.history_iterator()),
             map(lambda x: ConflictFeedItem(conflict_comment=x), self.comment_iterator())
-        ])
+        ])))
 
 
 class ConflictFeedView(AjaxFormView[Conflict]):

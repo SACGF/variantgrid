@@ -693,13 +693,16 @@ def group_conflicts(
                         else:
                             value_type_css += ["not-viewing"]
 
+                    value_type_css += ["value-type"]
                     href = None
                     link_type = LinkType.JAVASCRIPT
                     if link_types == GroupConflictsLinks.NO_LINKS:
                         pass
-                    elif not currently_viewing:
-                        href = reverse("conflict_feed", kwargs={"conflict_id": conflict.pk})
-                        link_type = LinkType.MODAL
+                    # the below provides modal links on the allele page to a conflict history - but it makes the experience
+                    # a little too cluttered
+                    # elif not currently_viewing:
+                    #     href = reverse("conflict_feed", kwargs={"conflict_id": conflict.pk})
+                    #     link_type = LinkType.MODAL
                     elif currently_viewing != conflict:
                         href = reverse("conflict", kwargs={"conflict_id": conflict.pk})
                         link_type = LinkType.LINK

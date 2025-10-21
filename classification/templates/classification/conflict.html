@@ -20,92 +20,66 @@
         <div class="text-small text-muted">viewing</div>
         <div><i class="fa-solid fa-circle main-icon mr-1" style="color:#bbb; font-size:8pt"></i><span class="text-monospace">Overlap</span></div>
         <a class="hover-link" href="#overlap-summary">Summary</a><br/>
-        <a class="hover-link" href="#triage-feed">Feed</a><br/>
         {% if conflict.show_triage %}
-        <a class="hover-link" href="#triage-status">Triage</a><br/>
+        <a class="hover-link" href="#conflict-triage">Triage</a><br/>
         {% endif %}
+        <a class="hover-link" href="#conflict-feed">Feed</a><br/>
     </div>
 
-    <div class="container">
-        <div class="card">
-            <div class="card-header">Allele Summary</div>
-            <div class="card-body">
-                {% labelled label="Allele" %}<a href="{{ conflict.allele.get_absolute_url }}">{{ conflict.allele }}</a>{% endlabelled %}
-                {% labelled label="c.HGVS" %}
-                    {% for c_hgvs in conflict.c_hgvses %}<div>{% c_hgvs c_hgvs %}</div>{% endfor %}
-                {% endlabelled %}
-                {% labelled label="All Overlaps for Allele" hint="chunky" %}
-                    {% conflicts conflict.allele currently_viewing=conflict %}
-                {% endlabelled %}
-            </div>
-        </div>
+    <div class="container mt-4">
+        <h4>Allele Summary</h4>
+        {% labelled label="Allele" %}<a href="{{ conflict.allele.get_absolute_url }}">{{ conflict.allele }}</a>{% endlabelled %}
+        {% labelled label="c.HGVS" %}
+            {% for c_hgvs in conflict.c_hgvses %}<div>{% c_hgvs c_hgvs %}</div>{% endfor %}
+        {% endlabelled %}
+        {% labelled label="All Overlaps for Allele" hint="chunky" %}
+            {% conflicts conflict.allele currently_viewing=conflict %}
+        {% endlabelled %}
 
         <hr class="my-4" style="border-top-style: dotted;"/>
     </div>
 
     <div class="container mt-4">
-        <div class="card" id="overlap-summary" style="scroll-margin-top: 60px;">
-            <div class="card-header">Selected Overlap Summary -&nbsp;
-                <div class="allele-origin-box horizontal allele-origin-{{ conflict.allele_origin_bucket }}">
-                    <div class="allele-origin-text">{{ conflict.get_allele_origin_bucket_display }}</div>
-                </div>
-                {% if conflict.testing_context_bucket != "G" %}
-                    <span class="testing-context">{{ conflict.get_testing_context_bucket_display }}</span>
-                {% endif %}
-                -
-                {% if conflict.conflict_type_labels %}
-                    {% for conflict_type_label in conflict.conflict_type_labels %}
-                        <span class="text-muted comma-sep">{{ conflict_type_label }}</span>
-                    {% endfor %}<span class="mr-1"></span>
-                {% else %}
-                    <span class="text-muted">{{ conflict.get_conflict_type_display }}</span>
-                {% endif %}
+        <h4>Selected Overlap Summary</h4>
+        {% if user.is_superuser %}
+            {% labelled label="Admin" %}{% admin_link conflict %}{% endlabelled %}
+        {% endif %}
+        {% labelled label="Context" %}
+            <div class="allele-origin-box horizontal allele-origin-{{ conflict.allele_origin_bucket }}">
+                <div class="allele-origin-text">{{ conflict.get_allele_origin_bucket_display }}</div>
             </div>
-            <div class="card-body">
-                {% if user.is_superuser %}
-                    {% labelled label="Admin" %}{% admin_link conflict %}{% endlabelled %}
-                {% endif %}
-                {% labelled label="Status" %}{{ conflict.latest.get_severity_display }}{% endlabelled %}
-                {% labelled label="As of" %}{% timestamp conflict.current_severity_as_of %}{% endlabelled %}
-                {% labelled label="Context" %}
-                    <div class="allele-origin-box horizontal allele-origin-{{ conflict.allele_origin_bucket }}">
-                        <div class="allele-origin-text">{{ conflict.get_allele_origin_bucket_display }}</div>
-                    </div>
-                    {% if conflict.testing_context_bucket != "G" %}
-                        <span class="testing-context">{{ conflict.get_testing_context_bucket_display }}</span>
-                    {% endif %}
-                    -
-                    {% if conflict.conflict_type_labels %}
-                        {% for conflict_type_label in conflict.conflict_type_labels %}
-                            <span class="text-muted comma-sep">{{ conflict_type_label }}</span>
-                        {% endfor %}<span class="mr-1"></span>
-                    {% else %}
-                        <span class="text-muted">{{ conflict.get_conflict_type_display }}</span>
-                    {% endif %}
-                {% endlabelled %}
-            </div>
-        </div>
+            {% if conflict.testing_context_bucket != "G" %}
+                <span class="testing-context">{{ conflict.get_testing_context_bucket_display }}</span>
+            {% endif %}
+            -
+            {% if conflict.conflict_type_labels %}
+                {% for conflict_type_label in conflict.conflict_type_labels %}
+                    <span class="text-muted comma-sep">{{ conflict_type_label }}</span>
+                {% endfor %}<span class="mr-1"></span>
+            {% else %}
+                <span class="text-muted">{{ conflict.get_conflict_type_display }}</span>
+            {% endif %}
+        {% endlabelled %}
+        {% labelled label="Status" %}{{ conflict.latest.get_severity_display }}{% endlabelled %}
+        {% labelled label="As of" %}{% timestamp conflict.current_severity_as_of %}{% endlabelled %}
+    </div>
 
+    <div class="container mt-4">
         <script>
         function classificationGroupingFilterExtra(data) {
             data.conflict_id = {{ conflict.id | jsonify }};
         }
         </script>
+        <h4>Classification Records</h4>
+        <a class="hover-link" href="{% url 'classification_diff' %}?conflict={{ conflict.pk }}">Show Diffs</a>
+        {% classification_groupings show_allele_origin_filter=False %}
+    </div>
 
-        <div class="container mt-4">
-            <h4>Classification Records</h4>
-            <a class="hover-link" href="{% url 'classification_diff' %}?conflict={{ conflict.pk }}">Show Diffs</a>
-            {% classification_groupings show_allele_origin_filter=False %}
-        </div>
+    <div class="container mt-4">
+        {% clinvar allele=conflict.allele expert_panel_only=True %}
+    </div>
 
-        <div class="mt-4">
-            {% clinvar allele=conflict.allele expert_panel_only=True %}
-        </div>
-
-        <div class="my-4" id="triage-feed" style="scroll-margin-top: 60px;">
-            {% embed feed mode="inline" %}
-        </div>
-        <div id="triage-status"></div>
-
+    <div id="triage-feed">
+        {% embed feed mode="inline" %}
     </div>
 {% endblock %}

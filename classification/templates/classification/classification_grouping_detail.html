@@ -14,7 +14,7 @@
     {% for zygosity in classification_grouping.zygosity_values %}{% if not forloop.first %}, {% endif %}{{ zygosity|ekey:"zygosity" }}{% endfor %}
 {% endlabelled %}
 {% if conflicts %}
-    {% labelled label="In Conflicts" %}
+    {% labelled label="In Discordances" %}
         {% for conflict in conflicts %}
             <div><a class="hover-link" href="{{ conflict.get_absolute_url }}">{{ conflict.context_summary }} - {{ conflict.latest.get_severity_display }}</a></div>
         {% endfor %}

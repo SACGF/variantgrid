@@ -106,7 +106,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 if ShareLevel(row["share_level"]).is_discordant_level:
                     if discordance_status := self.pending_conflict_labs_clin_sig.get((row["pk"], row["lab_id"])):
                         somatic_dict["conflict_status"] = discordance_status
-                        print(somatic_dict)
 
                 return somatic_dict
         return None

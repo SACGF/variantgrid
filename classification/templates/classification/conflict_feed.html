@@ -10,137 +10,144 @@
         background-color: #f7f7f7;
     }
 </style>
-<div class="card">
-<div class="card-header">{% if mode == "inline" %}Changes / Triage Feed (Oldest to Newest){% else %}{{ conflict }} - <a href="{{ conflict.get_absolute_url }}">click for full detail</a> {% admin_link conflict %}{% endif %}</div>
-<form data-toggle="ajax-form" method="POST" action="{% url 'conflict_feed' conflict.pk %}">
-    {% if mode == "inline" %}<input type="hidden" name="mode" value="inline">{% endif %}
-    <div class="card-body">
-        <div>
-            <div id="conflict-feed" {% if mode != "inline" %}style="overflow-y: auto; max-height: 600px"{% endif %}>
-                {% for feed_item in feed.feed %}
-                    {% if feed_item.conflict_comment %}
-                        {% with comment=feed_item.conflict_comment %}
-                            <div class="row mb-4">
-                                <div class="col-3 text-right">
-                                    <div style="font-size:0.8rem" class="mb-2">{% timestamp comment.created %}</div>
-                                    {% user comment.user size="tiny" show_group=True align_right=True %}
-                                </div>
-                                <div class="col-9">
-                                    <div class="comment-box">
-                                        <pre class="user-text">{{ comment.comment }}</pre>
-                                    </div>
-                                    {% with meta=comment.meta_data_html %}
-                                        {% if meta %}
-                                            <div class="mt-1" style="font-size:0.8rem; color: #666">{{ meta }}</div>
-                                        {% endif %}
-                                    {% endwith %}
-                                </div>
-                            </div>
-                        {% endwith %}
 
-                    {% elif feed_item.conflict_history %}
-                        {% with history=feed_item.conflict_history %}
-                            <div class="row mb-4">
-                                <div class="col-3 text-right">
-                                    <div style="font-size:0.8rem" class="mb-2">
-                                        {% if history.is_latest %}Current:{% endif %}
-                                        {% timestamp history.created %}
-                                    </div>
-                                    <div>{{ history.get_severity_display }}</div>
-                                </div>
-                                <div class="col-9">
-                                    {% if feed_item.extra_comments %}
-                                        <div class="no-value text-right">
-                                            {% for explain in feed_item.explanations %}
-                                                <div class="mb-2 mr-4">{{ explain }}</div>
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
-                                    {% for row in history.data_rows %}
-                                        <div class="row mb-2" {% if row.exclude %}style="opacity:0.6"{% endif %}>
-                                            <div class="col-8 text-right">
-                                                {% if row.share_level.value != 'logged_in_users' %}
-                                                    <img src="/static/icons/share_level/{{ row.share_level }}.png" style="width:12px; height: 12px; margin-right: 4px; top: -2px; position: relative;"/>
-                                                {% endif %}
-                                                {{ row.lab }}
-                                                {% if row.message %}
-                                                    <br/><span class="text-secondary" style="font-size:0.9rem">{{ row.message }}</span>
-                                                {% endif %}
-                                                {% if row.exclude %}<br/><span class="no-value">Not counted towards overlap</span>{% endif %}
-                                            </div>
-                                            <div class="col-4">
-                                                {% if conflict.conflict_type == "P" %}
-                                                    {% clinical_significance_inline row.classification %}
-                                                {% else %}
-                                                    {% somatic_clinical_significance_inline row.clinical_significance row.amp_level %}
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                        {% empty %}<div class="row"><div class="col-8 no-value text-right">No relevant records</div></div>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                        {% endwith %}
-                    {% endif %}
-                    {% if not forloop.last %}<hr/>{% endif %}
-                {% endfor %}
+{% if show_triage %}
+    <div id="conflict-triage" class="container mt-4">
+        <h4>Triage</h4>
+        <form data-toggle="ajax-form" method="POST" action="{% url 'conflict_feed' conflict.pk %}">
+            <div class="text-secondary">
+                Here you can provide your lab's preliminary opinion of this discordance.<br/>
+                You can optionally update the status, and leave a comment.
             </div>
-
-            {% if show_triage %}
-                <div class="loading-overlay-target">
-                <hr style="margin-top:0; border-top-width: 3px"/>
-                {% labelled label="Comment *" %}<textarea id="conflict_comment" name="comment" class="form-control"></textarea>{% endlabelled %}
-
-                {% for conflict_lab in conflict.conflict_labs %}
-                    {% if conflict_lab.active %}
-                        <hr style="border-top: dashed 1px lightgrey" />
-                        {% labelled label=conflict_lab.lab value_css="align-self-center"%}
-                            {% if request.user|access_to_lab:conflict_lab.lab %}
-                                {% for triage_option in triage_options %}
-                                    <div class="custom-control custom-radio custom-control-inline">
-                                      <input
-                                              type="radio"
-                                              name="lab-{{ conflict_lab.lab.pk }}-triage"
-                                              id="lab-{{ conflict_lab.lab.pk }}-{{ triage_option.value }}"
-                                              class="custom-control-input"
-                                              value="{{ triage_option.value }}"
-                                              {% if conflict_lab.status == triage_option.value %}checked{% endif %}
-                                      >
-                                      <label
-                                              class="custom-control-label"
-                                              for="lab-{{ conflict_lab.lab.pk }}-{{ triage_option.value }}">
-                                          {{ triage_option.label }}
-                                      </label>
-                                    </div>
-                                {% endfor %}
-                            {% else %}
-                                {{ conflict_lab.get_status_display }}
-                            {% endif %}
-                        {% endlabelled %}
-                    {% endif %}
-                {% endfor %}
-                <hr style="border-top: dashed 1px lightgrey" />
-                {% labelled label="Reviews" %}
-                    <div><a class="hover-link" href="{% url 'conflict_review_new' conflict_id=conflict.pk %}"><i class="fa-solid fa-circle-plus"></i> Start New Review</a></div>
-                    {% for review in conflict.reviews_all %}
-                        {% comment %} TODO make sure user can edit review
-                        {% endcomment %}
-                        {% if review.is_complete %}
-                            <div><a class="hover-link" href="{% url 'review_detail' review.pk %}">View Review</a> @ {% timestamp review.review_date %} by <div style="display:inline-block; position:relative; top:4px; left: 6px">{% user review.user size="tiny" %}</div></div>
-                        {% else %}
-                            <div><a class="hover-link" href="{% url 'edit_review' review.pk %}"><i class="fa-solid fa-pen-to-square"></i> Resume Review</a> @ {% timestamp review.review_date %} by <div style="display:inline-block; position:relative; top:4px; left: 6px">{% user review.user size="tiny" %}</div></div>
+            <div class="card">
+                <div class="card-body">
+                    {% for conflict_lab in conflict.conflict_labs %}
+                        {% if conflict_lab.active %}
+                            {% if not forloop.first %}<hr style="border-top: dashed 1px lightgrey" />{% endif %}
+                            {% labelled label=conflict_lab.lab value_css="align-self-center"%}
+                                {% if request.user|access_to_lab:conflict_lab.lab %}
+                                    {% for triage_option in triage_options %}
+                                        <div class="custom-control custom-radio custom-control-inline">
+                                          <input
+                                                  type="radio"
+                                                  name="lab-{{ conflict_lab.lab.pk }}-triage"
+                                                  id="lab-{{ conflict_lab.lab.pk }}-{{ triage_option.value }}"
+                                                  class="custom-control-input"
+                                                  value="{{ triage_option.value }}"
+                                                  {% if conflict_lab.status == triage_option.value %}checked{% endif %}
+                                          >
+                                          <label
+                                                  class="custom-control-label"
+                                                  for="lab-{{ conflict_lab.lab.pk }}-{{ triage_option.value }}">
+                                              {{ triage_option.label }}
+                                          </label>
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    {{ conflict_lab.get_status_display }}
+                                {% endif %}
+                            {% endlabelled %}
                         {% endif %}
                     {% endfor %}
-                {% endlabelled %}
-            {% endif %}
+                    <hr style="border-top: dashed 1px lightgrey" />
+                    {% labelled label="Reviews" %}
+                        <div><a class="hover-link" href="{% url 'conflict_review_new' conflict_id=conflict.pk %}"><i class="fa-solid fa-circle-plus"></i> Start New Review</a></div>
+                        {% for review in conflict.reviews_all %}
+                            {% comment %} TODO make sure user can edit review
+                            {% endcomment %}
+                            {% if review.is_complete %}
+                                <div><a class="hover-link" href="{% url 'review_detail' review.pk %}">View Review</a> @ {% timestamp review.review_date %} by <div style="display:inline-block; position:relative; top:4px; left: 6px">{% user review.user size="tiny" %}</div></div>
+                            {% else %}
+                                <div><a class="hover-link" href="{% url 'edit_review' review.pk %}"><i class="fa-solid fa-pen-to-square"></i> Resume Review</a> @ {% timestamp review.review_date %} by <div style="display:inline-block; position:relative; top:4px; left: 6px">{% user review.user size="tiny" %}</div></div>
+                            {% endif %}
+                        {% endfor %}
+                    {% endlabelled %}
+
+                     {% labelled label="Comment *" %}<textarea id="conflict_comment" name="comment" class="form-control"></textarea>{% endlabelled %}
+                </div>
+
+                <div class="card-footer">
+                    <input id="conflict_submit" type="submit" class="btn btn-primary" disabled  />
+                </div>
+            </div>
+        </form>
+    </div>
+{% endif %}
+
+<div class="container mt-4">
+    <h4>Changes / Triage Feed (Newest to Oldest)</h4>
+    {% if mode == "inline" %}<input type="hidden" name="mode" value="inline">{% endif %}
+    <div>
+        <div id="conflict-feed" {% if mode != "inline" %}style="overflow-y: auto; max-height: 600px"{% endif %}>
+            {% for feed_item in feed.feed %}
+                {% if feed_item.conflict_comment %}
+                    {% with comment=feed_item.conflict_comment %}
+                        <div class="row mb-4">
+                            <div class="col-3 text-right">
+                                <div style="font-size:0.8rem" class="mb-2">{% timestamp comment.created %}</div>
+                                {% user comment.user size="tiny" show_group=True align_right=True %}
+                            </div>
+                            <div class="col-9">
+                                <div class="comment-box">
+                                    <pre class="user-text">{{ comment.comment }}</pre>
+                                </div>
+                                {% with meta=comment.meta_data_html %}
+                                    {% if meta %}
+                                        <div class="mt-1" style="font-size:0.8rem; color: #666">{{ meta }}</div>
+                                    {% endif %}
+                                {% endwith %}
+                            </div>
+                        </div>
+                    {% endwith %}
+
+                {% elif feed_item.conflict_history %}
+                    {% with history=feed_item.conflict_history %}
+                        <div class="row mb-4">
+                            <div class="col-3 text-right">
+                                <div style="font-size:0.8rem" class="mb-2">
+                                    {% if history.is_latest %}Current:{% endif %}
+                                    {% timestamp history.created %}
+                                </div>
+                                <div>{{ history.get_severity_display }}</div>
+                            </div>
+                            <div class="col-9">
+                                {% if feed_item.extra_comments %}
+                                    <div class="no-value text-right">
+                                        {% for explain in feed_item.explanations %}
+                                            <div class="mb-2 mr-4">{{ explain }}</div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                {% for row in history.data_rows %}
+                                    <div class="row mb-2" {% if row.exclude %}style="opacity:0.6"{% endif %}>
+                                        <div class="col-8 text-right">
+                                            {% if row.share_level.value != 'logged_in_users' %}
+                                                <img src="/static/icons/share_level/{{ row.share_level }}.png" style="width:12px; height: 12px; margin-right: 4px; top: -2px; position: relative;"/>
+                                            {% endif %}
+                                            {{ row.lab }}
+                                            {% if row.message %}
+                                                <br/><span class="text-secondary" style="font-size:0.9rem">{{ row.message }}</span>
+                                            {% endif %}
+                                            {% if row.exclude %}<br/><span class="no-value">Not counted towards overlap</span>{% endif %}
+                                        </div>
+                                        <div class="col-4">
+                                            {% if conflict.conflict_type == "P" %}
+                                                {% clinical_significance_inline row.classification %}
+                                            {% else %}
+                                                {% somatic_clinical_significance_inline row.clinical_significance row.amp_level %}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% empty %}<div class="row"><div class="col-8 no-value text-right">No relevant records</div></div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endwith %}
+                {% endif %}
+                {% if not forloop.last %}<hr/>{% endif %}
+            {% endfor %}
         </div>
     </div>
-    {% if show_triage %}
-        <div class="card-footer">
-            <input id="conflict_submit" type="submit" class="btn btn-primary" disabled  />
-        </div>
-    {% endif %}
-</form>
 </div>
 <script>
     $("#conflict_comment").keyup(event => {

@@ -321,6 +321,23 @@ strong, .strong {
     }
 }
 
+.not-viewing.value-type a, .currently-viewing.value-type span {
+    border-radius: 8px;
+    width: 90%;
+    display: inline-block;
+    padding: 4px;
+}
+.not-viewing.value-type a {
+    border: 1px solid rgba(50, 50, 250, .2);
+    &:hover {
+        border: 1px solid rgba(50, 50, 250, .4);
+        background-color: rgba(50, 50, 250, .1);
+    }
+}
+.currently-viewing.value-type span {
+    background-color: rgba(50, 50, 250, .2);
+}
+
 .mono {
 	font-family: monospace;
 }
@@ -455,6 +472,7 @@ a {
     // f0b0
     &::before {
         color: #8888bb;
+        opacity: 0.6;
 		position: relative;
 		left: -4px;
 		content: '\f0b0';

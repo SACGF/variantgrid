@@ -760,6 +760,16 @@ class Conflict(ReviewableModelMixin, PreviewModelMixin, TimeStampedModel):
         unique_together = ("allele", "conflict_type", "allele_origin_bucket", "testing_context_bucket", "tumor_type_category")
 
     @property
+    def context_summary_short(self) -> str:
+        parts = [self.allele_origin_bucket]
+        if self.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
+            parts.append(self.get_testing_context_bucket_display())
+        if self.tumor_type_category:
+            parts.append(self.tumor_type_category)
+        parts.append(self.get_conflict_type_display())
+        return " ".join(parts)
+
+    @property
     def context_summary(self) -> str:
         parts = [self.get_allele_origin_bucket_display()]
         if self.allele_origin_bucket != AlleleOriginBucket.GERMLINE:
@@ -768,6 +778,13 @@ class Conflict(ReviewableModelMixin, PreviewModelMixin, TimeStampedModel):
             parts.append(self.tumor_type_category)
         parts.append(self.get_conflict_type_display())
         return " ".join(parts)
+
+    # @property
+    # def concise_str(self) -> str:
+    #     parts = []
+    #     parts.append(self.allele_origin_bucket) # just a single letter for Allele Origin
+    #     if self.tumor_type_category:
+    #         parts.append(self.tumor_type_category)
 
     def __str__(self) -> str:
         parts = [f"{self.allele:CA}", self.get_allele_origin_bucket_display()]

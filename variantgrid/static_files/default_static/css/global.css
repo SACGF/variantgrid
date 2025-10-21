@@ -276,6 +276,25 @@ strong, .strong {
   font-family: 'Font Awesome 6 Free', 'FontAwesome';
 }
 
+.not-viewing.value-type a, .currently-viewing.value-type span {
+  border-radius: 8px;
+  width: 90%;
+  display: inline-block;
+  padding: 4px;
+}
+
+.not-viewing.value-type a {
+  border: 1px solid rgba(50, 50, 250, 0.2);
+}
+.not-viewing.value-type a:hover {
+  border: 1px solid rgba(50, 50, 250, 0.4);
+  background-color: rgba(50, 50, 250, 0.1);
+}
+
+.currently-viewing.value-type span {
+  background-color: rgba(50, 50, 250, 0.2);
+}
+
 .mono {
   font-family: monospace;
 }
@@ -400,6 +419,7 @@ a.no-link-style {
 }
 .filter-link::before {
   color: #8888bb;
+  opacity: 0.6;
   position: relative;
   left: -4px;
   content: '\f0b0';

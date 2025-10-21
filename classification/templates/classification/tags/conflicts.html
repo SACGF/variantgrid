@@ -13,7 +13,7 @@
 {% for cell in conflicts_for_allele.cells %}
     {% if cell.start_tr %}<tr>{% endif %}
         <td rowspan="{{ cell.row_span }}" {% if cell.css_class %}class="{{ cell.css_class }}"{% endif %}>
-        {% if cell.href %}<a {{ cell.link_contents }}>{{ cell.value }}</a>{% else %}{{ cell.value }}{% endif %}
+            {% if cell.href %}<a {{ cell.link_contents }}>{{ cell.value }}</a>{% else %}<span class="no-link">{{ cell.value }}</span>{% endif %}
         </td>
     {% if cell.end_tr %}</tr>{% endif %}
 {% endfor %}
