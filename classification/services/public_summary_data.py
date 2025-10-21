@@ -35,7 +35,8 @@ class ClassificationPublicSummaryData:
     @cached_property
     def overlapped_alleles(self) -> int:
         # TODO no distinction between germline and somatic
-        return Allele.objects.annotate(lab_count=Count("importedalleleinfo__classification__lab", filter=Q(importedalleleinfo__classification__withdrawn=False), distinct=True)).filter(lab_count__gte=2).count()
+        # return Allele.objects.annotate(lab_count=Count("importedalleleinfo__classification__lab", filter=Q(importedalleleinfo__classification__withdrawn=False), distinct=True)).filter(lab_count__gte=2).count()
+        return Classification.objects.filter(allele__isnull=False, withdrawn=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).order_by('allele').distinct('allele').count()
 
     @cached_property
     def discordant_alleles(self) -> int:
