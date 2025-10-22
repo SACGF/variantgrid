@@ -8,7 +8,6 @@ biopython==1.84
 cdot==0.2.26
 celery==5.3.6
 ConfigArgParse==1.5.3
-coreapi==2.3.3
 crispy-bootstrap4==2022.1
 cyvcf2==0.30.28
 deprecation==2.1.0

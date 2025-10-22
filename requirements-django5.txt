@@ -6,7 +6,6 @@ biopython>=1.81
 cdot>=0.2.26
 celery
 ConfigArgParse
-coreapi
 crispy-bootstrap4
 cyvcf2>=0.30.14
 deprecation
