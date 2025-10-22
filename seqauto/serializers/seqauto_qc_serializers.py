@@ -62,8 +62,13 @@ class QCSerializer(serializers.ModelSerializer):
             raise VCFFile.DoesNotExist(f"No vcf file for {vcf_file_kwargs=}")
 
         defaults = {}
-        if qc_path := data.get("path"):
-            defaults["path"] = qc_path
+        qc_path = data.get("path")
+        if qc_path is None:
+            # We currently require path to define QC (in sequencing scans)
+            # @see QC class docs
+            qc_path = QC.get_path_from_vcf(vcf_file)
+        defaults["path"] = qc_path
+
 
         qc, _ = QC.objects.get_or_create(
             sequencing_run=sequencing_run,
