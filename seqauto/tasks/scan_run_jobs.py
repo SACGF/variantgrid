@@ -66,7 +66,7 @@ def scan_run_jobs(seq_auto_run_id, only_process_file_types=None, only_launch_fil
     params = (only_process_file_types, only_launch_file_types, run_launch_script)
     logging.info("only_process_file_types=%s, only_launch_file_types=%s, run_launch_script=%s", *params)
 
-    seqauto_run = SeqAutoRun.objects.get(seq_auto_run_id)
+    seqauto_run = SeqAutoRun.objects.get(pk=seq_auto_run_id)
     exception = None
     try:
         # Scan resources
