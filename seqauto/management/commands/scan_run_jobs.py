@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
 
+from seqauto.models import SeqAutoRun
 from seqauto.tasks.scan_run_jobs import scan_run_jobs
 
 
@@ -18,7 +19,9 @@ class Command(BaseCommand):
         run_launch_script = options.get("run_launch_script", False)
         reuse_prev_scan_id = options.get("reuse_prev_scan_id")
 
-        scan_run_jobs(only_process_file_types=only_process_file_types,  # @UndefinedVariable
+        seqauto_run = SeqAutoRun.objects.create()
+        scan_run_jobs(seq_auto_run_id=seqauto_run.pk,  # @UndefinedVariable
+                      only_process_file_types=only_process_file_types,
                       only_launch_file_types=only_launch_file_types,
                       run_launch_script=run_launch_script,
                       reuse_prev_scan_id=reuse_prev_scan_id)

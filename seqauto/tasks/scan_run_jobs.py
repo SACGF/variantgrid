@@ -56,8 +56,8 @@ def scan_resources(seqauto_run, seqauto_scripts):
 
 
 @celery.shared_task(track_started=True, queue="seqauto_single_worker")
-def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None,
-                  run_launch_script=None, reuse_prev_scan_id=None, fake_data=None):
+def scan_run_jobs(seq_auto_run_id, only_process_file_types=None, only_launch_file_types=None,
+                  run_launch_script=None, reuse_prev_scan_id=None):
     if not settings.SEQAUTO_ENABLED:
         raise ValueError("settings.SEQAUTO_ENABLED=False")
 
@@ -69,14 +69,14 @@ def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None,
     params = (only_process_file_types, only_launch_file_types, run_launch_script)
     logging.info("only_process_file_types=%s, only_launch_file_types=%s, run_launch_script=%s", *params)
 
-    task_id = scan_run_jobs.request.id
-    seqauto_run = SeqAutoRun.objects.create(task_id=task_id, fake_data=fake_data)
+    seqauto_run = SeqAutoRun.objects.get(seq_auto_run_id)
     exception = None
     try:
         # Scan resources
         scan_resources_dir = seqauto_run.get_scan_resources_dir()
         mk_path(scan_resources_dir)
 
+        seqauto_run.task_id = scan_run_jobs.request.id
         seqauto_run.scan_start = timezone.now()
         seqauto_run.scan_resources_dir = scan_resources_dir
         seqauto_run.save()

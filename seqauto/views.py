@@ -58,7 +58,9 @@ def seqauto_runs(request):
         only_process_file_types = []  # All
         only_launch_file_types = [SequencingFileType.ILLUMINA_FLOWCELL_QC]
 
-        task = scan_run_jobs.si(only_process_file_types=only_process_file_types,  # @UndefinedVariable
+        seqauto_run = SeqAutoRun.objects.create()
+        task = scan_run_jobs.si(seq_auto_run_id=seqauto_run.pk,  # @UndefinedVariable
+                                only_process_file_types=only_process_file_types,
                                 only_launch_file_types=only_launch_file_types)
         task.apply_async()
 
