@@ -21,8 +21,9 @@
         {% if enable_button %}
             <li>
               <form id="manual-seqauto-run" method="post">
-                {% csrf_token %}
-                <button class="btn btn-outline-secondary" id='seqauto-scan' type='submit'>Scan Disk for Sequencing Data</button>
+                  {% csrf_token %}
+                  <button class="btn btn-outline-secondary" id='seqauto-scan' type='submit'>Scan Disk for Sequencing Data</button>
+                  <div class="error-messages"></div>
               </form>
         {% endif %}
         </ul>
