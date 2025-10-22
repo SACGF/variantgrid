@@ -1002,7 +1002,16 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
 
 
 class QC(SeqAutoRecord):
-    """ This holds together all of the other QC objects """
+    """ This holds together all of the other QC objects
+
+        Historically, we regarded "QC" as the exec stats file, then we needed to load a whole bunch of QC so those
+        became new models that hung off "QC" which is just used to group things
+
+        So because of this, QC is dependent on "path". Probably the "right" thing to do is to change QC to not be a
+        SeqAuto object, as it's not actually a real object, just a way to link models.
+
+        TODO: Make this not a SeqAutoRecord. Perhaps make this unique_together w/bam+vcf?
+    """
     bam_file = models.ForeignKey(BamFile, on_delete=CASCADE)
     vcf_file = models.ForeignKey(VCFFile, on_delete=CASCADE)
 
