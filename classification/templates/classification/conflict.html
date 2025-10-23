@@ -44,6 +44,7 @@
         {% if user.is_superuser %}
             {% labelled label="Admin" %}{% admin_link conflict %}{% endlabelled %}
         {% endif %}
+        {% labelled label="ID" %}CR_{{ conflict.pk }}{% endlabelled %}
         {% labelled label="Context" %}
             <div class="allele-origin-box horizontal allele-origin-{{ conflict.allele_origin_bucket }}">
                 <div class="allele-origin-text">{{ conflict.get_allele_origin_bucket_display }}</div>

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 from functools import cached_property
 from html import escape
-from typing import Optional, Iterable, Callable
+from typing import Optional, Iterable, Callable, Collection, Tuple
 from datetime import datetime
 from django.contrib.auth.models import User
 from django.db import transaction
@@ -604,6 +604,70 @@ class GroupConflictsLinks(IntEnum):
     FILTER_LINK = 2
 
 
+@dataclass
+class ConflictSeverityIconAndText:
+    html: str
+    css_classes: list[str]
+    unique_classifications: set[str]
+    unique_clin_sigs: set[str]
+
+
+def conflict_severity_icon_and_text(user_lab_ids: Collection[int], severity: ConflictSeverity, data_rows: list[ConflictDataRow]) -> ConflictSeverityIconAndText:
+    # severity_type_css = [allele_origin_css]
+    # if currently_viewing == conflict:
+    #     severity_type_css += ["strong"]
+
+    severity_type_css = []
+    if severity < ConflictSeverity.SAME:
+        severity_type_css += ["no-value"]
+    elif severity == ConflictSeverity.SAME:
+        pass
+    elif severity < ConflictSeverity.MAJOR:
+        severity_type_css += ["strong", "text-warning"]
+    else:
+        severity_type_css += ["strong", "text-danger"]
+
+    unique_classifications = set()
+    unique_clin_sigs = set()
+    your_lab_ids = set()
+    other_lab_ids = set()
+    for row in data_rows:
+        if not row.exclude:
+            if user_lab_ids is not None:
+                if row.lab_id in user_lab_ids:
+                    your_lab_ids.add(row.lab_id)
+                else:
+                    other_lab_ids.add(row.lab_id)
+
+            if classification := row.classification:
+                unique_classifications.add(classification)
+            if clinical_sig := row.clinical_significance:
+                unique_clin_sigs.add(clinical_sig)
+
+    # now check the labs
+    severity_parts = []
+    if user_lab_ids is not None:
+        your_lab_count = len(your_lab_ids)
+        other_lab_count = len(other_lab_ids)
+
+        if your_lab_count:
+            severity_parts.append('<i class="fa-solid fa-user-doctor text-success" title="Your lab is involved"></i>')
+        if other_lab_count == 1:
+            severity_parts.append('<i class="fa-solid fa-user text-secondary" title="Another lab is involved"></i>')
+        elif other_lab_count > 1:
+            severity_parts.append(
+                '<i class="fa-solid fa-users text-secondary" title="Multiple other labs are involved"></i>')
+
+    severity_parts.append(escape(severity.label))
+    severity_str = SafeString("".join(severity_parts))
+    return ConflictSeverityIconAndText(
+        html=severity_str,
+        css_classes=severity_type_css,
+        unique_classifications=unique_classifications,
+        unique_clin_sigs=unique_clin_sigs,
+    )
+
+
 def group_conflicts(
         conflicts: Iterable[Conflict],
         link_types: GroupConflictsLinks = GroupConflictsLinks.NO_LINKS,
@@ -709,66 +773,71 @@ def group_conflicts(
 
                     table.add_cell(3, RowSpanCellValue(value_type_label, css_classes=value_type_css, href=href, link_type=link_type))
 
-                    severity = ConflictSeverity(conflict.latest.severity)
-                    severity_type_css = [allele_origin_css]
-                    if severity < ConflictSeverity.SAME:
-                        severity_type_css += ["no-value"]
-                    elif severity == ConflictSeverity.SAME:
-                        pass
-                    elif severity < ConflictSeverity.MAJOR:
-                        severity_type_css += ["strong", "text-warning"]
-                    else:
-                        severity_type_css += ["strong", "text-danger"]
+                    # severity = ConflictSeverity(conflict.latest.severity)
+                    # severity_type_css = [allele_origin_css]
+                    # if severity < ConflictSeverity.SAME:
+                    #     severity_type_css += ["no-value"]
+                    # elif severity == ConflictSeverity.SAME:
+                    #     pass
+                    # elif severity < ConflictSeverity.MAJOR:
+                    #     severity_type_css += ["strong", "text-warning"]
+                    # else:
+                    #     severity_type_css += ["strong", "text-danger"]
+                    #
+                    # if currently_viewing == conflict:
+                    #     severity_type_css += ["strong"]
+                    #
+                    # conflict_history: ConflictHistory = conflict.latest
+                    # unique_classifications = set()
+                    # unique_clin_sigs = set()
+                    # your_lab_ids = set()
+                    # other_lab_ids = set()
+                    # for row in conflict_history.data_rows():
+                    #     if not row.exclude:
+                    #         if user_lab_ids is not None:
+                    #             if row.lab_id in user_lab_ids:
+                    #                 your_lab_ids.add(row.lab_id)
+                    #             else:
+                    #                 other_lab_ids.add(row.lab_id)
+                    #
+                    #         if classification := row.classification:
+                    #             unique_classifications.add(classification)
+                    #         if clinical_sig := row.clinical_significance:
+                    #             unique_clin_sigs.add(clinical_sig)
+                    #
+                    #
+                    # # now check the labs
+                    #
+                    # severity_parts = []
+                    # if user_lab_ids is not None:
+                    #     your_lab_count = len(your_lab_ids)
+                    #     other_lab_count = len(other_lab_ids)
+                    #
+                    #     if your_lab_count:
+                    #         severity_parts.append('<i class="fa-solid fa-user-doctor text-success" title="Your lab is involved"></i>')
+                    #     if other_lab_count == 1:
+                    #         severity_parts.append('<i class="fa-solid fa-user text-secondary" title="Another lab is involved"></i>')
+                    #     elif other_lab_count > 1:
+                    #         severity_parts.append('<i class="fa-solid fa-users text-secondary" title="Multiple other labs are involved"></i>')
+                    #
+                    # severity_parts.append(escape(severity.label))
+                    # severity_str = SafeString("".join(severity_parts))
 
+                    parts = conflict_severity_icon_and_text(user_lab_ids, severity=ConflictSeverity(conflict.latest.severity), data_rows=conflict.latest.data_rows())
+                    severity_type_css = [] + parts.css_classes
+                    severity_type_css += [allele_origin_css]
                     if currently_viewing == conflict:
                         severity_type_css += ["strong"]
-
-                    conflict_history: ConflictHistory = conflict.latest
-                    unique_classifications = set()
-                    unique_clin_sigs = set()
-                    your_lab_ids = set()
-                    other_lab_ids = set()
-                    for row in conflict_history.data_rows():
-                        if not row.exclude:
-                            if user_lab_ids is not None:
-                                if row.lab_id in user_lab_ids:
-                                    your_lab_ids.add(row.lab_id)
-                                else:
-                                    other_lab_ids.add(row.lab_id)
-
-                            if classification := row.classification:
-                                unique_classifications.add(classification)
-                            if clinical_sig := row.clinical_significance:
-                                unique_clin_sigs.add(clinical_sig)
-
-
-                    # now check the labs
-
-                    severity_parts = []
-                    if user_lab_ids is not None:
-                        your_lab_count = len(your_lab_ids)
-                        other_lab_count = len(other_lab_ids)
-
-                        if your_lab_count:
-                            severity_parts.append('<i class="fa-solid fa-user-doctor text-success" title="Your lab is involved"></i>')
-                        if other_lab_count == 1:
-                            severity_parts.append('<i class="fa-solid fa-user text-secondary" title="Another lab is involved"></i>')
-                        elif other_lab_count > 1:
-                            severity_parts.append('<i class="fa-solid fa-users text-secondary" title="Multiple other labs are involved"></i>')
-
-                    severity_parts.append(escape(severity.label))
-                    severity_str = SafeString("".join(severity_parts))
-
-                    table.add_cell(4, RowSpanCellValue(severity_str, css_classes=severity_type_css))
+                    table.add_cell(4, RowSpanCellValue(parts.html, css_classes=severity_type_css))
 
                     values = []
                     value_css = [allele_origin_css]
                     if currently_viewing == conflict:
                         value_css += ["strong"]
-                    if unique_classifications:
+                    if unique_classifications := parts.unique_classifications:
                         values.extend(classification_key.sort_values(unique_classifications))
 
-                    if unique_clin_sigs:
+                    if unique_clin_sigs := parts.unique_clin_sigs:
                         values.extend(clin_sig_key.pretty_value(val) for val in clin_sig_key.sort_values(unique_clin_sigs))
 
                     values_str: str

@@ -8,7 +8,7 @@ from django.template.loader import render_to_string
 
 from classification.enums import ConflictSeverity, TestingContextBucket, AlleleOriginBucket, ConflictType
 from classification.models import Conflict, ConflictLab, DiscordanceReportTriageStatus, DiscordanceReportNextStep
-from classification.services.conflict_services import ConflictDataRow
+from classification.services.conflict_services import ConflictDataRow, conflict_severity_icon_and_text
 from genes.hgvs import CHGVS
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab
@@ -47,11 +47,11 @@ class ConflictColumns(DatatableConfig[Conflict]):
             ),
             RichColumn(
                 "severity",
-                renderer=self.render_severity,
-                extra_columns=["pk"],
+                extra_columns=["pk", "severity", "data"],
                 order_sequence=[SortOrder.DESC, SortOrder.ASC],
                 default_sort=SortOrder.DESC,
-                client_renderer='ConflictTable.renderSeverity',
+                renderer=self.render_severity,
+                # client_renderer='ConflictTable.renderSeverity',
             ),
             RichColumn(name="involved_labs", label="Involved Labs", extra_columns=["data", "conflict_type", "pk", "severity"], renderer=self.involved_labs),
             RichColumn("id", visible=False)
@@ -107,15 +107,27 @@ class ConflictColumns(DatatableConfig[Conflict]):
 
         return hgvs_list
 
+    @cached_property
+    def user_lab_ids(self):
+        return set(Lab.valid_labs_qs(self.user, admin_check=True).values_list("pk", flat=True))
+
     def render_severity(self, row_data: CellData):
-        if row_data.value is not None:
-            cs = ConflictSeverity(row_data.value)
-            return {
-                "code": cs.value,
-                "label": cs.label,
-                "conflict_id": row_data.get("pk")
-            }
-        return {"code": -1, "label": "Link error"}
+        # user_lab_ids: Collection[int], severity: ConflictSeverity, data_rows: list[ConflictDataRow]
+        data_parts = conflict_severity_icon_and_text(
+            user_lab_ids=self.user_lab_ids,
+            severity=ConflictSeverity(row_data.get("severity")),
+            data_rows=[ConflictDataRow.from_json(row) for row in row_data.get("data").get("rows")]
+        )
+        class_str = " ".join(data_parts.css_classes)
+        return f'<span class="{class_str}">{data_parts.html}</span>'
+        # if row_data.value is not None:
+        #     cs = ConflictSeverity(row_data.value)
+        #     return {
+        #         "code": cs.value,
+        #         "label": cs.label,
+        #         "conflict_id": row_data.get("pk")
+        #     }
+        # return {"code": -1, "label": "Link error"}
 
     def involved_labs(self, row_data: CellData):
         conflict_rows = [ConflictDataRow.from_json(row) for row in row_data.get("data").get("rows")]

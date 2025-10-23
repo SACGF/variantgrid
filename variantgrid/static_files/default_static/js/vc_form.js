@@ -2729,7 +2729,11 @@ let ConflictTable = (function() {
 
 ConflictTable.renderContext = (data, type, row) => {
     // return JSON.stringify(data);
-    let dom = $('<div>', { style: 'display:inline-block; line-height: 1.3rem' } );
+    let dom = $('<a>', {
+        "class": "subtle-link",
+        "href": Urls.conflict(data.conflict_id),
+        style: 'display:inline-block; line-height: 1.3rem'
+    } );
     dom.append(VCTable.allele_origin_bucket_label(
         data.allele_origin_bucket,
         "",
@@ -2742,17 +2746,28 @@ ConflictTable.renderContext = (data, type, row) => {
         dom.append($("<div>", {"class": "testing-context", text: data.tumor_type_category}));
     }
     //dom.append(" - ")
-    dom.append($("<div>", {html: [
-        $("<a>", {"class": "text-muted", text: data.conflict_type_label, href: Urls.conflict(data.conflict_id)})
-    ]}));
+    dom.append($("<div>", {html: [data.conflict_type_label]}));
+        // $("<a>", {"class": "text-muted", text: data.conflict_type_label, href: Urls.conflict(data.conflict_id)})
+    //]}));
 
     if (data.severity >= 2) {
-        dom.append($("<br/><br/>"));
-        dom.append($("<a>", {
-            "class": "hover-link",
-            "href": Urls.classification_diff() + `?conflict=${data.conflict_id}`,
-            "text": "Show Diffs"
-        }));
+        dom.append(
+            $("<div>", {html:[
+                $("<span>", {
+                "class": "hover-link",
+                //"href": Urls.conflict(data.conflict_id),
+                "html": `<i class="fa-solid fa-arrow-down-up-across-line"></i>CR_${data.conflict_id}`
+                })
+                ]}
+            ));
+
+        // Show Diffs is better placed on the dedicated page
+        // dom.append($("<br/><br/>"));
+        // dom.append($("<a>", {
+        //     "class": "hover-link",
+        //     "href": Urls.classification_diff() + `?conflict=${data.conflict_id}`,
+        //     "text": "Show Diffs"
+        // }));
     }
 
     return dom;
