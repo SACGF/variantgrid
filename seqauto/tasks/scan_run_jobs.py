@@ -56,7 +56,13 @@ def scan_resources(seqauto_run, seqauto_scripts):
 
 
 @celery.task(track_started=True)
-def scan_run_jobs(seq_auto_run_id, only_process_file_types=None, only_launch_file_types=None,
+def scan_run_jobs():
+    seqauto_run = SeqAutoRun.objects.create()
+    process_seq_auto_run(seqauto_run.pk)
+
+
+@celery.task(track_started=True)
+def process_seq_auto_run(seq_auto_run_id, only_process_file_types=None, only_launch_file_types=None,
                   run_launch_script=None, reuse_prev_scan_id=None):
     if run_launch_script is None:
         run_launch_script = settings.SEQAUTO_SCAN_RUN_SCRIPTS
@@ -73,7 +79,7 @@ def scan_run_jobs(seq_auto_run_id, only_process_file_types=None, only_launch_fil
         scan_resources_dir = seqauto_run.get_scan_resources_dir()
         mk_path(scan_resources_dir)
 
-        seqauto_run.task_id = scan_run_jobs.request.id
+        seqauto_run.task_id = process_seq_auto_run.request.id
         seqauto_run.scan_start = timezone.now()
         seqauto_run.scan_resources_dir = scan_resources_dir
         seqauto_run.save()

@@ -102,6 +102,7 @@ CELERY_ROUTES = {
 
     # SeqAuto
     'seqauto.tasks.scan_run_jobs.scan_run_jobs': SEQAUTO_SINGLE_WORKERS,
+    'seqauto.tasks.scan_run_jobs.process_seqauto_run': SEQAUTO_SINGLE_WORKERS,
     'sapath.tasks.import_helix_task.sapath_helix_load_if_changed': SEQAUTO_SINGLE_WORKERS,
 }
 
