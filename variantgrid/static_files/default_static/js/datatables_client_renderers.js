@@ -13,6 +13,7 @@ function renderGeneSymbol(geneSymbol, type, row) {
     return link;
 }
 
+
 function renderAnalysisAuditLogSummary(summary, type, row) {
     let summaryText = summary['summary_text'];
     if (summaryText) {
@@ -31,7 +32,6 @@ function renderAnalysisAuditLogSummary(summary, type, row) {
         changesSummary += "</table>"
         return changesSummary
     }
-
 }
 
 

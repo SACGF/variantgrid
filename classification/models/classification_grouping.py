@@ -690,7 +690,6 @@ class ConflictObjectManager(Manager):
 
 class Conflict(ReviewableModelMixin, PreviewModelMixin, TimeStampedModel):
     objects = ConflictObjectManager()
-
     allele = models.ForeignKey(Allele, on_delete=CASCADE)
     conflict_type = models.CharField(max_length=1, choices=ConflictType.choices)
     # FIXME while is allele origin bucket and testing context bucket nullable?

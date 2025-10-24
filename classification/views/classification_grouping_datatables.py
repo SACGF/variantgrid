@@ -117,28 +117,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         if ShareLevel(row["share_level"]).is_discordant_level:
             if discordance_status := self.pending_conflict_labs_onc_path.get((row["pk"], row["lab_id"])):
                 result_dict["conflict_status"] = discordance_status
-                print(result_dict)
-
-        # FIXME look at lab
-        # result_dict["pending_change"] = row["pending_change_onc_path"]
-
-        # Old code that would track discordances by discordance reports
-
-        # if dr := self.discordance_report:
-        #     if drc := DiscordanceReportClassification.objects.filter(report_id=dr.pk,
-        #                                                              classification_original__classification=row[
-        #                                                                  "latest_classification_modification__classification_id"]).first():
-        #         effective_cs = drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-        #         result_dict["classification"] = effective_cs
-        #
-        #         old_cs = drc.classification_original.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-        #         if result_dict and result_dict.get("classification") != old_cs:
-        #             result_dict["old"] = old_cs
-        #         if "pending" not in result_dict:
-        #             effective_cs = drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-        #             if effective_cs != result_dict.get("classification"):
-        #                 result_dict["new"] = result_dict.get("classification")
-        #                 result_dict["classification"] = effective_cs
 
         return result_dict
 
