@@ -141,6 +141,12 @@ class SequencingRunSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         name = validated_data.get('name')
+        # Create sequencer if it doesn't exist (can't be null)
+        sequencer = validated_data.pop('sequencer')
+        if sequencer and isinstance(sequencer, dict):
+            sequencer, _ = Sequencer.objects.get_or_create(**sequencer)
+        validated_data['sequencer'] = sequencer
+
         if ek_data := validated_data.pop('enrichment_kit', None):
             enrichment_kit = EnrichmentKitSerializer.get_from_data(ek_data)
             validated_data['enrichment_kit'] = enrichment_kit
