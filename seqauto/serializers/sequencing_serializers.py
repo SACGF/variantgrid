@@ -11,30 +11,18 @@ from snpdb.models import Manufacturer, DataState
 
 
 class SequencerModelSerializer(serializers.ModelSerializer):
-    manufacturer = serializers.StringRelatedField()
-    data_naming_convention = serializers.SerializerMethodField()
+    manufacturer = serializers.SlugRelatedField(slug_field='name', queryset=Manufacturer.objects.all())
+    data_naming_convention_display = serializers.CharField(source='get_data_naming_convention_display', read_only=True)
 
     class Meta:
         model = SequencerModel
         fields = "__all__"
 
-    def create(self, validated_data):
-        model = validated_data.get('model')
-        manufacturer = validated_data.get('manufacturer')
-        manufacturer, _ = Manufacturer.objects.get_or_create(name=manufacturer)
-
-        # Check if the object already exists
-        instance, _created = SequencerModel.objects.get_or_create(
-            model=model,
-            defaults={
-                "manufacturer": manufacturer,
-                "data_naming_convention": model.data_naming_convention,
-            }
-        )
-        return instance  # Return the existing or new instance
-
-    def get_data_naming_convention(self, obj):
-        return obj.get_data_naming_convention_display()
+    def to_internal_value(self, data):
+        pk = data["model"]
+        defaults = {k: v for k,v in data.items() if k != 'model'}
+        obj, _ = SequencerModel.objects.get_or_create(model=pk, defaults=defaults)
+        return obj
 
 
 class SequencerSerializer(serializers.ModelSerializer):
