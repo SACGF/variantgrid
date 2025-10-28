@@ -38,6 +38,11 @@ class SequencerModelSerializer(serializers.ModelSerializer):
         )
         return instance
 
+    @staticmethod
+    def get_object(validated_data):
+        return SequencerModel.objects.get(model=validated_data["model"])
+
+
 
 class SequencerSerializer(serializers.ModelSerializer):
     name = serializers.CharField(validators=[])  # Disable UniqueValidator
@@ -49,8 +54,8 @@ class SequencerSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         name = validated_data.get('name')
-        sequencer_model = validated_data.get('sequencer_model')
-        logging.info("sequencer_model=%s", sequencer_model)
+        sequencer_model_data = validated_data.get('sequencer_model')
+        sequencer_model = SequencerModelSerializer.get_object(sequencer_model_data)
 
         instance, _created = Sequencer.objects.get_or_create(
             name=name,
