@@ -26,7 +26,7 @@ class SequencerModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = SequencerModel
         extra_kwargs = {'model': {'validators': []}}  # turn off UniqueValidator
-        fields = ["model", "manufacturer", "data_naming_convention_display"]
+        fields = ["model", "manufacturer", "data_naming_convention", "data_naming_convention_display"]
 
     def create(self, validated_data):
         instance, _created = SequencerModel.objects.get_or_create(
