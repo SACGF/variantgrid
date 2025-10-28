@@ -10,35 +10,45 @@ from seqauto.serializers import EnrichmentKitSerializer, EnrichmentKitSummarySer
 from snpdb.models import Manufacturer, DataState
 
 
+class ManufacturerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Manufacturer
+        fields = ["name"]
+
+    def to_internal_value(self, data):
+        return Manufacturer.objects.get_or_create(name=data["name"])[0]
+
+
 class SequencerModelSerializer(serializers.ModelSerializer):
-    manufacturer = serializers.SlugRelatedField(slug_field='name', queryset=Manufacturer.objects.all())
+    manufacturer = serializers.SlugRelatedField(slug_field='name', queryset=Manufacturer.objects.all(), write_only=True)
+    manufacturer_detail = ManufacturerSerializer(source='manufacturer', read_only=True)
     data_naming_convention_display = serializers.CharField(source='get_data_naming_convention_display', read_only=True)
 
     class Meta:
         model = SequencerModel
-        fields = "__all__"
+        fields = ["model", "manufacturer", "manufacturer_detail", "data_naming_convention_display"]
 
-    def to_internal_value(self, data):
-        pk = data["model"]
-        defaults = {k: v for k,v in data.items() if k != 'model'}
-        obj, _ = SequencerModel.objects.get_or_create(model=pk, defaults=defaults)
-        return obj
+    def create(self, validated_data):
+        instance, _created = SequencerModel.objects.get_or_create(
+            model=validated_data["model"],
+            defaults={
+                "manufacturer": validated_data.get("manufacturer"),
+                "data_naming_convention": validated_data.get("data_naming_convention"),
+            }
+        )
+        return instance
 
 
 class SequencerSerializer(serializers.ModelSerializer):
     name = serializers.CharField(validators=[])  # Disable UniqueValidator
-    sequencer_model = SequencerModelSerializer()
+    sequencer_model = serializers.SlugRelatedField(
+        slug_field='model', queryset=SequencerModel.objects.all(), write_only=True
+    )
+    sequencer_model_detail = SequencerModelSerializer(source="sequencer_model", read_only=True)
 
     class Meta:
         model = Sequencer
-        fields = "__all__"
-
-    def to_internal_value(self, data):
-        # When POSTing, you can use just name (PK)
-        name = data.get('name')
-        if sequencer := Sequencer.objects.filter(name=name).first():
-            data = self.to_representation(sequencer)
-        return super().to_internal_value(data)
+        fields = ["name", "sequencer_model", "sequencer_model_detail"]
 
     def create(self, validated_data):
         name = validated_data.get('name')
