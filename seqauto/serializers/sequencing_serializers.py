@@ -20,13 +20,13 @@ class ManufacturerSerializer(serializers.ModelSerializer):
 
 
 class SequencerModelSerializer(serializers.ModelSerializer):
-    manufacturer = serializers.SlugRelatedField(slug_field='name', queryset=Manufacturer.objects.all(), write_only=True)
-    manufacturer_detail = ManufacturerSerializer(source='manufacturer', read_only=True)
+    manufacturer = ManufacturerSerializer()
     data_naming_convention_display = serializers.CharField(source='get_data_naming_convention_display', read_only=True)
 
     class Meta:
         model = SequencerModel
-        fields = ["model", "manufacturer", "manufacturer_detail", "data_naming_convention_display"]
+        extra_kwargs = {'model': {'validators': []}}  # turn off UniqueValidator
+        fields = ["model", "manufacturer", "data_naming_convention_display"]
 
     def create(self, validated_data):
         instance, _created = SequencerModel.objects.get_or_create(
@@ -41,14 +41,11 @@ class SequencerModelSerializer(serializers.ModelSerializer):
 
 class SequencerSerializer(serializers.ModelSerializer):
     name = serializers.CharField(validators=[])  # Disable UniqueValidator
-    sequencer_model = serializers.SlugRelatedField(
-        slug_field='model', queryset=SequencerModel.objects.all(), write_only=True
-    )
-    sequencer_model_detail = SequencerModelSerializer(source="sequencer_model", read_only=True)
+    sequencer_model = SequencerModelSerializer()
 
     class Meta:
         model = Sequencer
-        fields = ["name", "sequencer_model", "sequencer_model_detail"]
+        fields = ["name", "sequencer_model"]
 
     def create(self, validated_data):
         name = validated_data.get('name')
