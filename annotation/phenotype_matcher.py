@@ -52,28 +52,28 @@ class SkipAllPhenotypeMatchException(Exception):
 class PhenotypeMatcher:
     # Words which have no use matching on their own
     COMMON_WORDS = {
-        'acute', 'across', 'adult', 'all', 'and', 'associated', 'auditory',
+        'acute', 'across', 'adult', 'all', 'and', 'andrew', 'areas', 'associated', 'auditory',
         'bad', 'bilateral', 'birth', 'blood', 'borderline', 'brain', 'brainstem',
-        'can', 'carries', 'central', 'change', 'charge', 'child', 'chronic', 'close', 'comma', 'commas',
-        'coned', 'cord', 'cousin', 'cousins',
-        'diffused', 'deficiency', 'disorder', 'distal',
-        'ear', 'exclude',
-        'face', 'familial', 'floating', 'focal', 'forms', 'frequent', 'frequency', 'from', "ft 4",
+        'can', 'carries', 'cause', 'cells', 'central', 'change', 'charge', 'child', 'chronic', 'close', 'comma',
+        'commas', 'common', 'complete', 'coned', 'cord', 'cousin', 'cousins',
+        'day', 'days', 'diffused', 'deficiency', 'disease', 'disorder', 'distal',
+        'ear', 'exclude', 'exome',
+        'face', 'familial', 'father', 'floating', 'focal', 'forms', 'frequent', 'frequency', 'from', "ft 4",
         'generalized', "generalised",
-        'hard', 'has', 'hearing',
+        'hard', 'has', 'hearing', 'health', 'high grade',
         'image', 'inheritance', 'insulin',
         'joints',
         'kit',
         'large', 'lateral', 'left', 'likes', 'liver',
-        'match', 'macro', 'mild', 'milena', 'moderate', 'motor', 'movements',
-        'name',
+        'march', 'match', 'macro', 'mild', 'milena', 'moderate', 'mother', 'month', 'months', 'mother', 'motor', 'movements',
+        'nad', 'name', 'normal',
         'onset', 'other',
-        'parts', 'pending', 'periodic', 'person', 'pit', 'plan', 'position', 'profound', 'prolonged',
+        'panel', 'parts', 'pending', 'periodic', 'person', 'pit', 'plan', 'position', 'profound', 'prolonged',
         'proximal', 'progressive',
-        'range', 'raise', 'recurrent', 'right',
-        'severe', 'she', 'short', 'skeletal', 'sleep', 'syndrome',
-        'the', 'transient',
-        'wants', 'was', 'white', 'with',
+        'range', 'raise', 'recurrent', 'right', 'req',
+        'second', 'score', 'severe', 'she', 'short', 'son', 'skeletal', 'sleep', 'spine', 'stage', 'study', 'syndrome',
+        'tat', 'the', 'transient', 'trio', 'trial',
+        'wants', 'was', 'week', 'weeks', 'wes', 'wgs', 'white', 'with',
     }
 
     def __init__(self):
@@ -192,16 +192,18 @@ class PhenotypeMatcher:
         """ Return true to skip a word, throws SkipAllPhenotypeMatchException to skip all.
             Only need to skip >MIN_LENGTH words as will do that later (after exact) """
 
-        # For multi-words where you want to skip components
-        SKIP_ALL = {"library prep", "to cgf", "set up", "ad pattern", "recurrent eps", "rest of"}
-        if lower_text in SKIP_ALL:
-            raise SkipAllPhenotypeMatchException()
+        SKIP_MULTI_WORDS = False
+        if SKIP_MULTI_WORDS:
+            # For multi-words where you want to skip components
+            SKIP_ALL = {"library prep", "to cgf", "set up", "ad pattern", "recurrent eps", "rest of"}
+            if lower_text in SKIP_ALL:
+                raise SkipAllPhenotypeMatchException()
 
-        if cls._words_together(lower_text, {"TAT"}, {"non-urgent", "months", "month", "days", "week", "weeks"}):
-            raise SkipAllPhenotypeMatchException()
+            if cls._words_together(lower_text, {"TAT"}, {"non-urgent", "months", "month", "days", "week", "weeks"}):
+                raise SkipAllPhenotypeMatchException()
 
-        if cls._words_together(lower_text, {"trio"}, {"exome", "MedEx", "WES", "TS1", "father", "mother"}):
-            raise SkipAllPhenotypeMatchException()
+            if cls._words_together(lower_text, {"trio"}, {"exome", "MedEx", "WES", "TS1", "father", "mother"}):
+                raise SkipAllPhenotypeMatchException()
 
         return lower_text in cls.COMMON_WORDS
 
@@ -428,6 +430,7 @@ class PhenotypeMatcher:
 
         HARDCODED_LOOKUPS = {
             'aHUS': HUS,
+            "aCLL": (load_hpo_by_name, "chronic lymphocytic leukemia"),
             "ALL": (load_hpo_by_name, "Acute lymphoblastic leukemia"),
             # AML fix until we get new HPO data - see https://github.com/obophenotype/human-phenotype-ontology/issues/4236
             "AML": (load_hpo_by_name, "Acute myeloid leukemia"),
@@ -481,6 +484,8 @@ class PhenotypeMatcher:
             "brain abnormalities": ABNORMAL_BRAIN,
             "brain abnormality": ABNORMAL_BRAIN,
             "brain malformation": ABNORMAL_BRAIN,
+            "breast ca": (load_hpo_by_name, "breast cancer"),
+            "breat ca": (load_hpo_by_name, "breast cancer"),
             "bulls ' eye maculopathy": BULLS_EYE_MACULOPATHY,  # TODO: Hacked due to us joining ' badly
             "caf au lait": (load_hpo_by_name, "Cafe-au-lait spot"),
             "carnitine transporter deficiency": (load_omim_by_id, 212140),
@@ -561,6 +566,7 @@ class PhenotypeMatcher:
             "mitochondrial respiratory chain disorder": MITO_DEFICIENCY,
             "moya moya": (load_hpo_by_id, 11834),
             "musculoskeletal abnormalities": (load_hpo_by_id, 33127),
+            "myeloid": (load_hpo_by_name, "myeloid leukemia"),
             "na craving": (load_hpo_by_name, "Salt craving"),
             "neuroregression": (load_hpo_by_id, 2376),  # Developmental regression
             "noggin": (load_gene_by_name, 'NOG'),
@@ -589,6 +595,7 @@ class PhenotypeMatcher:
             "raised tyrosine": (load_hpo_by_name, "Hypertyrosinemia"),
             "raised tsh": HIGH_TSH,
             "rem sleep": (load_hpo_by_id, 2494),  # Abnormal REM sleep
+            # "Russel Sivler Syndrome"
             "increased tsh": HIGH_TSH,
             "increased sweat": (load_hpo_by_name, "Hyperhidrosis"),
             "recurrent urtis": (load_hpo_by_name, "Recurrent upper respiratory tract infections"),
