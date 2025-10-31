@@ -474,16 +474,12 @@ class Populate:
                 print("!!Got date out of order")
 
             if isinstance(cc, DiscordanceReportWrapper):
-                print(f"{cc.change_date} DiscordanceWrapper {cc.is_open_mode}")
                 self.apply_discordance_report_update(cc)
             elif isinstance(cc, TriageWrapper):
-                print(f"{cc.change_date} TriageWrapper")
                 self.apply_triage(cc.triage)
             elif isinstance(cc, ReviewWrapper):
-                print(f"{cc.change_date} ReviewWrapper")
                 self.apply_review(cc.review)
             else:
-                print(f"{cc.change_date} ClassificationUpdate")
                 self.apply_classification_update(cc)
                 self.log_and_update(cc.change_date)
 
