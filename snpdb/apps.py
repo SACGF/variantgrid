@@ -1,6 +1,7 @@
 import logging
 import mimetypes
 import sys
+from typing import AnyStr, Any
 
 from django.apps import AppConfig
 from django.conf import settings
@@ -67,12 +68,19 @@ class SnpdbConfig(AppConfig):
                 statement'''
                 stack = traceback.extract_stack()[:-1]
                 last = stack[-1]
-
+                filename: str
+                line_no: Any
                 # Handle different versions of the traceback module
                 if hasattr(last, 'filename'):
-                    out_str = "{}:{}\n".format(last.filename, last.lineno)
+                    filename = last.filename
+                    line_no = last.lineno
                 else:
-                    out_str = "{}:{}\n".format(last[0], last[1])
+                    filename = last[0]
+                    line_no = last[1]
+
+                out_str = ""
+                if "VariantGrid" in filename:
+                    out_str = "{}:{} - ".format(filename, line_no)
 
                 # Prepend the filename and linenumber
                 __builtins__['oldprint'](out_str, *args, **kwargs)
