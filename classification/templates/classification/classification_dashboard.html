@@ -73,6 +73,34 @@
             <label>See recent activity for</label>: {% for lab in dlab.labs %}{% if not forloop.first %}, {% endif %}<a href="{% url 'activity_lab' lab.pk %}">{% lab lab %}</a>{% endfor %}
         </div>
 
+        <p><a class="modal-link" data-toggle="modal" data-target="#exampleModal">
+        <i class="fa-solid fa-clipboard-user fa-bounce fa-animate-2"></i>
+          Survey Invitation: PanelApp Australia and Shariant Platforms
+        </a></p>
+        <div class="modal" id="exampleModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Survey Invitation: PanelApp Australia and Shariant Platforms</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="m-4">
+                            <p>Genomics Australia invites members of the genomics sector to participate in a survey regarding the utility and sustainability of the PanelApp Australia and Shariant platforms. The survey is open to both users and non-users of the platforms.</p>
+
+                            <p>Your feedback will inform future planning for these resources. Many questions are optional, and you are encouraged to share the survey link with colleagues. All responses will be treated confidentially; aggregated findings may be shared with relevant stakeholders. A summary of results will be provided to participants.</p>
+
+                            <p>The survey will be available for three weeks from 3 November to 23 November 2025.</p>
+
+                            <p><a href="https://consultations.health.gov.au/genomics/665ab3b5/">Click here to begin the survey</a></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {% page_help_embedded title="Classification Record Counts" %}
             <p>
             See the grand total of classifications provided by your lab, the progress of ClinVar submissions, and a comparison between your lab's classifications and ClinVar's.
