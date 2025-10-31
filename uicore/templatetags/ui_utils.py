@@ -233,6 +233,9 @@ class LabelledValueTag(template.Node):
         elif hint == "chunky":
             label_css = "col-12"
             value_css = "col-12 text-break"
+        elif hint == "top":
+            label_css = "col-12 col-md-3 text-md-right align-self-start pt-2"
+            value_css = "col-12 col-md-9 text-left text-break"
         elif hint == "inline":
             label_css = "m-2 align-self-center"
             value_css = "m-2"

@@ -1,0 +1,216 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load js_tags %}
+{% load lab_tags %}
+{% load static %}
+{% load ui_tabs_builder %}
+{% load classification_tags %}
+{% block title %}Classification Record Export{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block content %}
+    <style>
+        .checkbox-text {
+            display: inline-block;
+            position: relative;
+            top: 3px;
+            left: 4px;
+        }
+    </style>
+    {% comment %}
+    <a href="{% url 'classification_grouping_export' %}">Click here to download</a>
+    {% endcomment %}
+
+    <div class="container">
+        {% page_help_embedded title="Classification Group Export" %}
+
+            Export the latest classification record for each lab / allele / context combination. e.g.<br/>
+            <ul>
+                <li>Lab A, Allele 2334, Germline</li>
+                <li>Lab A, Allele 2334, Somatic Solid Tumor</li>
+                <li>Lab A, Allele 2334, Haematology</li>
+                <li>Lab B, Allele 2334, Germline</li>
+                <li>Lab A, Allele 5669, Germline etc</li>
+            </ul>
+
+        {% end_page_help_embedded %}
+
+        {% labelled label="Lab Selection" hint="top" %}
+            {% ui_register_tabs tab_set="lab-selection" %}
+            {% ui_register_tab_embedded tab_set="lab-selection" label="Exclude My Labs" %}
+                <span class="text-secondary">Use this option to exclude your own labs contributions from the download.<br/>
+                    This should help avoid double counting your records if you import this data into your system.<br/></span>
+                <label class="mt-2">Include</label><br/>
+                <div class="ml-4">
+                    {% for org in all_orgs %}
+                        {% for lab in org.sharing_labs %}
+                            <input class="form-check-input" type="checkbox" {% if lab not in user_labs %}checked{% endif %} disabled />{{ lab }}<br/>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+            {% end_ui_register_tab_embedded %}
+            {% ui_register_tab_embedded tab_set="lab-selection" label="Include Only My Labs" %}
+                <span class="text-secondary">Use this option to review the data you've submitted or to share with 3rd parties.<br/></span>
+                <label class="mt-2">Include</label><br/>
+                <div class="ml-4">
+                    {% for org in all_orgs %}
+                        {% for lab in org.sharing_labs %}
+                            <input class="form-check-input" type="checkbox" {% if lab in user_labs %}checked{% endif %} disabled />{{ lab }}<br/>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+            {% end_ui_register_tab_embedded %}
+            {% ui_register_tab_embedded tab_set="lab-selection" label="Include All Labs" %}
+                <span class="text-secondary">This will export data from all labs within the system including your own.<br/></span>
+                <label class="mt-2">Include</label>
+                <div class="ml-4">
+                    {% for org in all_orgs %}
+                        {% for lab in org.sharing_labs %}
+                            <input class="form-check-input" type="checkbox" checked disabled />{{ lab }}<br/>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+            {% end_ui_register_tab_embedded %}
+            {% ui_register_tab_embedded tab_set="lab-selection" label="Custom" %}
+                <span class="text-secondary">Deselect the labs you don't want included.<br/></span>
+                <label class="mt-2">Include</label>
+                <div class="ml-4">
+                    {% for org in all_orgs %}
+                        {% for lab in org.sharing_labs %}
+                            <label class="form-check-label">
+                            <input class="form-check-input custom-lab-selection" type="checkbox" checked id="{{ lab.group_name }}"/>{{ lab }}
+                            </label>
+                            <br/>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+            {% end_ui_register_tab_embedded %}
+            {% ui_render_tabs tab_set="lab-selection" mode="pills" %}
+            <hr/>
+        {% endlabelled %}
+
+        {% labelled label="Genome Build" %}
+            {% for genome_build in genome_builds %}
+                {% if genome_build.enabled %}
+                    <div class="form-check">
+                        <label class="form-check-label">
+                            <input class="form-check-input" {% if genome_build.name == default_genome_build.name %}checked="checked"{% endif %} id="genome_build_{{ genome_build.name }}" type="radio" name="genome_build" value="{{ genome_build.name }}" />
+                            {{ genome_build.name }}
+                        </label>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        {% endlabelled %}
+
+        {% labelled label="Rows per File" %}
+            <input class="form-control" id="rows_per_file" type="number" value="" placeholder="Unlimited"/>
+            <span class="text-muted">Set this to a value to download a zip of the export broken into files, where no file exceeds that many rows.</span>
+        {% endlabelled %}
+
+        {% labelled label="Since" %}
+            <input class="form-control" id="since" type="text" value="" placeholder="YYYY-MM-DD or <number of days>"/>
+            <span class="text-muted">Only download the records that have changed since this date.</span>
+            <hr/>
+        {% endlabelled %}
+
+        {% labelled label="Format" hint="top" %}
+            {% ui_register_tabs tab_set="format" %}
+            {% ui_register_tab_embedded tab_set="format" label="CSV" %}
+                <span class="text-secondary">CSV export for exporting the data in it's most raw format</span>
+            {% end_ui_register_tab_embedded %}
+            {% ui_register_tab_embedded tab_set="format" label="VCF" %}
+                <span class="text-secondary">VCF export for use with popular systems</span><br/><br/>
+                {% labelled label="Target System" hint="chunky" %}
+                    <div class="form-check">
+                        <label class="form-check-label">
+                            <input id="vcf_target_system_emedgene" type="radio" name="vcf_target_system" value="emedgene" class="form-check-input" />
+                            Emedgene
+                        </label>
+                        <div class="text-info">For Illumina's Emedgene system. Note Risk Factor &amp; Drug Response will be given the same priority as VUS.</div>
+                    </div>
+                    <div class="form-check">
+                        <label class="form-check-label">
+                            <input id="vcf_target_system_varseq" type="radio" name="vcf_target_system" value="varseq" class="form-check-input" />
+                            VarSeq
+                        </label>
+                        <div class="text-info">For Golden Helix's VarSeq system.</div>
+                    </div>
+                    <div class="form-check">
+                        <label class="form-check-label">
+                            <input checked="checked" id="vcf_target_system_generic" type="radio" name="vcf_target_system" value="generic" class="form-check-input" />
+                            Generic
+                        </label>
+                        <div class="text-info">VCF not formatted for any specific system.</div>
+                    </div>
+                {% endlabelled %}
+            {% end_ui_register_tab_embedded %}
+            {% ui_register_tab_embedded tab_set="format" label="JSON" %}
+                <span class="text-secondary">JSON export for exporting the system's internal representation of the classifications, only recommended for advanced use cases</span>
+            {% end_ui_register_tab_embedded %}
+            {% ui_render_tabs tab_set="format" mode="pills" %}
+            <hr/>
+        {% endlabelled %}
+
+        {% labelled label="Download" %}
+            <a id="download-link" href="">Click here to download</a>
+        {% endlabelled %}
+    </div>
+
+    <script>
+        function updateLink() {
+            let params = {};
+
+            let labSelectionTab = $('#lab-selection .nav-link.active').attr('id');
+            labSelectionTab = labSelectionTab.substring(1, labSelectionTab.length - 4); // drop off leading t and trailing -lab
+            if (labSelectionTab === 'custom') {
+                let labGroupNames = [];
+                $('.custom-lab-selection:checked').each((index, value) => {
+                    labGroupNames.push($(value).attr('id'));
+                });
+                labSelectionTab = labGroupNames.join(',');
+            }
+            params.labs = labSelectionTab;
+            params.genome_build = $('input[name=genome_build]:checked').val();
+            let rowsPerFile = $('#rows_per_file').val();
+            if (rowsPerFile) {
+                params.rowsPerFile = `${rowsPerFile}`;
+            }
+            let since = $('#since').val();
+            if (since) {
+                params.since = `${since}`;
+            }
+
+            let formatTab = $('#format .nav-link.active').attr('id');
+            formatTab = formatTab.substring(1, formatTab.length - 4);
+            params.format = formatTab;
+            if (formatTab === 'vcf') {
+                params.vcfFormat = $('input[name=vcf_target_system]:checked').val();
+            }
+
+            let paramParts = [];
+            for (let [key, value] of Object.entries(params)) {
+                paramParts.push(`${key}=${encodeURIComponent(value)}`);
+            }
+            paramString = '?' + paramParts.join('&');
+
+            let downloadLink = `{{ base_url }}${ paramString }`;
+            $('#download-link').attr('href', downloadLink).text(downloadLink);
+            console.log(params);
+        }
+
+        $(document).ready(() => {
+            $('a[data-toggle="tab"]').on('shown.bs.tab', (e) => {
+                updateLink();
+            });
+            $('input').change((e) => {
+                updateLink();
+            });
+            $('input').keyup((e) => {
+                updateLink();
+            });
+            updateLink();
+        });
+    </script>
+
+{% endblock %}

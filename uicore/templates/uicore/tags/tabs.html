@@ -42,7 +42,7 @@
         </div>
     {% else %}
         <div class="{{ css }}" id="{{ id }}">
-            <ul class="nav nav-tabs mb-4" role="tablist">
+            <ul class="nav nav-{{ mode }} mb-4" role="tablist">
                 {% for tab in tab_builder.tabs %}
                     <li class="nav-item">
                         <a class="nav-link {% if tab.active %}show active{% endif %}{% if tab.tab_status %} {{ tab.tab_status }}{% endif %}"

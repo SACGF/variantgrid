@@ -13,10 +13,11 @@ from guardian.shortcuts import get_objects_for_user
 from threadlocals.threadlocals import get_current_request
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
-from classification.enums import ShareLevel, ClinicalContextStatus, AlleleOriginBucket
+from classification.enums import ShareLevel, ClinicalContextStatus, AlleleOriginBucket, ConflictSeverity
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
-    DiscordanceReport, ClinicalContext, ImportedAlleleInfo, ClinVarExport
+    DiscordanceReport, ClinicalContext, ImportedAlleleInfo, ClinVarExport, ConflictLab, Conflict, \
+    ClassificationGroupingEntry
 from flags.models import FlagsMixin, Flag, FlagComment
 from genes.models import GeneSymbolAlias, GeneSymbol
 from genes.signals.gene_symbol_search import GENE_SYMBOL_PATTERN
@@ -533,21 +534,13 @@ class ClassificationFilter:
         Ids are not necessarily part of this import
         :return: A set of classification IDs
         """
-        discordance_status: Dict[int, DiscordanceReportStatus] = {}
-        for cc in ClinicalContext.objects.filter(status=ClinicalContextStatus.DISCORDANT):
-            if dr := DiscordanceReport.latest_report(cc):
-                status: Optional[DiscordanceReportStatus]
-                if dr.is_pending_concordance:
-                    status = DiscordanceReportStatus.PENDING_CONCORDANCE
-                elif dr.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
-                    status = DiscordanceReportStatus.CONTINUED
-                else:
-                    status = DiscordanceReportStatus.ON_GOING
 
-                for c in dr.actively_discordant_classification_ids():
-                    discordance_status[c] = status
+        # TODO - distinguish between different discordance types
 
-        return discordance_status
+        discordant_conflicts = Conflict.objects.filter(severity__gte=ConflictSeverity.MAJOR).values_list('pk', flat=True)
+        classification_grouping_ids = ConflictLab.objects.filter(conflict__in=discordant_conflicts, active=True).values_list('classification_grouping', flat=True)
+        classification_ids = ClassificationGroupingEntry.objects.filter(grouping__in=classification_grouping_ids).values_list('classification_id', flat=True)
+        return {c_id: DiscordanceReportStatus.ON_GOING for c_id in classification_ids.iterator()}
 
     def is_discordant(self, cm: ClassificationModification) -> DiscordanceReportStatus:
         if settings.DISCORDANCE_ENABLED:
