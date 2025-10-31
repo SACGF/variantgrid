@@ -40,6 +40,10 @@
                     <h1>{{ site_name }}</h1>
                     <p style="font-size: 18px">Australian Genomics Variant Classification Sharing Platform</p>
                     {% comment %}Not using the standard template for messages as want to provide link to ShariantTest in certain circumstances{% endcomment %}
+                    <p><a class="modal-link" data-toggle="modal" data-target="#exampleModal">
+                      Survey Invitation: PanelApp Australia and Shariant Platforms
+                    </a></p>
+
                     {% include "uicore/messages/messages.html" %}
                     {% login_form next=next form=form %}
                     <div class="mt-3">
@@ -57,6 +61,30 @@
                     <p><a class="external-link" href="https://www.cell.com/ajhg/fulltext/S0002-9297(22)00454-2">Shariant Paper (AJHG)</a></p>
                     <p><a class="external-link" href="https://shariant-public.s3.ap-southeast-2.amazonaws.com/Tudini+et+al_ICG+Poster_2023-07-10.pdf">Shariant Poster 2023</a></p>
                     <p><a class="external-link" href='https://www.australiangenomics.org.au/project-areas/genomic-diagnostics/'>About the Genomic Diagnostics project area</a></p>
+
+                    <div class="modal" id="exampleModal" tabindex="-1">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Survey Invitation: PanelApp Australia and Shariant Platforms</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="m-4">
+                                        <p>Genomics Australia invites members of the genomics sector to participate in a survey regarding the utility and sustainability of the PanelApp Australia and Shariant platforms. The survey is open to both users and non-users of the platforms.</p>
+
+                                        <p>Your feedback will inform future planning for these resources. Many questions are optional, and you are encouraged to share the survey link with colleagues. All responses will be treated confidentially; aggregated findings may be shared with relevant stakeholders. A summary of results will be provided to participants.</p>
+
+                                        <p>The survey will be available for three weeks from 3 November to 23 November 2025.</p>
+
+                                        <p><a href="https://consultations.health.gov.au/genomics/665ab3b5/">Click here to begin the survey</a></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <label>Shariant has been designed to:</label>
                     <p>Enable the real-time sharing of clinically curated variants with structured supporting evidence between Australian clinical genetic testing laboratories.</p>
