@@ -152,7 +152,6 @@ class Experiment(PreviewModelMixin, models.Model):
         """
     name = models.TextField(primary_key=True)
     created = models.DateTimeField(auto_now_add=True)
-    objects = ExperimentManager()
 
     @classmethod
     def preview_icon(cls) -> str:
@@ -161,22 +160,6 @@ class Experiment(PreviewModelMixin, models.Model):
     @classmethod
     def preview_if_url_visible(cls) -> Optional[str]:
         return 'data'
-
-    @staticmethod
-    def clean_experiment_name(experiment_name):
-        experiment_name = experiment_name.upper()
-        experiment_name = experiment_name.replace("-", "_")
-        experiment_name = experiment_name.replace(" ", "_")
-
-        # Remove RPT off the end...
-        experiment_name = re.sub("_RPT$", "", experiment_name)
-        experiment_name = re.sub("RPT$", "", experiment_name)
-        return experiment_name
-
-    def save(self, *args, **kwargs):
-        old_name = self.name
-        self.name = Experiment.clean_experiment_name(old_name)
-        return super().save(*args, **kwargs)
 
     def can_write(self, user) -> bool:
         """ can't delete once you've linked to SequencingRun """
