@@ -92,6 +92,8 @@ def mock_send_data(
                 ]
             }
     elif request_type == ClinVarExportRequestType.RESPONSE_FILES:
+        cves = batch.clinvarexportsubmission_set.first()
+
         response_json = {
             "submissionName": "SUB673156",
             "submissionDate": "2021-03-25",
@@ -105,8 +107,8 @@ def mock_send_data(
                 {
                     "identifiers": {
                         "localID": "ALLELE_1",  # might need to force this ID somehow
-                        "clinvarLocalKey": "instx/labby/x42",
-                        "localKey": "instx/labby/x42",
+                        "clinvarLocalKey": cves.localKey,
+                        "localKey": cves.localKey,
                         "clinvarAccession": "SCV000839746"
                     },
                     "processingStatus": "Success"

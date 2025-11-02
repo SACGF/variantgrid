@@ -18,7 +18,11 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('annotation', '0125_one_off_historical_vep_too_long'),
+<<<<<<< HEAD
         ('ontology', '0024_alter_ontologyversion_unique_together_and_more'),  # For OntologyVersion.omim_import
+=======
+        ('ontology', '0024_alter_ontologyversion_unique_together_and_more')
+>>>>>>> refs/heads/master
     ]
 
     operations = [

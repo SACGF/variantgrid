@@ -56,6 +56,10 @@ def scan_resources(seqauto_run, seqauto_scripts):
 
 
 @celery.shared_task(track_started=True, queue="seqauto_single_worker")
+<<<<<<< HEAD
+def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None,
+                  run_launch_script=None, reuse_prev_scan_id=None, fake_data=None):
+=======
 def scan_run_jobs():
     seqauto_run = SeqAutoRun.objects.create()
     process_seq_auto_run(seqauto_run.pk)
@@ -64,6 +68,7 @@ def scan_run_jobs():
 @celery.shared_task(track_started=True, queue="seqauto_single_worker")
 def process_seq_auto_run(seq_auto_run_id, only_process_file_types=None, only_launch_file_types=None,
                   run_launch_script=None, reuse_prev_scan_id=None):
+>>>>>>> refs/heads/master
     if not settings.SEQAUTO_ENABLED:
         raise ValueError("settings.SEQAUTO_ENABLED=False")
 

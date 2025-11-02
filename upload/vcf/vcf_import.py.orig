@@ -363,8 +363,11 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
         vcf.save()
 
         samples_by_sequencing_sample = backend_vcf.get_samples_by_sequencing_sample()
+<<<<<<< HEAD
+=======
         if not samples_by_sequencing_sample:
             raise ValueError("Couldn't link VCF samples to sequencing samples. VCF samples must start with sample names in SampleSheet.csv")
+>>>>>>> refs/heads/master
 
         # We have unique_together on sequencing_run/variant_caller
         if backend_vcf.combo_vcf:

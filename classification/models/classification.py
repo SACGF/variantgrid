@@ -2003,7 +2003,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @property
     def last_edited_version(self) -> 'ClassificationModification':
-        return ClassificationModification.objects.filter(classification=self, is_last_edited=True).first()
+        return ClassificationModification.objects.filter(classification_id=self.pk, is_last_edited=True).first()
 
     def latest_modification_for_user(self, user: User, exclude_withdrawn: bool = True) -> 'ClassificationModification':
         return ClassificationModification.latest_for_user(user, classification=self,

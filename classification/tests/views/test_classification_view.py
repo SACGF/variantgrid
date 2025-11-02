@@ -166,6 +166,10 @@ class ClassificationTestCaseViews(TestCase):
             ],
             "patch_messages": [
                 {
+                    "code": "patched",
+                    "message": "Patched changed values for allele_origin, c_hgvs, clinical_significance, condition, esp_af, gene_symbol, genome_build, molecular_consequence, owner, refseq_transcript_id, zygosity"
+                },
+                {
                     "code": "share_failure",
                     "message": "Cannot share record with errors"
                 }
@@ -173,6 +177,8 @@ class ClassificationTestCaseViews(TestCase):
         }
 
         diffs = DeepDiff(t1=expected, t2=response)
+        if diffs:
+            print(json.dumps(response))
         self.assertFalse(diffs)
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
@@ -243,6 +249,10 @@ class ClassificationTestCaseViews(TestCase):
             ],
             "patch_messages": [
                 {
+                    "code": "patched",
+                    "message": "Patched changed values for allele_origin, c_hgvs, clinical_significance, condition, gene_symbol, genome_build, owner, refseq_transcript_id, zygosity"
+                },
+                {
                     "code": "test_mode",
                     "message": "Test mode on, no changes have been saved"
                 }
@@ -251,7 +261,7 @@ class ClassificationTestCaseViews(TestCase):
 
         diffs = DeepDiff(t1=expected, t2=response_json)
         if diffs:
-            print(json.dumps(diffs))
+            print(json.dumps(response_json, indent=4))
         self.assertFalse(diffs)
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)

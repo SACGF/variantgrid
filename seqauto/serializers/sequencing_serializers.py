@@ -10,31 +10,38 @@ from seqauto.serializers import EnrichmentKitSerializer, EnrichmentKitSummarySer
 from snpdb.models import Manufacturer, DataState
 
 
+class ManufacturerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Manufacturer
+        fields = ["name"]
+
+    def to_internal_value(self, data):
+        return Manufacturer.objects.get_or_create(name=data["name"])[0]
+
+
 class SequencerModelSerializer(serializers.ModelSerializer):
-    manufacturer = serializers.StringRelatedField()
-    data_naming_convention = serializers.SerializerMethodField()
+    manufacturer = ManufacturerSerializer()
+    data_naming_convention_display = serializers.CharField(source='get_data_naming_convention_display', read_only=True)
 
     class Meta:
         model = SequencerModel
-        fields = "__all__"
+        extra_kwargs = {'model': {'validators': []}}  # turn off UniqueValidator
+        fields = ["model", "manufacturer", "data_naming_convention", "data_naming_convention_display"]
 
     def create(self, validated_data):
-        model = validated_data.get('model')
-        manufacturer = validated_data.get('manufacturer')
-        manufacturer, _ = Manufacturer.objects.get_or_create(name=manufacturer)
-
-        # Check if the object already exists
         instance, _created = SequencerModel.objects.get_or_create(
-            model=model,
+            model=validated_data["model"],
             defaults={
-                "manufacturer": manufacturer,
-                "data_naming_convention": model.data_naming_convention,
+                "manufacturer": validated_data.get("manufacturer"),
+                "data_naming_convention": validated_data.get("data_naming_convention"),
             }
         )
-        return instance  # Return the existing or new instance
+        return instance
 
-    def get_data_naming_convention(self, obj):
-        return obj.get_data_naming_convention_display()
+    @staticmethod
+    def get_object(validated_data):
+        return SequencerModel.objects.get(model=validated_data["model"])
+
 
 
 class SequencerSerializer(serializers.ModelSerializer):
@@ -43,19 +50,12 @@ class SequencerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Sequencer
-        fields = "__all__"
-
-    def to_internal_value(self, data):
-        # When POSTing, you can use just name (PK)
-        name = data.get('name')
-        if sequencer := Sequencer.objects.filter(name=name).first():
-            data = self.to_representation(sequencer)
-        return super().to_internal_value(data)
+        fields = ["name", "sequencer_model"]
 
     def create(self, validated_data):
         name = validated_data.get('name')
-        sequencer_model = validated_data.get('sequencer_model')
-        logging.info("sequencer_model=%s", sequencer_model)
+        sequencer_model_data = validated_data.get('sequencer_model')
+        sequencer_model = SequencerModelSerializer.get_object(sequencer_model_data)
 
         instance, _created = Sequencer.objects.get_or_create(
             name=name,

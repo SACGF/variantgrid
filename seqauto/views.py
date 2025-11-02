@@ -36,7 +36,7 @@ from seqauto.qc.sequencing_run_utils import get_sequencing_run_data, get_qc_exec
     get_sequencing_run_columns, SEQUENCING_RUN_QC_COLUMNS
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from seqauto.sequencing_files.create_resource_models import assign_old_sample_sheet_data_to_current_sample_sheet
-from seqauto.tasks.scan_run_jobs import scan_run_jobs
+from seqauto.tasks.scan_run_jobs import process_seq_auto_run
 from snpdb.graphs import graphcache
 from snpdb.models import Sample, UserSettings, DataState
 
@@ -58,8 +58,10 @@ def seqauto_runs(request):
         only_process_file_types = []  # All
         only_launch_file_types = [SequencingFileType.ILLUMINA_FLOWCELL_QC]
 
-        task = scan_run_jobs.si(only_process_file_types=only_process_file_types,  # @UndefinedVariable
-                                only_launch_file_types=only_launch_file_types)
+        seqauto_run = SeqAutoRun.objects.create()
+        task = process_seq_auto_run.si(seq_auto_run_id=seqauto_run.pk,  # @UndefinedVariable
+                                       only_process_file_types=only_process_file_types,
+                                       only_launch_file_types=only_launch_file_types)
         task.apply_async()
 
         msg = 'Scanning disk for sequencing data...'
