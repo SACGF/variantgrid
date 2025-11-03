@@ -208,6 +208,7 @@
 
                 {% block classification_form_extra_content %}
                 {% endblock %}
+                <hr/>
 
                 {% labelled label="Sample" %}
                     <div class='value'>
@@ -223,7 +224,7 @@
                     </div>
                 {% endlabelled %}
 
-                {% labelled label="For lab" %}
+                {% labelled label="For Lab" %}
                     {% if lab_form %}
                         {{ lab_form.lab }}
                         {{ lab_form.media }}
@@ -238,7 +239,7 @@
                 {% endif %}
 
                 <hr/>
-                {% labelled label="Copy values from" %}
+                {% labelled label="Copy Values From" %}
                     {% if consensuses %}
                         <div class="my-2">
                             <label class="form-check-label">
