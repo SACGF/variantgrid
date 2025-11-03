@@ -42,7 +42,8 @@ class SkipAllPhenotypeMatchException(Exception):
 class PhenotypeMatcher:
     # Words which have no use matching on their own
     COMMON_WORDS = {
-        'acute', 'across', 'adult', 'all', 'and', 'andrew', 'areas', 'associated', 'auditory',
+        # acc = account, AGU = Adult Genetics Unit
+        'acc', 'acute', 'across', 'adult', 'agu', 'all', 'and', 'andrew', 'areas', 'associated', 'auditory',
         'bad', 'bilateral', 'birth', 'blood', 'borderline', 'brain', 'brainstem',
         'can', 'carries', 'cause', 'cells', 'central', 'change', 'charge', 'child', 'chronic', 'close', 'comma',
         'commas', 'common', 'complete', 'coned', 'cord', 'cousin', 'cousins',
