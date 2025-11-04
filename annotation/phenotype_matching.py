@@ -335,7 +335,7 @@ def create_phenotype_description(text, phenotype_matcher=None):
 
 def bulk_patient_phenotype_matching(patients=None):
     if patients is None:
-        patients = Patient.objects.filter(phenotype__isnull=False)
+        patients = Patient.objects.filter(phenotype__isnull=False).exclude(phenotype='')
 
     start = time.time()
     phenotype_matcher = PhenotypeMatcher()
