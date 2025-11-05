@@ -66,6 +66,7 @@ psycopg2
 pypdf
 pysam
 python_dateutil
+pyyaml
 # Have trouble with Celery workers shutting down with newer versions of Redis
 redis==3.5.3
 reportlab

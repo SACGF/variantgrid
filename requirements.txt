@@ -71,6 +71,7 @@ psycopg2==2.9.9
 pypdf==4.0.2
 pysam==0.22.1
 python_dateutil==2.8.2
+pyyaml==6.0.2
 redis==3.5.3
 reportlab==3.6.13
 requests==2.32.0
