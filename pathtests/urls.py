@@ -1,5 +1,3 @@
-from rest_framework.urlpatterns import format_suffix_patterns
-
 from library.django_utils.jqgrid_view import JQGridView
 from pathtests import views, views_autocomplete, views_rest
 from pathtests.grids import PathologyTestOrdersGrid, CasesGrid, PathologyTestsGrid
@@ -33,10 +31,6 @@ urlpatterns = [
     # Autocompletes
     path('autocomplete/PathologyTest/v2', views_autocomplete.PathologyTestAutocompleteView.as_view(), name='pathology_test_autocomplete'),
     path('autocomplete/PathologyTestVersion', views_autocomplete.PathologyTestVersionAutocompleteView.as_view(), name='pathology_test_version_autocomplete'),
-]
-
-rest_urlpatterns = [
     path('api/view_pathology_test_version/<int:pk>', views_rest.PathologyTestVersionView.as_view(), name='api_view_pathology_test_version'),
     path('api/view_latest_pathology_test_version/<name>', views_rest.PathologyTestLatestVersionView.as_view(), name='api_view_latest_pathology_test_version'),
 ]
-urlpatterns += format_suffix_patterns(rest_urlpatterns)

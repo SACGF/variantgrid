@@ -46,6 +46,7 @@ git+https://github.com/dridk/PyVCF3#egg=pyvcf3
 gunicorn
 HTSeq
 ijson
+inflection
 ipython
 kombu
 levenshtein

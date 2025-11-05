@@ -1,5 +1,4 @@
 from rest_framework import routers
-from rest_framework.urlpatterns import format_suffix_patterns
 
 from classification.views import clinvar_export_view, search_view_metrics
 from classification.views import views, classification_dashboard_view, \
@@ -183,9 +182,7 @@ urlpatterns = [
     path('lab_gene_classification_counts', views.lab_gene_classification_counts, name='lab_gene_classification_counts'),
     path('clinical_significance_change_data', views.clin_sig_change_data, name='clinical_significance_change_data'),
     path('autocomplete/EvidenceKey/', views_autocomplete.EvidenceKeyAutocompleteView.as_view(), name='evidence_key_autocomplete'),
-]
 
-rest_urlpatterns = [
     path('api/imported_allele_info/datatables/', DatabaseTableView.as_view(column_class=ImportedAlleleInfoColumns), name='imported_allele_info_datatables'),
 
     path('api/classifications/auto_populate', AutopopulateView.as_view(), name='classification_auto_populate_api'),
@@ -214,5 +211,3 @@ rest_urlpatterns = [
 
     path('api/condition_text_matching/<int:pk>', ConditionTextMatchingAPI.as_view(), name='condition_text_matching_api')
 ]
-
-urlpatterns += format_suffix_patterns(rest_urlpatterns)

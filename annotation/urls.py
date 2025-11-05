@@ -1,5 +1,3 @@
-from rest_framework.urlpatterns import format_suffix_patterns
-
 from annotation import views, views_rest
 from annotation.grids import VariantAnnotationVersionGrid, AnnotationRunColumns, \
     VariantAnnotationVersionColumns
@@ -34,13 +32,9 @@ urlpatterns = [
     path('citation/<str:citation_id>', views.view_citation, name='view_citation'),
     path('citation/<str:citation_id>/detail', views.view_citation_detail, name='view_citation_detail'),
 
-    path('clinvar/<int:clinvar_variation_id>/detail/<int:min_stars>', views.view_clinvar_records_detail, name='view_clinvar_records_detail')
-]
+    path('clinvar/<int:clinvar_variation_id>/detail/<int:min_stars>', views.view_clinvar_records_detail, name='view_clinvar_records_detail'),
 
-rest_urlpatterns = [
     path('api/manual_variant_entry_collection/<int:pk>', views_rest.ManualVariantEntryCollectionView.as_view(),
          name='api_manual_variant_entry_collection'),
     path('api/variant_annotation/<genome_build_name>/<variant_string>', views_rest.VariantAnnotationView.as_view(), name='api_variant_annotation')
 ]
-
-urlpatterns += format_suffix_patterns(rest_urlpatterns)

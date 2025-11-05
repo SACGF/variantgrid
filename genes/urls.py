@@ -1,5 +1,3 @@
-from rest_framework.urlpatterns import format_suffix_patterns
-
 from genes.grids import GeneListGenesColumns, GenesGrid, QCGeneCoverageGrid, \
     UncoveredGenesGrid, GeneSymbolVariantsGrid, GeneSymbolWikiColumns, \
     GeneListColumns, CanonicalTranscriptCollectionColumns, CanonicalTranscriptColumns
@@ -91,9 +89,7 @@ urlpatterns = [
          name='gene_annotation_release_autocomplete'),
     path('autocomplete/GeneList/category/', views_autocomplete.CategoryGeneListAutocompleteView.as_view(), name='category_gene_list_autocomplete'),
     path('autocomplete/GeneList/', views_autocomplete.GeneListAutocompleteView.as_view(), name='gene_list_autocomplete'),
-]
 
-rest_urlpatterns = [
     path('api/gene_list/modify/<int:pk>', views_rest.ModifyGeneListView.as_view(), name='api_modify_gene_list'),
     path('api/gene_list/create', views_rest.CreateGeneListView.as_view(), name='api_create_gene_list'),
     path('api/gene_list/<pk>', views_rest.GeneListView.as_view(), name='api_view_gene_list'),
@@ -108,4 +104,3 @@ rest_urlpatterns = [
     path('api/sample_gene_list/<int:pk>', views_rest.SampleGeneListView.as_view(), name='api_sample_gene_list'),
 
 ]
-urlpatterns += format_suffix_patterns(rest_urlpatterns)

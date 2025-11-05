@@ -556,6 +556,8 @@ FINISH_IMPORT_VCF_STEP_TASKS_CLASSES = []
 CACHE_GENERATED_FILES = True
 
 REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.openapi.AutoSchema',
+
     # NOTE: Middleware is run first - so GlobalLoginRequiredMiddleware will reject tokens w/o logins
     # before DRF even sees it. You need to add your APIs to PUBLIC_PATHS
     'DEFAULT_AUTHENTICATION_CLASSES': [
