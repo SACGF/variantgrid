@@ -28,6 +28,9 @@
     .filter-row>div {
         z-index: 1000;
     }
+    #div_id_omim, #div_id_hpo, #div_id_mondo {
+        margin: 0px;
+    }
 </style>
 <script>
     function filterGrid() {
@@ -93,20 +96,17 @@
     {% settings_value 'CLASSIFICATION_GRID_SHOW_USERNAME' as CLASSIFICATION_GRID_SHOW_USERNAME %}
     <div id="classifications-page">
         <div class="container">
-            {% page_help_embedded title="Classification Record Listing" %}
-                <p>
-                This is the grouped view, where records for the same Lab, Allele Origin and Allele will be grouped into 1 record. This is useful so that labs which provide multiple classifications
-                for the same allele aren't over represented compared to labs that alter a single classification.
-                </p>
-                <p>
-                Click on the last curated date to go to the most up to date record for the group.<br/>
-                Click on the HGVS value to go to the allele.<br/>
-                Click anywhere else on the row to see the gene symbol, zygosities and individual classifications.
-                </p>
-            {% end_page_help_embedded %}
+        {% page_help_embedded title='Note on re-analysis of repoted data' %}
+            <p>
+                Please be aware that re-analysis of existing sequencing data may reveal previously unreported
+                pathogenic or likely pathogenic variants. Such findings may obligate you to perform a review, issue
+                an amended report, and notify the referring clinician in accordance with laboratory policy and
+                regulatory requirements. It is recommended that you perform these queries with limits on the
+                number of results returned.
+            </p>
+        {% end_page_help_embedded %}
         </div>
         <div class="container">
-            <a class="hover-link font-italic" href="?legacy=true" title="Each uploaded record (including those unmatched to an allele) will have its own row">Switch to single record mode</a>
             <div class="row filter-row">
                 <div class="col-md-4 col-lg-2">
                     <br/>
@@ -129,6 +129,9 @@
                     Allele Origin<br/>
                     {% allele_origin_toggle show_label=False %}
                 </div>
+            </div>
+            <div>
+                {% crispy phenotype_form %}
             </div>
 
             <table id="vc-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table" data-adjust-columns="false"></table>

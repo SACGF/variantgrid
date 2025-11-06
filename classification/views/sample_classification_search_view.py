@@ -5,6 +5,7 @@ from django.shortcuts import render
 
 from classification.forms import ClassificationAlleleOriginForm
 from genes.forms import GeneSymbolForm
+from ontology.forms import PhenotypeMultipleSelectForm
 from snpdb.forms import UserSelectForm, LabSelectForm, LabMultiSelectForm
 from snpdb.models import Lab
 from snpdb.user_settings_manager import UserSettingsManager
@@ -28,7 +29,7 @@ def sample_classification_search(request: HttpRequest) -> HttpResponse:
         "lab_form": lab_form,
         "allele_origin_form": ClassificationAlleleOriginForm(),
         "labs": Lab.valid_labs_qs(request.user),
-        "genome_build": user_settings.default_genome_build,
+        "phenotype_form": PhenotypeMultipleSelectForm(),
         "user_settings": user_settings,
     }
     return render(request, 'classification/sample_classification_search.html', context)

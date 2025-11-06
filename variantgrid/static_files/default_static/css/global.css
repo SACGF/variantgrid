@@ -1723,18 +1723,29 @@ nav ol.breadcrumb .breadcrumb-item a:hover,
   padding: 0 4px 0 4px;
 }
 
+label[for="id_hpo"],
+#div_id_hpo,
 .hp,
 .hpo {
   background-color: #FF8C00;
   border-color: #FF8C00;
 }
 
+label[for="id_omim"],
+#div_id_omim,
 .omim {
   background-color: #22529e;
   border-color: #22529e;
   color: #ddd;
 }
 
+/* Keep text in select 2 readable */
+span.select2 .omim {
+  color: #444 !important;
+}
+
+label[for="id_mondo"],
+#div_id_mondo,
 .mondo {
   background-color: #cce34c;
   border-color: #cce34c;
