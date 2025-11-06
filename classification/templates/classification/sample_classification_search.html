@@ -38,7 +38,13 @@
 
 </style>
 <script>
-    function filterGrid() {
+    function filterSampleGrid() {
+        $('#sample-datatable').DataTable().ajax.reload();
+    }
+
+
+    function filterClassificationGrid() {
+        console.log("filterClassificationGrid");
         $('#vc-datatable').DataTable().ajax.reload();
     }
 
@@ -50,7 +56,7 @@
     }
 
     function alleleOriginToggle() {
-        filterGrid();
+        filterClassificationGrid();
     }
 
     function filterDefaultLab() {
@@ -72,13 +78,34 @@
         return labVal;
     }
 
+    function getOntologySelects(prefix) {
+        let ontologyFields = []
+        for (const ontology of ["omim", "hpo", "mondo"]) {
+            ontologyFields.push(`#id_${prefix}-${ontology}`);
+        }
+        return ontologyFields;
+    }
+
+    function getOntologyTerms(prefix) {
+        let ontologySelects = getOntologySelects(prefix);
+        let terms = [];
+        for (const inputId of ontologySelects) {
+          let new_terms = $(inputId).val();
+          if (new_terms.length) {
+              terms = terms.concat(new_terms);
+          }
+        }
+        return terms;
+    }
+
     function classificationGroupingFilter(data, type) {
-        data.gene_symbol = blankToNull($('#id_gene_symbol').val());
+        data.gene_symbol = blankToNull($('#id_classification-gene_symbol').val());
         data.lab = blankToNull(getLabValue());
         let allele_origin_filter_value = blankToNull($("input[name='allele-origin-toggle']:checked").val());
         data.allele_origin = blankToNull($("input[name='allele-origin-toggle']:checked").val());
         data.id_filter = blankToNull($('#id_filter').val());
         data.user = blankToNull($('#id_user').val());
+        data.ontology_term_id = blankToNull(getOntologyTerms("classification").join(","));
         let column = $('#vc-datatable').DataTable().column(3);
         let germline_only = allele_origin_filter_value == "G";
         column.visible(!germline_only);
@@ -86,18 +113,24 @@
 
     function sampleFilter(data, type) {
         console.log("sampleFilter");
+        data.gene_symbol = blankToNull($('#id_sample-gene_symbol').val());
+        data.ontology_term_id = blankToNull(getOntologyTerms("sample"));
+
+
     }
 
 
     $(document).ready(() => {
-        $('#id_gene_symbol, #id_lab, #id_user, #id_allele_origin').on("change", function() {
-            filterGrid();
+        let sampleSelects = ["#id_sample-gene_symbol"];
+        sampleSelects = sampleSelects.concat(getOntologySelects("sample"))
+        $(sampleSelects.join(',')).on("change", function() {
+            filterSampleGrid();
         });
 
-        debouncedFilterGrid = debounce(filterGrid);
-
-        $('#id_filter').keyup(function() {
-            debouncedFilterGrid();
+        let classificationSelects = ["#id_classification-gene_symbol", "#id_lab", "#id_user", "#id_allele_origin"];
+        classificationSelects = classificationSelects.concat(getOntologySelects("classification"))
+        $(classificationSelects.join(',')).on("change", function() {
+            filterClassificationGrid();
         });
 
         $("button#search-samples").click(function() {
@@ -156,7 +189,7 @@
                     {% crispy sample_phenotype_form %}
                 </div>
             </div>
-            <table id="vc-datatable" data-datatable-data='sampleFilter' data-datatable-url="{% url 'samples_datatable' %}" class="sticky-header samples-table" data-adjust-columns="false"></table>
+            <table id="sample-datatable" data-datatable-data='sampleFilter' data-datatable-url="{% url 'samples_datatable' %}" class="sticky-header samples-table" data-adjust-columns="false"></table>
         </div>
 
         <div class="container">

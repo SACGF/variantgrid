@@ -157,9 +157,13 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         if allele_id := self.get_query_param('allele_id'):
             filters.append(Q(allele_origin_grouping__allele_grouping__allele_id=int(allele_id)))
 
-        if condition := self.get_query_param('ontology_term_id'):
-            if c_filter := self.condition_filter(condition):
-                filters.append(c_filter)
+        if ontology_terms := self.get_query_param('ontology_term_id'):
+            condition_filters = []
+            for condition in ontology_terms.split(","):
+                if c_filter := self.condition_filter(condition):
+                    condition_filters.append(c_filter)
+            if condition_filters:
+                filters.append(reduce(operator.or_, condition_filters))
 
         if page == "gene_symbol":
             if gene_symbol_str := self.get_query_param("gene_symbol"):
@@ -212,7 +216,6 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         if settings.CLASSIFICATION_GRID_SHOW_USERNAME:
             if user_id := self.get_query_param('user'):
                 filters.append(self.classification_filter_to_grouping(Q(user__pk=user_id)))
-
         return qs.filter(*filters)
 
     @cached_property
