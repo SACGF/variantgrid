@@ -676,3 +676,24 @@ class ManualVariantEntryCollectionColumns(DatatableConfig[ManualVariantEntryColl
         if not self.user.is_staff:
             qs = qs.filter(user=self.user)
         return qs
+
+
+class SampleColumns(DatatableConfig[Sample]):
+    """ This is currently only used on """
+    def __init__(self, request):
+        super().__init__(request)
+        self.user = request.user
+
+        self.rich_columns = [
+            RichColumn(key="id",
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="name", label="Name", orderable=True),
+            RichColumn(key="vcf__name", label="VCF", orderable=True),
+            RichColumn(key="vcf__date", client_renderer='TableFormat.timestamp', orderable=True),
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[Sample]:
+        return Sample.filter_for_user(self.user)
+
+

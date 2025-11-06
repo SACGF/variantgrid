@@ -22,3 +22,8 @@ class ClassificationAlleleOriginForm(forms.Form):
         ("other", "Origin Other"),
     )
     allele_origin = forms.ChoiceField(choices=ALLELE_ORIGIN_CHOICES, required=False)
+
+
+class SampleClassificationForm(forms.Form):
+    max_samples = forms.IntegerField(required=False, initial=1, min_value=1)
+    max_results = forms.IntegerField(required=False, initial=5, min_value=1)

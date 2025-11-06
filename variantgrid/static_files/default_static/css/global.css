@@ -1724,7 +1724,6 @@ nav ol.breadcrumb .breadcrumb-item a:hover,
 }
 
 label[for="id_hpo"],
-#div_id_hpo,
 .hp,
 .hpo {
   background-color: #FF8C00;
@@ -1732,7 +1731,6 @@ label[for="id_hpo"],
 }
 
 label[for="id_omim"],
-#div_id_omim,
 .omim {
   background-color: #22529e;
   border-color: #22529e;
@@ -1745,7 +1743,6 @@ span.select2 .omim {
 }
 
 label[for="id_mondo"],
-#div_id_mondo,
 .mondo {
   background-color: #cce34c;
   border-color: #cce34c;

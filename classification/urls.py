@@ -30,7 +30,8 @@ from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.exports.classification_export_formatter_redcap import redcap_data_dictionary
 from classification.views.imported_allele_info_view import view_imported_allele_info, ImportedAlleleInfoColumns, \
     view_imported_allele_info_detail, download_allele_info
-from classification.views.sample_classification_search_view import sample_classification_search
+from classification.views.sample_classification_search_view import sample_classification_search, \
+    sample_classification_search_results
 from classification.views.views import classification_import_tool, AutopopulateView
 from classification.views.views_hgvs_resolution_tool import hgvs_resolution_tool
 from classification.views.views_uploaded_classifications_unmapped import UploadedClassificationsUnmappedView, \
@@ -123,6 +124,8 @@ urlpatterns = [
     path('evidence_keys/<max_share_level>', views.evidence_keys, name='evidence_keys_max_share_level'),
     path('evidence_keys', views.evidence_keys, name='evidence_keys'),
 
+    path('sample_classification_search/results', sample_classification_search_results,
+         name='sample_classification_search_results'),
     path('sample_classification_search', sample_classification_search, name='sample_classification_search'),
 
     path('summary_email', summary_email_preview_html, name='summary_email_html'),

@@ -31,6 +31,11 @@
     #div_id_omim, #div_id_hpo, #div_id_mondo {
         margin: 0px;
     }
+
+    div#sample-classification-search-results {
+        text-align: center;
+    }
+
 </style>
 <script>
     function filterGrid() {
@@ -79,6 +84,11 @@
         column.visible(!germline_only);
     }
 
+    function sampleFilter(data, type) {
+        console.log("sampleFilter");
+    }
+
+
     $(document).ready(() => {
         $('#id_gene_symbol, #id_lab, #id_user, #id_allele_origin').on("change", function() {
             filterGrid();
@@ -89,13 +99,39 @@
         $('#id_filter').keyup(function() {
             debouncedFilterGrid();
         });
+
+        $("button#search-samples").click(function() {
+            console.log("search");
+
+             const params = new URLSearchParams()
+
+
+            let resultsDiv = $("div#sample-classification-search-results");
+            let spinner = $('<i class="fa fa-spinner"></i>');
+            resultsDiv.empty().append(spinner);
+
+            console.log("search done");
+            let scForm = $("#sample_classification_form");
+            const maxResults = $("input#id_max_results", scForm).val()
+            params.append('max_results', maxResults);
+            const url = `{% url 'sample_classification_search_results' %}?${params.toString()}`;
+            fetch(url).then(r => r.text()).then(html => {
+                resultsDiv.html(html);
+            })
+            .catch(e => {
+                resultsDiv.html(`<div class="alert alert-danger">Failed to load results: ${err.message}</div>`);
+            });
+        });
+
     });
 </script>
 {% endblock %}
 {% block content %}
+<div class="container">
     {% settings_value 'CLASSIFICATION_GRID_SHOW_USERNAME' as CLASSIFICATION_GRID_SHOW_USERNAME %}
-    <div id="classifications-page">
-        <div class="container">
+    <div id="sample-classification-search-page">
+        <h2>Sample Classification Search</h2>
+
         {% page_help_embedded title='Note on re-analysis of repoted data' %}
             <p>
                 Please be aware that re-analysis of existing sequencing data may reveal previously unreported
@@ -106,7 +142,25 @@
             </p>
         {% end_page_help_embedded %}
         </div>
+
         <div class="container">
+            <h3>Samples</h3>
+            <div class="row filter-row">
+                {% if num_sample_gene_lists %}
+                <div class="col-3">
+                    {{  num_sample_gene_lists }} of {{ num_visible_samples }} samples you can see have Sample Gene Lists
+                    {% crispy sample_gene_form form_helper.horizontal %}
+                </div>
+                {% endif %}
+                <div class="col-6">
+                    {% crispy sample_phenotype_form %}
+                </div>
+            </div>
+            <table id="vc-datatable" data-datatable-data='sampleFilter' data-datatable-url="{% url 'samples_datatable' %}" class="sticky-header samples-table" data-adjust-columns="false"></table>
+        </div>
+
+        <div class="container">
+            <h3>Classifications</h3>
             <div class="row filter-row">
                 <div class="col-md-4 col-lg-2">
                     <br/>
@@ -131,11 +185,18 @@
                 </div>
             </div>
             <div>
-                {% crispy phenotype_form %}
+                {% crispy classification_phenotype_form %}
             </div>
 
             <table id="vc-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table" data-adjust-columns="false"></table>
 
         </div>
-    </div>
+        <div class="container" id="sample_classification_form">
+            {% crispy sample_classification_form form_helper.horizontal %}
+            <button class="btn btn-primary" id='search-samples'><i class="fas fa-search"></i> Search Samples for Classifications</button>
+        </div>
+
+        <div id="sample-classification-search-results"></div>
+
+</div>
 {% endblock %}

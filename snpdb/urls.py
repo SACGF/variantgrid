@@ -11,7 +11,7 @@ from library.preview_request import preview_view
 from snpdb.grids import CohortListGrid, CohortSampleListGrid, SamplesListGrid, GenomicIntervalsListGrid, \
     CustomColumnsCollectionColumns, TriosListGrid, VCFListGrid, TagColorsCollectionColumns, \
     LiftoverRunColumns, LiftoverRunAlleleLiftoverColumns, AlleleLiftoverFailureColumns, \
-    ManualVariantEntryCollectionColumns
+    ManualVariantEntryCollectionColumns, SampleColumns
 from snpdb.views import views, views_json, views_rest, views_autocomplete
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
@@ -136,6 +136,9 @@ urlpatterns = [
     path('settings/custom_columns/collection/datatable',
          DatabaseTableView.as_view(column_class=CustomColumnsCollectionColumns),
          name='custom_columns_collections_datatable'),
+    path('samples/datatable',
+         DatabaseTableView.as_view(column_class=SampleColumns),
+         name='samples_datatable'),
     path('trio/grid/<slug:op>/', JQGridView.as_view(grid=TriosListGrid, delete_row=True), name='trio_grid'),
     path('vcfs/grid/<slug:op>/', JQGridView.as_view(grid=VCFListGrid, delete_row=True), name='vcfs_grid'),
 

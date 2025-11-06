@@ -1,17 +1,20 @@
+from crispy_forms.layout import Layout, Field
+
 from django.conf import settings
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse
 from django.shortcuts import render
 
-from classification.forms import ClassificationAlleleOriginForm
+from classification.forms import ClassificationAlleleOriginForm, SampleClassificationForm
 from genes.forms import GeneSymbolForm
+from genes.models import SampleGeneList
 from ontology.forms import PhenotypeMultipleSelectForm
 from snpdb.forms import UserSelectForm, LabSelectForm, LabMultiSelectForm
-from snpdb.models import Lab
+from snpdb.models import Lab, Sample
 from snpdb.user_settings_manager import UserSettingsManager
 
 
-def sample_classification_search(request: HttpRequest) -> HttpResponse:
+def sample_classification_search(request) -> HttpResponse:
     # A lot of this code is copy/pasted from classifications - classification listing page
     # TODO: We should go and refactor this into a tag later
 
@@ -23,14 +26,43 @@ def sample_classification_search(request: HttpRequest) -> HttpResponse:
     else:
         lab_form = LabSelectForm()
 
+    sample_gene_form = GeneSymbolForm(prefix="sample")
+    sample_gene_form.fields['gene_symbol'].label = "Sample Gene List Gene Symbol"
+
+    layout_fields = []
+    for field_name in ["omim", "hpo", "mondo"]:
+        layout_fields.append(Field(field_name, wrapper_class=field_name))
+    layout = Layout(*layout_fields)
+
+    sample_phenotype_form = PhenotypeMultipleSelectForm(prefix="sample")
+    sample_phenotype_form.helper.layout = layout
+
+    classification_phenotype_form = PhenotypeMultipleSelectForm(prefix="classification")
+    classification_phenotype_form.helper.layout = layout
+
     context = {
-        "gene_form": GeneSymbolForm(),
+        "sample_phenotype_form": sample_phenotype_form,
+        "gene_form": GeneSymbolForm(prefix="classification"),
         "user_form": UserSelectForm(),
         "lab_form": lab_form,
         "allele_origin_form": ClassificationAlleleOriginForm(),
         "labs": Lab.valid_labs_qs(request.user),
-        "phenotype_form": PhenotypeMultipleSelectForm(),
+        "classification_phenotype_form": classification_phenotype_form,
+        "sample_classification_form": SampleClassificationForm(),
         "user_settings": user_settings,
     }
+
+    samples_qs = Sample.filter_for_user(request.user)
+    context["num_visible_samples"] = samples_qs.count()
+    num_sample_gene_lists = SampleGeneList.objects.filter(sample__in=samples_qs).count()
+    context["num_sample_gene_lists"] = num_sample_gene_lists
+    if num_sample_gene_lists:
+        context["sample_gene_form"] = sample_gene_form
     return render(request, 'classification/sample_classification_search.html', context)
 
+
+def sample_classification_search_results(request: HttpRequest) -> HttpResponse:
+    context = {
+
+    }
+    return render(request, 'classification/sample_classification_search_results.html', context)
