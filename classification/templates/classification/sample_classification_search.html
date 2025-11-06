@@ -1,0 +1,138 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load compress %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% load settings_tags %}
+{% load classification_tags %}
+{% block title %}Sample Classification Search{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+<style>
+    #classify-container label, #gene-form-container label, #user-form-container label, #lab-form-container label {
+        display: none;
+    }
+
+    .select2-selection__rendered {
+       margin-top: -5px;
+    }
+
+    #flag-filter td {
+        text-align: center;
+        padding: 2px;
+    }
+
+    .filter-row>div {
+        z-index: 1000;
+    }
+</style>
+<script>
+    function filterGrid() {
+        $('#vc-datatable').DataTable().ajax.reload();
+    }
+
+    function checkIfAllChecked(toggle, array) {
+        let numChecked = 0;
+        array.each(function() { numChecked += $(this).is(":checked"); });
+        const allChecked = numChecked == array.length;
+        $(toggle).prop('checked', allChecked);
+    }
+
+    function alleleOriginToggle() {
+        filterGrid();
+    }
+
+    function filterDefaultLab() {
+        {% if user_settings.default_lab %}
+            setAutocompleteValue('#id_lab', '{{ user_settings.default_lab.id }}', '{{ user_settings.default_lab.organization.name }} / {{ user_settings.default_lab.name }}');
+        {% endif %}
+    }
+
+    function filterDefaultUser() {
+        setAutocompleteValue('#id_user', '{{ user.id }}', '{{ user.username }}');
+    }
+
+    function getLabValue() {
+        // Lab select can use settings to be normal autocomplete (string) or multi-select autocomplete (array)
+        let labVal = $('#id_lab').val();
+        if (Array.isArray(labVal)) {
+            labVal = labVal.join(',');
+        }
+        return labVal;
+    }
+
+    function classificationGroupingFilter(data, type) {
+        data.gene_symbol = blankToNull($('#id_gene_symbol').val());
+        data.lab = blankToNull(getLabValue());
+        let allele_origin_filter_value = blankToNull($("input[name='allele-origin-toggle']:checked").val());
+        data.allele_origin = blankToNull($("input[name='allele-origin-toggle']:checked").val());
+        data.id_filter = blankToNull($('#id_filter').val());
+        data.user = blankToNull($('#id_user').val());
+        let column = $('#vc-datatable').DataTable().column(3);
+        let germline_only = allele_origin_filter_value == "G";
+        column.visible(!germline_only);
+    }
+
+    $(document).ready(() => {
+        $('#id_gene_symbol, #id_lab, #id_user, #id_allele_origin').on("change", function() {
+            filterGrid();
+        });
+
+        debouncedFilterGrid = debounce(filterGrid);
+
+        $('#id_filter').keyup(function() {
+            debouncedFilterGrid();
+        });
+    });
+</script>
+{% endblock %}
+{% block content %}
+    {% settings_value 'CLASSIFICATION_GRID_SHOW_USERNAME' as CLASSIFICATION_GRID_SHOW_USERNAME %}
+    <div id="classifications-page">
+        <div class="container">
+            {% page_help_embedded title="Classification Record Listing" %}
+                <p>
+                This is the grouped view, where records for the same Lab, Allele Origin and Allele will be grouped into 1 record. This is useful so that labs which provide multiple classifications
+                for the same allele aren't over represented compared to labs that alter a single classification.
+                </p>
+                <p>
+                Click on the last curated date to go to the most up to date record for the group.<br/>
+                Click on the HGVS value to go to the allele.<br/>
+                Click anywhere else on the row to see the gene symbol, zygosities and individual classifications.
+                </p>
+            {% end_page_help_embedded %}
+        </div>
+        <div class="container">
+            <a class="hover-link font-italic" href="?legacy=true" title="Each uploaded record (including those unmatched to an allele) will have its own row">Switch to single record mode</a>
+            <div class="row filter-row">
+                <div class="col-md-4 col-lg-2">
+                    <br/>
+                    {% crispy gene_form form_helper.horizontal_no_labels %}
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    {% if user_settings.default_lab %}
+                    <a class="hover-link" onclick="filterDefaultLab()" title="{{ user_settings.default_lab.name }}">Filter : My Lab</a>
+                    {% else %}<span style="visibility: hidden">.</span>{% endif %}
+                    {% crispy lab_form form_helper.horizontal_no_labels %}
+                </div>
+                {% if CLASSIFICATION_GRID_SHOW_USERNAME %}
+                <div class="col-md-4 col-lg-2">
+                    <a class="hover-link" onclick="filterDefaultUser()">Filter : My Records</a>
+                    {% crispy user_form form_helper.horizontal_no_labels %}
+                </div>
+                {% endif %}
+
+                <div style="width: 160px" class="mx-3">
+                    Allele Origin<br/>
+                    {% allele_origin_toggle show_label=False %}
+                </div>
+            </div>
+
+            <table id="vc-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table" data-adjust-columns="false"></table>
+
+        </div>
+    </div>
+{% endblock %}
