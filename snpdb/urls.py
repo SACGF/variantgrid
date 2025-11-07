@@ -136,7 +136,7 @@ urlpatterns = [
     path('settings/custom_columns/collection/datatable',
          DatabaseTableView.as_view(column_class=CustomColumnsCollectionColumns),
          name='custom_columns_collections_datatable'),
-    path('samples/datatable',
+    path('samples/datatable/',
          DatabaseTableView.as_view(column_class=SampleColumns),
          name='samples_datatable'),
     path('trio/grid/<slug:op>/', JQGridView.as_view(grid=TriosListGrid, delete_row=True), name='trio_grid'),

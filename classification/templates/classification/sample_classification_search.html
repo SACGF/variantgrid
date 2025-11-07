@@ -112,11 +112,8 @@
     }
 
     function sampleFilter(data, type) {
-        console.log("sampleFilter");
         data.gene_symbol = blankToNull($('#id_sample-gene_symbol').val());
-        data.ontology_term_id = blankToNull(getOntologyTerms("sample"));
-
-
+        data.ontology_term_id = blankToNull(getOntologyTerms("sample").join(","));
     }
 
 
@@ -135,10 +132,7 @@
 
         $("button#search-samples").click(function() {
             console.log("search");
-
-             const params = new URLSearchParams()
-
-
+            const params = new URLSearchParams()
             let resultsDiv = $("div#sample-classification-search-results");
             let spinner = $('<i class="fa fa-spinner"></i>');
             resultsDiv.empty().append(spinner);

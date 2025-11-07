@@ -3,21 +3,24 @@ from functools import reduce
 from typing import Optional, Any
 
 from django.conf import settings
+from django.contrib.postgres.aggregates.general import StringAgg
 from django.db.models import F, QuerySet, Value, Func
 from django.db.models.aggregates import Count, Max
-from django.db.models.fields import CharField
+from django.db.models.fields import CharField, TextField
 from django.db.models.query_utils import Q
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 
-from annotation.models import ManualVariantEntryCollection
+from annotation.models import ManualVariantEntryCollection, PATIENT_ONTOLOGY_TERM_PATH
+from genes.models import GeneSymbol, SampleGeneList
 from library.django_utils import get_url_from_view_path
 from library.genomics.vcf_enums import INFO_LIFTOVER_SWAPPED_REF_ALT
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import calculate_age, JsonDataType
+from ontology.models import OntologyService, OntologyTerm
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
     GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig, GenomeBuild, ClinGenAllele, \
@@ -691,9 +694,43 @@ class SampleColumns(DatatableConfig[Sample]):
             RichColumn(key="name", label="Name", orderable=True),
             RichColumn(key="vcf__name", label="VCF", orderable=True),
             RichColumn(key="vcf__date", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn(key=OntologyService.OMIM, orderable=True),
+            RichColumn(key=OntologyService.HPO, orderable=True),
+            RichColumn(key=OntologyService.MONDO, orderable=True),
         ]
 
     def get_initial_queryset(self) -> QuerySet[Sample]:
-        return Sample.filter_for_user(self.user)
+        qs = Sample.filter_for_user(self.user)
+        sample_patient_ontology_path = f"patient__{PATIENT_ONTOLOGY_TERM_PATH}"
+        ontology_path = f"{sample_patient_ontology_path}__name"
+        annotation_kwargs = {}
+        for ot in [OntologyService.OMIM, OntologyService.HPO, OntologyService.MONDO]:
+            q_ot = Q(**{f"{sample_patient_ontology_path}__ontology_service": ot})
+            annotation_kwargs[ot.label] = StringAgg(ontology_path, '|',
+                                                    filter=q_ot, distinct=True,
+                                                    output_field=TextField())
+        qs = qs.annotate(**annotation_kwargs)
 
+        ontology_terms = self.get_query_param('ontology_term_id')
+        print("get_initial_queryset()")
+        return qs
 
+    def filter_queryset(self, qs: QuerySet[Sample]) -> QuerySet[Sample]:
+        filters = []
+        if ontology_terms := self.get_query_param('ontology_term_id'):
+            sample_patient_ontology_path = f"patient__{PATIENT_ONTOLOGY_TERM_PATH}"
+            ontology_filters = []
+            for term_name in ontology_terms.split(","):
+                if ot := OntologyTerm.get_or_stub(term_name):
+                    ontology_filters.append(Q(**{sample_patient_ontology_path: ot}))
+            if ontology_filters:
+                filters.append(reduce(operator.or_, ontology_filters))
+
+        if gene_symbol_str := self.get_query_param("gene_symbol"):
+            if gene_symbol := GeneSymbol.objects.filter(pk=gene_symbol_str).first():
+                sample_gene_list_qs = SampleGeneList.objects.filter(gene_list__genelistgenesymbol__gene_symbol=gene_symbol)
+                filters.append(Q(samplegenelist__in=sample_gene_list_qs))
+
+        if filters:
+            qs = qs.filter(*filters)
+        return qs
