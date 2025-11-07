@@ -9,44 +9,76 @@ import re
 from classification.models import Classification, EvidenceKeyMap
 from snpdb.models import Lab, Organization
 
-VERSION = 2
+VERSION = 4
+
+
+@dataclass(frozen=True)
+class DataField:
+    field: str
+    part: str  # value, note, explain
+
+    def __str__(self):
+        return f"{self.field}.{self.part}"
+
+    def __repr__(self):
+        return f"{self.field}.{self.part}"
+
+    def __lt__(self, other):
+        return str(self) < str(other)
+
+    @staticmethod
+    def from_str(value: str) -> list['DataField']:
+        if value == "all_notes":
+            return [DataField(e_key.key, "note") for e_key in EvidenceKeyMap.cached().all_keys]
+        elif value == "all_values":
+            return [DataField(e_key.key, "value") for e_key in EvidenceKeyMap.cached().all_keys]
+        else:
+            parts = value.split(".")
+            if EvidenceKeyMap.cached_key(parts[0]).is_dummy:
+                raise ValueError(f"Key {parts[0]} is not a valid evidence key")
+
+            if len(parts) == 2:
+                return [DataField(field=parts[0], part=parts[1])]
+            else:
+                return [DataField(field=parts[0], part="value")]
+
 
 @dataclass
 class DataFix:
-    field: str
+    field: DataField
     suspect_values: list[str]
 
     def __str__(self):
         return f"{self.field}: {', '.join(self.suspect_values)}"
 
+
 @dataclass
 class DataFixRun:
-    type: str
+    record_type: str
     fixes: list[DataFix]
 
     def __str__(self):
-        return f"{self.type} - " + ", ".join(str(df) for df in self.fixes)
+        return f"{self.record_type} - " + ", ".join(str(df) for df in self.fixes)
 
 
 class DataFixer:
 
-    def __init__(self, bad_pattern: re.Pattern, replacement: Any, keys: Optional[set[str]] = None):
+    def __init__(self, bad_pattern: re.Pattern, replacement: Any, keys: Optional[set[DataField]] = None):
         self.bad_pattern = bad_pattern
         self.replacement = replacement
         self.keys = keys
 
-    def fix_classification_data(self, type: str, data: dict) -> Optional[DataFixRun]:
+    def fix_classification_data(self, record_type: str, data: dict[str, Any]) -> Optional[DataFixRun]:
         modifications = []
-        for key, blob in data.items():
-            if self.keys and key not in self.keys:
-                continue
-            if isinstance(blob, dict):
-                if text := blob.get("value"):
-                    if isinstance(text, str):
+
+        for data_field in self.keys:
+            if blob := data.get(data_field.field):
+                if isinstance(blob, dict):
+                    if text := blob.get(data_field.part):
                         suspect_values = []
                         for match in self.bad_pattern.finditer(text):
                             start = match.start()
-                            while start > 0 and text[start-1] not in {" ", "\t", "\n", ">"}:
+                            while start > 0 and text[start - 1] not in {" ", "\t", "\n", ">"}:
                                 start -= 1
                             end = match.end()
                             while end < len(text) - 1 and text[end] not in {" ", "\t", "\n", ">"}:
@@ -55,11 +87,13 @@ class DataFixer:
                             suspect_values.append(suspect_value)
 
                         if suspect_values:
-                            modifications.append(DataFix(field=key, suspect_values=suspect_values))
-                            blob["value"] = self.replacement
+                            modifications.append(DataFix(field=data_field, suspect_values=suspect_values))
+                            blob[data_field.part] = self.replacement
 
         if modifications:
-            return DataFixRun(type=type, fixes=modifications)
+            return DataFixRun(record_type=record_type, fixes=modifications)
+        else:
+            return None
 
 
 class Command(BaseCommand):
@@ -112,10 +146,10 @@ class Command(BaseCommand):
         print("")
         keys = None
         if keys_str := options["keys"]:
-            keys = set([key.strip() for key in keys_str.split(",")])
-            for key in keys:
-                if EvidenceKeyMap.cached_key(key).is_dummy:
-                    raise ValueError(f"Key {key} is not a valid evidence key")
+            keys = set()
+            for key_str in keys_str.split(","):
+                keys |= set(DataField.from_str(key_str.strip()))
+
             print(f"Only on keys: {sorted(keys)}")
 
         bad_pattern = re.compile(pattern, flags=re.IGNORECASE if pattern_icase else 0)
