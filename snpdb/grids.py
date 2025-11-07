@@ -709,11 +709,7 @@ class SampleColumns(DatatableConfig[Sample]):
             annotation_kwargs[ot.label] = StringAgg(ontology_path, '|',
                                                     filter=q_ot, distinct=True,
                                                     output_field=TextField())
-        qs = qs.annotate(**annotation_kwargs)
-
-        ontology_terms = self.get_query_param('ontology_term_id')
-        print("get_initial_queryset()")
-        return qs
+        return qs.annotate(**annotation_kwargs)
 
     def filter_queryset(self, qs: QuerySet[Sample]) -> QuerySet[Sample]:
         filters = []

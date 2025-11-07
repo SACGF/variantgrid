@@ -62,6 +62,20 @@ def sample_classification_search(request) -> HttpResponse:
 
 
 def sample_classification_search_results(request: HttpRequest) -> HttpResponse:
+    # Sample filters
+    request.GET.get("sample_gene_symbol")
+    request.GET.get("sample_ontology_term_id")
+
+    # Classification filters
+    request.GET.get("classification_allele_origin")
+    request.GET.get("classification_gene_symbol")
+    request.GET.get("classification_id_filter")
+    request.GET.get("classification_lab")
+    request.GET.get("classification_ontology_term_id")
+    request.GET.get("classification_user")
+    # Search
+    request.GET.get("search_max_results")
+    request.GET.get("search_max_samples")
     context = {
 
     }

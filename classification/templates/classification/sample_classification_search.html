@@ -131,17 +131,43 @@
         });
 
         $("button#search-samples").click(function() {
-            console.log("search");
+            let sampleData = {};
+            sampleFilter(sampleData)
+
+            let classificationData = {};
+            classificationGroupingFilter(classificationData)
+
+            let scForm = $("#sample_classification_form");
+            let searchData = {
+                "max_samples": $("input#id_max_samples", scForm).val(),
+                "max_results": $("input#id_max_results", scForm).val()
+            }
+
+            let componentData = {
+                "search": searchData,
+                "sample": sampleData,
+                "classification": classificationData
+            }
+            // Sort for consistent GET caching
             const params = new URLSearchParams()
+            for (const [component_label, component_data] of Object.entries(componentData)) {
+              for (const [key, value] of Object.entries(component_data)) {
+                params.append(`${component_label}_${key}`, value)
+              }
+            }
+
+            const sortedParams = new URLSearchParams(
+              [...params.entries()].sort(([k1], [k2]) => k1.localeCompare(k2))
+            )
+            const query = sortedParams.toString()
+
+
+            console.log("search");
             let resultsDiv = $("div#sample-classification-search-results");
             let spinner = $('<i class="fa fa-spinner"></i>');
             resultsDiv.empty().append(spinner);
 
-            console.log("search done");
-            let scForm = $("#sample_classification_form");
-            const maxResults = $("input#id_max_results", scForm).val()
-            params.append('max_results', maxResults);
-            const url = `{% url 'sample_classification_search_results' %}?${params.toString()}`;
+            const url = `{% url 'sample_classification_search_results' %}?${query.toString()}`;
             fetch(url).then(r => r.text()).then(html => {
                 resultsDiv.html(html);
             })
