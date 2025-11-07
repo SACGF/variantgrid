@@ -6,11 +6,13 @@ from django.http.response import HttpResponse
 from django.shortcuts import render
 
 from classification.forms import ClassificationAlleleOriginForm, SampleClassificationForm
+from classification.views.classification_grouping_datatables import ClassificationGroupingColumns
 from genes.forms import GeneSymbolForm
 from genes.models import SampleGeneList
 from ontology.forms import PhenotypeMultipleSelectForm
 from snpdb.forms import UserSelectForm, LabSelectForm, LabMultiSelectForm
 from snpdb.models import Lab, Sample
+from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
 from snpdb.user_settings_manager import UserSettingsManager
 
 
@@ -63,15 +65,34 @@ def sample_classification_search(request) -> HttpResponse:
 
 def sample_classification_search_results(request: HttpRequest) -> HttpResponse:
     # Sample filters
-    request.GET.get("sample_gene_symbol")
-    request.GET.get("sample_ontology_term_id")
+
+    sample_filters = []
+    if ontology_terms := request.GET.get("sample_ontology_term_id"):
+        if q := get_sample_ontology_q(ontology_terms):
+            sample_filters.append(q)
+
+    if gene_symbol_str := request.GET.get("sample_gene_symbol"):
+        if q := get_sample_qc_gene_list_gene_symbol_q(gene_symbol_str):
+            sample_filters.append(q)
+
+    sample_qs = Sample.filter_for_user(request.user)
+    if sample_filters:
+        sample_qs = sample_qs.filter(*sample_filters)
 
     # Classification filters
+    classification_filters = []
     request.GET.get("classification_allele_origin")
-    request.GET.get("classification_gene_symbol")
-    request.GET.get("classification_id_filter")
+    if classification_gene_symbol := request.GET.get("classification_gene_symbol")
+        if q := ClassificationGroupingColumns.gene_symbol_filter(classification_gene_symbol):
+            classification_filters.append(q)
+
+    # request.GET.get("classification_id_filter")
     request.GET.get("classification_lab")
-    request.GET.get("classification_ontology_term_id")
+
+    if classification_ontology_term_id := request.GET.get("classification_ontology_term_id"):
+        if q := ClassificationGroupingColumns.get_ontology_q(classification_ontology_term_id):
+            classification_filters.append(q)
+
     request.GET.get("classification_user")
     # Search
     request.GET.get("search_max_results")

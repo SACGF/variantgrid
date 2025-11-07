@@ -26,6 +26,7 @@ from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
     GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig, GenomeBuild, ClinGenAllele, \
     VariantZygosityCountCollection, TagColorsCollection, LiftoverRun, AlleleConversionTool, AlleleLiftover, \
     ProcessingStatus, Allele
+from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs, remove_soft_deleted_vcfs_task
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 from uicore.templatetags.js_tags import jsonify_for_js
@@ -714,18 +715,12 @@ class SampleColumns(DatatableConfig[Sample]):
     def filter_queryset(self, qs: QuerySet[Sample]) -> QuerySet[Sample]:
         filters = []
         if ontology_terms := self.get_query_param('ontology_term_id'):
-            sample_patient_ontology_path = f"patient__{PATIENT_ONTOLOGY_TERM_PATH}"
-            ontology_filters = []
-            for term_name in ontology_terms.split(","):
-                if ot := OntologyTerm.get_or_stub(term_name):
-                    ontology_filters.append(Q(**{sample_patient_ontology_path: ot}))
-            if ontology_filters:
-                filters.append(reduce(operator.or_, ontology_filters))
+            if q:= get_sample_ontology_q(ontology_terms):
+                filters.append(q)
 
         if gene_symbol_str := self.get_query_param("gene_symbol"):
-            if gene_symbol := GeneSymbol.objects.filter(pk=gene_symbol_str).first():
-                sample_gene_list_qs = SampleGeneList.objects.filter(gene_list__genelistgenesymbol__gene_symbol=gene_symbol)
-                filters.append(Q(samplegenelist__in=sample_gene_list_qs))
+            if q := get_sample_qc_gene_list_gene_symbol_q(gene_symbol_str):
+                filters.append(q)
 
         if filters:
             qs = qs.filter(*filters)

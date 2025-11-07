@@ -158,12 +158,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
             filters.append(Q(allele_origin_grouping__allele_grouping__allele_id=int(allele_id)))
 
         if ontology_terms := self.get_query_param('ontology_term_id'):
-            condition_filters = []
-            for condition in ontology_terms.split(","):
-                if c_filter := self.condition_filter(condition):
-                    condition_filters.append(c_filter)
-            if condition_filters:
-                filters.append(reduce(operator.or_, condition_filters))
+            if q_ontology := self.get_ontology_q(ontology_terms):
+                filters.append(q_ontology)
 
         if page == "gene_symbol":
             if gene_symbol_str := self.get_query_param("gene_symbol"):
@@ -259,7 +255,8 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
                 ).values_list('grouping_id', flat=True)
         )
 
-    def gene_symbol_filter(self, gene_symbol: str):
+    @staticmethod
+    def gene_symbol_filter(gene_symbol: str):
         if gene_symbol := GeneSymbol.objects.filter(symbol=gene_symbol).first():
             all_strs = [gene_symbol.symbol] + gene_symbol.alias_meta.alias_symbol_strs
             all_strs = [gs.upper() for gs in all_strs]
@@ -270,7 +267,20 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         if scv.startswith("SCV"):
             return ClassificationGroupingSearchTerm.filter_q(ClassificationGroupingSearchTermType.CLINVAR_SCV, scv)
 
-    def condition_filter(self, text, must_exist: bool = False):
+    @staticmethod
+    def get_ontology_q(ontology_terms: str) -> Q | None:
+        condition_filters = []
+        for condition in ontology_terms.split(","):
+            if c_filter := ClassificationGroupingColumns.condition_filter(condition):
+                condition_filters.append(c_filter)
+        q = None
+        if condition_filters:
+            q = reduce(operator.or_, condition_filters)
+        return q
+
+
+    @staticmethod
+    def condition_filter(text, must_exist: bool = False):
         try:
             term = OntologyTerm.get_or_stub(text)
             if must_exist and term.is_stub:
