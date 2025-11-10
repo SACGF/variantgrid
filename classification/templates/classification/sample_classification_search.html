@@ -38,6 +38,8 @@
 
 </style>
 <script>
+    const CLINICAL_SIGNICANCES = ["other", "benign", "likely_benign", "vus", "likely_pathogenic", "pathogenic"];
+
     function filterSampleGrid() {
         $('#sample-datatable').DataTable().ajax.reload();
     }
@@ -98,7 +100,7 @@
         return terms;
     }
 
-    function classificationGroupingFilter(data, type) {
+    function classificationFilter(data, type) {
         data.gene_symbol = blankToNull($('#id_classification-gene_symbol').val());
         data.lab = blankToNull(getLabValue());
         let allele_origin_filter_value = blankToNull($("input[name='allele-origin-toggle']:checked").val());
@@ -106,6 +108,14 @@
         data.id_filter = blankToNull($('#id_filter').val());
         data.user = blankToNull($('#id_user').val());
         data.ontology_term_id = blankToNull(getOntologyTerms("classification").join(","));
+        for (const cs of CLINICAL_SIGNICANCES) {
+            if ($(`#id_${cs}`).is(":checked")) {
+                data[cs] = true;
+            }
+
+        }
+        console.log(data);
+
         let column = $('#vc-datatable').DataTable().column(3);
         let germline_only = allele_origin_filter_value == "G";
         column.visible(!germline_only);
@@ -125,6 +135,10 @@
         });
 
         let classificationSelects = ["#id_classification-gene_symbol", "#id_lab", "#id_user", "#id_allele_origin"];
+        for (const cs of CLINICAL_SIGNICANCES) {
+            classificationSelects.push(`#id_${cs}`);
+        }
+
         classificationSelects = classificationSelects.concat(getOntologySelects("classification"))
         $(classificationSelects.join(',')).on("change", function() {
             filterClassificationGrid();
@@ -135,7 +149,7 @@
             sampleFilter(sampleData)
 
             let classificationData = {};
-            classificationGroupingFilter(classificationData)
+            classificationFilter(classificationData)
 
             let scForm = $("#sample_classification_form");
             let searchData = {
@@ -152,7 +166,9 @@
             const params = new URLSearchParams()
             for (const [component_label, component_data] of Object.entries(componentData)) {
               for (const [key, value] of Object.entries(component_data)) {
-                params.append(`${component_label}_${key}`, value)
+                  if (value != null) {
+                      params.append(`${component_label}_${key}`, value);
+                  }
               }
             }
 
@@ -214,6 +230,10 @@
 
         <div class="container">
             <h3>Classifications</h3>
+
+            <div>
+                {% crispy clinical_significance_form  %}
+            </div>
             <div class="row filter-row">
                 <div class="col-md-4 col-lg-2">
                     <br/>
@@ -241,10 +261,11 @@
                 {% crispy classification_phenotype_form %}
             </div>
 
-            <table id="vc-datatable" data-datatable-data='classificationGroupingFilter' data-datatable-url="{% url 'classification_grouping_datatables' %}" class="sticky-header classification-table" data-adjust-columns="false"></table>
+            <table id="vc-datatable" data-datatable-data='classificationFilter' data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table"></table>
 
         </div>
         <div class="container" id="sample_classification_form">
+            <h3>Results</h3>
             {% crispy sample_classification_form form_helper.horizontal %}
             <button class="btn btn-primary" id='search-samples'><i class="fas fa-search"></i> Search Samples for Classifications</button>
         </div>

@@ -2,6 +2,7 @@ from django import forms
 
 from classification.models import EvidenceKey
 from library.django_utils.autocomplete_utils import ModelSelect2
+from uicore.utils.form_helpers import form_helper_horizontal
 
 
 class EvidenceKeyForm(forms.Form):
@@ -22,6 +23,17 @@ class ClassificationAlleleOriginForm(forms.Form):
         ("other", "Origin Other"),
     )
     allele_origin = forms.ChoiceField(choices=ALLELE_ORIGIN_CHOICES, required=False)
+
+
+class ClinicalSignificanceForm(forms.Form):
+    other = forms.BooleanField()
+    benign = forms.BooleanField()
+    likely_benign = forms.BooleanField()
+    vus = forms.BooleanField()
+    likely_pathogenic = forms.BooleanField()
+    pathogenic = forms.BooleanField()
+
+    helper = form_helper_horizontal()
 
 
 class SampleClassificationForm(forms.Form):

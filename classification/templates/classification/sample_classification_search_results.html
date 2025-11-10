@@ -1,2 +1,23 @@
-hello, world!
+RESULTS:
 
+Question here is - show per classification or per sample
+
+<div class="container">
+    {% for sample, sample_variant_and_classifications in sample_records %}
+        <div class="row">
+            <div class="col-3">
+                {{ sample }}
+            </div>
+            <div class="col-9">
+                {% for variant, classifications in sample_variant_and_classifications %}
+                    <a href="{% url 'view_variant' variant.pk %}">{{ variant }}</a>
+
+                    {% for c in classifications %}
+                        <a href="{% url 'view_classification' c.pk %}">{{ c }}</a>
+                    {% endfor %}
+                {% endfor %}
+            </div>
+        </div>
+
+    {% endfor %}
+</div>

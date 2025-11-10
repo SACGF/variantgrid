@@ -1,17 +1,23 @@
+from collections import defaultdict
+
 from crispy_forms.layout import Layout, Field
 
 from django.conf import settings
+from django.db.models.query_utils import Q
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse
 from django.shortcuts import render
 
-from classification.forms import ClassificationAlleleOriginForm, SampleClassificationForm
-from classification.views.classification_grouping_datatables import ClassificationGroupingColumns
+from classification.enums import ClinicalSignificance, AlleleOriginBucket
+from classification.forms import ClassificationAlleleOriginForm, SampleClassificationForm, ClinicalSignificanceForm
+from classification.models import Classification
+from classification.models.classification_utils import classification_gene_symbol_filter
+from classification.views.classification_datatables import ClassificationColumns
 from genes.forms import GeneSymbolForm
 from genes.models import SampleGeneList
 from ontology.forms import PhenotypeMultipleSelectForm
 from snpdb.forms import UserSelectForm, LabSelectForm, LabMultiSelectForm
-from snpdb.models import Lab, Sample
+from snpdb.models import Lab, Sample, GenomeBuild
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
 from snpdb.user_settings_manager import UserSettingsManager
 
@@ -42,6 +48,11 @@ def sample_classification_search(request) -> HttpResponse:
     classification_phenotype_form = PhenotypeMultipleSelectForm(prefix="classification")
     classification_phenotype_form.helper.layout = layout
 
+    cs_form = ClinicalSignificanceForm(initial={
+        "likely_pathogenic": True,
+        "pathogenic": True,
+    })
+
     context = {
         "sample_phenotype_form": sample_phenotype_form,
         "gene_form": GeneSymbolForm(prefix="classification"),
@@ -49,6 +60,7 @@ def sample_classification_search(request) -> HttpResponse:
         "lab_form": lab_form,
         "allele_origin_form": ClassificationAlleleOriginForm(),
         "labs": Lab.valid_labs_qs(request.user),
+        "clinical_significance_form": cs_form,
         "classification_phenotype_form": classification_phenotype_form,
         "sample_classification_form": SampleClassificationForm(),
         "user_settings": user_settings,
@@ -63,9 +75,59 @@ def sample_classification_search(request) -> HttpResponse:
     return render(request, 'classification/sample_classification_search.html', context)
 
 
+
+def _sample_classification_overlaps(samples_qs, classification_qs):
+    classifications_by_allele = defaultdict(set)
+    for c in classification_qs:
+        classifications_by_allele[c.variant.allele].add(c)
+
+    sample_records = []
+    for genome_build in GenomeBuild.builds_with_annotation():
+        variant_q = Classification.get_variant_q_from_classification_qs(classification_qs, genome_build)
+        # variant_qs = Variant.objects.filter(variant_q)
+        #variants_qs = Variant.objects.filter(variantallele__allele__in=classifications_by_allele,
+        #                                     variantallele__genome_build=genome_build)
+
+        # Easier when allele is on Classification (like master)
+        print(f"{genome_build=}")
+        for s in samples_qs:
+            sample_variant_and_classifications = []
+
+            for v in s.get_variant_qs().filter(variant_q).distinct():
+                # existing_class = ret_classifications_path.filter(sample=s, variant__variantallele__allele__variantallele__variant=v=v)
+                # print(f"{s} has {v}")
+
+                sample_variant_and_classifications.append((v, classifications_by_allele[v.allele]))
+
+                # for c in classifications_by_allele[v.allele]:
+                #     sample_msg = ""
+                #     if c.sample == s:
+                #         sample_msg = "This sample"
+                #     else:
+                #         if c.sample:
+                #             sample_msg = "Class has other sample {c.sample}"
+                #             if c.sample.patient:
+                #                 if c.sample.patient == s.patient:
+                #                     sample_msg = "Same patient, diff sample"
+                #                 else:
+                #                     print(f"diff patient: {c.sample.patient} vs {s.patient}")
+                #         else:
+                #             sample_id = c.evidence.get("sample_id", {}).get("value")
+                #             sample_msg = f"Class has no sample - but {sample_id=}"
+                #
+                #     sample_alleles[v.allele] = (c, s, sample_msg)
+
+            if sample_variant_and_classifications:
+                sample_records.append((s, sample_variant_and_classifications))
+                    # print(c, sample_msg)
+                    # print(f"sample date: {s.vcf.date} vs classification created: {c.created}")
+
+    return sample_records
+
+
+
 def sample_classification_search_results(request: HttpRequest) -> HttpResponse:
     # Sample filters
-
     sample_filters = []
     if ontology_terms := request.GET.get("sample_ontology_term_id"):
         if q := get_sample_ontology_q(ontology_terms):
@@ -76,28 +138,55 @@ def sample_classification_search_results(request: HttpRequest) -> HttpResponse:
             sample_filters.append(q)
 
     sample_qs = Sample.filter_for_user(request.user)
+    num_unfiltered_samples = sample_qs.count()
     if sample_filters:
         sample_qs = sample_qs.filter(*sample_filters)
 
     # Classification filters
     classification_filters = []
-    request.GET.get("classification_allele_origin")
-    if classification_gene_symbol := request.GET.get("classification_gene_symbol")
-        if q := ClassificationGroupingColumns.gene_symbol_filter(classification_gene_symbol):
+
+    cs_data = {}
+    for cs in ClassificationColumns.CLINICAL_SIGNIFICANCE_FILTERS:
+        if request.GET.get(f"classification_{cs}"):
+            cs_data[cs] = True
+
+    if q := ClassificationColumns.get_clinical_significance_q(cs_data):
+        classification_filters.append(q)
+
+    if allele_origin := request.GET.get("classification_allele_origin"):
+        if allele_origin != "A":
+            classification_filters.append(Q(allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
+
+    if gene_symbol_str := request.GET.get("classification_gene_symbol"):
+        if q := classification_gene_symbol_filter(gene_symbol_str):
             classification_filters.append(q)
 
     # request.GET.get("classification_id_filter")
-    request.GET.get("classification_lab")
+    if lab_id := request.GET.get("classification_lab"):
+        lab_list = lab_id.split(",")
+        classification_filters.append(Q(lab__pk__in=lab_list))
 
     if classification_ontology_term_id := request.GET.get("classification_ontology_term_id"):
-        if q := ClassificationGroupingColumns.get_ontology_q(classification_ontology_term_id):
+        if q := ClassificationColumns.get_ontology_q(classification_ontology_term_id):
             classification_filters.append(q)
+
+    classification_qs = Classification.filter_for_user(request.user)
+    num_unfiltered_classifications = classification_qs.count()
+    if classification_filters:
+        classification_qs = classification_qs.filter(*classification_filters)
 
     request.GET.get("classification_user")
     # Search
     request.GET.get("search_max_results")
     request.GET.get("search_max_samples")
-    context = {
 
+    num_samples = sample_qs.count()
+    print(f"filtered - kept {num_samples=} of {num_unfiltered_samples} samples")
+    num_classifications = classification_qs.count()
+    print(f"filtered - kept {num_classifications=} of {num_unfiltered_classifications} classifications")
+
+    sample_records = _sample_classification_overlaps(sample_qs, classification_qs)
+    context = {
+        "sample_records": sample_records,
     }
     return render(request, 'classification/sample_classification_search_results.html', context)
