@@ -1,4 +1,6 @@
+import operator
 from collections import defaultdict
+from functools import reduce
 
 from crispy_forms.layout import Layout, Field
 
@@ -8,7 +10,7 @@ from django.http.request import HttpRequest
 from django.http.response import HttpResponse
 from django.shortcuts import render
 
-from classification.enums import ClinicalSignificance, AlleleOriginBucket
+from classification.enums import AlleleOriginBucket
 from classification.forms import ClassificationAlleleOriginForm, SampleClassificationForm, ClinicalSignificanceForm
 from classification.models import Classification
 from classification.models.classification_utils import classification_gene_symbol_filter
@@ -166,8 +168,12 @@ def sample_classification_search_results(request: HttpRequest) -> HttpResponse:
         lab_list = lab_id.split(",")
         classification_filters.append(Q(lab__pk__in=lab_list))
 
-    if classification_ontology_term_id := request.GET.get("classification_ontology_term_id"):
-        if q := ClassificationColumns.get_ontology_q(classification_ontology_term_id):
+    if ontology_terms := request.GET.get("classification_ontology_term_id"):
+        terms = []
+        for term_id in ontology_terms.split(","):
+            terms.append(Q(condition_resolution__resolved_terms__contains=[{"term_id": term_id}]))
+        if terms:
+            q = reduce(operator.or_, terms)
             classification_filters.append(q)
 
     classification_qs = Classification.filter_for_user(request.user)

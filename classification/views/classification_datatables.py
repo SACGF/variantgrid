@@ -334,16 +334,6 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 e_key.evidence_category in (EvidenceCategory.HEADER_PATIENT, EvidenceCategory.HEADER_TEST, EvidenceCategory.SIGN_OFF)]
 
     @staticmethod
-    def get_ontology_q(ontology_terms: str) -> Q | None:
-        terms = []
-        for term_id in ontology_terms.split(","):
-            terms.append(Q(classification__condition_resolution__resolved_terms__contains=[{"term_id": term_id}]))
-        q = None
-        if terms:
-            q = reduce(operator.or_, terms)
-        return q
-
-    @staticmethod
     def get_clinical_significance_q(clinical_significances: dict) -> Q | None:
         clinical_significance_list = []
         for cs_label, cs_val in ClassificationColumns.CLINICAL_SIGNIFICANCE_FILTERS.items():
@@ -452,7 +442,11 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             filters.append(Q(classification__analysisclassification__analysis_id=analysis_id))
 
         if ontology_terms := self.get_query_param("ontology_term_id"):
-            if q := self.get_ontology_q(ontology_terms):
+            terms = []
+            for term_id in ontology_terms.split(","):
+                terms.append(Q(classification__condition_resolution__resolved_terms__contains=[{"term_id": term_id}]))
+            if terms:
+                q = reduce(operator.or_, terms)
                 filters.append(q)
 
         cs_filters = {cs: True for cs in ClassificationColumns.CLINICAL_SIGNIFICANCE_FILTERS if self.get_query_param(cs)}
