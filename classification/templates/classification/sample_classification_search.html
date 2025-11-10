@@ -154,8 +154,14 @@
             let scForm = $("#sample_classification_form");
             let searchData = {
                 "max_samples": $("input#id_max_samples", scForm).val(),
-                "max_results": $("input#id_max_results", scForm).val()
+                "max_results": $("input#id_max_results", scForm).val(),
             }
+            for (const cs of ["hom_ref", "het", "hom_alt"]) {
+                if ($(`#id_${cs}`).is(":checked")) {
+                    searchData[cs] = true;
+                }
+            }
+
 
             let componentData = {
                 "search": searchData,

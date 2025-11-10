@@ -18,6 +18,7 @@ from classification.views.classification_datatables import ClassificationColumns
 from genes.forms import GeneSymbolForm
 from genes.models import SampleGeneList
 from ontology.forms import PhenotypeMultipleSelectForm
+from patients.models_enums import Zygosity
 from snpdb.forms import UserSelectForm, LabSelectForm, LabMultiSelectForm
 from snpdb.models import Lab, Sample, GenomeBuild
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
@@ -78,7 +79,7 @@ def sample_classification_search(request) -> HttpResponse:
 
 
 
-def _sample_classification_overlaps(samples_qs, classification_qs):
+def _sample_classification_overlaps(samples_qs, classification_qs, zygosities):
     classifications_by_allele = defaultdict(set)
     for c in classification_qs:
         classifications_by_allele[c.variant.allele].add(c)
@@ -94,8 +95,11 @@ def _sample_classification_overlaps(samples_qs, classification_qs):
         print(f"{genome_build=}")
         for s in samples_qs:
             sample_variant_and_classifications = []
+            filter_kwargs = {}
+            if zygosities:
+                filter_kwargs[f"{s.zygosity_alias}__in"] = zygosities
 
-            for v in s.get_variant_qs().filter(variant_q).distinct():
+            for v in s.get_variant_qs().filter(variant_q, **filter_kwargs).distinct():
                 # existing_class = ret_classifications_path.filter(sample=s, variant__variantallele__allele__variantallele__variant=v=v)
                 # print(f"{s} has {v}")
 
@@ -185,13 +189,23 @@ def sample_classification_search_results(request: HttpRequest) -> HttpResponse:
     # Search
     request.GET.get("search_max_results")
     request.GET.get("search_max_samples")
+    ZYG_NAMES = {
+        "hom_ref": Zygosity.HOM_REF,
+        "het": Zygosity.HET,
+        "hom_alt": Zygosity.HOM_ALT,
+    }
+
+    zygosities = []
+    for zyg, code in ZYG_NAMES.items():
+        if request.GET.get(f"search_{zyg}"):
+            zygosities.append(code)
 
     num_samples = sample_qs.count()
     print(f"filtered - kept {num_samples=} of {num_unfiltered_samples} samples")
     num_classifications = classification_qs.count()
     print(f"filtered - kept {num_classifications=} of {num_unfiltered_classifications} classifications")
 
-    sample_records = _sample_classification_overlaps(sample_qs, classification_qs)
+    sample_records = _sample_classification_overlaps(sample_qs, classification_qs, zygosities)
     context = {
         "sample_records": sample_records,
     }
