@@ -180,7 +180,8 @@ def sample_classification_search_results(request: HttpRequest) -> HttpResponse:
             q = reduce(operator.or_, terms)
             classification_filters.append(q)
 
-    classification_qs = Classification.filter_for_user(request.user)
+    # Needs a variant to look in samples
+    classification_qs = Classification.filter_for_user(request.user).filter(variant__isnull=False)
     num_unfiltered_classifications = classification_qs.count()
     if classification_filters:
         classification_qs = classification_qs.filter(*classification_filters)
