@@ -44,6 +44,7 @@ class Command(BaseCommand):
             if not refresh:
                 qs = qs.filter(dirty=True)
 
+            index = 0
             for index, dirty in enumerate(qs.iterator()):
                 dirty.update()
                 if index % 1000 == 0 and index:
