@@ -108,6 +108,9 @@
         data.id_filter = blankToNull($('#id_filter').val());
         data.user = blankToNull($('#id_user').val());
         data.ontology_term_id = blankToNull(getOntologyTerms("classification").join(","));
+        if ($("#id_internal_requires_sample").is(":checked")) {
+            data.internal_requires_sample = true;
+        }
         for (const cs of CLINICAL_SIGNICANCES) {
             if ($(`#id_${cs}`).is(":checked")) {
                 data[cs] = true;
@@ -134,7 +137,8 @@
             filterSampleGrid();
         });
 
-        let classificationSelects = ["#id_classification-gene_symbol", "#id_lab", "#id_user", "#id_allele_origin"];
+        let classificationSelects = ["#id_classification-gene_symbol", "#id_lab", "#id_user",
+                                     "#id_allele_origin", "#id_internal_requires_sample"];
         for (const cs of CLINICAL_SIGNICANCES) {
             classificationSelects.push(`#id_${cs}`);
         }
@@ -261,6 +265,10 @@
                 <div style="width: 160px" class="mx-3">
                     Allele Origin<br/>
                     {% allele_origin_toggle show_label=False %}
+                </div>
+                <div style="width: 160px" class="mx-3">
+                    Internal Classifications require sample<br/>
+                    <input id="id_internal_requires_sample" type="checkbox" checked="checked" />
                 </div>
             </div>
             <div>

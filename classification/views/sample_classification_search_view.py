@@ -205,6 +205,9 @@ def sample_classification_search_results(request: HttpRequest) -> HttpResponse:
             q = reduce(operator.or_, terms)
             classification_filters.append(q)
 
+    if request.GET.get("classification_internal_requires_sample"):
+        classification_filters.append(Q(lab__external=True) | Q(sample__isnull=False))
+
     # Needs a variant to look in samples
     classification_qs = Classification.filter_for_user(request.user).filter(variant__isnull=False)
     num_unfiltered_classifications = classification_qs.count()
