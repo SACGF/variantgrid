@@ -94,16 +94,19 @@ def _sample_classification_overlaps(samples_qs, classification_qs, zygosities):
         # Easier when allele is on Classification (like master)
         print(f"{genome_build=}")
         for s in samples_qs:
-            sample_variant_and_classifications = []
+            sample_variant_zyg_and_classifications = []
             filter_kwargs = {}
             if zygosities:
                 filter_kwargs[f"{s.zygosity_alias}__in"] = zygosities
 
             for v in s.get_variant_qs().filter(variant_q, **filter_kwargs).distinct():
+                sample_zygosity = getattr(v, s.zygosity_alias)
+
                 # existing_class = ret_classifications_path.filter(sample=s, variant__variantallele__allele__variantallele__variant=v=v)
                 # print(f"{s} has {v}")
 
-                sample_variant_and_classifications.append((v, classifications_by_allele[v.allele]))
+                classification = classifications_by_allele[v.allele]
+                sample_variant_zyg_and_classifications.append((v, Zygosity.display(sample_zygosity), classification))
 
                 # for c in classifications_by_allele[v.allele]:
                 #     sample_msg = ""
@@ -123,8 +126,8 @@ def _sample_classification_overlaps(samples_qs, classification_qs, zygosities):
                 #
                 #     sample_alleles[v.allele] = (c, s, sample_msg)
 
-            if sample_variant_and_classifications:
-                yield s, sample_variant_and_classifications
+            if sample_variant_zyg_and_classifications:
+                yield s, sample_variant_zyg_and_classifications
 
 
 def limit_sample_and_results(sample_records, max_samples, max_results):
