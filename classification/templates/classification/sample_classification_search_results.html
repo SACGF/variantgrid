@@ -9,7 +9,7 @@
     {% for sample, sample_variant_and_classifications in sample_records %}
         <div class="row">
             <div class="col-3">
-                {{ sample }}
+                <a href="{% url 'view_sample' sample.pk %}">{{ sample }}</a>
             </div>
             <div class="col-9">
                 {% for variant, zygosity, classifications in sample_variant_and_classifications %}

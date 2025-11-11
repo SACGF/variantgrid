@@ -2,6 +2,7 @@ import itertools
 import operator
 from collections import defaultdict
 from functools import reduce
+from typing import Iterable
 
 from crispy_forms.layout import Layout, Field
 
@@ -79,6 +80,15 @@ def sample_classification_search(request) -> HttpResponse:
     return render(request, 'classification/sample_classification_search.html', context)
 
 
+def _filter_classifications_by_sample_and_patient(sample: Sample, classifications: Iterable[Classification]) -> Iterable[Classification]:
+    for c in classifications:
+        if sample and c.sample:
+            if sample == c.sample:
+                continue
+            if sample.patient and sample.patient == c.sample.patient:
+                continue
+        yield c
+
 
 def _sample_classification_overlaps(samples_qs, classification_qs, zygosities):
     classifications_by_allele = defaultdict(set)
@@ -93,20 +103,22 @@ def _sample_classification_overlaps(samples_qs, classification_qs, zygosities):
 
         # Easier when allele is on Classification (like master)
         print(f"{genome_build=}")
-        for s in samples_qs:
+        for sample in samples_qs.filter(vcf__genome_build=genome_build):
             sample_variant_zyg_and_classifications = []
             filter_kwargs = {}
             if zygosities:
-                filter_kwargs[f"{s.zygosity_alias}__in"] = zygosities
+                filter_kwargs[f"{sample.zygosity_alias}__in"] = zygosities
 
-            for v in s.get_variant_qs().filter(variant_q, **filter_kwargs).distinct():
-                sample_zygosity = getattr(v, s.zygosity_alias)
+            for v in sample.get_variant_qs().filter(variant_q, **filter_kwargs).distinct():
+                sample_zygosity = getattr(v, sample.zygosity_alias)
 
                 # existing_class = ret_classifications_path.filter(sample=s, variant__variantallele__allele__variantallele__variant=v=v)
                 # print(f"{s} has {v}")
 
-                classification = classifications_by_allele[v.allele]
-                sample_variant_zyg_and_classifications.append((v, Zygosity.display(sample_zygosity), classification))
+                classifications = classifications_by_allele[v.allele]
+                classifications = list(_filter_classifications_by_sample_and_patient(sample, classifications))
+                if classifications:
+                    sample_variant_zyg_and_classifications.append((v, Zygosity.display(sample_zygosity), classifications))
 
                 # for c in classifications_by_allele[v.allele]:
                 #     sample_msg = ""
@@ -127,7 +139,7 @@ def _sample_classification_overlaps(samples_qs, classification_qs, zygosities):
                 #     sample_alleles[v.allele] = (c, s, sample_msg)
 
             if sample_variant_zyg_and_classifications:
-                yield s, sample_variant_zyg_and_classifications
+                yield sample, sample_variant_zyg_and_classifications
 
 
 def limit_sample_and_results(sample_records, max_samples, max_results):
