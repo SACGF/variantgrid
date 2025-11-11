@@ -4,6 +4,7 @@ from typing import List
 from django import forms
 from django.contrib import admin, messages
 from django.db.models import AutoField, ForeignKey, DateTimeField
+from django.forms import ModelForm
 from django.http import HttpResponse
 from django.utils.html import format_html
 from guardian.admin import GuardedModelAdmin
@@ -12,7 +13,7 @@ from martor.widgets import AdminMartorWidget
 from classification.models.clinvar_export_models import ClinVarExport
 from snpdb import models
 from snpdb.liftover import liftover_alleles
-from snpdb.models import Allele, VariantAllele
+from snpdb.models import Allele, VariantAllele, SiteMessage
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models_admin_forms import LabAdmin, OrganizationAdmin
 
