@@ -52,6 +52,7 @@ kombu
 levenshtein
 lxml
 Markdown
+martor
 matplotlib
 more_itertools
 mozilla_django_oidc

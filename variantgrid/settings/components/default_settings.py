@@ -622,6 +622,7 @@ INSTALLED_APPS = [
     'guardian',
     'jfu',
     'leaflet',
+    'martor',
     "psqlextra",
     'rest_framework',
     'rest_framework.authtoken',

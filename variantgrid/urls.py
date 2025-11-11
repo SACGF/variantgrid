@@ -36,6 +36,7 @@ urlpatterns = [
     path('', views.index),
     path('admin/', admin.site.urls),
     path('authenticated', views.authenticated, name='authenticated'),
+    path('martor/', include('martor.urls')),
     path('messages/', include('django_messages.urls')),
     path('external_help', views.external_help, name='external_help'),
     path('system/version', views.version, name='version'),

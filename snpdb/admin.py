@@ -1,8 +1,11 @@
 import re
 
+from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin.widgets import AdminTextInputWidget
 from django.db.models import QuerySet
+from django.forms import ModelForm
+from martor.widgets import AdminMartorWidget
 from unidecode import unidecode
 
 from snpdb import models
@@ -11,7 +14,7 @@ from snpdb.admin_utils import ModelAdminBasics, GuardedModelAdminBasics, admin_l
 from snpdb.liftover import liftover_alleles
 from snpdb.models import Allele, VariantAllele, ClinVarKey, ClinVarKeyExcludePattern, UserSettingsOverride, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, UserPageAck, Organization, Lab, GlobalSettings, Variant, \
-    AlleleLiftover
+    AlleleLiftover, SiteMessage
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -353,6 +356,22 @@ class GenomicIntervalsCollectionAdmin(ModelAdminBasics):
     search_fields = ('name', )
 
 
+class SiteMessageAdminForm(ModelForm):
+    class Meta:
+        model = SiteMessage
+        fields = '__all__'
+
+
+@admin.register(SiteMessage)
+class SiteMessagesAdmin(ModelAdminBasics):
+    form = SiteMessageAdminForm
+
+    def get_form(self, request, obj=None, **kwargs):
+        return super().get_form(request, obj, widgets={
+            'message': AdminMartorWidget(),
+        }, **kwargs)
+
+
 admin.site.register(models.CachedGeneratedFile, ModelAdminBasics)
 admin.site.register(models.Cohort, ModelAdminBasics)
 admin.site.register(models.CohortGenotypeCollection, ModelAdminBasics)
@@ -367,7 +386,6 @@ admin.site.register(models.Sample, ModelAdminBasics)
 admin.site.register(models.SampleLabProject)
 admin.site.register(models.SampleTag, ModelAdminBasics)
 admin.site.register(models.SettingsInitialGroupPermission, ModelAdminBasics)
-admin.site.register(models.SiteMessage, ModelAdminBasics)
 admin.site.register(models.Tag, ModelAdminBasics)
 admin.site.register(models.Trio, ModelAdminBasics)
 admin.site.register(models.VCF, GuardedModelAdminBasics)
