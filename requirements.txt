@@ -38,6 +38,7 @@ kombu==4.6.11
 lazy==1.4
 lxml==4.6.3
 Markdown==3.2.2
+martor==1.7.16
 matplotlib==3.3.0
 mozilla_django_oidc==1.2.3
 nameparser==1.0.6

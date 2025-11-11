@@ -1,11 +1,13 @@
 import csv
 from typing import List
 
+from django import forms
 from django.contrib import admin, messages
 from django.db.models import AutoField, ForeignKey, DateTimeField
 from django.http import HttpResponse
 from django.utils.html import format_html
 from guardian.admin import GuardedModelAdmin
+from martor.widgets import AdminMartorWidget
 
 from classification.models.clinvar_export_models import ClinVarExport
 from snpdb import models
@@ -167,6 +169,21 @@ class UserSettingsOverrideAdmin(admin.ModelAdmin, AdminExportCsvMixin):
 class UserPageAck(ModelAdminBasics):
     list_display = ('user', 'page_id')
 
+class SiteMessageAdminForm(ModelForm):
+    class Meta:
+        model = SiteMessage
+        fields = '__all__'
+
+
+class SiteMessagesAdmin(ModelAdminBasics):
+    form = SiteMessageAdminForm
+
+    def get_form(self, request, obj=None, **kwargs):
+        return super().get_form(request, obj, widgets={
+            'message': AdminMartorWidget(),
+        }, **kwargs)
+    
+    
 
 admin.site.register(models.Allele, AlleleAdmin)
 admin.site.register(models.CachedGeneratedFile, ModelAdminBasics)
@@ -190,7 +207,7 @@ admin.site.register(models.Sample, ModelAdminBasics)
 admin.site.register(models.SampleLabProject)
 admin.site.register(models.SampleTag, ModelAdminBasics)
 admin.site.register(models.SettingsInitialGroupPermission, ModelAdminBasics)
-admin.site.register(models.SiteMessage, ModelAdminBasics)
+admin.site.register(models.SiteMessage, SiteMessagesAdmin)
 admin.site.register(models.Tag, ModelAdminBasics)
 admin.site.register(models.Trio, ModelAdminBasics)
 admin.site.register(models.UserSettingsOverride, UserSettingsOverrideAdmin)
