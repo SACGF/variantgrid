@@ -1,3 +1,4 @@
+import itertools
 import operator
 from collections import defaultdict
 from functools import reduce
@@ -84,7 +85,6 @@ def _sample_classification_overlaps(samples_qs, classification_qs, zygosities):
     for c in classification_qs:
         classifications_by_allele[c.variant.allele].add(c)
 
-    sample_records = []
     for genome_build in GenomeBuild.builds_with_annotation():
         variant_q = Classification.get_variant_q_from_classification_qs(classification_qs, genome_build)
         # variant_qs = Variant.objects.filter(variant_q)
@@ -124,11 +124,21 @@ def _sample_classification_overlaps(samples_qs, classification_qs, zygosities):
                 #     sample_alleles[v.allele] = (c, s, sample_msg)
 
             if sample_variant_and_classifications:
-                sample_records.append((s, sample_variant_and_classifications))
-                    # print(c, sample_msg)
-                    # print(f"sample date: {s.vcf.date} vs classification created: {c.created}")
+                yield s, sample_variant_and_classifications
 
-    return sample_records
+
+def limit_sample_and_results(sample_records, max_samples, max_results):
+    num_results = 0
+    for sample, results in itertools.islice(sample_records, max_samples):
+        max_remaining = max_results - num_results
+        if max_remaining <= 0:
+            break
+        limited = results[:max_remaining]
+        yield sample, limited
+        num_results += len(limited)
+        if num_results >= max_results:
+            break
+
 
 
 
@@ -188,8 +198,8 @@ def sample_classification_search_results(request: HttpRequest) -> HttpResponse:
 
     request.GET.get("classification_user")
     # Search
-    request.GET.get("search_max_results")
-    request.GET.get("search_max_samples")
+    search_max_results = int(request.GET.get("search_max_results"))
+    search_max_samples = int(request.GET.get("search_max_samples"))
     ZYG_NAMES = {
         "hom_ref": Zygosity.HOM_REF,
         "het": Zygosity.HET,
@@ -208,6 +218,8 @@ def sample_classification_search_results(request: HttpRequest) -> HttpResponse:
 
     sample_records = _sample_classification_overlaps(sample_qs, classification_qs, zygosities)
     context = {
-        "sample_records": sample_records,
+        "search_max_samples": search_max_samples,
+        "search_max_results": search_max_results,
+        "sample_records": limit_sample_and_results(sample_records, search_max_samples, search_max_results),
     }
     return render(request, 'classification/sample_classification_search_results.html', context)

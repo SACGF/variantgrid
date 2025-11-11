@@ -1,6 +1,9 @@
-RESULTS:
-
-Question here is - show per classification or per sample
+{% load ui_utils %}
+<h3>Results</h3>
+<div>
+    {% labelled label="Max Samples" %}{{ search_max_samples }}{% endlabelled %}
+    {% labelled label="Max Results" %}{{ search_max_results }}{% endlabelled %}
+</div>
 
 <div class="container">
     {% for sample, sample_variant_and_classifications in sample_records %}
