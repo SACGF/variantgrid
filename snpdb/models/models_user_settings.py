@@ -362,6 +362,7 @@ class UserSettings:
     variant_link_in_analysis_opens_new_tab: bool
     tool_tips: bool
     node_debug_tab: bool
+    analysis_horizontal_mode: bool
     import_messages: bool
     igv_port: bool
     default_genome_build: GenomeBuild
