@@ -129,7 +129,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     phenotype = models.TextField(null=True, blank=True)
     affected = models.BooleanField(null=True)
     consanguineous = models.BooleanField(null=True)
-
+    research_consent = models.BooleanField(null=True, blank=True)
     medicare = models.TextField(null=True, blank=True)
     billing_details = models.TextField(null=True, blank=True)
 
