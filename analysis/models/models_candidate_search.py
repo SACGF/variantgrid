@@ -19,7 +19,7 @@ from annotation.models import ClinVar, AnnotationVersion
 from classification.models import Classification
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from patients.models_enums import Zygosity
-from snpdb.models import Variant, Sample
+from snpdb.models import Variant, Sample, ProcessingStatus
 
 
 class CandidateSearchType(models.TextChoices):
@@ -45,6 +45,8 @@ class CandidateSearchVersion(TimeStampedModel):
 class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     search_version = models.ForeignKey(CandidateSearchVersion, on_delete=CASCADE)
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
+    status = models.CharField(max_length=1, choices=ProcessingStatus.choices, default=ProcessingStatus.CREATED)
+    error_exception = models.TextField(null=True, blank=True)
     config_snapshot = models.JSONField(default=dict)
     git_hash = models.TextField()
 

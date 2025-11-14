@@ -14,6 +14,19 @@
 {% block content %}
     <div class="container">
         {% load ui_help %}
+        {% page_help page_id='analysis/reanalysis_help' title='Reanalysis' %}
+
+        <div>
+            <ul>
+                <li>
+                    <a href="{% url 'new_reanalysis_candidate_search'  %}">New Reanalysis</a> - use new annotation to find something missed in old analyses
+                </li>
+            </ul>
+        </div>
+
+        <div>
+            TODO: Grid of previous runs - filtered by reanalysis
+        </div>
 
     </div>
 
