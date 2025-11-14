@@ -2,7 +2,7 @@ from analysis.grids import AnalysesGrid, NodeColumnSummaryGrid, KaromappingAnaly
     AnalysisNodeIssuesGrid, NodeOntologyGenesGrid, NodeGeneDiseaseClassificationGenesGrid, \
     NodeTissueExpressionGenesGrid, NodeTissueUniProtTissueSpecificityGenesGrid, NodeGeneListGenesColumns, \
     AnalysisLogEntryColumns
-from analysis.views import views, views_json, views_grid, views_karyomapping, views_autocomplete
+from analysis.views import views, views_json, views_grid, views_karyomapping, views_autocomplete, views_reanalysis
 from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import path
@@ -141,8 +141,11 @@ urlpatterns = [
     path('karyomapping/view_karyomapping_analysis/<int:pk>/', views_karyomapping.view_karyomapping_analysis, name='view_karyomapping_analysis'),
     path('karyomapping/view_karyomapping_gene/<int:pk>/', views_karyomapping.view_karyomapping_gene, name='view_karyomapping_gene'),
     path('karyomapping/download_karyomapping_gene_csv/<int:pk>/', views_karyomapping.download_karyomapping_gene_csv, name='download_karyomapping_gene_csv'),
-
     path('karyomapping/analyses/grid/<slug:op>/', JQGridView.as_view(grid=KaromappingAnalysesGrid, delete_row=True), name='karyomapping_analyses_grid'),
+
+    # Reanalysis
+    path('reanalysis/<int:pk>', views_reanalysis.view_reanalyis, name='view_reanalysis'),
+    path('reanalysis/', views_reanalysis.reanalyis, name='reanalysis'),
 
     # Autocompletes
     path('autocomplete/Analysis/', views_autocomplete.AnalysisAutocompleteView.as_view(), name='analysis_autocomplete'),

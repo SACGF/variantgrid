@@ -1,0 +1,25 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load compress %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% load settings_tags %}
+{% load classification_tags %}
+{% block title %}Classification Candidate Search: {{ candidate_search_run }}{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+{% endblock %}
+{% block content %}
+<div class="container">
+
+    {{ candidate_search_run }}
+
+    <div>
+        Grid of results
+    </div>
+
+</div>
+{% endblock %}

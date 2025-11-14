@@ -1,0 +1,23 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load crispy_forms_field %}
+{% load crispy_forms_tags %}
+
+{% block submenu %}{% menu_bar_analysis %}{% endblock %}
+{% block title %}VariantGrid: Reanalysis{% endblock title %}
+{% block head %}
+    {{ block.super }}
+{% endblock head %}
+
+{% block content %}
+    <div class="container">
+        {% load ui_help %}
+        {% page_help page_id='analysis/reanalysis_help' title='Reanalysis' %}
+
+    </div>
+
+{% endblock content %}
+
+

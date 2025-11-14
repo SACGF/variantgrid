@@ -74,16 +74,21 @@ class ReanalysisCandidate(AbstractCandidate):
     variant = models.ForeignKey(Variant, null=True, blank=True, on_delete=CASCADE)
 
 
-class CrossSampleClassificationCandidate(AbstractCandidate):
-    sample = models.ForeignKey(Sample, on_delete=CASCADE)
+class AbstractClassificationCandidate(AbstractCandidate):
     classification = models.ForeignKey(Classification, on_delete=CASCADE)
+
+    class Meta:
+        abstract = True
+        ordering = ('-created',)
+
+class CrossSampleClassificationCandidate(AbstractClassificationCandidate):
+    sample = models.ForeignKey(Sample, on_delete=CASCADE)
     zygosity = models.CharField(choices=Zygosity.CHOICES, max_length=1)
 
 
-class ClassificationEvidenceUpdateCandidate(AbstractCandidate):
+class ClassificationEvidenceUpdateCandidate(AbstractClassificationCandidate):
     """ Examples:
             * ClinVar appears for classification
             * Splice AI calculated for a VUS
     """
-    classification = models.ForeignKey(Classification, on_delete=CASCADE)
     annotation_version = models.ForeignKey(AnnotationVersion, null=True, on_delete=CASCADE)

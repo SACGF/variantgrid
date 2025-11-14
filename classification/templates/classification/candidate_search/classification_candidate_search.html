@@ -1,0 +1,39 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load compress %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% load settings_tags %}
+{% load classification_tags %}
+{% block title %}Classification Candidate Search{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+{% endblock %}
+{% block content %}
+<div class="container">
+
+    {% load ui_help %}
+    {% page_help page_id='classification/classification_candidate_search_help' title='Classification Candidate Search Help' %}
+
+
+    <div>
+        <ul>
+            <li>
+                <a href="{% url 'new_cross_sample_classification_candidate_search'  %}">New Cross Sample Classification Candidate Search</a>
+            </li>
+            <li>
+                <a href="{% url 'new_classification_evidence_update_candidate_search'  %}">New Classification Evidence Update Candidate Search</a>
+            </li>
+        </ul>
+
+    </div>
+
+    <div>
+        Grid of previous runs, summary and links etc
+    </div>
+
+</div>
+{% endblock %}

@@ -192,14 +192,6 @@
             let resultsDiv = $("div#sample-classification-search-results");
             let spinner = $('<i class="fa fa-spinner"></i>');
             resultsDiv.empty().append(spinner);
-
-            const url = `{% url 'sample_classification_search_results' %}?${query.toString()}`;
-            fetch(url).then(r => r.text()).then(html => {
-                resultsDiv.html(html);
-            })
-            .catch(e => {
-                resultsDiv.html(`<div class="alert alert-danger">Failed to load results: ${err.message}</div>`);
-            });
         });
 
     });
@@ -207,6 +199,12 @@
 {% endblock %}
 {% block content %}
 <div class="container">
+
+    <div>
+        <a href="{% url 'classification_candidate_search' %}">Back to Classification Candidate Search</a>
+    </div>
+
+
     {% settings_value 'CLASSIFICATION_GRID_SHOW_USERNAME' as CLASSIFICATION_GRID_SHOW_USERNAME %}
     <div id="sample-classification-search-page">
         <h2>Sample Classification Search</h2>
@@ -283,8 +281,6 @@
             {% crispy sample_classification_form form_helper.horizontal %}
             <button class="btn btn-primary" id='search-samples'><i class="fas fa-search"></i> Search Samples for Classifications</button>
         </div>
-
-        <div id="sample-classification-search-results"></div>
 
 </div>
 {% endblock %}

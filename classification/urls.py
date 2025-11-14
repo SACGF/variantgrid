@@ -1,6 +1,6 @@
 from rest_framework import routers
 
-from classification.views import clinvar_export_view, search_view_metrics
+from classification.views import clinvar_export_view, search_view_metrics, classification_candidate_search_view
 from classification.views import views, classification_dashboard_view, \
     classification_export_view, views_autocomplete, \
     classification_accumulation_graph
@@ -30,8 +30,6 @@ from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.exports.classification_export_formatter_redcap import redcap_data_dictionary
 from classification.views.imported_allele_info_view import view_imported_allele_info, ImportedAlleleInfoColumns, \
     view_imported_allele_info_detail, download_allele_info
-from classification.views.sample_classification_search_view import sample_classification_search, \
-    sample_classification_search_results
 from classification.views.views import classification_import_tool, AutopopulateView
 from classification.views.views_hgvs_resolution_tool import hgvs_resolution_tool
 from classification.views.views_uploaded_classifications_unmapped import UploadedClassificationsUnmappedView, \
@@ -124,9 +122,17 @@ urlpatterns = [
     path('evidence_keys/<max_share_level>', views.evidence_keys, name='evidence_keys_max_share_level'),
     path('evidence_keys', views.evidence_keys, name='evidence_keys'),
 
-    path('sample_classification_search/results', sample_classification_search_results,
-         name='sample_classification_search_results'),
-    path('sample_classification_search', sample_classification_search, name='sample_classification_search'),
+    # Classification Candidate Searching
+    path('classification_candidate_search/view/<int:pk>', classification_candidate_search_view.view_classification_candidate_search,
+         name='view_classification_candidate_search'),
+    path('classification_candidate_search', classification_candidate_search_view.classification_candidate_search,
+         name='classification_candidate_search'),
+    path('classification_candidate_search/cross_sample/new',
+         classification_candidate_search_view.new_cross_sample_classification_candidate_search,
+         name='new_cross_sample_classification_candidate_search'),
+    path('classification_candidate_search/evidence_update/new',
+         classification_candidate_search_view.new_classification_evidence_update_candidate_search,
+         name='new_classification_evidence_update_candidate_search'),
 
     path('summary_email', summary_email_preview_html, name='summary_email_html'),
     path('summary_email/<str:lab_id>', summary_email_preview_html, name='summary_email_html'),

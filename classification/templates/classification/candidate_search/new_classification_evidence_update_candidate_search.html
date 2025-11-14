@@ -1,0 +1,27 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load compress %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% load settings_tags %}
+{% load classification_tags %}
+{% block title %}Classification Evidence Update Candidate Search{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+{% endblock %}
+{% block content %}
+<div class="container">
+
+    <div>
+        <a href="{% url 'classification_candidate_search' %}">Back to Classification Candidate Search</a>
+    </div>
+
+    <div>
+        Page help, explain different types
+    </div>
+
+</div>
+{% endblock %}

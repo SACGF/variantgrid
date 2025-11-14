@@ -454,8 +454,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             if q := self.get_clinical_significance_q(cs_filters):
                 filters.append(q)
 
-        if internal_requires_sample := self.get_query_param("internal_requires_sample"):
-            print(f"{internal_requires_sample=}")
+        if self.get_query_param("internal_requires_sample"):
             filters.append(Q(classification__lab__external=True) | Q(classification__sample__isnull=False))
 
         if filters:
