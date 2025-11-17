@@ -2,9 +2,12 @@ import itertools
 from collections import defaultdict
 from typing import Iterable
 
+from analysis.models import Candidate
+from analysis.tasks.abstract_candidate_search_task import AbstractCandidateSearchTask
 from classification.models import Classification
 from patients.models_enums import Zygosity
-from snpdb.models import Lab, Sample, GenomeBuild
+from snpdb.models import Lab, Sample, GenomeBuild, Variant
+from variantgrid.celery import app
 
 
 def _filter_classifications_by_sample_and_patient(sample: Sample, classifications: Iterable[Classification]) -> Iterable[Classification]:
@@ -81,78 +84,79 @@ def limit_sample_and_results(sample_records, max_samples, max_results):
         if num_results >= max_results:
             break
 
+def _get_class_qs():
+    # Sample filters
+    sample_filters = []
+    if ontology_terms := request.POST.get("sample_ontology_term_id"):
+        if q := get_sample_ontology_q(ontology_terms):
+            sample_filters.append(q)
+
+    if gene_symbol_str := request.POST.get("sample_gene_symbol"):
+        if q := get_sample_qc_gene_list_gene_symbol_q(gene_symbol_str):
+            sample_filters.append(q)
+
+    sample_qs = Sample.filter_for_user(request.user)
+    num_unfiltered_samples = sample_qs.count()
+    if sample_filters:
+        sample_qs = sample_qs.filter(*sample_filters)
+
+    # Classification filters
+    classification_filters = []
+
+    cs_data = {}
+    for cs in ClassificationColumns.CLINICAL_SIGNIFICANCE_FILTERS:
+        if request.GET.get(f"classification_{cs}"):
+            cs_data[cs] = True
+
+    if q := ClassificationColumns.get_clinical_significance_q(cs_data):
+        classification_filters.append(q)
+
+    if allele_origin := request.POST.get("classification_allele_origin"):
+        if allele_origin != "A":
+            classification_filters.append(Q(allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
+
+    if gene_symbol_str := request.POST.get("classification_gene_symbol"):
+        if q := classification_gene_symbol_filter(gene_symbol_str):
+            classification_filters.append(q)
+
+    # request.GET.get("classification_id_filter")
+    if lab_id := request.POST.get("classification_lab"):
+        lab_list = lab_id.split(",")
+        classification_filters.append(Q(lab__pk__in=lab_list))
+
+    if ontology_terms := request.POST.get("classification_ontology_term_id"):
+        terms = []
+        for term_id in ontology_terms.split(","):
+            terms.append(Q(condition_resolution__resolved_terms__contains=[{"term_id": term_id}]))
+        if terms:
+            q = reduce(operator.or_, terms)
+            classification_filters.append(q)
+
+    if request.POST.get("classification_internal_requires_sample"):
+        classification_filters.append(Q(lab__external=True) | Q(sample__isnull=False))
+
+    # Needs a variant to look in samples
+    classification_qs = Classification.filter_for_user(request.user).filter(variant__isnull=False)
+    num_unfiltered_classifications = classification_qs.count()
+    if classification_filters:
+        classification_qs = classification_qs.filter(*classification_filters)
+
+    request.POST.get("classification_user")
+    # Search
+    search_max_results = int(request.POST.get("search_max_results"))
+    search_max_samples = int(request.POST.get("search_max_samples"))
+    ZYG_NAMES = {
+        "hom_ref": Zygosity.HOM_REF,
+        "het": Zygosity.HET,
+        "hom_alt": Zygosity.HOM_ALT,
+    }
+
+    zygosities = []
+    for zyg, code in ZYG_NAMES.items():
+        if request.GET.get(f"search_{zyg}"):
+            zygosities.append(code)
 
 
-#     # Sample filters
-#     sample_filters = []
-#     if ontology_terms := request.GET.get("sample_ontology_term_id"):
-#         if q := get_sample_ontology_q(ontology_terms):
-#             sample_filters.append(q)
-#
-#     if gene_symbol_str := request.GET.get("sample_gene_symbol"):
-#         if q := get_sample_qc_gene_list_gene_symbol_q(gene_symbol_str):
-#             sample_filters.append(q)
-#
-#     sample_qs = Sample.filter_for_user(request.user)
-#     num_unfiltered_samples = sample_qs.count()
-#     if sample_filters:
-#         sample_qs = sample_qs.filter(*sample_filters)
-#
-#     # Classification filters
-#     classification_filters = []
-#
-#     cs_data = {}
-#     for cs in ClassificationColumns.CLINICAL_SIGNIFICANCE_FILTERS:
-#         if request.GET.get(f"classification_{cs}"):
-#             cs_data[cs] = True
-#
-#     if q := ClassificationColumns.get_clinical_significance_q(cs_data):
-#         classification_filters.append(q)
-#
-#     if allele_origin := request.GET.get("classification_allele_origin"):
-#         if allele_origin != "A":
-#             classification_filters.append(Q(allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
-#
-#     if gene_symbol_str := request.GET.get("classification_gene_symbol"):
-#         if q := classification_gene_symbol_filter(gene_symbol_str):
-#             classification_filters.append(q)
-#
-#     # request.GET.get("classification_id_filter")
-#     if lab_id := request.GET.get("classification_lab"):
-#         lab_list = lab_id.split(",")
-#         classification_filters.append(Q(lab__pk__in=lab_list))
-#
-#     if ontology_terms := request.GET.get("classification_ontology_term_id"):
-#         terms = []
-#         for term_id in ontology_terms.split(","):
-#             terms.append(Q(condition_resolution__resolved_terms__contains=[{"term_id": term_id}]))
-#         if terms:
-#             q = reduce(operator.or_, terms)
-#             classification_filters.append(q)
-#
-#     if request.GET.get("classification_internal_requires_sample"):
-#         classification_filters.append(Q(lab__external=True) | Q(sample__isnull=False))
-#
-#     # Needs a variant to look in samples
-#     classification_qs = Classification.filter_for_user(request.user).filter(variant__isnull=False)
-#     num_unfiltered_classifications = classification_qs.count()
-#     if classification_filters:
-#         classification_qs = classification_qs.filter(*classification_filters)
-#
-#     request.GET.get("classification_user")
-#     # Search
-#     search_max_results = int(request.GET.get("search_max_results"))
-#     search_max_samples = int(request.GET.get("search_max_samples"))
-#     ZYG_NAMES = {
-#         "hom_ref": Zygosity.HOM_REF,
-#         "het": Zygosity.HET,
-#         "hom_alt": Zygosity.HOM_ALT,
-#     }
-#
-#     zygosities = []
-#     for zyg, code in ZYG_NAMES.items():
-#         if request.GET.get(f"search_{zyg}"):
-#             zygosities.append(code)
 #
 #     num_samples = sample_qs.count()
 #     print(f"filtered - kept {num_samples=} of {num_unfiltered_samples} samples")
@@ -166,3 +170,57 @@ def limit_sample_and_results(sample_records, max_samples, max_results):
 #         "sample_records": limit_sample_and_results(sample_records, search_max_samples, search_max_results),
 #     }
 #     return render(request, 'classification/sample_classification_search_results.html', context)
+
+class CrosssSampleClassificationCandidateSearchTask(AbstractCandidateSearchTask):
+    def get_candidate_records(self, candidate_search_run):
+        # Get out config
+        analysis_qs = Analysis.objects.none()
+
+        # Start searching
+        records = []
+        for analysis in analysis_qs:
+            variant = Variant.objects.first()
+            clinvar = None
+            notes = "TODO"
+            evidence = {
+
+            }
+
+            records.append(Candidate(
+                search_run=candidate_search_run,
+                analysis=analysis,
+                variant=variant,
+                clinvar=clinvar,
+                notes=notes,
+                evidence=evidence,
+            ))
+        return records
+
+
+class ClassificationEvidenceUpdateCandidateSearchTask(AbstractCandidateSearchTask):
+    def get_candidate_records(self, candidate_search_run):
+        # Get out config
+        analysis_qs = Analysis.objects.none()
+
+        # Start searching
+        records = []
+        for analysis in analysis_qs:
+            variant = Variant.objects.first()
+            clinvar = None
+            notes = "TODO"
+            evidence = {
+
+            }
+
+            records.append(Candidate(
+                search_run=candidate_search_run,
+                analysis=analysis,
+                variant=variant,
+                notes=notes,
+                evidence=evidence,
+            ))
+        return records
+
+CrosssSampleClassificationCandidateSearchTask = app.register_task(CrosssSampleClassificationCandidateSearchTask())
+ClassificationEvidenceUpdateCandidateSearchTask = app.register_task(ClassificationEvidenceUpdateCandidateSearchTask())
+

@@ -26,12 +26,12 @@ class ClassificationAlleleOriginForm(forms.Form):
 
 
 class ClinicalSignificanceForm(forms.Form):
-    other = forms.BooleanField()
-    benign = forms.BooleanField()
-    likely_benign = forms.BooleanField()
-    vus = forms.BooleanField()
-    likely_pathogenic = forms.BooleanField()
-    pathogenic = forms.BooleanField()
+    other = forms.BooleanField(required=False)
+    benign = forms.BooleanField(required=False)
+    likely_benign = forms.BooleanField(required=False)
+    vus = forms.BooleanField(required=False)
+    likely_pathogenic = forms.BooleanField(required=False)
+    pathogenic = forms.BooleanField(required=False)
 
     helper = form_helper_horizontal()
 

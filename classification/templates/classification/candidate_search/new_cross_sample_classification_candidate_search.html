@@ -147,127 +147,78 @@
         $(classificationSelects.join(',')).on("change", function() {
             filterClassificationGrid();
         });
-
-        $("button#search-samples").click(function() {
-            let sampleData = {};
-            sampleFilter(sampleData)
-
-            let classificationData = {};
-            classificationFilter(classificationData)
-
-            let scForm = $("#sample_classification_form");
-            let searchData = {
-                "max_samples": $("input#id_max_samples", scForm).val(),
-                "max_results": $("input#id_max_results", scForm).val(),
-            }
-            for (const cs of ["hom_ref", "het", "hom_alt"]) {
-                if ($(`#id_${cs}`).is(":checked")) {
-                    searchData[cs] = true;
-                }
-            }
-
-
-            let componentData = {
-                "search": searchData,
-                "sample": sampleData,
-                "classification": classificationData
-            }
-            // Sort for consistent GET caching
-            const params = new URLSearchParams()
-            for (const [component_label, component_data] of Object.entries(componentData)) {
-              for (const [key, value] of Object.entries(component_data)) {
-                  if (value != null) {
-                      params.append(`${component_label}_${key}`, value);
-                  }
-              }
-            }
-
-            const sortedParams = new URLSearchParams(
-              [...params.entries()].sort(([k1], [k2]) => k1.localeCompare(k2))
-            )
-            const query = sortedParams.toString()
-
-
-            console.log("search");
-            let resultsDiv = $("div#sample-classification-search-results");
-            let spinner = $('<i class="fa fa-spinner"></i>');
-            resultsDiv.empty().append(spinner);
-        });
-
     });
 </script>
 {% endblock %}
 {% block content %}
 <div class="container">
-
     <div>
         <a href="{% url 'classification_candidate_search' %}">Back to Classification Candidate Search</a>
     </div>
 
+    <form method="post">
+        {% csrf_token %}
+        {% settings_value 'CLASSIFICATION_GRID_SHOW_USERNAME' as CLASSIFICATION_GRID_SHOW_USERNAME %}
+        <div id="sample-classification-search-page">
+            <h2>Sample Classification Search</h2>
 
-    {% settings_value 'CLASSIFICATION_GRID_SHOW_USERNAME' as CLASSIFICATION_GRID_SHOW_USERNAME %}
-    <div id="sample-classification-search-page">
-        <h2>Sample Classification Search</h2>
+            {% page_help_embedded title='Note on re-analysis of repoted data' %}
+                <p>
+                    Please be aware that re-analysis of existing sequencing data may reveal previously unreported
+                    pathogenic or likely pathogenic variants. Such findings may obligate you to perform a review, issue
+                    an amended report, and notify the referring clinician in accordance with laboratory policy and
+                    regulatory requirements. It is recommended that you perform these queries with limits on the
+                    number of results returned.
+                </p>
+            {% end_page_help_embedded %}
 
-        {% page_help_embedded title='Note on re-analysis of repoted data' %}
-            <p>
-                Please be aware that re-analysis of existing sequencing data may reveal previously unreported
-                pathogenic or likely pathogenic variants. Such findings may obligate you to perform a review, issue
-                an amended report, and notify the referring clinician in accordance with laboratory policy and
-                regulatory requirements. It is recommended that you perform these queries with limits on the
-                number of results returned.
-            </p>
-        {% end_page_help_embedded %}
-        </div>
-
-        <div class="container">
-            <h3>Samples</h3>
-            <div class="row filter-row">
-                {% if num_sample_gene_lists %}
-                <div class="col-3">
-                    {{  num_sample_gene_lists }} of {{ num_visible_samples }} samples you can see have Sample Gene Lists
-                    {% crispy sample_gene_form form_helper.horizontal %}
+            <div class="container">
+                <h3>Samples</h3>
+                <div class="row filter-row">
+                    {% if num_sample_gene_lists %}
+                    <div class="col-3">
+                        {{  num_sample_gene_lists }} of {{ num_visible_samples }} samples you can see have Sample Gene Lists
+                        {% crispy sample_gene_form form_helper.horizontal %}
+                    </div>
+                    {% endif %}
+                    <div class="col-6">
+                        {% crispy sample_phenotype_form %}
+                    </div>
                 </div>
-                {% endif %}
-                <div class="col-6">
-                    {% crispy sample_phenotype_form %}
-                </div>
+                <table id="sample-datatable" data-datatable-data='sampleFilter' data-datatable-url="{% url 'samples_datatable' %}" class="sticky-header samples-table" data-adjust-columns="false"></table>
             </div>
-            <table id="sample-datatable" data-datatable-data='sampleFilter' data-datatable-url="{% url 'samples_datatable' %}" class="sticky-header samples-table" data-adjust-columns="false"></table>
-        </div>
 
-        <div class="container">
-            <h3>Classifications</h3>
+            <div class="container">
+                <h3>Classifications</h3>
+                <div>
+                    {% crispy clinical_significance_form  %}
+                </div>
+                <div class="row filter-row">
+                    <div class="col-md-4 col-lg-2">
+                        <br/>
+                        {% crispy gene_form form_helper.horizontal_no_labels %}
+                    </div>
+                    <div class="col-md-4 col-lg-2">
+                        {% if user_settings.default_lab %}
+                        <a class="hover-link" onclick="filterDefaultLab()" title="{{ user_settings.default_lab.name }}">Filter : My Lab</a>
+                        {% else %}<span style="visibility: hidden">.</span>{% endif %}
+                        {% crispy lab_form form_helper.horizontal_no_labels %}
+                    </div>
+                    {% if CLASSIFICATION_GRID_SHOW_USERNAME %}
+                    <div class="col-md-4 col-lg-2">
+                        <a class="hover-link" onclick="filterDefaultUser()">Filter : My Records</a>
+                        {% crispy user_form form_helper.horizontal_no_labels %}
+                    </div>
+                    {% endif %}
 
-            <div>
-                {% crispy clinical_significance_form  %}
-            </div>
-            <div class="row filter-row">
-                <div class="col-md-4 col-lg-2">
-                    <br/>
-                    {% crispy gene_form form_helper.horizontal_no_labels %}
-                </div>
-                <div class="col-md-4 col-lg-2">
-                    {% if user_settings.default_lab %}
-                    <a class="hover-link" onclick="filterDefaultLab()" title="{{ user_settings.default_lab.name }}">Filter : My Lab</a>
-                    {% else %}<span style="visibility: hidden">.</span>{% endif %}
-                    {% crispy lab_form form_helper.horizontal_no_labels %}
-                </div>
-                {% if CLASSIFICATION_GRID_SHOW_USERNAME %}
-                <div class="col-md-4 col-lg-2">
-                    <a class="hover-link" onclick="filterDefaultUser()">Filter : My Records</a>
-                    {% crispy user_form form_helper.horizontal_no_labels %}
-                </div>
-                {% endif %}
-
-                <div style="width: 160px" class="mx-3">
-                    Allele Origin<br/>
-                    {% allele_origin_toggle show_label=False %}
-                </div>
-                <div style="width: 160px" class="mx-3">
-                    Internal Classifications require sample<br/>
-                    <input id="id_internal_requires_sample" type="checkbox" checked="checked" />
-                </div>
+                    <div style="width: 160px" class="mx-3">
+                        Allele Origin<br/>
+                        {% allele_origin_toggle show_label=False %}
+                    </div>
+                    <div style="width: 160px" class="mx-3">
+                        Internal Classifications require sample<br/>
+                        <input id="id_internal_requires_sample" type="checkbox" checked="checked" />
+                    </div>
             </div>
             <div>
                 {% crispy classification_phenotype_form %}
@@ -275,12 +226,12 @@
 
             <table id="vc-datatable" data-datatable-data='classificationFilter' data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table"></table>
 
+            <div class="container" id="sample_classification_form">
+                <h3>Search</h3>
+                {% crispy sample_classification_form form_helper.horizontal %}
+            </div>
         </div>
-        <div class="container" id="sample_classification_form">
-            <h3>Search</h3>
-            {% crispy sample_classification_form form_helper.horizontal %}
-            <button class="btn btn-primary" id='search-samples'><i class="fas fa-search"></i> Search Samples for Classifications</button>
-        </div>
-
+        <button type="submit" class="btn btn-primary" id='search-samples'><i class="fas fa-search"></i> Search Samples for Classifications</button>
+    </form>
 </div>
 {% endblock %}

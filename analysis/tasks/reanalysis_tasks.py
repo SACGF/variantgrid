@@ -1,23 +1,16 @@
-from urllib import request
+from analysis.models import Analysis, Candidate
+from analysis.tasks.abstract_candidate_search_task import AbstractCandidateSearchTask
+from snpdb.models import Variant
+from variantgrid.celery import app
 
-from analysis.models import CandidateSearchRun, ReanalysisCandidate, Analysis
-from snpdb.models import ProcessingStatus, Variant
-from variantgrid import celery
 
-
-@celery.shared_task
-def reanalysis_new_annotation_task(candidate_search_run_id):
-    candidate_search_run = CandidateSearchRun.get_for_user(request.user, pk=candidate_search_run_id)
-    candidate_search_run.status = ProcessingStatus.PENDING
-    candidate_search_run.save()
-
-    records = []
-
-    try:
+class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
+    def get_candidate_records(self, candidate_search_run):
         # Get out config
         analysis_qs = Analysis.objects.none()
 
         # Start searching
+        records = []
         for analysis in analysis_qs:
             variant = Variant.objects.first()
             clinvar = None
@@ -26,7 +19,7 @@ def reanalysis_new_annotation_task(candidate_search_run_id):
 
             }
 
-            records.append(ReanalysisCandidate(
+            records.append(Candidate(
                 search_run=candidate_search_run,
                 analysis=analysis,
                 variant=variant,
@@ -34,11 +27,6 @@ def reanalysis_new_annotation_task(candidate_search_run_id):
                 notes=notes,
                 evidence=evidence,
             ))
+        return records
 
-        if records:
-            ReanalysisCandidate.objects.bulk_create(records, batch_size=1000)
-        candidate_search_run.status = ProcessingStatus.SUCCESS
-    except Exception as e:
-        candidate_search_run.status = ProcessingStatus.ERROR
-
-    candidate_search_run.save()
+ReAnalysisNewAnnotationTask = app.register_task(ReAnalysisNewAnnotationTask())
