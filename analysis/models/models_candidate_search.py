@@ -97,6 +97,12 @@ class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMod
         CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE: ("classification.tasks.classification_candidate_search_tasks.ClassificationEvidenceUpdateCandidateSearchTask", 1),
     }
 
+    CANDIDATE_GRID_COLUMNS = {
+        CandidateSearchType.REANALYSIS_NEW_ANNOTATION: ["variant", "sample", "analysis", "annotation_version", "clinvar", "zygosity"],
+        CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION: ["classification", "sample", "zygosity"],
+        CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE: ["classification", "annotation_version", "clinvar"],
+    }
+
     def __str__(self):
         return f"{self.search_version}: {self.pk}"
 
