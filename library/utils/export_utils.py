@@ -189,29 +189,21 @@ def get_decorated_methods(cls, categories: Optional[dict[Any, Any]], attribute: 
         def passes_filter(export_method) -> bool:
             nonlocal categories
             # FIXME, some non-NONE but falsey values could get confused here, e.g. 0 and False
-            decorated_values = export_method.categories or {}
-            # for every requirement of categories
-            for key, value in categories.items():
-                # get the decorated value
-                value_set: set
-                if isinstance(value, (set, tuple, list)):
-                    value_set = set(value)
-                else:
-                    value_set = {value}
 
-                if decorated_value := decorated_values.get(key):
-                    decorated_set: set
-                    if isinstance(decorated_value, (set, tuple, list)):
-                        decorated_set = set(decorated_value)
+            if decorated_values := export_method.categories:
+                for method_key, method_value in decorated_values.items():
+
+                    if category_value := categories.get(method_key):
+                        if isinstance(category_value, (set, tuple, list)):
+                            if method_value not in category_value:
+                                return False
+                        elif category_value != method_value:
+                            return False
+
+                    elif method_value is False:
+                        pass  # setting a value to False means only exclude it when providing True forthe value
                     else:
-                        decorated_set = {decorated_value}
-                    return bool(value_set.intersection(decorated_set))
-
-                    # handle decorated value being a collection (and matching a single value in that collection)
-                # if the requirement for the category is None and there's no value at all in the decorator
-                # it passes the test
-                elif value is not None:
-                    return False
+                        pass
 
             return True
 
