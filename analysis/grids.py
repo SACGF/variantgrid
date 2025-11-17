@@ -13,7 +13,8 @@ from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 from django.utils.functional import SimpleLazyObject
 
-from analysis.models import Analysis, AnalysisNode, NodeCount, NodeStatus, AnalysisTemplate, GroupOperation
+from analysis.models import Analysis, AnalysisNode, NodeCount, NodeStatus, AnalysisTemplate, GroupOperation, \
+    CandidateSearchRun, CandidateSearchType
 from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.models.nodes.analysis_node import get_extra_filters_q, NodeColumnSummaryCacheCollection
 from analysis.views.analysis_permissions import get_node_subclass_or_404
@@ -33,7 +34,7 @@ from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_
 from snpdb.grid_columns.grid_sample_columns import get_available_format_columns, \
     get_variantgrid_zygosity_annotation_kwargs
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, CohortGenotype
+from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, CohortGenotype, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.views.datatable_view import DatatableConfig, RichColumn
 
@@ -721,3 +722,31 @@ class AnalysisLogEntryColumns(DatatableConfig[LogEntry]):
             analysis = Analysis.get_for_user(self.user, pk=analysis_id)
             qs = analysis.log_entry_qs()
         return qs
+
+
+class CandidateSearchRunColumns(DatatableConfig[LogEntry]):
+    def __init__(self, request):
+        super().__init__(request)
+        self.user = request.user
+        self.rich_columns = [
+            RichColumn('id',
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="search_version__search_type", orderable=True, renderer=self.render_search_type),
+            RichColumn(key="search_version__code_version", orderable=True),
+            RichColumn(key="user__username", label="User", orderable=True),
+            RichColumn(key="status", label="Status", orderable=True, renderer=self.render_status),
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[LogEntry]:
+        qs = CandidateSearchRun.filter_for_user(self.user)
+        return qs
+
+    @staticmethod
+    def render_search_type(row: dict[str, Any]):
+        return CandidateSearchType(row["search_version__search_type"]).label
+
+    @staticmethod
+    def render_status(row: dict[str, Any]):
+        return ProcessingStatus(row["status"]).label
+

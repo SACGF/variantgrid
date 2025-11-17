@@ -1,7 +1,7 @@
 from analysis.grids import AnalysesGrid, NodeColumnSummaryGrid, KaromappingAnalysesGrid, AnalysisTemplatesGrid, \
     AnalysisNodeIssuesGrid, NodeOntologyGenesGrid, NodeGeneDiseaseClassificationGenesGrid, \
     NodeTissueExpressionGenesGrid, NodeTissueUniProtTissueSpecificityGenesGrid, NodeGeneListGenesColumns, \
-    AnalysisLogEntryColumns
+    AnalysisLogEntryColumns, CandidateSearchRunColumns
 from analysis.views import views, views_json, views_grid, views_karyomapping, views_autocomplete, views_candidate_search
 from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
@@ -147,6 +147,10 @@ urlpatterns = [
     path('candidate_search/<int:pk>', views_candidate_search.view_candidate_search_run, name='view_candidate_search_run'),
     path('candidate_search/reanalysis/new', views_candidate_search.new_reanalyis_candidate_search, name='new_reanalysis_candidate_search'),
     path('candidate_search/reanalysis', views_candidate_search.reanalyis, name='reanalysis'),
+
+    path('candidate_search/runs/datatable',
+         DatabaseTableView.as_view(column_class=CandidateSearchRunColumns),
+         name='candidate_search_runs_datatable'),
 
     # Autocompletes
     path('autocomplete/Analysis/', views_autocomplete.AnalysisAutocompleteView.as_view(), name='analysis_autocomplete'),

@@ -11,6 +11,17 @@
 {% block title %}Classification Candidate Search{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
+<script>
+    function filterCandidateSearchRunGrid() {
+        // TODO: This is for when we want to trigger reload after changing filters
+        $('#candidate-search-run-datatable').DataTable().ajax.reload();
+    }
+
+
+    function candidateSearchRunFilter(data, type) {
+        // TODO: This is where we should filter to ONLY certain types - ie classification ones
+    }
+</script>
 {% endblock %}
 {% block content %}
 <div class="container">
@@ -33,6 +44,7 @@
 
     <div>
         Grid of previous runs, summary and links etc
+        <table id="candidate-search-run-datatable" data-datatable-data='candidateSearchRunFilter' data-datatable-url="{% url 'candidate_search_runs_datatable' %}" class="sticky-header samples-table" data-adjust-columns="false"></table>
     </div>
 
 </div>
