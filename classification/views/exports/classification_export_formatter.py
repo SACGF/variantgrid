@@ -40,10 +40,6 @@ class ClassificationExportFormatter(ABC):
         return ""
 
     @property
-    def is_genome_build_relevant(self) -> bool:
-        return True
-
-    @property
     def genome_build(self) -> GenomeBuild:
         return self.classification_filter.genome_build
 

@@ -30,18 +30,17 @@ class ClassificationGroupingExportProcess:
         :param extension_override: If creating a wrapper file, e.g. "zip"
         :return: The appropriate filename
         """
-        filename_parts: list[str] = []
-        if file_prefix := self.format_properties.filename_suffix:
-            filename_parts.append(file_prefix)
-
+        filename_parts: list[str] = ["classifications"]
         # if self.classification_filter.allele_origin_filter != AlleleOriginFilterDefault.SHOW_ALL:
         #     filename_parts.append(self.classification_filter.allele_origin_filter.label.lower())
 
-        # FIXME add date_str back
-        # filename_parts.append(self.classification_filter.date_str)
+        filename_parts.append(self.classification_export_format.classification_grouping_filter.date_str)
 
-        if self.format_properties.is_genome_build_relevant:
-            filename_parts.append(str(self.classification_export_format.classification_grouping_filter.genome_build))
+        if custom_parts := self.classification_export_format.extra_filename_parts():
+            filename_parts.extend(custom_parts)
+
+        if lab_mode := self.classification_export_format.classification_grouping_filter.lab_mode:
+            filename_parts.append(lab_mode)
 
         # set by the decorator
         # noinspection PyUnresolvedReferences
@@ -102,7 +101,7 @@ class ClassificationGroupingExportProcess:
 
     def with_new_lines(self, data: list[str]) -> list[str]:
         if data:
-            return [row + self.format_properties.delimiter_for_row for row in data]
+            return [str(row) + self.format_properties.delimiter_for_row for row in data]
         else:
             return []
 
