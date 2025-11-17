@@ -70,7 +70,7 @@ class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMod
 
     TASKS_AND_VERSIONS = {
         CandidateSearchType.REANALYSIS_NEW_ANNOTATION: ("analysis.tasks.reanalysis_tasks.ReAnalysisNewAnnotationTask", 1),
-        CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION: ("classification.tasks.classification_candidate_search_tasks.CrosssSampleClassificationCandidateSearchTask", 1),
+        CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION: ("classification.tasks.classification_candidate_search_tasks.CrossSampleClassificationCandidateSearchTask", 1),
         CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE: ("classification.tasks.classification_candidate_search_tasks.ClassificationEvidenceUpdateCandidateSearchTask", 1),
     }
 
