@@ -98,8 +98,8 @@ class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMod
     }
 
     CANDIDATE_GRID_COLUMNS = {
-        CandidateSearchType.REANALYSIS_NEW_ANNOTATION: ["variant", "sample", "analysis", "annotation_version", "clinvar", "zygosity"],
-        CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION: ["classification", "sample", "zygosity"],
+        CandidateSearchType.REANALYSIS_NEW_ANNOTATION: ["variant", "sample__name", "analysis", "annotation_version", "clinvar", "zygosity"],
+        CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION: ["classification", "sample__name", "zygosity"],
         CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE: ["classification", "annotation_version", "clinvar"],
     }
 

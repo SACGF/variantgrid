@@ -767,13 +767,18 @@ class CandidateColumns(DatatableConfig[LogEntry]):
             RichColumn(key="evidence", label="Evidence", orderable=True),
             RichColumn(key="reviewer__username", label="User", orderable=True),
             RichColumn(key="reviewer_comment", label="Reviewer Comment", orderable=True),
+            RichColumn(
+                key='sample_id',
+                name='sample_id',
+                visible=False,  # Only used to build links
+            ),
         ]
 
         # Show/hide various columns based on search type (as we only use some)
         optional_columns = [
             RichColumn(key="variant", label="Variant", orderable=True),
-            RichColumn(key="classification", label="Classification", orderable=True),
-            RichColumn(key="sample", label="Sample", orderable=True),
+            RichColumn(key="classification", label="Classification", orderable=True, client_renderer="classification_summary_renderer"),
+            RichColumn(key="sample__name", label="Sample", orderable=True, client_renderer='VCTable.sample'),
             RichColumn(key="analysis", label="Analysis", orderable=True),
             RichColumn(key="annotation_version", label="Annotation Version", orderable=True),
             RichColumn(key="clinvar", label="ClinVar", orderable=True),

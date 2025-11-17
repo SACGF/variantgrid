@@ -11,6 +11,16 @@
 {% block title %}Classification Candidate Search: {{ candidate_search_run }}{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
+<script>
+function classification_summary_renderer(data, type, row) {
+    console.log("classification_summary_renderer");
+    console.log(data);
+    console.log(row);
+
+    // TODO: Do other stuff...
+    return data;
+}
+</script>
 {% endblock %}
 {% block content %}
 <div class="container">
