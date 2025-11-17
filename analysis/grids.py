@@ -14,7 +14,7 @@ from django.urls.base import reverse
 from django.utils.functional import SimpleLazyObject
 
 from analysis.models import Analysis, AnalysisNode, NodeCount, NodeStatus, AnalysisTemplate, GroupOperation, \
-    CandidateSearchRun, CandidateSearchType
+    CandidateSearchRun, CandidateSearchType, Candidate, CandidateStatus
 from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.models.nodes.analysis_node import get_extra_filters_q, NodeColumnSummaryCacheCollection
 from analysis.views.analysis_permissions import get_node_subclass_or_404
@@ -734,11 +734,12 @@ class CandidateSearchRunColumns(DatatableConfig[LogEntry]):
                        client_renderer='TableFormat.linkUrl'),
             RichColumn(key="search_version__search_type", orderable=True, renderer=self.render_search_type),
             RichColumn(key="search_version__code_version", orderable=True),
+            RichColumn(key="created", label="Created", orderable=True),
             RichColumn(key="user__username", label="User", orderable=True),
             RichColumn(key="status", label="Status", orderable=True, renderer=self.render_status),
         ]
 
-    def get_initial_queryset(self) -> QuerySet[LogEntry]:
+    def get_initial_queryset(self) -> QuerySet[CandidateSearchRun]:
         qs = CandidateSearchRun.filter_for_user(self.user)
         return qs
 
@@ -750,3 +751,38 @@ class CandidateSearchRunColumns(DatatableConfig[LogEntry]):
     def render_status(row: dict[str, Any]):
         return ProcessingStatus(row["status"]).label
 
+
+class CandidateColumns(DatatableConfig[LogEntry]):
+    def __init__(self, request):
+        super().__init__(request)
+        self.user = request.user
+        self.rich_columns = [
+            RichColumn('id', visible=False),
+            RichColumn(key="status", orderable=True, renderer=self.render_status),
+            RichColumn(key="notes", orderable=True),
+            RichColumn(key="evidence", label="Evidence", orderable=True),
+            RichColumn(key="reviewer__username", label="User", orderable=True),
+            RichColumn(key="reviewer_comment", label="Reviewer Comment", orderable=True),
+            RichColumn(key="variant", label="Variant", orderable=True),
+            RichColumn(key="classification", label="Classification", orderable=True),
+            RichColumn(key="sample", label="Sample", orderable=True),
+            RichColumn(key="analysis", label="Analysis", orderable=True),
+            RichColumn(key="annotation_version", label="Annotation Version", orderable=True),
+            RichColumn(key="clinvar", label="ClinVar", orderable=True),
+            RichColumn(key="zygosity", label="Zygosity", orderable=True, renderer=self.render_zygosity),
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[Candidate]:
+        csr_id = self.get_query_param("candidate_search_run_id")
+        # Retrieve for Permission check
+        csr = CandidateSearchRun.get_for_user(self.user, pk=csr_id)
+        qs = Candidate.objects.filter(search_run=csr)
+        return qs
+
+    @staticmethod
+    def render_status(row: dict[str, Any]):
+        return CandidateStatus(row["status"]).label
+
+    @staticmethod
+    def render_zygosity(row: dict[str, Any]):
+        return Zygosity(row["zygosity"]).label

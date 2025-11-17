@@ -42,6 +42,13 @@ class CandidateSearchType(models.TextChoices):
             raise ValueError(f"Method not defined for {self}")
         return methods
 
+    def is_analysis_type(self):
+        return self in (CandidateSearchType.REANALYSIS_NEW_ANNOTATION, )
+
+    def is_classification_type(self):
+        return self in (CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION, CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE)
+
+
 class CandidateStatus(models.TextChoices):
     OPEN = 'O', 'OPEN'
     RESOLVED = 'R', 'RESOLVED'
@@ -58,6 +65,22 @@ class CandidateSearchVersion(TimeStampedModel):
     class Meta:
         unique_together = ('search_type', 'code_version')
 
+    def __str__(self) -> str:
+        description = self.get_search_type_display()
+        if self.code_version > 1:
+            description += f"/v{self.code_version}"
+        return description
+
+    def get_type_base_page_url(self) -> str | None:
+        url = None
+        search_type = CandidateSearchType(self.search_type)
+        if search_type.is_analysis_type():
+            url = reverse("reanalysis")
+        elif search_type.is_classification_type():
+            url = reverse("classification_candidate_search")
+        return url
+
+
 
 class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     search_version = models.ForeignKey(CandidateSearchVersion, on_delete=CASCADE)
@@ -73,6 +96,9 @@ class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMod
         CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION: ("classification.tasks.classification_candidate_search_tasks.CrossSampleClassificationCandidateSearchTask", 1),
         CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE: ("classification.tasks.classification_candidate_search_tasks.ClassificationEvidenceUpdateCandidateSearchTask", 1),
     }
+
+    def __str__(self):
+        return f"{self.search_version}: {self.pk}"
 
     def get_absolute_url(self) -> str:
         return reverse("view_candidate_search_run", kwargs={"pk": self.pk})

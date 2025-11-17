@@ -15,11 +15,32 @@
 {% block content %}
 <div class="container">
 
-    {{ candidate_search_run }}
+    {% with back_url=candidate_search_run.search_version.get_type_base_page_url %}
+        {% if back_url %}
+            <a href="{{ back_url }}">Back to runs</a>
+        {% endif %}
+    {% endwith %}
 
-    <div>
-        Grid of results
+
+    <div class="card">
+        <div class="card-header">{{ candidate_search_run }}</div>
+        <div class="card-body">
+            {% labelled id='search_version' label='' hint="tiny" %}{{ candidate_search_run.search_version }}{% endlabelled %}
+            {% labelled id='created' label='Created' hint="tiny" %}{{ candidate_search_run.created }}{% endlabelled %}
+            {% labelled id='user' label='User' hint="tiny" %}{{ candidate_search_run.user }}{% endlabelled %}
+            {% labelled id='celery_task' label='Celery Task' hint="tiny" %}{{ candidate_search_run.celery_task }}{% endlabelled %}
+            {% labelled id='status' label='Status' hint="tiny" %}{{ candidate_search_run.get_status_display }}{% endlabelled %}
+            {% labelled id='error_exception' label='Error' hint="tiny" %}{{ candidate_search_run.error_exception }}{% endlabelled %}
+            {% labelled id='config_snapshot' label='Config' hint="tiny" %}{{ candidate_search_run.config_snapshot }}{% endlabelled %}
+            {% labelled id='git_hash' label='' hint="tiny" %}{{ candidate_search_run.git_hash }}{% endlabelled %}
+        </div>
     </div>
+
+    {% if candidate_search_run.status == 'S' %}
+        <div>
+            <table id="candidate-datatable" data-datatable-url="{% url 'candidate_datatable' candidate_search_run.pk %}" class="sticky-header samples-table" data-adjust-columns="false"></table>
+        </div>
+    {% endif %}
 
 </div>
 {% endblock %}
