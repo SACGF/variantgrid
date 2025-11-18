@@ -18,6 +18,19 @@
 </style>
 
 <script>
+
+
+function candidate_action_renderer(data, type, row) {
+    let outterDom = $('<div>').css("display", "inline-block");
+    let dom = $('<div>').appendTo(outterDom);
+    let url = data['url'];
+    let text = data['text'];
+    if (url && text) {
+        dom.append($("<a>", {href: url, html: text}));
+    }
+    return outterDom;
+}
+
 function classification_summary_renderer(data, type, row) {
     const CLIN_SIG = {
         '1': 'B',

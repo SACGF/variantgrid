@@ -147,6 +147,9 @@ urlpatterns = [
     path('candidate_search/<int:pk>', views_candidate_search.view_candidate_search_run, name='view_candidate_search_run'),
     path('candidate_search/reanalysis/new', views_candidate_search.new_reanalyis_candidate_search, name='new_reanalysis_candidate_search'),
     path('candidate_search/reanalysis', views_candidate_search.reanalyis, name='reanalysis'),
+    path('candidate_search/candidate/classify/<int:candidate_id>',
+         views_candidate_search.CreateClassificationForCandidateView.as_view(),
+         name='create_classification_for_candidate'),
 
     path('candidate_search/runs/datatable',
          DatabaseTableView.as_view(column_class=CandidateSearchRunColumns),

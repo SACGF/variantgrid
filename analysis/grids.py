@@ -766,7 +766,7 @@ class CandidateColumns(DatatableConfig[LogEntry]):
             RichColumn(key="status", orderable=True, renderer=self.render_status),
             RichColumn(key="notes", orderable=True),
             RichColumn(key="evidence", label="Evidence", orderable=True, client_renderer='TableFormat.json'),
-            RichColumn(key="reviewer__username", label="User", orderable=True),
+            RichColumn(key="reviewer__username", label="Reviewer", orderable=True),
             RichColumn(key="reviewer_comment", label="Reviewer Comment", orderable=True),
             RichColumn(
                 key='sample_id',
@@ -777,6 +777,9 @@ class CandidateColumns(DatatableConfig[LogEntry]):
 
         # Show/hide various columns based on search type (as we only use some)
         optional_columns = [
+            # search type is used as an "Action" (as we don't need to see the type as they are all the same)
+            RichColumn(key="search_run__search_version__search_type", label="Action", orderable=True,
+                       renderer=self.render_search_type, client_renderer='candidate_action_renderer'),
             RichColumn(key="variant", label="Variant", orderable=True),
             RichColumn(key="classification",
                        label="Classification",
@@ -819,3 +822,14 @@ class CandidateColumns(DatatableConfig[LogEntry]):
             'g_hgvs': row.get('classification__evidence__g_hgvs__value'),
             'clinical_significance': row.get('classification__clinical_significance'),
         }
+
+    @staticmethod
+    def render_search_type(row: dict[str, Any]) -> JsonDataType:
+        search_type = row["search_run__search_version__search_type"]
+        if search_type == CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION.value:
+            data = {
+                "url": reverse("create_classification_for_candidate", args=[row["id"]]),
+                "text": "Classify sample",
+            }
+
+        return data
