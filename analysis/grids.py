@@ -9,6 +9,7 @@ from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied
 from django.db.models import Max, F, Q, QuerySet
 from django.db.models.functions import Substr
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 from django.utils.functional import SimpleLazyObject
@@ -764,7 +765,7 @@ class CandidateColumns(DatatableConfig[LogEntry]):
             RichColumn('id', visible=False),
             RichColumn(key="status", orderable=True, renderer=self.render_status),
             RichColumn(key="notes", orderable=True),
-            RichColumn(key="evidence", label="Evidence", orderable=True),
+            RichColumn(key="evidence", label="Evidence", orderable=True, client_renderer='TableFormat.json'),
             RichColumn(key="reviewer__username", label="User", orderable=True),
             RichColumn(key="reviewer_comment", label="Reviewer Comment", orderable=True),
             RichColumn(
@@ -777,7 +778,16 @@ class CandidateColumns(DatatableConfig[LogEntry]):
         # Show/hide various columns based on search type (as we only use some)
         optional_columns = [
             RichColumn(key="variant", label="Variant", orderable=True),
-            RichColumn(key="classification", label="Classification", orderable=True, client_renderer="classification_summary_renderer"),
+            RichColumn(key="classification",
+                       label="Classification",
+                       orderable=True,
+                       extra_columns=[
+                           'classification__evidence__c_hgvs__value',
+                           'classification__evidence__g_hgvs__value',
+                           'classification__clinical_significance',
+                       ],
+                       renderer=self.render_classification_summary,
+                       client_renderer="classification_summary_renderer"),
             RichColumn(key="sample__name", label="Sample", orderable=True, client_renderer='VCTable.sample'),
             RichColumn(key="analysis", label="Analysis", orderable=True),
             RichColumn(key="annotation_version", label="Annotation Version", orderable=True),
@@ -788,7 +798,6 @@ class CandidateColumns(DatatableConfig[LogEntry]):
         for rc in optional_columns:
             if rc.key in columns:
                 self.rich_columns.append(rc)
-
 
     def get_initial_queryset(self) -> QuerySet[Candidate]:
         qs = Candidate.objects.filter(search_run=self.csr)
@@ -801,3 +810,12 @@ class CandidateColumns(DatatableConfig[LogEntry]):
     @staticmethod
     def render_zygosity(row: dict[str, Any]):
         return Zygosity.display(row["zygosity"])
+
+    @staticmethod
+    def render_classification_summary(row: dict[str, Any]) -> JsonDataType:
+        return {
+            "classification": row["classification"],
+            'c_hgvs': row.get('classification__evidence__c_hgvs__value'),
+            'g_hgvs': row.get('classification__evidence__g_hgvs__value'),
+            'clinical_significance': row.get('classification__clinical_significance'),
+        }

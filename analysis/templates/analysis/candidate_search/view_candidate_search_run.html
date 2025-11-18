@@ -11,14 +11,33 @@
 {% block title %}Classification Candidate Search: {{ candidate_search_run }}{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
+<style>
+.c-pill {
+    width: 50px; /* shrink a lot */
+}
+</style>
+
 <script>
 function classification_summary_renderer(data, type, row) {
-    console.log("classification_summary_renderer");
-    console.log(data);
-    console.log(row);
+    const CLIN_SIG = {
+        '1': 'B',
+        '2': 'LB',
+        '3': 'VUS',
+        '4': 'LP',
+        '5': 'P',
+    }
+    let outterDom = $('<div>').css("display", "inline-block");
+    let dom = $('<div>').appendTo(outterDom);
 
-    // TODO: Do other stuff...
-    return data;
+    let hgvs = data["c_hgvs"] || data["g_hgvs"];
+    let classificationId = data["classification"];
+    let classificationUrl = Urls.view_classification(classificationId);
+    let classificationLink = $("<a>", {href: classificationUrl, html: hgvs})
+    dom.append(classificationLink);
+    let csVal = CLIN_SIG[data["clinical_significance"]] || "";
+    let csClass = `cs-` + (csVal || '').toLowerCase()
+    dom.append($('<span>', {class: `c-pill cs ${csClass}`, html: csVal}));
+    return outterDom;
 }
 </script>
 {% endblock %}
