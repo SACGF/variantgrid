@@ -150,3 +150,10 @@ class Candidate(TimeStampedModel):
 
     class Meta:
         ordering = ('-created',)
+
+    @staticmethod
+    def get_permission_check(pk, user, write=False):
+        """ Checks user has permission on CandidateSearchRun """
+        c = Candidate.objects.get(pk=pk)
+        c.search_run.check_permission(user, write)
+        return c
