@@ -9,7 +9,7 @@ from django.db.models import Q
 from analysis.models import Candidate
 from analysis.tasks.abstract_candidate_search_task import AbstractCandidateSearchTask
 from classification.enums import AlleleOriginBucket
-from classification.models import Classification
+from classification.models import Classification, ClassificationModification
 from classification.models.classification_utils import classification_gene_symbol_filter
 from classification.views.classification_datatables import ClassificationColumns
 from patients.models_enums import Zygosity
@@ -80,7 +80,7 @@ class CrossSampleClassificationCandidateSearchTask(AbstractCandidateSearchTask):
 
         if allele_origin := config.get("allele_origin"):
             if allele_origin != "A":
-                classification_filters.append(Q(allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
+                classification_filters.append(Q(classification__allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
 
         if gene_symbol_str := config.get("gene_symbol"):
             if q := classification_gene_symbol_filter(gene_symbol_str):
@@ -94,19 +94,20 @@ class CrossSampleClassificationCandidateSearchTask(AbstractCandidateSearchTask):
         if ontology_terms := config.get("ontology_term_id"):
             terms = []
             for term_id in ontology_terms.split(","):
-                terms.append(Q(condition_resolution__resolved_terms__contains=[{"term_id": term_id}]))
+                terms.append(Q(classification__condition_resolution__resolved_terms__contains=[{"term_id": term_id}]))
             if terms:
                 q = reduce(operator.or_, terms)
                 classification_filters.append(q)
 
         if config.get("internal_requires_sample"):
-            classification_filters.append(Q(lab__external=True) | Q(sample__isnull=False))
+            classification_filters.append(Q(classification__lab__external=True) | Q(classification__sample__isnull=False))
 
         # TODO
         config.get("user")
 
-        # Needs a variant to look in samples
-        classification_qs = Classification.filter_for_user(user).filter(variant__isnull=False)
+        classification_qs = ClassificationModification.latest_for_user(
+            user=user,
+            published=True)
         if classification_filters:
             classification_qs = classification_qs.filter(*classification_filters)
         return classification_qs
@@ -114,8 +115,8 @@ class CrossSampleClassificationCandidateSearchTask(AbstractCandidateSearchTask):
     @staticmethod
     def _sample_classification_overlaps(samples_qs, classification_qs, zygosities):
         classifications_by_allele = defaultdict(set)
-        for c in classification_qs:
-            classifications_by_allele[c.variant.allele].add(c)
+        for cm in classification_qs:
+            classifications_by_allele[cm.classification.variant.allele].add(cm.classification)
 
         for genome_build in GenomeBuild.builds_with_annotation():
             variant_q = Classification.get_variant_q_from_classification_qs(classification_qs, genome_build)
