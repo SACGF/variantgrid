@@ -11,7 +11,7 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
-from analysis.models import AnalysisVariable, AnalysisTemplate, NodeCount, VariantTag
+from analysis.models import AnalysisVariable, AnalysisTemplate, NodeCount, VariantTag, CandidateSearchRun
 from analysis.models.enums import TagLocation
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import NodeStatus, AnalysisEdge, AnalysisNode
@@ -22,7 +22,7 @@ from analysis.models.nodes.filters.venn_node import VennNode
 from analysis.models.nodes.node_types import get_node_types_hash_by_class_name
 from analysis.models.nodes.node_utils import reload_analysis_nodes, update_analysis, \
     get_toposorted_nodes, get_rendering_dict
-from analysis.serializers import VariantTagSerializer
+from analysis.serializers import VariantTagSerializer, CandidateSearchRunSerializer
 from analysis.tasks.analysis_update_tasks import populate_clingen_alleles_from_analysis_node
 from analysis.views.analysis_permissions import get_analysis_or_404, get_node_subclass_or_404, \
     get_node_subclass_or_non_fatal_exception
@@ -448,3 +448,10 @@ def analysis_template_clone(request, pk):
     new_analysis_template = analysis_template.clone(request.user)
     reload_analysis_nodes(new_analysis_template.analysis.pk)
     return JsonResponse({"analysis_template_id": new_analysis_template.pk})
+
+
+def get_candidate_search_run_json(request, pk):
+    candidate_search_run = CandidateSearchRun.get_for_user(request.user, pk=pk)
+    serializer = CandidateSearchRunSerializer(candidate_search_run)
+    return JsonResponse(serializer.data)
+

@@ -106,6 +106,9 @@ class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMod
     def __str__(self):
         return f"{self.search_version}: {self.pk}"
 
+    def is_running(self) -> bool:
+        return self.status in ProcessingStatus.RUNNING_STATES
+
     def get_absolute_url(self) -> str:
         return reverse("view_candidate_search_run", kwargs={"pk": self.pk})
 

@@ -143,7 +143,7 @@ urlpatterns = [
     path('karyomapping/download_karyomapping_gene_csv/<int:pk>/', views_karyomapping.download_karyomapping_gene_csv, name='download_karyomapping_gene_csv'),
     path('karyomapping/analyses/grid/<slug:op>/', JQGridView.as_view(grid=KaromappingAnalysesGrid, delete_row=True), name='karyomapping_analyses_grid'),
 
-    # Reanalysis
+    # Candidates / Reanalysis
     path('candidate_search/<int:pk>', views_candidate_search.view_candidate_search_run, name='view_candidate_search_run'),
     path('candidate_search/reanalysis/new', views_candidate_search.new_reanalyis_candidate_search, name='new_reanalysis_candidate_search'),
     path('candidate_search/reanalysis', views_candidate_search.reanalyis, name='reanalysis'),
@@ -152,6 +152,8 @@ urlpatterns = [
     path('candidate_search/candidate/classify/<int:candidate_id>',
          views_candidate_search.CreateClassificationForCandidateView.as_view(),
          name='classify_candidate'),
+    path('candidate_search/json/<int:pk>', views_json.get_candidate_search_run_json,
+         name='get_candidate_search_run_json'),
 
     path('candidate_search/runs/datatable',
          DatabaseTableView.as_view(column_class=CandidateSearchRunColumns),

@@ -4,7 +4,7 @@ from analysis.models import AnalysisVariable, FilterNode, FilterNodeItem, Phenot
     ClassificationsNode, DamageNode, VennNode, ZygosityNode, TrioNode, CohortNode, PedigreeNode, \
     TissueNode, SelectedInParentNode, SampleNode, PopulationNode, PopulationNodeGnomADPopulation, GeneListNode, \
     IntersectionNode, GeneListNodeGeneList, Analysis, AlleleFrequencyNode, AllVariantsNode, TagNode, MergeNode, \
-    PhenotypeNodeOntologyTerm
+    PhenotypeNodeOntologyTerm, CandidateSearchRun
 from analysis.models.models_variant_tag import VariantTag
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyRange, NodeAlleleFrequencyFilter, AnalysisNode, \
     NodeWiki
@@ -307,3 +307,9 @@ class VariantTagSerializer(serializers.ModelSerializer):
     def get_can_write(self, obj):
         user = self.context['request'].user
         return obj.can_write(user)
+
+
+class CandidateSearchRunSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CandidateSearchRun
+        fields = "__all__"

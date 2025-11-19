@@ -15,9 +15,51 @@
 .c-pill {
     width: 50px; /* shrink a lot */
 }
+#loading-spinner {
+    display: none;
+}
 </style>
-
 <script>
+
+const INITIAL_UPDATE_SECS = 1;
+const MAX_UPDATE_SECS = 16;
+let update_secs = INITIAL_UPDATE_SECS;
+
+
+// Upon page loading - if status is loading - then add a spinner next to the status + poll
+// use exponential backoff
+// upon it being anything different than the page, reload
+function poll_candidate_search_run() {
+    console.log("poll_candidate_search_run");
+    $("#candidate-search-status").hide();
+    $("#loading-spinner").show();
+
+    $.ajax({
+        url: "{% url 'get_candidate_search_run_json' candidate_search_run.pk %}",
+        dataType: 'json',
+        success: function(data) {
+            $("#loading-spinner").hide();
+            console.log(data);
+            let initialStatus = "{{ candidate_search_run.status }}";
+            if (data["status"] !== initialStatus) {
+                window.location.reload();
+            } else {
+                if (update_secs < MAX_UPDATE_SECS) {
+                    update_secs *= 2;
+                }
+                console.log("Sleeping for " + update_secs + " secs");
+                setTimeout(poll_candidate_search_run, update_secs * 1000);
+                $("#candidate-search-status").show();
+            }
+        },
+        error: function(jqXHR, textStatus, errorThrown) {
+            // display a message about it being an error
+            $("#loading-spinner").hide();
+        }
+    });
+
+
+}
 
 
 function candidate_action_renderer(data, type, row) {
@@ -52,6 +94,14 @@ function classification_summary_renderer(data, type, row) {
     dom.append($('<span>', {class: `c-pill cs ${csClass}`, html: csVal}));
     return outterDom;
 }
+
+$(document).ready(function() {
+    {% if candidate_search_run.is_running %}
+        // is running
+        setTimeout(poll_candidate_search_run, update_secs * 1000);
+    {% endif %}
+});
+
 </script>
 {% endblock %}
 {% block content %}
@@ -69,11 +119,16 @@ function classification_summary_renderer(data, type, row) {
             {% labelled id='search_version' label='' hint="tiny" %}{{ candidate_search_run.search_version }}{% endlabelled %}
             {% labelled id='created' label='Created' hint="tiny" %}{{ candidate_search_run.created }}{% endlabelled %}
             {% labelled id='user' label='User' hint="tiny" %}{{ candidate_search_run.user }}{% endlabelled %}
-            {% labelled id='celery_task' label='Celery Task' hint="tiny" %}{{ candidate_search_run.celery_task }}{% endlabelled %}
-            {% labelled id='status' label='Status' hint="tiny" %}{{ candidate_search_run.get_status_display }}{% endlabelled %}
-            {% labelled id='error_exception' label='Error' hint="tiny" %}{{ candidate_search_run.error_exception }}{% endlabelled %}
-            {% labelled id='config_snapshot' label='Config' hint="tiny" %}{{ candidate_search_run.config_snapshot }}{% endlabelled %}
-            {% labelled id='git_hash' label='' hint="tiny" %}{{ candidate_search_run.git_hash }}{% endlabelled %}
+            {% labelled id='status' label='Status' hint="tiny" %}
+                <span id="candidate-search-status">{{ candidate_search_run.get_status_display }}</span>
+                <i id="loading-spinner" class="fa fa-spinner"></i>
+            {% endlabelled %}
+            {% if candidate_search_run.error_exception %}
+                {% labelled id='error_exception' label='Error' hint="tiny" %}{{ candidate_search_run.error_exception }}{% endlabelled %}
+            {% endif %}
+            {% labelled admin_only=True id='celery_task' label='Celery Task' hint="tiny" %}{{ candidate_search_run.celery_task }}{% endlabelled %}
+            {% labelled admin_only=True id='config_snapshot' label='Config' hint="tiny" %}{{ candidate_search_run.config_snapshot }}{% endlabelled %}
+            {% labelled admin_only=True id='git_hash' label='Git Hash' hint="tiny" %}{{ candidate_search_run.git_hash }}{% endlabelled %}
         </div>
     </div>
 
