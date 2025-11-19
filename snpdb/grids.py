@@ -714,9 +714,14 @@ class SampleColumns(DatatableConfig[Sample]):
 
     def filter_queryset(self, qs: QuerySet[Sample]) -> QuerySet[Sample]:
         filters = []
+        ontology_filters = []
         if ontology_terms := self.get_query_param('ontology_term_id'):
             if q:= get_sample_ontology_q(ontology_terms):
-                filters.append(q)
+                ontology_filters.append(q)
+
+        if ontology_filters:
+            q = reduce(operator.or_, ontology_filters)
+            filters.append(q)
 
         if gene_symbol_str := self.get_query_param("gene_symbol"):
             if q := get_sample_qc_gene_list_gene_symbol_q(gene_symbol_str):

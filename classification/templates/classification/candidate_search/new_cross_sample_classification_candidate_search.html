@@ -1,134 +1,17 @@
-{% extends "uicore/page/base.html" %}
+{% extends "classification/candidate_search/abstract_new_classification_candidate_search_view.html" %}
 {% load crispy_forms_tags %}
-{% load static %}
-{% load js_tags %}
-{% load compress %}
-{% load ui_utils %}
-{% load ui_help %}
-{% load ui_menu_bars %}
-{% load settings_tags %}
-{% load classification_tags %}
-{% block title %}Sample Classification Search{% endblock %}
-{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
-<style>
-    #classify-container label, #gene-form-container label, #user-form-container label, #lab-form-container label {
-        display: none;
-    }
-
-    .select2-selection__rendered {
-       margin-top: -5px;
-    }
-
-    #flag-filter td {
-        text-align: center;
-        padding: 2px;
-    }
-
-    .filter-row>div {
-        z-index: 1000;
-    }
-    #div_id_omim, #div_id_hpo, #div_id_mondo {
-        margin: 0px;
-    }
-
-    div#sample-classification-search-results {
-        text-align: center;
-    }
-
-</style>
+    {{ block.super }}
 <script>
-    const CLINICAL_SIGNICANCES = ["other", "benign", "likely_benign", "vus", "likely_pathogenic", "pathogenic"];
-
     function filterSampleGrid() {
         $('#sample-datatable').DataTable().ajax.reload();
     }
 
 
-    function filterClassificationGrid() {
-        console.log("filterClassificationGrid");
-        $('#vc-datatable').DataTable().ajax.reload();
-    }
-
-    function checkIfAllChecked(toggle, array) {
-        let numChecked = 0;
-        array.each(function() { numChecked += $(this).is(":checked"); });
-        const allChecked = numChecked == array.length;
-        $(toggle).prop('checked', allChecked);
-    }
-
-    function alleleOriginToggle() {
-        filterClassificationGrid();
-    }
-
-    function filterDefaultLab() {
-        {% if user_settings.default_lab %}
-            setAutocompleteValue('#id_lab', '{{ user_settings.default_lab.id }}', '{{ user_settings.default_lab.organization.name }} / {{ user_settings.default_lab.name }}');
-        {% endif %}
-    }
-
-    function filterDefaultUser() {
-        setAutocompleteValue('#id_user', '{{ user.id }}', '{{ user.username }}');
-    }
-
-    function getLabValue() {
-        // Lab select can use settings to be normal autocomplete (string) or multi-select autocomplete (array)
-        let labVal = $('#id_lab').val();
-        if (Array.isArray(labVal)) {
-            labVal = labVal.join(',');
-        }
-        return labVal;
-    }
-
-    function getOntologySelects(prefix) {
-        let ontologyFields = []
-        for (const ontology of ["omim", "hpo", "mondo"]) {
-            ontologyFields.push(`#id_${prefix}-${ontology}`);
-        }
-        return ontologyFields;
-    }
-
-    function getOntologyTerms(prefix) {
-        let ontologySelects = getOntologySelects(prefix);
-        let terms = [];
-        for (const inputId of ontologySelects) {
-          let new_terms = $(inputId).val();
-          if (new_terms.length) {
-              terms = terms.concat(new_terms);
-          }
-        }
-        return terms;
-    }
-
-    function classificationFilter(data, type) {
-        data.gene_symbol = blankToNull($('#id_classification-gene_symbol').val());
-        data.lab = blankToNull(getLabValue());
-        let allele_origin_filter_value = blankToNull($("input[name='allele-origin-toggle']:checked").val());
-        data.allele_origin = blankToNull($("input[name='allele-origin-toggle']:checked").val());
-        data.id_filter = blankToNull($('#id_filter').val());
-        data.user = blankToNull($('#id_user').val());
-        data.ontology_term_id = blankToNull(getOntologyTerms("classification").join(","));
-        if ($("#id_internal_requires_sample").is(":checked")) {
-            data.internal_requires_sample = true;
-        }
-        for (const cs of CLINICAL_SIGNICANCES) {
-            if ($(`#id_${cs}`).is(":checked")) {
-                data[cs] = true;
-            }
-
-        }
-        console.log(data);
-
-        let column = $('#vc-datatable').DataTable().column(3);
-        let germline_only = allele_origin_filter_value == "G";
-        column.visible(!germline_only);
-    }
-
     function sampleFilter(data, type) {
         data.gene_symbol = blankToNull($('#id_sample-gene_symbol').val());
         data.ontology_term_id = blankToNull(getOntologyTerms("sample").join(","));
     }
-
 
     $(document).ready(() => {
         let sampleSelects = ["#id_sample-gene_symbol"];
@@ -136,102 +19,40 @@
         $(sampleSelects.join(',')).on("change", function() {
             filterSampleGrid();
         });
-
-        let classificationSelects = ["#id_classification-gene_symbol", "#id_lab", "#id_user",
-                                     "#id_allele_origin", "#id_internal_requires_sample"];
-        for (const cs of CLINICAL_SIGNICANCES) {
-            classificationSelects.push(`#id_${cs}`);
-        }
-
-        classificationSelects = classificationSelects.concat(getOntologySelects("classification"))
-        $(classificationSelects.join(',')).on("change", function() {
-            filterClassificationGrid();
-        });
     });
+
 </script>
 {% endblock %}
-{% block content %}
+
+{% block filters_above_classification %}
 <div class="container">
-    <div>
-        <a href="{% url 'classification_candidate_search' %}">Back to Classification Candidate Search</a>
-    </div>
-
-    <form method="post">
-        {% csrf_token %}
-        {% settings_value 'CLASSIFICATION_GRID_SHOW_USERNAME' as CLASSIFICATION_GRID_SHOW_USERNAME %}
-        <div id="sample-classification-search-page">
-            <h2>Sample Classification Search</h2>
-
-            {% page_help_embedded title='Note on re-analysis of repoted data' %}
-                <p>
-                    Please be aware that re-analysis of existing sequencing data may reveal previously unreported
-                    pathogenic or likely pathogenic variants. Such findings may obligate you to perform a review, issue
-                    an amended report, and notify the referring clinician in accordance with laboratory policy and
-                    regulatory requirements. It is recommended that you perform these queries with limits on the
-                    number of results returned.
-                </p>
-            {% end_page_help_embedded %}
-
-            <div class="container">
-                <h3>Samples</h3>
-                <div class="row filter-row">
-                    {% if num_sample_gene_lists %}
-                    <div class="col-3">
-                        {{  num_sample_gene_lists }} of {{ num_visible_samples }} samples you can see have Sample Gene Lists
-                        {% crispy sample_gene_form form_helper.horizontal %}
-                    </div>
-                    {% endif %}
-                    <div class="col-6">
-                        {% crispy sample_phenotype_form %}
-                    </div>
-                </div>
-                <table id="sample-datatable" data-datatable-data='sampleFilter' data-datatable-url="{% url 'samples_datatable' %}" class="sticky-header samples-table" data-adjust-columns="false"></table>
-            </div>
-
-            <div class="container">
-                <h3>Classifications</h3>
-                <div>
-                    {% crispy clinical_significance_form  %}
-                </div>
-                <div class="row filter-row">
-                    <div class="col-md-4 col-lg-2">
-                        <br/>
-                        {% crispy gene_form form_helper.horizontal_no_labels %}
-                    </div>
-                    <div class="col-md-4 col-lg-2">
-                        {% if user_settings.default_lab %}
-                        <a class="hover-link" onclick="filterDefaultLab()" title="{{ user_settings.default_lab.name }}">Filter : My Lab</a>
-                        {% else %}<span style="visibility: hidden">.</span>{% endif %}
-                        {% crispy lab_form form_helper.horizontal_no_labels %}
-                    </div>
-                    {% if CLASSIFICATION_GRID_SHOW_USERNAME %}
-                    <div class="col-md-4 col-lg-2">
-                        <a class="hover-link" onclick="filterDefaultUser()">Filter : My Records</a>
-                        {% crispy user_form form_helper.horizontal_no_labels %}
-                    </div>
-                    {% endif %}
-
-                    <div style="width: 160px" class="mx-3">
-                        Allele Origin<br/>
-                        {% allele_origin_toggle show_label=False %}
-                    </div>
-                    <div style="width: 160px" class="mx-3">
-                        Internal Classifications require sample<br/>
-                        <input id="id_internal_requires_sample" type="checkbox" checked="checked" />
-                    </div>
-            </div>
-            <div>
-                {% crispy classification_phenotype_form %}
-            </div>
-
-            <table id="vc-datatable" data-datatable-data='classificationFilter' data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table"></table>
-
-            <div class="container" id="sample_classification_form">
-                <h3>Search</h3>
-                {% crispy sample_classification_form form_helper.horizontal %}
-            </div>
+    <h3>Samples</h3>
+    <div class="row filter-row">
+        {% if num_sample_gene_lists %}
+        <div class="col-3">
+            {{  num_sample_gene_lists }} of {{ num_visible_samples }} samples you can see have Sample Gene Lists
+            {% crispy sample_gene_form form_helper.horizontal %}
         </div>
-        <button type="submit" class="btn btn-primary" id='search-samples'><i class="fas fa-search"></i> Search Samples for Classifications</button>
-    </form>
+        {% endif %}
+        <div class="col-6">
+            {% crispy sample_phenotype_form %}
+        </div>
+    </div>
+    <table id="sample-datatable" data-datatable-data='sampleFilter' data-datatable-url="{% url 'samples_datatable' %}" class="sticky-header samples-table" data-adjust-columns="false"></table>
 </div>
 {% endblock %}
+
+{% block filters_extra %}
+<div style="width: 160px" class="mx-3">
+    Internal Classifications require sample<br/>
+    <input id="id_internal_requires_sample" type="checkbox" checked="checked" />
+</div>
+{% endblock %}
+
+{% block filters_below_classification %}
+    <div class="container" id="sample_classification_form">
+        <h3>Search</h3>
+        {% crispy sample_classification_form form_helper.horizontal %}
+    </div>
+{% endblock %}
+

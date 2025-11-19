@@ -3,6 +3,8 @@ from crispy_forms.layout import Layout, Field
 from django.conf import settings
 from django.http.response import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
+from django.views import View
+from django.views.generic import TemplateView
 
 from analysis.models import CandidateSearchRun, CandidateSearchType
 from classification.forms import ClassificationAlleleOriginForm, SampleClassificationForm, ClinicalSignificanceForm
@@ -29,10 +31,13 @@ def classification_candidate_search(request) -> HttpResponse:
     return render(request, 'classification/candidate_search/classification_candidate_search.html', context)
 
 
-def new_cross_sample_classification_candidate_search(request) -> HttpResponse:
-    """ TODO: This could be a class then use inheritance to handle grid being in common?? """
+class AbstractNewClassificationCandidateSearchView(View):
+    template_name = "classification/candidate_search/abstract_new_classification_candidate_search_view.html"
 
-    if request.method == "POST":
+    def get(self, request):
+        return render(request, self.template_name, self.get_context_data())
+
+    def post(self, request):
         post_ignore_contains = [
             "csrfmiddlewaretoken",
             "datatable_length",
@@ -47,14 +52,19 @@ def new_cross_sample_classification_candidate_search(request) -> HttpResponse:
                 config_snapshot[k] = v
 
         csr = CandidateSearchRun.create_and_launch_job(request.user,
-                                                       CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION,
+                                                       self._get_candidate_search_type(),
                                                        config_snapshot)
         # Launch a job
         return redirect(csr)
-    else:
-        # A lot of this code is copy/pasted from classifications - classification listing page
-        # TODO: We should go and refactor this into a tag later
 
+    def _get_layout(self):
+        layout_fields = []
+        for field_name in ["omim", "hpo", "mondo"]:
+            layout_fields.append(Field(field_name, wrapper_class=field_name))
+        return Layout(*layout_fields)
+
+
+    def get_context_data(self):
         # is cached on the request
         user_settings = UserSettingsManager.get_user_settings()
 
@@ -63,17 +73,7 @@ def new_cross_sample_classification_candidate_search(request) -> HttpResponse:
         else:
             lab_form = LabSelectForm()
 
-        sample_gene_form = GeneSymbolForm(prefix="sample")
-        sample_gene_form.fields['gene_symbol'].label = "Sample Gene List Gene Symbol"
-
-        layout_fields = []
-        for field_name in ["omim", "hpo", "mondo"]:
-            layout_fields.append(Field(field_name, wrapper_class=field_name))
-        layout = Layout(*layout_fields)
-
-        sample_phenotype_form = PhenotypeMultipleSelectForm(prefix="sample")
-        sample_phenotype_form.helper.layout = layout
-
+        layout = self._get_layout()
         classification_phenotype_form = PhenotypeMultipleSelectForm(prefix="classification")
         classification_phenotype_form.helper.layout = layout
 
@@ -82,26 +82,50 @@ def new_cross_sample_classification_candidate_search(request) -> HttpResponse:
             "pathogenic": True,
         })
 
-        context = {
-            "sample_phenotype_form": sample_phenotype_form,
+        cs_type = CandidateSearchType(self._get_candidate_search_type())
+
+        return {
+            "heading": f"New {cs_type.label} candidate search",
+            "button_text": f"Search for {cs_type.label} candidates",
             "gene_form": GeneSymbolForm(prefix="classification"),
             "user_form": UserSelectForm(),
             "lab_form": lab_form,
             "allele_origin_form": ClassificationAlleleOriginForm(),
-            "labs": Lab.valid_labs_qs(request.user),
+            "labs": Lab.valid_labs_qs(self.request.user),
             "clinical_significance_form": cs_form,
             "classification_phenotype_form": classification_phenotype_form,
-            "sample_classification_form": SampleClassificationForm(),
             "user_settings": user_settings,
         }
 
-        samples_qs = Sample.filter_for_user(request.user)
+
+    def _get_candidate_search_type(self) -> CandidateSearchType:
+        raise NotImplementedError()
+
+
+class NewCrossSampleClassificationCandidateSearchView(AbstractNewClassificationCandidateSearchView):
+    template_name = "classification/candidate_search/new_cross_sample_classification_candidate_search.html"
+
+    def get_context_data(self):
+        context = super().get_context_data()
+        layout = self._get_layout()
+        sample_phenotype_form = PhenotypeMultipleSelectForm(prefix="sample")
+        sample_phenotype_form.helper.layout = layout
+        context["sample_phenotype_form"] = sample_phenotype_form
+        context["sample_classification_form"] = SampleClassificationForm()
+
+        samples_qs = Sample.filter_for_user(self.request.user)
         context["num_visible_samples"] = samples_qs.count()
         num_sample_gene_lists = SampleGeneList.objects.filter(sample__in=samples_qs).count()
         context["num_sample_gene_lists"] = num_sample_gene_lists
         if num_sample_gene_lists:
+            sample_gene_form = GeneSymbolForm(prefix="sample")
+            sample_gene_form.fields['gene_symbol'].label = "Sample Gene List Gene Symbol"
             context["sample_gene_form"] = sample_gene_form
-        return render(request, 'classification/candidate_search/new_cross_sample_classification_candidate_search.html', context)
+
+        return context
+
+    def _get_candidate_search_type(self) -> CandidateSearchType:
+        return CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION
 
 
 def new_classification_evidence_update_candidate_search(request) -> HttpResponse:

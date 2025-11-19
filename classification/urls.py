@@ -126,7 +126,7 @@ urlpatterns = [
     path('classification_candidate_search', classification_candidate_search_view.classification_candidate_search,
          name='classification_candidate_search'),
     path('classification_candidate_search/cross_sample/new',
-         classification_candidate_search_view.new_cross_sample_classification_candidate_search,
+         classification_candidate_search_view.NewCrossSampleClassificationCandidateSearchView.as_view(),
          name='new_cross_sample_classification_candidate_search'),
     path('classification_candidate_search/evidence_update/new',
          classification_candidate_search_view.new_classification_evidence_update_candidate_search,

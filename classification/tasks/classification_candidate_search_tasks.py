@@ -48,9 +48,15 @@ class CrossSampleClassificationCandidateSearchTask(AbstractCandidateSearchTask):
     def _get_sample_qs(user, config: dict):
         # Sample filters
         sample_filters = []
-        if ontology_terms := config.get("sample_ontology_term_id"):
-            if q := get_sample_ontology_q(ontology_terms):
-                sample_filters.append(q)
+        ontology_filters = []
+        for ontology_service in ["hpo", "omim", "mondo"]:
+            if ontology_terms := config.get(f"sample-{ontology_service}"):
+                if q := get_sample_ontology_q(ontology_terms):
+                    ontology_filters.append(q)
+        if ontology_filters:
+            # Do an or (meaning any of the phenos)
+            q = reduce(operator.or_, ontology_filters)
+            sample_filters.append(q)
 
         if gene_symbol_str := config.get("sample_gene_symbol"):
             if q := get_sample_qc_gene_list_gene_symbol_q(gene_symbol_str):
