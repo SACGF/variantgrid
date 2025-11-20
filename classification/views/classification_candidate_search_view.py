@@ -7,7 +7,8 @@ from django.views import View
 from django.views.generic import TemplateView
 
 from analysis.models import CandidateSearchRun, CandidateSearchType
-from classification.forms import ClassificationAlleleOriginForm, SampleClassificationForm, ClinicalSignificanceForm
+from classification.forms import ClassificationAlleleOriginForm, CrossSampleClassificationForm, \
+    ClinicalSignificanceForm, ClassificationEvidenceUpdateForm
 from genes.forms import GeneSymbolForm
 from genes.models import SampleGeneList
 from ontology.forms import PhenotypeMultipleSelectForm
@@ -111,7 +112,7 @@ class NewCrossSampleClassificationCandidateSearchView(AbstractNewClassificationC
         sample_phenotype_form = PhenotypeMultipleSelectForm(prefix="sample")
         sample_phenotype_form.helper.layout = layout
         context["sample_phenotype_form"] = sample_phenotype_form
-        context["sample_classification_form"] = SampleClassificationForm()
+        context["sample_classification_form"] = CrossSampleClassificationForm()
 
         samples_qs = Sample.filter_for_user(self.request.user)
         context["num_visible_samples"] = samples_qs.count()
@@ -128,6 +129,14 @@ class NewCrossSampleClassificationCandidateSearchView(AbstractNewClassificationC
         return CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION
 
 
-def new_classification_evidence_update_candidate_search(request) -> HttpResponse:
-    context = {}
-    return render(request, 'classification/candidate_search/new_classification_evidence_update_candidate_search.html', context)
+class NewClassificationEvidenceUpdateCandidateSearchView(AbstractNewClassificationCandidateSearchView):
+    template_name = "classification/candidate_search/new_classification_evidence_update_candidate_search.html"
+
+    def get_context_data(self):
+        context = super().get_context_data()
+        context["classification_evidence_update_form"] = ClassificationEvidenceUpdateForm()
+        return context
+
+    def _get_candidate_search_type(self) -> CandidateSearchType:
+        return CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE
+

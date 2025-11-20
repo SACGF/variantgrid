@@ -1,27 +1,21 @@
-{% extends "uicore/page/base.html" %}
+{% extends "classification/candidate_search/abstract_new_classification_candidate_search_view.html" %}
 {% load crispy_forms_tags %}
-{% load static %}
-{% load js_tags %}
-{% load compress %}
-{% load ui_utils %}
-{% load ui_help %}
-{% load ui_menu_bars %}
-{% load settings_tags %}
-{% load classification_tags %}
-{% block title %}Classification Evidence Update Candidate Search{% endblock %}
-{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
+    {{ block.super }}
+<script>
+</script>
 {% endblock %}
-{% block content %}
-<div class="container">
 
-    <div>
-        <a href="{% url 'classification_candidate_search' %}">Back to Classification Candidate Search</a>
-    </div>
-
-    <div>
-        Page help, explain different types
-    </div>
-
-</div>
+{% block filters_above_classification %}
 {% endblock %}
+
+{% block filters_extra %}
+{% endblock %}
+
+{% block filters_below_classification %}
+    <div class="container" id="sample_classification_form">
+        <h3>Search</h3>
+        {% crispy classification_evidence_update_form form_helper.horizontal %}
+    </div>
+{% endblock %}
+
