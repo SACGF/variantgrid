@@ -211,13 +211,17 @@ class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSea
         check_computational = config.get("computational")
         check_gene_disease = config.get("gene_disease")
 
-        pop_no_ba1_min_af = config.get("pop_no_ba1_min_af")
-        pop_no_bs1_min_af = config.get("pop_no_bs1_min_af")
-        pop_recessive_no_bs2_min_homozygotes = config.get("pop_recessive_no_bs2_min_homozygotes")
-        pop_pm2_min_af = config.get("pop_pm2_min_af")
-        clinvar_min_conflict_distance = config.get("clinvar_min_conflict_distance")
-        clinvar_min_stars = config.get("clinvar_min_stars")
-        computational_vus_spliceai_min = config.get("computational_vus_spliceai_min")
+        def none_or_cast(v, op):
+            if v is not None:
+                return op(v)
+
+        pop_no_ba1_min_af = none_or_cast(config.get("pop_no_ba1_min_af"), float)
+        pop_no_bs1_min_af = none_or_cast(config.get("pop_no_bs1_min_af"), float)
+        pop_recessive_no_bs2_min_homozygotes = none_or_cast(config.get("pop_recessive_no_bs2_min_homozygotes"), int)
+        pop_pm2_min_af = none_or_cast(config.get("pop_pm2_min_af"), float)
+        clinvar_min_conflict_distance = none_or_cast(config.get("clinvar_min_conflict_distance"), int)
+        clinvar_min_stars = none_or_cast(config.get("clinvar_min_stars"), int)
+        computational_vus_spliceai_min = none_or_cast(config.get("computational_vus_spliceai_min"), float)
 
         # We need to use genome builds because we're going to pull in the annotations
         cm_qs = self._get_classification_modifications_qs(candidate_search_run.user, config)
