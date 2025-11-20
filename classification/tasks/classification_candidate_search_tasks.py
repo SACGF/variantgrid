@@ -8,8 +8,10 @@ from django.db.models import Q, QuerySet
 
 from analysis.models import Candidate
 from analysis.tasks.abstract_candidate_search_task import AbstractCandidateSearchTask
-from classification.enums import AlleleOriginBucket
-from classification.models import Classification, ClassificationModification
+from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
+from annotation.models import AnnotationVersion, VariantAnnotation, ClinVar, ClinVarReviewStatus
+from classification.enums import AlleleOriginBucket, ClinicalSignificance
+from classification.models import Classification, ClassificationModification, EvidenceKey
 from classification.models.classification_utils import classification_gene_symbol_filter
 from classification.views.classification_datatables import ClassificationColumns
 from patients.models_enums import Zygosity
@@ -57,9 +59,10 @@ class ClassificationCandidateSearchMixin:
         # TODO
         config.get("user")
 
+        # Classifications must be local (not external) and matched to a variant
         classification_qs = ClassificationModification.latest_for_user(
             user=user,
-            published=True)
+            published=True).filter(classification__lab__external=False, classification__variant__isnull=False)
         if classification_filters:
             classification_qs = classification_qs.filter(*classification_filters)
         return classification_qs
@@ -187,21 +190,136 @@ class CrossSampleClassificationCandidateSearchTask(ClassificationCandidateSearch
 
 
 class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSearchMixin, AbstractCandidateSearchTask):
+    @staticmethod
+    def maybe_splicing_related(evidence):
+        # TODO: we are also trying to do similar "look for splicing" in rna4rd so perhaps split this into common library code
+        if molecular_consequence := EvidenceKey.get_value(evidence.get("molecular_consequence")):
+            for mc in molecular_consequence:
+                mc = mc.lower()
+                if "splice" in mc or "intron" in mc:
+                    return True
+        if EvidenceKey.get_value(evidence.get("intron")):
+            return True
+        return False
+
     def get_candidate_records(self, candidate_search_run):
         config = candidate_search_run.config_snapshot
         records = []
-        for cm in self._get_classification_modifications_qs(candidate_search_run.user, config):
-            if False:
+
+        check_population = config.get("population")
+        check_clinvar = config.get("clinvar")
+        check_computational = config.get("computational")
+        check_gene_disease = config.get("gene_disease")
+
+        pop_no_ba1_min_af = config.get("pop_no_ba1_min_af")
+        pop_no_bs1_min_af = config.get("pop_no_bs1_min_af")
+        pop_recessive_no_bs2_min_homozygotes = config.get("pop_recessive_no_bs2_min_homozygotes")
+        pop_pm2_min_af = config.get("pop_pm2_min_af")
+        clinvar_min_conflict_distance = config.get("clinvar_min_conflict_distance")
+        clinvar_min_stars = config.get("clinvar_min_stars")
+        computational_vus_spliceai_min = config.get("computational_vus_spliceai_min")
+
+        # We need to use genome builds because we're going to pull in the annotations
+        cm_qs = self._get_classification_modifications_qs(candidate_search_run.user, config)
+
+        for genome_build in GenomeBuild.builds_with_annotation():
+            av = AnnotationVersion.latest(genome_build)
+
+            cm_build_qs = cm_qs.filter(classification__allele_info__imported_genome_build_patch_version__genome_build=genome_build)
+
+            # Read in annotation / ClinVar per variant
+            variant_ids = list(cm_build_qs.values_list("classification__variant_id", flat=True).distinct())
+            va_by_variant_id = {}
+            if check_population or check_computational:
+                va_qs = VariantAnnotation.objects.filter(version=av.variant_annotation_version, variant__in=variant_ids)
+                va_by_variant_id = {va.variant_id: va for va in va_qs}
+
+            clinvar_by_variant_id = {}
+            if check_clinvar:
+                clinvar_qs = ClinVar.objects.filter(version=av.clinvar_version, variant__in=variant_ids)
+                if clinvar_min_stars is not None:
+                    review_statuses = ClinVarReviewStatus.statuses_gte_stars(clinvar_min_stars)
+                    clinvar_qs = clinvar_qs.filter(clinvar__review_status__in=review_statuses)
+
+                clinvar_by_variant_id = {cv.variant_id: cv for cv in clinvar_qs}
+
+            for cm in cm_build_qs:
                 classification = cm.classification
+                variant_id = classification.variant_id
                 notes = None
-                evidence = {}
-                records.append(Candidate(
-                    search_run=candidate_search_run,
-                    variant=classification.variant,
-                    classification=classification,
-                    notes=notes,
-                    evidence=evidence,
-                ))
+                candidate_evidence = {}
+                clinvar = None
+                va = va_by_variant_id.get(variant_id)
+                cv = clinvar_by_variant_id.get(variant_id)
+
+                def evidence(key):
+                    return EvidenceKey.get_value(cm.published_evidence.get(key))
+
+                if check_population and va:
+                    if cm.clinical_significance in (ClinicalSignificance.VUS, ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC):
+                        popmax_af = va.gnomad_popmax_af
+                        if popmax_af is not None:
+                            if pop_no_ba1_min_af is not None:
+                                if not evidence("acmg:ba1") and popmax_af >= pop_no_ba1_min_af:
+                                    candidate_evidence["acmg:ba1 missing"] = f"{popmax_af=} >= {pop_no_ba1_min_af}"
+
+                            if pop_no_bs1_min_af is not None:
+                                if not evidence("acmg:bs1") and popmax_af >= pop_no_bs1_min_af:
+                                    candidate_evidence["acmg:bs1 missing"] = f"{popmax_af=} >= {pop_no_bs1_min_af}"
+
+                            if pop_pm2_min_af is not None:
+                                if evidence("acmg:pm2") and popmax_af >= pop_pm2_min_af:
+                                    candidate_evidence["acmg:pm2"] = f"PM2 set with {popmax_af=} >= {pop_pm2_min_af}"
+
+                        if pop_recessive_no_bs2_min_homozygotes is not None:
+                            if not evidence("acmg:bs2"):
+                                if evidence("mode_of_inheritance") == "autosomal_recessive":
+                                    if gnomad_num_homozygotes := va.gnomad_hom_alt:
+                                        if gnomad_num_homozygotes >= pop_recessive_no_bs2_min_homozygotes:
+                                            candidate_evidence["acmg:bs2"] = f"{gnomad_num_homozygotes=} >= {pop_recessive_no_bs2_min_homozygotes}"
+
+
+                if check_clinvar and cv:
+                    if clinvar_min_conflict_distance is not None:
+                        distance = ClinicalSignificance.distance(cm.clinical_significance, cv.highest_pathogenicity)
+                        if abs(distance) >= clinvar_min_conflict_distance:
+                            clinvar = cv
+                            candidate_evidence["clinvar"] = f"clinvar {distance=} >= {clinvar_min_conflict_distance}"
+
+                if check_computational and va:
+
+                    if computational_vus_spliceai_min is not None:
+                        if cm.clinical_significance in (ClinicalSignificance.VUS,
+                                                        ClinicalSignificance.LIKELY_PATHOGENIC):
+
+                            splicing_assertion = evidence("splicing_assertion")
+                            already_used = splicing_assertion is not None and splicing_assertion != "no_effect"
+                            if not already_used and self.maybe_splicing_related(cm.published_evidence):
+                                if not evidence("spliceai"):  # Missing
+                                    if highest_spliceai := va.highest_spliceai():
+                                        if highest_spliceai >= computational_vus_spliceai_min:
+                                            spliceai_evidence = f"No splicing assertion, {highest_spliceai=} >= {computational_vus_spliceai_min}"
+                                            candidate_evidence["splicing"] = spliceai_evidence
+
+                if check_gene_disease:
+                    # EKey: gene_disease_validity
+                    # see MOINode.get_gene_disease_relations
+                    # moderate : Moderate
+                    # strong : Strong
+                    # definitive : Definitive
+                    # TODO: Need to read in Gene disease associations etc
+                    pass
+
+                if notes or candidate_evidence:
+                    records.append(Candidate(
+                        search_run=candidate_search_run,
+                        variant=classification.variant,
+                        classification=classification,
+                        annotation_version=av,
+                        notes=notes,
+                        evidence=candidate_evidence,
+                        clinvar=clinvar,
+                    ))
         return records
 
 

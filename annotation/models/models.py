@@ -1475,6 +1475,16 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return any((self.spliceai_pred_ds_ag, self.spliceai_pred_ds_al,
                     self.spliceai_pred_ds_dg, self.spliceai_pred_ds_dl))
 
+    def highest_spliceai(self) -> int|None:
+        values = []
+        for (ds, _) in self.SPLICEAI_DS_DP.values():
+            if v := getattr(self, ds):
+                values.append(v)
+        if values:
+            return max(values)
+        return None
+
+
     @staticmethod
     def get_gnomad_population_field(population):
         return VariantAnnotation.GNOMAD_FIELDS.get(population)
