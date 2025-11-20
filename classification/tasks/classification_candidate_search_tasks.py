@@ -4,7 +4,7 @@ from collections import defaultdict
 from functools import reduce
 from typing import Iterable
 
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 
 from analysis.models import Candidate
 from analysis.tasks.abstract_candidate_search_task import AbstractCandidateSearchTask
@@ -18,9 +18,55 @@ from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_
 from variantgrid.celery import app
 
 
+class ClassificationCandidateSearchMixin:
+    @staticmethod
+    def _get_classification_modifications_qs(user, config: dict) -> QuerySet[ClassificationModification]:
+        cs_data = {}
+        for cs in ClassificationColumns.CLINICAL_SIGNIFICANCE_FILTERS:
+            if config.get(cs):
+                cs_data[cs] = True
+
+        classification_filters = []
+        if q := ClassificationColumns.get_clinical_significance_q(cs_data):
+            classification_filters.append(q)
+
+        if allele_origin := config.get("allele_origin"):
+            if allele_origin != "A":
+                classification_filters.append(Q(classification__allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
+
+        if gene_symbol_str := config.get("gene_symbol"):
+            if q := classification_gene_symbol_filter(gene_symbol_str):
+                classification_filters.append(q)
+
+        # request.GET.get("classification_id_filter")
+        if lab_id := config.get("lab"):
+            lab_list = lab_id.split(",")
+            classification_filters.append(Q(lab__pk__in=lab_list))
+
+        if ontology_terms := config.get("ontology_term_id"):
+            terms = []
+            for term_id in ontology_terms.split(","):
+                terms.append(Q(classification__condition_resolution__resolved_terms__contains=[{"term_id": term_id}]))
+            if terms:
+                q = reduce(operator.or_, terms)
+                classification_filters.append(q)
+
+        if config.get("internal_requires_sample"):
+            classification_filters.append(Q(classification__lab__external=True) | Q(classification__sample__isnull=False))
+
+        # TODO
+        config.get("user")
+
+        classification_qs = ClassificationModification.latest_for_user(
+            user=user,
+            published=True)
+        if classification_filters:
+            classification_qs = classification_qs.filter(*classification_filters)
+        return classification_qs
 
 
-class CrossSampleClassificationCandidateSearchTask(AbstractCandidateSearchTask):
+
+class CrossSampleClassificationCandidateSearchTask(ClassificationCandidateSearchMixin, AbstractCandidateSearchTask):
     @staticmethod
     def _filter_classifications_by_sample_and_patient(sample: Sample, classifications: Iterable[Classification]) -> Iterable[Classification]:
         for c in classifications:
@@ -68,51 +114,6 @@ class CrossSampleClassificationCandidateSearchTask(AbstractCandidateSearchTask):
         return sample_qs
 
     @staticmethod
-    def _get_classification_qs(user, config: dict):
-        cs_data = {}
-        for cs in ClassificationColumns.CLINICAL_SIGNIFICANCE_FILTERS:
-            if config.get(cs):
-                cs_data[cs] = True
-
-        classification_filters = []
-        if q := ClassificationColumns.get_clinical_significance_q(cs_data):
-            classification_filters.append(q)
-
-        if allele_origin := config.get("allele_origin"):
-            if allele_origin != "A":
-                classification_filters.append(Q(classification__allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
-
-        if gene_symbol_str := config.get("gene_symbol"):
-            if q := classification_gene_symbol_filter(gene_symbol_str):
-                classification_filters.append(q)
-
-        # request.GET.get("classification_id_filter")
-        if lab_id := config.get("lab"):
-            lab_list = lab_id.split(",")
-            classification_filters.append(Q(lab__pk__in=lab_list))
-
-        if ontology_terms := config.get("ontology_term_id"):
-            terms = []
-            for term_id in ontology_terms.split(","):
-                terms.append(Q(classification__condition_resolution__resolved_terms__contains=[{"term_id": term_id}]))
-            if terms:
-                q = reduce(operator.or_, terms)
-                classification_filters.append(q)
-
-        if config.get("internal_requires_sample"):
-            classification_filters.append(Q(classification__lab__external=True) | Q(classification__sample__isnull=False))
-
-        # TODO
-        config.get("user")
-
-        classification_qs = ClassificationModification.latest_for_user(
-            user=user,
-            published=True)
-        if classification_filters:
-            classification_qs = classification_qs.filter(*classification_filters)
-        return classification_qs
-
-    @staticmethod
     def _sample_classification_overlaps(samples_qs, classification_qs, zygosities):
         classifications_by_allele = defaultdict(set)
         for cm in classification_qs:
@@ -150,7 +151,7 @@ class CrossSampleClassificationCandidateSearchTask(AbstractCandidateSearchTask):
     def get_candidate_records(self, candidate_search_run):
         config = candidate_search_run.config_snapshot
         sample_qs = self._get_sample_qs(candidate_search_run.user, config)
-        classification_qs = self._get_classification_qs(candidate_search_run.user, config)
+        cm_qs = self._get_classification_modifications_qs(candidate_search_run.user, config)
 
         # Search
         search_max_results = int(config.get("max_results"))
@@ -167,7 +168,7 @@ class CrossSampleClassificationCandidateSearchTask(AbstractCandidateSearchTask):
                 zygosities.append(code)
 
         records = []
-        sample_records = self._sample_classification_overlaps(sample_qs, classification_qs, zygosities)
+        sample_records = self._sample_classification_overlaps(sample_qs, cm_qs, zygosities)
         for sample, data in self.limit_sample_and_results(sample_records, search_max_results, search_max_samples):
             for (v, sample_zygosity, classifications) in data:
                 for classification in classifications:
@@ -185,10 +186,24 @@ class CrossSampleClassificationCandidateSearchTask(AbstractCandidateSearchTask):
         return records
 
 
-class ClassificationEvidenceUpdateCandidateSearchTask(AbstractCandidateSearchTask):
+class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSearchMixin, AbstractCandidateSearchTask):
     def get_candidate_records(self, candidate_search_run):
-        # TODO
-        return []
+        config = candidate_search_run.config_snapshot
+        records = []
+        for cm in self._get_classification_modifications_qs(candidate_search_run.user, config):
+            if False:
+                classification = cm.classification
+                notes = None
+                evidence = {}
+                records.append(Candidate(
+                    search_run=candidate_search_run,
+                    variant=classification.variant,
+                    classification=classification,
+                    notes=notes,
+                    evidence=evidence,
+                ))
+        return records
+
 
 CrossSampleClassificationCandidateSearchTask = app.register_task(CrossSampleClassificationCandidateSearchTask())
 ClassificationEvidenceUpdateCandidateSearchTask = app.register_task(ClassificationEvidenceUpdateCandidateSearchTask())
