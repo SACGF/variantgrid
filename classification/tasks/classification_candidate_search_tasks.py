@@ -253,7 +253,7 @@ class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSea
                 variant_id = classification.variant_id
                 notes = None
                 candidate_evidence = {}
-                clinvar = None
+                # clinvar = None
                 va = va_by_variant_id.get(variant_id)
                 cv = clinvar_by_variant_id.get(variant_id)
 
@@ -288,7 +288,7 @@ class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSea
                     if clinvar_min_conflict_distance is not None:
                         distance = ClinicalSignificance.distance(cm.clinical_significance, cv.highest_pathogenicity)
                         if abs(distance) >= clinvar_min_conflict_distance:
-                            clinvar = cv
+                            # clinvar = cv
                             candidate_evidence["clinvar"] = f"clinvar {distance=} >= {clinvar_min_conflict_distance}"
 
                 if check_computational and va:
@@ -323,7 +323,7 @@ class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSea
                         annotation_version=av,
                         notes=notes,
                         evidence=candidate_evidence,
-                        clinvar=clinvar,
+                        # clinvar=clinvar,
                     ))
         return records
 

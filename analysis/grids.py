@@ -796,7 +796,6 @@ class CandidateColumns(DatatableConfig[LogEntry]):
             RichColumn(key="sample__name", label="Sample", orderable=True, client_renderer='VCTable.sample'),
             RichColumn(key="analysis", label="Analysis", orderable=True),
             RichColumn(key="annotation_version", label="Annotation Version", orderable=True),
-            RichColumn(key="clinvar", label="ClinVar", orderable=True),
             RichColumn(key="zygosity", label="Zygosity", orderable=True, renderer=self.render_zygosity),
         ]
         columns = CandidateSearchRun.CANDIDATE_GRID_COLUMNS[self.csr.search_version.search_type]

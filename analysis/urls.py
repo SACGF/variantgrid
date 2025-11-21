@@ -149,7 +149,7 @@ urlpatterns = [
 
     # Candidates / Reanalysis
     path('candidate_search/<int:pk>', views_candidate_search.view_candidate_search_run, name='view_candidate_search_run'),
-    path('candidate_search/reanalysis/new', views_candidate_search.new_reanalyis_candidate_search, name='new_reanalysis_candidate_search'),
+    path('candidate_search/reanalysis/new', views_candidate_search.NewReanalysisCandidateSearchView.as_view(), name='new_reanalysis_candidate_search'),
     path('candidate_search/reanalysis', views_candidate_search.ReanalyisCandidateSearchView.as_view(), name='reanalysis_candidate_search'),
     path('candidate_search/candidate/classify/<int:candidate_id>/create/',
          views_candidate_search.create_classification_for_candidate, name='create_classification_for_candidate'),

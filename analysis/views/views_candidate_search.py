@@ -1,12 +1,13 @@
 import logging
 from functools import cached_property
 
+from crispy_forms.helper import FormHelper
 from django.core.exceptions import PermissionDenied
 from django.http.response import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.views.decorators.http import require_POST
-from django.views.generic.base import TemplateView
+from django.views.generic.base import TemplateView, View
 
 from analysis.forms import ReanalysisCandidateSearchForm, AnalysisFilterForm
 from analysis.models import CandidateSearchRun, Candidate, CandidateStatus, CandidateSearchType
@@ -41,16 +42,64 @@ class ReanalyisCandidateSearchView(AbstractCandidateSearchView):
         return [CandidateSearchType.REANALYSIS_NEW_ANNOTATION]
 
 
-def new_reanalyis_candidate_search(request):
-    search_type = CandidateSearchType.REANALYSIS_NEW_ANNOTATION
-    context = {
-        "heading": f"Search for new {search_type.label}",
-        "methods": search_type.get_methods(),
-        "button_text": "Search for reanalysis candidates",
-        "analyses_filter_form": AnalysisFilterForm(),
-        "reanalysis_candidate_search_form": ReanalysisCandidateSearchForm(),
-    }
-    return render(request, 'analysis/candidate_search/new_reanalysis_candidate_search.html', context)
+class AbstractNewCandidateSearchView(View):
+    template_name = "analysis/candidate_search/abstract_new_candidate_search_view.html"
+
+    def get(self, request):
+        return render(request, self.template_name, self.get_context_data())
+
+    def post(self, request):
+        post_ignore_contains = [
+            "csrfmiddlewaretoken",
+            "datatable_length",
+        ]
+        config_snapshot = {}
+        for k, v in request.POST.items():
+            ignore = False
+            for ignore_str in post_ignore_contains:
+                if ignore := ignore_str in k:
+                    break
+            if not ignore:
+                config_snapshot[k] = v
+
+        csr = CandidateSearchRun.create_and_launch_job(request.user,
+                                                       self._get_candidate_search_type(),
+                                                       config_snapshot)
+        # Launch a job
+        return redirect(csr)
+
+    def get_context_data(self):
+        cs_type = CandidateSearchType(self._get_candidate_search_type())
+
+        return {
+            "heading": f"New {cs_type.label} candidate search",
+            "button_text": f"Search for {cs_type.label} candidates",
+            "methods": cs_type.get_methods(),
+        }
+
+    def _get_candidate_search_type(self) -> CandidateSearchType:
+        raise NotImplementedError()
+
+
+class NewReanalysisCandidateSearchView(AbstractNewCandidateSearchView):
+    template_name = 'analysis/candidate_search/new_reanalysis_candidate_search.html'
+
+    def _get_candidate_search_type(self) -> CandidateSearchType:
+        return CandidateSearchType.REANALYSIS_NEW_ANNOTATION
+
+    def get_context_data(self):
+        no_form_helper = FormHelper()
+        no_form_helper.form_tag = False
+
+        analyses_filter_form = AnalysisFilterForm()
+        analyses_filter_form.helper = no_form_helper
+        reanalysis_candidate_search_form = ReanalysisCandidateSearchForm()
+        reanalysis_candidate_search_form.helper = no_form_helper
+
+        context = super().get_context_data()
+        context["analyses_filter_form"] = analyses_filter_form
+        context["reanalysis_candidate_search_form"] = reanalysis_candidate_search_form
+        return context
 
 
 class CreateClassificationForCandidateView(CreateClassificationForVariantView):

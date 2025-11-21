@@ -75,7 +75,7 @@ class CandidateSearchVersion(TimeStampedModel):
         url = None
         search_type = CandidateSearchType(self.search_type)
         if search_type.is_analysis_type():
-            url = reverse("reanalysis")
+            url = reverse("reanalysis_candidate_search")
         elif search_type.is_classification_type():
             url = reverse("classification_candidate_search")
         return url
@@ -98,9 +98,9 @@ class CandidateSearchRun(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMod
     }
 
     CANDIDATE_GRID_COLUMNS = {
-        CandidateSearchType.REANALYSIS_NEW_ANNOTATION: ["variant", "sample__name", "analysis", "annotation_version", "clinvar", "zygosity"],
+        CandidateSearchType.REANALYSIS_NEW_ANNOTATION: ["variant", "sample__name", "analysis", "annotation_version", "zygosity"],
         CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION: ["search_run__search_version__search_type", "classification", "sample__name", "zygosity"],
-        CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE: ["classification", "annotation_version", "clinvar"],
+        CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE: ["classification", "annotation_version"],
     }
 
     def __str__(self):
@@ -147,12 +147,18 @@ class Candidate(TimeStampedModel):
     classification = models.ForeignKey(Classification, null=True, blank=True, on_delete=CASCADE)
     analysis = models.ForeignKey(Analysis, null=True, blank=True, on_delete=CASCADE)
     annotation_version = models.ForeignKey(AnnotationVersion, null=True, blank=True, on_delete=CASCADE)
-    clinvar = models.ForeignKey(ClinVar, null=True, blank=True, on_delete=CASCADE)
+    # We can't point to ClinVar directly - so if you need to retrieve it
     sample = models.ForeignKey(Sample, null=True, on_delete=CASCADE)
     zygosity = models.CharField(choices=Zygosity.CHOICES, null=True, blank=True, max_length=1)
 
     class Meta:
         ordering = ('-created',)
+
+    def get_clinvar(self) -> ClinVar|None:
+        clinvar = None
+        if self.variant and self.annotation_version and self.annotation_version.clinvar_version:
+            clinvar = ClinVar.objects.filter(version=self.annotation_version.clinvar_version, variant=self.variant).first()
+        return clinvar
 
     @staticmethod
     def get_permission_check(pk, user, write=False):

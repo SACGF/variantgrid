@@ -1,4 +1,4 @@
-{% extends "uicore/page/base.html" %}
+{% extends "analysis/candidate_search/abstract_new_candidate_search_view.html" %}
 {% load crispy_forms_tags %}
 {% load static %}
 {% load js_tags %}
@@ -133,65 +133,50 @@
     });
 </script>
 {% endblock %}
-{% block content %}
-<div class="container">
+{% block back_top_link %}
     <div>
         <a href="{% url 'classification_candidate_search' %}">Back to Classification Candidate Search</a>
     </div>
+{% endblock %}
+{% block new_candidate_search_content %}
+        {% block filters_above_classification %}{% endblock %}
 
-    <form method="post">
-        {% csrf_token %}
-        {% settings_value 'CLASSIFICATION_GRID_SHOW_USERNAME' as CLASSIFICATION_GRID_SHOW_USERNAME %}
-        <div id="sample-classification-search-page">
-            <h2>{{ heading }}</h2>
-
+        <div class="container">
+            <h3>Classifications</h3>
             <div>
-                {{ methods }}
+                {% crispy clinical_significance_form  %}
             </div>
-
-            {% page_help page_id='analysis/reanalysis_warning' title='Note on re-analysis of reported data' %}
-
-            {% block filters_above_classification %}{% endblock %}
-
-            <div class="container">
-                <h3>Classifications</h3>
-                <div>
-                    {% crispy clinical_significance_form  %}
+            <div class="row filter-row">
+                <div class="col-md-4 col-lg-2">
+                    <br/>
+                    {% crispy gene_form form_helper.horizontal_no_labels %}
                 </div>
-                <div class="row filter-row">
-                    <div class="col-md-4 col-lg-2">
-                        <br/>
-                        {% crispy gene_form form_helper.horizontal_no_labels %}
-                    </div>
-                    <div class="col-md-4 col-lg-2">
-                        {% if user_settings.default_lab %}
-                        <a class="hover-link" onclick="filterDefaultLab()" title="{{ user_settings.default_lab.name }}">Filter : My Lab</a>
-                        {% else %}<span style="visibility: hidden">.</span>{% endif %}
-                        {% crispy lab_form form_helper.horizontal_no_labels %}
-                    </div>
-                    {% if CLASSIFICATION_GRID_SHOW_USERNAME %}
-                    <div class="col-md-4 col-lg-2">
-                        <a class="hover-link" onclick="filterDefaultUser()">Filter : My Records</a>
-                        {% crispy user_form form_helper.horizontal_no_labels %}
-                    </div>
-                    {% endif %}
+                <div class="col-md-4 col-lg-2">
+                    {% if user_settings.default_lab %}
+                    <a class="hover-link" onclick="filterDefaultLab()" title="{{ user_settings.default_lab.name }}">Filter : My Lab</a>
+                    {% else %}<span style="visibility: hidden">.</span>{% endif %}
+                    {% crispy lab_form form_helper.horizontal_no_labels %}
+                </div>
+                {% settings_value 'CLASSIFICATION_GRID_SHOW_USERNAME' as CLASSIFICATION_GRID_SHOW_USERNAME %}
+                {% if CLASSIFICATION_GRID_SHOW_USERNAME %}
+                <div class="col-md-4 col-lg-2">
+                    <a class="hover-link" onclick="filterDefaultUser()">Filter : My Records</a>
+                    {% crispy user_form form_helper.horizontal_no_labels %}
+                </div>
+                {% endif %}
 
-                    <div style="width: 160px" class="mx-3">
-                        Allele Origin<br/>
-                        {% allele_origin_toggle show_label=False %}
-                    </div>
-                    {% block filters_extra %}
-                    {% endblock %}
-            </div>
-            <div>
-                {% crispy classification_phenotype_form %}
-            </div>
-
-            <table id="vc-datatable" data-datatable-data='classificationFilter' data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table"></table>
-
-            {% block filters_below_classification %}{% endblock %}
+                <div style="width: 160px" class="mx-3">
+                    Allele Origin<br/>
+                    {% allele_origin_toggle show_label=False %}
+                </div>
+                {% block filters_extra %}
+                {% endblock %}
         </div>
-        <button type="submit" class="btn btn-primary" id='search-samples'><i class="fas fa-search"></i> {{ button_text }}</button>
-    </form>
-</div>
+        <div>
+            {% crispy classification_phenotype_form %}
+        </div>
+
+        <table id="vc-datatable" data-datatable-data='classificationFilter' data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table"></table>
+
+        {% block filters_below_classification %}{% endblock %}
 {% endblock %}

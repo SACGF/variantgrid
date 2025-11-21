@@ -27,14 +27,14 @@ class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
                 # Get all the samples - and the highest annotation version that they were analysed with
                 # What we are looking for are samples where the LAST analysis is too old
                 sample_analyses = defaultdict(set)
-                nodes_qs = AnalysisNode.filter(analyses__in=analyses_qs, analysisnode_parent__isnull=True)
+                nodes_qs = AnalysisNode.objects.filter(analysis__in=analyses_qs, analysisnode_parent__isnull=True)
                 for node in nodes_qs.select_related("analysis", "analysis__annotation_version").select_subclasses():
                     for sample in node.get_samples_from_node_only_not_ancestors():
                         sample_analyses[sample].add(node.analysis)
 
                 # Double check to make sure we can see these samples not just analyses
                 samples_qs = Sample.filter_for_user(candidate_search_run.user)
-                samples_qs = samples_qs.filter(pk__in=sample_analyses)
+                samples_qs = samples_qs.filter(pk__in=(s.pk for s in sample_analyses))
 
                 # It might be worth sorting them into analysis versions??
                 samples_and_analyses_by_annotation_version = defaultdict(list)
@@ -46,8 +46,9 @@ class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
                         samples_and_analyses_by_annotation_version[analysis.annotation_version].append((sample, analysis))
 
                 for annotation_version in sorted(samples_and_analyses_by_annotation_version):
-                    if annotation_version.clinvar_version >= av_latest.clinvar_version:
+                    if annotation_version.clinvar_version.pk >= av_latest.clinvar_version.pk:
                         logging.info("Skipped %s as uses same clinvar version", annotation_version)
+                        continue
 
                     qs_latest = get_variant_queryset_for_annotation_version(av_latest)
                     cv_patho_qs_latest = qs_latest.filter(clinvar__highest_pathogenicity=5)
@@ -68,17 +69,16 @@ class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
                         sample_qs = sample.get_variant_qs()
                         for variant in sample_qs.filter(pk__in=new_patho_variants):
                             # TODO: could clinvar for this version be more efficiently done by annotating the QS?
-                            clinvar = variant.clinvar_set.filter(version=av_latest.clinvar_version).first()
-                            notes = "TODO"
-                            evidence = {
-                            }
+                            evidence = {}
+                            if clinvar := variant.clinvar_set.filter(version=av_latest.clinvar_version).first():
+                                evidence["clinvar"] = f"New ClinVar in version {av_latest.clinvar_version}: {clinvar.short_summary()}"
                             records.append(Candidate(
                                 search_run=candidate_search_run,
                                 analysis=analysis,
                                 sample=sample,
                                 variant=variant,
-                                clinvar=clinvar,
-                                notes=notes,
+                                annotation_version=av_latest,
+                                # notes=notes,
                                 evidence=evidence,
                             ))
 

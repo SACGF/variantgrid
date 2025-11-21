@@ -2,11 +2,10 @@ from crispy_forms.layout import Layout, Field
 
 from django.conf import settings
 from django.http.response import HttpResponse
-from django.shortcuts import render, get_object_or_404, redirect
-from django.views import View
+from django.shortcuts import render, get_object_or_404
 
 from analysis.models import CandidateSearchRun, CandidateSearchType
-from analysis.views.views_candidate_search import AbstractCandidateSearchView
+from analysis.views.views_candidate_search import AbstractCandidateSearchView, AbstractNewCandidateSearchView
 from classification.forms import ClassificationAlleleOriginForm, CrossSampleClassificationForm, \
     ClinicalSignificanceForm, ClassificationEvidenceUpdateForm
 from genes.forms import GeneSymbolForm
@@ -34,31 +33,8 @@ class ReanalyisCandidateSearchView(AbstractCandidateSearchView):
 
 
 
-class AbstractNewClassificationCandidateSearchView(View):
+class AbstractNewClassificationCandidateSearchView(AbstractNewCandidateSearchView):
     template_name = "classification/candidate_search/abstract_new_classification_candidate_search_view.html"
-
-    def get(self, request):
-        return render(request, self.template_name, self.get_context_data())
-
-    def post(self, request):
-        post_ignore_contains = [
-            "csrfmiddlewaretoken",
-            "datatable_length",
-        ]
-        config_snapshot = {}
-        for k, v in request.POST.items():
-            ignore = False
-            for ignore_str in post_ignore_contains:
-                if ignore := ignore_str in k:
-                    break
-            if not ignore:
-                config_snapshot[k] = v
-
-        csr = CandidateSearchRun.create_and_launch_job(request.user,
-                                                       self._get_candidate_search_type(),
-                                                       config_snapshot)
-        # Launch a job
-        return redirect(csr)
 
     def _get_layout(self):
         layout_fields = []
@@ -66,8 +42,8 @@ class AbstractNewClassificationCandidateSearchView(View):
             layout_fields.append(Field(field_name, wrapper_class=field_name))
         return Layout(*layout_fields)
 
-
     def get_context_data(self):
+        context = super().get_context_data()
         # is cached on the request
         user_settings = UserSettingsManager.get_user_settings()
 
@@ -85,12 +61,7 @@ class AbstractNewClassificationCandidateSearchView(View):
             "pathogenic": True,
         })
 
-        cs_type = CandidateSearchType(self._get_candidate_search_type())
-
-        return {
-            "heading": f"New {cs_type.label} candidate search",
-            "button_text": f"Search for {cs_type.label} candidates",
-            "methods": cs_type.get_methods(),
+        context.update({
             "gene_form": GeneSymbolForm(prefix="classification"),
             "user_form": UserSelectForm(),
             "lab_form": lab_form,
@@ -99,11 +70,8 @@ class AbstractNewClassificationCandidateSearchView(View):
             "clinical_significance_form": cs_form,
             "classification_phenotype_form": classification_phenotype_form,
             "user_settings": user_settings,
-        }
-
-
-    def _get_candidate_search_type(self) -> CandidateSearchType:
-        raise NotImplementedError()
+        })
+        return context
 
 
 class NewCrossSampleClassificationCandidateSearchView(AbstractNewClassificationCandidateSearchView):
