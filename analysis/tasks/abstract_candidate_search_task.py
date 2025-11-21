@@ -1,6 +1,7 @@
 from celery import Task
 
 from analysis.models import CandidateSearchRun, Candidate
+from library.log_utils import get_traceback, log_traceback
 from snpdb.models import ProcessingStatus
 
 
@@ -20,7 +21,8 @@ class AbstractCandidateSearchTask(Task):
                 Candidate.objects.bulk_create(records, batch_size=1000)
             candidate_search_run.status = ProcessingStatus.SUCCESS
         except Exception as e:
-            candidate_search_run.error_exception = str(e)
+            log_traceback()
+            candidate_search_run.error_exception = get_traceback()
             candidate_search_run.status = ProcessingStatus.ERROR
 
         candidate_search_run.save()

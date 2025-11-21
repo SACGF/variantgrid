@@ -6,11 +6,12 @@ from crispy_forms.bootstrap import FieldWithButtons, StrictButton
 from crispy_forms.layout import Layout, Field
 from dal import forward
 from django import forms
+from django.core.exceptions import ValidationError
 from django.forms.widgets import TextInput
 
 from analysis.models import Analysis, NodeGraphType, FilterNodeItem, AnalysisTemplate, AnalysisTemplateVersion, \
     AnalysisNode
-from analysis.models.enums import SNPMatrix, AnalysisTemplateType, TrioSample
+from analysis.models.enums import SNPMatrix, AnalysisTemplateType, TrioSample, AnalysisType
 from analysis.models.models_karyomapping import KaryomappingGene
 from analysis.models.nodes.node_types import get_nodes_by_classification
 from annotation.models.models import AnnotationVersion
@@ -368,3 +369,24 @@ class VCFLocusFilterForm(forms.Form):
 
         for filter_id, initial in sorted(vcf_filters.items(), key=lambda s: s[0].lower()):
             self.fields[filter_id] = forms.BooleanField(required=False, initial=initial)
+
+
+class AnalysisFilterForm(forms.Form):
+    analysis_type = forms.ChoiceField(choices=[('', '---')] + AnalysisType.choices, required=False)
+    my_user = forms.BooleanField(required=False)
+    date_min = forms.DateField(required=False, widget=forms.DateInput(attrs={'type': 'date'}))
+    date_max = forms.DateField(required=False, widget=forms.DateInput(attrs={'type': 'date'}))
+
+    def clean(self):
+        cleaned = super().clean()
+        dmin = cleaned.get('date_min')
+        dmax = cleaned.get('date_max')
+
+        if dmin and dmax and dmin > dmax:
+            raise ValidationError('date_min must be <= date_max')
+
+
+
+class ReanalysisCandidateSearchForm(forms.Form):
+    max_analyses = forms.IntegerField(required=False, initial=10, min_value=1)
+    max_results = forms.IntegerField(required=False, initial=20, min_value=1)

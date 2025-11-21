@@ -4,9 +4,9 @@ from django.conf import settings
 from django.http.response import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views import View
-from django.views.generic import TemplateView
 
 from analysis.models import CandidateSearchRun, CandidateSearchType
+from analysis.views.views_candidate_search import AbstractCandidateSearchView
 from classification.forms import ClassificationAlleleOriginForm, CrossSampleClassificationForm, \
     ClinicalSignificanceForm, ClassificationEvidenceUpdateForm
 from genes.forms import GeneSymbolForm
@@ -27,9 +27,11 @@ def view_classification_candidate_search(request, pk) -> HttpResponse:
 
 
 
-def classification_candidate_search(request) -> HttpResponse:
-    context = {}
-    return render(request, 'classification/candidate_search/classification_candidate_search.html', context)
+class ReanalyisCandidateSearchView(AbstractCandidateSearchView):
+    template_name = 'classification/candidate_search/classification_candidate_search.html'
+    def _get_search_types(self) -> list[CandidateSearchType]:
+        return [CandidateSearchType.CROSS_SAMPLE_CLASSIFICATION, CandidateSearchType.CLASSIFICATION_EVIDENCE_UPDATE]
+
 
 
 class AbstractNewClassificationCandidateSearchView(View):
@@ -88,6 +90,7 @@ class AbstractNewClassificationCandidateSearchView(View):
         return {
             "heading": f"New {cs_type.label} candidate search",
             "button_text": f"Search for {cs_type.label} candidates",
+            "methods": cs_type.get_methods(),
             "gene_form": GeneSymbolForm(prefix="classification"),
             "user_form": UserSelectForm(),
             "lab_form": lab_form,

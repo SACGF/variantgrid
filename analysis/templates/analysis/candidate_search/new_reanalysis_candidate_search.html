@@ -1,5 +1,6 @@
 {% extends "uicore/page/base.html" %}
 {% load static %}
+{% load ui_help %}
 {% load ui_menu_bars %}
 {% load ui_utils %}
 {% load crispy_forms_field %}
@@ -8,19 +9,55 @@
 {% block submenu %}{% menu_bar_analysis %}{% endblock %}
 {% block title %}VariantGrid: Reanalysis{% endblock title %}
 {% block head %}
-    {{ block.super }}
+{{ block.super }}
+<script>
+    function filterAnalysesGrid() {
+        $('#analyses-datatable').DataTable().ajax.reload();
+    }
+
+
+    function analysesFilter(data, type) {
+
+    }
+</script>
 {% endblock head %}
-
 {% block content %}
-    <div class="container">
-        {% load ui_help %}
 
-        <div>
-            View the filters
-        </div>
-
+    <div>
+        <a href="{% url 'reanalysis_candidate_search' %}">Back to Reanalysis Candidate Search</a>
     </div>
 
-{% endblock content %}
+    <form method="post">
+        {% csrf_token %}
+        <div id="sample-classification-search-page">
+            <h2>{{ heading }}</h2>
 
+            <div>
+                {{ methods }}
+            </div>
+
+            {% page_help page_id='analysis/reanalysis_warning' title='Note on re-analysis of reported data' %}
+
+            {% block filters_above_classification %}{% endblock %}
+
+            <div class="container">
+                <h3>Analyses</h3>
+                <div>
+                    {% crispy analyses_filter_form  %}
+                </div>
+            </div>
+
+            <table id="analyses-datatable" data-datatable-data='analysesFilter' data-datatable-url="{% url 'analyses_datatables' %}" class="sticky-header classification-table"></table>
+
+            <div class="container">
+                <h3>Search</h3>
+                <div>
+                    {% crispy reanalysis_candidate_search_form %}
+                </div>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary" id='search-samples'><i class="fas fa-search"></i> {{ button_text }}</button>
+    </form>
+</div>
+{% endblock %}
 

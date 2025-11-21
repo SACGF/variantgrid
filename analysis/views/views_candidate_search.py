@@ -6,8 +6,10 @@ from django.http.response import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.views.decorators.http import require_POST
+from django.views.generic.base import TemplateView
 
-from analysis.models import CandidateSearchRun, Candidate, CandidateStatus
+from analysis.forms import ReanalysisCandidateSearchForm, AnalysisFilterForm
+from analysis.models import CandidateSearchRun, Candidate, CandidateStatus, CandidateSearchType
 from classification.views.views import CreateClassificationForVariantView, create_classification_object
 from snpdb.forms import SampleChoiceForm
 from snpdb.models import GenomeBuild
@@ -23,21 +25,38 @@ def view_candidate_search_run(request, pk) -> HttpResponse:
     return render(request, 'analysis/candidate_search/view_candidate_search_run.html', context)
 
 
-def reanalyis(request):
-    # Another name for this would be analysis candidate search
-    context = {}
-    return render(request, 'analysis/candidate_search/reanalysis.html', context)
+class AbstractCandidateSearchView(TemplateView):
+    def _get_search_types(self) -> list[CandidateSearchType]:
+        raise NotImplementedError()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["search_types"] = self._get_search_types()
+        return context
+
+
+class ReanalyisCandidateSearchView(AbstractCandidateSearchView):
+    template_name = "analysis/candidate_search/reanalysis_candidate_search.html"
+    def _get_search_types(self) -> list[CandidateSearchType]:
+        return [CandidateSearchType.REANALYSIS_NEW_ANNOTATION]
 
 
 def new_reanalyis_candidate_search(request):
+    search_type = CandidateSearchType.REANALYSIS_NEW_ANNOTATION
     context = {
+        "heading": f"Search for new {search_type.label}",
+        "methods": search_type.get_methods(),
+        "button_text": "Search for reanalysis candidates",
+        "analyses_filter_form": AnalysisFilterForm(),
+        "reanalysis_candidate_search_form": ReanalysisCandidateSearchForm(),
     }
     return render(request, 'analysis/candidate_search/new_reanalysis_candidate_search.html', context)
 
 
-
-
 class CreateClassificationForCandidateView(CreateClassificationForVariantView):
+    """ This is a wrapper around Classification """
+    # I am not sure whether this belongs in Anaylsis or just Classification - will see if we ever want to classify
+    # something in analysis candidate results
     template_name = "analysis/candidate_search/create_classification_for_candidate.html"
 
     def _get_variant(self):

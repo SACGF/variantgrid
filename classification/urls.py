@@ -123,7 +123,7 @@ urlpatterns = [
     path('evidence_keys', views.evidence_keys, name='evidence_keys'),
 
     # Classification Candidate Searching
-    path('classification_candidate_search', classification_candidate_search_view.classification_candidate_search,
+    path('classification_candidate_search', classification_candidate_search_view.ReanalyisCandidateSearchView.as_view(),
          name='classification_candidate_search'),
     path('classification_candidate_search/cross_sample/new',
          classification_candidate_search_view.NewCrossSampleClassificationCandidateSearchView.as_view(),

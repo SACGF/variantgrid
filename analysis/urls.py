@@ -1,7 +1,7 @@
 from analysis.grids import AnalysesGrid, NodeColumnSummaryGrid, KaromappingAnalysesGrid, AnalysisTemplatesGrid, \
     AnalysisNodeIssuesGrid, NodeOntologyGenesGrid, NodeGeneDiseaseClassificationGenesGrid, \
     NodeTissueExpressionGenesGrid, NodeTissueUniProtTissueSpecificityGenesGrid, NodeGeneListGenesColumns, \
-    AnalysisLogEntryColumns, CandidateSearchRunColumns, CandidateColumns
+    AnalysisLogEntryColumns, CandidateSearchRunColumns, CandidateColumns, AnalysesColumns
 from analysis.views import views, views_json, views_grid, views_karyomapping, views_autocomplete, views_candidate_search
 from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
@@ -9,6 +9,10 @@ from variantgrid.perm_path import path
 
 urlpatterns = [
     path('analyses/list/', views.analysis_list, name='analyses'),
+    path('analyses/datatable',
+         DatabaseTableView.as_view(column_class=AnalysesColumns),
+         name='analyses_datatables'),
+
     path('analysis_templates/', views.analysis_templates, name='analysis_templates'),
     path('<int:analysis_id>/', views.view_analysis, name='analysis'),
     path('<int:analysis_id>/<int:active_node_id>/', views.view_analysis, name='analysis_node'),
@@ -146,7 +150,7 @@ urlpatterns = [
     # Candidates / Reanalysis
     path('candidate_search/<int:pk>', views_candidate_search.view_candidate_search_run, name='view_candidate_search_run'),
     path('candidate_search/reanalysis/new', views_candidate_search.new_reanalyis_candidate_search, name='new_reanalysis_candidate_search'),
-    path('candidate_search/reanalysis', views_candidate_search.reanalyis, name='reanalysis'),
+    path('candidate_search/reanalysis', views_candidate_search.ReanalyisCandidateSearchView.as_view(), name='reanalysis_candidate_search'),
     path('candidate_search/candidate/classify/<int:candidate_id>/create/',
          views_candidate_search.create_classification_for_candidate, name='create_classification_for_candidate'),
     path('candidate_search/candidate/classify/<int:candidate_id>',

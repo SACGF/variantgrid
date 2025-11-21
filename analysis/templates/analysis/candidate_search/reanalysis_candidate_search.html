@@ -1,0 +1,20 @@
+{% extends "analysis/candidate_search/abstract_candidate_search.html" %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% block submenu %}{% menu_bar_analysis %}{% endblock %}
+{% block title %}VariantGrid: Reanalysis{% endblock title %}
+{% block top_content %}
+    {% page_help page_id='analysis/reanalysis_help' title='Reanalysis' %}
+
+    <div>
+        <ul>
+            <li>
+                <a href="{% url 'new_reanalysis_candidate_search'  %}">New Cross Reanalysis Annotation Update Candidate Search</a>
+            </li>
+        </ul>
+    </div>
+
+
+{% endblock top_content %}
+
+

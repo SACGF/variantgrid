@@ -1,34 +1,10 @@
-{% extends "uicore/page/base.html" %}
-{% load crispy_forms_tags %}
-{% load static %}
-{% load js_tags %}
-{% load compress %}
-{% load ui_utils %}
-{% load ui_help %}
-{% load ui_menu_bars %}
-{% load settings_tags %}
-{% load classification_tags %}
+{% extends "analysis/candidate_search/abstract_candidate_search.html" %}
 {% block title %}Classification Candidate Search{% endblock %}
+{% load ui_menu_bars %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
-{% block head %}
-<script>
-    function filterCandidateSearchRunGrid() {
-        // TODO: This is for when we want to trigger reload after changing filters
-        $('#candidate-search-run-datatable').DataTable().ajax.reload();
-    }
-
-
-    function candidateSearchRunFilter(data, type) {
-        // TODO: This is where we should filter to ONLY certain types - ie classification ones
-    }
-</script>
-{% endblock %}
-{% block content %}
-<div class="container">
-
+{% block top_content %}
     {% load ui_help %}
     {% page_help page_id='classification/classification_candidate_search_help' title='Classification Candidate Search Help' %}
-
 
     <div>
         <ul>
@@ -41,11 +17,4 @@
         </ul>
 
     </div>
-
-    <div>
-        Grid of previous runs, summary and links etc
-        <table id="candidate-search-run-datatable" data-datatable-data='candidateSearchRunFilter' data-datatable-url="{% url 'candidate_search_runs_datatable' %}" class="sticky-header samples-table" data-adjust-columns="false"></table>
-    </div>
-
-</div>
-{% endblock %}
+{% endblock top_content %}

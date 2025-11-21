@@ -15,7 +15,7 @@ from django.urls.base import reverse
 from django.utils.functional import SimpleLazyObject
 
 from analysis.models import Analysis, AnalysisNode, NodeCount, NodeStatus, AnalysisTemplate, GroupOperation, \
-    CandidateSearchRun, CandidateSearchType, Candidate, CandidateStatus
+    CandidateSearchRun, CandidateSearchType, Candidate, CandidateStatus, AnalysisType
 from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.models.nodes.analysis_node import get_extra_filters_q, NodeColumnSummaryCacheCollection
 from analysis.views.analysis_permissions import get_node_subclass_or_404
@@ -742,6 +742,8 @@ class CandidateSearchRunColumns(DatatableConfig[LogEntry]):
 
     def get_initial_queryset(self) -> QuerySet[CandidateSearchRun]:
         qs = CandidateSearchRun.filter_for_user(self.user)
+        if search_types := self.get_query_param("search_types"):
+            qs = qs.filter(search_version__search_type__in=search_types)
         return qs
 
     @staticmethod
@@ -833,3 +835,31 @@ class CandidateColumns(DatatableConfig[LogEntry]):
                 data["text"] = "Classify sample"
 
         return data
+
+
+class AnalysesColumns(DatatableConfig[LogEntry]):
+    """ For listing Analyses """
+    def __init__(self, request):
+        super().__init__(request)
+        self.user = request.user
+
+        self.rich_columns = [
+            RichColumn('id',
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="name", orderable=True),
+            RichColumn(key="user__username", label='User', orderable=True),
+            RichColumn(key="analysis_type", label="Type", orderable=True, renderer=self.render_analysis_type),
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[Analysis]:
+        qs = Analysis.filter_for_user(self.user)
+        qs = qs.filter(visible=True, template_type__isnull=True)  # Hide templates
+        return qs
+
+    @staticmethod
+    def render_analysis_type(row: dict[str, Any]):
+        if analysis_type := row["analysis_type"]:
+            analysis_type = AnalysisType(row["analysis_type"]).label
+        return analysis_type
+

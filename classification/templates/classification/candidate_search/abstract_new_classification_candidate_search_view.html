@@ -8,7 +8,7 @@
 {% load ui_menu_bars %}
 {% load settings_tags %}
 {% load classification_tags %}
-{% block title %}Sample Classification Search{% endblock %}
+{% block title %}Classification Candidate Search{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
 <style>
@@ -119,8 +119,6 @@
         column.visible(!germline_only);
     }
 
-
-
     $(document).ready(() => {
         let classificationSelects = ["#id_classification-gene_symbol", "#id_lab", "#id_user",
                                      "#id_allele_origin", "#id_internal_requires_sample"];
@@ -147,15 +145,11 @@
         <div id="sample-classification-search-page">
             <h2>{{ heading }}</h2>
 
-            {% page_help_embedded title='Note on re-analysis of repoted data' %}
-                <p>
-                    Please be aware that re-analysis of existing sequencing data may reveal previously unreported
-                    pathogenic or likely pathogenic variants. Such findings may obligate you to perform a review, issue
-                    an amended report, and notify the referring clinician in accordance with laboratory policy and
-                    regulatory requirements. It is recommended that you perform these queries with limits on the
-                    number of results returned.
-                </p>
-            {% end_page_help_embedded %}
+            <div>
+                {{ methods }}
+            </div>
+
+            {% page_help page_id='analysis/reanalysis_warning' title='Note on re-analysis of reported data' %}
 
             {% block filters_above_classification %}{% endblock %}
 

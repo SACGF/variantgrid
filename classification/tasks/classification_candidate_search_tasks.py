@@ -8,7 +8,6 @@ from django.db.models import Q, QuerySet
 
 from analysis.models import Candidate
 from analysis.tasks.abstract_candidate_search_task import AbstractCandidateSearchTask
-from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models import AnnotationVersion, VariantAnnotation, ClinVar, ClinVarReviewStatus
 from classification.enums import AlleleOriginBucket, ClinicalSignificance
 from classification.models import Classification, ClassificationModification, EvidenceKey
@@ -28,22 +27,22 @@ class ClassificationCandidateSearchMixin:
             if config.get(cs):
                 cs_data[cs] = True
 
-        classification_filters = []
+        cm_filters = []
         if q := ClassificationColumns.get_clinical_significance_q(cs_data):
-            classification_filters.append(q)
+            cm_filters.append(q)
 
         if allele_origin := config.get("allele_origin"):
             if allele_origin != "A":
-                classification_filters.append(Q(classification__allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
+                cm_filters.append(Q(classification__allele_origin_bucket__in=[allele_origin, AlleleOriginBucket.UNKNOWN]))
 
         if gene_symbol_str := config.get("gene_symbol"):
             if q := classification_gene_symbol_filter(gene_symbol_str):
-                classification_filters.append(q)
+                cm_filters.append(q)
 
         # request.GET.get("classification_id_filter")
         if lab_id := config.get("lab"):
             lab_list = lab_id.split(",")
-            classification_filters.append(Q(lab__pk__in=lab_list))
+            cm_filters.append(Q(lab__pk__in=lab_list))
 
         if ontology_terms := config.get("ontology_term_id"):
             terms = []
@@ -51,21 +50,21 @@ class ClassificationCandidateSearchMixin:
                 terms.append(Q(classification__condition_resolution__resolved_terms__contains=[{"term_id": term_id}]))
             if terms:
                 q = reduce(operator.or_, terms)
-                classification_filters.append(q)
+                cm_filters.append(q)
 
         if config.get("internal_requires_sample"):
-            classification_filters.append(Q(classification__lab__external=True) | Q(classification__sample__isnull=False))
+            cm_filters.append(Q(classification__lab__external=True) | Q(classification__sample__isnull=False))
 
         # TODO
         config.get("user")
 
         # Classifications must be local (not external) and matched to a variant
-        classification_qs = ClassificationModification.latest_for_user(
+        cm_qs = ClassificationModification.latest_for_user(
             user=user,
             published=True).filter(classification__lab__external=False, classification__variant__isnull=False)
-        if classification_filters:
-            classification_qs = classification_qs.filter(*classification_filters)
-        return classification_qs
+        if cm_filters:
+            cm_qs = cm_qs.filter(*cm_filters)
+        return cm_qs
 
 
 
@@ -117,10 +116,12 @@ class CrossSampleClassificationCandidateSearchTask(ClassificationCandidateSearch
         return sample_qs
 
     @staticmethod
-    def _sample_classification_overlaps(samples_qs, classification_qs, zygosities):
+    def _sample_classification_overlaps(samples_qs, cm_qs, zygosities):
         classifications_by_allele = defaultdict(set)
-        for cm in classification_qs:
+        for cm in cm_qs:
             classifications_by_allele[cm.classification.variant.allele].add(cm.classification)
+
+        classification_qs = Classification.objects.filter(classificationmodification__in=cm_qs)
 
         for genome_build in GenomeBuild.builds_with_annotation():
             variant_q = Classification.get_variant_q_from_classification_qs(classification_qs, genome_build)
@@ -243,7 +244,7 @@ class ClassificationEvidenceUpdateCandidateSearchTask(ClassificationCandidateSea
                 clinvar_qs = ClinVar.objects.filter(version=av.clinvar_version, variant__in=variant_ids)
                 if clinvar_min_stars is not None:
                     review_statuses = ClinVarReviewStatus.statuses_gte_stars(clinvar_min_stars)
-                    clinvar_qs = clinvar_qs.filter(clinvar__review_status__in=review_statuses)
+                    clinvar_qs = clinvar_qs.filter(review_status__in=review_statuses)
 
                 clinvar_by_variant_id = {cv.variant_id: cv for cv in clinvar_qs}
 
