@@ -9,7 +9,6 @@ from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied
 from django.db.models import Max, F, Q, QuerySet
 from django.db.models.functions import Substr
-from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 from django.utils.functional import SimpleLazyObject
@@ -37,7 +36,7 @@ from snpdb.grid_columns.grid_sample_columns import get_available_format_columns,
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, CohortGenotype, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.views.datatable_view import DatatableConfig, RichColumn
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 
 class VariantGrid(AbstractVariantGrid):
@@ -732,10 +731,10 @@ class CandidateSearchRunColumns(DatatableConfig[LogEntry]):
         self.rich_columns = [
             RichColumn('id',
                        renderer=self.view_primary_key,
-                       client_renderer='TableFormat.linkUrl'),
+                       client_renderer='TableFormat.linkUrl', default_sort=SortOrder.DESC),
             RichColumn(key="search_version__search_type", orderable=True, renderer=self.render_search_type),
             RichColumn(key="search_version__code_version", orderable=True),
-            RichColumn(key="created", label="Created", orderable=True),
+            RichColumn(key="created", label="Created", orderable=True, client_renderer='TableFormat.timestamp'),
             RichColumn(key="user__username", label="User", orderable=True),
             RichColumn(key="status", label="Status", orderable=True, renderer=self.render_status),
         ]
@@ -766,6 +765,8 @@ class CandidateColumns(DatatableConfig[LogEntry]):
         self.rich_columns = [
             RichColumn('id', visible=False),
             RichColumn(key="status", orderable=True, renderer=self.render_status),
+            RichColumn(key="variant", label="Variant", orderable=True,
+                       renderer=self.render_variant_link, client_renderer='TableFormat.linkUrl'),
             RichColumn(key="notes", orderable=True),
             RichColumn(key="evidence", label="Evidence", orderable=True, client_renderer='TableFormat.json'),
             RichColumn(key="reviewer__username", label="Reviewer", orderable=True),
@@ -782,7 +783,6 @@ class CandidateColumns(DatatableConfig[LogEntry]):
             # search type is used as an "Action" (as we don't need to see the type as they are all the same)
             RichColumn(key="search_run__search_version__search_type", label="Action", orderable=True,
                        renderer=self.render_search_type, client_renderer='candidate_action_renderer'),
-            RichColumn(key="variant", label="Variant", orderable=True),
             RichColumn(key="classification",
                        label="Classification",
                        orderable=True,
@@ -794,7 +794,8 @@ class CandidateColumns(DatatableConfig[LogEntry]):
                        renderer=self.render_classification_summary,
                        client_renderer="classification_summary_renderer"),
             RichColumn(key="sample__name", label="Sample", orderable=True, client_renderer='VCTable.sample'),
-            RichColumn(key="analysis", label="Analysis", orderable=True),
+            RichColumn(key="analysis", label="Analysis", orderable=True,
+                       renderer=self.render_analysis_link, client_renderer='TableFormat.linkUrl'),
             RichColumn(key="annotation_version", label="Annotation Version", orderable=True),
             RichColumn(key="zygosity", label="Zygosity", orderable=True, renderer=self.render_zygosity),
         ]
@@ -810,6 +811,28 @@ class CandidateColumns(DatatableConfig[LogEntry]):
     @staticmethod
     def render_status(row: dict[str, Any]):
         return CandidateStatus(row["status"]).label
+
+    @staticmethod
+    def render_variant_link(row: dict[str, Any]):
+        variant = row["variant"]
+        text = variant
+        if g_hgvs := row.get("classification__evidence__g_hgvs__value"):
+            text = g_hgvs
+
+        return {
+            "text": text,
+            "url": reverse('view_variant', kwargs={'variant_id': variant}),
+        }
+
+    @staticmethod
+    def render_analysis_link(row: dict[str, Any]):
+        data = {}
+        if analysis := row.get("analysis"):
+            data = {
+                "text": analysis,
+                "url": reverse('analysis', kwargs={'analysis_id': analysis}),
+            }
+        return data
 
     @staticmethod
     def render_zygosity(row: dict[str, Any]):

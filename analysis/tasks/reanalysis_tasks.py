@@ -1,6 +1,8 @@
 import logging
 from collections import defaultdict
 
+from django.utils.timesince import timesince
+
 from analysis.models import Analysis, Candidate, AnalysisNode
 from analysis.tasks.abstract_candidate_search_task import AbstractCandidateSearchTask
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
@@ -21,6 +23,8 @@ class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
                                              annotation_version__clinvar_version__isnull=False)
 
             av_latest = AnnotationVersion.latest(genome_build)
+            latest_clinvar_date = av_latest.clinvar_version.annotation_date
+
             analysis_older_clinvar = analyses_qs.filter(annotation_version__clinvar_version__lt=av_latest.clinvar_version_id)
             # No point looking unless old ones exist
             if analysis_older_clinvar.exists():
@@ -49,6 +53,7 @@ class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
                     if annotation_version.clinvar_version.pk >= av_latest.clinvar_version.pk:
                         logging.info("Skipped %s as uses same clinvar version", annotation_version)
                         continue
+                    analysis_clinvar_date = annotation_version.clinvar_version.annotation_date
 
                     qs_latest = get_variant_queryset_for_annotation_version(av_latest)
                     cv_patho_qs_latest = qs_latest.filter(clinvar__highest_pathogenicity=5)
@@ -71,7 +76,8 @@ class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
                             # TODO: could clinvar for this version be more efficiently done by annotating the QS?
                             evidence = {}
                             if clinvar := variant.clinvar_set.filter(version=av_latest.clinvar_version).first():
-                                evidence["clinvar"] = f"New ClinVar in version {av_latest.clinvar_version}: {clinvar.short_summary()}"
+                                ts = timesince(analysis_clinvar_date, latest_clinvar_date)
+                                evidence["clinvar"] = f"New ClinVar in version {latest_clinvar_date.date()} ({ts} since analysis): {clinvar.short_summary()}"
                             records.append(Candidate(
                                 search_run=candidate_search_run,
                                 analysis=analysis,

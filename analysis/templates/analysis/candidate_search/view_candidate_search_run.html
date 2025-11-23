@@ -95,6 +95,10 @@ function classification_summary_renderer(data, type, row) {
     return outterDom;
 }
 
+function candidateSearchRunDatatableFilter(data, type) {
+
+}
+
 $(document).ready(function() {
     {% if candidate_search_run.is_running %}
         // is running
@@ -114,9 +118,11 @@ $(document).ready(function() {
     {% endwith %}
 
     <div class="card">
-        <div class="card-header">{{ candidate_search_run }}</div>
+        <div class="card-header">
+            {{ candidate_search_run }}
+        </div>
         <div class="card-body">
-            {% labelled id='search_version' label='' hint="tiny" %}{{ candidate_search_run.search_version }}{% endlabelled %}
+            {% labelled id='Methods' label='' hint="tiny" %}{{ candidate_search_run.search_version.methods }}{% endlabelled %}
             {% labelled id='created' label='Created' hint="tiny" %}{{ candidate_search_run.created }}{% endlabelled %}
             {% labelled id='user' label='User' hint="tiny" %}{{ candidate_search_run.user }}{% endlabelled %}
             {% labelled id='status' label='Status' hint="tiny" %}
@@ -134,7 +140,7 @@ $(document).ready(function() {
 
     {% if candidate_search_run.status == 'S' %}
         <div>
-            <table id="candidate-datatable" data-datatable-url="{% url 'candidate_datatable' candidate_search_run.pk %}" class="sticky-header samples-table" data-adjust-columns="false"></table>
+            <table id="candidate-datatable" data-datatable-url="{% url 'candidate_datatable' candidate_search_run.pk %}" class="sticky-header samples-table" data-adjust-columns="false" data-datatable-data="candidateSearchRunDatatableFilter"></table>
         </div>
     {% endif %}
 
