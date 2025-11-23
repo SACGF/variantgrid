@@ -63,6 +63,20 @@
         {% endlabelled %}
         {% labelled label="Status" %}{{ conflict.latest.get_severity_display }}{% endlabelled %}
         {% labelled label="As of" %}{% timestamp conflict.current_severity_as_of %}{% endlabelled %}
+        <h4>Involved Labs</h4>
+        {% for lab in conflict.latest.involved_labs %}
+            {% labelled label=lab %}
+                {% if lab.contact_name %}
+                     <div><i class="fa-solid fa-user"></i>{{ lab.contact_name }}</div>
+                {% endif %}
+                {% if lab.contact_phone %}
+                    <div><i class="fa-solid fa-phone"></i><a href="tel:{{ lab.contact_phone }}">{{ lab.contact_phone }}</a></div>
+                {% endif %}
+                {% if lab.contact_email %}
+                    <div><i class="fa-solid fa-envelope"></i><a href="mail:{{ lab.contact_email }}">{{ lab.contact_email }}</a></div>
+                {% endif %}
+            {% endlabelled %}
+        {% endfor %}
     </div>
 
     <div class="container mt-4">

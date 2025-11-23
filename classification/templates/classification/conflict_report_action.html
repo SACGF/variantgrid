@@ -1,0 +1,51 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load classification_tags %}
+{% load ui_tabs_builder %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% block title %}Conflict Report{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block content %}
+    <div class="container">
+        <h4>Post Review</h4>
+        {% preview conflict %}
+
+        <h4>Outcome</h4>
+        <p class="mt-4 text-help">
+            From the joint review, mark which labs (if any) have agreed to re-submit changes.
+        </p>
+        <form method="post">
+            {% csrf_token %}
+            <table class="table">
+                <thead>
+                    <th>Lab</th>
+                    <th>Current Value</th>
+                    <th class="text-center">Confident</th>
+                    <th class="text-center">Will Amend</th>
+                </thead>
+                <tbody>
+                {% for data_row in conflict.latest.data_rows %}
+                    <tr>
+                        <td>{{ data_row.lab }}</td>
+                        <td>{{ data_row.value_label }}</td>
+                        <td><input type="radio" name="lab_{{ data_row.lab.pk }}_res" value="C" class="form-check-input, w-100" checked="checked"/></td>
+                        <td><input type="radio" name="lab_{{ data_row.lab.pk }}_res" value="A" class="form-check-input, w-100"/></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+
+            {% labelled label="Comment" hint="chunky" %}
+                <textarea class="form-control" name="comment"></textarea>
+            {% endlabelled %}
+
+            <div class="buttons-bar">
+                <button type="submit" class="btn btn-primary">Submit</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

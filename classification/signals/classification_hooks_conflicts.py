@@ -8,13 +8,6 @@ from classification.services.conflict_services import conflict_lab_for_grouping
 from library.guardian_utils import admin_bot
 
 
-# @receiver(post_save, sender=ConflictLab)
-# def conflict_lab_save_update_grouping(sender, instance: ConflictLab, **kwargs):
-#     # Updates a ConflictGroup's will_amend values
-#     # so we can quickly render a warning
-#     apply_conflict_lab_to_grouping(instance)
-
-
 @receiver(classification_grouping_clin_sig_signal, sender=ClassificationGrouping)
 def clin_sig_changed(sender, instance: ClassificationGrouping, **kwargs):
     value_changed(instance, ConflictType.CLIN_SIG)
@@ -26,6 +19,8 @@ def onc_path_changed(sender, instance: ClassificationGrouping, **kwargs):
 
 
 def value_changed(instance: ClassificationGrouping, conflict_type: ConflictType):
+    # when a classification grouping latest record is changed, update the corresponding conflicts
+    # just here for update Will Amend to Pending after a value is changed
     if conflict_lab := conflict_lab_for_grouping(instance, conflict_type):
         if conflict_lab.status == DiscordanceReportTriageStatus.REVIEWED_WILL_FIX:
             conflict_lab.status = DiscordanceReportTriageStatus.PENDING

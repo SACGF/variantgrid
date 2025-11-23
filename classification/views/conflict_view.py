@@ -16,6 +16,7 @@ from classification.services.conflict_services import ConflictDataRow, group_con
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from library.django_utils import get_url_from_view_path
 from library.utils import IterableStitcher
+from review.models import Review
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
 from snpdb.utils import LabNotificationBuilder
@@ -333,3 +334,21 @@ def conflict_review_new(request: HttpRequest, conflict_id: int) -> HttpResponse:
         discussed_object = data.report.reviews_safe
         return redirect(reverse('start_review',
                                 kwargs={"reviewed_object_id": discussed_object.pk, "topic_id": "discordance_report"}))
+
+
+def conflict_review_complete(request: HttpRequest, review_id: int) -> HttpResponse:
+    review = Review.objects.get(pk=review_id)
+    conflict = review.reviewing.source_object
+
+    match request.method:
+        case "POST":
+            # TODO perform updates
+            return redirect(reverse('conflict', kwargs={"conflict_id": conflict.pk}))
+
+        case "GET":
+            # FIXME do a check to see if the user belongs to this conflict and if this conflict can have a review
+
+            return render(request, 'classification/conflict_report_action.html', {
+                "conflict": conflict,
+                "review": review
+            })

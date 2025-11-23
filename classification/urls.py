@@ -26,7 +26,7 @@ from classification.views.condition_matching_view import condition_matching_view
     ConditionTextColumns, ConditionTextMatchingAPI
 from classification.views.conflict_datatables import ConflictColumns
 from classification.views.conflict_view import conflicts_view, ConflictFeedView, overlaps_view, conflict_view, \
-    conflict_review_new
+    conflict_review_new, conflict_review_complete
 from classification.views.discordance_report_triage_view import DiscordanceReportTriageView
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report, \
     discordance_reports_view, discordance_reports_history_detail, discordance_reports_active_detail, \
@@ -120,8 +120,10 @@ urlpatterns = [
     path('conflicts/datatable', DatabaseTableView.as_view(column_class=ConflictColumns), name='conflicts_datatables'),
     path('conflicts/<int:conflict_id>/feed', ConflictFeedView.as_view(), name='conflict_feed'),
     path('conflicts/<int:conflict_id>/review/new', conflict_review_new, name='conflict_review_new'),
+    path('conflicts/review/<int:review_id>/complete', conflict_review_complete, name='conflict_review_complete'),
     path('conflicts/<int:conflict_id>/detail', conflict_view, name='conflict'),
     path('conflicts/lab/<str:lab_id>', conflicts_view, name='conflicts'),
+
 
     path('condition_matchings', condition_matchings_view, name='condition_matchings'),
     path('condition_matchings/<str:lab_id>', condition_matchings_view, name='condition_matchings_lab'),
@@ -141,6 +143,7 @@ urlpatterns = [
     path('classification/<classification_id>/history', views.classification_history, name='classification_history'),
     # classification ID might have a version in it (e.g. a dot)
     path('classification/<classification_id>', views.view_classification, name='view_classification'),
+
 
     path('evidence_keys/<max_share_level>', views.evidence_keys, name='evidence_keys_max_share_level'),
     path('evidence_keys', views.evidence_keys, name='evidence_keys'),

@@ -37,12 +37,29 @@
                                                   {% if conflict_lab.status == triage_option.value %}checked{% endif %}
                                           >
                                           <label
+                                                  {% if forloop.first %}style="opacity:0.8"{% endif %}
                                                   class="custom-control-label"
                                                   for="lab-{{ conflict_lab.lab.pk }}-{{ triage_option.value }}">
                                               {{ triage_option.label }}
                                           </label>
+
                                         </div>
+                                        {% if forloop.first %}<br/>{% endif %}
                                     {% endfor %}
+                                    {% comment %}
+                                    <div class="mt-2">
+                                        <label>Amend To</label>
+                                        <select class="form-control">
+                                            <option selected>To Be Determined</option>
+                                            <option>Benign</option>
+                                            <option>Likely Benign</option>
+                                            <option>VUS</option>
+                                            <option>Likely Pathogenic</option>
+                                            <option>Pathogenic</option>
+                                        </select>
+                                    </div>
+                                    {% endcomment %}
+
                                 {% else %}
                                     {{ conflict_lab.get_status_display }}
                                 {% endif %}

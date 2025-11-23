@@ -27,7 +27,7 @@ from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import strip_json
-from review.models import ReviewableModelMixin
+from review.models import ReviewableModelMixin, Review
 from snpdb.models import Allele, Lab
 import html
 from datetime import datetime, timedelta
@@ -862,6 +862,9 @@ class Conflict(ReviewableModelMixin, PreviewModelMixin, TimeStampedModel):
     def reviewing_labs(self) -> list[Lab]:
         return [cl.lab for cl in ConflictLab.objects.filter(conflict=self, active=True).select_related("lab")]
 
+    def post_review_url(self, review: Review) -> str:
+        return reverse('conflict_review_complete', kwargs={'review_id': review.pk})
+
     # def grouped_data(self) -> 'ConflictLabGrouped':
     #     lab_comments: dict[Lab, list[ConflictLabComment]] = defaultdict(list)
     #     for comment in self.conflictlab_set.select_related("lab").all():
@@ -899,9 +902,13 @@ class ConflictHistory(TimeStampedModel):
     def involved_lab_ids(self) -> set[int]:
         lab_ids: set[int] = set()
         for row in self.data_rows():
-            if row.exclude:
+            if not row.exclude:
                 lab_ids.add(row.lab_id)
         return lab_ids
+
+    @cached_property
+    def involved_labs(self) -> list[Lab]:
+        return list(sorted(Lab.objects.filter(pk__in=self.involved_lab_ids)))
 
     @property
     def date_detected_str(self) -> str:
